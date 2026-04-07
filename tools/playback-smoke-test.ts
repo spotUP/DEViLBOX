@@ -40,6 +40,12 @@ interface TestCase {
   expectedEditorMode?: string;
   /** Allow this test to be silent (some loop-based formats may not report level reliably) */
   allowSilent?: boolean;
+  /**
+   * True for engine-driven formats with no tracker pattern data (SID, etc.).
+   * Skips the noteCells check — these formats are 6502/68k code that runs
+   * directly on an emulated chip; there are no pattern rows to inspect.
+   */
+  engineDriven?: boolean;
 }
 
 const TESTS: TestCase[] = [
@@ -54,7 +60,9 @@ const TESTS: TestCase[] = [
   { name: 'TFMX - Turrican Aliens',           family: 'TFMX', loader: 'modland', path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens' },
   { name: 'JamCracker - bartmanintro',        family: 'JAM',  loader: 'modland', path: 'pub/modules/JamCracker/Ape/bartmanintro.jam' },
   // ── C64 SID ──
-  { name: 'Hubbard - Commando',               family: 'SID',  loader: 'hvsc',    path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid' },
+  // SID is engine-driven (6502 code on emulated CPU + SID chip) — no tracker
+  // pattern data, so skip the pattern check.
+  { name: 'Hubbard - Commando',               family: 'SID',  loader: 'hvsc',    path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', engineDriven: true },
 ];
 
 // ── WebSocket bridge client ────────────────────────────────────────────────
@@ -148,6 +156,23 @@ async function downloadFile(loader: 'modland' | 'hvsc', path: string): Promise<{
   }
 }
 
+interface SongInfoResp {
+  editorMode?: string;
+  numChannels?: number;
+  numPatterns?: number;
+  patternLength?: number;
+  bpm?: number;
+}
+interface PatternStatsResp {
+  patternIndex?: number;
+  totalCells?: number;
+  noteCells?: number;
+  effectCells?: number;
+  noteDensity?: number;
+  uniqueNotes?: number;
+  error?: string;
+}
+
 async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestResult> {
   const start = Date.now();
   try {
@@ -158,26 +183,75 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     if (test.loader === 'modland' || test.loader === 'hvsc') {
       const { filename, base64 } = await downloadFile(test.loader, test.path);
       await client.call('load_file', { filename, data: base64 });
-      await client.call('play', { mode: 'song' });
     } else if (test.loader === 'fur') {
       await client.call('play_fur', { path: test.path });
     }
 
-    // 3. Wait for audio output (best-effort)
+    // 3. Verify the song actually loaded with pattern data BEFORE play()
+    // This catches "loaded but no patterns" failures (the bartmanintro bug)
+    // that audio-level checks miss when the engine plays silence.
+    const songInfo = await client.call<SongInfoResp>('get_song_info');
+    if (!songInfo || (songInfo.numPatterns ?? 0) <= 0) {
+      await client.call('stop').catch(() => {});
+      return {
+        name: test.name, family: test.family, status: 'fail',
+        reason: `no patterns loaded (numPatterns=${songInfo?.numPatterns ?? 'undefined'})`,
+        durationMs: Date.now() - start,
+      };
+    }
+    if ((songInfo.numChannels ?? 0) <= 0) {
+      await client.call('stop').catch(() => {});
+      return {
+        name: test.name, family: test.family, status: 'fail',
+        reason: `no channels loaded (numChannels=${songInfo.numChannels ?? 'undefined'})`,
+        durationMs: Date.now() - start,
+      };
+    }
+
+    // Verify pattern 0 has actual notes — not just empty rows. The
+    // bartmanintro symptom: song loads with patterns and channels declared,
+    // but every cell is empty so playback is silent. Fail-fast on this.
+    // Skipped for engine-driven formats (SID, etc.) that have no pattern data.
+    if (!test.engineDriven) {
+      let noteCells = 0;
+      try {
+        const stats = await client.call<PatternStatsResp>('get_pattern_stats', { patternIndex: 0 });
+        noteCells = stats.noteCells ?? 0;
+      } catch {
+        // get_pattern_stats unavailable — fall through; audio level check is
+        // the last line of defence.
+      }
+      if (noteCells === 0) {
+        await client.call('stop').catch(() => {});
+        return {
+          name: test.name, family: test.family, status: 'fail',
+          reason: 'pattern 0 has no note cells (load decoded but pattern data is empty)',
+          durationMs: Date.now() - start,
+        };
+      }
+    }
+
+    // 4. Now play
+    if (test.loader === 'modland' || test.loader === 'hvsc') {
+      await client.call('play', { mode: 'song' });
+    }
+    // (fur loader already started playback inside play_fur)
+
+    // 5. Wait for audio output (best-effort)
     try {
       await client.call('wait_for_audio', { thresholdRms: SILENCE_THRESHOLD_RMS, timeoutMs: 5000 });
     } catch { /* fall through to level check */ }
 
-    // 4. Let it play
+    // 6. Let it play
     await sleep(PLAY_DURATION_MS);
 
-    // 5. Measure
+    // 7. Measure
     const level = await client.call<{ rmsAvg: number; rmsMax: number; isSilent: boolean }>(
       'get_audio_level',
       { durationMs: 1000 },
     );
 
-    // 6. Check console errors
+    // 8. Check console errors
     const errs = await client.call<{ entries: Array<{ level: string; message: string }> }>('get_console_errors');
     const critical = errs.entries.filter((e) =>
       e.level === 'error' &&
@@ -186,26 +260,27 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       !e.message.includes('AudioContext was not allowed'),
     );
 
-    // 7. Verify editorMode (if expected)
+    // 9. Verify editorMode (if expected)
     let editorModeOk = true;
-    if (test.expectedEditorMode) {
-      const songInfo = await client.call<{ editorMode: string }>('get_song_info');
+    if (test.expectedEditorMode && songInfo.editorMode) {
       editorModeOk = songInfo.editorMode === test.expectedEditorMode;
     }
 
-    // 8. Stop
+    // 10. Stop
     await client.call('stop');
 
     const durationMs = Date.now() - start;
 
-    // 9. Verdict
-    const isSilent = level.isSilent && !test.allowSilent;
-    if (isSilent) {
+    // 11. Verdict — STRICT: trust rmsAvg/rmsMax directly, don't rely on the
+    // tool's isSilent flag (which has historically been too lenient).
+    const audibleByOurThreshold = (level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS
+      || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4;
+    if (!audibleByOurThreshold && !test.allowSilent) {
       return {
         name: test.name, family: test.family, status: 'fail',
         rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
         errorCount: critical.length,
-        reason: 'silent (rmsAvg < threshold)',
+        reason: `silent (rmsAvg=${level.rmsAvg.toFixed(6)}, rmsMax=${level.rmsMax.toFixed(6)}, threshold=${SILENCE_THRESHOLD_RMS})`,
         durationMs,
       };
     }
@@ -223,7 +298,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
         name: test.name, family: test.family, status: 'fail',
         rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
         errorCount: critical.length,
-        reason: `editorMode mismatch (expected ${test.expectedEditorMode})`,
+        reason: `editorMode mismatch (expected ${test.expectedEditorMode}, got ${songInfo.editorMode})`,
         durationMs,
       };
     }
