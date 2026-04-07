@@ -54,6 +54,14 @@ window.addEventListener('error', (event) => {
     return;
   }
 
+  // Suppress WAM plugin SortableJS clone errors — external WAM plugins bundle their
+  // own SortableJS which crashes when cloning custom elements (constructors require
+  // initialized plugin instances). Non-critical; the WAM GUI still works.
+  if (event.error?.message?.includes("setting 'gui'") || event.error?.message?.includes("reading 'audioNode'")) {
+    event.preventDefault();
+    return;
+  }
+
   // event.error is null for cross-origin script errors (browser sanitizes them for security)
   // or when WASM/worker code throws a non-Error value. Log what we can from the event itself.
   if (event.error == null) {
