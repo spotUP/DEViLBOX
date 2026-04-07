@@ -162,20 +162,106 @@ export async function parseCustomMadeFile(
     throw new Error('Not a Custom Made module');
   }
 
+  const buf = new Uint8Array(buffer);
+
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "cm.", "rk.", or "rkb." prefix (case-insensitive)
   const moduleName = baseName.replace(/^(cm|rk|rkb)\./i, '') || baseName;
 
-  // ── Instrument placeholders ───────────────────────────────────────────────
+  // ── Detect sub-variant ────────────────────────────────────────────────────
 
+  const isDelitracker = buf.length >= 4 && u32BE(buf, 0) === DELITRACKER_CUSTOM_MAGIC;
+  const word0 = u16BE(buf, 0);
+  const isBRAVariant = word0 === 0x6000;
+  const variantLabel = isDelitracker ? 'Delitracker Custom' : 'Custom Made';
+
+  // ── Sample count extraction ───────────────────────────────────────────────
+  //
+  // Scan the binary for sample table structures. In the CustomMade format,
+  // after the voice-clear signature there is typically a sample table with
+  // 6 or 8-byte entries (offset + length per sample).
+  //
+  // For the Delitracker variant, scan for MOVE.W #n,Dn patterns that set
+  // sample count, or count recognizable sample headers.
+
+  let sampleCount = DEFAULT_INSTRUMENTS;
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
+  try {
+    if (isDelitracker) {
+      // Delitracker Custom: scan for u16 sample count in the header area.
+      // Look for MOVE.W immediate patterns that set sample counts.
+      for (let off = 32; off < Math.min(buf.length - 4, 512); off += 2) {
+        const op = u16BE(buf, off);
+        // MOVE.W #imm,Dn ($303C = MOVE.W #imm,D0, $323C = MOVE.W #imm,D1, etc.)
+        if ((op & 0xF1FF) === 0x303C) {
+          const val = u16BE(buf, off + 2);
+          if (val >= 1 && val <= 64) {
+            sampleCount = val;
+            break;
+          }
+        }
+      }
+    } else {
+      // CustomMade (cm/rk/rkb): look for the voice-clear signature location
+      // and then scan after it for sample data
+      const scanStart = 8;
+      const scanEnd = Math.min(scanStart + 400, buf.length - 12);
+
+      let sigOffset = -1;
+      for (let off = scanStart; off <= scanEnd; off += 2) {
+        if (
+          u32BE(buf, off + 0) === 0x42280030 &&
+          u32BE(buf, off + 4) === 0x42280031 &&
+          u32BE(buf, off + 8) === 0x42280032
+        ) {
+          sigOffset = off + 12;
+          break;
+        }
+      }
+
+      // Scan for LEA instructions after the signature to find sample tables
+      if (sigOffset > 0) {
+        for (let off = sigOffset; off < Math.min(sigOffset + 512, buf.length - 4); off += 2) {
+          const op = u16BE(buf, off);
+          // $41FA = LEA d16(PC),A0
+          if (op === 0x41FA && off + 4 <= buf.length) {
+            const disp = u16BE(buf, off + 2);
+            const signedDisp = disp < 0x8000 ? disp : disp - 0x10000;
+            const target = off + 2 + signedDisp;
+            if (target > 0 && target + 8 <= buf.length) {
+              // Try to count sample entries at target
+              let count = 0;
+              let soff = target;
+              for (let i = 0; i < 64 && soff + 6 <= buf.length; i++) {
+                const len = u32BE(buf, soff);
+                if (len === 0 || len > 0x100000) break;
+                const period = u16BE(buf, soff + 4);
+                if (period === 0) break;
+                count++;
+                soff += 6 + len;
+              }
+              if (count >= 2) {
+                sampleCount = count;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // Binary scan failed — use defaults
+  }
+
+  // ── Build instrument list ────────────────────────────────────────────────
+
+  for (let i = 0; i < sampleCount; i++) {
     instruments.push({
       id: i + 1,
-      name: `Sample ${i + 1}`,
+      name: `${variantLabel} Sample ${i + 1}`,
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
@@ -218,12 +304,13 @@ export async function parseCustomMadeFile(
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: DEFAULT_INSTRUMENTS,
+      originalInstrumentCount: sampleCount,
+      variant: isDelitracker ? 'delitracker' : isBRAVariant ? 'bra' : 'jmp',
     },
   };
 
   return {
-    name: `${moduleName} [Custom Made]`,
+    name: `${moduleName} [${variantLabel}]`,
     format: 'MOD' as TrackerFormat,
     patterns: [pattern],
     instruments,
