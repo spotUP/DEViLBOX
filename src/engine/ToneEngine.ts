@@ -467,7 +467,7 @@ export class ToneEngine {
           'dest context:', destCtx.constructor?.name);
       }
     } else {
-      console.warn('[ToneEngine] Could not find native AudioNode in Tone.js destination, falling back');
+      console.log('[ToneEngine] Could not find native AudioNode in Tone.js destination, falling back');
       // Last resort: try connecting to Tone.js input property
       const destWithInput = destination as unknown as { input?: AudioNode };
       if (destWithInput.input) {
@@ -909,8 +909,24 @@ export class ToneEngine {
       !(c.synthType === 'V2' && c.v2Speech)
     );
 
+    // For native whole-song players (HivelySynth, UADESynth, etc.) only create ONE
+    // instance — the engine is a singleton that handles all channels internally.
+    // Creating a standalone player per instrument exhausts the WASM player pool.
+    const nativePlayerTypes = new Set([
+      'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
+      'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+    ]);
+    const seenNativeTypes = new Set<string>();
+    const dedupedOther = otherConfigs.filter((c) => {
+      if (c.synthType && nativePlayerTypes.has(c.synthType)) {
+        if (seenNativeTypes.has(c.synthType)) return false;
+        seenNativeTypes.add(c.synthType);
+      }
+      return true;
+    });
+
     // Create non-sampler instruments immediately
-    otherConfigs.forEach((config) => {
+    dedupedOther.forEach((config) => {
       this.getInstrument(config.id, config);
     });
 
