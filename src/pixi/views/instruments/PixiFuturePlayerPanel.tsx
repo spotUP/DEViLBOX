@@ -16,7 +16,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { PixiKnob, PixiLabel, PixiButton } from '../../components';
+import { PixiKnob, PixiLabel, PixiButton, PixiSelect, type SelectOption } from '../../components';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { FuturePlayerConfig } from '@/types/instrument/exotic';
@@ -108,10 +108,28 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
     </layoutContainer>
   );
 
-  const pitchModModeText = (m: number): string =>
-    m === 0 ? 'Loop' : m === 1 ? 'Continue' : 'One-shot';
-  const sampleModModeText = (m: number): string =>
-    m === 0 ? 'Loop' : (m & 0x80) ? 'One-shot' : 'Continue';
+  const MODE_OPTIONS: SelectOption[] = [
+    { value: '0',   label: 'Loop' },
+    { value: '1',   label: 'Continue' },
+    { value: '128', label: 'One-shot' },
+  ];
+
+  const pitchModModeValue = (m: number): string =>
+    m === 0 ? '0' : m === 1 ? '1' : '128';
+  const sampleModModeValue = (m: number): string =>
+    m === 0 ? '0' : (m & 0x80) ? '128' : '1';
+
+  const ModeSelect: React.FC<{ value: string; onChange: (v: number) => void }> = ({ value, onChange }) => (
+    <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 88 }}>
+      <PixiLabel text="Mode" size="xs" color="textMuted" />
+      <PixiSelect
+        options={MODE_OPTIONS}
+        value={value}
+        onChange={(v) => onChange(Number(v))}
+        width={88}
+      />
+    </layoutContainer>
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -280,7 +298,7 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
                 size={KNOB_SIZE}
                 defaultValue={0}
               />
-              <ReadOnlyField label="Mode" value={pitchModModeText(fp.pitchMod1Mode)} />
+              <ModeSelect value={pitchModModeValue(fp.pitchMod1Mode)} onChange={(v) => upd('pitchMod1Mode', v)} />
               <ReadOnlyField label="Negate" value={fp.pitchMod1Negate ? 'Yes' : 'No'} highlight={fp.pitchMod1Negate} />
             </layoutContainer>
           )}
@@ -314,7 +332,7 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
                 size={KNOB_SIZE}
                 defaultValue={0}
               />
-              <ReadOnlyField label="Mode" value={pitchModModeText(fp.pitchMod2Mode)} />
+              <ModeSelect value={pitchModModeValue(fp.pitchMod2Mode)} onChange={(v) => upd('pitchMod2Mode', v)} />
               <ReadOnlyField label="Negate" value={fp.pitchMod2Negate ? 'Yes' : 'No'} highlight={fp.pitchMod2Negate} />
             </layoutContainer>
           )}
@@ -353,7 +371,7 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
                 size={KNOB_SIZE}
                 defaultValue={0}
               />
-              <ReadOnlyField label="Mode" value={sampleModModeText(fp.sampleMod1Mode)} />
+              <ModeSelect value={sampleModModeValue(fp.sampleMod1Mode)} onChange={(v) => upd('sampleMod1Mode', v)} />
             </layoutContainer>
           )}
 
@@ -386,7 +404,7 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
                 size={KNOB_SIZE}
                 defaultValue={0}
               />
-              <ReadOnlyField label="Mode" value={sampleModModeText(fp.sampleMod2Mode)} />
+              <ModeSelect value={sampleModModeValue(fp.sampleMod2Mode)} onChange={(v) => upd('sampleMod2Mode', v)} />
             </layoutContainer>
           )}
         </layoutContainer>
