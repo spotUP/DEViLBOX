@@ -52,6 +52,7 @@ import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
 import { UADEDebuggerPanel } from './controls/UADEDebuggerPanel';
 import { SampleLoopEditor } from './SampleLoopEditor';
 import { useInstrumentPlaybackState } from '../../hooks/useInstrumentPlaybackState';
+import { getInstrumentLastAttack } from '@/engine/instrumentPlaybackTracker';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -285,8 +286,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   } = s;
 
   const {
-    startTime,
-    endTime,
     loopEnabled,
     loopStart,
     loopEnd,
@@ -308,6 +307,87 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       setPlaybackPosition(0);
     }
   }, [songPlayback.isPlaying, songPlayback.position, isPlaying, setIsPlaying, setPlaybackPosition]);
+
+  // ─── Test-keyboard / external-MIDI playhead overlay ───────────────
+  // When the user triggers notes via the test keyboard, test piano, or
+  // external MIDI, ToneEngine records the attack time in
+  // instrumentPlaybackTracker. This effect polls it and animates the
+  // editor's playhead from there using the same loop math as the
+  // editor's own Play button. Inactive when the editor's own Play
+  // button is running its own animation.
+  useEffect(() => {
+    if (isPlaying) return; // handlePlay owns the playhead in this case
+    if (!audioBuffer) return;
+    const duration = audioBuffer.duration;
+    if (!duration || duration <= 0) return;
+
+    let rafId = 0;
+    let lastSeenAttack = -1;
+    let attackCtxTime = 0;
+
+    const tick = () => {
+      const lastAttack = getInstrumentLastAttack(instrument.id);
+      if (lastAttack !== null && lastAttack !== lastSeenAttack) {
+        lastSeenAttack = lastAttack;
+        attackCtxTime = lastAttack;
+      }
+
+      if (lastSeenAttack > 0) {
+        const ctx = Tone.getContext().rawContext as AudioContext;
+        const elapsed = ctx.currentTime - attackCtxTime;
+
+        let progress = 0;
+        if (loopEnabled) {
+          const loopStartNorm = Math.max(0, Math.min(0.99, loopStart));
+          const loopEndNorm = Math.max(loopStartNorm + 0.001, Math.min(1, loopEnd));
+          const loopRegionDur = (loopEndNorm - loopStartNorm) * duration;
+          const preLoopDur = loopEndNorm * duration;
+
+          if (elapsed < preLoopDur) {
+            progress = elapsed / duration;
+          } else if (loopType === 'pingpong') {
+            const cycleDur = 2 * loopRegionDur;
+            const cycleElapsed = (elapsed - preLoopDur) % cycleDur;
+            if (cycleElapsed < loopRegionDur) {
+              progress = loopStartNorm + (cycleElapsed / loopRegionDur) * (loopEndNorm - loopStartNorm);
+            } else {
+              const back = cycleElapsed - loopRegionDur;
+              progress = loopEndNorm - (back / loopRegionDur) * (loopEndNorm - loopStartNorm);
+            }
+          } else {
+            const loopElapsed = (elapsed - preLoopDur) % loopRegionDur;
+            progress = loopStartNorm + loopElapsed / duration;
+          }
+
+          // Cap the loop animation at 60s of wall-clock so a stale
+          // "attack ages ago" doesn't keep the playhead spinning forever.
+          if (elapsed > 60) {
+            lastSeenAttack = -1;
+            setPlaybackPosition(0);
+          } else {
+            setPlaybackPosition(progress);
+          }
+        } else {
+          // One-shot — animate over the sample's natural duration
+          progress = elapsed / duration;
+          if (progress >= 1) {
+            lastSeenAttack = -1;
+            setPlaybackPosition(0);
+          } else {
+            setPlaybackPosition(progress);
+          }
+        }
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [
+    isPlaying, audioBuffer, instrument.id,
+    loopEnabled, loopStart, loopEnd, loopType,
+    setPlaybackPosition,
+  ]);
 
   // ─── Sync loop params from parameters → sample config ────────────
   // The sample editor writes loop settings to `parameters` (normalized 0-1),
@@ -465,8 +545,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       audioBuffer,
       viewStart,
       viewEnd,
-      startTime,
-      endTime,
       selectionStart,
       selectionEnd,
       loopEnabled,
@@ -483,7 +561,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
   }, [
-    audioBuffer, viewStart, viewEnd, startTime, endTime,
+    audioBuffer, viewStart, viewEnd,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
     playbackPosition, isGranular, granular, dragTarget, showSpectrum,
     showBeatSlicer, instrument.sample?.slices, selectedSliceId, offsetMarkers,
@@ -507,8 +585,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       audioBuffer,
       viewStart: 0,
       viewEnd: 1,
-      startTime,
-      endTime,
       selectionStart,
       selectionEnd,
       loopEnabled,
@@ -522,7 +598,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     };
     drawSampleWaveform(ctx, CANVAS_W, MINIMAP_H, opts);
   }, [
-    audioBuffer, viewStart, viewEnd, startTime, endTime,
+    audioBuffer, viewStart, viewEnd,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
   ]);
 
@@ -567,8 +643,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             ...instrument.parameters,
             sampleUrl: dataUrl,
             sampleInfo: { name: file.name, duration, size: file.size },
-            startTime: 0,
-            endTime: 1,
             loopStart: 0,
             loopEnd: 1,
           },
@@ -649,26 +723,20 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       const pos = canvasXToNorm(normX);
       const handleZone = 0.12;
 
-      // Top: start/end handles
-      if (normY < handleZone) {
-        if (Math.abs(pos - startTime) < hitRadius * viewRange) return 'start';
-        if (Math.abs(pos - endTime) < hitRadius * viewRange) return 'end';
-      }
-      // Bottom: loop handles
-      if (loopEnabled && normY > 1 - handleZone) {
+      // Loop handles (top OR bottom — easier to grab anywhere along the
+      // edges, since start/end markers are gone)
+      if (loopEnabled && (normY < handleZone || normY > 1 - handleZone)) {
         if (Math.abs(pos - loopStart) < hitRadius * viewRange) return 'loopStart';
         if (Math.abs(pos - loopEnd) < hitRadius * viewRange) return 'loopEnd';
       }
-      // Fallback
-      if (Math.abs(pos - startTime) < hitRadius * viewRange) return 'start';
-      if (Math.abs(pos - endTime) < hitRadius * viewRange) return 'end';
+      // Fallback — anywhere on the canvas
       if (loopEnabled) {
         if (Math.abs(pos - loopStart) < hitRadius * viewRange) return 'loopStart';
         if (Math.abs(pos - loopEnd) < hitRadius * viewRange) return 'loopEnd';
       }
       return null;
     },
-    [viewStart, viewEnd, startTime, endTime, loopStart, loopEnd, loopEnabled, canvasXToNorm],
+    [viewStart, viewEnd, loopStart, loopEnd, loopEnabled, canvasXToNorm],
   );
 
   // ─── Canvas mouse down ──────────────────────────────────────────
@@ -737,12 +805,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       const pos = canvasXToNorm(x);
 
       switch (target) {
-        case 'start':
-          updateParam('startTime', Math.max(0, Math.min(pos, endTime - 0.005)));
-          break;
-        case 'end':
-          updateParam('endTime', Math.min(1, Math.max(pos, startTime + 0.005)));
-          break;
         case 'loopStart':
           updateParam('loopStart', Math.max(0, Math.min(pos, loopEnd - 0.005)));
           break;
@@ -777,7 +839,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [
-    getCanvasNorm, canvasXToNorm, canvasXToSample, startTime, endTime,
+    getCanvasNorm, canvasXToNorm, canvasXToSample,
     loopStart, loopEnd, audioBuffer, selectionStart, selectionEnd,
     updateParam, setSelection, clearSelection, setDragTarget, dragTargetRef,
   ]);
@@ -901,10 +963,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     const loopEndSec = loopEndNorm * duration;
     const totalFrames = audioBuffer.length;
 
-    if (loopType === 'pingpong') {
-      console.warn('[SampleEditor] pingpong loop falls back to forward in preview');
-    }
-
     console.log('[SampleEditor] play raw values ' + JSON.stringify({
       loopEnabled,
       loopStart_param: loopStart,
@@ -927,8 +985,11 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       // produce "play attack then loop". Workaround:
       //   1) attack source: loop=false, plays 0 → loopEnd as a one-shot
       //   2) loop source:   loop=true, scheduled to start exactly when
-      //                     the attack source ends. Begins at loopStart
-      //                     and loops [loopStart, loopEnd] forever.
+      //                     the attack source ends. Behavior depends on
+      //                     loopType:
+      //                     - 'forward': loops [loopStart, loopEnd]
+      //                     - 'pingpong': loops a pre-built pingpong
+      //                       cycle buffer (forward + reverse)
       const attackBufferSec = loopEndSec; // 0 → loopEnd in buffer-time
       const attackWallSec = attackBufferSec / playbackRate;
 
@@ -939,25 +1000,66 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       attackSrc.start(now, 0, attackBufferSec);
 
       const loopSrc = ctx.createBufferSource();
-      loopSrc.buffer = bufToPlay;
       loopSrc.playbackRate.value = playbackRate;
       loopSrc.loop = true;
-      loopSrc.loopStart = loopStartSec;
-      loopSrc.loopEnd = loopEndSec;
-      loopSrc.connect(ctx.destination);
-      loopSrc.start(now + attackWallSec, loopStartSec);
+
+      if (loopType === 'pingpong') {
+        // Build a pingpong cycle buffer: forward [loopStart..loopEnd]
+        // followed by reverse [loopEnd-1..loopStart+1] (skipping the
+        // shared endpoints to avoid samples being heard twice). Looping
+        // this buffer with loop=true gives sample-perfect ping-pong.
+        const startFrame = Math.round(loopStartNorm * totalFrames);
+        const endFrame = Math.round(loopEndNorm * totalFrames);
+        const fwdLen = endFrame - startFrame;
+        const revLen = Math.max(0, fwdLen - 2);
+        const cycleLen = fwdLen + revLen;
+        if (cycleLen > 0) {
+          const cycleBuf = ctx.createBuffer(
+            bufToPlay.numberOfChannels,
+            cycleLen,
+            bufToPlay.sampleRate,
+          );
+          for (let ch = 0; ch < bufToPlay.numberOfChannels; ch++) {
+            const src = bufToPlay.getChannelData(ch);
+            const dst = cycleBuf.getChannelData(ch);
+            for (let i = 0; i < fwdLen; i++) {
+              dst[i] = src[startFrame + i];
+            }
+            for (let i = 0; i < revLen; i++) {
+              dst[fwdLen + i] = src[startFrame + fwdLen - 2 - i];
+            }
+          }
+          loopSrc.buffer = cycleBuf;
+          // Loop the entire cycle buffer.
+          loopSrc.loopStart = 0;
+          loopSrc.loopEnd = cycleLen / bufToPlay.sampleRate;
+          loopSrc.connect(ctx.destination);
+          loopSrc.start(now + attackWallSec, 0);
+        } else {
+          // Loop region too small for pingpong — fall back to forward.
+          loopSrc.buffer = bufToPlay;
+          loopSrc.loopStart = loopStartSec;
+          loopSrc.loopEnd = loopEndSec;
+          loopSrc.connect(ctx.destination);
+          loopSrc.start(now + attackWallSec, loopStartSec);
+        }
+      } else {
+        // Forward loop
+        loopSrc.buffer = bufToPlay;
+        loopSrc.loopStart = loopStartSec;
+        loopSrc.loopEnd = loopEndSec;
+        loopSrc.connect(ctx.destination);
+        loopSrc.start(now + attackWallSec, loopStartSec);
+      }
 
       previewSourcesRef.current = [attackSrc, loopSrc];
     } else {
-      // === ONE-SHOT ===
-      const startOffset = startTime * duration;
-      const playDur = (endTime - startTime) * duration;
-
+      // === ONE-SHOT === plays the entire sample once
       const src = ctx.createBufferSource();
       src.buffer = bufToPlay;
       src.playbackRate.value = playbackRate;
       src.connect(ctx.destination);
-      src.start(now, startOffset, playDur);
+      src.start(now, 0);
       src.onended = () => {
         if (previewSourcesRef.current.includes(src)) {
           stopPreviewSources();
@@ -981,13 +1083,25 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       if (loopEnabled && loopRegionDur > 0) {
         if (elapsed < preLoopDur) {
           progress = (elapsed * playbackRate) / duration;
+        } else if (loopType === 'pingpong') {
+          // Pingpong: position oscillates between loopStart and loopEnd
+          const cycleDur = 2 * loopRegionDur;
+          const cycleElapsed = (elapsed - preLoopDur) % cycleDur;
+          if (cycleElapsed < loopRegionDur) {
+            progress = loopStartNorm + ((cycleElapsed / loopRegionDur) * (loopEndNorm - loopStartNorm));
+          } else {
+            const back = cycleElapsed - loopRegionDur;
+            progress = loopEndNorm - ((back / loopRegionDur) * (loopEndNorm - loopStartNorm));
+          }
         } else {
+          // Forward loop
           const loopElapsed = (elapsed - preLoopDur) % loopRegionDur;
           progress = loopStartNorm + (loopElapsed * playbackRate) / duration;
         }
       } else {
-        progress = startTime + (elapsed * playbackRate) / duration;
-        if (progress >= endTime) return; // onended will clear state
+        // One-shot — animate from 0 to 1 over the sample's natural duration
+        progress = (elapsed * playbackRate) / duration;
+        if (progress >= 1) return; // onended will clear state
       }
 
       setPlaybackPosition(progress);
@@ -995,7 +1109,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     };
     animate();
   }, [
-    audioBuffer, isPlaying, playbackRate, reverse, startTime, endTime,
+    audioBuffer, isPlaying, playbackRate, reverse,
     loopEnabled, loopStart, loopEnd, loopType,
     setIsPlaying, setPlaybackPosition, stopPreviewSources,
   ]);
@@ -1502,30 +1616,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 </div>
               </div>
             )}
-
-            {/* Start / End */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-mono text-text-muted text-xs mb-1">
-                  {'START: '}<span className="text-accent-success">{(startTime * 100).toFixed(1)}%</span>
-                </label>
-                <input
-                  type="range" min="0" max="0.99" step="0.001" value={startTime}
-                  onChange={(e) => updateParam('startTime', Math.min(parseFloat(e.target.value), endTime - 0.01))}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block font-mono text-text-muted text-xs mb-1">
-                  {'END: '}<span className="text-accent-secondary">{(endTime * 100).toFixed(1)}%</span>
-                </label>
-                <input
-                  type="range" min="0.01" max="1" step="0.001" value={endTime}
-                  onChange={(e) => updateParam('endTime', Math.max(parseFloat(e.target.value), startTime + 0.01))}
-                  className="w-full"
-                />
-              </div>
-            </div>
 
             {/* Reverse */}
             <div className="flex items-center gap-4">

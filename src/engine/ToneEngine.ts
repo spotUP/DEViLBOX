@@ -112,6 +112,7 @@ import {
   updateInstrumentEffectParams as _updateInstrumentEffectParams,
 } from './tone/MasterEffectsChain';
 import { captureLiveAudio, mixAndNormalize, MONO_WASM_SYNTHS } from '@/lib/audio/LiveCapture';
+import { notifyInstrumentAttack } from './instrumentPlaybackTracker';
 import {
   type InstrumentEffectsContext,
   buildInstrumentEffectChain as _buildInstrumentEffectChain,
@@ -3120,6 +3121,12 @@ export class ToneEngine {
     if (config.synthType === 'SuperCollider') {
       console.log('[SC:ToneEngine] triggerPolyNoteAttack called — id:', instrumentId, 'note:', note, 'synthType:', config.synthType, 'binary:', config.superCollider?.binary ? `${config.superCollider.binary.length}b` : 'EMPTY');
     }
+
+    // Side-channel: record the attack time for this instrument so the
+    // SampleEditor playhead can animate when notes are triggered via
+    // the test keyboard / piano / external MIDI (not just the editor's
+    // own Play button).
+    notifyInstrumentAttack(instrumentId, Tone.getContext().rawContext.currentTime);
 
     // Fire-and-forget drum machines: trigger immediately, no voice tracking or release.
     // Drums create independent Web Audio nodes per hit — no gate/release cycle needed.
