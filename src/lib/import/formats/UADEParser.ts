@@ -485,12 +485,26 @@ export async function parseUADEFile(
     'ml',    // Medley (alternate ext) — enhanced scan crashes browser
     'sun',   // SunTronic/TSM — compiled 68k synth, enhanced scan corrupts engine
     'tsm',   // SunTronic/TSM — suffix-form variant
+    // FORCE_CLASSIC compiled replayer formats whose enhanced scan may hang or crash:
+    'cm', 'cus', 'cust', 'custom', 'rk', 'rkb',  // CustomMade variants
+    'pvp',    // PeterVerswyvelenPacker
+    'dns',    // DynamicSynthesizer
+    'vss',    // VoodooSupremeSynthesizer
+    'synmod', // SynTracker
+    'scn',    // SeanConnolly
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
     'ash',   // AshleyHogg — compiled 68k replayer, enhanced scan crashes browser
     'tsm',   // SunTronic/TSM — compiled 68k synth replayer, enhanced scan corrupts engine state
+    // FORCE_CLASSIC prefix-form compiled replayers whose enhanced scan may hang or crash:
+    'cm', 'cus', 'cust', 'custom', 'rk', 'rkb',  // CustomMade variants
+    'pvp',    // PeterVerswyvelenPacker
+    'dns',    // DynamicSynthesizer
+    'vss',    // VoodooSupremeSynthesizer
+    'synmod', // SynTracker
+    'scn',    // SeanConnolly
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
   // hangs indefinitely, crashes the browser, or corrupts engine state. Skip scan for these.
@@ -1015,6 +1029,10 @@ export async function parseUADEFile(
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
     const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    // Ensure uadeEditableFileData is set so the UADEEditable engine starts and plays.
+    // Without this, no engine calls play() and the song is silent.
+    classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+    classicSong.uadeEditableFileName ??= filename;
     return await reconstructClassicPatterns(classicSong, engine, basename);
   }
 
@@ -1060,6 +1078,8 @@ export async function parseUADEFile(
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
     const classicSong = buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+    classicSong.uadeEditableFileName ??= filename;
     return await reconstructClassicPatterns(classicSong, engine, basename);
   }
 
@@ -1121,6 +1141,8 @@ export async function parseUADEFile(
       console.warn('[UADEParser] Isolated channel renders failed:', err);
     }
 
+    classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
+    classicSong.uadeEditableFileName ??= filename;
     return classicSong;
   }
   // Note: .fc files with FC13/FC14/SMOD magic are routed to parseFCFile via NATIVE_ROUTES above.
