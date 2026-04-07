@@ -14,6 +14,7 @@
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import { createEffect } from './factories/EffectFactory';
+import { applyEffectParametersDiff } from './tone/EffectParameterEngine';
 
 export const MAX_CHANNEL_FX_SLOTS = 4;
 
@@ -170,6 +171,53 @@ class ChannelEffectsManager {
 
     // Last effect → output
     enabledEffects[enabledEffects.length - 1].node.connect(chain.output);
+  }
+
+  /**
+   * Get a specific effect's audio node for parameter updates.
+   */
+  getEffectNode(channelIndex: number, effectIndex: number): Tone.ToneAudioNode | null {
+    const chain = this.chains.get(channelIndex);
+    if (!chain || effectIndex < 0 || effectIndex >= chain.effects.length) return null;
+    return chain.effects[effectIndex].node;
+  }
+
+  /**
+   * Update parameters for a specific channel insert effect.
+   * Mirrors MasterEffectsChain.updateMasterEffectParams() pattern.
+   */
+  updateEffectParams(channelIndex: number, effectIndex: number, config: EffectConfig): void {
+    const chain = this.chains.get(channelIndex);
+    if (!chain || effectIndex < 0 || effectIndex >= chain.effects.length) return;
+
+    const effect = chain.effects[effectIndex];
+    const prevConfig = effect.config;
+
+    // Update wet if changed
+    if (config.wet !== prevConfig.wet) {
+      const wetValue = config.wet / 100;
+      if ('wet' in effect.node && effect.node.wet instanceof Tone.Signal) {
+        effect.node.wet.rampTo(wetValue, 0.02);
+      } else if ('wet' in effect.node && typeof (effect.node as Record<string, unknown>).wet === 'number') {
+        (effect.node as Record<string, unknown>).wet = wetValue;
+      }
+    }
+
+    // Compute changed parameters
+    const changedParams: Record<string, number | string> = {};
+    for (const [key, value] of Object.entries(config.parameters)) {
+      if (prevConfig.parameters[key] !== value) {
+        changedParams[key] = value;
+      }
+    }
+
+    // Apply diff to audio node
+    if (Object.keys(changedParams).length > 0) {
+      applyEffectParametersDiff(effect.node, config.type, changedParams);
+    }
+
+    // Update stored config
+    effect.config = config;
   }
 
   /**
