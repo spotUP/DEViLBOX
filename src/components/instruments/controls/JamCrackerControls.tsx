@@ -30,6 +30,8 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 interface JamCrackerControlsProps {
   config: JamCrackerConfig;
   onChange: (updates: Partial<JamCrackerConfig>) => void;
+  /** Runtime id of the instrument being edited — used by Find Usage to scan patterns. */
+  instrumentId?: number;
 }
 
 /** Fill the first WAVE_SIZE bytes of a JamCracker waveform with a preset shape. */

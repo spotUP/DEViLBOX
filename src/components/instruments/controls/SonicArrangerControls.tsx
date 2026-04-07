@@ -162,6 +162,8 @@ interface SonicArrangerControlsProps {
   onChange: (updates: Partial<SonicArrangerConfig>) => void;
   /** Present when this instrument was loaded via UADE's native SA parser. */
   uadeChipRam?: UADEChipRamInfo;
+  /** Runtime id of the instrument being edited — used by Find Usage to scan patterns. */
+  instrumentId?: number;
 }
 
 type SATab = 'synthesis' | 'envelope' | 'modulation';

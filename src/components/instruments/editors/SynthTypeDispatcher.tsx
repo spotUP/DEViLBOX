@@ -991,6 +991,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={saConfig}
             onChange={handleSonicArrangerChange}
             uadeChipRam={instrument.uadeChipRam}
+            instrumentId={instrument.id}
           />
         </Suspense>
       </div>
@@ -1245,6 +1246,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={hippelCoSoConfig}
             onChange={handleHippelCoSoChange}
             uadeChipRam={instrument.uadeChipRam}
+            instrumentId={instrument.id}
           />
         </Suspense>
       </div>
@@ -1472,6 +1474,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           <JamCrackerControls
             config={jcConfig}
             onChange={handleJamCrackerChange}
+            instrumentId={instrument.id}
           />
         </Suspense>
       </div>
