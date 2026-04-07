@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { current } from 'immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
@@ -205,8 +206,8 @@ export const useAudioStore = create<AudioStore>()(
           // have Tone nodes. Skip the per-param update path for enable/disable toggles.
           if ('enabled' in updates) return;
 
-          // Clone before passing to ToneEngine — Immer draft proxies can't be structuredCloned
-          const effectCopy = structuredClone(effect) as EffectConfig;
+          // Extract plain object from Immer draft before passing to ToneEngine
+          const effectCopy = current(effect) as EffectConfig;
 
           // Notify ToneEngine to update effect parameters
           const engine = get().toneEngineInstance;
