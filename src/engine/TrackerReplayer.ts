@@ -1608,41 +1608,23 @@ export class TrackerReplayer {
         let lastRow = -1;
         let lastPosition = -1;
         this._hvlPositionUnsub = this.hivelyEngine.onPositionUpdate((update: import('./hively/HivelyEngine').HivelyPositionUpdate) => {
-          if (!this.playing || !this.song) return;
           if (update.row === lastRow && update.position === lastPosition) return;
           lastRow = update.row;
           lastPosition = update.position;
-          this.songPos = update.position;
-          this.pattPos = update.row;
-          const patternNum = this.song.songPositions[update.position] ?? 0;
-          const time = Tone.now();
-          this.queueDisplayState(time, update.row, patternNum, update.position, 0, (2.5 / this.bpm) * this.speed);
-          if (this.onRowChange) {
-            this.onRowChange(update.row, patternNum, update.position);
-          }
-          this.fireHybridNotesForRow(time);
+          this.dispatchEnginePosition(update.row, update.position);
         });
         _playLog('HVL position subscription active');
       }
 
-      // Subscribe to MusicLineEngine position updates (same queueDisplayState path as Hively)
+      // Subscribe to MusicLineEngine position updates (same dispatch path as Hively)
       if (result.musicLineEngine) {
         let lastMLRow = -1;
         let lastMLPos = -1;
         this._mlPositionUnsub = result.musicLineEngine.onPosition((update) => {
-          if (!this.playing || !this.song) return;
           if (update.row === lastMLRow && update.position === lastMLPos) return;
           lastMLRow = update.row;
           lastMLPos = update.position;
-          this.songPos = update.position;
-          this.pattPos = update.row;
-          const patternNum = this.song.songPositions[update.position] ?? 0;
-          const time = Tone.now();
-          this.queueDisplayState(time, update.row, patternNum, update.position, 0, (2.5 / this.bpm) * this.speed);
-          if (this.onRowChange) {
-            this.onRowChange(update.row, patternNum, update.position);
-          }
-          this.fireHybridNotesForRow(time);
+          this.dispatchEnginePosition(update.row, update.position);
         });
       }
 
@@ -1680,15 +1662,7 @@ export class TrackerReplayer {
           if (row === lastRow && position === lastPosition) return;
           lastRow = row;
           lastPosition = position;
-          this.songPos = position;
-          this.pattPos = row;
-          const patternNum = this.song!.songPositions[position] ?? 0;
-          const time = Tone.now();
-          this.queueDisplayState(time, row, patternNum, position, 0, (2.5 / this.bpm) * this.speed);
-          if (this.onRowChange) {
-            this.onRowChange(row, patternNum, position);
-          }
-          this.fireHybridNotesForRow(time);
+          this.dispatchEnginePosition(row, position);
         });
         _playLog('UADE position subscription active');
 
@@ -1778,19 +1752,13 @@ export class TrackerReplayer {
           lastRow = row;
           lastPosition = position;
 
-          this.songPos = position;
-          this.pattPos = row;
-          const patternNum = this.song!.songPositions[position] ?? 0;
-          const time = Tone.now();
-          this.queueDisplayState(time, row, patternNum, position, 0, (2.5 / this.bpm) * this.speed);
+          // TFMX opts out of fireHybridNotesForRow — the UADE position
+          // subscription block already covers it for UADE-backed formats.
+          this.dispatchEnginePosition(row, position, undefined, /*fireHybrid*/ false);
 
           // Drive FormatPlaybackState for PatternEditorCanvas RAF loop
           setFormatPlaybackRow(row);
           setFormatPlaybackPlaying(true);
-
-          if (this.onRowChange) {
-            this.onRowChange(row, patternNum, position);
-          }
         });
         _playLog('TFMX timing-table position subscription active');
       }
@@ -2067,27 +2035,13 @@ export class TrackerReplayer {
 
           // Subscribe to position updates from libopenmpt (~344 times/sec at 44.1kHz)
           // Throttle to only fire onRowChange when the row actually changes.
-          // Also queue display states so smooth scrolling can interpolate between rows.
           let lastRow = -1;
           let lastOrder = -1;
-          mptEngine.onPosition = (order, pattern, row, audioTime) => {
-            if (!this.playing || !this.song) return;
+          mptEngine.onPosition = (order, _pattern, row, audioTime) => {
             if (row === lastRow && order === lastOrder) return;
             lastRow = row;
             lastOrder = order;
-            this.songPos = order;
-            this.pattPos = row;
-            const patternNum = this.song.songPositions[order] ?? pattern;
-            // Use worklet audio timestamp + output latency for accurate sync
-            const rawCtx = Tone.context.rawContext as AudioContext;
-            const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
-            const time = audioTime != null ? audioTime + latency : Tone.now();
-            this.queueDisplayState(time, row, patternNum, order, 0, (2.5 / this.bpm) * this.speed);
-            if (this.onRowChange) {
-              this.onRowChange(row, patternNum, order);
-            }
-            // Fire hybrid notes for replaced instruments using live pattern data
-            this.fireHybridNotesForRow(time);
+            this.dispatchEnginePosition(row, order, audioTime);
           };
 
           mptEngine.onEnded = () => {
@@ -2630,6 +2584,45 @@ export class TrackerReplayer {
   /** Clear the state queue (called on stop/reset). Keeps lastDequeuedState. */
   private clearStateQueue(): void {
     this.coordinator.stateRing.clear();
+  }
+
+  /**
+   * Canonical position-update dispatch shared by every WASM engine subscription
+   * (Hively, MusicLine, libopenmpt, UADE, TFMX, ...). Each engine has its own
+   * throttling + per-format math; once it has computed `(row, position)` and
+   * (optionally) an audio timestamp, it calls into here to:
+   *   - update songPos / pattPos
+   *   - queue a display state for smooth UI scrolling
+   *   - fire onRowChange
+   *   - fire hybrid notes for any replaced instruments (unless opted out)
+   *
+   * @param row        Row within the current pattern
+   * @param position   Index into songPositions[]
+   * @param audioTime  Optional audio-context timestamp; if omitted, Tone.now() is used.
+   *                   When provided, output latency is added to keep visuals in sync.
+   * @param fireHybrid Whether to fire hybrid notes. Default true. TFMX opts out
+   *                   because the UADE position subscription already handles that.
+   */
+  private dispatchEnginePosition(row: number, position: number, audioTime?: number, fireHybrid: boolean = true): void {
+    if (!this.playing || !this.song) return;
+    this.songPos = position;
+    this.pattPos = row;
+    const patternNum = this.song.songPositions[position] ?? 0;
+    let time: number;
+    if (audioTime != null) {
+      const rawCtx = Tone.context.rawContext as AudioContext;
+      const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
+      time = audioTime + latency;
+    } else {
+      time = Tone.now();
+    }
+    this.queueDisplayState(time, row, patternNum, position, 0, (2.5 / this.bpm) * this.speed);
+    if (this.onRowChange) {
+      this.onRowChange(row, patternNum, position);
+    }
+    if (fireHybrid) {
+      this.fireHybridNotesForRow(time);
+    }
   }
 
   // ==========================================================================
