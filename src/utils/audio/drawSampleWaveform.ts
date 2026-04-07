@@ -13,11 +13,7 @@ export interface WaveformDrawOptions {
   // View window (0–1 normalized, for zoom/scroll)
   viewStart: number;
   viewEnd: number;
-  
-  // Start/end markers (0–1 normalized)
-  startTime: number;
-  endTime: number;
-  
+
   // Selection range (sample indices, -1 = no selection)
   selectionStart: number;
   selectionEnd: number;
@@ -60,10 +56,6 @@ const COLORS = {
   center: '#2f2525',
   waveform: '#ef4444',
   waveformDim: '#a83232',
-  startMarker: '#10b981',
-  startMarkerActive: '#34d399',
-  endMarker: '#f97316',
-  endMarkerActive: '#fb923c',
   selection: 'rgba(59, 130, 246, 0.3)',
   selectionBorder: '#3b82f6',
   loop: 'rgba(59, 130, 246, 0.15)',
@@ -256,14 +248,6 @@ function drawOverlays(
   // Convert normalized position to pixel X
   const normToX = (norm: number) => ((norm - viewStart) / viewRange) * width;
 
-  // ─── Start/End dimmed regions ────────
-  const startX = normToX(opts.startTime);
-  const endX = normToX(opts.endTime);
-  
-  ctx.fillStyle = COLORS.dimOverlay;
-  if (startX > 0) ctx.fillRect(0, 0, Math.max(0, startX), height);
-  if (endX < width) ctx.fillRect(endX, 0, width - endX, height);
-
   // ─── Selection range ──────────────────
   if (opts.selectionStart >= 0 && opts.selectionEnd > opts.selectionStart && opts.audioBuffer) {
     const totalSamples = opts.audioBuffer.length;
@@ -283,12 +267,6 @@ function drawOverlays(
     ctx.moveTo(selX2, 0); ctx.lineTo(selX2, height);
     ctx.stroke();
   }
-
-  // ─── Start marker ────────────────────
-  drawHandle(ctx, startX, height, 'start', opts.activeDrag === 'start');
-  
-  // ─── End marker ──────────────────────
-  drawHandle(ctx, endX, height, 'end', opts.activeDrag === 'end');
 
   // ─── Loop region ─────────────────────
   if (opts.loopEnabled) {
@@ -445,45 +423,6 @@ function drawOverlays(
 }
 
 // ─── Handle drawing ────────────────────────────────────────────────────
-
-function drawHandle(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  height: number,
-  type: 'start' | 'end',
-  active: boolean,
-): void {
-  const isStart = type === 'start';
-  const color = isStart ? (active ? COLORS.startMarkerActive : COLORS.startMarker) : (active ? COLORS.endMarkerActive : COLORS.endMarker);
-  const label = isStart ? 'S' : 'E';
-
-  // Vertical line
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, 0); ctx.lineTo(x, height);
-  ctx.stroke();
-
-  // Triangle handle at top
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  if (isStart) {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + HANDLE_W, 0);
-    ctx.lineTo(x, HANDLE_H);
-  } else {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x - HANDLE_W, 0);
-    ctx.lineTo(x, HANDLE_H);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // Label
-  ctx.fillStyle = COLORS.handleText;
-  ctx.font = 'bold 9px sans-serif';
-  ctx.fillText(label, isStart ? x + 1 : x - 8, 11);
-}
 
 function drawLoopHandle(
   ctx: CanvasRenderingContext2D,
