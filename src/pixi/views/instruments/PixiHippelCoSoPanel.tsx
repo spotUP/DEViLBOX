@@ -2,24 +2,27 @@
  * PixiHippelCoSoPanel — GL-native Hippel CoSo instrument editor.
  *
  * Mirrors the DOM editor at src/components/instruments/controls/HippelCoSoControls.tsx
- * 1:1 in structure: scalar knobs (volSpeed, vibSpeed, vibDepth, vibDelay) + read-only
- * bar-chart displays for the frequency and volume sequences.
+ * 1:1 in structure: scalar knobs (volSpeed, vibSpeed, vibDepth, vibDelay) + drag-to-
+ * edit bar-chart displays for the frequency and volume sequences.
  *
  * Data shape: instrument.hippelCoso (HippelCoSoConfig). Mutations flow through the
  * shared onUpdate(instrumentId, { hippelCoso: { ... } }) path. The underlying store
  * handles any UADE chip RAM propagation — this panel never touches UADEChipEditor
  * directly (same policy as the DOM editor's updU8WithChipRam path).
  *
- * The fseq/vseq displays are read-only for this phase. Live drag-edit on Pixi
- * sequence bars is a follow-up that needs drag-on-Graphics work matching the
- * JamCracker AM waveform editor.
+ * Both fseq and vseq displays are interactive: click-and-drag to draw a new
+ * sequence using the shared writeBipolarBar/writeUnipolarBar helpers in
+ * src/lib/pixi/barChartDraw.ts. Terminator sentinels (-31..-25 for fseq,
+ * -128 loop markers for vseq) are skipped by the writer so end-of-sequence
+ * positions are preserved during a drag.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { PixiKnob, PixiLabel } from '../../components';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import type { Graphics } from 'pixi.js';
+import type { Graphics, FederatedPointerEvent, Container } from 'pixi.js';
+import { writeBipolarBar, writeUnipolarBar } from '@/lib/pixi/barChartDraw';
 
 const KNOB_SIZE = 'sm' as const;
 
@@ -47,7 +50,34 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
     [instrument.id, instrument.hippelCoso, onUpdate],
   );
 
-  // ── Bar chart renderers for fseq/vseq (read-only) ──────────────────────────
+  // ── Drag state for interactive bar charts ──────────────────────────────────
+  // Refs mirror the JamCracker AM-waveform drag pattern: hcRef keeps the latest
+  // config so pointer callbacks never read stale data mid-drag, fseq/vseqDrag
+  // track whether a drag is active and the last written index.
+  const hcRef = useRef(hc);
+  useEffect(() => { hcRef.current = hc; }, [hc]);
+  const instrumentIdRef = useRef(instrument.id);
+  useEffect(() => { instrumentIdRef.current = instrument.id; }, [instrument.id]);
+
+  const fseqDrawing = useRef(false);
+  const fseqLastIdx = useRef(-1);
+  const vseqDrawing = useRef(false);
+  const vseqLastIdx = useRef(-1);
+
+  // Compute bipolar maxMag exactly as the fseq renderer does so the drag
+  // amplitude matches what the user sees on screen.
+  const computeFseqMaxMag = useCallback((values: number[]): number => {
+    let maxMag = 1;
+    for (const v of values) {
+      if (v <= -25 && v >= -31) continue;
+      const a = Math.abs(v);
+      if (a > maxMag) maxMag = a;
+    }
+    if (maxMag < 12) maxMag = 12;
+    return maxMag;
+  }, []);
+
+  // ── Bar chart renderers for fseq/vseq ──────────────────────────────────────
 
   const SEQ_W = 320;
   const SEQ_H = 80;
@@ -129,6 +159,51 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
     [hc.vseq, drawUnipolarBars, theme.success.color],
   );
 
+  // ── Drag writers (fseq bipolar, vseq unipolar) ─────────────────────────────
+
+  const writeFseqAt = useCallback((e: FederatedPointerEvent) => {
+    const cur = hcRef.current;
+    const values = cur.fseq ?? [];
+    if (values.length === 0) return;
+    const local = e.getLocalPosition(e.currentTarget as Container);
+    const maxMag = computeFseqMaxMag(values);
+    const { next, idx } = writeBipolarBar(
+      values,
+      local.x,
+      local.y,
+      SEQ_W,
+      SEQ_H,
+      maxMag,
+      -127,
+      127,
+      fseqLastIdx.current,
+    );
+    fseqLastIdx.current = idx;
+    onUpdate(instrumentIdRef.current, {
+      hippelCoso: { ...cur, fseq: next },
+    });
+  }, [computeFseqMaxMag, onUpdate]);
+
+  const writeVseqAt = useCallback((e: FederatedPointerEvent) => {
+    const cur = hcRef.current;
+    const values = cur.vseq ?? [];
+    if (values.length === 0) return;
+    const local = e.getLocalPosition(e.currentTarget as Container);
+    const { next, idx } = writeUnipolarBar(
+      values,
+      local.x,
+      local.y,
+      SEQ_W,
+      SEQ_H,
+      63,
+      vseqLastIdx.current,
+    );
+    vseqLastIdx.current = idx;
+    onUpdate(instrumentIdRef.current, {
+      hippelCoso: { ...cur, vseq: next },
+    });
+  }, [onUpdate]);
+
   return (
     <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
       {/* Header */}
@@ -193,7 +268,7 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
         />
       </layoutContainer>
 
-      {/* Frequency sequence (read-only) */}
+      {/* Frequency sequence (drag to edit) */}
       <SectionHeading text="FREQUENCY SEQUENCE (SEMITONES)" />
       <layoutContainer
         layout={{
@@ -202,6 +277,24 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
           borderWidth: 1,
           borderColor: theme.border.color,
           borderRadius: 4,
+        }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          fseqDrawing.current = true;
+          fseqLastIdx.current = -1;
+          writeFseqAt(e);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (fseqDrawing.current) writeFseqAt(e);
+        }}
+        onPointerUp={() => {
+          fseqDrawing.current = false;
+          fseqLastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          fseqDrawing.current = false;
+          fseqLastIdx.current = -1;
         }}
       >
         <pixiGraphics draw={drawFseq} layout={{ width: SEQ_W, height: SEQ_H }} />
@@ -212,7 +305,7 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
         color="textMuted"
       />
 
-      {/* Volume sequence (read-only) */}
+      {/* Volume sequence (drag to edit) */}
       <SectionHeading text="VOLUME SEQUENCE (0–63)" />
       <layoutContainer
         layout={{
@@ -221,6 +314,24 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
           borderWidth: 1,
           borderColor: theme.border.color,
           borderRadius: 4,
+        }}
+        eventMode="static"
+        cursor="crosshair"
+        onPointerDown={(e: FederatedPointerEvent) => {
+          vseqDrawing.current = true;
+          vseqLastIdx.current = -1;
+          writeVseqAt(e);
+        }}
+        onPointerMove={(e: FederatedPointerEvent) => {
+          if (vseqDrawing.current) writeVseqAt(e);
+        }}
+        onPointerUp={() => {
+          vseqDrawing.current = false;
+          vseqLastIdx.current = -1;
+        }}
+        onPointerUpOutside={() => {
+          vseqDrawing.current = false;
+          vseqLastIdx.current = -1;
         }}
       >
         <pixiGraphics draw={drawVseq} layout={{ width: SEQ_W, height: SEQ_H }} />
