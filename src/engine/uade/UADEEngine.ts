@@ -13,6 +13,8 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
+import type { TrackerSong } from '@engine/TrackerReplayer';
 
 export interface UADEScanRow {
   period: number;
@@ -646,6 +648,200 @@ export class UADEEngine {
   onChannelData(cb: ChannelCallback): () => void {
     this._channelCallbacks.add(cb);
     return () => this._channelCallbacks.delete(cb);
+  }
+
+  /**
+   * Wire this engine into a PlaybackCoordinator. Sets up:
+   *
+   *   1. Position-update subscription with CIA-tick→row math (uses
+   *      song.uadeFirstTick + song.initialSpeed). Throttles to row-change
+   *      events and dispatches via coordinator.dispatchEnginePosition.
+   *   2. Paula register log polling (10Hz) — converts register writes to
+   *      automation capture entries via decodePaulaRegister.
+   *   3. Optional deferred pattern reconstruction for SKIP_SCAN formats —
+   *      enables tick snapshots, runs reconstructPatterns() after 15s.
+   *   4. Optional TFMX timing-table position subscription via
+   *      onChannelData → jiffies → row math.
+   *
+   * Returns a cleanup function that:
+   *   - Unsubscribes the position callback
+   *   - Clears the Paula log polling interval
+   *   - Disables tick snapshots
+   *   - Unsubscribes the TFMX channel callback (if attached)
+   *
+   * Replaces ~110 lines of UADE-specific glue that previously lived inline
+   * in TrackerReplayer.play().
+   *
+   * @param coordinator The PlaybackCoordinator dispatching position updates
+   * @param song        The TrackerSong containing UADE timing metadata
+   * @param isPlaying   A getter the engine reads to check if it should still
+   *                    be processing (lets the cleanup race-free against stop()).
+   */
+  subscribeToCoordinator(
+    coordinator: PlaybackCoordinator,
+    song: TrackerSong,
+    isPlaying: () => boolean,
+  ): () => void {
+    const cleanups: Array<() => void> = [];
+
+    // ── 1. Position subscription with CIA-tick → row math ────────────────
+    if (song.uadeFirstTick != null) {
+      const speed = song.initialSpeed || 6;
+      const firstTick = song.uadeFirstTick;
+      const patternLengths = song.patterns.map(p => p.length);
+      let lastRow = -1;
+      let lastPosition = -1;
+      const unsub = this.onPositionUpdate((update) => {
+        if (!isPlaying()) return;
+        const tickCount = update.tickCount ?? 0;
+        // Convert CIA tick count to absolute row index
+        const absoluteRow = Math.max(0, Math.floor((tickCount - firstTick) / speed));
+        // Map absolute row to pattern position + row within pattern
+        let remaining = absoluteRow;
+        let position = 0;
+        for (let i = 0; i < song.songPositions.length; i++) {
+          const patIdx = song.songPositions[i];
+          const patLen = patternLengths[patIdx] ?? 64;
+          if (remaining < patLen) {
+            position = i;
+            break;
+          }
+          remaining -= patLen;
+          position = i;
+          // If we've exhausted all patterns, clamp to last position
+          if (i === song.songPositions.length - 1) {
+            remaining = Math.min(remaining, patLen - 1);
+          }
+        }
+        const row = remaining;
+        if (row === lastRow && position === lastPosition) return;
+        lastRow = row;
+        lastPosition = position;
+        coordinator.dispatchEnginePosition(row, position);
+      });
+      cleanups.push(unsub);
+
+      // ── 2. Paula register log polling (10Hz) ──────────────────────────
+      this.enablePaulaLog(true);
+      const paulaInterval = window.setInterval(async () => {
+        if (!isPlaying()) return;
+        try {
+          const entries = await this.getPaulaLog();
+          // Lazy-import to avoid pulling automation capture into the engine
+          // module's static dependency graph.
+          const { getAutomationCapture } = await import('@engine/automation/AutomationCapture');
+          const { decodePaulaRegister } = await import('@engine/automation/decoders/PaulaRegisterDecoder');
+          const capture = getAutomationCapture();
+          for (const entry of entries) {
+            const decoded = decodePaulaRegister(entry.channel, entry.reg, entry.value);
+            for (const d of decoded) {
+              capture.push(d.paramId, entry.tick, d.value, {
+                type: 'effect',
+                row: Math.floor((entry.tick - firstTick) / speed),
+                channel: entry.channel,
+                effectCol: 0,
+              });
+            }
+          }
+        } catch { /* ignore errors during shutdown */ }
+      }, 100);
+      cleanups.push(() => clearInterval(paulaInterval));
+    }
+
+    // ── 3. Deferred pattern capture for SKIP_SCAN formats ────────────────
+    if (song.uadeDeferredCapture) {
+      this.enableTickSnapshots(true);
+      const captureEngine = this;
+      const captureSong = song;
+      const deferredTimer = window.setTimeout(async () => {
+        try {
+          const tickSnapshots = await captureEngine.getTickSnapshots();
+          captureEngine.enableTickSnapshots(false);
+          if (tickSnapshots.length < 10) return;
+
+          const { reconstructPatterns } = await import('@engine/uade/UADEPatternReconstructor');
+          const samplePtrToInstrIndex = new Map<number, number>();
+          captureSong.instruments.forEach((inst, idx) => {
+            const ptr = inst.sample?.uadeSamplePtr;
+            if (ptr != null) samplePtrToInstrIndex.set(ptr, idx + 1);
+          });
+
+          const reconstructed = reconstructPatterns(
+            tickSnapshots, samplePtrToInstrIndex, captureSong.numChannels, 6,
+          );
+
+          if (reconstructed.patterns.length > 0) {
+            // Update song in-place (store will pick up the changes)
+            captureSong.patterns = reconstructed.patterns;
+            captureSong.songPositions = reconstructed.patterns.map((_, i) => i);
+            captureSong.songLength = reconstructed.patterns.length;
+            captureSong.initialSpeed = reconstructed.speed;
+            captureSong.uadeFirstTick = reconstructed.firstTick;
+            captureSong.uadeDeferredCapture = false;
+            console.log(`[UADEEngine] Deferred capture: ${reconstructed.patterns.length} patterns reconstructed`);
+          }
+        } catch (e) {
+          console.warn('[UADEEngine] Deferred pattern capture failed:', e);
+        }
+      }, 15000);
+      cleanups.push(() => {
+        clearTimeout(deferredTimer);
+        this.enableTickSnapshots(false);
+      });
+    }
+
+    // ── 4. TFMX timing-table position subscription ───────────────────────
+    if (song.tfmxTimingTable && song.tfmxTimingTable.length > 0) {
+      const tt = song.tfmxTimingTable;
+      let lastRow = -1;
+      let lastPosition = -1;
+      // Lazy-load the format playback store (UI plumbing for the pattern
+      // editor RAF loop). TFMX is the only path that needs this — it doesn't
+      // come through the main play() route that sets it elsewhere.
+      let setFormatPlaybackRow: ((row: number) => void) | null = null;
+      let setFormatPlaybackPlaying: ((playing: boolean) => void) | null = null;
+      void import('@engine/FormatPlaybackState').then((mod) => {
+        setFormatPlaybackRow = mod.setFormatPlaybackRow;
+        setFormatPlaybackPlaying = mod.setFormatPlaybackPlaying;
+      }).catch(() => { /* store unavailable */ });
+
+      const tfmxUnsub = this.onChannelData((_channels, totalFrames) => {
+        if (!isPlaying()) return;
+        // Convert totalFrames to jiffies (PAL VBlank = 50 Hz = 882 samples at 44100)
+        const jiffies = Math.floor(totalFrames / 882);
+
+        // Binary search the timing table
+        let lo = 0, hi = tt.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (tt[mid].cumulativeJiffies <= jiffies) lo = mid;
+          else hi = mid - 1;
+        }
+
+        const entry = tt[lo];
+        const position = entry.patternIndex;
+        const row = entry.row;
+        if (row === lastRow && position === lastPosition) return;
+        lastRow = row;
+        lastPosition = position;
+
+        // TFMX opts out of fireHybridNotes — sister UADE position
+        // subscription block (above) already covers it for UADE-backed formats.
+        coordinator.dispatchEnginePosition(row, position, undefined, /*fireHybrid*/ false);
+
+        // Drive FormatPlaybackState for PatternEditorCanvas RAF loop
+        if (setFormatPlaybackRow) setFormatPlaybackRow(row);
+        if (setFormatPlaybackPlaying) setFormatPlaybackPlaying(true);
+      });
+      cleanups.push(tfmxUnsub);
+    }
+
+    // Return composite cleanup
+    return () => {
+      for (const fn of cleanups) {
+        try { fn(); } catch { /* best-effort */ }
+      }
+    };
   }
 
   /** Subscribe to song end events. Returns unsubscribe function. */
