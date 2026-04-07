@@ -16,7 +16,7 @@
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
 import type { TFMXNativeData } from '@/types/tfmxNative';
-import { setFormatPlaybackRow, setFormatPlaybackPlaying } from './FormatPlaybackState';
+import { setFormatPlaybackPlaying } from './FormatPlaybackState';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
@@ -26,7 +26,6 @@ import { StereoSeparationNode } from './StereoSeparationNode';
 import { getPatternScheduler } from './PatternScheduler';
 import { getAutomationPlayer } from './AutomationPlayer';
 import { getAutomationCapture } from './automation/AutomationCapture';
-import { decodePaulaRegister } from './automation/decoders/PaulaRegisterDecoder';
 import { decodeFurnaceCommand } from './automation/decoders/FurnaceCommandDecoder';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
@@ -415,8 +414,14 @@ export class TrackerReplayer {
     this.coordinator.stateRing.playing = v;
   }
   private _songEndFiredThisBatch = false;
-  private songPos = 0;           // Current position in song order
-  private pattPos = 0;           // Current row in pattern
+  // Position state lives on the coordinator. Engines call
+  // coordinator.dispatchEnginePosition() directly which writes to
+  // coordinator.songPos / pattPos. The accessors below let the rest of
+  // TrackerReplayer keep its `this.songPos` / `this.pattPos` sites unchanged.
+  private get songPos(): number { return this.coordinator.songPos; }
+  private set songPos(v: number) { this.coordinator.songPos = v; }
+  private get pattPos(): number { return this.coordinator.pattPos; }
+  private set pattPos(v: number) { this.coordinator.pattPos = v; }
   private currentTick = 0;       // Current tick (0 to speed-1)
   // Speed (ticks per row) and BPM mirror into coordinator.context so the
   // coordinator's dispatchEnginePosition() always sees the live values when
@@ -575,11 +580,13 @@ export class TrackerReplayer {
   private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
   private _mlPositionUnsub: (() => void) | null = null;
+  // Composite UADE cleanup returned by UADEEngine.subscribeToCoordinator;
+  // unwinds position subscription + Paula log polling + deferred pattern
+  // reconstruction + TFMX channel subscription in one call.
   private _uadePositionUnsub: (() => void) | null = null;
-  private _uadePaulaLogInterval: number | null = null;
   private _furnaceCmdLogUnsub: (() => void) | null = null;
   // Capture sync interval moved to coordinator.startCaptureSync/stopCaptureSync
-  private _tfmxChannelUnsub: (() => void) | null = null;
+  // TFMX channel subscription moved into UADEEngine composite cleanup (4.5)
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
   public getC64SIDEngine(): C64SIDEngine | null {
@@ -1626,139 +1633,18 @@ export class TrackerReplayer {
         this._mlPositionUnsub = result.musicLineEngine.subscribeToCoordinator(this.coordinator);
       }
 
-      // Subscribe to UADEEngine position updates for real-time row/pattern tracking.
-      // Derives pattern/row from CIA tick count using the speed detected during scan.
-      if (result.uadeEngine && this.song.uadeFirstTick != null) {
-        const speed = this.song.initialSpeed || 6;
-        const firstTick = this.song.uadeFirstTick;
-        const patternLengths = this.song.patterns.map(p => p.length);
-        let lastRow = -1;
-        let lastPosition = -1;
-        this._uadePositionUnsub = result.uadeEngine.onPositionUpdate((update) => {
-          if (!this.playing || !this.song) return;
-          const tickCount = update.tickCount ?? 0;
-          // Convert CIA tick count to absolute row index
-          const absoluteRow = Math.max(0, Math.floor((tickCount - firstTick) / speed));
-          // Map absolute row to pattern position + row within pattern
-          let remaining = absoluteRow;
-          let position = 0;
-          for (let i = 0; i < this.song!.songPositions.length; i++) {
-            const patIdx = this.song!.songPositions[i];
-            const patLen = patternLengths[patIdx] ?? 64;
-            if (remaining < patLen) {
-              position = i;
-              break;
-            }
-            remaining -= patLen;
-            position = i;
-            // If we've exhausted all patterns, clamp to last position
-            if (i === this.song!.songPositions.length - 1) {
-              remaining = Math.min(remaining, patLen - 1);
-            }
-          }
-          const row = remaining;
-          if (row === lastRow && position === lastPosition) return;
-          lastRow = row;
-          lastPosition = position;
-          this.dispatchEnginePosition(row, position);
-        });
-        _playLog('UADE position subscription active');
-
-        // Enable Paula register logging for automation capture
-        result.uadeEngine.enablePaulaLog(true);
-        this._uadePaulaLogInterval = window.setInterval(async () => {
-          if (!this.playing) return;
-          try {
-            const entries = await result.uadeEngine!.getPaulaLog();
-            const capture = getAutomationCapture();
-            for (const entry of entries) {
-              const decoded = decodePaulaRegister(entry.channel, entry.reg, entry.value);
-              for (const d of decoded) {
-                capture.push(d.paramId, entry.tick, d.value, {
-                  type: 'effect',
-                  row: Math.floor((entry.tick - firstTick) / speed),
-                  channel: entry.channel,
-                  effectCol: 0,
-                });
-              }
-            }
-          } catch { /* ignore errors during shutdown */ }
-        }, 100); // Poll 10x/sec
-      }
-
-      // Deferred pattern capture for SKIP_SCAN formats: enable tick snapshots
-      // during normal-speed playback and reconstruct patterns after 15 seconds.
-      if (this.song.uadeDeferredCapture && result.uadeEngine) {
-        result.uadeEngine.enableTickSnapshots(true);
-        const captureEngine = result.uadeEngine;
-        const captureSong = this.song;
-        setTimeout(async () => {
-          try {
-            const tickSnapshots = await captureEngine.getTickSnapshots();
-            captureEngine.enableTickSnapshots(false);
-            if (tickSnapshots.length < 10) return;
-
-            const { reconstructPatterns } = await import('./uade/UADEPatternReconstructor');
-            const samplePtrToInstrIndex = new Map<number, number>();
-            captureSong.instruments.forEach((inst, idx) => {
-              const ptr = inst.sample?.uadeSamplePtr;
-              if (ptr != null) samplePtrToInstrIndex.set(ptr, idx + 1);
-            });
-
-            const reconstructed = reconstructPatterns(
-              tickSnapshots, samplePtrToInstrIndex, captureSong.numChannels, 6,
-            );
-
-            if (reconstructed.patterns.length > 0) {
-              // Update song in-place (store will pick up the changes)
-              captureSong.patterns = reconstructed.patterns;
-              captureSong.songPositions = reconstructed.patterns.map((_, i) => i);
-              captureSong.songLength = reconstructed.patterns.length;
-              captureSong.initialSpeed = reconstructed.speed;
-              captureSong.uadeFirstTick = reconstructed.firstTick;
-              captureSong.uadeDeferredCapture = false;
-              console.log(`[TrackerReplayer] Deferred capture: ${reconstructed.patterns.length} patterns reconstructed`);
-            }
-          } catch (e) {
-            console.warn('[TrackerReplayer] Deferred pattern capture failed:', e);
-          }
-        }, 15000); // Capture after 15 seconds of playback
-      }
-
-      // TFMX: use timing table + onChannelData for position sync
-      if (result.uadeEngine && this.song.tfmxTimingTable && this.song.tfmxTimingTable.length > 0) {
-        const tt = this.song.tfmxTimingTable;
-        let lastRow = -1;
-        let lastPosition = -1;
-        this._tfmxChannelUnsub = result.uadeEngine.onChannelData((_channels, totalFrames) => {
-          if (!this.playing || !this.song) return;
-          // Convert totalFrames to jiffies (PAL VBlank = 50 Hz = 882 samples at 44100)
-          const jiffies = Math.floor(totalFrames / 882);
-
-          // Binary search the timing table
-          let lo = 0, hi = tt.length - 1;
-          while (lo < hi) {
-            const mid = (lo + hi + 1) >> 1;
-            if (tt[mid].cumulativeJiffies <= jiffies) lo = mid;
-            else hi = mid - 1;
-          }
-
-          const entry = tt[lo];
-          const position = entry.patternIndex;
-          const row = entry.row;
-          if (row === lastRow && position === lastPosition) return;
-          lastRow = row;
-          lastPosition = position;
-
-          // TFMX opts out of fireHybridNotesForRow — the UADE position
-          // subscription block already covers it for UADE-backed formats.
-          this.dispatchEnginePosition(row, position, undefined, /*fireHybrid*/ false);
-
-          // Drive FormatPlaybackState for PatternEditorCanvas RAF loop
-          setFormatPlaybackRow(row);
-          setFormatPlaybackPlaying(true);
-        });
-        _playLog('TFMX timing-table position subscription active');
+      // UADE setup — position subscription with CIA-tick→row math, Paula log
+      // polling for automation capture, optional deferred pattern reconstruction
+      // for SKIP_SCAN formats, and optional TFMX timing-table position sync.
+      // All ~110 lines of glue now live in UADEEngine.subscribeToCoordinator.
+      if (result.uadeEngine) {
+        this._uadePositionUnsub = result.uadeEngine.subscribeToCoordinator(
+          this.coordinator,
+          this.song,
+          () => this.playing && this.song != null,
+        );
+        if (this.song.uadeFirstTick != null) _playLog('UADE position subscription active');
+        if (this.song.tfmxTimingTable) _playLog('TFMX timing-table position subscription active');
       }
     }
 
@@ -2119,15 +2005,15 @@ export class TrackerReplayer {
       this._mlPositionUnsub = null;
     }
 
-    // Clean up UADE position subscription
+    // Clean up UADE composite cleanup (position, Paula log, deferred capture,
+    // TFMX channel — all rolled into the unsubscribe returned from
+    // UADEEngine.subscribeToCoordinator).
     if (this._uadePositionUnsub) {
       this._uadePositionUnsub();
       this._uadePositionUnsub = null;
-    }
-    // Clean up UADE Paula log polling
-    if (this._uadePaulaLogInterval != null) {
-      clearInterval(this._uadePaulaLogInterval);
-      this._uadePaulaLogInterval = null;
+      // TFMX path drives FormatPlaybackPlaying — clear it on stop in case it
+      // was set. Cheap no-op for non-TFMX UADE songs.
+      setFormatPlaybackPlaying(false);
     }
     // Clean up Furnace command log subscription
     if (this._furnaceCmdLogUnsub) {
@@ -2137,13 +2023,6 @@ export class TrackerReplayer {
     // Clean up automation capture sync
     this.coordinator.stopCaptureSync();
     resetCaptureSync();
-
-    // Clean up TFMX channel subscription
-    if (this._tfmxChannelUnsub) {
-      this._tfmxChannelUnsub();
-      this._tfmxChannelUnsub = null;
-      setFormatPlaybackPlaying(false);
-    }
 
     // Stop all channels (release synth notes + stop sample players)
     for (let i = 0; i < this.channels.length; i++) {
@@ -2545,22 +2424,9 @@ export class TrackerReplayer {
     this.coordinator.context.speed = this.speed;
     this.coordinator.context.fireHybridNotes = (time) => this.fireHybridNotesForRow(time);
     this.coordinator.context.audioContext = Tone.context.rawContext as AudioContext;
-    this.coordinator.songPos = this.songPos;
-    this.coordinator.pattPos = this.pattPos;
+    // songPos / pattPos already live on coordinator (mirrored via accessor)
   }
 
-  /**
-   * Thin delegate to coordinator.dispatchEnginePosition. Engines call this
-   * (via their position subscription) once they've computed (row, position).
-   * Mirrors the new songPos/pattPos back into the replayer's own fields so
-   * the rest of the (still TS-scheduler-coupled) code keeps working.
-   */
-  private dispatchEnginePosition(row: number, position: number, audioTime?: number, fireHybrid: boolean = true): void {
-    if (!this.playing || !this.song) return;
-    this.coordinator.dispatchEnginePosition(row, position, audioTime, fireHybrid);
-    this.songPos = this.coordinator.songPos;
-    this.pattPos = this.coordinator.pattPos;
-  }
 
   // ==========================================================================
   // ROW PROCESSING (TICK 0)
