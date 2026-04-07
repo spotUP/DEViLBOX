@@ -27,6 +27,23 @@ import { GranularFreezeEffect } from '../effects/GranularFreezeEffect';
 import { ShimmerReverbEffect } from '../effects/ShimmerReverbEffect';
 import { TapeDegradationEffect } from '../effects/TapeDegradationEffect';
 import { VocoderEffect } from '../effects/VocoderEffect';
+import { NoiseGateEffect } from '../effects/NoiseGateEffect';
+import { LimiterEffect } from '../effects/LimiterEffect';
+import { FlangerEffect } from '../effects/FlangerEffect';
+import { OverdriveEffect } from '../effects/OverdriveEffect';
+import { RingModEffect } from '../effects/RingModEffect';
+import { DragonflyPlateEffect } from '../effects/DragonflyPlateEffect';
+import { DragonflyHallEffect } from '../effects/DragonflyHallEffect';
+import { DragonflyRoomEffect } from '../effects/DragonflyRoomEffect';
+import { JunoChorusEffect } from '../effects/JunoChorusEffect';
+import { ParametricEQEffect } from '../effects/ParametricEQEffect';
+import { CabinetSimEffect } from '../effects/CabinetSimEffect';
+import { TubeAmpEffect } from '../effects/TubeAmpEffect';
+import { DeEsserEffect } from '../effects/DeEsserEffect';
+import { MultibandCompEffect } from '../effects/MultibandCompEffect';
+import { TransientDesignerEffect } from '../effects/TransientDesignerEffect';
+import { BassEnhancerEffect } from '../effects/BassEnhancerEffect';
+import { ExpanderEffect } from '../effects/ExpanderEffect';
 import { BuzzmachineSynth } from '../buzzmachines/BuzzmachineSynth';
 
 export const EFFECT_RAMP_TIME = 0.02;
@@ -124,13 +141,23 @@ export function applyEffectParametersDiff(
       }
       break;
 
-    case 'EQ3':
-      if (node instanceof Tone.EQ3) {
+    case 'EQ3': {
+      // Node is a Gain wrapper with _eq3Filters: [lowFilter, midFilter, highFilter]
+      const filters = (node as unknown as Record<string, unknown>)._eq3Filters as Tone.Filter[] | undefined;
+      if (filters && filters.length === 3) {
+        if ('low' in changed) filters[0].gain.rampTo(changed.low as number, R);
+        if ('mid' in changed) filters[1].gain.rampTo(changed.mid as number, R);
+        if ('high' in changed) filters[2].gain.rampTo(changed.high as number, R);
+        if ('lowFrequency' in changed) filters[0].frequency.rampTo(changed.lowFrequency as number, R);
+        if ('highFrequency' in changed) filters[2].frequency.rampTo(changed.highFrequency as number, R);
+      } else if (node instanceof Tone.EQ3) {
+        // Fallback for legacy Tone.EQ3 instances
         if ('low' in changed) node.low.rampTo(changed.low as number, R);
         if ('mid' in changed) node.mid.rampTo(changed.mid as number, R);
         if ('high' in changed) node.high.rampTo(changed.high as number, R);
       }
       break;
+    }
 
     case 'Filter':
       if (node instanceof Tone.Filter) {
@@ -412,6 +439,600 @@ export function applyEffectParametersDiff(
         if ('release' in changed) node.setRelease(Number(changed.release) / 1000);
         if ('thru' in changed) node.setThru(Number(changed.thru));
       }
+      break;
+
+    case 'NoiseGate':
+      if (node instanceof NoiseGateEffect) {
+        if ('threshold' in changed) node.setThreshold(Number(changed.threshold));
+        if ('attack' in changed) node.setAttack(Number(changed.attack));
+        if ('hold' in changed) node.setHold(Number(changed.hold));
+        if ('release' in changed) node.setRelease(Number(changed.release));
+        if ('range' in changed) node.setRange(Number(changed.range) / 100);
+        if ('hpf' in changed) node.setHpf(Number(changed.hpf));
+      }
+      break;
+
+    case 'Limiter':
+      if (node instanceof LimiterEffect) {
+        if ('threshold' in changed) node.setThreshold(Number(changed.threshold));
+        if ('ceiling' in changed) node.setCeiling(Number(changed.ceiling));
+        if ('attack' in changed) node.setAttack(Number(changed.attack));
+        if ('release' in changed) node.setRelease(Number(changed.release));
+        if ('lookahead' in changed) node.setLookahead(Number(changed.lookahead));
+        if ('knee' in changed) node.setKnee(Number(changed.knee));
+      }
+      break;
+
+    case 'Flanger':
+      if (node instanceof FlangerEffect) {
+        if ('rate' in changed) node.setRate(Number(changed.rate));
+        if ('depth' in changed) node.setDepth(Number(changed.depth) / 100);
+        if ('delay' in changed) node.setDelay(Number(changed.delay));
+        if ('feedback' in changed) node.setFeedback(Number(changed.feedback) / 100);
+        if ('stereo' in changed) node.setStereo(Number(changed.stereo));
+        if ('mix' in changed) node.setMix(Number(changed.mix) / 100);
+      }
+      break;
+
+    case 'Overdrive':
+      if (node instanceof OverdriveEffect) {
+        if ('drive' in changed) node.setDrive(Number(changed.drive) / 100);
+        if ('tone' in changed) node.setTone(Number(changed.tone) / 100);
+        if ('mix' in changed) node.setMix(Number(changed.mix) / 100);
+        if ('level' in changed) node.setLevel(Number(changed.level) / 100);
+      }
+      break;
+
+    case 'RingMod':
+      if (node instanceof RingModEffect) {
+        if ('frequency' in changed) node.setFrequency(Number(changed.frequency));
+        if ('mix' in changed) node.setMix(Number(changed.mix) / 100);
+        if ('waveform' in changed) node.setWaveform(Number(changed.waveform));
+        if ('lfoRate' in changed) node.setLfoRate(Number(changed.lfoRate));
+        if ('lfoDepth' in changed) node.setLfoDepth(Number(changed.lfoDepth) / 100);
+      }
+      break;
+
+    case 'DragonflyPlate':
+      if (node instanceof DragonflyPlateEffect) {
+        if ('decay' in changed) node.setDecay(Number(changed.decay) / 100);
+        if ('damping' in changed) node.setDamping(Number(changed.damping) / 100);
+        if ('predelay' in changed) node.setPredelay(Number(changed.predelay));
+        if ('width' in changed) node.setWidth(Number(changed.width) / 100);
+        if ('brightness' in changed) node.setBrightness(Number(changed.brightness) / 100);
+      }
+      break;
+
+    case 'DragonflyHall':
+      if (node instanceof DragonflyHallEffect) {
+        if ('decay' in changed) node.setDecay(Number(changed.decay) / 100);
+        if ('damping' in changed) node.setDamping(Number(changed.damping) / 100);
+        if ('predelay' in changed) node.setPredelay(Number(changed.predelay));
+        if ('width' in changed) node.setWidth(Number(changed.width) / 100);
+        if ('earlyLevel' in changed) node.setEarlyLevel(Number(changed.earlyLevel) / 100);
+        if ('size' in changed) node.setSize(Number(changed.size));
+      }
+      break;
+
+    case 'DragonflyRoom':
+      if (node instanceof DragonflyRoomEffect) {
+        if ('decay' in changed) node.setDecay(Number(changed.decay) / 100);
+        if ('damping' in changed) node.setDamping(Number(changed.damping) / 100);
+        if ('predelay' in changed) node.setPredelay(Number(changed.predelay));
+        if ('width' in changed) node.setWidth(Number(changed.width) / 100);
+        if ('earlyLevel' in changed) node.setEarlyLevel(Number(changed.earlyLevel) / 100);
+        if ('size' in changed) node.setSize(Number(changed.size));
+      }
+      break;
+
+    case 'JunoChorus':
+      if (node instanceof JunoChorusEffect) {
+        if ('rate' in changed) node.setRate(Number(changed.rate));
+        if ('depth' in changed) node.setDepth(Number(changed.depth) / 100);
+        if ('mode' in changed) node.setMode(Number(changed.mode));
+        if ('mix' in changed) node.setMix(Number(changed.mix) / 100);
+      }
+      break;
+
+    case 'ParametricEQ':
+      if (node instanceof ParametricEQEffect) {
+        for (const k of Object.keys(changed)) {
+          node.setParam(k, Number(changed[k]));
+        }
+      }
+      break;
+
+    case 'CabinetSim':
+      if (node instanceof CabinetSimEffect) {
+        if ('cabinet' in changed) node.setCabinet(Number(changed.cabinet));
+        if ('mix' in changed) node.setMix(Number(changed.mix) / 100);
+        if ('brightness' in changed) node.setBrightness(Number(changed.brightness) / 100);
+      }
+      break;
+
+    case 'TubeAmp':
+      if (node instanceof TubeAmpEffect) {
+        if ('drive' in changed) node.setDrive(Number(changed.drive) / 100);
+        if ('bass' in changed) node.setBass(Number(changed.bass) / 100);
+        if ('mid' in changed) node.setMid(Number(changed.mid) / 100);
+        if ('treble' in changed) node.setTreble(Number(changed.treble) / 100);
+        if ('presence' in changed) node.setPresence(Number(changed.presence) / 100);
+        if ('master' in changed) node.setMaster(Number(changed.master) / 100);
+        if ('sag' in changed) node.setSag(Number(changed.sag) / 100);
+      }
+      break;
+
+    case 'DeEsser':
+      if (node instanceof DeEsserEffect) {
+        if ('frequency' in changed) node.setFrequency(Number(changed.frequency));
+        if ('bandwidth' in changed) node.setBandwidth(Number(changed.bandwidth));
+        if ('threshold' in changed) node.setThreshold(Number(changed.threshold));
+        if ('ratio' in changed) node.setRatio(Number(changed.ratio));
+        if ('attack' in changed) node.setAttack(Number(changed.attack));
+        if ('release' in changed) node.setRelease(Number(changed.release));
+      }
+      break;
+
+    case 'MultibandComp':
+      if (node instanceof MultibandCompEffect) {
+        if ('lowCrossover' in changed) node.setLowCrossover(Number(changed.lowCrossover));
+        if ('highCrossover' in changed) node.setHighCrossover(Number(changed.highCrossover));
+        if ('lowThreshold' in changed) node.setLowThreshold(Number(changed.lowThreshold));
+        if ('midThreshold' in changed) node.setMidThreshold(Number(changed.midThreshold));
+        if ('highThreshold' in changed) node.setHighThreshold(Number(changed.highThreshold));
+        if ('lowRatio' in changed) node.setLowRatio(Number(changed.lowRatio));
+        if ('midRatio' in changed) node.setMidRatio(Number(changed.midRatio));
+        if ('highRatio' in changed) node.setHighRatio(Number(changed.highRatio));
+        if ('lowGain' in changed) node.setLowGain(Number(changed.lowGain));
+        if ('midGain' in changed) node.setMidGain(Number(changed.midGain));
+        if ('highGain' in changed) node.setHighGain(Number(changed.highGain));
+      }
+      break;
+
+    case 'TransientDesigner':
+      if (node instanceof TransientDesignerEffect) {
+        if ('attack' in changed) node.setAttack(Number(changed.attack));
+        if ('sustain' in changed) node.setSustain(Number(changed.sustain));
+        if ('output' in changed) node.setOutputGain(Number(changed.output));
+      }
+      break;
+
+    case 'BassEnhancer':
+      if (node instanceof BassEnhancerEffect) {
+        if ('frequency' in changed) node.setFrequency(Number(changed.frequency));
+        if ('amount' in changed) node.setAmount(Number(changed.amount));
+        if ('drive' in changed) node.setDrive(Number(changed.drive));
+        if ('mix' in changed) node.setMix(Number(changed.mix));
+      }
+      break;
+
+    case 'Expander':
+      if (node instanceof ExpanderEffect) {
+        if ('threshold' in changed) node.setThreshold(Number(changed.threshold));
+        if ('ratio' in changed) node.setRatio(Number(changed.ratio));
+        if ('attack' in changed) node.setAttack(Number(changed.attack));
+        if ('release' in changed) node.setRelease(Number(changed.release));
+        if ('range' in changed) node.setRange(Number(changed.range));
+        if ('knee' in changed) node.setKnee(Number(changed.knee));
+      }
+      break;
+
+
+    case 'ReverseDelay':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'VintageDelay':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('cutoff' in changed) (node as any).setParam('cutoff', Number(changed.cutoff));
+        if ('drive' in changed) (node as any).setParam('drive', Number(changed.drive));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'ArtisticDelay':
+        if ('timeL' in changed) (node as any).setParam('timeL', Number(changed.timeL));
+        if ('timeR' in changed) (node as any).setParam('timeR', Number(changed.timeR));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('pan' in changed) (node as any).setParam('pan', Number(changed.pan));
+        if ('lpf' in changed) (node as any).setParam('lpf', Number(changed.lpf));
+        if ('hpf' in changed) (node as any).setParam('hpf', Number(changed.hpf));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'SlapbackDelay':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('tone' in changed) (node as any).setParam('tone', Number(changed.tone));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'ZamDelay':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('lpf' in changed) (node as any).setParam('lpf', Number(changed.lpf));
+        if ('hpf' in changed) (node as any).setParam('hpf', Number(changed.hpf));
+        if ('invert' in changed) (node as any).setParam('invert', Number(changed.invert));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Saturator':
+        if ('drive' in changed) (node as any).setParam('drive', Number(changed.drive));
+        if ('blend' in changed) (node as any).setParam('blend', Number(changed.blend));
+        if ('preFreq' in changed) (node as any).setParam('preFreq', Number(changed.preFreq));
+        if ('postFreq' in changed) (node as any).setParam('postFreq', Number(changed.postFreq));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Exciter':
+        if ('frequency' in changed) (node as any).setParam('frequency', Number(changed.frequency));
+        if ('amount' in changed) (node as any).setParam('amount', Number(changed.amount));
+        if ('blend' in changed) (node as any).setParam('blend', Number(changed.blend));
+        if ('ceil' in changed) (node as any).setParam('ceil', Number(changed.ceil));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'AutoSat':
+        if ('amount' in changed) (node as any).setParam('amount', Number(changed.amount));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Satma':
+        if ('distortion' in changed) (node as any).setParam('distortion', Number(changed.distortion));
+        if ('tone' in changed) (node as any).setParam('tone', Number(changed.tone));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'DistortionShaper':
+        if ('inputGain' in changed) (node as any).setParam('inputGain', Number(changed.inputGain));
+        if ('point1x' in changed) (node as any).setParam('point1x', Number(changed.point1x));
+        if ('point1y' in changed) (node as any).setParam('point1y', Number(changed.point1y));
+        if ('point2x' in changed) (node as any).setParam('point2x', Number(changed.point2x));
+        if ('point2y' in changed) (node as any).setParam('point2y', Number(changed.point2y));
+        if ('outputGain' in changed) (node as any).setParam('outputGain', Number(changed.outputGain));
+        if ('preLpf' in changed) (node as any).setParam('preLpf', Number(changed.preLpf));
+        if ('postLpf' in changed) (node as any).setParam('postLpf', Number(changed.postLpf));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MonoComp':
+        if ('threshold' in changed) (node as any).setParam('threshold', Number(changed.threshold));
+        if ('ratio' in changed) (node as any).setParam('ratio', Number(changed.ratio));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('knee' in changed) (node as any).setParam('knee', Number(changed.knee));
+        if ('makeup' in changed) (node as any).setParam('makeup', Number(changed.makeup));
+      break;
+
+    case 'SidechainGate':
+        if ('threshold' in changed) (node as any).setParam('threshold', Number(changed.threshold));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('hold' in changed) (node as any).setParam('hold', Number(changed.hold));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('range' in changed) (node as any).setParam('range', Number(changed.range));
+        if ('scFreq' in changed) (node as any).setParam('scFreq', Number(changed.scFreq));
+        if ('scQ' in changed) (node as any).setParam('scQ', Number(changed.scQ));
+      break;
+
+    case 'MultibandGate':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowThresh' in changed) (node as any).setParam('lowThresh', Number(changed.lowThresh));
+        if ('midThresh' in changed) (node as any).setParam('midThresh', Number(changed.midThresh));
+        if ('highThresh' in changed) (node as any).setParam('highThresh', Number(changed.highThresh));
+        if ('lowRange' in changed) (node as any).setParam('lowRange', Number(changed.lowRange));
+        if ('midRange' in changed) (node as any).setParam('midRange', Number(changed.midRange));
+        if ('highRange' in changed) (node as any).setParam('highRange', Number(changed.highRange));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+      break;
+
+    case 'MultibandLimiter':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowCeil' in changed) (node as any).setParam('lowCeil', Number(changed.lowCeil));
+        if ('midCeil' in changed) (node as any).setParam('midCeil', Number(changed.midCeil));
+        if ('highCeil' in changed) (node as any).setParam('highCeil', Number(changed.highCeil));
+        if ('lowGain' in changed) (node as any).setParam('lowGain', Number(changed.lowGain));
+        if ('midGain' in changed) (node as any).setParam('midGain', Number(changed.midGain));
+        if ('highGain' in changed) (node as any).setParam('highGain', Number(changed.highGain));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+      break;
+
+    case 'SidechainLimiter':
+        if ('ceiling' in changed) (node as any).setParam('ceiling', Number(changed.ceiling));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('scFreq' in changed) (node as any).setParam('scFreq', Number(changed.scFreq));
+        if ('scGain' in changed) (node as any).setParam('scGain', Number(changed.scGain));
+      break;
+
+    case 'Clipper':
+        if ('inputGain' in changed) (node as any).setParam('inputGain', Number(changed.inputGain));
+        if ('ceiling' in changed) (node as any).setParam('ceiling', Number(changed.ceiling));
+        if ('softness' in changed) (node as any).setParam('softness', Number(changed.softness));
+      break;
+
+    case 'DynamicsProc':
+        if ('lowerThresh' in changed) (node as any).setParam('lowerThresh', Number(changed.lowerThresh));
+        if ('upperThresh' in changed) (node as any).setParam('upperThresh', Number(changed.upperThresh));
+        if ('ratio' in changed) (node as any).setParam('ratio', Number(changed.ratio));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('makeup' in changed) (node as any).setParam('makeup', Number(changed.makeup));
+      break;
+
+    case 'X42Comp':
+        if ('threshold' in changed) (node as any).setParam('threshold', Number(changed.threshold));
+        if ('ratio' in changed) (node as any).setParam('ratio', Number(changed.ratio));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('hold' in changed) (node as any).setParam('hold', Number(changed.hold));
+        if ('inputGain' in changed) (node as any).setParam('inputGain', Number(changed.inputGain));
+      break;
+
+    case 'EQ5Band':
+        if ('lowShelfFreq' in changed) (node as any).setParam('lowShelfFreq', Number(changed.lowShelfFreq));
+        if ('lowShelfGain' in changed) (node as any).setParam('lowShelfGain', Number(changed.lowShelfGain));
+        if ('peak1Freq' in changed) (node as any).setParam('peak1Freq', Number(changed.peak1Freq));
+        if ('peak1Gain' in changed) (node as any).setParam('peak1Gain', Number(changed.peak1Gain));
+        if ('peak1Q' in changed) (node as any).setParam('peak1Q', Number(changed.peak1Q));
+        if ('peak2Freq' in changed) (node as any).setParam('peak2Freq', Number(changed.peak2Freq));
+        if ('peak2Gain' in changed) (node as any).setParam('peak2Gain', Number(changed.peak2Gain));
+        if ('peak2Q' in changed) (node as any).setParam('peak2Q', Number(changed.peak2Q));
+        if ('peak3Freq' in changed) (node as any).setParam('peak3Freq', Number(changed.peak3Freq));
+        if ('peak3Gain' in changed) (node as any).setParam('peak3Gain', Number(changed.peak3Gain));
+        if ('peak3Q' in changed) (node as any).setParam('peak3Q', Number(changed.peak3Q));
+        if ('highShelfFreq' in changed) (node as any).setParam('highShelfFreq', Number(changed.highShelfFreq));
+        if ('highShelfGain' in changed) (node as any).setParam('highShelfGain', Number(changed.highShelfGain));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'EQ8Band':
+      // No params to update
+      break;
+
+    case 'EQ12Band':
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'GEQ31':
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'ZamEQ2':
+        if ('lowFreq' in changed) (node as any).setParam('lowFreq', Number(changed.lowFreq));
+        if ('lowGain' in changed) (node as any).setParam('lowGain', Number(changed.lowGain));
+        if ('lowBw' in changed) (node as any).setParam('lowBw', Number(changed.lowBw));
+        if ('highFreq' in changed) (node as any).setParam('highFreq', Number(changed.highFreq));
+        if ('highGain' in changed) (node as any).setParam('highGain', Number(changed.highGain));
+        if ('highBw' in changed) (node as any).setParam('highBw', Number(changed.highBw));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'PhonoFilter':
+        if ('mode' in changed) (node as any).setParam('mode', Number(changed.mode));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'DynamicEQ':
+        if ('detectFreq' in changed) (node as any).setParam('detectFreq', Number(changed.detectFreq));
+        if ('detectQ' in changed) (node as any).setParam('detectQ', Number(changed.detectQ));
+        if ('processFreq' in changed) (node as any).setParam('processFreq', Number(changed.processFreq));
+        if ('processQ' in changed) (node as any).setParam('processQ', Number(changed.processQ));
+        if ('threshold' in changed) (node as any).setParam('threshold', Number(changed.threshold));
+        if ('maxGain' in changed) (node as any).setParam('maxGain', Number(changed.maxGain));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'HaasEnhancer':
+        if ('delay' in changed) (node as any).setParam('delay', Number(changed.delay));
+        if ('side' in changed) (node as any).setParam('side', Number(changed.side));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MultiSpread':
+        if ('bands' in changed) (node as any).setParam('bands', Number(changed.bands));
+        if ('spread' in changed) (node as any).setParam('spread', Number(changed.spread));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MultibandEnhancer':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('midCross' in changed) (node as any).setParam('midCross', Number(changed.midCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowWidth' in changed) (node as any).setParam('lowWidth', Number(changed.lowWidth));
+        if ('midWidth' in changed) (node as any).setParam('midWidth', Number(changed.midWidth));
+        if ('highWidth' in changed) (node as any).setParam('highWidth', Number(changed.highWidth));
+        if ('topWidth' in changed) (node as any).setParam('topWidth', Number(changed.topWidth));
+        if ('harmonics' in changed) (node as any).setParam('harmonics', Number(changed.harmonics));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'EarlyReflections':
+        if ('size' in changed) (node as any).setParam('size', Number(changed.size));
+        if ('damping' in changed) (node as any).setParam('damping', Number(changed.damping));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Pulsator':
+        if ('rate' in changed) (node as any).setParam('rate', Number(changed.rate));
+        if ('depth' in changed) (node as any).setParam('depth', Number(changed.depth));
+        if ('waveform' in changed) (node as any).setParam('waveform', Number(changed.waveform));
+        if ('stereoPhase' in changed) (node as any).setParam('stereoPhase', Number(changed.stereoPhase));
+        if ('offset' in changed) (node as any).setParam('offset', Number(changed.offset));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Ducka':
+        if ('threshold' in changed) (node as any).setParam('threshold', Number(changed.threshold));
+        if ('drop' in changed) (node as any).setParam('drop', Number(changed.drop));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Masha':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('volume' in changed) (node as any).setParam('volume', Number(changed.volume));
+        if ('passthrough' in changed) (node as any).setParam('passthrough', Number(changed.passthrough));
+        if ('active' in changed) (node as any).setParam('active', Number(changed.active));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Vinyl':
+        if ('crackle' in changed) (node as any).setParam('crackle', Number(changed.crackle));
+        if ('noise' in changed) (node as any).setParam('noise', Number(changed.noise));
+        if ('rumble' in changed) (node as any).setParam('rumble', Number(changed.rumble));
+        if ('wear' in changed) (node as any).setParam('wear', Number(changed.wear));
+        if ('speed' in changed) (node as any).setParam('speed', Number(changed.speed));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'BeatBreather':
+        if ('transientBoost' in changed) (node as any).setParam('transientBoost', Number(changed.transientBoost));
+        if ('sustainBoost' in changed) (node as any).setParam('sustainBoost', Number(changed.sustainBoost));
+        if ('sensitivity' in changed) (node as any).setParam('sensitivity', Number(changed.sensitivity));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MultibandClipper':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowCeil' in changed) (node as any).setParam('lowCeil', Number(changed.lowCeil));
+        if ('midCeil' in changed) (node as any).setParam('midCeil', Number(changed.midCeil));
+        if ('highCeil' in changed) (node as any).setParam('highCeil', Number(changed.highCeil));
+        if ('softness' in changed) (node as any).setParam('softness', Number(changed.softness));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MultibandDynamics':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowExpThresh' in changed) (node as any).setParam('lowExpThresh', Number(changed.lowExpThresh));
+        if ('midExpThresh' in changed) (node as any).setParam('midExpThresh', Number(changed.midExpThresh));
+        if ('highExpThresh' in changed) (node as any).setParam('highExpThresh', Number(changed.highExpThresh));
+        if ('lowCompThresh' in changed) (node as any).setParam('lowCompThresh', Number(changed.lowCompThresh));
+        if ('midCompThresh' in changed) (node as any).setParam('midCompThresh', Number(changed.midCompThresh));
+        if ('highCompThresh' in changed) (node as any).setParam('highCompThresh', Number(changed.highCompThresh));
+        if ('ratio' in changed) (node as any).setParam('ratio', Number(changed.ratio));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MultibandExpander':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowThresh' in changed) (node as any).setParam('lowThresh', Number(changed.lowThresh));
+        if ('midThresh' in changed) (node as any).setParam('midThresh', Number(changed.midThresh));
+        if ('highThresh' in changed) (node as any).setParam('highThresh', Number(changed.highThresh));
+        if ('ratio' in changed) (node as any).setParam('ratio', Number(changed.ratio));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('range' in changed) (node as any).setParam('range', Number(changed.range));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'GOTTComp':
+        if ('lowCross' in changed) (node as any).setParam('lowCross', Number(changed.lowCross));
+        if ('highCross' in changed) (node as any).setParam('highCross', Number(changed.highCross));
+        if ('lowThresh' in changed) (node as any).setParam('lowThresh', Number(changed.lowThresh));
+        if ('midThresh' in changed) (node as any).setParam('midThresh', Number(changed.midThresh));
+        if ('highThresh' in changed) (node as any).setParam('highThresh', Number(changed.highThresh));
+        if ('lowRatio' in changed) (node as any).setParam('lowRatio', Number(changed.lowRatio));
+        if ('midRatio' in changed) (node as any).setParam('midRatio', Number(changed.midRatio));
+        if ('highRatio' in changed) (node as any).setParam('highRatio', Number(changed.highRatio));
+        if ('attack' in changed) (node as any).setParam('attack', Number(changed.attack));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Maximizer':
+        if ('ceiling' in changed) (node as any).setParam('ceiling', Number(changed.ceiling));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'AGC':
+        if ('target' in changed) (node as any).setParam('target', Number(changed.target));
+        if ('speed' in changed) (node as any).setParam('speed', Number(changed.speed));
+        if ('maxGain' in changed) (node as any).setParam('maxGain', Number(changed.maxGain));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Della':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('volume' in changed) (node as any).setParam('volume', Number(changed.volume));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Driva':
+        if ('amount' in changed) (node as any).setParam('amount', Number(changed.amount));
+        if ('tone' in changed) (node as any).setParam('tone', Number(changed.tone));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Panda':
+        if ('threshold' in changed) (node as any).setParam('threshold', Number(changed.threshold));
+        if ('factor' in changed) (node as any).setParam('factor', Number(changed.factor));
+        if ('release' in changed) (node as any).setParam('release', Number(changed.release));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'BinauralPanner':
+        if ('azimuth' in changed) (node as any).setParam('azimuth', Number(changed.azimuth));
+        if ('elevation' in changed) (node as any).setParam('elevation', Number(changed.elevation));
+        if ('distance' in changed) (node as any).setParam('distance', Number(changed.distance));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Roomy':
+        if ('time' in changed) (node as any).setParam('time', Number(changed.time));
+        if ('damping' in changed) (node as any).setParam('damping', Number(changed.damping));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Bitta':
+        if ('crush' in changed) (node as any).setParam('crush', Number(changed.crush));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Kuiza':
+        if ('low' in changed) (node as any).setParam('low', Number(changed.low));
+        if ('lowMid' in changed) (node as any).setParam('lowMid', Number(changed.lowMid));
+        if ('highMid' in changed) (node as any).setParam('highMid', Number(changed.highMid));
+        if ('high' in changed) (node as any).setParam('high', Number(changed.high));
+        if ('gain' in changed) (node as any).setParam('gain', Number(changed.gain));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'Vihda':
+        if ('width' in changed) (node as any).setParam('width', Number(changed.width));
+        if ('invert' in changed) (node as any).setParam('invert', Number(changed.invert));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'MultiChorus':
+        if ('rate' in changed) (node as any).setParam('rate', Number(changed.rate));
+        if ('depth' in changed) (node as any).setParam('depth', Number(changed.depth));
+        if ('voices' in changed) (node as any).setParam('voices', Number(changed.voices));
+        if ('stereoPhase' in changed) (node as any).setParam('stereoPhase', Number(changed.stereoPhase));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      break;
+
+    case 'CalfPhaser':
+        if ('rate' in changed) (node as any).setParam('rate', Number(changed.rate));
+        if ('depth' in changed) (node as any).setParam('depth', Number(changed.depth));
+        if ('stages' in changed) (node as any).setParam('stages', Number(changed.stages));
+        if ('feedback' in changed) (node as any).setParam('feedback', Number(changed.feedback));
+        if ('stereoPhase' in changed) (node as any).setParam('stereoPhase', Number(changed.stereoPhase));
+        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
       break;
 
     case 'ShimmerReverb':
