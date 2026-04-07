@@ -7,3 +7,4 @@ export { MasterEffectsPanel } from './MasterEffectsPanel';
 export { MasterEffectsModal } from './MasterEffectsModal';
 export { InstrumentEffectsModal } from './InstrumentEffectsModal';
 export { EffectParameterEditor } from './EffectParameterEditor';
+export { ChannelInsertEffectsModal } from './ChannelInsertEffectsModal';
