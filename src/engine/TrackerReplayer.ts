@@ -1700,7 +1700,7 @@ export class TrackerReplayer {
       // (uadeFirstTick != null OR tfmxTimingTable populated). UADE songs without
       // a known firstTick (some FC/JAM/etc. variants) still need the TS scheduler
       // for VU/automation/display state updates.
-      if (result.uadeEngine) {
+      if (result.uadeEngine && typeof result.uadeEngine.subscribeToCoordinator === 'function') {
         this._uadePositionUnsub = result.uadeEngine.subscribeToCoordinator(
           this.coordinator,
           this.song,
