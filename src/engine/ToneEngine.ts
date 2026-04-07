@@ -916,6 +916,13 @@ export class ToneEngine {
       'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
       'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
       'TFMXSynth', 'FCSynth', 'C64SID',
+      // WASM player-pool synths — each has a fixed-size pool, must dedup
+      'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
+      'FredSynth', 'FredEditorReplayerSynth', 'OctaMEDSynth',
+      'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth',
+      'DavidWhittakerSynth', 'SonicArrangerSynth',
+      'InStereo2Synth', 'InStereo1Synth', 'StartrekkerAMSynth',
+      'DeltaMusic1Synth', 'DeltaMusic2Synth',
     ]);
     const seenNativeTypes = new Set<string>();
     const dedupedOther = otherConfigs.filter((c) => {
@@ -1110,7 +1117,13 @@ export class ToneEngine {
     // is a singleton that handles all channels internally.
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
-      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth' || c.synthType === 'TFMXSynth' || c.synthType === 'FCSynth' || c.synthType === 'C64SID') {
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth' || c.synthType === 'TFMXSynth' || c.synthType === 'FCSynth' || c.synthType === 'C64SID'
+        || c.synthType === 'SoundMonSynth' || c.synthType === 'SidMonSynth' || c.synthType === 'SidMon1Synth' || c.synthType === 'DigMugSynth'
+        || c.synthType === 'FredSynth' || c.synthType === 'FredEditorReplayerSynth' || c.synthType === 'OctaMEDSynth'
+        || c.synthType === 'HippelCoSoSynth' || c.synthType === 'RobHubbardSynth' || c.synthType === 'SteveTurnerSynth'
+        || c.synthType === 'DavidWhittakerSynth' || c.synthType === 'SonicArrangerSynth'
+        || c.synthType === 'InStereo2Synth' || c.synthType === 'InStereo1Synth' || c.synthType === 'StartrekkerAMSynth'
+        || c.synthType === 'DeltaMusic1Synth' || c.synthType === 'DeltaMusic2Synth') {
         if (seenNativePlayers.has(c.synthType!)) return false;
         seenNativePlayers.add(c.synthType!);
       }

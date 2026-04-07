@@ -1730,6 +1730,13 @@ export class TrackerReplayer {
         'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
         'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
         'TFMXSynth', 'FCSynth', 'C64SID',
+        // WASM player-pool synths — each has a fixed-size pool, must dedup
+        'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
+        'FredSynth', 'FredEditorReplayerSynth', 'OctaMEDSynth',
+        'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth',
+        'DavidWhittakerSynth', 'SonicArrangerSynth',
+        'InStereo2Synth', 'InStereo1Synth', 'StartrekkerAMSynth',
+        'DeltaMusic1Synth', 'DeltaMusic2Synth',
       ]);
       const { useInstrumentStore } = await import('@stores/useInstrumentStore');
       const instruments = useInstrumentStore.getState().instruments;
