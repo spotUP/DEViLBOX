@@ -154,7 +154,12 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
           WAMQuadraFuzz: 1.3,
           WAMVoxAmp: 1.15,
         };
+        // Effects that should render at 1:1 and be centered (no zoom scaling)
+        const WAM_NO_SCALE: Set<string> = new Set([
+          'WAMBigMuff',
+        ]);
         const effectMinScale = WAM_MIN_SCALE[effect.type] ?? 0;
+        const forceNoScale = WAM_NO_SCALE.has(effect.type);
 
         // Try to directly resize canvas-based WAM plugins through their Shadow DOM.
         // This is the ONLY correct approach for canvas plugins that use
@@ -217,6 +222,18 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
           const container = guiContainerRef.current;
           if (!container || !gui) return;
 
+          // No-scale mode: render at 1:1 and center
+          if (forceNoScale) {
+            (gui.style as any).zoom = '';
+            gui.style.transform = '';
+            gui.style.position = 'relative';
+            gui.style.margin = '0 auto';
+            gui.style.display = 'block';
+            const h = gui.offsetHeight || gui.scrollHeight || gui.clientHeight;
+            if (h) container.style.height = `${h + 8}px`;
+            return;
+          }
+
           // For canvas-based plugins, directly resize canvases (no CSS scaling)
           if (isCanvasPlugin || tryResizeCanvasPlugin(container)) {
             isCanvasPlugin = true;
@@ -278,8 +295,8 @@ export const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
       {/* Native WAM GUI */}
       <div
         ref={guiContainerRef}
-        className="bg-black rounded-lg border border-dark-border overflow-visible relative"
-        style={{ minHeight: hasGui ? 200 : 0, display: hasGui || isLoading ? 'block' : 'none' }}
+        className="bg-black rounded-lg border border-dark-border overflow-visible relative flex justify-center"
+        style={{ minHeight: hasGui ? 200 : 0, display: hasGui || isLoading ? 'flex' : 'none' }}
       />
       {isLoading && (
         <div className="flex items-center justify-center py-8 text-text-muted text-xs">
