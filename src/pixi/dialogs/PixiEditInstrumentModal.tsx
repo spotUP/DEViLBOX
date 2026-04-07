@@ -40,6 +40,8 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { PixiModularSynthEditor } from '../views/instruments/PixiModularSynthEditor';
 import { PixiAmigaSynthPanel } from '../views/instruments/PixiAmigaSynthPanel';
 import { PixiTFMXMacroPanel } from '../views/instruments/PixiTFMXMacroPanel';
+import { PixiHippelCoSoPanel } from '../views/instruments/PixiHippelCoSoPanel';
+import { PixiSonicArrangerPanel } from '../views/instruments/PixiSonicArrangerPanel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
@@ -1818,6 +1820,12 @@ const NativeInstrumentPanel: React.FC<{
   if (instrument.synthType === 'TFMXSynth'
       && (instrument.metadata as { tfmxMacroIndex?: number } | undefined)?.tfmxMacroIndex !== undefined) {
     return <PixiTFMXMacroPanel instrument={instrument} />;
+  }
+  if (instrument.synthType === 'HippelCoSoSynth' && instrument.hippelCoso) {
+    return <PixiHippelCoSoPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'SonicArrangerSynth' && instrument.sonicArranger) {
+    return <PixiSonicArrangerPanel instrument={instrument} onUpdate={onUpdate} />;
   }
   // Generic Amiga synth panel for all formats with layout descriptors
   const amigaLayout = instrument.synthType ? AMIGA_SYNTH_LAYOUTS[instrument.synthType] : undefined;
