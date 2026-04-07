@@ -106,7 +106,7 @@ const TABLE_COLUMN: ColumnDef[] = [
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
-type DM1Tab = 'envelope' | 'modulation' | 'arpeggio' | 'table';
+type DM1Tab = 'envelope' | 'modulation' | 'arpeggio' | 'table' | 'sample';
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -477,13 +477,125 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     );
   };
 
+  // ── SAMPLE PREVIEW TAB (read-only waveform of raw sampleData) ────────────
+
+  const sampleCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'sample') return;
+    const canvas = sampleCanvasRef.current;
+    if (!canvas) return;
+    const sd = configRef.current.sampleData;
+    if (!sd || sd.length === 0) return;
+
+    const draw = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth || 320;
+      const cssH = canvas.clientHeight || 120;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+
+      const w = cssW;
+      const h = cssH;
+      const mid = h / 2;
+
+      // Background
+      ctx.fillStyle = '#0a0e14';
+      ctx.fillRect(0, 0, w, h);
+
+      // Center line
+      ctx.strokeStyle = '#1a2a3a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, mid);
+      ctx.lineTo(w, mid);
+      ctx.stroke();
+
+      // Waveform: sampleData entries are signed 8-bit (-128..127)
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const step = Math.max(1, Math.floor(sd.length / w));
+      for (let x = 0; x < w; x++) {
+        const i = Math.min(sd.length - 1, Math.floor((x / w) * sd.length));
+        // Peak-pick across the bucket so dense samples remain visible
+        let peak = 0;
+        const end = Math.min(sd.length, i + step);
+        for (let j = i; j < end; j++) {
+          const v = sd[j];
+          const signed = v > 127 ? v - 256 : v; // tolerate either signed or unsigned ints
+          if (Math.abs(signed) > Math.abs(peak)) peak = signed;
+        }
+        const y = mid - (peak / 128) * (mid - 2);
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    };
+
+    const raf = requestAnimationFrame(draw);
+    const obs = new ResizeObserver(draw);
+    obs.observe(canvas);
+    return () => {
+      cancelAnimationFrame(raf);
+      obs.disconnect();
+    };
+  }, [activeTab, config.sampleData, accent]);
+
+  const renderSample = () => {
+    const sd = config.sampleData;
+    if (!sd || sd.length === 0) {
+      return (
+        <div className="p-3 text-[11px] text-text-muted">
+          No raw sample data available for this instrument.
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+          <SectionLabel color={accent} label="Raw Sample Data (read-only preview)" />
+          <div className="text-[10px] text-text-muted mb-2">
+            {sd.length.toLocaleString()} bytes — signed 8-bit PCM from the DM1 sample pool.
+            {config.isSample
+              ? ' This is the playable PCM sample for this instrument.'
+              : ' For synth instruments this is the waveform pool used by the sound table.'}
+          </div>
+          <canvas
+            ref={sampleCanvasRef}
+            className="w-full rounded border border-dark-border bg-[#0a0e14]"
+            style={{ height: 140 }}
+          />
+          <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-mono"
+            style={{ color: accent, opacity: 0.8 }}>
+            <div>Bytes: <span className="text-text-muted">{sd.length}</span></div>
+            <div>Min: <span className="text-text-muted">
+              {Math.min(...sd.map((v) => (v > 127 ? v - 256 : v)))}
+            </span></div>
+            <div>Max: <span className="text-text-muted">
+              {Math.max(...sd.map((v) => (v > 127 ? v - 256 : v)))}
+            </span></div>
+            <div>Mode: <span className="text-text-muted">{config.isSample ? 'PCM sample' : 'Synth waveform pool'}</span></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── TABS ──────────────────────────────────────────────────────────────────
+
+  const hasSampleData = !!(config.sampleData && config.sampleData.length > 0);
 
   const tabs: Array<[DM1Tab, string]> = [
     ['envelope',   'Envelope'],
     ['modulation', 'Modulation'],
     ['arpeggio',   'Arpeggio'],
     ...(!config.isSample ? [['table', 'Table'] as [DM1Tab, string]] : []),
+    ...(hasSampleData ? [['sample', 'Sample'] as [DM1Tab, string]] : []),
   ];
 
   return (
@@ -507,6 +619,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
       {activeTab === 'modulation' && renderModulation()}
       {activeTab === 'arpeggio'   && renderArpeggio()}
       {activeTab === 'table'      && renderTable()}
+      {activeTab === 'sample'     && renderSample()}
 
       {uadeChipRam && (
         <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
