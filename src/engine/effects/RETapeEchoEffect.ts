@@ -79,10 +79,9 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
     this.output = new Tone.Gain(1);
 
     // WASM outputs wet-only signal; we mix externally.
-    // Use a minimum dry floor of 0.2 until WASM is confirmed ready — ensures
-    // audio passes through even at 100% wet before the worklet produces output.
-    this.dryGain = new Tone.Gain(Math.max(0.2, 1 - this._options.wet));
-    this.wetGain = new Tone.Gain(this._options.wet);
+    // Start full-dry until worklet is ready — prevents silence while WASM loads.
+    this.dryGain = new Tone.Gain(1);
+    this.wetGain = new Tone.Gain(0);
 
     // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
@@ -113,7 +112,7 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
 
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
-          // WASM ready — send params and apply the true dry level
+          // WASM ready — send params and apply the true wet/dry levels
           this.sendParam('mode', this._options.mode);
           this.sendParam('repeatRate', this._options.repeatRate);
           this.sendParam('intensity', this._options.intensity);
@@ -124,8 +123,9 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
           this.sendParam('inputBleed', this._options.inputBleed);
           this.sendParam('loopAmount', this._options.loopAmount);
           this.sendParam('playheadFilter', this._options.playheadFilter);
-          // Remove the dry floor now that WASM is producing output
+          // Worklet producing output — apply correct wet/dry mix
           this.dryGain.gain.value = 1 - this._options.wet;
+          this.wetGain.gain.value = this._options.wet;
         } else if (event.data.type === 'error') {
           console.error('[RETapeEcho] Worklet error:', event.data.message);
         }
