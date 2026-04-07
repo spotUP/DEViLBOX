@@ -36,7 +36,8 @@ export interface DispatchCommand {
 export type PlatformFamily =
   | 'fm_opn2'    // YM2612 (Genesis/Mega Drive) — fmOPN2PostEffectHandlerMap
   | 'fm_opn'     // YM2203, YM2608, YM2610 (with AY PSG) — fmOPNPostEffectHandlerMap
-  | 'fm_opm'     // YM2151, TX81Z (Arcade) — fmOPMPostEffectHandlerMap
+  | 'fm_opm'     // YM2151 (Arcade) — fmOPMPostEffectHandlerMap
+  | 'fm_opz'     // TX81Z / OPZ — fmOPZPostEffectHandlerMap (extends OPM with LFO2)
   | 'fm_opl'     // OPL, OPL2, OPL3 — fmOPLPostEffectHandlerMap
   | 'fm_esfm'    // ESFM — fmESFMPostEffectHandlerMap
   | 'fm_opll'    // OPLL, VRC7 — fmOPLLPostEffectHandlerMap
@@ -53,7 +54,10 @@ export type PlatformFamily =
   | 'namco'      // Namco WSG / N163
   | 'amiga'      // Amiga Paula
   | 'segapcm'    // Sega PCM
-  | 'sample'     // Generic sample-based chips (QSound, ES5506, etc.)
+  | 'sample'     // Generic sample-based chips (RF5C68, MSM6295, etc.)
+  | 'qsound'     // Capcom QSound — unique echo/surround effects
+  | 'es5506'     // Ensoniq ES5506 — filter + envelope effects
+  | 'multipcm'   // Sega MultiPCM — LFO + envelope effects
   | 'scc'        // Konami SCC / SCC+
   | 'x1010'      // Seta X1-010
   | 'wavetable'  // Generic wavetable chips (VERA, Sound Unit, BubSys WSG)
@@ -97,8 +101,11 @@ export function getPlatformFamily(platform: number): PlatformFamily {
     // FM OPM (YM2151)
     case FurnaceDispatchPlatform.YM2151:
     case FurnaceDispatchPlatform.ARCADE:
-    case FurnaceDispatchPlatform.TX81Z:
       return 'fm_opm';
+
+    // FM OPZ (TX81Z) — extends OPM with LFO2, AM2, PM2, reverb, waveform select
+    case FurnaceDispatchPlatform.TX81Z:
+      return 'fm_opz';
 
     // FM OPL
     case FurnaceDispatchPlatform.OPL:
@@ -184,9 +191,19 @@ export function getPlatformFamily(platform: number): PlatformFamily {
     case FurnaceDispatchPlatform.SEGAPCM_COMPAT:
       return 'segapcm';
 
-    // Sample-based
+    // Capcom QSound — unique echo/surround effects
     case FurnaceDispatchPlatform.QSOUND:
+      return 'qsound';
+
+    // Sega MultiPCM — LFO + envelope effects
     case FurnaceDispatchPlatform.MULTIPCM:
+      return 'multipcm';
+
+    // Ensoniq ES5506 — filter + envelope effects
+    case FurnaceDispatchPlatform.ES5506:
+      return 'es5506';
+
+    // Sample-based (generic)
     case FurnaceDispatchPlatform.RF5C68:
     case FurnaceDispatchPlatform.MSM6295:
     case FurnaceDispatchPlatform.MSM6258:
@@ -196,7 +213,6 @@ export function getPlatformFamily(platform: number): PlatformFamily {
     case FurnaceDispatchPlatform.GA20:
     case FurnaceDispatchPlatform.C140:
     case FurnaceDispatchPlatform.C219:
-    case FurnaceDispatchPlatform.ES5506:
     case FurnaceDispatchPlatform.PCM_DAC:
     case FurnaceDispatchPlatform.GBA_DMA:     // GBA DMA — sample playback
     case FurnaceDispatchPlatform.GBA_MINMOD:  // GBA MinMod — sample playback
@@ -469,6 +485,7 @@ export class FurnaceEffectRouter {
       case 'fm_opn2':  return this.routeOPN2Effect(chan, effect, param);
       case 'fm_opn':   return this.routeOPNEffect(chan, effect, param);
       case 'fm_opm':   return this.routeOPMEffect(chan, effect, param);
+      case 'fm_opz':   return this.routeOPZEffect(chan, effect, param);
       case 'fm_opl':   return this.routeOPLEffect(chan, effect, param);
       case 'fm_esfm':  return this.routeESFMEffect(chan, effect, param);
       case 'fm_opll':  return this.routeOPLLEffect(chan, effect, param);
@@ -486,6 +503,9 @@ export class FurnaceEffectRouter {
       case 'amiga':      return this.routeAmigaEffect(chan, effect, param);
       case 'segapcm':    return this.routeSegaPCMEffect(chan, effect, param);
       case 'sample':     return this.routeSampleEffect(chan, effect, param);
+      case 'qsound':     return this.routeQSoundEffect(chan, effect, param);
+      case 'es5506':     return this.routeES5506Effect(chan, effect, param);
+      case 'multipcm':   return this.routeMultiPCMEffect(chan, effect, param);
       case 'scc':        return this.routeSCCEffect(chan, effect, param);
       case 'x1010':      return this.routeX1010Effect(chan, effect, param);
       case 'wavetable':  return this.routeWavetableEffect(chan, effect, param);
@@ -840,6 +860,66 @@ export class FurnaceEffectRouter {
 
       default:
         commands.push(...this.routeBaseFMEffect(chan, effect, param));
+        break;
+    }
+
+    return commands;
+  }
+
+  /**
+   * TX81Z / OPZ — extends OPM with LFO2, AM2/PM2 depth, reverb, waveform select
+   * Post: fmOPZPostEffectHandlerMap (extends fmOPMPostEffectHandlerMap)
+   * From Furnace sysDef.cpp fmOPZPostEffectHandlerMap
+   */
+  private routeOPZEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+
+    switch (effect) {
+      // OPZ-specific post-effects (not in OPM)
+      case 0x24: // Set LFO 2 speed
+        commands.push({ cmd: DivCmd.FM_LFO2, chan, val1: param, val2: 0 });
+        break;
+      case 0x25: // Set LFO 2 waveform (0: saw, 1: square, 2: triangle, 3: noise)
+        commands.push({ cmd: DivCmd.FM_LFO2_WAVE, chan, val1: param, val2: 0 });
+        break;
+      case 0x26: // Set AM 2 depth (0 to 7F)
+        commands.push({ cmd: DivCmd.FM_AM2_DEPTH, chan, val1: param & 127, val2: 0 });
+        break;
+      case 0x27: // Set PM 2 depth (0 to 7F)
+        commands.push({ cmd: DivCmd.FM_PM2_DEPTH, chan, val1: param & 127, val2: 0 });
+        break;
+      case 0x28: { // Set reverb (x: op 1-4 or 0=all; y: reverb 0-7)
+        const op = (param >> 4);
+        if (op <= 4) {
+          commands.push({ cmd: DivCmd.FM_REV, chan, val1: op > 0 ? op - 1 : op, val2: param & 7 });
+        }
+        break;
+      }
+      case 0x2a: { // Set waveform (x: op 1-4 or 0=all; y: waveform 0-7)
+        const op = (param >> 4);
+        if (op <= 4) {
+          commands.push({ cmd: DivCmd.FM_WS, chan, val1: op > 0 ? op - 1 : op, val2: param & 7 });
+        }
+        break;
+      }
+      case 0x2b: { // Set EG shift (x: op 1-4 or 0=all; y: shift 0-3)
+        const op = (param >> 4);
+        if (op <= 4) {
+          commands.push({ cmd: DivCmd.FM_EG_SHIFT, chan, val1: op > 0 ? op - 1 : op, val2: param & 3 });
+        }
+        break;
+      }
+      case 0x2c: { // Set fine multiplier (x: op 1-4 or 0=all; y: fine 0-15)
+        const op = (param >> 4);
+        if (op <= 4) {
+          commands.push({ cmd: DivCmd.FM_FINE, chan, val1: op > 0 ? op - 1 : op, val2: param & 15 });
+        }
+        break;
+      }
+
+      default:
+        // Fall through to OPM handler for shared OPM effects
+        commands.push(...this.routeOPMEffect(chan, effect, param));
         break;
     }
 
@@ -1451,8 +1531,8 @@ export class FurnaceEffectRouter {
   }
 
   /**
-   * Generic sample-based chip effects (QSound, ES5506, etc.)
-   * Various chips have their own post-effect maps; this covers common ones.
+   * Generic sample-based chip effects (RF5C68, MSM6295, C140, etc.)
+   * Only common sample effects — chip-specific effects handled by dedicated routers.
    */
   private routeSampleEffect(chan: number, effect: number, param: number): DispatchCommand[] {
     const commands: DispatchCommand[] = [];
@@ -1461,16 +1541,108 @@ export class FurnaceEffectRouter {
       case 0x11: commands.push({ cmd: DivCmd.SAMPLE_BANK, chan, val1: param, val2: 0 }); break;
       case 0x12: commands.push({ cmd: DivCmd.SAMPLE_DIR, chan, val1: param, val2: 0 }); break;
       case 0x20: commands.push({ cmd: DivCmd.SAMPLE_FREQ, chan, val1: param, val2: 0 }); break;
+    }
+    return commands;
+  }
 
-      // ES5506-specific filter effects
-      case 0x14: commands.push({ cmd: DivCmd.ES5506_FILTER_MODE, chan, val1: param, val2: 0 }); break;
-      case 0x15: commands.push({ cmd: DivCmd.ES5506_FILTER_K1, chan, val1: param << 8, val2: 0xFF00 }); break;
-      case 0x16: commands.push({ cmd: DivCmd.ES5506_FILTER_K2, chan, val1: param << 8, val2: 0xFF00 }); break;
+  /**
+   * Capcom QSound
+   * Pre: 0x10→ECHO_FEEDBACK, 0x11→ECHO_LEVEL, 0x12→SURROUND
+   *      0x30-0x3F→ECHO_DELAY (12-bit long format)
+   * From Furnace sysDef.cpp qSoundEffectHandlerMap
+   */
+  private routeQSoundEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    switch (effect) {
+      case 0x10: commands.push({ cmd: DivCmd.QSOUND_ECHO_FEEDBACK, chan, val1: param, val2: 0 }); break;
+      case 0x11: commands.push({ cmd: DivCmd.QSOUND_ECHO_LEVEL, chan, val1: param, val2: 0 }); break;
+      case 0x12: commands.push({ cmd: DivCmd.QSOUND_SURROUND, chan, val1: param, val2: 0 }); break;
+    }
+    // 0x30-0x3F: echo delay (12-bit long format: 3xyz → delay = xyz)
+    if (effect >= 0x30 && effect <= 0x3f) {
+      const longVal = ((effect & 0x0f) << 8) | param;
+      commands.push({ cmd: DivCmd.QSOUND_ECHO_DELAY, chan, val1: longVal, val2: 0 });
+    }
+    return commands;
+  }
 
-      // QSound-specific
-      case 0x17: commands.push({ cmd: DivCmd.QSOUND_ECHO_FEEDBACK, chan, val1: param, val2: 0 }); break;
-      case 0x18: commands.push({ cmd: DivCmd.QSOUND_ECHO_LEVEL, chan, val1: param, val2: 0 }); break;
-      case 0x19: commands.push({ cmd: DivCmd.QSOUND_SURROUND, chan, val1: param, val2: 0 }); break;
+  /**
+   * Ensoniq ES5506
+   * Pre:  0x11→FILTER_MODE, 0x14→K1_LO, 0x15→K1_HI, 0x16→K2_LO, 0x17→K2_HI,
+   *       0x18→K1_SLIDE_UP, 0x19→K1_SLIDE_DOWN, 0x1A→K2_SLIDE_UP, 0x1B→K2_SLIDE_DOWN,
+   *       0x22→ENVELOPE_LVRAMP, 0x23→ENVELOPE_RVRAMP,
+   *       0x24→ENVELOPE_K1RAMP, 0x25→ENVELOPE_K1RAMP_SLOW,
+   *       0x26→ENVELOPE_K2RAMP, 0x27→ENVELOPE_K2RAMP_SLOW,
+   *       0x20-0x21→ENVELOPE_COUNT (long 9-bit), 0x30-0x3F→K1 (long 12-bit), 0x40-0x4F→K2 (long 12-bit)
+   *       0xDF→SAMPLE_DIR
+   * Post: 0x12→ES5506_PAUSE
+   * From Furnace sysDef.cpp es5506PreEffectHandlerMap / es5506PostEffectHandlerMap
+   */
+  private routeES5506Effect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    switch (effect) {
+      case 0x11: commands.push({ cmd: DivCmd.ES5506_FILTER_MODE, chan, val1: param & 3, val2: 0 }); break;
+      case 0x12: commands.push({ cmd: DivCmd.ES5506_PAUSE, chan, val1: param & 1, val2: 0 }); break;
+      case 0x14: commands.push({ cmd: DivCmd.ES5506_FILTER_K1, chan, val1: param, val2: 0x00ff }); break;
+      case 0x15: commands.push({ cmd: DivCmd.ES5506_FILTER_K1, chan, val1: param << 8, val2: 0xff00 }); break;
+      case 0x16: commands.push({ cmd: DivCmd.ES5506_FILTER_K2, chan, val1: param, val2: 0x00ff }); break;
+      case 0x17: commands.push({ cmd: DivCmd.ES5506_FILTER_K2, chan, val1: param << 8, val2: 0xff00 }); break;
+      case 0x18: commands.push({ cmd: DivCmd.ES5506_FILTER_K1_SLIDE, chan, val1: param, val2: 0 }); break;
+      case 0x19: commands.push({ cmd: DivCmd.ES5506_FILTER_K1_SLIDE, chan, val1: param, val2: 1 }); break;
+      case 0x1a: commands.push({ cmd: DivCmd.ES5506_FILTER_K2_SLIDE, chan, val1: param, val2: 0 }); break;
+      case 0x1b: commands.push({ cmd: DivCmd.ES5506_FILTER_K2_SLIDE, chan, val1: param, val2: 1 }); break;
+      case 0x22: commands.push({ cmd: DivCmd.ES5506_ENVELOPE_LVRAMP, chan, val1: param, val2: 0 }); break;
+      case 0x23: commands.push({ cmd: DivCmd.ES5506_ENVELOPE_RVRAMP, chan, val1: param, val2: 0 }); break;
+      case 0x24: commands.push({ cmd: DivCmd.ES5506_ENVELOPE_K1RAMP, chan, val1: param, val2: 0 }); break;
+      case 0x25: commands.push({ cmd: DivCmd.ES5506_ENVELOPE_K1RAMP, chan, val1: param, val2: 1 }); break;
+      case 0x26: commands.push({ cmd: DivCmd.ES5506_ENVELOPE_K2RAMP, chan, val1: param, val2: 0 }); break;
+      case 0x27: commands.push({ cmd: DivCmd.ES5506_ENVELOPE_K2RAMP, chan, val1: param, val2: 1 }); break;
+      case 0xdf: commands.push({ cmd: DivCmd.SAMPLE_DIR, chan, val1: param, val2: 0 }); break;
+    }
+    // 0x20-0x21: envelope count (9-bit long format: 2xyz → count = xyz, max 0x1FF)
+    if (effect >= 0x20 && effect <= 0x21) {
+      const longVal = ((effect & 0x01) << 8) | param;
+      commands.push({ cmd: DivCmd.ES5506_ENVELOPE_COUNT, chan, val1: longVal, val2: 0 });
+    }
+    // 0x30-0x3F: filter K1 (12-bit long format, shifted <<4, mask 0xfff0)
+    if (effect >= 0x30 && effect <= 0x3f) {
+      const longVal = (((effect & 0x0f) << 8) | param) << 4;
+      commands.push({ cmd: DivCmd.ES5506_FILTER_K1, chan, val1: longVal, val2: 0xfff0 });
+    }
+    // 0x40-0x4F: filter K2 (12-bit long format, shifted <<4, mask 0xfff0)
+    if (effect >= 0x40 && effect <= 0x4f) {
+      const longVal = (((effect & 0x0f) << 8) | param) << 4;
+      commands.push({ cmd: DivCmd.ES5506_FILTER_K2, chan, val1: longVal, val2: 0xfff0 });
+    }
+    return commands;
+  }
+
+  /**
+   * Sega MultiPCM
+   * Pre:  0x1E→MIX_FM, 0x1F→MIX_PCM
+   * Post: 0x20→LFO, 0x21→VIB, 0x22→AM, 0x23→AR, 0x24→D1R, 0x25→DL,
+   *       0x26→D2R, 0x27→RR, 0x28→RC, 0x2C→DAMP, 0x2D→PSEUDO_REVERB,
+   *       0x2E→LFO_RESET, 0x2F→LEVEL_DIRECT
+   * From Furnace sysDef.cpp fmOPL4PostEffectHandlerMap / multiPCMPostEffectHandlerMap
+   */
+  private routeMultiPCMEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    switch (effect) {
+      case 0x1e: commands.push({ cmd: DivCmd.MULTIPCM_MIX_FM, chan, val1: param, val2: 0 }); break;
+      case 0x1f: commands.push({ cmd: DivCmd.MULTIPCM_MIX_PCM, chan, val1: param, val2: 0 }); break;
+      case 0x20: commands.push({ cmd: DivCmd.MULTIPCM_LFO, chan, val1: param & 7, val2: 0 }); break;
+      case 0x21: commands.push({ cmd: DivCmd.MULTIPCM_VIB, chan, val1: param & 7, val2: 0 }); break;
+      case 0x22: commands.push({ cmd: DivCmd.MULTIPCM_AM, chan, val1: param & 7, val2: 0 }); break;
+      case 0x23: commands.push({ cmd: DivCmd.MULTIPCM_AR, chan, val1: param & 15, val2: 0 }); break;
+      case 0x24: commands.push({ cmd: DivCmd.MULTIPCM_D1R, chan, val1: param & 15, val2: 0 }); break;
+      case 0x25: commands.push({ cmd: DivCmd.MULTIPCM_DL, chan, val1: param & 15, val2: 0 }); break;
+      case 0x26: commands.push({ cmd: DivCmd.MULTIPCM_D2R, chan, val1: param & 15, val2: 0 }); break;
+      case 0x27: commands.push({ cmd: DivCmd.MULTIPCM_RR, chan, val1: param & 15, val2: 0 }); break;
+      case 0x28: commands.push({ cmd: DivCmd.MULTIPCM_RC, chan, val1: param & 15, val2: 0 }); break;
+      case 0x2c: commands.push({ cmd: DivCmd.MULTIPCM_DAMP, chan, val1: param & 1, val2: 0 }); break;
+      case 0x2d: commands.push({ cmd: DivCmd.MULTIPCM_PSEUDO_REVERB, chan, val1: param & 1, val2: 0 }); break;
+      case 0x2e: commands.push({ cmd: DivCmd.MULTIPCM_LFO_RESET, chan, val1: param & 1, val2: 0 }); break;
+      case 0x2f: commands.push({ cmd: DivCmd.MULTIPCM_LEVEL_DIRECT, chan, val1: param & 1, val2: 0 }); break;
     }
     return commands;
   }
