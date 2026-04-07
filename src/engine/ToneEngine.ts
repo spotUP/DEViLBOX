@@ -915,6 +915,7 @@ export class ToneEngine {
     const nativePlayerTypes = new Set([
       'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
       'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
+      'TFMXSynth', 'FCSynth', 'C64SID',
     ]);
     const seenNativeTypes = new Set<string>();
     const dedupedOther = otherConfigs.filter((c) => {
@@ -1109,7 +1110,7 @@ export class ToneEngine {
     // is a singleton that handles all channels internally.
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
-      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth') {
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth' || c.synthType === 'TFMXSynth' || c.synthType === 'FCSynth' || c.synthType === 'C64SID') {
         if (seenNativePlayers.has(c.synthType!)) return false;
         seenNativePlayers.add(c.synthType!);
       }
