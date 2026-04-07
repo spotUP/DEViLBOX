@@ -596,8 +596,24 @@ export class UADEEngine {
     // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
     const prefix = fileName.split('.')[0]?.toLowerCase() ?? '';
-    const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray']);
-    const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray']);
+    // Skip scan for compiled 68k replayer formats that hang or crash during enhanced scan.
+    // Must stay in sync with FORCE_CLASSIC_FORMATS/PREFIXES in UADEParser.ts.
+    const SKIP_SCAN_EXTS = new Set([
+      'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
+      // FORCE_CLASSIC suffix-form formats:
+      'mon', 'sa', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+      'aps', 'sas', 'mso', 'ml', 'rho', 'dln', 'core', 'hot', 'wb', 'dh',
+      'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
+      'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+    ]);
+    const SKIP_SCAN_PREFIXES = new Set([
+      'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
+      // FORCE_CLASSIC prefix-form formats:
+      'fw', 'sas', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+      'dns', 'mk2', 'mkii', 'ash', 'rho', 'core', 'hot', 'wb', 'dh',
+      'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
+      'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+    ]);
     const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
     await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong);
   }

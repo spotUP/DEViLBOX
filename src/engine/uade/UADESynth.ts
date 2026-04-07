@@ -42,8 +42,20 @@ export class UADESynth implements DevilboxSynth {
       await this.engine.ready();
       const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
       const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
-      const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
-      const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+      const SKIP_SCAN_EXTS = new Set([
+        'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
+        'mon', 'sa', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+        'aps', 'sas', 'mso', 'ml', 'rho', 'dln', 'core', 'hot', 'wb', 'dh',
+        'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
+        'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+      ]);
+      const SKIP_SCAN_PREFIXES = new Set([
+        'dl', 'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
+        'fw', 'sas', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+        'dns', 'mk2', 'mkii', 'ash', 'rho', 'core', 'hot', 'wb', 'dh',
+        'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
+        'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+      ]);
       const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
       await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
     })();
