@@ -40,6 +40,9 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const cuePoint = useDJStore(s => s.decks[deckId].cuePoint);
   const keyLockEnabled = useDJStore(s => s.decks[deckId].keyLockEnabled);
+  const pendingAction = useDJStore(s => s.decks[deckId].pendingAction);
+  const playPending = pendingAction?.kind === 'play';
+  const cuePending = pendingAction?.kind === 'cue';
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const thisBPM = useDJStore(s => s.decks[deckId].effectiveBPM);
   const otherBPM = useDJStore(s => s.decks[otherDeckId].effectiveBPM);
@@ -99,15 +102,18 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
       {/* Play/Pause */}
       <PixiTransportButton
         iconTexture={playTex}
-        color={isPlaying ? theme.success.color : theme.textMuted.color}
-        isActive={isPlaying}
+        color={playPending ? theme.accent.color : (isPlaying ? theme.success.color : theme.textMuted.color)}
+        isActive={isPlaying || playPending}
+        pulsing={playPending}
         onClick={handlePlayPause}
       />
 
       {/* Cue */}
       <PixiTransportButton
         iconTexture={cueTex}
-        color={theme.warning.color}
+        color={cuePending ? theme.accent.color : theme.warning.color}
+        isActive={cuePending}
+        pulsing={cuePending}
         onClick={handleCue}
       />
 
@@ -144,16 +150,32 @@ interface TransportBtnProps {
   iconTexture: Texture;
   color: number;
   isActive?: boolean;
+  /** When true, the button alpha-pulses to mirror the DOM `animate-pulse` class. */
+  pulsing?: boolean;
   onClick: () => void;
 }
 
-const PixiTransportButton: React.FC<TransportBtnProps> = ({ iconTexture, color, isActive, onClick }) => {
+const PixiTransportButton: React.FC<TransportBtnProps> = ({ iconTexture, color, isActive, pulsing, onClick }) => {
   const theme = usePixiTheme();
+
+  // Pulse driver — toggle a `bright` boolean every 400ms while pulsing.
+  const [bright, setBright] = useState(false);
+  useEffect(() => {
+    if (!pulsing) { setBright(false); return; }
+    const id = setInterval(() => setBright(b => !b), 400);
+    return () => clearInterval(id);
+  }, [pulsing]);
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.roundRect(0, 0, BTN_SIZE, BTN_SIZE, 6);
-    if (isActive) {
+    if (pulsing) {
+      // Filled accent tint that pulses between two alpha levels.
+      const a = bright ? 0.5 : 0.2;
+      g.fill({ color, alpha: a });
+      g.roundRect(0, 0, BTN_SIZE, BTN_SIZE, 6);
+      g.stroke({ color, alpha: 0.9, width: 1 });
+    } else if (isActive) {
       g.fill({ color, alpha: 0.2 });
       g.roundRect(0, 0, BTN_SIZE, BTN_SIZE, 6);
       g.stroke({ color, alpha: 0.6, width: 1 });
@@ -162,7 +184,7 @@ const PixiTransportButton: React.FC<TransportBtnProps> = ({ iconTexture, color, 
       g.roundRect(0, 0, BTN_SIZE, BTN_SIZE, 6);
       g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
     }
-  }, [color, isActive, theme]);
+  }, [color, isActive, theme, pulsing, bright]);
 
   return (
     <pixiContainer
