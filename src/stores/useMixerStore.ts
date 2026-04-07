@@ -502,6 +502,7 @@ interface MixerStoreActions {
   removeChannelInsertEffect: (ch: number, effectIndex: number) => void;
   toggleChannelInsertEffect: (ch: number, effectIndex: number) => void;
   moveChannelInsertEffect: (ch: number, fromIndex: number, toIndex: number) => void;
+  updateChannelInsertEffect: (ch: number, effectIndex: number, updates: Partial<EffectConfig>) => void;
 
   // Send levels
   setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
@@ -648,6 +649,32 @@ export const useMixerStore = create<MixerStore>()(
         if (item) arr.splice(toIndex, 0, item);
       });
       getChannelEffectsManager().moveEffect(ch, fromIndex, toIndex);
+    },
+
+    updateChannelInsertEffect(ch: number, effectIndex: number, updates: Partial<EffectConfig>): void {
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        const fx = state.channels[ch].insertEffects[effectIndex];
+        if (!fx) return;
+        if (updates.parameters) {
+          fx.parameters = { ...fx.parameters, ...updates.parameters };
+        }
+        if (updates.wet !== undefined) fx.wet = updates.wet;
+        if (updates.enabled !== undefined) fx.enabled = updates.enabled;
+      });
+
+      if (updates.enabled !== undefined) {
+        getChannelEffectsManager().toggleEffect(ch, effectIndex);
+      } else {
+        // Push parameter/wet changes to the audio engine in real-time
+        const state = get();
+        const effect = state.channels[ch]?.insertEffects[effectIndex];
+        if (effect) {
+          getChannelEffectsManager().updateEffectParams(
+            ch, effectIndex, structuredClone(effect) as EffectConfig
+          );
+        }
+      }
     },
 
     // Send levels
