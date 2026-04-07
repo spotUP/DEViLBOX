@@ -11,7 +11,7 @@
  * - Real-time visualization
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Zap,
   ChevronDown,
@@ -90,26 +90,28 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
 }) => {
   // Normalize config to ensure it has all fields
   const config = normalizeConfig(rawConfig);
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
 
   const [showPresetBrowser, setShowPresetBrowser] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copiedSteps, setCopiedSteps] = useState<ArpeggioStep[] | null>(null);
   const [currentPresetName, setCurrentPresetName] = useState<string | null>(null);
 
-  // Update config helper
+  // Update config helper — uses configRef to avoid stale closures
   const updateConfig = useCallback((updates: Partial<ArpeggioConfig>) => {
-    onChange({ ...config, ...updates });
+    onChange({ ...configRef.current, ...updates });
     // Clear preset name if we're manually editing
     if (updates.steps) {
       setCurrentPresetName(null);
     }
-  }, [config, onChange]);
+  }, [onChange]);
 
   // Handle preset selection
   const handlePresetSelect = useCallback((presetConfig: ArpeggioConfig, presetName: string) => {
-    onChange({ ...config, ...presetConfig });
+    onChange({ ...configRef.current, ...presetConfig });
     setCurrentPresetName(presetName);
-  }, [config, onChange]);
+  }, [onChange]);
 
   // Handle steps change
   const handleStepsChange = useCallback((steps: ArpeggioStep[]) => {

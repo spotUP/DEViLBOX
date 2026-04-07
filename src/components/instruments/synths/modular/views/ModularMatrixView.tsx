@@ -10,7 +10,7 @@
  * - Compact, tracker-aesthetic layout
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ModularPatchConfig, ModularConnection } from '../../../../../types/modular';
 import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
 import { getSunVoxControlMeta } from '../../../../../engine/sunvox-modular/graphToConfig';
@@ -31,6 +31,8 @@ interface PortInfo {
 
 export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, onChange }) => {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // Build lists of all input and output ports
   const { inputPorts, outputPorts } = useMemo(() => {
@@ -84,43 +86,41 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
       const existing = findConnection(inputPort, outputPort);
 
       if (existing) {
-        // Remove connection
-        const updatedConnections = config.connections.filter((c) => c.id !== existing.id);
-        onChange({ ...config, connections: updatedConnections });
+        const updatedConnections = configRef.current.connections.filter((c) => c.id !== existing.id);
+        onChange({ ...configRef.current, connections: updatedConnections });
       } else {
-        // Add connection
         const newConnection: ModularConnection = {
           id: `conn_${Date.now()}`,
           source: { moduleId: outputPort.moduleId, portId: outputPort.portId },
           target: { moduleId: inputPort.moduleId, portId: inputPort.portId },
           amount: 1,
         };
-        onChange({ ...config, connections: [...config.connections, newConnection] });
+        onChange({ ...configRef.current, connections: [...configRef.current.connections, newConnection] });
       }
     },
-    [config, onChange, findConnection]
+    [onChange, findConnection]
   );
 
   // Update connection amount
   const handleAmountChange = useCallback(
     (connection: ModularConnection, amount: number) => {
-      const updatedConnections = config.connections.map((c) =>
+      const updatedConnections = configRef.current.connections.map((c) =>
         c.id === connection.id ? { ...c, amount } : c
       );
-      onChange({ ...config, connections: updatedConnections });
+      onChange({ ...configRef.current, connections: updatedConnections });
     },
-    [config, onChange]
+    [onChange]
   );
 
   // Module parameter change
   const handleParameterChange = useCallback(
     (moduleId: string, paramId: string, value: number) => {
-      const updatedModules = config.modules.map((m) =>
+      const updatedModules = configRef.current.modules.map((m) =>
         m.id === moduleId ? { ...m, parameters: { ...m.parameters, [paramId]: value } } : m
       );
-      onChange({ ...config, modules: updatedModules });
+      onChange({ ...configRef.current, modules: updatedModules });
     },
-    [config, onChange]
+    [onChange]
   );
 
   // Selected module

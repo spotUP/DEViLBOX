@@ -6,7 +6,7 @@
  * - Bottom: Spectral, Filter, Envelope, LFO knobs
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { HarmonicSynthConfig } from '@/types/instrument';
 import { DEFAULT_HARMONIC_SYNTH } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
@@ -64,6 +64,8 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
   onChange,
 }) => {
   const [_isDragging, setIsDragging] = useState(false);
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
 
   const { isCyan: isCyanTheme, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#4ade80');
   const barColor = isCyanTheme ? 'rgba(0, 255, 255, 0.7)' : 'rgba(74, 222, 128, 0.7)';
@@ -76,22 +78,23 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
     const idx = Math.floor(nx * NUM_HARMONICS);
     const amp = Math.max(0, Math.min(1, 1 - ny));
     if (idx >= 0 && idx < NUM_HARMONICS) {
-      const newH = [...harmonics];
+      const cur = configRef.current;
+      const newH = [...(cur.harmonics || DEFAULT_HARMONIC_SYNTH.harmonics)];
       newH[idx] = amp;
       onChange({ harmonics: newH });
     }
-  }, [harmonics, onChange]);
+  }, [onChange]);
 
-  // Helpers for nested updates
-  const updateFilter = (updates: Partial<typeof config.filter>) => {
-    onChange({ filter: { ...config.filter, ...updates } });
-  };
-  const updateEnvelope = (updates: Partial<typeof config.envelope>) => {
-    onChange({ envelope: { ...config.envelope, ...updates } });
-  };
-  const updateLFO = (updates: Partial<typeof config.lfo>) => {
-    onChange({ lfo: { ...config.lfo, ...updates } });
-  };
+  // Helpers for nested updates — use configRef to avoid stale closures
+  const updateFilter = useCallback((updates: Partial<typeof config.filter>) => {
+    onChange({ filter: { ...configRef.current.filter, ...updates } });
+  }, [onChange]);
+  const updateEnvelope = useCallback((updates: Partial<typeof config.envelope>) => {
+    onChange({ envelope: { ...configRef.current.envelope, ...updates } });
+  }, [onChange]);
+  const updateLFO = useCallback((updates: Partial<typeof config.lfo>) => {
+    onChange({ lfo: { ...configRef.current.lfo, ...updates } });
+  }, [onChange]);
 
   return (
     <div className="space-y-3">
