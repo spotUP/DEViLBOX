@@ -76,8 +76,10 @@ static uint32_t         g_tick_snap_read    = 0;
 static uint8_t          g_tick_snap_enabled = 0;
 
 /* Per-channel state for DMA restart detection (see uade_wasm_on_cia_a_tick). */
-static uint32_t g_prev_lc[4]  = {0, 0, 0, 0};
-static uint8_t  g_prev_dma[4] = {0, 0, 0, 0};
+static uint32_t g_prev_lc[4]     = {0, 0, 0, 0};
+static uint8_t  g_prev_dma[4]    = {0, 0, 0, 0};
+static uint16_t g_prev_period[4] = {0, 0, 0, 0};
+static uint16_t g_prev_volume[4] = {0, 0, 0, 0};
 /* ------------------------------------------------------------------------- */
 
 /* Called from audio.c AUDx handlers (inside #ifdef UADE_WASM guards). */
@@ -564,16 +566,44 @@ void uade_wasm_on_cia_a_tick(void) {
         snap->channels[ch].len       = (uint16_t)(audio_channel[ch].len & 0xFFFF);
         snap->channels[ch].dma_en    = dmaen(1 << ch) ? 1 : 0;
 
-        /* DMA restart detection: triggered=1 when LC changed or DMA just enabled */
-        uint32_t curr_lc  = snap->channels[ch].lc;
-        uint8_t  curr_dma = snap->channels[ch].dma_en;
-        uint8_t  triggered = 0;
-        if (curr_dma && (curr_lc != g_prev_lc[ch] || !g_prev_dma[ch])) {
-            triggered = 1;
+        /* Enhanced trigger detection:
+         * 1. LC changed while DMA on (original: sample pointer change = new note)
+         * 2. DMA just enabled (original: channel was off, now on)
+         * 3. Period changed significantly while DMA on and LC unchanged
+         *    (compiled replayers reuse same sample for different pitched notes)
+         *    Threshold: period ratio > 1.06 (~1 semitone) to avoid vibrato false positives
+         * 4. Volume went from 0 to >0 while DMA on (note-on after silence)
+         */
+        uint32_t curr_lc     = snap->channels[ch].lc;
+        uint8_t  curr_dma    = snap->channels[ch].dma_en;
+        uint16_t curr_period = snap->channels[ch].period;
+        uint16_t curr_volume = snap->channels[ch].volume;
+        uint8_t  triggered   = 0;
+
+        if (curr_dma) {
+            if (curr_lc != g_prev_lc[ch] || !g_prev_dma[ch]) {
+                /* Case 1 & 2: LC changed or DMA just enabled */
+                triggered = 1;
+            } else if (curr_period > 0 && g_prev_period[ch] > 0) {
+                /* Case 3: significant period change (>1 semitone) on same sample */
+                uint16_t hi = curr_period > g_prev_period[ch] ? curr_period : g_prev_period[ch];
+                uint16_t lo = curr_period > g_prev_period[ch] ? g_prev_period[ch] : curr_period;
+                /* ratio > 1.06 ≈ 1 semitone (2^(1/12) ≈ 1.0595) */
+                /* Use integer: hi * 100 > lo * 106 to avoid float */
+                if ((uint32_t)hi * 100 > (uint32_t)lo * 106) {
+                    triggered = 1;
+                }
+            }
+            if (!triggered && curr_volume > 0 && g_prev_volume[ch] == 0 && g_prev_dma[ch]) {
+                /* Case 4: volume from zero while DMA was already on */
+                triggered = 1;
+            }
         }
         snap->channels[ch].triggered = triggered;
-        g_prev_lc[ch]  = curr_lc;
-        g_prev_dma[ch] = curr_dma;
+        g_prev_lc[ch]     = curr_lc;
+        g_prev_dma[ch]    = curr_dma;
+        g_prev_period[ch] = curr_period;
+        g_prev_volume[ch] = curr_volume;
     }
     g_tick_snap_write++;
 }
@@ -780,6 +810,13 @@ void uade_wasm_enable_tick_snapshots(int enable) {
     if (!enable) {
         g_tick_snap_write = 0;
         g_tick_snap_read  = 0;
+    }
+    /* Reset per-channel trigger state when enabling/disabling */
+    for (int i = 0; i < 4; i++) {
+        g_prev_lc[i]     = 0;
+        g_prev_dma[i]    = 0;
+        g_prev_period[i] = 0;
+        g_prev_volume[i] = 0;
     }
 }
 

@@ -41,6 +41,11 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._outFrames = 256;    // Larger than 128 to handle render calls > quantum size
     this._needsReload = false; // Set after stop so next play() reloads from _lastData
 
+    // Live tick capture: drain tick snapshots during playback for pattern reconstruction
+    this._liveTickCapture = false;     // Enabled via 'enableLiveTickCapture' message
+    this._liveTickDrainBuf = null;     // WASM-heap buffer for draining (allocated once)
+    this._lastTickDrain = 0;           // currentTime of last drain
+
     this.port.onmessage = (event) => this._handleMessage(event.data);
   }
 
@@ -401,6 +406,18 @@ class UADEProcessor extends AudioWorkletProcessor {
         const { mask } = data;
         if (this._wasm && this._wasm._uade_wasm_mute_channels) {
           this._wasm._uade_wasm_mute_channels(mask & 0x0F);
+        }
+        break;
+      }
+
+      case 'enableLiveTickCapture': {
+        const { enable } = data;
+        this._liveTickCapture = !!enable;
+        if (this._wasm && this._wasm._uade_wasm_enable_tick_snapshots) {
+          this._wasm._uade_wasm_enable_tick_snapshots(enable ? 1 : 0);
+          if (enable) {
+            this._wasm._uade_wasm_reset_tick_snapshots?.();
+          }
         }
         break;
       }
@@ -1929,6 +1946,43 @@ class UADEProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'chLevels', levels });
 
         this._lastChannelPost = currentTime;
+      }
+
+      // Live tick capture: drain tick snapshot ring buffer every ~500ms
+      if (this._liveTickCapture && this._wasm._uade_wasm_get_tick_snapshots &&
+          currentTime - this._lastTickDrain > 0.5) {
+        this._lastTickDrain = currentTime;
+        const maxDrain = 4096;
+        const wordsPerSnap = 13;
+        if (!this._liveTickDrainBuf) {
+          this._liveTickDrainBuf = this._wasm._malloc(maxDrain * wordsPerSnap * 4);
+        }
+        if (this._liveTickDrainBuf) {
+          const count = this._wasm._uade_wasm_get_tick_snapshots(this._liveTickDrainBuf, maxDrain);
+          if (count > 0) {
+            const raw = new Uint32Array(this._wasm.HEAPU8.buffer, this._liveTickDrainBuf, count * wordsPerSnap);
+            const snapshots = [];
+            for (let i = 0; i < count; i++) {
+              const base = i * wordsPerSnap;
+              const channels = [];
+              for (let ch = 0; ch < 4; ch++) {
+                const w0 = raw[base + 1 + ch * 3 + 0];
+                const w1 = raw[base + 1 + ch * 3 + 1];
+                const w2 = raw[base + 1 + ch * 3 + 2];
+                channels.push({
+                  period:    (w0 >>> 16) & 0xFFFF,
+                  volume:    w0 & 0xFFFF,
+                  lc:        w1,
+                  len:       (w2 >>> 8) & 0xFFFF,
+                  dmaEn:     (w2 >>> 1) & 1,
+                  triggered: w2 & 1,
+                });
+              }
+              snapshots.push({ tick: raw[base], channels });
+            }
+            this.port.postMessage({ type: 'liveTickBatch', snapshots });
+          }
+        }
       }
     } catch (err) {
       outL.fill(0);

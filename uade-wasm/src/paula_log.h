@@ -31,7 +31,7 @@ typedef struct {
  * Each tick corresponds to one tracker "speed" unit. Every `speed` ticks = one pattern row.
  * Unlike the Paula write log, tick snapshots capture held notes (no register writes).
  */
-#define TICK_SNAP_SIZE  4096
+#define TICK_SNAP_SIZE  32768
 #define TICK_SNAP_MASK  (TICK_SNAP_SIZE - 1)
 
 typedef struct {

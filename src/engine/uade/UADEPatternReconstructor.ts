@@ -289,9 +289,10 @@ export function reconstructPatterns(
     () => [],
   );
 
-  // Track previous row state per channel for held-note detection
+  // Track previous row state per channel for held-note and note-off detection
   const prevPeriod  = new Array<number>(channelCount).fill(0);
   const prevLc      = new Array<number>(channelCount).fill(0);
+  const prevPlaying = new Array<boolean>(channelCount).fill(false);
 
   for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
     const rowStartTick = firstTick + rowIdx * speed;
@@ -358,10 +359,15 @@ export function reconstructPatterns(
 
           prevPeriod[ch] = state.period;
           prevLc[ch]     = state.lc;
+          prevPlaying[ch] = true;
         } else {
-          // DMA off or no period: clear hold state
+          // DMA off or no period — emit note-off if channel was previously playing
+          if (prevPlaying[ch]) {
+            cell.note = 97; // XM note-off
+          }
           prevPeriod[ch] = 0;
           prevLc[ch]     = 0;
+          prevPlaying[ch] = false;
         }
 
         // Detect effects from intra-row tick deltas (only on non-empty/non-held rows)
