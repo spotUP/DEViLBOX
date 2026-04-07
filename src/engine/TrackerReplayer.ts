@@ -1605,6 +1605,10 @@ export class TrackerReplayer {
     // hybrid hook / audio context). Engines that subscribe to position updates
     // dispatch through the coordinator and read from this on every callback.
     this.syncCoordinatorContext();
+    // Reset the dispatch-active flag — each engine that wires a position
+    // subscription this play() will set it back to true via markDispatchActive.
+    // The end-of-play() guard reads it to decide whether to skip the scheduler.
+    this.coordinator.hasActiveDispatch = false;
 
     await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
     _playLog('unlockIOSAudio');
@@ -1678,24 +1682,35 @@ export class TrackerReplayer {
       if (result.hivelyEngine) {
         this.hivelyEngine = result.hivelyEngine;
         this._hvlPositionUnsub = this.hivelyEngine.subscribeToCoordinator(this.coordinator);
+        this.coordinator.markDispatchActive();
         _playLog('HVL position subscription active');
       }
 
       // Subscribe to MusicLineEngine position updates.
       if (result.musicLineEngine) {
         this._mlPositionUnsub = result.musicLineEngine.subscribeToCoordinator(this.coordinator);
+        this.coordinator.markDispatchActive();
       }
 
       // UADE setup — position subscription with CIA-tick→row math, Paula log
       // polling for automation capture, optional deferred pattern reconstruction
       // for SKIP_SCAN formats, and optional TFMX timing-table position sync.
       // All ~110 lines of glue now live in UADEEngine.subscribeToCoordinator.
+      // Only mark dispatch active if a position subscription was actually wired
+      // (uadeFirstTick != null OR tfmxTimingTable populated). UADE songs without
+      // a known firstTick (some FC/JAM/etc. variants) still need the TS scheduler
+      // for VU/automation/display state updates.
       if (result.uadeEngine) {
         this._uadePositionUnsub = result.uadeEngine.subscribeToCoordinator(
           this.coordinator,
           this.song,
           () => this.playing && this.song != null,
         );
+        const uadeHasPositionDispatch = this.song.uadeFirstTick != null
+          || (this.song.tfmxTimingTable != null && this.song.tfmxTimingTable.length > 0);
+        if (uadeHasPositionDispatch) {
+          this.coordinator.markDispatchActive();
+        }
         if (this.song.uadeFirstTick != null) _playLog('UADE position subscription active');
         if (this.song.tfmxTimingTable) _playLog('TFMX timing-table position subscription active');
       }
@@ -1774,6 +1789,7 @@ export class TrackerReplayer {
         if (result.started) {
           this.useWasmSequencer = true;
           this._seqPositionUnsub = result.cleanup;
+          this.coordinator.markDispatchActive();
           _log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
           return;
         }
@@ -1821,6 +1837,7 @@ export class TrackerReplayer {
           this.useLibopenmptPlayback = true;
           this._suppressNotes = true;
           this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
+          this.coordinator.markDispatchActive();
 
           _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes,
             'replacedInstruments =', this._replacedInstruments.size);
@@ -1845,9 +1862,15 @@ export class TrackerReplayer {
     // Display state, hybrid notes, VU meters, and automation curves all
     // flow through coordinator.dispatchEnginePosition (driven by the
     // engine's own position callback). Skip startScheduler entirely when
-    // a native WASM engine has taken over note triggering.
-    if (this._suppressNotes) {
-      _playLog('skipping TS scheduler (WASM engine driving playback)');
+    // an engine actually wired a position-update subscription.
+    //
+    // Gating on hasActiveDispatch (not _suppressNotes) is critical: some
+    // UADE-backed formats (FC, JAM variants, etc.) play through UADE but
+    // don't have uadeFirstTick set, so no position subscription gets wired.
+    // Those songs need the TS scheduler to drive VU/automation/display
+    // state even though _suppressNotes is true.
+    if (this.coordinator.hasActiveDispatch) {
+      _playLog('skipping TS scheduler (engine driving position dispatch)');
       this._hasPlayedOnce = true;
       return;
     }

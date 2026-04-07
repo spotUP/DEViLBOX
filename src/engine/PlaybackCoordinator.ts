@@ -213,6 +213,15 @@ export class PlaybackCoordinator {
   pattPos = 0;
 
   /**
+   * Set to true by an engine when it wires a position-update subscription
+   * via dispatchEnginePosition(). Used by TrackerReplayer to decide whether
+   * the TS scheduler can be skipped: if no engine is dispatching positions,
+   * the scheduler must run for VU/automation/display state to update.
+   * Reset to false on every play() before any subscription is wired.
+   */
+  hasActiveDispatch = false;
+
+  /**
    * Per-frame playback context. The replayer sets this once per play() and
    * mutates `bpm`/`speed` as the song progresses. dispatchEnginePosition()
    * reads from it on every position update.
@@ -261,6 +270,17 @@ export class PlaybackCoordinator {
    *                   Default true. TFMX opts out because its sister UADE
    *                   subscription already handles hybrid playback.
    */
+  /**
+   * Engines call this from their subscribeToCoordinator/startWithCoordinator
+   * method right after wiring a position-update subscription, so the
+   * replayer knows it can skip the TS scheduler. The flag must be set
+   * synchronously from inside play(), before play() decides whether to
+   * call startScheduler.
+   */
+  markDispatchActive(): void {
+    this.hasActiveDispatch = true;
+  }
+
   dispatchEnginePosition(
     row: number,
     position: number,
