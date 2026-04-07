@@ -1,0 +1,235 @@
+/**
+ * PixiHippelCoSoPanel — GL-native Hippel CoSo instrument editor.
+ *
+ * Mirrors the DOM editor at src/components/instruments/controls/HippelCoSoControls.tsx
+ * 1:1 in structure: scalar knobs (volSpeed, vibSpeed, vibDepth, vibDelay) + read-only
+ * bar-chart displays for the frequency and volume sequences.
+ *
+ * Data shape: instrument.hippelCoso (HippelCoSoConfig). Mutations flow through the
+ * shared onUpdate(instrumentId, { hippelCoso: { ... } }) path. The underlying store
+ * handles any UADE chip RAM propagation — this panel never touches UADEChipEditor
+ * directly (same policy as the DOM editor's updU8WithChipRam path).
+ *
+ * The fseq/vseq displays are read-only for this phase. Live drag-edit on Pixi
+ * sequence bars is a follow-up that needs drag-on-Graphics work matching the
+ * JamCracker AM waveform editor.
+ */
+
+import React, { useCallback } from 'react';
+import { PixiKnob, PixiLabel } from '../../components';
+import { usePixiTheme } from '../../theme';
+import type { InstrumentConfig } from '@typedefs/instrument';
+import type { Graphics } from 'pixi.js';
+
+const KNOB_SIZE = 'sm' as const;
+
+interface Props {
+  instrument: InstrumentConfig;
+  onUpdate: (id: number, changes: Partial<InstrumentConfig>) => void;
+}
+
+const SectionHeading: React.FC<{ text: string }> = ({ text }) => (
+  <layoutContainer layout={{ paddingTop: 2, paddingBottom: 2 }}>
+    <PixiLabel text={text} size="xs" weight="bold" color="textMuted" />
+  </layoutContainer>
+);
+
+export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
+  const theme = usePixiTheme();
+  const hc = instrument.hippelCoso!;
+
+  const updHC = useCallback(
+    (key: string, value: number) => {
+      onUpdate(instrument.id, {
+        hippelCoso: { ...instrument.hippelCoso!, [key]: value },
+      });
+    },
+    [instrument.id, instrument.hippelCoso, onUpdate],
+  );
+
+  // ── Bar chart renderers for fseq/vseq (read-only) ──────────────────────────
+
+  const SEQ_W = 320;
+  const SEQ_H = 80;
+
+  const drawBipolarBars = useCallback(
+    (values: number[], color: number) => (g: Graphics) => {
+      g.clear();
+      const W = SEQ_W;
+      const H = SEQ_H;
+      const mid = H / 2;
+
+      // Background
+      g.rect(0, 0, W, H).fill({ color: theme.bg.color });
+      // Zero line
+      g.moveTo(0, mid).lineTo(W, mid).stroke({ color: theme.border.color, width: 1 });
+
+      if (!values || values.length === 0) return;
+
+      // Determine magnitude (clamp -128..127). Filter out terminator sentinels -31..-25.
+      const visible = values.filter((v) => !(v <= -25 && v >= -31));
+      if (visible.length === 0) return;
+
+      let maxMag = 1;
+      for (const v of visible) {
+        const a = Math.abs(v);
+        if (a > maxMag) maxMag = a;
+      }
+      // Round up to a nice max (at least 12 semitones for fseq look)
+      if (maxMag < 12) maxMag = 12;
+
+      const barW = W / visible.length;
+      for (let i = 0; i < visible.length; i++) {
+        const v = visible[i];
+        const scaled = (v / maxMag) * (mid - 2);
+        const x = i * barW;
+        const w = Math.max(1, barW - 1);
+        if (scaled >= 0) {
+          g.rect(x, mid - scaled, w, scaled).fill({ color });
+        } else {
+          g.rect(x, mid, w, -scaled).fill({ color });
+        }
+      }
+    },
+    [theme.bg.color, theme.border.color],
+  );
+
+  const drawUnipolarBars = useCallback(
+    (values: number[], color: number, max: number) => (g: Graphics) => {
+      g.clear();
+      const W = SEQ_W;
+      const H = SEQ_H;
+
+      g.rect(0, 0, W, H).fill({ color: theme.bg.color });
+      g.moveTo(0, H - 1).lineTo(W, H - 1).stroke({ color: theme.border.color, width: 1 });
+
+      if (!values || values.length === 0) return;
+      // Clamp -128 loop markers to 0 for display (same as DOM editor)
+      const visible = values.map((v) => Math.max(0, v));
+      if (visible.length === 0) return;
+
+      const barW = W / visible.length;
+      for (let i = 0; i < visible.length; i++) {
+        const v = Math.min(max, visible[i]);
+        const h = (v / max) * (H - 2);
+        const x = i * barW;
+        const w = Math.max(1, barW - 1);
+        g.rect(x, H - h - 1, w, h).fill({ color });
+      }
+    },
+    [theme.bg.color, theme.border.color],
+  );
+
+  const drawFseq = useCallback(
+    drawBipolarBars(hc.fseq ?? [], theme.accent.color),
+    [hc.fseq, drawBipolarBars, theme.accent.color],
+  );
+  const drawVseq = useCallback(
+    drawUnipolarBars(hc.vseq ?? [], theme.success.color, 63),
+    [hc.vseq, drawUnipolarBars, theme.success.color],
+  );
+
+  return (
+    <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
+      {/* Header */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          padding: 6,
+          borderRadius: 4,
+          backgroundColor: theme.bgTertiary.color,
+        }}
+      >
+        <PixiLabel
+          text="HippelCoSo"
+          size="sm"
+          weight="bold"
+          color="custom"
+          customColor={theme.accent.color}
+        />
+        <PixiLabel text={instrument.name} size="sm" color="textSecondary" />
+      </layoutContainer>
+
+      {/* Timing / Vibrato knobs */}
+      <SectionHeading text="TIMING & VIBRATO" />
+      <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
+        <PixiKnob
+          value={hc.volSpeed}
+          min={1}
+          max={16}
+          onChange={(v) => updHC('volSpeed', Math.round(v))}
+          label="Vol Speed"
+          size={KNOB_SIZE}
+          defaultValue={1}
+        />
+        <PixiKnob
+          value={hc.vibDelay}
+          min={0}
+          max={255}
+          onChange={(v) => updHC('vibDelay', Math.round(v))}
+          label="Vib Delay"
+          size={KNOB_SIZE}
+          defaultValue={0}
+        />
+        <PixiKnob
+          value={hc.vibSpeed}
+          min={-128}
+          max={127}
+          onChange={(v) => updHC('vibSpeed', Math.round(v))}
+          label="Vib Speed"
+          size={KNOB_SIZE}
+          defaultValue={0}
+        />
+        <PixiKnob
+          value={hc.vibDepth}
+          min={0}
+          max={255}
+          onChange={(v) => updHC('vibDepth', Math.round(v))}
+          label="Vib Depth"
+          size={KNOB_SIZE}
+          defaultValue={0}
+        />
+      </layoutContainer>
+
+      {/* Frequency sequence (read-only) */}
+      <SectionHeading text="FREQUENCY SEQUENCE (SEMITONES)" />
+      <layoutContainer
+        layout={{
+          width: SEQ_W,
+          height: SEQ_H,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 4,
+        }}
+      >
+        <pixiGraphics draw={drawFseq} layout={{ width: SEQ_W, height: SEQ_H }} />
+      </layoutContainer>
+      <PixiLabel
+        text={`fseq length: ${hc.fseq?.length ?? 0}`}
+        size="xs"
+        color="textMuted"
+      />
+
+      {/* Volume sequence (read-only) */}
+      <SectionHeading text="VOLUME SEQUENCE (0–63)" />
+      <layoutContainer
+        layout={{
+          width: SEQ_W,
+          height: SEQ_H,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 4,
+        }}
+      >
+        <pixiGraphics draw={drawVseq} layout={{ width: SEQ_W, height: SEQ_H }} />
+      </layoutContainer>
+      <PixiLabel
+        text={`vseq length: ${hc.vseq?.length ?? 0}`}
+        size="xs"
+        color="textMuted"
+      />
+    </layoutContainer>
+  );
+};
