@@ -140,20 +140,79 @@ export class DisplayStateRing {
 }
 
 /**
- * PlaybackCoordinator — top-level coordinator class.
+ * UI position callbacks fired by the active playback engine.
  *
- * Currently a thin shell around DisplayStateRing. Subsequent refactor phases
- * will add: hybrid note dispatch, mute/solo masks, capture sync, etc.
+ * - onRowChange:        new row reached (drives the pattern editor cursor)
+ * - onChannelRowChange: per-channel row updates (for engines with independent
+ *                       channel sequencing like MusicLine Editor)
+ * - onSongEnd:          song looped or finished (debounced once per loop)
+ * - onTickProcess:      every tick, for diagnostics / metering
+ */
+export type RowChangeCallback = (row: number, pattern: number, position: number) => void;
+export type ChannelRowChangeCallback = (channelRows: number[]) => void;
+export type SongEndCallback = () => void;
+export type TickProcessCallback = (tick: number, row: number) => void;
+
+/**
+ * PlaybackCoordinator — engine-agnostic playback infrastructure.
+ *
+ * Currently owns:
+ *   - DisplayStateRing (audio-synced row scheduling for UI scrolling)
+ *   - UI position callbacks (onRowChange / onChannelRowChange / onSongEnd / onTickProcess)
+ *   - Capture sync timer (drives automation capture → store conversion)
+ *
+ * Subsequent refactor phases will move in: hybrid note dispatch, mute/solo
+ * masks, position tracking. See thoughts/shared/research/2026-04-07_tracker-replayer-audit.md.
  */
 export class PlaybackCoordinator {
   readonly stateRing = new DisplayStateRing();
 
-  // Convenience pass-throughs so callers don't need to reach into the ring.
+  // ── UI position callbacks ────────────────────────────────────────────────
+  onRowChange: RowChangeCallback | null = null;
+  onChannelRowChange: ChannelRowChangeCallback | null = null;
+  onSongEnd: SongEndCallback | null = null;
+  onTickProcess: TickProcessCallback | null = null;
+
+  /** Drop all callbacks (called on dispose). */
+  clearCallbacks(): void {
+    this.onRowChange = null;
+    this.onChannelRowChange = null;
+    this.onSongEnd = null;
+    this.onTickProcess = null;
+  }
+
+  // ── Display state ring pass-throughs ─────────────────────────────────────
   queueDisplayState(time: number, row: number, pattern: number, position: number, tick: number, duration: number = 0): void {
     this.stateRing.queue(time, row, pattern, position, tick, duration);
   }
 
   getStateAtTime(time: number, peek: boolean = false): DisplayState | null {
     return this.stateRing.getStateAtTime(time, peek);
+  }
+
+  // ── Capture sync timer ───────────────────────────────────────────────────
+  // Drives the automation-capture → store-sync polling loop. The replayer
+  // hands us a function that knows how to read the current pattern context
+  // and call syncCaptureToStore(); we just own the interval lifecycle.
+  private _captureSyncInterval: number | null = null;
+
+  /**
+   * Start the capture sync polling loop. Calls `tick` every `intervalMs`
+   * (default 100ms) until stopCaptureSync() is called. Replaces any existing
+   * timer so it's safe to call repeatedly.
+   */
+  startCaptureSync(tick: () => void, intervalMs: number = 100): void {
+    if (this._captureSyncInterval != null) {
+      clearInterval(this._captureSyncInterval);
+    }
+    this._captureSyncInterval = window.setInterval(tick, intervalMs);
+  }
+
+  /** Stop the capture sync polling loop. No-op if not running. */
+  stopCaptureSync(): void {
+    if (this._captureSyncInterval != null) {
+      clearInterval(this._captureSyncInterval);
+      this._captureSyncInterval = null;
+    }
   }
 }
