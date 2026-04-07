@@ -748,11 +748,6 @@ export class TrackerReplayer {
     this.seekTo(songPos, pattPos);
   }
 
-  /** Set BPM directly without going through transport store */
-  setBPMDirect(bpm: number): void {
-    this.bpm = Math.max(32, Math.min(255, bpm));
-  }
-
   /** Temporary BPM offset for DJ nudge — auto-resets after tickCount ticks */
   setNudge(offset: number, tickCount: number = 8): void {
     this.nudgeOffset = offset;
