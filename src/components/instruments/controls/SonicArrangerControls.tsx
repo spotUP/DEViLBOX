@@ -265,16 +265,27 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 
   const { isCyan, accent, knob, dim, panelBg, panelStyle } = useInstrumentColors('#ff8844', { knob: '#ffaa66', dim: '#331a00' });
 
-  const updateParam = useCallback((key: keyof SonicArrangerConfig, value: number) => {
+  const updateParam = useCallback(<K extends keyof SonicArrangerConfig>(
+    key: K,
+    value: SonicArrangerConfig[K],
+  ) => {
     onChange({ ...configRef.current, [key]: value });
     // Mirror to UADE chip RAM as a u16BE write at the SA instrument struct offset
-    // for this parameter, when an SA instrument was loaded via UADE.
-    if (uadeChipRam && SA_OFFSET[key as string] !== undefined && UADEEngine.hasInstance()) {
+    // for this parameter, when an SA instrument was loaded via UADE. Only numeric
+    // fields are mirrored — string fields like `name` live in the file header and
+    // don't map to the 152-byte instrument struct.
+    if (
+      typeof value === 'number' &&
+      uadeChipRam &&
+      SA_OFFSET[key as string] !== undefined &&
+      UADEEngine.hasInstance()
+    ) {
       const off = SA_OFFSET[key as string];
       const addr = uadeChipRam.instrBase + off;
       // fineTuning is signed; the rest are unsigned. writeU16 stores both correctly
       // because we mask to & 0xFFFF before splitting into bytes.
-      const u = (value < 0 ? value + 0x10000 : value) & 0xFFFF;
+      const numVal = value as number;
+      const u = (numVal < 0 ? numVal + 0x10000 : numVal) & 0xFFFF;
       void getEditor().writeU16(addr, u).catch((err) => console.warn('SA chip RAM write failed:', err));
     }
   }, [onChange, uadeChipRam, getEditor]);
@@ -350,8 +361,29 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
 
   // ── SYNTHESIS TAB ──────────────────────────────────────────────────────────
 
+  // Number of ADSR / AMF tables available on this instrument's source module,
+  // exposed by SonicArrangerParser via the UADE chipRam.sections bag. When
+  // unavailable (e.g. loaded from a project snapshot) fall back to 16 which is
+  // the reasonable practical upper bound for SA songs.
+  const numAdsrTables = uadeChipRam?.sections?.numAdsrTables ?? 16;
+  const numAmfTables  = uadeChipRam?.sections?.numAmfTables  ?? 16;
+  const numWaveforms  = (config.allWaveforms ?? []).length;
+
   const renderSynthesis = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+        <SectionLabel color={accent} label="Instrument" />
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-text-muted w-12">Name</label>
+          <input
+            type="text"
+            value={config.name ?? ''}
+            onChange={(e) => updateParam('name', e.target.value)}
+            className="flex-1 text-xs font-mono border rounded px-2 py-1"
+            style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+          />
+        </div>
+      </div>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Synthesis Effect" />
         <div className="flex gap-3 flex-wrap">
@@ -389,8 +421,46 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <SectionLabel color={accent} label="Waveform" />
         <WaveformLineCanvas data={config.waveformData} width={320} height={72} color={accent} maxSamples={128} />
         <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted">
-          <span>Wave #{config.waveformNumber}</span>
-          <span>Length: {config.waveformLength} words</span>
+          <div className="flex items-center gap-1">
+            <label>Wave #</label>
+            {numWaveforms > 0 ? (
+              <select
+                value={config.waveformNumber}
+                onChange={(e) => updateParam('waveformNumber', parseInt(e.target.value) || 0)}
+                className="text-[10px] font-mono border rounded px-1 py-0.5"
+                style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+              >
+                {Array.from({ length: numWaveforms }, (_, i) => (
+                  <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
+                    {i}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="number"
+                min={0}
+                max={255}
+                value={config.waveformNumber}
+                onChange={(e) => updateParam('waveformNumber', Math.max(0, Math.min(255, parseInt(e.target.value) || 0)))}
+                className="w-14 text-[10px] font-mono border rounded px-1 py-0.5"
+                style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <label>Length</label>
+            <input
+              type="number"
+              min={0}
+              max={65535}
+              value={config.waveformLength}
+              onChange={(e) => updateParam('waveformLength', Math.max(0, Math.min(65535, parseInt(e.target.value) || 0)))}
+              className="w-16 text-[10px] font-mono border rounded px-1 py-0.5"
+              style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+            />
+            <span>words</span>
+          </div>
         </div>
       </div>
     </div>
@@ -416,6 +486,22 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="ADSR Envelope" />
         <BarChart data={config.adsrTable} width={320} height={56} color={accent} />
+        <div className="flex items-center gap-2 mt-2">
+          <label className="text-[10px] text-text-muted">ADSR Table #</label>
+          <select
+            value={config.adsrNumber}
+            onChange={(e) => updateParam('adsrNumber', parseInt(e.target.value) || 0)}
+            className="text-[10px] font-mono border rounded px-1 py-0.5"
+            style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+          >
+            {Array.from({ length: numAdsrTables }, (_, i) => (
+              <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
+                {i}
+              </option>
+            ))}
+          </select>
+          <span className="text-[9px] text-text-muted">({numAdsrTables} available)</span>
+        </div>
         <div className="flex gap-3 flex-wrap mt-3">
           <Knob value={config.adsrDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('adsrDelay', Math.round(v))}
@@ -452,6 +538,22 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="AMF (Pitch Modulation)" />
         <BarChart data={config.amfTable} width={320} height={56} color={accent} signed />
+        <div className="flex items-center gap-2 mt-2">
+          <label className="text-[10px] text-text-muted">AMF Table #</label>
+          <select
+            value={config.amfNumber}
+            onChange={(e) => updateParam('amfNumber', parseInt(e.target.value) || 0)}
+            className="text-[10px] font-mono border rounded px-1 py-0.5"
+            style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
+          >
+            {Array.from({ length: numAmfTables }, (_, i) => (
+              <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
+                {i}
+              </option>
+            ))}
+          </select>
+          <span className="text-[9px] text-text-muted">({numAmfTables} available)</span>
+        </div>
         <div className="flex gap-3 mt-3">
           <Knob value={config.amfDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('amfDelay', Math.round(v))}
@@ -664,10 +766,11 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
               return (
                 <div
                   key={i}
-                  className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
+                  onClick={() => updateParam('waveformNumber', i)}
+                  className={`px-2 py-1.5 border-b border-dark-border text-[10px] cursor-pointer hover:bg-accent-primary/20 transition-colors ${
                     isCurrent ? 'bg-accent-primary/10' : ''
                   }`}
-                  title={`Waveform #${i} — ${wf.length} bytes`}
+                  title={`Click to select waveform #${i} — ${wf.length} bytes`}
                 >
                   <div className={`font-mono ${isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
                     {String(i).padStart(2, '0')}. wave{i}
