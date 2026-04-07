@@ -72,7 +72,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* Preset + Source */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#a855f7" title="Voice Preset" />
         <div className="grid grid-cols-4 gap-1 mb-3">
           {VOCODER_EFFECT_PRESETS.map((p) => (
@@ -110,7 +110,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Carrier */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#a855f7" title="Carrier" />
         <div className="grid grid-cols-4 gap-1 mb-3">
           {CARRIER_LABELS.map((name, i) => (
@@ -150,7 +150,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Filterbank */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#a855f7" title="Filterbank" />
         <div className="flex justify-around items-end">
           <Knob
@@ -184,7 +184,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Mix */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -221,7 +221,7 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* Key */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ec4899" title="Key" />
         <div className="grid grid-cols-6 gap-1">
           {KEY_NAMES.map((name, i) => (
@@ -241,7 +241,7 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Scale */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ec4899" title="Scale" />
         <div className="grid grid-cols-5 gap-1">
           {SCALE_OPTIONS.map((s) => (
@@ -261,7 +261,7 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Correction */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ec4899" title="Correction" />
         <div className="flex justify-around items-end">
           <Knob
@@ -286,7 +286,7 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
 
       {/* Mix */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}

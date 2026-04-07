@@ -563,7 +563,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
       {/* Cache status + pre-cache button */}
       {activePlaylist && modlandCount > 0 && (
-        <div className="px-2 py-1.5 border-b border-border">
+        <div className="px-2 py-1.5 border-b border-dark-border">
           {precacheProgress ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px]">
@@ -617,7 +617,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   onDoubleClick={() => loadTrackWithProgress(track, pickFreeDeck(), i)}
                   onPointerEnter={() => setHoveredIdx(i)}
                   onPointerLeave={() => setHoveredIdx(prev => prev === i ? null : prev)}
-                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-border transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-1.5 py-1 border-b border-dark-border transition-colors cursor-pointer ${
                     loadingTrackIndex === i
                       ? 'bg-cyan-900/20'
                       : dragIndex === i

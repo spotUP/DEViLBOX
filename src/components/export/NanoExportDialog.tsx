@@ -77,15 +77,15 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
         <div className="p-6 space-y-6 overflow-y-auto">
           {/* Info Cards */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-black/40 border border-border p-3 rounded-lg text-center">
+            <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
               <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Total Size</div>
               <div className="text-lg font-mono text-text-primary">{stats.bytes} <span className="text-xs text-text-muted">bytes</span></div>
             </div>
-            <div className="bg-black/40 border border-border p-3 rounded-lg text-center">
+            <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
               <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Kilobytes</div>
               <div className="text-lg font-mono text-text-primary">{stats.kb} <span className="text-xs text-text-muted">KB</span></div>
             </div>
-            <div className="bg-black/40 border border-border p-3 rounded-lg text-center">
+            <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
               <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Target</div>
               <div className="text-lg font-mono text-green-500">4K OK</div>
             </div>
@@ -97,7 +97,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
               <textarea
                 readOnly
                 value={base64Data}
-                className="w-full h-32 bg-black/60 border border-border rounded-lg p-4 font-mono text-[10px] text-amber-400/80 resize-none focus:outline-none focus:border-amber-500/50"
+                className="w-full h-32 bg-black/60 border border-dark-border rounded-lg p-4 font-mono text-[10px] text-amber-400/80 resize-none focus:outline-none focus:border-amber-500/50"
               />
               <button
                 onClick={handleCopy}
@@ -122,10 +122,10 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-black/20 border-t border-border flex gap-3">
+        <div className="p-6 bg-black/20 border-t border-dark-border flex gap-3">
           <button
             onClick={handleDownload}
-            className="flex-1 py-3 bg-dark-bgActive hover:bg-dark-bgHover border border-border rounded-lg font-bold text-xs text-text-primary transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-dark-bgActive hover:bg-dark-bgHover border border-dark-border rounded-lg font-bold text-xs text-text-primary transition-all flex items-center justify-center gap-2"
           >
             <Save size={16} />
             DOWNLOAD .NANO

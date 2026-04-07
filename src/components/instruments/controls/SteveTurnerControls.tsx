@@ -80,7 +80,7 @@ export const SteveTurnerControls: React.FC<SteveTurnerControlsProps> = ({
   return (
     <div className="p-3 space-y-3">
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-border-primary pb-1">
+      <div className="flex gap-1 border-b border-dark-border pb-1">
         {tabs.map(t => (
           <button
             key={t.key}

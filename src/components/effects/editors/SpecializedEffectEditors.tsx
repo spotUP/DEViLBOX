@@ -25,7 +25,7 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#22c55e" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#22c55e" title="Auto Panner" />
         <div className="flex justify-around items-end">
           <Knob
@@ -79,7 +79,7 @@ export const AutoWahEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#f43f5e" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f43f5e" title="Auto Wah" />
         <div className="flex justify-around items-end">
           <Knob
@@ -124,7 +124,7 @@ export const AutoWahEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -156,7 +156,7 @@ export const BitCrusherEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#84cc16" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#84cc16" title="Bit Crusher" />
         <div className="flex justify-around items-end">
           <Knob
@@ -201,7 +201,7 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#f59e0b" />
       <WaveshaperCurve type="Chebyshev" order={order} color="#f59e0b" height={100} />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f59e0b" title="Chebyshev Waveshaper" />
         <div className="flex justify-around items-end">
           <Knob
@@ -245,7 +245,7 @@ export const FrequencyShifterEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#06b6d4" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#06b6d4" title="Frequency Shifter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -292,7 +292,7 @@ export const PitchShiftEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#8b5cf6" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#8b5cf6" title="Pitch Shift" />
         <div className="flex justify-around items-end">
           <Knob
@@ -325,7 +325,7 @@ export const PitchShiftEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -357,7 +357,7 @@ export const JCReverbEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#6366f1" title="JC Reverb" />
         <div className="flex justify-around items-end">
           <Knob
@@ -401,7 +401,7 @@ export const StereoWidenerEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#ec4899" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ec4899" title="Stereo Widener" />
         <div className="flex justify-around items-end">
           <Knob
