@@ -14,6 +14,7 @@ import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
 import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/instrumentFxPresets';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface InstrumentEffectsModalProps {
   isOpen: boolean;
@@ -47,6 +48,8 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
   React.useLayoutEffect(() => {
     editingEffectRef.current = editingEffect;
   }, [editingEffect]);
+
+  useModalClose({ isOpen, onClose });
 
   // Load a factory preset
   const handleLoadPreset = useCallback((preset: InstrumentFxPreset) => {

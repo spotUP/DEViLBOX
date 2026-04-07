@@ -10,6 +10,7 @@ import { X, Music, Download, ExternalLink } from 'lucide-react';
 import { usePatternMatchModal } from '@stores/usePatternMatchModal';
 import { findPatternMatches } from '@/lib/modlandApi';
 import { extractMetadata } from '@/lib/modland/ModlandMetadata';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 export const PatternMatchModal: React.FC = () => {
   const { 
@@ -21,6 +22,8 @@ export const PatternMatchModal: React.FC = () => {
     setMatches, 
     closeModal 
   } = usePatternMatchModal();
+
+  useModalClose({ isOpen, onClose: closeModal });
 
   // Fetch pattern matches when modal opens
   useEffect(() => {

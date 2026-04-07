@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import type { HivelyConfig } from '@typedefs/instrument';
 import { extractInstrumentsFromHvl } from '@lib/import/formats/HivelyParser';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface HivelyImportEntry {
   name: string;
@@ -47,6 +48,8 @@ export const HivelyImportDialog: React.FC<HivelyImportDialogProps> = ({ onClose,
     if (selected.length > 0) onImport(selected);
     onClose();
   };
+
+  useDialogKeyboard({ isOpen: true, onConfirm: handleConfirm, onCancel: onClose });
 
   const selectedCount = entries.filter(e => e.selected).length;
 

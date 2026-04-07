@@ -6,6 +6,7 @@ import { useMIDI } from '../../hooks/useMIDI';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { X, Radio, Trash2, Zap, LayoutGrid, Disc, Piano, Play, Drum } from 'lucide-react';
 import { TR707DrumMap } from '../../engine/tr707/TR707Synth';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface DrumpadEditorModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
   const [mappings, setMappings] = useState<PadMapping[]>([]);
   const [selectedPadIndex, setSelectedPadIndex] = useState<number | null>(null);
   const [isLearning, setIsLearning] = useState(false);
+
+  useModalClose({ isOpen, onClose });
 
   // Detect drum machines in instrument list
   const drumMachines = useMemo(() => {

@@ -16,6 +16,7 @@ import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon, LimiterI
 import { useUIStore } from '@stores';
 import { applyAmigaPalPipeline } from '@utils/audio/SampleProcessing';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 // ProTracker notes (C-1 to B-3, 36 notes total)
 const PT_NOTES = [
@@ -413,6 +414,8 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     onApply(result);
     setStatusMessage('Conversion complete!', false, 2000);
   };
+
+  useDialogKeyboard({ isOpen, onConfirm: handleConvertAll, onCancel: onClose });
 
   const handleSetAll = () => {
     setSamples((prev) =>

@@ -17,6 +17,7 @@ import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
 import { notify } from '../../stores/useNotificationStore';
 import { Button } from '../ui/Button';
 import { Toggle } from '../controls/Toggle';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 // ============================================================================
 // Types
@@ -321,6 +322,8 @@ export const AmiResamplerModal: React.FC<AmiResamplerModalProps> = ({
       setIsProcessing(false);
     }
   }, [audioBuffer, isProcessing, options, onBufferProcessed, onClose, stopPlayback]);
+
+  useDialogKeyboard({ isOpen, onConfirm: handleApply, onCancel: onClose });
 
   // Options update helper
   const updateOption = useCallback(<K extends keyof AmiResampleOptions>(
