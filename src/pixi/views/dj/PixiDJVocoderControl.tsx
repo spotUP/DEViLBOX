@@ -1,14 +1,28 @@
 /**
  * PixiDJVocoderControl — GL-native vocoder toggle + controls for DJ top bar.
  *
- * Mirrors DJVocoderControl.tsx exactly: ROBOT toggle, MIC mute, carrier type,
- * formant shift, wet/dry, and amplitude level meter.
+ * Mirrors DJVocoderControl.tsx: ROBOT toggle, MIC mute, carrier type,
+ * formant shift, wet/dry, amplitude level meter, plus the recent
+ * additions:
+ *
+ *   - Tune (real autotune)   : real pitch-correction with key + scale
+ *   - Melody (carrier follower): legacy "follow active deck melody"
+ *
+ * Both can be enabled simultaneously.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useVocoderStore, type CarrierType } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
+import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
+import type { AutoTuneScale } from '@/engine/effects/AutoTuneEffect';
 import { PixiButton, PixiKnob, PixiLabel } from '../../components';
+
+const KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SCALE_OPTIONS: AutoTuneScale[] = ['major', 'minor', 'chromatic', 'pentatonic', 'blues'];
+const SCALE_LABELS: Record<AutoTuneScale, string> = {
+  major: 'MAJ', minor: 'MIN', chromatic: 'CHR', pentatonic: 'PNT', blues: 'BLU',
+};
 
 export const PixiDJVocoderControl: React.FC = () => {
   const isActive = useVocoderStore(s => s.isActive);
@@ -16,11 +30,20 @@ export const PixiDJVocoderControl: React.FC = () => {
   const params = useVocoderStore(s => s.params);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
+  /** Real pitch-correction autotune (YIN + scale snap) on the vocoder output. */
+  const [realTuneEnabled, setRealTuneEnabled] = useState(false);
+  const [tuneKey, setTuneKey] = useState(0);
+  const [tuneScale, setTuneScale] = useState<AutoTuneScale>('major');
+  /** Legacy "follow melody" — drives the vocoder carrier from the active deck's pattern data. */
+  const [followMelodyEnabled, setFollowMelodyEnabled] = useState(true);
+  const followMelodyRef = useRef<VocoderAutoTune | null>(null);
   const engineRef = useRef<VocoderEngine | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      followMelodyRef.current?.stop();
+      followMelodyRef.current = null;
       engineRef.current?.dispose();
       engineRef.current = null;
     };
@@ -37,7 +60,19 @@ export const PixiDJVocoderControl: React.FC = () => {
         await engine.start();
         engineRef.current = engine;
         setMuted(false);
+        // Apply persisted toggles
+        if (followMelodyEnabled) {
+          followMelodyRef.current = new VocoderAutoTune(engine);
+          followMelodyRef.current.start();
+        }
+        if (realTuneEnabled) {
+          engine.setRealAutoTuneEnabled(true, {
+            key: tuneKey, scale: tuneScale, strength: 1.0, speed: 0.7,
+          });
+        }
       } else {
+        followMelodyRef.current?.stop();
+        followMelodyRef.current = null;
         engineRef.current?.stop();
         engineRef.current = null;
         setMuted(false);
@@ -50,7 +85,7 @@ export const PixiDJVocoderControl: React.FC = () => {
         setError('Failed');
       }
     }
-  }, [isActive]);
+  }, [isActive, followMelodyEnabled, realTuneEnabled, tuneKey, tuneScale]);
 
   const handleMute = useCallback(() => {
     const next = !muted;
@@ -69,6 +104,42 @@ export const PixiDJVocoderControl: React.FC = () => {
   const handleWet = useCallback((v: number) => {
     engineRef.current?.setWet(v);
   }, []);
+
+  const handleRealTuneToggle = useCallback(() => {
+    const next = !realTuneEnabled;
+    setRealTuneEnabled(next);
+    engineRef.current?.setRealAutoTuneEnabled(next, {
+      key: tuneKey, scale: tuneScale, strength: 1.0, speed: 0.7,
+    });
+  }, [realTuneEnabled, tuneKey, tuneScale]);
+
+  const handleFollowMelodyToggle = useCallback(() => {
+    const next = !followMelodyEnabled;
+    setFollowMelodyEnabled(next);
+    if (next && engineRef.current) {
+      if (!followMelodyRef.current) {
+        followMelodyRef.current = new VocoderAutoTune(engineRef.current);
+      }
+      followMelodyRef.current.start();
+    } else {
+      followMelodyRef.current?.stop();
+    }
+  }, [followMelodyEnabled]);
+
+  /** Cycle to next key on click. */
+  const handleKeyCycle = useCallback(() => {
+    const next = (tuneKey + 1) % 12;
+    setTuneKey(next);
+    engineRef.current?.setAutoTuneKey(next);
+  }, [tuneKey]);
+
+  /** Cycle to next scale on click. */
+  const handleScaleCycle = useCallback(() => {
+    const i = SCALE_OPTIONS.indexOf(tuneScale);
+    const next = SCALE_OPTIONS[(i + 1) % SCALE_OPTIONS.length];
+    setTuneScale(next);
+    engineRef.current?.setAutoTuneScale(next);
+  }, [tuneScale]);
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
@@ -137,10 +208,8 @@ export const PixiDJVocoderControl: React.FC = () => {
             <pixiGraphics
               draw={(g) => {
                 g.clear();
-                // Background
                 g.rect(0, 0, 24, 6);
                 g.fill({ color: 0x1a1a2e, alpha: 0.8 });
-                // Level bar
                 const w = Math.min(24, (muted ? 0 : amplitude) * 72);
                 if (w > 0) {
                   g.rect(0, 0, w, 6);
@@ -152,6 +221,42 @@ export const PixiDJVocoderControl: React.FC = () => {
           </pixiContainer>
         </>
       )}
+
+      {/* Tune (real autotune) + key/scale cycle buttons — always available */}
+      <PixiButton
+        label="TUNE"
+        variant={realTuneEnabled ? 'ft2' : 'ghost'}
+        color={realTuneEnabled ? 'purple' : undefined}
+        size="sm"
+        active={realTuneEnabled}
+        onClick={handleRealTuneToggle}
+      />
+      {realTuneEnabled && (
+        <>
+          <PixiButton
+            label={KEY_NAMES[tuneKey]}
+            variant="ghost"
+            size="sm"
+            onClick={handleKeyCycle}
+          />
+          <PixiButton
+            label={SCALE_LABELS[tuneScale]}
+            variant="ghost"
+            size="sm"
+            onClick={handleScaleCycle}
+          />
+        </>
+      )}
+
+      {/* Melody (legacy carrier follower) */}
+      <PixiButton
+        label="MEL"
+        variant={followMelodyEnabled ? 'ft2' : 'ghost'}
+        color={followMelodyEnabled ? 'purple' : undefined}
+        size="sm"
+        active={followMelodyEnabled}
+        onClick={handleFollowMelodyToggle}
+      />
     </pixiContainer>
   );
 };

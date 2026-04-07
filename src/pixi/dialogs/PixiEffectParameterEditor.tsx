@@ -17,6 +17,7 @@ import { PixiLabel, PixiKnob, PixiSlider, PixiScrollView } from '../components';
 import { usePixiTheme } from '../theme';
 import type { EffectConfig } from '@typedefs/instrument';
 import { NeuralParameterMapper } from '@engine/effects/NeuralParameterMapper';
+import { PixiVocoderEditor, PixiAutoTuneEditor } from './editors/PixiVoiceEffectEditors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,17 @@ export const PixiEffectParameterEditor: React.FC<PixiEffectParameterEditorProps>
   const theme = usePixiTheme();
   const categoryAccent = getCategoryAccent(theme);
   const accent = categoryAccent[effect.category] ?? theme.accent.color;
+
+  // ── Specialized editors (button grids, custom layouts) ───────────
+  // The generic param-grid editor below can't render preset/key/scale
+  // pickers, so a few effect types ship dedicated editors that take
+  // over the entire content area.
+  if (effect.type === 'Vocoder') {
+    return <PixiVocoderEditor effect={effect} onChange={onChange} onWetChange={onWetChange} />;
+  }
+  if (effect.type === 'AutoTune') {
+    return <PixiAutoTuneEditor effect={effect} onChange={onChange} onWetChange={onWetChange} />;
+  }
 
   // Resolve parameter definitions
   const neuralParams = useMemo(() => getNeuralParamDefs(effect), [effect.category, effect.neuralModelIndex]);

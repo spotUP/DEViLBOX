@@ -16,10 +16,11 @@ interface SampleLoopEditorProps {
   loopType: LoopType;
   updateParam: (key: string, value: string | number | boolean | null) => void;
   doFindLoop: () => void;
+  doSnapLoopToZero: () => void;
 }
 
 export const SampleLoopEditor: React.FC<SampleLoopEditorProps> = ({
-  loopEnabled, loopStart, loopEnd, loopType, updateParam, doFindLoop,
+  loopEnabled, loopStart, loopEnd, loopType, updateParam, doFindLoop, doSnapLoopToZero,
 }) => (
   <div className="border-t border-dark-border pt-3">
     <div className="flex items-center gap-3 mb-2">
@@ -67,8 +68,13 @@ export const SampleLoopEditor: React.FC<SampleLoopEditorProps> = ({
             >{'\u2194'}</button>
           </div>
           <button
-            onClick={doFindLoop}
+            onClick={doSnapLoopToZero}
             className="px-2 py-0.5 rounded text-[10px] font-mono text-blue-300 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors ml-auto"
+            title="Snap loop start and end to nearest zero crossings (eliminates click/pop at the seam)"
+          >Snap 0</button>
+          <button
+            onClick={doFindLoop}
+            className="px-2 py-0.5 rounded text-[10px] font-mono text-blue-300 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
             title="Auto-find best loop point"
           >Auto</button>
         </>
