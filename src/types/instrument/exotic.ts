@@ -369,6 +369,26 @@ export interface TFMXConfig {
 }
 
 /**
+ * One entry in the Hippel CoSo sample bank. Extracted from the sample header
+ * table between `headersOff` and `samplesData` in the COSO file format. In the
+ * COSO variant each header is 10 bytes: pointer(u32 BE), length*2(u16 BE),
+ * loopPtr(u16 BE), repeat*2(u16 BE) — no name, no volume (those only appear in
+ * the non-COSO Hippel variant). See FlodJS JHPlayer.js and HippelCoSoParser.
+ */
+export interface HippelCoSoSampleEntry {
+  /** Zero-based index into the sample bank. */
+  index: number;
+  /** File-relative pointer into the samples data area. */
+  pointer: number;
+  /** Sample length in bytes (already ×2 from the raw word in the header). */
+  length: number;
+  /** Loop start pointer (raw loopPtr as stored, NOT yet ORed with `pointer`). */
+  loopStart: number;
+  /** Repeat length in bytes (already ×2 from the raw word in the header). */
+  repeatLength: number;
+}
+
+/**
  * Jochen Hippel CoSo instrument configuration.
  */
 export interface HippelCoSoConfig {
@@ -378,6 +398,14 @@ export interface HippelCoSoConfig {
   vibSpeed: number;
   vibDepth: number;
   vibDelay: number;
+  /**
+   * The entire CoSo sample bank, copied onto every instrument's config so the
+   * editor can render a sample browser without pulling from a separate store.
+   * Shared across all instruments in the same song — HC samples are not
+   * owned by a single instrument (they're selected at runtime via fseq -32
+   * opcodes) so this is intentionally redundant. Populated by the parser.
+   */
+  sampleBank?: HippelCoSoSampleEntry[];
 }
 
 /**
