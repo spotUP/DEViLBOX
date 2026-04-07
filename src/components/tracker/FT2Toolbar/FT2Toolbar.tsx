@@ -648,7 +648,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
     setIsLooping(true);
-    setCurrentRow(0);
+    // Start from the cursor's current row instead of always resetting to 0
+    const cursorRow = useCursorStore.getState().cursor.rowIndex;
+    setCurrentRow(cursorRow);
     await engine.init();
     // Reset ToneEngine state before first play — matches what playStopToggle does.
     // Without this, native synth audio routing is broken on first play.

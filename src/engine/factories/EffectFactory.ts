@@ -394,12 +394,17 @@ export async function createEffect(
         wet: wetValue,
       });
       // JCReverb uses 4 FeedbackCombFilter AudioWorklets that load async.
-      // Wait for them to connect before returning, otherwise wet path is silent.
+      // Wait for Tone.js to finish registering all worklet modules first,
+      // then poll for the actual AudioWorkletNode instances to be created.
+      try { await Tone.loaded(); } catch { /* ignore */ }
       const combFilters = (jcr as unknown as { _feedbackCombFilters: { _worklet?: AudioWorkletNode }[] })._feedbackCombFilters;
       if (combFilters?.length) {
-        for (let attempt = 0; attempt < 50; attempt++) {
+        for (let attempt = 0; attempt < 150; attempt++) {
           if (combFilters.every(f => f._worklet)) break;
           await new Promise(r => setTimeout(r, 20));
+        }
+        if (!combFilters.every(f => f._worklet)) {
+          console.warn('[EffectFactory] JCReverb worklets did not load after 3s — reverb wet path may be silent');
         }
       }
       node = jcr;
