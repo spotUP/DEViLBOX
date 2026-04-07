@@ -116,6 +116,11 @@ export function useEditorControls(opts?: {
     (presetId: string) => {
       if (presetId === 'none' || presetId === '__group__') return;
       applySystemPreset(presetId);
+      // Auto-show channel names so hardware labels are visible
+      const uiState = useUIStore.getState();
+      if (!uiState.showChannelNames) {
+        uiState.toggleChannelNames();
+      }
       notify.success(
         `Hardware System: ${SYSTEM_PRESETS.find((p) => p.id === presetId)?.name.toUpperCase()}`,
       );
