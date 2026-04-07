@@ -41,6 +41,7 @@ import { PixiModularSynthEditor } from '../views/instruments/PixiModularSynthEdi
 import { PixiAmigaSynthPanel } from '../views/instruments/PixiAmigaSynthPanel';
 import { PixiTFMXMacroPanel } from '../views/instruments/PixiTFMXMacroPanel';
 import { PixiHippelCoSoPanel } from '../views/instruments/PixiHippelCoSoPanel';
+import { PixiFuturePlayerPanel } from '../views/instruments/PixiFuturePlayerPanel';
 import { PixiSonicArrangerPanel } from '../views/instruments/PixiSonicArrangerPanel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
@@ -1814,6 +1815,10 @@ const NativeInstrumentPanel: React.FC<{
     return <JamCrackerPanel instrument={instrument} onUpdate={onUpdate} />;
   }
   if (instrument.synthType === 'FuturePlayerSynth') {
+    if (instrument.futurePlayer) {
+      return <PixiFuturePlayerPanel instrument={instrument} onUpdate={onUpdate} />;
+    }
+    // Fallback placeholder for FP instruments without a parsed detail struct.
     return <FuturePlayerPanel instrument={instrument} />;
   }
   // TFMX (Huelsbeck mdat) — full macro editor for instruments tagged with tfmxMacroIndex

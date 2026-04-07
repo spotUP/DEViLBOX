@@ -25,33 +25,7 @@ import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization } from '@components/instruments/shared';
 import { FuturePlayerEngine } from '@/engine/futureplayer/FuturePlayerEngine';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-
-// Future Player instrument detail struct byte offsets (from FuturePlayer.c
-// update_audio() — same offsets the parser uses to read these fields).
-// Each entry is the offset INTO the detail struct; the absolute write
-// address is `detailPtr + offset`.
-const FP_DETAIL_OFFSET: Partial<Record<keyof FuturePlayerConfig, number>> = {
-  volume:          0x08,
-  attackRate:      0x12,
-  attackPeak:      0x13,
-  decayRate:       0x14,
-  sustainLevel:    0x15,
-  sustainRate:     0x16,
-  sustainTarget:   0x17,
-  releaseRate:     0x18,
-  pitchMod1Shift:  0x1E,
-  pitchMod1Delay:  0x1F,
-  pitchMod1Mode:   0x20,
-  pitchMod2Shift:  0x26,
-  pitchMod2Delay:  0x27,
-  pitchMod2Mode:   0x28,
-  sampleMod1Shift: 0x2E,
-  sampleMod1Delay: 0x2F,
-  sampleMod1Mode:  0x30,
-  sampleMod2Shift: 0x36,
-  sampleMod2Delay: 0x37,
-  sampleMod2Mode:  0x38,
-};
+import { FP_DETAIL_OFFSET, FP_NEGATE_OFFSET } from '@/lib/futureplayer/detailOffsets';
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
@@ -95,10 +69,10 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
       // Negate flags don't have a single offset entry but live at known
       // positions (pitchMod1Negate=detail+0x21, pitchMod2Negate=detail+0x29).
       else if (key === 'pitchMod1Negate' && typeof value === 'boolean') {
-        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + 0x21, value ? 1 : 0);
+        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + FP_NEGATE_OFFSET.pitchMod1Negate, value ? 1 : 0);
       }
       else if (key === 'pitchMod2Negate' && typeof value === 'boolean') {
-        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + 0x29, value ? 1 : 0);
+        FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + FP_NEGATE_OFFSET.pitchMod2Negate, value ? 1 : 0);
       }
     }
   }, [onChange]);
