@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
+import { getEffectGainCompensation } from '../factories/effectGainCompensation';
 
 export interface MasterEffectsContext {
   masterEffectsInput: Tone.Gain;
@@ -109,21 +110,37 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     return;
   }
 
-  // Store nodes and configs
+  // Store nodes and configs, interleaving compensation gains for level normalization
+  // Chain: masterEffectsInput → [effect → compGain?] → [effect → compGain?] → blepInput
+  const chainNodes: Tone.ToneAudioNode[] = [];
   successNodes.forEach((node, index) => {
     ctx.masterEffectsNodes.push(node);
     ctx.masterEffectConfigs.set(successConfigs[index].id, { node, config: successConfigs[index] });
+    chainNodes.push(node);
+
+    const compLinear = getEffectGainCompensation(successConfigs[index].type);
+    if (compLinear !== 1) {
+      const compGain = new Tone.Gain(compLinear);
+      ctx.masterEffectsNodes.push(compGain); // tracked for disposal
+      chainNodes.push(compGain);
+    }
   });
 
-  // Connect chain: masterEffectsInput → effects[0] → effects[n] → blepInput → [BLEP?] → masterChannel
-  // Both tracker audio (via amigaFilter) and synth audio (via synthBus) feed masterEffectsInput
-  ctx.masterEffectsInput.connect(ctx.masterEffectsNodes[0]);
+  // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
+  try {
+    ctx.masterEffectsInput.connect(chainNodes[0]);
 
-  for (let i = 0; i < ctx.masterEffectsNodes.length - 1; i++) {
-    ctx.masterEffectsNodes[i].connect(ctx.masterEffectsNodes[i + 1]);
+    for (let i = 0; i < chainNodes.length - 1; i++) {
+      chainNodes[i].connect(chainNodes[i + 1]);
+    }
+
+    chainNodes[chainNodes.length - 1].connect(ctx.blepInput);
+  } catch (e) {
+    console.error('[MasterEffectsChain] Chain connection failed:', e,
+      'chainNodes:', chainNodes.map(n => n?.name || n?.constructor?.name));
+    // Fallback: bypass effects entirely
+    ctx.masterEffectsInput.connect(ctx.blepInput);
   }
-
-  ctx.masterEffectsNodes[ctx.masterEffectsNodes.length - 1].connect(ctx.blepInput);
   // Debug: Success
   // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
   //   ctx.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
@@ -233,9 +250,15 @@ export function updateEffectParameters(ctx: MasterEffectsContext, newEffects: Ef
       }
     });
 
-    // Update enabled state (bypass)
-    if ('wet' in existing.node) {
-      (existing.node as any).wet.value = newConfig.enabled ? 1 : 0;
+    // Update wet level — respect the user's configured value (0-100 → 0-1)
+    if ('wet' in existing.node && existing.config.wet !== newConfig.wet) {
+      const wetValue = newConfig.wet / 100;
+      const node = existing.node as any;
+      if (node.wet instanceof Tone.Signal) {
+        node.wet.rampTo(wetValue, 0.02);
+      } else if (typeof node.wet === 'number') {
+        node.wet = wetValue;
+      }
     }
 
     // Update stored config

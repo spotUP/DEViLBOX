@@ -113,10 +113,15 @@ export class TapeSaturation extends Tone.ToneAudioNode {
   }
 
   /**
-   * Calculate makeup gain to compensate for saturation
+   * Calculate makeup gain to compensate for saturation and input boost.
+   * tanh(x*driveAmount) compresses peaks, but the input gain boost plus
+   * harmonic content means net output is louder. Compensate more aggressively.
    */
   private calculateMakeupGain(drive: number): number {
-    return 1 / (1 + drive * 0.5); // Reduce output as drive increases
+    // At drive=0: inputGain=1, makeup=1 → unity
+    // At drive=0.5: inputGain=2, makeup≈0.5 → unity
+    // At drive=1: inputGain=3, makeup≈0.4 → slight reduction (tanh adds energy)
+    return 1 / (1 + drive * 1.5);
   }
 
   // Getters and setters
