@@ -282,6 +282,28 @@ export class HivelyEngine {
     return () => this._positionCallbacks.delete(cb);
   }
 
+  /**
+   * Wire this engine's position-update stream into a PlaybackCoordinator.
+   * Throttles to row-change events and dispatches via
+   * coordinator.dispatchEnginePosition. Returns an unsubscribe function the
+   * caller stores so it can detach on stop().
+   *
+   * Replaces ~20 lines of identical glue that previously lived inline in
+   * TrackerReplayer.play() for every WASM engine.
+   */
+  subscribeToCoordinator(coordinator: import('@engine/PlaybackCoordinator').PlaybackCoordinator): () => void {
+    let lastRow = -1;
+    let lastPosition = -1;
+    return this.onPositionUpdate((update) => {
+      if (update.row === lastRow && update.position === lastPosition) return;
+      lastRow = update.row;
+      lastPosition = update.position;
+      // No audioTime — coordinator falls back to its audio context's currentTime.
+      // Hively's worklet doesn't expose per-callback audio timestamps.
+      coordinator.dispatchEnginePosition(update.row, update.position);
+    });
+  }
+
   /** Subscribe to song end events. Returns unsubscribe function. */
   onSongEnd(cb: () => void): () => void {
     this._songEndCallbacks.add(cb);

@@ -83,9 +83,17 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
         // Map WASM instrument data to KlysNativeInstrument shape (nest fm fields)
         const instruments = data.instruments
           .filter((i): i is NonNullable<typeof i> => i !== null)
-          .map(({ fmModulation, fmFeedback, fmHarmonic, fmAdsr, ...rest }) => ({
+          .map(({ fmFlags, fmModulation, fmFeedback, fmWave, fmHarmonic, fmAdsr, fmAttackStart, ...rest }) => ({
             ...rest,
-            fm: { modulation: fmModulation, feedback: fmFeedback, harmonic: fmHarmonic, adsr: fmAdsr },
+            fm: {
+              flags: fmFlags,
+              modulation: fmModulation,
+              feedback: fmFeedback,
+              wave: fmWave,
+              harmonic: fmHarmonic,
+              adsr: fmAdsr,
+              attackStart: fmAttackStart,
+            },
           }));
         useFormatStore.setState({
           klysNative: {

@@ -94,6 +94,18 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'setInstrumentName': {
+        if (!this.wasm || typeof this.wasm._klys_set_instrument_name !== 'function') break;
+        const { idx, name } = data;
+        const bytes = new TextEncoder().encode((name || '').slice(0, 32));
+        const ptr = this.wasm._malloc(bytes.length + 1);
+        this.wasm.HEAPU8.set(bytes, ptr);
+        this.wasm.HEAPU8[ptr + bytes.length] = 0;
+        this.wasm._klys_set_instrument_name(idx, ptr);
+        this.wasm._free(ptr);
+        break;
+      }
+
       case 'setInstrumentProgramStep': {
         if (!this.wasm) break;
         const { idx: progIdx, step, value: progVal } = data;
@@ -324,8 +336,8 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     }
     w._free(seqPtr);
 
-    // Extract instruments
-    const INST_BUF = 256;
+    // Extract instruments — MAXIMIZED layout: every MusInstrument field
+    const INST_BUF = 512;
     const instPtr = w._malloc(INST_BUF);
     const instruments = [];
     for (let i = 0; i < numInstruments; i++) {
@@ -333,54 +345,69 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       if (n < 32) { instruments.push(null); continue; }
       const raw = new Uint8Array(w.HEAPU8.buffer, instPtr, n);
       let p = 0;
-      const adsr = { a: raw[p++], d: raw[p++], s: raw[p++], r: raw[p++] };
-      const flags = raw[p] | (raw[p + 1] << 8); p += 2;
-      const cydflags = raw[p++];
-      const baseNote = raw[p++];
-      const finetune = raw[p++];
-      const slideSpeed = raw[p++];
-      const pw = raw[p] | (raw[p + 1] << 8); p += 2;
-      const volume = raw[p++];
-      const progPeriod = raw[p++];
-      const vibratoSpeed = raw[p++];
-      const vibratoDepth = raw[p++];
-      const pwmSpeed = raw[p++];
-      const pwmDepth = raw[p++];
-      const cutoff = raw[p] | (raw[p + 1] << 8); p += 2;
-      const resonance = raw[p++];
-      const flttype = raw[p++];
-      const fxBus = raw[p++];
-      const buzzOffset = raw[p] | (raw[p + 1] << 8); p += 2;
-      const ringMod = raw[p++];
-      const syncSource = raw[p++];
-      const wavetableEntry = raw[p++];
-      const fmModulation = raw[p++];
-      const fmFeedback = raw[p++];
-      const fmHarmonic = raw[p++];
-      const fmAdsr = { a: raw[p++], d: raw[p++], s: raw[p++], r: raw[p++] };
+      const u8 = () => raw[p++];
+      const s8 = () => { const v = raw[p++]; return v > 127 ? v - 256 : v; };
+      const u16 = () => { const v = raw[p] | (raw[p+1] << 8); p += 2; return v; };
+      const s16 = () => { const v = raw[p] | (raw[p+1] << 8); p += 2; return v > 32767 ? v - 65536 : v; };
+      const u32 = () => { const v = (raw[p] | (raw[p+1] << 8) | (raw[p+2] << 16) | (raw[p+3] << 24)) >>> 0; p += 4; return v; };
+
+      const adsr = { a: u8(), d: u8(), s: u8(), r: u8() };
+      const flags = u32();
+      const cydflags = u32();
+      const baseNote = u8();
+      const finetune = s8();
+      const slideSpeed = u8();
+      const pw = u16();
+      const volume = u8();
+      const progPeriod = u8();
+      const vibratoSpeed = u8();
+      const vibratoDepth = u8();
+      const pwmSpeed = u8();
+      const pwmDepth = u8();
+      const cutoff = u16();
+      const resonance = u8();
+      const flttype = u8();
+      const ymEnvShape = u8();
+      const buzzOffset = s16();
+      const fxBus = u8();
+      const vibShape = u8();
+      const vibDelay = u8();
+      const pwmShape = u8();
+      const lfsrType = u8();
+      const wavetableEntry = u8();
+      const ringMod = u8();
+      const syncSource = u8();
+      const fmFlags = u32();
+      const fmModulation = u8();
+      const fmFeedback = u8();
+      const fmWave = u8();
+      const fmHarmonic = u8();
+      const fmAdsr = { a: u8(), d: u8(), s: u8(), r: u8() };
+      const fmAttackStart = u8();
 
       // Program (32 steps, 2 bytes each)
       const program = [];
       for (let pi = 0; pi < 32 && p + 1 < n; pi++) {
-        program.push(raw[p] | (raw[p + 1] << 8));
-        p += 2;
+        program.push(u16());
       }
 
-      // Name (32 bytes, null-terminated) — no TextDecoder in AudioWorklet
+      // Name (33 bytes, null-terminated) — no TextDecoder in AudioWorklet
       let name = '';
-      if (p + 32 <= n) {
-        const end = Math.min(p + 32, n);
-        for (let ci = p; ci < end; ci++) {
-          if (raw[ci] === 0) break;
-          name += String.fromCharCode(raw[ci]);
-        }
+      const nameMax = Math.min(p + 33, n);
+      for (let ci = p; ci < nameMax; ci++) {
+        if (raw[ci] === 0) break;
+        name += String.fromCharCode(raw[ci]);
       }
+      p = nameMax;
 
       instruments.push({
         name, adsr, flags, cydflags, baseNote, finetune, slideSpeed,
         pw, volume, progPeriod, vibratoSpeed, vibratoDepth, pwmSpeed, pwmDepth,
-        cutoff, resonance, flttype, fxBus, buzzOffset, ringMod, syncSource,
-        wavetableEntry, fmModulation, fmFeedback, fmHarmonic, fmAdsr, program,
+        cutoff, resonance, flttype, ymEnvShape, buzzOffset,
+        fxBus, vibShape, vibDelay, pwmShape, lfsrType, wavetableEntry,
+        ringMod, syncSource,
+        fmFlags, fmModulation, fmFeedback, fmWave, fmHarmonic, fmAdsr, fmAttackStart,
+        program,
       });
     }
     w._free(instPtr);
