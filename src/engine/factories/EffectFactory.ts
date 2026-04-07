@@ -38,11 +38,11 @@ switch (type) {
     return { decay: 1.5, preDelay: 0.01 };
   case 'Delay':
   case 'FeedbackDelay':
-    return { time: 0.25, feedback: 0.5 };
+    return { time: 0.25, feedback: 0.35 };
   case 'Chorus':
     return { frequency: 1.5, delayTime: 3.5, depth: 0.7 };
   case 'Phaser':
-    return { frequency: 0.5, octaves: 3, baseFrequency: 350 };
+    return { frequency: 0.5, octaves: 3, baseFrequency: 350, Q: 2, stages: 4 };
   case 'Tremolo':
     return { frequency: 10, depth: 0.5 };
   case 'Vibrato':
@@ -50,9 +50,9 @@ switch (type) {
   case 'AutoFilter':
     return { frequency: 1, baseFrequency: 200, octaves: 2.6, filterType: 'lowpass' };
   case 'AutoPanner':
-    return { frequency: 1, depth: 1 };
+    return { frequency: 1, depth: 0.5 };
   case 'AutoWah':
-    return { baseFrequency: 100, octaves: 6, sensitivity: 0, Q: 2, gain: 2, follower: 0.1 };
+    return { baseFrequency: 100, octaves: 4, sensitivity: 0, Q: 2, gain: 1, follower: 0.1 };
   case 'BitCrusher':
     return { bits: 4 };
   case 'Chebyshev':
@@ -60,13 +60,13 @@ switch (type) {
   case 'FrequencyShifter':
     return { frequency: 0 };
   case 'PingPongDelay':
-    return { time: 0.25, feedback: 0.5 };
+    return { time: 0.25, feedback: 0.35 };
   case 'PitchShift':
     return { pitch: 0, windowSize: 0.1, delayTime: 0, feedback: 0 };
   case 'Compressor':
     return { threshold: -24, ratio: 12, attack: 0.003, release: 0.25 };
   case 'EQ3':
-    return { low: 0, mid: 0, high: 0, lowFrequency: 400, highFrequency: 2500 };
+    return { low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 3500 };
   case 'Filter':
     return { type: 'lowpass', frequency: 5000, rolloff: -12, Q: 1, gain: 0 };
   case 'JCReverb':
@@ -189,7 +189,7 @@ export async function createEffect(
     case 'Delay':
       node = new Tone.FeedbackDelay({
         delayTime: p.time || 0.25,
-        feedback: p.feedback || 0.5,
+        feedback: p.feedback || 0.35,
         wet: wetValue,
       });
       break;
@@ -210,7 +210,9 @@ export async function createEffect(
       node = new Tone.Phaser({
         frequency: p.frequency || 0.5,
         octaves: p.octaves || 3,
+        stages: p.stages || 4,
         baseFrequency: p.baseFrequency || 350,
+        Q: p.Q || 2,
         wet: wetValue,
       });
       break;
@@ -256,7 +258,7 @@ export async function createEffect(
     case 'AutoPanner': {
       const autoPanner = new Tone.AutoPanner({
         frequency: p.frequency || 1,
-        depth: p.depth || 1,
+        depth: p.depth || 0.5,
         wet: wetValue,
       });
       autoPanner.start(); // Start LFO
@@ -267,10 +269,10 @@ export async function createEffect(
     case 'AutoWah':
       node = new Tone.AutoWah({
         baseFrequency: p.baseFrequency || 100,
-        octaves: p.octaves || 6,
+        octaves: p.octaves || 4,
         sensitivity: p.sensitivity || 0,
         Q: p.Q || 2,
-        gain: p.gain || 2,
+        gain: p.gain || 1,
         follower: p.follower || 0.1,
         wet: wetValue,
       });
@@ -305,7 +307,7 @@ export async function createEffect(
     case 'FeedbackDelay':
       node = new Tone.FeedbackDelay({
         delayTime: p.time || 0.25,
-        feedback: p.feedback || 0.5,
+        feedback: p.feedback || 0.35,
         wet: wetValue,
       });
       break;
@@ -320,7 +322,7 @@ export async function createEffect(
     case 'PingPongDelay':
       node = new Tone.PingPongDelay({
         delayTime: p.time || 0.25,
-        feedback: p.feedback || 0.5,
+        feedback: p.feedback || 0.35,
         wet: wetValue,
       });
       break;
@@ -344,15 +346,37 @@ export async function createEffect(
       });
       break;
 
-    case 'EQ3':
-      node = new Tone.EQ3({
-        low: p.low || 0,
-        mid: p.mid || 0,
-        high: p.high || 0,
-        lowFrequency: p.lowFrequency || 400,
-        highFrequency: p.highFrequency || 2500,
+    case 'EQ3': {
+      // Use three serial peaking filters instead of Tone.EQ3's multiband split,
+      // which has inherent phase cancellation causing ~11dB insertion loss.
+      // Peaking filters are transparent at 0dB gain (no band splitting).
+      const eqInput = new Tone.Gain(1);
+      const lowFilter = new Tone.Filter({
+        type: 'peaking' as BiquadFilterType,
+        frequency: p.lowFrequency || 250,
+        gain: p.low || 0,
+        Q: 0.5,
       });
+      const midFilter = new Tone.Filter({
+        type: 'peaking' as BiquadFilterType,
+        frequency: Math.sqrt((p.lowFrequency || 250) * (p.highFrequency || 3500)),
+        gain: p.mid || 0,
+        Q: 0.7,
+      });
+      const highFilter = new Tone.Filter({
+        type: 'peaking' as BiquadFilterType,
+        frequency: p.highFrequency || 3500,
+        gain: p.high || 0,
+        Q: 0.5,
+      });
+      eqInput.chain(lowFilter, midFilter, highFilter);
+      // Store filters for parameter updates
+      (eqInput as unknown as Record<string, unknown>)._eq3Filters = [lowFilter, midFilter, highFilter];
+      // Override output so chain connects FROM highFilter
+      Object.defineProperty(eqInput, 'output', { value: (highFilter as unknown as { output: unknown }).output, configurable: true });
+      node = eqInput;
       break;
+    }
 
     case 'Filter':
       node = new Tone.Filter({

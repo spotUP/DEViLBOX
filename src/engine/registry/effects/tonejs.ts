@@ -332,12 +332,38 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.EQ3({
-        low: Number(p.low) || 0, mid: Number(p.mid) || 0, high: Number(p.high) || 0,
-        lowFrequency: Number(p.lowFrequency) || 400, highFrequency: Number(p.highFrequency) || 2500,
+      const lowFreq = Number(p.lowFrequency) || 250;
+      const highFreq = Number(p.highFrequency) || 3500;
+      // Use three serial peaking filters instead of Tone.EQ3's multiband split,
+      // which has inherent phase cancellation causing ~11dB insertion loss.
+      const eqInput = new Tone.Gain(1);
+      const lowFilter = new Tone.Filter({
+        type: 'peaking' as BiquadFilterType,
+        frequency: lowFreq,
+        gain: Number(p.low) || 0,
+        Q: 0.5,
       });
+      const midFilter = new Tone.Filter({
+        type: 'peaking' as BiquadFilterType,
+        frequency: Math.sqrt(lowFreq * highFreq),
+        gain: Number(p.mid) || 0,
+        Q: 0.7,
+      });
+      const highFilter = new Tone.Filter({
+        type: 'peaking' as BiquadFilterType,
+        frequency: highFreq,
+        gain: Number(p.high) || 0,
+        Q: 0.5,
+      });
+      eqInput.chain(lowFilter, midFilter, highFilter);
+      (eqInput as unknown as Record<string, unknown>)._eq3Filters = [lowFilter, midFilter, highFilter];
+      Object.defineProperty(eqInput, 'output', {
+        value: (highFilter as unknown as { output: unknown }).output,
+        configurable: true,
+      });
+      return eqInput;
     },
-    getDefaultParameters: () => ({ low: 0, mid: 0, high: 0, lowFrequency: 400, highFrequency: 2500 }),
+    getDefaultParameters: () => ({ low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 3500 }),
   },
   {
     id: 'StereoWidener', name: 'Stereo Widener', category: 'tonejs', group: 'EQ & Stereo',

@@ -1466,11 +1466,33 @@ export function createMcpServer(): McpServer {
         const filename = remotePath.split('/').pop() || 'download';
         const base64 = buffer.toString('base64');
 
+        // Auto-discover and download companion files for multi-file formats
+        // (TFMX: mdat.songname + smpl.songname, MIDI-Loriciel: MIDI.songname + SMPL.songname)
+        const companionFiles: Record<string, string> = {};
+        const lowerFilename = filename.toLowerCase();
+        const dirPath = remotePath.slice(0, remotePath.lastIndexOf('/'));
+        const prefixPairs: [string, string][] = [['mdat.', 'smpl.'], ['smpl.', 'mdat.'], ['midi.', 'smpl.'], ['smpl.', 'midi.']];
+        for (const [myPrefix, pairPrefix] of prefixPairs) {
+          if (lowerFilename.startsWith(myPrefix)) {
+            const suffix = filename.slice(myPrefix.length);
+            const pairName = `${pairPrefix}${suffix}`;
+            const pairPath = `${dirPath}/${pairName}`;
+            try {
+              const pairResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(pairPath)}`);
+              if (pairResp.ok) {
+                const pairBuf = Buffer.from(await pairResp.arrayBuffer());
+                companionFiles[pairName] = pairBuf.toString('base64');
+              }
+            } catch { /* companion download is best-effort */ }
+          }
+        }
+
         // Send to browser for loading
         const loadResult = await callBrowser('load_file', {
           filename,
           data: base64,
           subsong: p.subsong,
+          ...(Object.keys(companionFiles).length > 0 ? { companionFiles } : {}),
         });
 
         // Auto-play in song mode unless explicitly disabled
