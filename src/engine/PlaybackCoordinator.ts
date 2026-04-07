@@ -189,6 +189,14 @@ export interface PlaybackContext {
    */
   triggerVUMeters: ((time: number) => void) | null;
   /**
+   * Optional hook to drive the automation player for the current row.
+   * Called from dispatchEnginePosition() so WASM-backed formats apply
+   * automation curves at row boundaries without the TS scheduler running.
+   * Sub-row interpolation is still handled by processTick for non-WASM
+   * formats — WASM engines only report row changes, not sub-row positions.
+   */
+  applyAutomation: (() => void) | null;
+  /**
    * Audio context, used to read outputLatency for latency-compensated visuals.
    * If null, no latency compensation is applied.
    */
@@ -215,6 +223,7 @@ export class PlaybackCoordinator {
     speed: 6,
     fireHybridNotes: null,
     triggerVUMeters: null,
+    applyAutomation: null,
     audioContext: null,
   };
 
@@ -286,6 +295,12 @@ export class PlaybackCoordinator {
     // the meters animate during playback regardless of which engine drives.
     if (ctx.triggerVUMeters) {
       ctx.triggerVUMeters(time);
+    }
+    // Automation: same reason — apply curve-based automation at row
+    // boundaries from here so WASM-backed formats get curve playback
+    // without depending on processTick.
+    if (ctx.applyAutomation) {
+      ctx.applyAutomation();
     }
   }
 

@@ -873,6 +873,22 @@ export class TrackerReplayer {
   }
 
   /**
+   * Drive the automation player for the current row. Called from
+   * coordinator.dispatchEnginePosition for WASM-backed formats so curve
+   * automation applies at row boundaries without the TS scheduler running.
+   * Sub-row interpolation only happens via processTick (non-WASM path).
+   */
+  private applyAutomationForRow(): void {
+    if (!this.song) return;
+    const ap = getAutomationPlayer();
+    const curPattern = this.song.patterns[this.song.songPositions[this.songPos]];
+    if (!curPattern) return;
+    ap.setPattern(curPattern);
+    ap.setAutomationData(useAutomationStore.getState().buildAutomationData());
+    ap.processPatternRow(this.pattPos);
+  }
+
+  /**
    * Read the current row's pattern data and fire per-channel VU meters.
    * Used by WASM-backed formats (libopenmpt, Hively, MusicLine, UADE,
    * JamCracker, FC, Klystrack, etc.) where the TS scheduler doesn't run
@@ -2307,6 +2323,7 @@ export class TrackerReplayer {
     this.coordinator.context.speed = this.speed;
     this.coordinator.context.fireHybridNotes = (time) => this.fireHybridNotesForRow(time);
     this.coordinator.context.triggerVUMeters = (time) => this.triggerVUMetersForRow(time);
+    this.coordinator.context.applyAutomation = () => this.applyAutomationForRow();
     this.coordinator.context.audioContext = Tone.context.rawContext as AudioContext;
     // songPos / pattPos already live on coordinator (mirrored via accessor)
   }
