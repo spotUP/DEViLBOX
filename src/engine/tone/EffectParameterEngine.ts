@@ -27,6 +27,7 @@ import { GranularFreezeEffect } from '../effects/GranularFreezeEffect';
 import { ShimmerReverbEffect } from '../effects/ShimmerReverbEffect';
 import { TapeDegradationEffect } from '../effects/TapeDegradationEffect';
 import { VocoderEffect } from '../effects/VocoderEffect';
+import { BuzzmachineSynth } from '../buzzmachines/BuzzmachineSynth';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -473,6 +474,40 @@ export function applyEffectParametersDiff(
       if (node instanceof NeuralEffectWrapper) {
         for (const [key, value] of Object.entries(changed)) {
           node.setParameter(key, Number(value));
+        }
+      }
+      break;
+
+    // Buzzmachine WASM effects — indexed parameters
+    case 'BuzzDistortion':
+    case 'BuzzOverdrive':
+    case 'BuzzDistortion2':
+    case 'BuzzDist2':
+    case 'BuzzSoftSat':
+    case 'BuzzStereoDist':
+    case 'BuzzSVF':
+    case 'BuzzPhilta':
+    case 'BuzzNotch':
+    case 'BuzzZfilter':
+    case 'BuzzDelay':
+    case 'BuzzCrossDelay':
+    case 'BuzzFreeverb':
+    case 'BuzzPanzerDelay':
+    case 'BuzzChorus':
+    case 'BuzzChorus2':
+    case 'BuzzWhiteChorus':
+    case 'BuzzFreqShift':
+    case 'BuzzCompressor':
+    case 'BuzzLimiter':
+    case 'BuzzExciter':
+    case 'BuzzMasterizer':
+    case 'BuzzStereoGain':
+      if (node instanceof BuzzmachineSynth) {
+        for (const [key, value] of Object.entries(changed)) {
+          const paramIndex = parseInt(key, 10);
+          if (!isNaN(paramIndex)) {
+            node.setParameter(paramIndex, Number(value));
+          }
         }
       }
       break;

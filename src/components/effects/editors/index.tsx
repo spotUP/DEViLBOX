@@ -29,6 +29,8 @@ import { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, Les
 import { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
+import { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, GranularFreezeEditor } from './AdditionalEffectEditors';
+import { BuzzmachineEditor } from './BuzzmachineEditor';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
 // Re-export all editors
@@ -38,6 +40,8 @@ export { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, Les
 export { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 export { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 export { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
+export { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, GranularFreezeEditor } from './AdditionalEffectEditors';
+export { BuzzmachineEditor } from './BuzzmachineEditor';
 export { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
 // ============================================================================
@@ -89,6 +93,34 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   MVerb: MVerbEditor,
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
+  TapeDegradation: TapeDegradationEditor,
+  AmbientDelay: AmbientDelayEditor,
+  ShimmerReverb: ShimmerReverbEditor,
+  GranularFreeze: GranularFreezeEditor,
+  // Buzzmachine WASM effects — dynamic knob editor
+  BuzzDistortion: BuzzmachineEditor,
+  BuzzOverdrive: BuzzmachineEditor,
+  BuzzDistortion2: BuzzmachineEditor,
+  BuzzDist2: BuzzmachineEditor,
+  BuzzSoftSat: BuzzmachineEditor,
+  BuzzStereoDist: BuzzmachineEditor,
+  BuzzSVF: BuzzmachineEditor,
+  BuzzPhilta: BuzzmachineEditor,
+  BuzzNotch: BuzzmachineEditor,
+  BuzzZfilter: BuzzmachineEditor,
+  BuzzDelay: BuzzmachineEditor,
+  BuzzCrossDelay: BuzzmachineEditor,
+  BuzzFreeverb: BuzzmachineEditor,
+  BuzzPanzerDelay: BuzzmachineEditor,
+  BuzzChorus: BuzzmachineEditor,
+  BuzzChorus2: BuzzmachineEditor,
+  BuzzWhiteChorus: BuzzmachineEditor,
+  BuzzFreqShift: BuzzmachineEditor,
+  BuzzCompressor: BuzzmachineEditor,
+  BuzzLimiter: BuzzmachineEditor,
+  BuzzExciter: BuzzmachineEditor,
+  BuzzMasterizer: BuzzmachineEditor,
+  BuzzStereoGain: BuzzmachineEditor,
   // WAM 2.0 effects — embed native plugin GUI
   WAMBigMuff: WAMEffectEditor,
   WAMTS9: WAMEffectEditor,
