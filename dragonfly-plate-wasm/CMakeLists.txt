@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(DragonflyPlate VERSION 1.0.0)
+set(CMAKE_CXX_STANDARD 17)
+add_executable(DragonflyPlate DragonflyPlateWASM.cpp)
+set_target_properties(DragonflyPlate PROPERTIES OUTPUT_NAME "DragonflyPlate" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/dragonfly-plate")
+target_link_options(DragonflyPlate PRIVATE "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createDragonflyPlate'" "SHELL:-s ALLOW_MEMORY_GROWTH=1" "SHELL:-s ENVIRONMENT='web,worker'" "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']" "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_dragonfly_plate_create','_dragonfly_plate_destroy','_dragonfly_plate_process','_dragonfly_plate_set_decay','_dragonfly_plate_set_damping','_dragonfly_plate_set_predelay','_dragonfly_plate_set_width','_dragonfly_plate_set_brightness']" "SHELL:-s INITIAL_MEMORY=4194304" "SHELL:-s STACK_SIZE=262144" "SHELL:-s NO_EXIT_RUNTIME=1" "SHELL:-s FILESYSTEM=0" -O2)

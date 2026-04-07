@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(DragonflyRoom VERSION 1.0.0)
+set(CMAKE_CXX_STANDARD 17)
+add_executable(DragonflyRoom DragonflyRoomWASM.cpp)
+set_target_properties(DragonflyRoom PROPERTIES OUTPUT_NAME "DragonflyRoom" SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../public/dragonfly-room")
+target_link_options(DragonflyRoom PRIVATE "SHELL:-s WASM=1" "SHELL:-s MODULARIZE=1" "SHELL:-s EXPORT_NAME='createDragonflyRoom'" "SHELL:-s ALLOW_MEMORY_GROWTH=1" "SHELL:-s ENVIRONMENT='web,worker'" "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']" "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_dragonfly_room_create','_dragonfly_room_destroy','_dragonfly_room_process','_dragonfly_room_set_decay','_dragonfly_room_set_damping','_dragonfly_room_set_predelay','_dragonfly_room_set_width','_dragonfly_room_set_early_level','_dragonfly_room_set_size']" "SHELL:-s INITIAL_MEMORY=4194304" "SHELL:-s STACK_SIZE=262144" "SHELL:-s NO_EXIT_RUNTIME=1" "SHELL:-s FILESYSTEM=0" -O2)
