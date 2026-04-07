@@ -25,6 +25,7 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiGenericFormatView } from '@/pixi/views/shared/PixiGenericFormatView';
 import { klysToFormatChannels, KLYS_COLUMNS } from '@/components/klystrack/klysAdapter';
 import { PixiKlysPositionEditor } from './PixiKlysPositionEditor';
+import { PixiKlysInstrumentEditor } from './PixiKlysInstrumentEditor';
 
 const SEQ_H = 140;
 const KT_ACCENT = 0x88ccff;
@@ -43,6 +44,8 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
 
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const [editPosition, setEditPosition] = useState(0);
+  const [showInstEditor, setShowInstEditor] = useState(false);
+  const [selectedInstrument, setSelectedInstrument] = useState(0);
 
   const activePosition = isPlaying ? currentPositionIndex : editPosition;
 
@@ -105,20 +108,76 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
     />
   );
 
+  const INST_PANEL_W = 360;
+  const mainW = showInstEditor ? Math.max(200, width - INST_PANEL_W) : width;
+  const numInstruments = nativeData.instruments.length;
+
   return (
-    <PixiGenericFormatView
-      width={width}
-      height={height}
-      formatLabel="KT"
-      formatAccentColor={KT_ACCENT}
-      toolbarInfo={toolbarInfo}
-      actionButton={{ label: 'KT\u2193', onClick: handleExport, color: 'green' }}
-      overviewSlot={overviewSlot}
-      overviewHeight={SEQ_H}
-      columns={KLYS_COLUMNS}
-      channels={channels}
-      currentRow={currentRow}
-      isPlaying={isPlaying}
-    />
+    <pixiContainer layout={{ width, height, flexDirection: 'row' }}>
+      <pixiContainer layout={{ width: mainW, height, flexDirection: 'column' }}>
+        {/* Inst toggle bar */}
+        <pixiContainer layout={{ width: mainW, height: 22, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 6, paddingRight: 6 }}>
+          <pixiContainer
+            eventMode="static"
+            cursor="pointer"
+            onPointerTap={() => setShowInstEditor(!showInstEditor)}
+            layout={{ paddingLeft: 6, paddingRight: 6, paddingTop: 2, paddingBottom: 2, backgroundColor: showInstEditor ? theme.accent.color : theme.bgTertiary.color, borderRadius: 3 }}
+          >
+            <pixiBitmapText
+              text="INST"
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+              tint={showInstEditor ? 0xffffff : theme.textSecondary.color}
+            />
+          </pixiContainer>
+          {showInstEditor && (
+            <>
+              <pixiContainer
+                eventMode="static"
+                cursor="pointer"
+                onPointerTap={() => setSelectedInstrument(Math.max(0, selectedInstrument - 1))}
+                layout={{ paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, backgroundColor: theme.bgTertiary.color, borderRadius: 3 }}
+              >
+                <pixiBitmapText text="<" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
+              </pixiContainer>
+              <pixiBitmapText
+                text={`${selectedInstrument.toString(16).toUpperCase().padStart(2, '0')}: ${nativeData.instruments[selectedInstrument]?.name || 'Unnamed'}`}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                tint={theme.text.color}
+              />
+              <pixiContainer
+                eventMode="static"
+                cursor="pointer"
+                onPointerTap={() => setSelectedInstrument(Math.min(numInstruments - 1, selectedInstrument + 1))}
+                layout={{ paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, backgroundColor: theme.bgTertiary.color, borderRadius: 3 }}
+              >
+                <pixiBitmapText text=">" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
+              </pixiContainer>
+            </>
+          )}
+        </pixiContainer>
+
+        <PixiGenericFormatView
+          width={mainW}
+          height={height - 22}
+          formatLabel="KT"
+          formatAccentColor={KT_ACCENT}
+          toolbarInfo={toolbarInfo}
+          actionButton={{ label: 'KT\u2193', onClick: handleExport, color: 'green' }}
+          overviewSlot={overviewSlot}
+          overviewHeight={SEQ_H}
+          columns={KLYS_COLUMNS}
+          channels={channels}
+          currentRow={currentRow}
+          isPlaying={isPlaying}
+        />
+      </pixiContainer>
+      {showInstEditor && (
+        <PixiKlysInstrumentEditor
+          instrumentIndex={selectedInstrument}
+          width={INST_PANEL_W}
+          height={height}
+        />
+      )}
+    </pixiContainer>
   );
 };

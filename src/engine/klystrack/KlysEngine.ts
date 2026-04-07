@@ -36,10 +36,13 @@ export interface KlysSongData {
     flags: number; cydflags: number; baseNote: number; finetune: number;
     slideSpeed: number; pw: number; volume: number; progPeriod: number;
     vibratoSpeed: number; vibratoDepth: number; pwmSpeed: number; pwmDepth: number;
-    cutoff: number; resonance: number; flttype: number; fxBus: number;
-    buzzOffset: number; ringMod: number; syncSource: number; wavetableEntry: number;
-    fmModulation: number; fmFeedback: number; fmHarmonic: number;
-    fmAdsr: { a: number; d: number; s: number; r: number }; program: number[];
+    cutoff: number; resonance: number; flttype: number;
+    ymEnvShape: number; buzzOffset: number;
+    fxBus: number; vibShape: number; vibDelay: number; pwmShape: number;
+    lfsrType: number; wavetableEntry: number; ringMod: number; syncSource: number;
+    fmFlags: number; fmModulation: number; fmFeedback: number; fmWave: number; fmHarmonic: number;
+    fmAdsr: { a: number; d: number; s: number; r: number }; fmAttackStart: number;
+    program: number[];
   } | null>;
 }
 
@@ -357,6 +360,10 @@ export class KlysEngine {
 
   setInstrumentParam(idx: number, paramId: number, value: number): void {
     this.sendMessage({ type: 'setInstrumentParam', idx, paramId, value });
+  }
+
+  setInstrumentName(idx: number, name: string): void {
+    this.sendMessage({ type: 'setInstrumentName', idx, name });
   }
 
   setInstrumentProgramStep(idx: number, step: number, value: number): void {

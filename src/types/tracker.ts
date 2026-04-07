@@ -670,10 +670,10 @@ export interface KlysNativeSeqEntry {
 export interface KlysNativeInstrument {
   name: string;
   adsr: { a: number; d: number; s: number; r: number };
-  flags: number;
-  cydflags: number;
+  flags: number;       // MUS_INST_* bitfield (32-bit)
+  cydflags: number;    // CYD_CHN_* bitfield (32-bit)
   baseNote: number;
-  finetune: number;
+  finetune: number;    // signed
   slideSpeed: number;
   pw: number;
   volume: number;
@@ -685,16 +685,24 @@ export interface KlysNativeInstrument {
   cutoff: number;
   resonance: number;
   flttype: number;
+  ymEnvShape: number;
+  buzzOffset: number;  // signed
   fxBus: number;
-  buzzOffset: number;
+  vibShape: number;
+  vibDelay: number;
+  pwmShape: number;
+  lfsrType: number;
+  wavetableEntry: number;
   ringMod: number;
   syncSource: number;
-  wavetableEntry: number;
   fm: {
+    flags: number;     // CYD_FM_* bitfield (32-bit)
     modulation: number;
     feedback: number;
+    wave: number;
     harmonic: number;
     adsr: { a: number; d: number; s: number; r: number };
+    attackStart: number;
   };
   program: number[];  // 32 entries
 }

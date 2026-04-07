@@ -82,6 +82,7 @@ if(EMSCRIPTEN)
         "_klys_set_pattern_step"
         "_klys_set_sequence_entry"
         "_klys_set_instrument_param"
+        "_klys_set_instrument_name"
         "_klys_set_instrument_program_step"
         "_klys_save_song"
         "_klys_set_channel_gain"
