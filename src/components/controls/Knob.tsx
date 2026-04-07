@@ -87,19 +87,21 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const rafRef = useRef<number | null>(null);
   const pendingValueRef = useRef<number | null>(null);
   const gradientId = useId();
-  // Stable refs for values needed during drag (avoids stale closures)
+  // Stable refs for values needed during drag (avoids stale closures).
+  // Synced during render (not useEffect) to eliminate the timing gap between
+  // paint and effect — a useEffect leaves refs stale for one frame, which
+  // causes intermittent "stuck knob" failures when RAF callbacks fire in
+  // the gap between render-commit and effect-execution.
   const onChangeRef = useRef(onChange);
   const minRef = useRef(min);
   const maxRef = useRef(max);
   const logarithmicRef = useRef(logarithmic);
   const stepRef = useRef(step);
-  useEffect(() => {
-    onChangeRef.current = onChange;
-    minRef.current = min;
-    maxRef.current = max;
-    logarithmicRef.current = logarithmic;
-    stepRef.current = step;
-  }, [onChange, min, max, logarithmic, step]);
+  onChangeRef.current = onChange;
+  minRef.current = min;
+  maxRef.current = max;
+  logarithmicRef.current = logarithmic;
+  stepRef.current = step;
 
   // Theme-aware colors: use cyan for cyan-lineart theme
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
