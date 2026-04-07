@@ -31,7 +31,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
 import type { SynthType } from '@typedefs/instrument';
-import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
+import { getParamsForFormat, type AutomationFormat } from '@/engine/automation/AutomationParams';
 import {
   CHORD_TYPES, ARP_PRESETS_UNIQUE,
   chordNotes, invertChord, chordLabel, arpLabel,
@@ -292,8 +292,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 
   // Automation submenu items (NKS + register params)
   const automationMenuItems = useMemo((): MenuItemType[] => {
-    const { setActiveParameter, setShowLane, getShowLane, getCurvesForPattern, removeCurve, addCurve, addPoint } = useAutomationStore.getState();
-    const showLane = getShowLane(channelIndex);
+    const { setActiveParameter, getCurvesForPattern, removeCurve, addCurve, addPoint } = useAutomationStore.getState();
     const items: MenuItemType[] = [];
 
     // Helper: register a parameter, create the curve and seed a point at row 0
@@ -301,7 +300,6 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     const pat = patterns[currentPatternIndex];
     const ensureAutomationCurve = (paramId: string) => {
       setActiveParameter(channelIndex, paramId);
-      setShowLane(channelIndex, true);
       if (!useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
       if (!pat) return;
       const existing = getCurvesForPattern(pat.id, channelIndex).find((c) => c.parameter === paramId);
@@ -344,37 +342,33 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       const config = fmt === 'furnace' && furnaceNative
         ? { chipIds: furnaceNative.chipIds, channelCount: furnaceNative.subsongs[furnaceNative.activeSubsong]?.channels.length ?? 4 }
         : undefined;
-      const groups = groupParams(getParamsForFormat(fmt, config));
-      if (groups.length > 0) {
+      // Filter to ONLY params for the right-clicked channel. Params without
+      // a channel field (e.g. SID filter/global, format-wide params) are
+      // always included so they're not hidden by the per-channel filter.
+      const allParams = getParamsForFormat(fmt, config);
+      const channelParams = allParams.filter((p) => p.channel === undefined || p.channel === channelIndex);
+      if (channelParams.length > 0) {
         if (items.length > 0) items.push({ type: 'divider' });
+        // Flat list — no per-chip-channel sub-submenu
+        const flatItems = channelParams.map(p => ({
+          id: `reg-${p.id}`,
+          label: p.label,
+          onClick: () => ensureAutomationCurve(p.id),
+        }));
+        // Wrap under a "Register Params" submenu so they don't bloat the
+        // top-level Automation submenu, but use a flat list inside.
         items.push({
           id: 'register-params',
           label: 'Register Params',
-          submenu: groups.map(g => ({
-            id: `reg-g-${g.label}`,
-            label: g.label,
-            submenu: g.params.map(p => ({
-              id: `reg-${p.id}`,
-              label: p.label,
-              onClick: () => ensureAutomationCurve(p.id),
-            })),
-          })),
+          submenu: flatItems,
         });
       }
     }
 
-    // Show/hide + clear
-    items.push({ type: 'divider' });
-    items.push({
-      id: 'auto-toggle',
-      label: showLane ? 'Hide Lane' : 'Show Lane',
-      onClick: () => {
-        setShowLane(channelIndex, !showLane);
-        if (!showLane && !useUIStore.getState().showAutomationLanes) useUIStore.getState().toggleAutomationLanes();
-      },
-    });
+    // Clear automation
     const curves = pat ? getCurvesForPattern(pat.id, channelIndex) : [];
     if (curves.length > 0) {
+      if (items.length > 0) items.push({ type: 'divider' });
       items.push({
         id: 'auto-clear',
         label: 'Clear Automation',
