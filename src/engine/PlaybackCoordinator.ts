@@ -183,6 +183,12 @@ export interface PlaybackContext {
    */
   fireHybridNotes: ((time: number) => void) | null;
   /**
+   * Optional hook to trigger per-channel VU meters from the current row's
+   * pattern data. Called from dispatchEnginePosition() so WASM-backed
+   * formats get VU updates without needing the TS scheduler running.
+   */
+  triggerVUMeters: ((time: number) => void) | null;
+  /**
    * Audio context, used to read outputLatency for latency-compensated visuals.
    * If null, no latency compensation is applied.
    */
@@ -208,6 +214,7 @@ export class PlaybackCoordinator {
     bpm: 125,
     speed: 6,
     fireHybridNotes: null,
+    triggerVUMeters: null,
     audioContext: null,
   };
 
@@ -273,6 +280,12 @@ export class PlaybackCoordinator {
     }
     if (fireHybrid && ctx.fireHybridNotes) {
       ctx.fireHybridNotes(time);
+    }
+    // VU meters: WASM-backed formats can't use processTick's per-row VU
+    // dispatch (the TS scheduler doesn't run for them). Fire it from here so
+    // the meters animate during playback regardless of which engine drives.
+    if (ctx.triggerVUMeters) {
+      ctx.triggerVUMeters(time);
     }
   }
 
