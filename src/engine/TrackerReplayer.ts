@@ -1841,6 +1841,17 @@ export class TrackerReplayer {
       void getTrackerScratchController().initScratchBuffer();
     }).catch(() => { /* scratch not available */ });
 
+    // Phase 5.3: WASM-backed formats no longer need the TS scheduler.
+    // Display state, hybrid notes, VU meters, and automation curves all
+    // flow through coordinator.dispatchEnginePosition (driven by the
+    // engine's own position callback). Skip startScheduler entirely when
+    // a native WASM engine has taken over note triggering.
+    if (this._suppressNotes) {
+      _playLog('skipping TS scheduler (WASM engine driving playback)');
+      this._hasPlayedOnce = true;
+      return;
+    }
+
     _playLog('startScheduler (total)');
     this.startScheduler();
     this._hasPlayedOnce = true;
