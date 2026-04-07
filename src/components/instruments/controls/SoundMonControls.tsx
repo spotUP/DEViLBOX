@@ -69,6 +69,7 @@ import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/compo
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { encodeSoundMonADSR, generateSoundMonWaveform } from '@/engine/uade/chipRamEncoders';
+import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 
 interface SoundMonControlsProps {
   config: SoundMonConfig;
@@ -79,7 +80,10 @@ interface SoundMonControlsProps {
   uadeChipRam?: UADEChipRamInfo;
 }
 
-type SMTab = 'main' | 'arpeggio';
+type SMTab = 'main' | 'arpeggio' | 'sample';
+
+// Default wavePCM length when none stored on the instrument yet (synth type).
+const DEFAULT_WAVE_PCM_LEN = 64;
 
 // -- Wave type definitions (16 waveforms) ---
 
@@ -423,10 +427,312 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     </div>
   );
 
+  // -- SAMPLE TAB ---
+  // Exposes wavePCM (synth-type click+drag editor), pcmData (read-only preview
+  // for pcm-type), loop start/length (pcm-type only), and the always-applicable
+  // finetune / transpose / volume scalars.
+
+  const waveCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pcmPreviewRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+  const lastIdxRef = useRef(-1);
+
+  // Convert signed-int8 number[] -> Uint8Array (two's complement bytes).
+  const wavePCMToBytes = useCallback((arr: number[] | undefined): Uint8Array => {
+    const len = arr && arr.length > 0 ? arr.length : DEFAULT_WAVE_PCM_LEN;
+    const out = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      const v = arr && i < arr.length ? arr[i] : 0;
+      out[i] = (v < 0 ? v + 256 : v) & 0xFF;
+    }
+    return out;
+  }, []);
+
+  // Convert Uint8Array -> signed int8 number[] for storage.
+  const bytesToWavePCM = useCallback((bytes: Uint8Array): number[] => {
+    const out: number[] = new Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) {
+      out[i] = bytes[i] > 127 ? bytes[i] - 256 : bytes[i];
+    }
+    return out;
+  }, []);
+
+  // Draw the editable wavePCM (synth type)
+  useEffect(() => {
+    if (config.type !== 'synth') return;
+    const canvas = waveCanvasRef.current;
+    if (!canvas) return;
+    const raf = requestAnimationFrame(() => {
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth || 320;
+      const cssH = canvas.clientHeight || 120;
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#0a0e14';
+      ctx.fillRect(0, 0, cssW, cssH);
+      const mid = cssH / 2;
+      // Center axis
+      ctx.strokeStyle = accent + '40';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, mid);
+      ctx.lineTo(cssW, mid);
+      ctx.stroke();
+      // Waveform
+      const data = configRef.current.wavePCM;
+      const len = data && data.length > 0 ? data.length : DEFAULT_WAVE_PCM_LEN;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x < cssW; x++) {
+        const idx = Math.floor((x / cssW) * len);
+        const s = data && idx < data.length ? data[idx] : 0;
+        const y = mid - (s / 128) * (mid - 4);
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [config.type, config.wavePCM, accent]);
+
+  // Draw the read-only pcmData preview (pcm type)
+  useEffect(() => {
+    if (config.type !== 'pcm') return;
+    const canvas = pcmPreviewRef.current;
+    if (!canvas) return;
+    const raf = requestAnimationFrame(() => {
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth || 320;
+      const cssH = canvas.clientHeight || 120;
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#0a0e14';
+      ctx.fillRect(0, 0, cssW, cssH);
+      const mid = cssH / 2;
+      ctx.strokeStyle = accent + '40';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, mid);
+      ctx.lineTo(cssW, mid);
+      ctx.stroke();
+      const pcm = configRef.current.pcmData;
+      if (!pcm || pcm.length === 0) {
+        ctx.fillStyle = '#4a5a6a';
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('No PCM data', cssW / 2, mid + 4);
+        return;
+      }
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x < cssW; x++) {
+        const idx = Math.floor((x / cssW) * pcm.length);
+        const raw = pcm[idx];
+        const s = raw > 127 ? raw - 256 : raw;
+        const y = mid - (s / 128) * (mid - 4);
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      // Loop markers
+      const ls = configRef.current.loopStart ?? 0;
+      const ll = configRef.current.loopLength ?? 0;
+      if (ll > 0 && pcm.length > 0) {
+        const xStart = (ls / pcm.length) * cssW;
+        const xEnd = ((ls + ll) / pcm.length) * cssW;
+        ctx.strokeStyle = '#ffaa00';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xStart, 0); ctx.lineTo(xStart, cssH);
+        ctx.moveTo(xEnd, 0); ctx.lineTo(xEnd, cssH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [config.type, config.pcmData, config.loopStart, config.loopLength, accent]);
+
+  const writeWavePCMFromEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const cur = configRef.current;
+    if (cur.type !== 'synth') return;
+    const canvas = waveCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const bytes = wavePCMToBytes(cur.wavePCM);
+    const { next, idx } = writeWaveformByte(
+      bytes,
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+      rect.width,
+      rect.height,
+      lastIdxRef.current,
+    );
+    lastIdxRef.current = idx;
+    upd('wavePCM', bytesToWavePCM(next));
+  }, [upd, wavePCMToBytes, bytesToWavePCM]);
+
+  const handleWavePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (configRef.current.type !== 'synth') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDrawingRef.current = true;
+    lastIdxRef.current = -1;
+    writeWavePCMFromEvent(e);
+  }, [writeWavePCMFromEvent]);
+
+  const handleWavePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    writeWavePCMFromEvent(e);
+  }, [writeWavePCMFromEvent]);
+
+  const handleWavePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    isDrawingRef.current = false;
+    lastIdxRef.current = -1;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  const pcmLen = config.pcmData?.length ?? 0;
+
+  const renderSample = () => (
+    <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+
+      {/* Type indicator */}
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+        <SectionLabel color={accent} label="Instrument Type" />
+        <div className="text-[11px] font-mono mt-1" style={{ color: accent }}>
+          {config.type === 'synth' ? 'SYNTH (wavetable)' : 'PCM (sample)'}
+        </div>
+      </div>
+
+      {/* Synth: editable wavePCM */}
+      {config.type === 'synth' && (
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+          <div className="flex items-center justify-between mb-2">
+            <SectionLabel color={accent} label="Wave PCM (click + drag to draw)" />
+            <span className="text-[10px] text-text-muted font-mono">
+              {config.wavePCM?.length ?? DEFAULT_WAVE_PCM_LEN} bytes
+            </span>
+          </div>
+          <canvas
+            ref={waveCanvasRef}
+            className="w-full rounded border cursor-crosshair"
+            style={{ height: 120, touchAction: 'none', borderColor: dim }}
+            onPointerDown={handleWavePointerDown}
+            onPointerMove={handleWavePointerMove}
+            onPointerUp={handleWavePointerUp}
+            onPointerCancel={handleWavePointerUp}
+          />
+        </div>
+      )}
+
+      {/* PCM: read-only preview + loop points */}
+      {config.type === 'pcm' && (
+        <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+          <div className="flex items-center justify-between mb-2">
+            <SectionLabel color={accent} label="PCM Sample" />
+            <span className="text-[10px] text-text-muted font-mono">{pcmLen} bytes</span>
+          </div>
+          <canvas
+            ref={pcmPreviewRef}
+            className="w-full rounded border"
+            style={{ height: 120, borderColor: dim }}
+          />
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.6 }}>
+                Loop Start
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={Math.max(0, pcmLen)}
+                step={1}
+                value={config.loopStart ?? 0}
+                onChange={(e) => {
+                  const raw = parseInt(e.target.value, 10);
+                  const v = Number.isFinite(raw) ? Math.max(0, Math.min(pcmLen, raw)) : 0;
+                  upd('loopStart', v);
+                }}
+                className="px-2 py-1 rounded border text-xs font-mono bg-[#0a0e14] text-text-primary"
+                style={{ borderColor: dim }}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.6 }}>
+                Loop Length (0 = no loop)
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={Math.max(0, pcmLen - (config.loopStart ?? 0))}
+                step={1}
+                value={config.loopLength ?? 0}
+                onChange={(e) => {
+                  const raw = parseInt(e.target.value, 10);
+                  const maxLen = Math.max(0, pcmLen - (config.loopStart ?? 0));
+                  const v = Number.isFinite(raw) ? Math.max(0, Math.min(maxLen, raw)) : 0;
+                  upd('loopLength', v);
+                }}
+                className="px-2 py-1 rounded border text-xs font-mono bg-[#0a0e14] text-text-primary"
+                style={{ borderColor: dim }}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Tuning + Volume — applies to both types */}
+      <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
+        <SectionLabel color={accent} label="Tuning & Volume" />
+        <div className="flex gap-4 mt-2">
+          <Knob
+            value={config.finetune ?? 0}
+            min={-8}
+            max={7}
+            step={1}
+            bipolar
+            onChange={(v) => upd('finetune', Math.round(v))}
+            label="Finetune"
+            color={knob}
+            formatValue={(v) => Math.round(v).toString()}
+          />
+          <Knob
+            value={config.transpose ?? 0}
+            min={-12}
+            max={12}
+            step={1}
+            bipolar
+            onChange={(v) => upd('transpose', Math.round(v))}
+            label="Transpose"
+            color={knob}
+            formatValue={(v) => Math.round(v).toString()}
+          />
+          <Knob
+            value={config.volume ?? 64}
+            min={0}
+            max={64}
+            step={1}
+            onChange={(v) => upd('volume', Math.round(v))}
+            label="Volume"
+            color={knob}
+            formatValue={(v) => Math.round(v).toString()}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b" style={{ borderColor: dim }}>
-        {([['main', 'Parameters'], ['arpeggio', 'Arpeggio']] as const).map(([id, label]) => (
+        {([['main', 'Parameters'], ['arpeggio', 'Arpeggio'], ['sample', 'Sample']] as const).map(([id, label]) => (
           <button key={id}
             onClick={() => setActiveTab(id)}
             className="px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
@@ -441,6 +747,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
       </div>
       {activeTab === 'main'     && renderMain()}
       {activeTab === 'arpeggio' && renderArpeggio()}
+      {activeTab === 'sample'   && renderSample()}
       {uadeChipRam && (
         <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
           style={{ borderColor: dim }}>
