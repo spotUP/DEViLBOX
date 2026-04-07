@@ -16,6 +16,7 @@ import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { useTrackerStore } from '@stores/useTrackerStore';
 
 // SA instrument struct byte offsets (from SonicArrangerParser.ts file header).
 // All multi-byte fields are uint16 big-endian unless noted.
@@ -215,11 +216,44 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   config,
   onChange,
   uadeChipRam,
+  instrumentId,
 }) => {
   const [activeTab, setActiveTab] = useState<SATab>('synthesis');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  // ── Find Usage — scan tracker patterns for any cell referencing this
+  // instrument's runtime id, find the song position of the first pattern
+  // that contains such a cell, and seek the player there. Mirrors the
+  // TFMX/FC/JC/HC Find Usage pattern. ──────────────────────────────────────
+  const findUsage = useCallback((): boolean => {
+    if (instrumentId === undefined) return false;
+    const store = useTrackerStore.getState();
+    const patterns = store.patterns;
+    const order = store.patternOrder;
+    const usingPatternIdx = new Set<number>();
+    for (let p = 0; p < patterns.length; p++) {
+      const pat = patterns[p];
+      if (!pat) continue;
+      outer: for (const ch of pat.channels) {
+        for (const row of ch.rows) {
+          if (row && row.instrument === instrumentId) {
+            usingPatternIdx.add(p);
+            break outer;
+          }
+        }
+      }
+    }
+    if (usingPatternIdx.size === 0) return false;
+    for (let i = 0; i < order.length; i++) {
+      if (usingPatternIdx.has(order[i])) {
+        store.setCurrentPosition(i, false);
+        return true;
+      }
+    }
+    return false;
+  }, [instrumentId]);
 
   const chipEditorRef = useRef<UADEChipEditor | null>(null);
   const getEditor = useCallback(() => {
@@ -583,17 +617,31 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             {label}
           </button>
         ))}
-        <button
-          onClick={() => setShowSamplePane((v) => !v)}
-          title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
-          className={`ml-auto mr-2 my-1 px-2 py-0.5 rounded text-[10px] font-mono border ${
-            showSamplePane
-              ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
-              : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
-          }`}
-        >
-          SMP
-        </button>
+        <div className="ml-auto mr-2 my-1 flex items-center gap-1">
+          {instrumentId !== undefined && (
+            <button
+              onClick={() => {
+                const ok = findUsage();
+                if (!ok) console.warn('[SonicArranger] instrument is unused — nothing to seek to');
+              }}
+              title="Find a song position where this instrument is used and seek the player there"
+              className="px-2 py-0.5 rounded text-[10px] font-mono bg-dark-bg text-accent-primary border border-dark-border hover:border-accent-primary/60 transition-colors"
+            >
+              ▶ Find Usage
+            </button>
+          )}
+          <button
+            onClick={() => setShowSamplePane((v) => !v)}
+            title={`${showSamplePane ? 'Hide' : 'Show'} sample browser`}
+            className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+              showSamplePane
+                ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/60'
+                : 'bg-dark-bg text-text-secondary border-dark-border hover:text-accent-primary hover:border-accent-primary/50'
+            }`}
+          >
+            SMP
+          </button>
+        </div>
       </div>
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 min-w-0 overflow-y-auto">
