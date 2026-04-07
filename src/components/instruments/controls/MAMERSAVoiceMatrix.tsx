@@ -147,7 +147,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
 
       {/* Selected Part Editor */}
       <div className={`p-4 rounded border ${panelBg} space-y-4 shadow-inner-dark`} style={panelStyle}>
-        <div className="flex items-center justify-between border-b border-border pb-2">
+        <div className="flex items-center justify-between border-b border-dark-border pb-2">
           <div className="flex items-center gap-2">
             <Settings size={14} className="text-text-muted" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
@@ -167,7 +167,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <div className="bg-black/20 p-2 rounded border border-border space-y-1">
+           <div className="bg-black/20 p-2 rounded border border-dark-border space-y-1">
               <div className="text-[8px] text-text-muted uppercase font-bold tracking-tighter">Hardware Info (SA Engine)</div>
               <div className="flex justify-between text-[10px] font-mono">
                 <span className="text-text-muted">PITCH:</span>
@@ -178,7 +178,7 @@ export const MAMERSAVoiceMatrix: React.FC<MAMERSAVoiceMatrixProps> = ({
                 <span className="text-sky-400">HI: 0x{(partParams[3] || 0).toString(16).toUpperCase().padStart(2, '0')} | LP: 0x{(partParams[2] || 0).toString(16).toUpperCase().padStart(2, '0')}</span>
               </div>
            </div>
-           <div className="bg-black/20 p-2 rounded border border-border flex flex-col justify-center italic text-[9px] text-text-muted">
+           <div className="bg-black/20 p-2 rounded border border-dark-border flex flex-col justify-center italic text-[9px] text-text-muted">
               <div>• Structured Adaptive (SA) - Ultra-accurate 80s piano synthesis.</div>
               <div>• Each voice is composed of 10 "Parts" (harmonic components).</div>
            </div>

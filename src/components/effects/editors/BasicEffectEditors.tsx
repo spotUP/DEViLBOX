@@ -25,7 +25,7 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#ef4444" />
       <WaveshaperCurve type="Distortion" drive={drive} color="#ef4444" height={100} />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ef4444" title="Distortion" />
         <div className="flex justify-around items-end">
           <Knob
@@ -70,7 +70,7 @@ export const ReverbEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#6366f1" title="Reverb" />
         <div className="flex justify-around items-end">
           <Knob
@@ -125,7 +125,7 @@ export const DelayEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#3b82f6" title={isPingPong ? 'Ping Pong Delay' : 'Delay'} />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -182,7 +182,7 @@ export const ChorusEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#ec4899" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ec4899" title="Chorus" />
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
@@ -251,7 +251,7 @@ export const PhaserEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#a855f7" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#a855f7" title="Phaser" />
         <div className="flex justify-around items-end">
           <Knob
@@ -316,7 +316,7 @@ export const TremoloEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#f97316" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f97316" title="Tremolo" />
         <div className="flex justify-around items-end">
           <Knob
@@ -368,7 +368,7 @@ export const VibratoEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#14b8a6" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#14b8a6" title="Vibrato" />
         <div className="flex justify-around items-end">
           <Knob

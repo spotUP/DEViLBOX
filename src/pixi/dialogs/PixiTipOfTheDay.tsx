@@ -85,7 +85,7 @@ const CategoryBadge: React.FC<{ category: string; accentColor: number }> = ({
 );
 
 // ─── Version entry — matches DOM VersionEntry ─────────────────────────────────
-// px-5 py-4 border-b border-border
+// px-5 py-4 border-b border-dark-border
 
 const VersionEntry: React.FC<{
   entry: ChangelogEntry;

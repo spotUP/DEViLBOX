@@ -26,7 +26,7 @@ export const AutoFilterEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#eab308" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#eab308" title="Auto Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -94,7 +94,7 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#10b981" />
       <GainReductionMeter pre={pre} post={post} />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#10b981" title="Compressor" />
         <div className="flex justify-around items-end">
           <Knob
@@ -139,7 +139,7 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -175,7 +175,7 @@ export const EQ3Editor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#3b82f6" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#3b82f6" title="3-Band EQ" />
         <div className="flex justify-around items-end">
           <Knob
@@ -210,7 +210,7 @@ export const EQ3Editor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#6b7280" title="Crossover" />
         <div className="flex justify-around items-end">
           <Knob
@@ -266,7 +266,7 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#f97316" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f97316" title="Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -299,7 +299,7 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -333,7 +333,7 @@ export const DubFilterEditor: React.FC<VisualEffectEditorProps> = ({
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#22c55e" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#22c55e" title="Dub Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -365,7 +365,7 @@ export const DubFilterEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -403,7 +403,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#10b981" />
       <GainReductionMeter pre={pre} post={post} />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#10b981" title="Compressor" />
         <div className="flex justify-around items-end">
           <Knob
@@ -435,7 +435,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#34d399" title="Envelope & Sidechain" />
         <div className="flex justify-around items-end">
           <Knob
@@ -467,7 +467,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
@@ -507,7 +507,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#f59e0b" />
       {/* Model & Mode */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f59e0b" title="Model" />
         <div className="grid grid-cols-3 gap-1 mb-3">
           {MOOG_MODEL_NAMES.map((name, i) => (
@@ -546,7 +546,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
         )}
       </section>
       {/* Filter Controls */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f59e0b" title="Filter" />
         <div className="flex justify-around items-end">
           <Knob
@@ -579,7 +579,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
         </div>
       </section>
       {/* Mix */}
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-center">
           <Knob
             value={effect.wet}

@@ -88,7 +88,7 @@ export const MAMEDOCVoiceMatrix: React.FC<MAMEDOCVoiceMatrixProps> = ({
 
       {/* Selected Oscillator Editor */}
       <div className={`p-4 rounded border ${panelBg} space-y-4 shadow-inner-dark`} style={panelStyle}>
-        <div className="flex items-center justify-between border-b border-border pb-2">
+        <div className="flex items-center justify-between border-b border-dark-border pb-2">
           <div className="flex items-center gap-2">
             <Settings size={14} className="text-text-muted" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
@@ -113,7 +113,7 @@ export const MAMEDOCVoiceMatrix: React.FC<MAMEDOCVoiceMatrixProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <div className="bg-black/20 p-2 rounded border border-border space-y-1">
+           <div className="bg-black/20 p-2 rounded border border-dark-border space-y-1">
               <div className="text-[8px] text-text-muted uppercase font-bold tracking-tighter">Register State (HEX)</div>
               <div className="flex justify-between text-[10px] font-mono">
                 <span className="text-text-muted">FREQ:</span>
@@ -124,7 +124,7 @@ export const MAMEDOCVoiceMatrix: React.FC<MAMEDOCVoiceMatrixProps> = ({
                 <span className="text-amber-400">PTR: 0x{(oscParams[0xC0] || 0).toString(16).toUpperCase().padStart(2, '0')} | SZ: 0x{(oscParams[0xA0] || 0).toString(16).toUpperCase().padStart(2, '0')}</span>
               </div>
            </div>
-           <div className="bg-black/20 p-2 rounded border border-border flex flex-col justify-center italic text-[9px] text-text-muted">
+           <div className="bg-black/20 p-2 rounded border border-dark-border flex flex-col justify-center italic text-[9px] text-text-muted">
               <div>• ES5503 (DOC) - Gritty 8-bit wavetable engine.</div>
               <div>• HALT bit must be cleared (0) for audio to play.</div>
            </div>

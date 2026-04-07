@@ -132,7 +132,7 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-border-subtle pb-1">
+      <div className="flex gap-1 border-b border-dark-border pb-1">
         {tabs.map(t => (
           <button
             key={t.id}
