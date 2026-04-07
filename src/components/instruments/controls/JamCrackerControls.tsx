@@ -294,7 +294,13 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
       <div className="flex items-center gap-3 text-sm">
         <span className="text-accent-highlight font-mono font-bold">JamCracker Pro</span>
         <span className="text-text-muted">|</span>
-        <span className="text-text-secondary">{config.name}</span>
+        <input
+          type="text"
+          value={config.name}
+          onChange={(e) => onChange({ ...configRef.current, name: e.target.value })}
+          className="px-2 py-0.5 rounded bg-dark-bg border border-dark-border text-text-primary font-mono text-xs focus:outline-none focus:border-accent-primary min-w-[120px]"
+          placeholder="Instrument name"
+        />
         <div className="flex gap-2 ml-auto">
           {config.isAM && (
             <span className="px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded text-xs font-mono">
@@ -396,10 +402,49 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
         )}
       </div>
 
-      {/* Info */}
-      <div className="text-[10px] text-text-muted font-mono">
-        Flags: 0x{config.flags.toString(16).padStart(2, '0')}
-        {config.isAM ? ' (AM synthesis — 64-byte waveform loop with phase modulation)' : ' (PCM sample)'}
+      {/* Flags — bitfield editor mirroring the parser (bit0=loop, bit1=AM) */}
+      <div className="flex items-center gap-4 text-[11px] font-mono">
+        <span className="text-text-muted uppercase tracking-wider">Flags:</span>
+        <label className="flex items-center gap-1.5 cursor-pointer text-text-primary select-none">
+          <input
+            type="checkbox"
+            checked={(config.flags & 0x01) !== 0}
+            onChange={(e) => {
+              const cur = configRef.current;
+              const newFlags = e.target.checked ? (cur.flags | 0x01) : (cur.flags & ~0x01);
+              onChange({
+                ...cur,
+                flags: newFlags,
+                isAM: (newFlags & 0x02) !== 0,
+                hasLoop: (newFlags & 0x01) !== 0,
+              });
+            }}
+            className="accent-accent-primary"
+          />
+          Loop
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer text-text-primary select-none">
+          <input
+            type="checkbox"
+            checked={(config.flags & 0x02) !== 0}
+            onChange={(e) => {
+              const cur = configRef.current;
+              const newFlags = e.target.checked ? (cur.flags | 0x02) : (cur.flags & ~0x02);
+              onChange({
+                ...cur,
+                flags: newFlags,
+                isAM: (newFlags & 0x02) !== 0,
+                hasLoop: (newFlags & 0x01) !== 0,
+              });
+            }}
+            className="accent-accent-primary"
+          />
+          AM Synth
+        </label>
+        <span className="text-text-muted ml-auto">
+          0x{config.flags.toString(16).padStart(2, '0')}
+          {config.isAM ? ' — AM synthesis (64-byte waveform loop with phase modulation)' : ' — PCM sample'}
+        </span>
       </div>
       </div>
 
