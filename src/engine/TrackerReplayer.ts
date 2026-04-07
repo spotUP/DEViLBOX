@@ -389,17 +389,10 @@ export interface TrackerSong {
 // TRACKER REPLAYER
 // ============================================================================
 
-/**
- * Display state for audio-synced UI updates (BassoonTracker pattern)
- */
-export interface DisplayState {
-  time: number;      // Web Audio time when this state becomes active
-  row: number;       // Pattern row
-  pattern: number;   // Pattern number
-  position: number;  // Song position index
-  tick: number;      // Current tick within row
-  duration: number;  // Expected duration of this row in seconds
-}
+// DisplayState now lives in PlaybackCoordinator. Re-export for backward
+// compatibility with any caller that imports it from this module.
+export type { DisplayState } from './PlaybackCoordinator';
+import { PlaybackCoordinator, type DisplayState } from './PlaybackCoordinator';
 
 export class TrackerReplayer {
   // Song data
@@ -412,7 +405,15 @@ export class TrackerReplayer {
   private _cachedTransportState: ReturnType<typeof useTransportStore.getState> | null = null;
 
   // Playback state
-  private playing = false;
+  // Backed by a private field so the setter can mirror into the coordinator,
+  // which uses .playing to decide whether getStateAtTime() should drain the
+  // ring buffer (playing) or freeze on the last dequeued state (stopped).
+  private _playing = false;
+  private get playing(): boolean { return this._playing; }
+  private set playing(v: boolean) {
+    this._playing = v;
+    this.coordinator.stateRing.playing = v;
+  }
   private _songEndFiredThisBatch = false;
   private songPos = 0;           // Current position in song order
   private pattPos = 0;           // Current row in pattern
@@ -469,16 +470,11 @@ export class TrackerReplayer {
   private stereoMode: 'pt2' | 'modplug' = 'pt2';
   private modplugSeparation = 0;
 
-  // Audio-synced state ring buffer for smooth scrolling (BassoonTracker pattern)
-  // States are queued with Web Audio timestamps during scheduling,
-  // then dequeued in render loop as audioContext.currentTime advances.
-  // Ring buffer avoids O(n) shift() and per-push object allocation.
-  private static readonly MAX_STATE_QUEUE_SIZE = 256; // ~5 seconds at 50Hz
-  private stateRing: DisplayState[] = Array.from({ length: 256 }, () => ({ time: 0, row: 0, pattern: 0, position: 0, tick: 0, duration: 0 }));
-  private stateRingHead = 0;   // Next write index
-  private stateRingTail = 0;   // Next read index
-  private stateRingCount = 0;  // Number of items in ring
-  private lastDequeuedState: DisplayState | null = null;
+  // Audio-synced state ring buffer for smooth scrolling (BassoonTracker pattern).
+  // States are queued with Web Audio timestamps during scheduling, then
+  // dequeued in the render loop as audioContext.currentTime advances.
+  // Owned by the PlaybackCoordinator — TrackerReplayer just delegates.
+  private readonly coordinator = new PlaybackCoordinator();
 
   // Cache for ToneAudioBuffer wrappers (keyed by instrument ID)
   // Avoids re-wrapping the same decoded AudioBuffer on every note trigger
@@ -693,7 +689,7 @@ export class TrackerReplayer {
       this.playing = true;
       this._suppressNotes = false;
       this.clearStateQueue();
-      this.lastDequeuedState = null;
+      this.coordinator.stateRing.clearLastDequeued();
       // Restart libopenmpt if this is a libopenmpt-backed format
       if (this.useLibopenmptPlayback) {
         import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
@@ -2151,7 +2147,7 @@ export class TrackerReplayer {
       // which tracks the engine's actual position. The replayer's lastDequeuedState
       // is stale (row 0) because no notes were scheduled.
       const wasmPos = useWasmPositionStore.getState();
-      const lastVisual = this.lastDequeuedState;
+      const lastVisual = this.coordinator.stateRing.getLastDequeued();
       const stopRow = wasmPos.active ? wasmPos.row : (lastVisual ? lastVisual.row : this.pattPos);
       useTransportStore.getState().setCurrentRow(stopRow);
       // Move the editing cursor to the stop position so the pattern editor
@@ -2614,23 +2610,10 @@ export class TrackerReplayer {
 
   /**
    * Queue a display state for audio-synced UI updates.
-   * Ring buffer: O(1) enqueue, reuses pre-allocated DisplayState objects.
+   * Delegates to the PlaybackCoordinator's ring buffer.
    */
   private queueDisplayState(time: number, row: number, pattern: number, position: number, tick: number, duration: number = 0): void {
-    const s = this.stateRing[this.stateRingHead];
-    s.time = time;
-    s.row = row;
-    s.pattern = pattern;
-    s.position = position;
-    s.tick = tick;
-    s.duration = duration;
-    this.stateRingHead = (this.stateRingHead + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
-    if (this.stateRingCount < TrackerReplayer.MAX_STATE_QUEUE_SIZE) {
-      this.stateRingCount++;
-    } else {
-      // Overwrite oldest — advance tail
-      this.stateRingTail = (this.stateRingTail + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
-    }
+    this.coordinator.queueDisplayState(time, row, pattern, position, tick, duration);
   }
 
   /**
@@ -2641,51 +2624,12 @@ export class TrackerReplayer {
    * @param peek If true, just look at the state at that time without dequeuing older states
    */
   public getStateAtTime(time: number, peek: boolean = false): DisplayState | null {
-    if (!this.playing) {
-      return this.lastDequeuedState;
-    }
-
-    if (peek) {
-      // Just find the state matching the time in the ring
-      let best = this.lastDequeuedState;
-      let idx = this.stateRingTail;
-      for (let i = 0; i < this.stateRingCount; i++) {
-        const state = this.stateRing[idx];
-        if (state.time <= time) best = state;
-        else break;
-        idx = (idx + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
-      }
-      return best;
-    }
-
-    // Dequeue states that are past the requested time
-    let result = this.lastDequeuedState;
-
-    while (this.stateRingCount > 0) {
-      const state = this.stateRing[this.stateRingTail];
-      if (state.time <= time) {
-        result = state;
-        this.lastDequeuedState = result;
-        this.stateRingTail = (this.stateRingTail + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
-        this.stateRingCount--;
-      } else {
-        break;
-      }
-    }
-
-    return result;
+    return this.coordinator.getStateAtTime(time, peek);
   }
 
-  /**
-   * Clear the state queue (called on stop/reset)
-   */
+  /** Clear the state queue (called on stop/reset). Keeps lastDequeuedState. */
   private clearStateQueue(): void {
-    this.stateRingHead = 0;
-    this.stateRingTail = 0;
-    this.stateRingCount = 0;
-    // Keep lastDequeuedState — pattern editor reads it after stop to show
-    // where playback was. Nulling it causes the editor to fall back to
-    // cursor.rowIndex (usually 0), jumping the view to the top.
+    this.coordinator.stateRing.clear();
   }
 
   // ==========================================================================
