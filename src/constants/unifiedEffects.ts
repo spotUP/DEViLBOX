@@ -373,6 +373,100 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     description: 'Drag-and-drop guitar pedalboard (WAM 2.0)',
   },
 
+  // ===== WASM EFFECTS (Zynthian-ported) =====
+
+  // ── Creative ──
+  { category: 'wasm', type: 'Masha', label: 'Masha Beat Stutter', group: 'Creative', description: 'Beat-synced stutter/glitch effect' },
+
+  // ── Delay ──
+  { category: 'tonejs', type: 'AmbientDelay', label: 'Ambient Delay', group: 'Reverb & Delay', description: 'Diffused multi-tap ambient delay with modulation' },
+  { category: 'wasm', type: 'ArtisticDelay', label: 'Artistic Delay', group: 'Reverb & Delay', description: 'Creative delay with pitch-shifting and modulation' },
+  { category: 'wasm', type: 'Della', label: 'Della Delay', group: 'Reverb & Delay', description: 'Analog-style delay with tape character' },
+  { category: 'wasm', type: 'ReverseDelay', label: 'Reverse Delay', group: 'Reverb & Delay', description: 'Reversed playback delay effect' },
+  { category: 'wasm', type: 'SlapbackDelay', label: 'Slapback Delay', group: 'Reverb & Delay', description: 'Short single-repeat rockabilly delay' },
+  { category: 'wasm', type: 'VintageDelay', label: 'Vintage Delay', group: 'Reverb & Delay', description: 'Warm analog-modeled vintage delay' },
+  { category: 'wasm', type: 'ZamDelay', label: 'ZAM Delay', group: 'Reverb & Delay', description: 'Clean digital delay with feedback control' },
+
+  // ── Distortion ──
+  { category: 'wasm', type: 'AutoSat', label: 'Auto Saturator', group: 'Distortion', description: 'Automatic saturation with dynamic response' },
+  { category: 'wasm', type: 'CabinetSim', label: 'Cabinet Simulator', group: 'Distortion', description: 'Guitar/bass cabinet impulse response simulator' },
+  { category: 'wasm', type: 'DistortionShaper', label: 'Distortion Shaper', group: 'Distortion', description: 'Waveshaper distortion with adjustable curve' },
+  { category: 'wasm', type: 'Driva', label: 'Driva', group: 'Distortion', description: 'Tube-style drive with tone control' },
+  { category: 'wasm', type: 'Exciter', label: 'Exciter', group: 'Distortion', description: 'Harmonic exciter for adding presence and clarity' },
+  { category: 'wasm', type: 'Overdrive', label: 'Overdrive', group: 'Distortion', description: 'Soft-clipping overdrive effect' },
+  { category: 'wasm', type: 'Satma', label: 'Satma', group: 'Distortion', description: 'Saturation and warming effect' },
+  { category: 'wasm', type: 'Saturator', label: 'Saturator', group: 'Distortion', description: 'Multimode saturation processor' },
+  { category: 'wasm', type: 'TubeAmp', label: 'Tube Amplifier', group: 'Distortion', description: 'Vacuum tube amplifier simulation' },
+
+  // ── Dynamics ──
+  { category: 'wasm', type: 'AGC', label: 'Auto Gain Control', group: 'Dynamics', description: 'Automatic gain leveling' },
+  { category: 'wasm', type: 'BeatBreather', label: 'Beat Breather', group: 'Dynamics', description: 'Transient-aware dynamics processor' },
+  { category: 'wasm', type: 'Clipper', label: 'Clipper', group: 'Dynamics', description: 'Hard/soft clipper for peak limiting' },
+  { category: 'wasm', type: 'DeEsser', label: 'De-Esser', group: 'Dynamics', description: 'Sibilance reduction processor' },
+  { category: 'wasm', type: 'Ducka', label: 'Ducka', group: 'Dynamics', description: 'Ducking/sidechain dynamics effect' },
+  { category: 'wasm', type: 'DynamicsProc', label: 'Dynamics Processor', group: 'Dynamics', description: 'Full-featured dynamics processor' },
+  { category: 'wasm', type: 'Expander', label: 'Expander', group: 'Dynamics', description: 'Dynamic range expander' },
+  { category: 'wasm', type: 'GOTTComp', label: 'GOTT Compressor', group: 'Dynamics', description: 'Glue-style optical compressor' },
+  { category: 'wasm', type: 'Limiter', label: 'Limiter', group: 'Dynamics', description: 'Brick-wall limiter for peak control' },
+  { category: 'wasm', type: 'Maximizer', label: 'Maximizer', group: 'Dynamics', description: 'Loudness maximizer with look-ahead' },
+  { category: 'wasm', type: 'MonoComp', label: 'Mono Compressor', group: 'Dynamics', description: 'Simple mono compressor' },
+  { category: 'wasm', type: 'MultibandClipper', label: 'Multiband Clipper', group: 'Dynamics', description: 'Per-band clipping for transparent limiting' },
+  { category: 'wasm', type: 'MultibandComp', label: 'Multiband Compressor', group: 'Dynamics', description: 'Multi-band compression processor' },
+  { category: 'wasm', type: 'MultibandDynamics', label: 'Multiband Dynamics', group: 'Dynamics', description: 'Full multiband dynamics processor' },
+  { category: 'wasm', type: 'MultibandExpander', label: 'Multiband Expander', group: 'Dynamics', description: 'Per-band expansion processor' },
+  { category: 'wasm', type: 'MultibandGate', label: 'Multiband Gate', group: 'Dynamics', description: 'Per-band noise gate' },
+  { category: 'wasm', type: 'MultibandLimiter', label: 'Multiband Limiter', group: 'Dynamics', description: 'Per-band limiting processor' },
+  { category: 'wasm', type: 'NoiseGate', label: 'Noise Gate', group: 'Dynamics', description: 'Noise gate with adjustable threshold' },
+  { category: 'wasm', type: 'Panda', label: 'Panda Comp/Expand', group: 'Dynamics', description: 'Combined compressor/expander' },
+  { category: 'tonejs', type: 'SidechainCompressor', label: 'Sidechain Compressor', group: 'Dynamics', description: 'Compressor with external sidechain input' },
+  { category: 'wasm', type: 'SidechainGate', label: 'Sidechain Gate', group: 'Dynamics', description: 'Gate with external sidechain trigger' },
+  { category: 'wasm', type: 'SidechainLimiter', label: 'Sidechain Limiter', group: 'Dynamics', description: 'Limiter with external sidechain' },
+  { category: 'wasm', type: 'TransientDesigner', label: 'Transient Designer', group: 'Dynamics', description: 'Attack/sustain transient shaping' },
+  { category: 'wasm', type: 'X42Comp', label: 'X42 Compressor', group: 'Dynamics', description: 'Clean digital compressor' },
+
+  // ── EQ & Filter ──
+  { category: 'wasm', type: 'ParametricEQ', label: 'Parametric EQ', group: 'EQ & Filter', description: '4-band parametric equalizer' },
+  { category: 'wasm', type: 'EQ5Band', label: '5-Band EQ', group: 'EQ & Filter', description: '5-band equalizer' },
+  { category: 'wasm', type: 'EQ8Band', label: '8-Band EQ', group: 'EQ & Filter', description: '8-band equalizer' },
+  { category: 'wasm', type: 'EQ12Band', label: '12-Band EQ', group: 'EQ & Filter', description: '12-band equalizer' },
+  { category: 'wasm', type: 'GEQ31', label: '31-Band Graphic EQ', group: 'EQ & Filter', description: '31-band graphic equalizer' },
+  { category: 'wasm', type: 'DynamicEQ', label: 'Dynamic EQ', group: 'EQ & Filter', description: 'Frequency-selective dynamic EQ' },
+  { category: 'wasm', type: 'Kuiza', label: 'Kuiza EQ', group: 'EQ & Filter', description: 'Smooth parametric EQ' },
+  { category: 'wasm', type: 'ZamEQ2', label: 'ZAM EQ2', group: 'EQ & Filter', description: 'Stereo parametric EQ' },
+  { category: 'wasm', type: 'BassEnhancer', label: 'Bass Enhancer', group: 'EQ & Filter', description: 'Sub-harmonic bass enhancement' },
+  { category: 'wasm', type: 'PhonoFilter', label: 'Phono Filter (RIAA)', group: 'EQ & Filter', description: 'RIAA phono equalization curve' },
+
+  // ── Granular ──
+  { category: 'wasm', type: 'GranularFreeze', label: 'Granular Freeze', group: 'Creative', description: 'Granular freeze/sustain effect' },
+
+  // ── Lo-Fi ──
+  { category: 'wasm', type: 'Bitta', label: 'Bitta Crusher', group: 'Lo-Fi', description: 'Bit-crushing and sample-rate reduction' },
+  { category: 'tonejs', type: 'TapeDegradation', label: 'Tape Degradation', group: 'Lo-Fi', description: 'Worn tape emulation with wow, flutter, and hiss' },
+  { category: 'wasm', type: 'Vinyl', label: 'Vinyl Simulator', group: 'Lo-Fi', description: 'Vinyl record crackle, noise, and wear simulation' },
+
+  // ── Modulation ──
+  { category: 'wasm', type: 'CalfPhaser', label: 'Calf Phaser', group: 'Modulation', description: 'Multi-stage phaser with feedback' },
+  { category: 'wasm', type: 'Flanger', label: 'Flanger', group: 'Modulation', description: 'Classic flanging effect' },
+  { category: 'wasm', type: 'JunoChorus', label: 'Juno-60 Chorus', group: 'Modulation', description: 'Roland Juno-60 chorus emulation' },
+  { category: 'wasm', type: 'MultiChorus', label: 'Multi Chorus', group: 'Modulation', description: 'Multi-voice chorus with spread' },
+  { category: 'wasm', type: 'Pulsator', label: 'Pulsator', group: 'Modulation', description: 'Rhythmic tremolo/pulsation effect' },
+  { category: 'wasm', type: 'RingMod', label: 'Ring Modulator', group: 'Modulation', description: 'Ring modulation with carrier frequency control' },
+
+  // ── Reverb ──
+  { category: 'wasm', type: 'DragonflyHall', label: 'Dragonfly Hall', group: 'Reverb & Delay', description: 'Large hall algorithmic reverb' },
+  { category: 'wasm', type: 'DragonflyPlate', label: 'Dragonfly Plate', group: 'Reverb & Delay', description: 'Plate reverb emulation' },
+  { category: 'wasm', type: 'DragonflyRoom', label: 'Dragonfly Room', group: 'Reverb & Delay', description: 'Small room algorithmic reverb' },
+  { category: 'wasm', type: 'EarlyReflections', label: 'Early Reflections', group: 'Reverb & Delay', description: 'Room early reflections processor' },
+  { category: 'wasm', type: 'Roomy', label: 'Roomy Reverb', group: 'Reverb & Delay', description: 'Natural room reverb' },
+  { category: 'wasm', type: 'ShimmerReverb', label: 'Shimmer Reverb', group: 'Reverb & Delay', description: 'Pitch-shifted ethereal reverb' },
+
+  // ── Stereo & Spatial ──
+  { category: 'wasm', type: 'BinauralPanner', label: 'Binaural Panner', group: 'Stereo & Spatial', description: 'HRTF-based 3D binaural panning' },
+  { category: 'wasm', type: 'HaasEnhancer', label: 'Haas Stereo Enhancer', group: 'Stereo & Spatial', description: 'Haas effect stereo widening' },
+  { category: 'wasm', type: 'MultiSpread', label: 'Multi Spread', group: 'Stereo & Spatial', description: 'Multi-band stereo spreading' },
+  { category: 'wasm', type: 'MultibandEnhancer', label: 'Multiband Enhancer', group: 'Stereo & Spatial', description: 'Per-band stereo enhancement' },
+  { category: 'wasm', type: 'Vihda', label: 'Vihda Stereo', group: 'Stereo & Spatial', description: 'Stereo widening and enhancement' },
+
   // ===== NEURAL EFFECTS (37 GuitarML models) =====
   ...GUITARML_MODEL_REGISTRY.map((model) => ({
     category: 'neural' as const,
