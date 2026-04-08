@@ -82,6 +82,39 @@ const UADE_ONLY_PREFIXES = [
   'tomy.',
   // VoodooSupremeSynthesizer
   'vss.',
+  // ── PTK-Prowiz packed MOD formats ──────────────────────────────────────
+  // All these go through UADE's PTK-Prowiz replayer (ProWizard unpacker).
+  // Noisepacker
+  'np.', 'np1.', 'np2.', 'noisepacker2.', 'np3.', 'noisepacker3.',
+  // ProPacker / PowerPacker
+  'pp10.', 'pp20.', 'pp21.', 'pp30.', 'ppk.',
+  // The Player
+  'p10.', 'p21.', 'p30.', 'p40a.', 'p40b.', 'p41a.', 'p4x.',
+  'p50a.', 'p5a.', 'p5x.', 'p60.', 'p60a.', 'p61.', 'p61a.', 'p6x.',
+  // ProRunner
+  'pr1.', 'pr2.', 'pru.', 'pru1.', 'pru2.', 'prun.', 'prun1.', 'prun2.',
+  // Promizer
+  'pm.', 'pm0.', 'pm01.', 'pm1.', 'pm10c.', 'pm18a.', 'pm2.', 'pm20.', 'pm4.', 'pm40.', 'pmz.',
+  // Tracker Packer
+  'tp.', 'tp1.', 'tp2.', 'tp3.',
+  // SKYT / Startrekker Packer
+  'skt.', 'skyt.', 'star.', 'stpk.',
+  // Heatseeker, ICE, Kefrens, Fuzac, Channel Players, Xann, PhaPacker, Zen
+  'hrt.', 'hrt!.', 'ice.', 'kef.', 'kef7.', 'fuz.', 'fuzz.', 'chan.',
+  'xan.', 'xann.', 'pha.', 'zen.',
+  // UNIC
+  'unic.', 'unic2.', 'un2.',
+  // Other PTK-Prowiz variants
+  '!pm!.', 'ac1.', 'ac1d.', 'aval.', 'cp.', 'cplx.', 'crb.', 'di.',
+  'eu.', 'fc-m.', 'fcm.', 'ft.', 'gv.', 'hmc.',
+  'it1.', 'lax.', 'mexxmp.', 'mpro.',
+  'nr.', 'nru.', 'ntpk.',
+  'pin.', 'polk.', 'prom.', 'pwr.', 'pyg.', 'pygm.', 'pygmy.',
+  'snt.', 'snt!.', 'st2.', 'st26.', 'st30.', 'wn.',
+  // SGT (Graoumf Tracker alias)
+  'sgt.',
+  // NTP1 (NewtronPacker variant)
+  'ntp1.',
 ] as const;
 
 /**
@@ -109,6 +142,14 @@ const EXT_TO_UADE_PREFIX: Record<string, string> = {
   'tme':      'tme',       // TheMusicalEnlightenment → "tme"
   'unic':     'unic',      // UNIC Tracker → "unic" (in PTK-Prowiz list)
   'ins':      'ins',       // InStereo! → "ins"
+  // PTK-Prowiz packed format extension aliases
+  'p22a':     'p21',       // ProPacker 2.2a → p21 prefix
+  'p30a':     'p30',       // ProPacker 3.0a → p30
+  'pp':       'ppk',       // PowerPacker → ppk
+  'pru2':     'pru2',      // ProRunner 2 → pru2
+  'p40a':     'p40a',      // The Player 4.0a → p40a
+  'smp':      'pru1',      // ProRunner .smp variant
+  'ntp1':     'ntp1',      // NewtronPacker v1
 };
 
 /**
