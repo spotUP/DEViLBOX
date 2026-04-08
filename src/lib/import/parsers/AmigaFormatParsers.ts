@@ -650,12 +650,17 @@ export async function tryRouteFormat(
   }
 
   // ── PumaTracker ───────────────────────────────────────────────────────────
-  // .puma files — native parser + UADE fallback
+  // .puma files — OpenMPT WASM handles playback (UADE can't play Pumatracker)
   if (matchesExt(filename, ['puma'])) {
-    const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
-    return withNativeThenUADE('pumaTracker', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parsePumaTrackerFile(bytes instanceof Uint8Array ? bytes.buffer as ArrayBuffer : bytes, name),
-      'PumaTrackerParser', { isFormat: (b: Uint8Array) => isPumaTrackerFormat(b.buffer as ArrayBuffer), injectUADE: true });
+    try {
+      const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+      return await parseWithOpenMPT(buffer, originalFileName);
+    } catch {
+      const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
+      return withNativeThenUADE('pumaTracker', ctx,
+        (bytes: Uint8Array | ArrayBuffer, name: string) => parsePumaTrackerFile(bytes instanceof Uint8Array ? bytes.buffer as ArrayBuffer : bytes, name),
+        'PumaTrackerParser', { isFormat: (b: Uint8Array) => isPumaTrackerFormat(b.buffer as ArrayBuffer), injectUADE: true });
+    }
   }
 
   // ── Synthesis ─────────────────────────────────────────────────────────────
