@@ -4,6 +4,8 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { DrumPad, FilterType, OutputBus, ScratchActionId, PlayMode, VelocityCurve } from '../../types/drumpad';
+import type { DjFxActionId } from '../../engine/drumpad/DjFxActions';
+import { DJ_FX_ACTIONS } from '../../engine/drumpad/DjFxActions';
 import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
 import type { InstrumentConfig } from '../../types/instrument/defaults';
 import type { SynthType } from '../../types/instrument/base';
@@ -149,6 +151,22 @@ const SCRATCH_ACTION_OPTIONS: { value: ScratchActionId | ''; label: string }[] =
   { value: 'lfo_116',        label: 'Fader LFO: ⅟₁₆' },
   { value: 'lfo_132',        label: 'Fader LFO: ⅟₃₂' },
 ];
+
+const DJ_FX_OPTIONS: { value: DjFxActionId | ''; label: string; category: string }[] = [
+  { value: '', label: 'None', category: '' },
+  ...DJ_FX_ACTIONS.map(a => ({ value: a.id, label: a.name, category: a.category })),
+];
+
+const FX_CATEGORY_LABELS: Record<string, string> = {
+  stutter: '🔁 Stutter',
+  delay: '🔊 Delay / Echo',
+  filter: '🎛️ Filter',
+  reverb: '🌊 Reverb',
+  modulation: '🌀 Modulation',
+  distortion: '🔥 Distortion',
+  tape: '📼 Tape / Vinyl',
+  oneshot: '🎵 One-Shot Sounds',
+};
 
 export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabName>('main');
@@ -1140,6 +1158,50 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 No DJ action assigned. This pad will only trigger its sample (if loaded).
               </div>
             )}
+
+            {/* DJ FX Actions */}
+            <div className="mt-6 pt-4 border-t border-dark-border">
+              <div className="text-xs text-text-muted mb-3 leading-relaxed">
+                Assign a DJ effect to this pad. <strong>Momentary</strong> effects engage while held, <strong>one-shot</strong> effects fire once on press.
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted mb-1">DJ FX Action</label>
+                <select
+                  value={pad.djFxAction ?? ''}
+                  onChange={(e) => handleUpdate({ djFxAction: (e.target.value as DjFxActionId) || undefined })}
+                  className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                >
+                  {(() => {
+                    let lastCategory = '';
+                    return DJ_FX_OPTIONS.map(({ value, label, category }) => {
+                      const showGroup = category !== lastCategory && category !== '';
+                      lastCategory = category;
+                      return (
+                        <React.Fragment key={value}>
+                          {showGroup && <option disabled className="font-bold">{FX_CATEGORY_LABELS[category] ?? category}</option>}
+                          <option value={value}>{value ? `  ${label}` : label}</option>
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
+                </select>
+              </div>
+
+              {pad.djFxAction && (
+                <div className="p-3 mt-2 bg-dark-surface border border-dark-border rounded text-xs font-mono">
+                  <div className="text-text-muted mb-1">Active FX:</div>
+                  <div className="text-accent-primary">
+                    {DJ_FX_ACTIONS.find(a => a.id === pad.djFxAction)?.name ?? pad.djFxAction}
+                  </div>
+                  <div className="text-text-muted mt-1">
+                    {DJ_FX_ACTIONS.find(a => a.id === pad.djFxAction)?.mode === 'momentary'
+                      ? 'Hold pad to engage, release to disengage'
+                      : 'Press pad to fire (plays out automatically)'}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

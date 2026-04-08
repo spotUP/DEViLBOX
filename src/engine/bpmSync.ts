@@ -84,6 +84,15 @@ export const SYNCABLE_EFFECT_PARAMS: Record<string, { param: string; unit: 'seco
   SlapbackDelay:  [{ param: 'time', unit: 'ms' }],
   ZamDelay:       [{ param: 'time', unit: 'ms' }],
   Della:          [{ param: 'time', unit: 'ms' }],
+  AmbientDelay:   [{ param: 'time', unit: 'ms' }],
+  Masha:          [{ param: 'time', unit: 'ms' }],
+  AutoFilter:     [{ param: 'frequency', unit: 'hz' }],
+  AutoPanner:     [{ param: 'frequency', unit: 'hz' }],
+  Tremolo:        [{ param: 'frequency', unit: 'hz' }],
+  Phaser:         [{ param: 'frequency', unit: 'hz' }],
+  Flanger:        [{ param: 'speed', unit: 'hz' }],
+  Leslie:         [{ param: 'speed', unit: 'hz' }],
+  Pulsator:       [{ param: 'speed', unit: 'hz' }],
 };
 
 /**
