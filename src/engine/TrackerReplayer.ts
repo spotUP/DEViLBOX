@@ -330,6 +330,8 @@ export interface TrackerSong {
   uadeEditableFileData?: ArrayBuffer;
   /** Original filename hint for UADE format detection */
   uadeEditableFileName?: string;
+  /** Companion files for two-file UADE formats (e.g. smp.*, .ins, .set) */
+  uadeCompanionFiles?: Map<string, ArrayBuffer>;
   /** Raw Symphonie Pro (.symmod) binary for SymphonieEngine playback + export */
   symphonieFileData?: ArrayBuffer;
   /** Raw module binary for libopenmpt WASM playback (MOD/XM/IT/S3M) */

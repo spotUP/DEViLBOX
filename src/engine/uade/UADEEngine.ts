@@ -624,6 +624,15 @@ export class UADEEngine {
       'mfp',    // MagneticFieldsPacker
     ]);
     const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
+
+    // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading
+    const companions = state.uadeCompanionFiles;
+    if (companions) {
+      for (const [cfName, cfBuf] of companions) {
+        await this.addCompanionFile(cfName, cfBuf);
+      }
+    }
+
     await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong);
   }
 

@@ -47,6 +47,10 @@ export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): T
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
   }
+  // Preserve companion files so UADEEngine.loadTune() can register them before playback
+  if (ctx.companionFiles && ctx.companionFiles.size > 0) {
+    (result as any).uadeCompanionFiles = ctx.companionFiles;
+  }
   return result;
 }
 
