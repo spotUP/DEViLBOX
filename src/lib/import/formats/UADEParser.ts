@@ -1087,7 +1087,7 @@ export async function parseUADEFile(
     if (companionFiles && companionFiles.size > 0) {
       (classicSong as any).uadeCompanionFiles = companionFiles;
     }
-    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename));
+    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename, metadata.shortScanTicks));
   }
 
   const FORCE_CLASSIC_PREFIXES = new Set<string>([
@@ -1146,7 +1146,7 @@ export async function parseUADEFile(
     if (companionFiles && companionFiles.size > 0) {
       (classicSong as any).uadeCompanionFiles = companionFiles;
     }
-    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename));
+    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename, metadata.shortScanTicks));
   }
 
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
@@ -2203,9 +2203,15 @@ async function reconstructClassicPatterns(
   song: TrackerSong,
   engine: { getTickSnapshots(): Promise<any[]>; enableTickSnapshots(on: boolean): void },
   basename: string,
+  shortScanTicks?: any[],
 ): Promise<TrackerSong> {
   try {
-    const tickSnapshots = await engine.getTickSnapshots();
+    // Use short-scan tick data if available (ring buffer was lost during WASM reinit),
+    // otherwise read from the ring buffer directly.
+    let tickSnapshots = shortScanTicks ?? [];
+    if (tickSnapshots.length < 2) {
+      tickSnapshots = await engine.getTickSnapshots();
+    }
     engine.enableTickSnapshots(false);
 
     if (tickSnapshots.length < 2) return song;

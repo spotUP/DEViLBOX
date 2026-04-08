@@ -89,6 +89,7 @@ export interface UADEMetadata {
   subsongCount: number;
   scanData?: UADEScanRow[][];            // Pre-scanned pattern data: rows of 4 channels
   enhancedScan?: UADEEnhancedScanData;   // Enhanced scan data with samples + effects
+  shortScanTicks?: UADETickSnapshot[];   // Tick snapshots from short scan (compiled replayers)
 }
 
 export interface UADEPositionUpdate {
@@ -304,6 +305,10 @@ export class UADEEngine {
                 ...data.enhancedScan,
                 warnings: data.enhancedScan.warnings ?? [],
               };
+            }
+            // Include tick snapshots from short scan (captured before WASM reinit)
+            if (data.shortScanTicks) {
+              meta.shortScanTicks = data.shortScanTicks;
             }
             this._resolveLoad(meta);
             this._resolveLoad = null;
