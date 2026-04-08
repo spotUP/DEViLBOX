@@ -47,8 +47,19 @@ interface ParseOptions {
  */
 export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions'], companionFiles?: Map<string, ArrayBuffer>): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
-  const buffer = await file.arrayBuffer();
+  let buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
+
+  // ── Gzip auto-detection ────────────────────────────────────────────────────
+  // Many Amiga archives are gzip-compressed (magic bytes 0x1f 0x8b).
+  // Transparently inflate before format routing.
+  const header = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+  if (header[0] === 0x1f && header[1] === 0x8b) {
+    const pako = await import('pako');
+    const inflated = pako.inflate(new Uint8Array(buffer));
+    buffer = inflated.buffer as ArrayBuffer;
+    console.log(`[parseModuleToSong] Gzip detected, inflated ${file.size} → ${buffer.byteLength} bytes`);
+  }
 
   // ── Regular Audio ─────────────────────────────────────────────────────────
   // If it's a regular audio file (MP3, WAV, etc.), it shouldn't be here.
