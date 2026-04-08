@@ -71,6 +71,15 @@ export class UADESynth implements DevilboxSynth {
         'ps',     // PaulShields
       ]);
       const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
+      // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading.
+      // Mirrors the logic in UADEEngine.loadTune() for the UADEEditableSynth path.
+      const { useFormatStore } = await import('@/stores/useFormatStore');
+      const companions = useFormatStore.getState().uadeCompanionFiles;
+      if (companions) {
+        for (const [cfName, cfBuf] of companions) {
+          await this.engine.addCompanionFile(cfName, cfBuf);
+        }
+      }
       await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
     })();
     this._initPromise = p;
