@@ -880,7 +880,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         </VisualizerFrame>
       </div>
 
-      <div className="flex items-center gap-1.5 py-1 w-full overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
         <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
         <input
           ref={folderInputRef}
