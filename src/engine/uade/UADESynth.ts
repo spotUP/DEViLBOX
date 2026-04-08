@@ -52,6 +52,9 @@ export class UADESynth implements DevilboxSynth {
         'jmf',    // JankoMrsicFlogel
         'kh',     // KrisHatlelid
         'thm',    // ThomasHermann
+        'sb',     // SteveBarrett
+        'ps',     // PaulShields
+        'sng',    // RichardJoseph
       ]);
       const SKIP_SCAN_PREFIXES = new Set([
         'dl', 'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
@@ -64,6 +67,8 @@ export class UADESynth implements DevilboxSynth {
         'kh',     // KrisHatlelid
         'thm', 'smp',  // ThomasHermann
         'mfp',    // MagneticFieldsPacker
+        'sb',     // SteveBarrett
+        'ps',     // PaulShields
       ]);
       const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
       await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
