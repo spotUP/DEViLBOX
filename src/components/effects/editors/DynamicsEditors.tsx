@@ -579,7 +579,7 @@ export const SidechainGateEditor: React.FC<VisualEffectEditorProps> = ({ effect,
   const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
   const channelNames = useTrackerStore(useShallow(s =>
     s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
-  );
+  ));
 
   return (
     <div className="space-y-4">
@@ -647,7 +647,7 @@ export const SidechainLimiterEditor: React.FC<VisualEffectEditorProps> = ({ effe
   const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
   const channelNames = useTrackerStore(useShallow(s =>
     s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
-  );
+  ));
 
   return (
     <div className="space-y-4">
