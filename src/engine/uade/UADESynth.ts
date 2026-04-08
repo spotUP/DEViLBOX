@@ -42,40 +42,39 @@ export class UADESynth implements DevilboxSynth {
       await this.engine.ready();
       const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
       const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
-
-      // SCAN_CRASH: formats that crash the browser during scan
-      const SCAN_CRASH_EXTS = new Set([
-        'mon', 'sa', 'aps', 'sas', 'mso', 'ml', 'sun', 'tsm',
-        'thm', 'sb', 'ps',
-      ]);
-      const SCAN_CRASH_PREFIXES = new Set([
-        'sas', 'ash', 'tsm', 'thm', 'sb', 'ps',
-      ]);
-
-      // SHORT_SCAN: compiled 68k replayers that loop but don't crash — 30s timeout
-      const SHORT_SCAN_EXTS = new Set([
+      const SKIP_SCAN_EXTS = new Set([
         'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-        'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-        'rho', 'dln', 'core', 'hot', 'wb', 'dh',
+        'mon', 'sa', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+        'aps', 'sas', 'mso', 'ml', 'rho', 'dln', 'core', 'hot', 'wb', 'dh',
         'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
         'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
-        'mc', 'mcr', 'mco', 'jmf', 'kh',
-        'sng', 'sjs', 'jpn', 'jpnd', 'jp',
+        'mc', 'mcr', 'mco',  // MarkCooksey
+        'jmf',    // JankoMrsicFlogel
+        'kh',     // KrisHatlelid
+        'thm',    // ThomasHermann
+        'sb',     // SteveBarrett
+        'ps',     // PaulShields
+        'sng',    // RichardJoseph
+        'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
+        'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
       ]);
-      const SHORT_SCAN_PREFIXES = new Set([
+      const SKIP_SCAN_PREFIXES = new Set([
         'dl', 'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-        'fw', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-        'dns', 'mk2', 'mkii', 'rho', 'core', 'hot', 'wb', 'dh',
+        'fw', 'sas', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+        'dns', 'mk2', 'mkii', 'ash', 'rho', 'core', 'hot', 'wb', 'dh',
         'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
         'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
-        'mc', 'mcr', 'mco', 'jmf', 'kh',
-        'mfp', 'smp', 'sng', 'jpn', 'jpnd', 'jp', 'sjs',
+        'mc', 'mcr', 'mco',  // MarkCooksey
+        'jmf',    // JankoMrsicFlogel
+        'kh',     // KrisHatlelid
+        'thm', 'smp',  // ThomasHermann
+        'mfp',    // MagneticFieldsPacker
+        'sb',     // SteveBarrett
+        'ps',     // PaulShields
+        'sjs',    // SoundPlayer — compiled 68k replayer
+        'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer
       ]);
-
-      const skipScan = SCAN_CRASH_EXTS.has(ext) || SCAN_CRASH_PREFIXES.has(prefix);
-      const shortScan = SHORT_SCAN_EXTS.has(ext) || SHORT_SCAN_PREFIXES.has(prefix);
-      const scanTimeoutSec = shortScan ? 30 : undefined;
-
+      const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
       // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading.
       // Mirrors the logic in UADEEngine.loadTune() for the UADEEditableSynth path.
       const { useFormatStore } = await import('@/stores/useFormatStore');
@@ -85,7 +84,7 @@ export class UADESynth implements DevilboxSynth {
           await this.engine.addCompanionFile(cfName, cfBuf);
         }
       }
-      await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0, scanTimeoutSec);
+      await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
     })();
     this._initPromise = p;
     await p;
