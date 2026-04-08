@@ -383,6 +383,8 @@ export async function parseWithOpenMPT(
       linearPeriods: info.linearSlides,
       // MOD period table adds +24 extra vs other formats; compensate in display only
       noteDisplayOffset: format === 'MOD' ? -12 : 0,
+      // Store original file data for export fallback (return original binary)
+      libopenmptFileData: buffer.slice(0),
     };
 
     // Activate the edit bridge so pattern edits sync to the soundlib
