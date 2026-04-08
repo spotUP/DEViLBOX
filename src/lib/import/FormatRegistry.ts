@@ -897,10 +897,11 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'quartet',
     label: 'Quartet',
-    description: 'Quartet (qpa.*/sqt.*/qts.* prefix)',
+    description: 'Quartet (qpa.*/sqt.*/qts.* prefix, .4v suffix)',
     family: 'amiga-native',
     matchMode: 'prefix',
     prefixes: ['qpa.', 'sqt.', 'qts.'],
+    extRegex: /\.4v$/i,
     prefKey: 'quartet',
     nativeParser: { module: '@lib/import/formats/QuartetParser', parseFn: 'parseQuartetFile', detectFn: 'isQuartetFormat' },
     uadeFallback: true,
