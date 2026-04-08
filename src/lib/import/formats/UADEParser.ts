@@ -1059,6 +1059,9 @@ export async function parseUADEFile(
     'jmf',    // JankoMrsicFlogel — compiled 68k replayer
     'kh',     // KrisHatlelid — compiled 68k replayer
     'thm',    // ThomasHermann — compiled 68k replayer
+    'sb',     // SteveBarrett — compiled 68k replayer
+    'ps',     // PaulShields — compiled 68k replayer
+    'sng',    // RichardJoseph/ZoundMonitor — compiled 68k replayer
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -1116,6 +1119,8 @@ export async function parseUADEFile(
     'kh',     // KrisHatlelid
     'thm', 'smp',  // ThomasHermann (thm.* and smp.* prefixes)
     'mfp',    // MagneticFieldsPacker
+    'sb',     // SteveBarrett — compiled 68k replayer
+    'ps',     // PaulShields — compiled 68k replayer
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
