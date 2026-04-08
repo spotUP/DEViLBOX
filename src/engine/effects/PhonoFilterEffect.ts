@@ -133,7 +133,7 @@ export class PhonoFilterEffect extends Tone.ToneAudioNode {
     }
   }
 
-  setMode(v: number): void { this._mode = v >= 0.5 ? 1 : 0; this.sendParam('mode', this._mode); }
+  setMode(v: number): void { this._mode = Math.round(clamp(v, 0, 3)); this.sendParam('mode', this._mode); }
   setMix(v: number): void { this._mix = clamp(v, 0, 1); this.sendParam('mix', this._mix); }
 
   get mode(): number { return this._mode; }
