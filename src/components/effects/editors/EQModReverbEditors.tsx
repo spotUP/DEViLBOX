@@ -514,12 +514,15 @@ export const RingModEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
 // DRAGONFLY HALL / PLATE / ROOM
 // ============================================================================
 
-const DragonflyEditor = (title: string, color: string): React.FC<VisualEffectEditorProps> => {
+const DragonflyEditor = (title: string, color: string, extras: { earlyLevel?: boolean; size?: boolean; brightness?: boolean }): React.FC<VisualEffectEditorProps> => {
   const Comp: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
     const decay = getParam(effect, 'decay', 50);
     const damping = getParam(effect, 'damping', 50);
     const predelay = getParam(effect, 'predelay', 10);
     const width = getParam(effect, 'width', 100);
+    const earlyLevel = extras.earlyLevel ? getParam(effect, 'earlyLevel', 50) : 0;
+    const size = extras.size ? getParam(effect, 'size', 1) : 0;
+    const brightness = extras.brightness ? getParam(effect, 'brightness', 70) : 0;
     const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
     return (
@@ -536,6 +539,18 @@ const DragonflyEditor = (title: string, color: string): React.FC<VisualEffectEdi
               label="Pre-Delay" color={color} formatValue={(v) => `${Math.round(v)} ms`} />
             <Knob value={width} min={0} max={150} onChange={(v) => onUpdateParameter('width', v)}
               label="Width" color={color} formatValue={(v) => `${Math.round(v)}%`} />
+            {extras.earlyLevel && (
+              <Knob value={earlyLevel} min={0} max={100} onChange={(v) => onUpdateParameter('earlyLevel', v)}
+                label="Early" color={color} formatValue={(v) => `${Math.round(v)}%`} />
+            )}
+            {extras.size && (
+              <Knob value={size} min={0.1} max={5} onChange={(v) => onUpdateParameter('size', v)}
+                label="Size" color={color} formatValue={(v) => v.toFixed(1)} />
+            )}
+            {extras.brightness && (
+              <Knob value={brightness} min={0} max={100} onChange={(v) => onUpdateParameter('brightness', v)}
+                label="Bright" color={color} formatValue={(v) => `${Math.round(v)}%`} />
+            )}
           </div>
         </Section>
         <Section>
@@ -551,9 +566,9 @@ const DragonflyEditor = (title: string, color: string): React.FC<VisualEffectEdi
   return Comp;
 };
 
-export const DragonflyHallEditor = DragonflyEditor('Dragonfly Hall', '#7c3aed');
-export const DragonflyPlateEditor = DragonflyEditor('Dragonfly Plate', '#8b5cf6');
-export const DragonflyRoomEditor = DragonflyEditor('Dragonfly Room', '#a78bfa');
+export const DragonflyHallEditor = DragonflyEditor('Dragonfly Hall', '#7c3aed', { earlyLevel: true, size: true });
+export const DragonflyPlateEditor = DragonflyEditor('Dragonfly Plate', '#8b5cf6', { brightness: true });
+export const DragonflyRoomEditor = DragonflyEditor('Dragonfly Room', '#a78bfa', { earlyLevel: true, size: true });
 
 // ============================================================================
 // EARLY REFLECTIONS

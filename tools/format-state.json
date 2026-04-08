@@ -4647,7 +4647,7 @@
   },
   "uade-dtm": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=4 inst=63[Sampler] rms=0.0974 exp=18185b [10/10]",
+    "notes": "PASS 10/10 ch=8 pat=4 inst=63[Sampler] rms=0.0973 exp=18185b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4679,7 +4679,7 @@
   },
   "uade-format-669": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=38 inst=13[Sampler] rms=0.0638 exp=343852b [10/10]",
+    "notes": "PASS 10/10 ch=8 pat=38 inst=13[Sampler] rms=0.0636 exp=343852b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4775,7 +4775,7 @@
   },
   "uade-mtm": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=19 inst=31[Sampler] rms=0.0552 exp=66241b [10/10]",
+    "notes": "PASS 10/10 ch=8 pat=19 inst=31[Sampler] rms=0.0559 exp=66241b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4891,7 +4891,7 @@
   },
   "uade-stm": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=12 inst=31[Sampler] rms=0.0758 exp=42896b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=12 inst=31[Sampler] rms=0.0755 exp=42896b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4995,7 +4995,7 @@
   },
   "uade-jason-page": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000026)",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000098)",
     "data": {
       "auditStatus": "fail",
       "notes": "7/10 silent + UADE play fail + no notes"
@@ -5003,7 +5003,7 @@
   },
   "uade-mark-cooksey": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5035,7 +5035,7 @@
   },
   "uade-steve-barrett": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5151,7 +5151,7 @@
   },
   "uade-janko-mrsic-flogel": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5159,7 +5159,7 @@
   },
   "uade-kris-hatlelid": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes"
@@ -5222,8 +5222,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-richard-joseph": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=5 inst=36[Synth,Sampler] rms=0.0281 exp=2989b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "5/10 no instruments + silent + no export + UADE play fail"
@@ -7175,7 +7175,7 @@
   },
   "uade-soundplayer": {
     "auditStatus": "fail",
-    "notes": "FAIL 7/10: no instruments | first 1 patterns have no notes | silent (rms=0.000000)"
+    "notes": "FAIL 7/10: first 1 patterns have no notes | silent (rms=0.000397) | 5 errors: [UADEEngine] UADE could not play: sjs.awesome (ret=-1); [InstrumentFactory] UADE load failed: Error: UADE could not ; [ToneEngine] Some WASM synths failed to initialize: Error: U; [UADEEngine] Failed to reload song for playback; Failed to start playback: Error: UADE could not play: sjs.aw"
   },
   "uade-infogrames": {
     "auditStatus": "fail",
@@ -7187,7 +7187,7 @@
   },
   "uade-synth-pack": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)"
+    "notes": "FAIL 9/10: first 1 patterns have no notes"
   },
   "fur": {
     "status": "works",
