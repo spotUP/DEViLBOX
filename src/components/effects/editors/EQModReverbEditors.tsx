@@ -164,16 +164,23 @@ export const ZamEQ2Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpda
 // ============================================================================
 
 export const PhonoFilterEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const mode = getParam(effect, 'mode', 0);
+  const mode = Math.round(getParam(effect, 'mode', 0));
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const modes = ['RIAA', 'NAB', 'Columbia', 'IEC'];
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#a1887f" />
       <Section>
         <SectionHeader size="lg" color="#a1887f" title="Phono Filter" />
-        <div className="flex justify-around items-end">
-          <Knob value={mode} min={0} max={3} step={1} onChange={(v) => onUpdateParameter('mode', Math.round(v))}
-            label="Mode" color="#a1887f" formatValue={(v) => ['RIAA', 'NAB', 'Columbia', 'IEC'][Math.round(v)] || `${Math.round(v)}`} />
+        <div className="flex gap-2 mb-4 justify-center">
+          {modes.map((label, idx) => (
+            <button key={idx} onClick={() => onUpdateParameter('mode', idx)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                mode === idx ? 'bg-amber-700/70 border-amber-500 text-amber-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-700'
+              }`}>{label}</button>
+          ))}
+        </div>
+        <div className="flex justify-center">
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
             label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
         </div>
@@ -968,6 +975,172 @@ export const VinylEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
             onChange={(v) => onUpdateParameter('wear', v)} label="Wear" color="#d97706" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={getParam(effect, 'speed', 0.5)} min={0} max={1}
             onChange={(v) => onUpdateParameter('speed', v)} label="Speed" color="#f59e0b" formatValue={(v) => `${Math.round(v * 100)}%`} />
+        </div>
+      </Section>
+      <Section>
+        <div className="flex justify-center">
+          <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
+            label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </Section>
+    </div>
+  );
+};
+
+// ============================================================================
+// 8-BAND PARAMETRIC EQ
+// ============================================================================
+
+const fmtFreq = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} Hz`;
+
+export const EQ8BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
+  const hpFreq = getParam(effect, 'hpFreq', 20);
+  const lpFreq = getParam(effect, 'lpFreq', 20000);
+  const lowShelfFreq = getParam(effect, 'lowShelfFreq', 100);
+  const lowShelfGain = getParam(effect, 'lowShelfGain', 0);
+  const highShelfFreq = getParam(effect, 'highShelfFreq', 8000);
+  const highShelfGain = getParam(effect, 'highShelfGain', 0);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  return (
+    <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
+      <Section>
+        <SectionHeader size="lg" color="#3b82f6" title="Filters" />
+        <div className="flex justify-around items-end">
+          <Knob value={hpFreq} min={20} max={2000} onChange={(v) => onUpdateParameter('hpFreq', v)}
+            label="HP Freq" color="#60a5fa" formatValue={fmtFreq} />
+          <Knob value={lpFreq} min={1000} max={20000} onChange={(v) => onUpdateParameter('lpFreq', v)}
+            label="LP Freq" color="#60a5fa" formatValue={fmtFreq} />
+        </div>
+      </Section>
+      <Section>
+        <SectionHeader size="lg" color="#2563eb" title="Shelves" />
+        <div className="flex justify-around items-end">
+          <Knob value={lowShelfFreq} min={20} max={1000} onChange={(v) => onUpdateParameter('lowShelfFreq', v)}
+            label="Lo Freq" color="#3b82f6" formatValue={fmtFreq} />
+          <Knob value={lowShelfGain} min={-36} max={36} onChange={(v) => onUpdateParameter('lowShelfGain', v)}
+            label="Lo Gain" color="#3b82f6" formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+          <Knob value={highShelfFreq} min={1000} max={20000} onChange={(v) => onUpdateParameter('highShelfFreq', v)}
+            label="Hi Freq" color="#60a5fa" formatValue={fmtFreq} />
+          <Knob value={highShelfGain} min={-36} max={36} onChange={(v) => onUpdateParameter('highShelfGain', v)}
+            label="Hi Gain" color="#60a5fa" formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+        </div>
+      </Section>
+      {[1, 2, 3, 4].map((band) => {
+        const freq = getParam(effect, `peak${band}Freq`, [250, 1000, 3500, 8000][band - 1]);
+        const gain = getParam(effect, `peak${band}Gain`, 0);
+        const q = getParam(effect, `peak${band}Q`, 1);
+        const colors = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'];
+        return (
+          <Section key={band}>
+            <SectionHeader size="lg" color={colors[band - 1]} title={`Peak ${band}`} />
+            <div className="flex justify-around items-end">
+              <Knob value={freq} min={20} max={20000} onChange={(v) => onUpdateParameter(`peak${band}Freq`, v)}
+                label="Freq" color={colors[band - 1]} formatValue={fmtFreq} />
+              <Knob value={gain} min={-36} max={36} onChange={(v) => onUpdateParameter(`peak${band}Gain`, v)}
+                label="Gain" color={colors[band - 1]} formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+              <Knob value={q} min={0.1} max={10} onChange={(v) => onUpdateParameter(`peak${band}Q`, v)}
+                label="Q" color={colors[band - 1]} formatValue={(v) => v.toFixed(2)} />
+            </div>
+          </Section>
+        );
+      })}
+      <Section>
+        <div className="flex justify-center">
+          <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
+            label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </Section>
+    </div>
+  );
+};
+
+// ============================================================================
+// 12-BAND EQ
+// ============================================================================
+
+const EQ12_FREQS = [30, 80, 160, 400, 800, 1500, 3000, 5000, 8000, 12000, 14000, 18000];
+const EQ12_COLORS = ['#1e3a5f', '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',
+                     '#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#075985'];
+
+export const EQ12BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  return (
+    <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
+      <Section>
+        <SectionHeader size="lg" color="#3b82f6" title="12-Band EQ" />
+        <div className="grid grid-cols-6 gap-x-2 gap-y-4">
+          {EQ12_FREQS.map((defaultFreq, i) => {
+            const gain = getParam(effect, `gain_${i}`, 0);
+            return (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <span className="text-[9px] text-text-muted">{fmtFreq(defaultFreq)}</span>
+                <Knob value={gain} min={-36} max={36} onChange={(v) => onUpdateParameter(`gain_${i}`, v)}
+                  label="" color={EQ12_COLORS[i]} size={36}
+                  formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+      <Section>
+        <SectionHeader size="lg" color="#60a5fa" title="Q & Mix" />
+        <div className="grid grid-cols-6 gap-x-2 gap-y-4">
+          {EQ12_FREQS.map((_, i) => {
+            const q = getParam(effect, `q_${i}`, 1);
+            return (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <Knob value={q} min={0.1} max={10} onChange={(v) => onUpdateParameter(`q_${i}`, v)}
+                  label="" color="#6b7280" size={28}
+                  formatValue={(v) => `Q ${v.toFixed(1)}`} />
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-center mt-4">
+          <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
+            label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </Section>
+    </div>
+  );
+};
+
+// ============================================================================
+// 31-BAND GRAPHIC EQ
+// ============================================================================
+
+const GEQ31_FREQS = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
+  200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
+  2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000];
+
+export const GEQ31Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  return (
+    <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
+      <Section>
+        <SectionHeader size="lg" color="#3b82f6" title="31-Band Graphic EQ" />
+        <div className="flex gap-0.5 items-end justify-center overflow-x-auto pb-2">
+          {GEQ31_FREQS.map((freq, i) => {
+            const gain = getParam(effect, `band_${i}`, 0);
+            const hue = 210 + (i / 30) * 60;
+            const color = `hsl(${hue}, 70%, 55%)`;
+            return (
+              <div key={i} className="flex flex-col items-center gap-0.5 min-w-[22px]">
+                <Knob value={gain} min={-12} max={12} onChange={(v) => onUpdateParameter(`band_${i}`, v)}
+                  label="" color={color} size={22}
+                  formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+                <span className="text-[7px] text-text-muted leading-none" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                  {freq >= 1000 ? `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 1)}k` : `${freq}`}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </Section>
       <Section>

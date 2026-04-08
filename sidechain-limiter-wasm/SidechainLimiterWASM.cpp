@@ -72,12 +72,16 @@ struct Instance {
     }
 
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
+        processExt(inL, inR, inL, inR, outL, outR, n);
+    }
+
+    void processExt(const float* inL, const float* inR, const float* scInL, const float* scInR, float* outL, float* outR, int n) {
         float ceilLin = std::pow(10.0f, ceiling / 20.0f);
 
         for (int i = 0; i < n; i++) {
-            // Sidechain: frequency-weighted version of input
-            float scL = scFilterL.process(inL[i]);
-            float scR = scFilterR.process(inR[i]);
+            // Sidechain: frequency-weighted version of sidechain input
+            float scL = scFilterL.process(scInL[i]);
+            float scR = scFilterR.process(scInR[i]);
             float scPeak = std::max(std::abs(scL), std::abs(scR));
 
             // Desired gain based on sidechain
@@ -124,6 +128,12 @@ EMSCRIPTEN_KEEPALIVE void sidechain_limiter_process(int h, float* iL, float* iR,
         if (oL && iL) std::memcpy(oL, iL, n * 4); if (oR && iR) std::memcpy(oR, iR, n * 4); return;
     }
     instances[h].process(iL, iR, oL, oR, n);
+}
+EMSCRIPTEN_KEEPALIVE void sidechain_limiter_process_ext(int h, float* iL, float* iR, float* scL, float* scR, float* oL, float* oR, int n) {
+    if (h < 0 || h >= MAX_INSTANCES || !instances[h].active) {
+        if (oL && iL) std::memcpy(oL, iL, n * 4); if (oR && iR) std::memcpy(oR, iR, n * 4); return;
+    }
+    instances[h].processExt(iL, iR, scL, scR, oL, oR, n);
 }
 EMSCRIPTEN_KEEPALIVE void sidechain_limiter_set_ceiling(int h, float v) {
     if (h >= 0 && h < MAX_INSTANCES && instances[h].active) instances[h].ceiling = std::clamp(v, -24.0f, 0.0f);
