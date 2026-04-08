@@ -14,7 +14,7 @@ import { randomUUID } from 'crypto';
 const WS_URL = 'ws://localhost:4003/mcp';
 const TRACKER_URL = 'http://localhost:4444';
 const TIMEOUT = 15000;
-const SETTLE_MS = 800;
+const SETTLE_MS = 1500;
 
 interface EffectTest {
   type: string;
@@ -252,15 +252,27 @@ const HAS_PARAM_ENGINE = new Set([
 class MCPClient {
   private ws: WebSocket | null = null;
   private pending = new Map<string, (resp: any) => void>();
+  private _connected = false;
+
+  get connected() { return this._connected && this.ws?.readyState === WebSocket.OPEN; }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(WS_URL);
       this.ws.on('open', () => {
+        this._connected = true;
         console.log('✓ Connected to MCP relay');
         resolve();
       });
       this.ws.on('error', (err) => reject(err));
+      this.ws.on('close', () => {
+        this._connected = false;
+        // Reject all pending calls on close
+        for (const [id, handler] of this.pending) {
+          handler({ type: 'error', error: 'WebSocket closed' });
+        }
+        this.pending.clear();
+      });
       this.ws.on('message', (data) => {
         try {
           const msg = JSON.parse(data.toString());
@@ -272,6 +284,36 @@ class MCPClient {
         } catch { /* ignore non-JSON */ }
       });
     });
+  }
+
+  /** Reconnect after browser disconnect — close old WS and open new one */
+  async reconnect(): Promise<void> {
+    this.close();
+    // Reject all pending calls
+    for (const [, handler] of this.pending) {
+      handler({ type: 'error', error: 'reconnecting' });
+    }
+    this.pending.clear();
+    await sleep(2000);
+    await this.connect();
+  }
+
+  /** Wait until the browser is actually connected and responding */
+  async waitForBrowser(maxWaitMs = 60000): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      try {
+        if (!this.connected) {
+          await this.reconnect();
+        }
+        await this.call('get_audio_state');
+        return true; // browser responded!
+      } catch {
+        process.stdout.write('.');
+        await sleep(3000);
+      }
+    }
+    return false;
   }
 
   call<T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T> {
@@ -293,7 +335,7 @@ class MCPClient {
     });
   }
 
-  close() { this.ws?.close(); }
+  close() { try { this.ws?.close(); } catch { /* */ } this.ws = null; this._connected = false; }
 }
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
@@ -354,6 +396,14 @@ async function main() {
   const client = new MCPClient();
   await client.connect();
 
+  // Wait for browser to be available
+  console.log('Waiting for browser connection...');
+  const browserOk = await client.waitForBrowser();
+  if (!browserOk) {
+    console.error('✗ No browser connected after 60s. Open DEViLBOX at http://localhost:5173 and click in it.');
+    process.exit(1);
+  }
+
   // Start test tone routed through master effects chain
   console.log('Starting test tone (440 Hz, -12 dBFS)...');
   try {
@@ -361,7 +411,18 @@ async function main() {
     await sleep(1000);
   } catch (err: any) {
     console.log(`⚠ Could not start test tone: ${err.message}`);
-    console.log('  Make sure the browser tab is open and AudioContext is unlocked.');
+    // Try to recover
+    const ok = await client.waitForBrowser();
+    if (!ok) {
+      console.error('✗ Browser not available. Aborting.');
+      process.exit(1);
+    }
+    try {
+      await client.call('test_tone', { action: 'start', frequency: 440, level: -12 });
+      await sleep(1000);
+    } catch {
+      console.log('⚠ Test tone still failing. Continuing without it.');
+    }
   }
 
   // Baseline audio level (no master FX)
@@ -407,6 +468,20 @@ async function main() {
         result.addError = err.message;
         result.notes = `add failed: ${err.message}`;
         console.log(`${label}: ✗ ADD FAILED — ${err.message}`);
+        // If browser crashed, wait for it to come back before next effect
+        if (err.message?.includes('browser') || err.message?.includes('connected') || err.message?.includes('Not connected')) {
+          console.log(`  → Browser crashed, waiting for reconnect...`);
+          result.notes = 'crashes browser';
+          const ok = await client.waitForBrowser();
+          if (ok) {
+            try { await client.call('test_tone', { action: 'start', frequency: 440, level: -12 }); } catch { /* */ }
+            await sleep(1000);
+          } else {
+            console.log('  ✗ Browser did not reconnect. Aborting audit.');
+            results.push(result);
+            break;
+          }
+        }
         results.push(result);
         continue;
       }
@@ -418,9 +493,18 @@ async function main() {
         const level = await client.call<any>('get_audio_level', { durationMs: 800 });
         result.rmsLevel = level?.rmsAvg ?? 0;
         result.audioOk = !level?.silent;
-      } catch {
+      } catch (err: any) {
         result.rmsLevel = 0;
         result.audioOk = false;
+        // If browser crashed during audio check, recover
+        if (err.message?.includes('browser') || err.message?.includes('connected') || err.message?.includes('Not connected')) {
+          console.log(`${label}: ⟳ browser crashed during audio check, recovering...`);
+          const ok = await client.waitForBrowser();
+          if (ok) {
+            try { await client.call('test_tone', { action: 'start', frequency: 440, level: -12 }); } catch { /* */ }
+            await sleep(1000);
+          }
+        }
       }
 
       // 3. Try parameter update
@@ -439,10 +523,8 @@ async function main() {
           }
         } catch (err: any) {
           result.paramError = err.message;
-          if (i < 3) console.log(`  DEBUG ${fx.type} param error: ${err.message}`);
         }
       } else {
-        // No test params defined — skip param test
         result.paramUpdateOk = true;
       }
 
@@ -469,6 +551,15 @@ async function main() {
     } catch (err: any) {
       result.notes = `crash: ${err.message}`;
       console.log(`${label}: ✗ CRASH — ${err.message}`);
+      // If browser crashed, wait for recovery before next effect
+      if (err.message?.includes('browser') || err.message?.includes('connected') || err.message?.includes('Not connected')) {
+        console.log(`  → Browser crashed, waiting for reconnect...`);
+        const ok = await client.waitForBrowser();
+        if (ok) {
+          try { await client.call('test_tone', { action: 'start', frequency: 440, level: -12 }); } catch { /* */ }
+          await sleep(1000);
+        }
+      }
     }
 
     results.push(result);

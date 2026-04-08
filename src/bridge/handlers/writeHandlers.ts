@@ -993,17 +993,16 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
       let peakMax = 0;
 
       const startTime = performance.now();
-
-      function sample() {
+      // Use setInterval instead of rAF — rAF is throttled when tab is backgrounded
+      const interval = setInterval(() => {
         const frame = bus.update();
         framesAnalyzed++;
         rmsSum += frame.rms;
         if (frame.rms > rmsMax) rmsMax = frame.rms;
         if (frame.peak > peakMax) peakMax = frame.peak;
 
-        if (performance.now() - startTime < durationMs) {
-          requestAnimationFrame(sample);
-        } else {
+        if (performance.now() - startTime >= durationMs) {
+          clearInterval(interval);
           const rmsAvg = framesAnalyzed > 0 ? rmsSum / framesAnalyzed : 0;
           resolve({
             rmsAvg: +rmsAvg.toFixed(6),
@@ -1014,9 +1013,7 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
             silent: rmsMax < 0.001,
           });
         }
-      }
-
-      requestAnimationFrame(sample);
+      }, 16); // ~60 samples/sec
     } catch (e) {
       resolve({ error: `getAudioLevel failed: ${(e as Error).message}` });
     }
@@ -1033,12 +1030,12 @@ export function waitForAudio(params: Record<string, unknown>): Promise<Record<st
       const bus = AudioDataBus.getShared();
 
       const startTime = performance.now();
-
-      function check() {
+      const interval = setInterval(() => {
         const frame = bus.update();
         const elapsed = performance.now() - startTime;
 
         if (frame.rms > thresholdRms) {
+          clearInterval(interval);
           resolve({
             detected: true,
             rms: +frame.rms.toFixed(6),
@@ -1046,18 +1043,15 @@ export function waitForAudio(params: Record<string, unknown>): Promise<Record<st
             waitedMs: Math.round(elapsed),
           });
         } else if (elapsed >= timeoutMs) {
+          clearInterval(interval);
           resolve({
             detected: false,
             rms: +frame.rms.toFixed(6),
             peak: +frame.peak.toFixed(6),
             waitedMs: Math.round(elapsed),
           });
-        } else {
-          requestAnimationFrame(check);
         }
-      }
-
-      requestAnimationFrame(check);
+      }, 16);
     } catch (e) {
       resolve({ error: `waitForAudio failed: ${(e as Error).message}` });
     }
