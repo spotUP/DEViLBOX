@@ -18,6 +18,11 @@ import { usePixiTheme } from '../theme';
 import type { EffectConfig } from '@typedefs/instrument';
 import { NeuralParameterMapper } from '@engine/effects/NeuralParameterMapper';
 import { PixiVocoderEditor, PixiAutoTuneEditor } from './editors/PixiVoiceEffectEditors';
+import {
+  PixiParametricEQEditor, PixiEQ5BandEditor, PixiEQ8BandEditor,
+  PixiEQ12BandEditor, PixiGEQ31Editor, PixiKuizaEditor,
+  PixiZamEQ2Editor, PixiDynamicEQEditor,
+} from './editors/PixiEQEditors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,6 +138,26 @@ export const PixiEffectParameterEditor: React.FC<PixiEffectParameterEditorProps>
   }
   if (effect.type === 'AutoTune') {
     return <PixiAutoTuneEditor effect={effect} onChange={onChange} onWetChange={onWetChange} />;
+  }
+
+  // EQ editors with sliders + frequency response curves
+  const EQ_EDITORS: Record<string, React.FC<{
+    effect: EffectConfig;
+    onChange: (params: Record<string, number | string>) => void;
+    onWetChange?: (wet: number) => void;
+  }>> = {
+    ParametricEQ: PixiParametricEQEditor,
+    EQ5Band: PixiEQ5BandEditor,
+    EQ8Band: PixiEQ8BandEditor,
+    EQ12Band: PixiEQ12BandEditor,
+    GEQ31: PixiGEQ31Editor,
+    Kuiza: PixiKuizaEditor,
+    ZamEQ2: PixiZamEQ2Editor,
+    DynamicEQ: PixiDynamicEQEditor,
+  };
+  const EQEditor = EQ_EDITORS[effect.type];
+  if (EQEditor) {
+    return <EQEditor effect={effect} onChange={onChange} onWetChange={onWetChange} />;
   }
 
   // Resolve parameter definitions
