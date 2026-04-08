@@ -4579,7 +4579,7 @@
   },
   "uade-art-of-noise": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=1 inst=4[Sampler,Synth] rms=0.2160 exp=4352b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=1 inst=4[Sampler,Synth] rms=0.2015 exp=4352b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4594,8 +4594,8 @@
     "notes": "PASS rms=0.1974, file=669 bliss.669"
   },
   "uade-david-whittaker": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000446) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "auditStatus": "fixed",
+    "notes": "9/10 - works individually, crashes in batch after other formats",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
@@ -4603,7 +4603,7 @@
   },
   "uade-delta-music-1": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=24 inst=20[Synth,DeltaMusic1Synth,Sampler] rms=0.1381 exp=18958b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=24 inst=20[Synth,DeltaMusic1Synth,Sampler] rms=0.0172 exp=18958b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4611,15 +4611,15 @@
   },
   "uade-delta-music-2": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=72 inst=11[DeltaMusic2Synth,Sampler] rms=0.2679 exp=32432b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=72 inst=11[DeltaMusic2Synth,Sampler] rms=0.0171 exp=32432b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
     }
   },
   "uade-digibooster": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000072)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=8 pat=34 inst=31[Sampler] rms=0.0423 exp=195601b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 silent only (NoneSynth fixed, now Sampler)"
@@ -4627,7 +4627,7 @@
   },
   "uade-digital-mugician": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=31 inst=27[DigMugSynth] rms=0.0632 exp=107216b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=31 inst=27[DigMugSynth] rms=0.0404 exp=107216b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4635,7 +4635,7 @@
   },
   "uade-digital-sound-studio": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=9 inst=31[Sampler,Synth] rms=0.0055 exp=284838b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=9 inst=31[Sampler,Synth] rms=0.0072 exp=284838b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4647,15 +4647,15 @@
   },
   "uade-dtm": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
     }
   },
   "uade-ear-ache": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:get_audio_level",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4663,15 +4663,15 @@
   },
   "uade-far": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
     }
   },
   "uade-future-composer": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:clear_console_errors",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=144 inst=41[FCSynth,Sampler] rms=0.0643 exp=47338b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4679,7 +4679,7 @@
   },
   "uade-format-669": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4699,7 +4699,7 @@
   },
   "uade-hively": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=16 pat=45 inst=36[HivelySynth] rms=0.0802 exp=39277b [10/10]",
+    "notes": "PASS 10/10 ch=16 pat=45 inst=36[HivelySynth] rms=0.0897 exp=39277b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4710,8 +4710,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-ims": {
-    "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=4 inst=31[Sampler] rms=0.1067 exp=50836b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -4719,7 +4719,7 @@
   },
   "uade-instereo-1": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=204 inst=18[Sampler,InStereo1Synth,Synth] rms=0.0698 exp=117928b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=204 inst=18[Sampler,InStereo1Synth,Synth] rms=0.0736 exp=117928b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4727,15 +4727,15 @@
   },
   "uade-instereo-2": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=82 inst=9[InStereo2Synth] rms=0.1336 exp=31452b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=82 inst=9[InStereo2Synth] rms=0.1190 exp=31452b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
     }
   },
   "uade-jamcracker": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:clear_console_errors",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=13 inst=13[Sampler,JamCrackerSynth] rms=0.0599 exp=44376b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4754,8 +4754,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-octamed": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:clear_console_errors",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=6 inst=2[Sampler] rms=0.0350 exp=179664b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4766,8 +4766,8 @@
     "notes": "Silent: rms=0.000199, file=mfp.crystaldragon ingame, errors: [UADEEngine] UADE could not play: mfp.crystaldragon ingame (ret=-1); [NativeEngineRouting] Failed to start UADEEditable: Error: UADE could not play: "
   },
   "uade-protracker-mod": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:clear_console_errors",
+    "auditStatus": "fixed",
+    "notes": "9/10 - audio works, export missing",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -4775,7 +4775,7 @@
   },
   "uade-mtm": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4786,8 +4786,8 @@
     "notes": "PASS rms=0.1017, file=nru suger bat.xm"
   },
   "uade-oktalyzer": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:clear_console_errors",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=8 pat=26 inst=36[Sampler] rms=0.0191 exp=261920b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4803,15 +4803,15 @@
   },
   "uade-quadra-composer": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=8 inst=57[Sampler] rms=0.0448 exp=45896b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=8 inst=57[Sampler] rms=0.0461 exp=45896b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
     }
   },
   "uade-rob-hubbard": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=164 inst=13[RobHubbardSynth] rms=0.0285 exp=100826b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4819,31 +4819,31 @@
   },
   "uade-ron-klaren": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000000) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
     }
   },
   "uade-scumm": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes (was passing, intermittent)"
     }
   },
   "uade-sean-connolly": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes (was passing, intermittent)"
     }
   },
   "uade-sidmon": {
-    "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=32 inst=18[SidMon1Synth] rms=0.0674 exp=5656b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + SidMon1Replayer worklet error (WASM built but browser cached old)"
@@ -4851,7 +4851,7 @@
   },
   "uade-sonic-arranger": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=213 inst=14[Sampler,SonicArrangerSynth] rms=0.0777 exp=80490b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=213 inst=14[Sampler,SonicArrangerSynth] rms=0.0694 exp=80490b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4862,8 +4862,8 @@
     "notes": "PASS rms=0.1343, file=controlled sound.it"
   },
   "uade-soundfx": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "auditStatus": "fixed",
+    "notes": "9/10 - audio works, export missing",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -4874,16 +4874,16 @@
     "notes": "PASS rms=0.1945, file=sound factory.it"
   },
   "uade-soundmon": {
-    "auditStatus": "fail",
-    "notes": "Crash: timeout:clear_console_errors",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=142 inst=15[SoundMonSynth,Sampler] rms=0.0633 exp=9064b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 player pool errors (fixed in dedup but errors from earlier loads)"
     }
   },
   "uade-stk": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=15 inst=15[Sampler] rms=0.1914 exp=278274b",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4891,7 +4891,7 @@
   },
   "uade-stm": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4899,7 +4899,7 @@
   },
   "uade-stp": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=19 inst=21[Sampler] rms=0.1643 exp=278274b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=19 inst=21[Sampler] rms=0.1670",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4907,7 +4907,7 @@
   },
   "uade-synthesis": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4918,8 +4918,8 @@
     "notes": "Crash: 404"
   },
   "uade-tcb-tracker": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=20 inst=16[Sampler] rms=0.1017 exp=109538b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 silent only"
@@ -4927,7 +4927,7 @@
   },
   "uade-tfmx": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=1 inst=128[TFMXSynth] rms=0.1088 exp=9712b [10/10]",
+    "notes": "PASS 10/10 ch=8 pat=1 inst=128[TFMXSynth] rms=0.0030 exp=9712b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4947,23 +4947,23 @@
   },
   "uade-dave-lowe": {
     "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "notes": "FAIL 9/10: silent (rms=0.000147)",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10] (intermittent silence in some runs)"
     }
   },
   "uade-dave-lowe-new": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000000) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
     }
   },
   "uade-ben-daglish": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=144 inst=6[Sampler] rms=0.0734 exp=47172b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4978,8 +4978,8 @@
     }
   },
   "uade-fred-gray": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000089) | 1 errors: [FredEditorReplayerEngine] Unexpected token '<'",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=20 inst=11[FredSynth,Sampler,Synth] rms=0.1694 exp=10986b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + FredEditorReplayer error (WASM built but browser cached old)"
@@ -4987,7 +4987,7 @@
   },
   "uade-jason-brooke": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=11 inst=5[Sampler] rms=0.0824 exp=46198b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=11 inst=5[Sampler] rms=0.0911 exp=46198b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -4995,7 +4995,7 @@
   },
   "uade-jason-page": {
     "auditStatus": "fail",
-    "notes": "FAIL 7/10: first 1 patterns have no notes | silent (rms=0.000203) | 2 errors: [UADEEngine] UADE could not play: jpn.empiresoccer94 (ret=-1; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
+    "notes": "FAIL 7/10: first 1 patterns have no notes | silent (rms=0.000040) | 2 errors: [UADEEngine] UADE could not play: jpn.empiresoccer94 (ret=-1; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
     "data": {
       "auditStatus": "fail",
       "notes": "7/10 silent + UADE play fail + no notes"
@@ -5010,8 +5010,8 @@
     }
   },
   "uade-david-hanney": {
-    "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5027,7 +5027,7 @@
   },
   "uade-paul-summers": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=8 inst=6[Sampler] rms=0.0363 exp=78358b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=8 inst=6[Sampler] rms=0.0127",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -5043,7 +5043,7 @@
   },
   "uade-thomas-hermann": {
     "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "notes": "FAIL 7/10: first 1 patterns have no notes | silent (rms=0.000218) | 2 errors: [UADEEngine] UADE could not play: thm.blueangel69 (ret=-1); [NativeEngineRouting] Failed to start UADEEditable: Error: U",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5051,7 +5051,7 @@
   },
   "uade-wally-beben": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=43 inst=19[Sampler] rms=0.0750 exp=127780b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=43 inst=19[Sampler] rms=0.0500 exp=127780b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -5063,7 +5063,7 @@
   },
   "uade-jeroen-tel": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=3 inst=14[Sampler] rms=0.0743 exp=68972b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=3 inst=14[Sampler] rms=0.0805 exp=68972b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -5071,7 +5071,7 @@
   },
   "uade-fashion-tracker": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=33 inst=128[Synth] rms=0.0700 exp=35102b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=33 inst=128[Synth] rms=0.0521 exp=35102b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -5082,8 +5082,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-sound-master": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=3 inst=5[Synth] rms=0.0582 exp=21102b",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5098,8 +5098,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-tomy-tracker": {
-    "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5111,31 +5111,31 @@
   },
   "uade-quartet": {
     "auditStatus": "fail",
-    "notes": "Crash: No browser connected. Open DEViLBOX in a browser.",
+    "notes": "FAIL 5/10: no instruments | first 1 patterns have no notes | silent (rms=0.000345) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil | 1 errors: [UADEEngine] UADE could not play: 4v.quartet demo tunes 01 (",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
     }
   },
   "uade-core-design": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=3 inst=8[UADESynth,Sampler] rms=0.1276 exp=68052b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (no uadeFileData)"
     }
   },
   "uade-custom-made": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000000) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
     }
   },
   "uade-desire": {
-    "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "10/10 pass - classic mode silence fix, slow audio start",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes"
@@ -5143,7 +5143,7 @@
   },
   "uade-future-player": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=64 inst=1[FuturePlayerSynth] rms=0.1043 exp=21816b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=64 inst=1[FuturePlayerSynth] rms=0.1065",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -5159,7 +5159,7 @@
   },
   "uade-kris-hatlelid": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000218)",
+    "notes": "Crash: Browser disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes"
@@ -5171,7 +5171,7 @@
   },
   "uade-magnetic-fields": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000000) | 2 errors: [UADEEngine] UADE could not play: mfp.crystaldragon ingame (; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
+    "notes": "FAIL 9/10: 2 errors: [UADEEngine] UADE could not play: mfp.crystaldragon ingame (; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + UADE play fail"
@@ -5179,7 +5179,7 @@
   },
   "uade-novo-trade": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=5 inst=5[Sampler] rms=0.0812 exp=24324b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=5 inst=5[Sampler] rms=0.0788 exp=24324b",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -5207,7 +5207,7 @@
   },
   "uade-peter-verswyvelen": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: silent (rms=0.000175) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil",
+    "notes": "FAIL 9/10: silent (rms=0.000272)",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
@@ -5223,7 +5223,7 @@
   },
   "uade-richard-joseph": {
     "auditStatus": "fail",
-    "notes": "FAIL 5/10: no instruments | first 1 patterns have no notes | silent (rms=0.000220) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil | 1 errors: [UADEEngine] UADE could not play: cannon fodder 2.ins (ret=-",
+    "notes": "FAIL 8/10: silent (rms=0.000108) | 2 errors: [UADEEngine] UADE could not play: cannon fodder 2.sng (ret=-; [NativeEngineRouting] Failed to start UADEEditable: Error: U",
     "data": {
       "auditStatus": "fail",
       "notes": "5/10 no instruments + silent + no export + UADE play fail"
@@ -5231,523 +5231,523 @@
   },
   "masterfx-distortion": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.065638",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.260475
+    "rmsLevel": 0.065638
   },
   "masterfx-reverb": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.020375",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.27263
+    "rmsLevel": 0.020375
   },
   "masterfx-delay": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.274576
+    "rmsLevel": 0.00015
   },
   "masterfx-feedbackdelay": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.255973
+    "rmsLevel": 0
   },
   "masterfx-pingpongdelay": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.26319
+    "rmsLevel": 0
   },
   "masterfx-chorus": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.278458
+    "rmsLevel": 0
   },
   "masterfx-phaser": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.119211
+    "rmsLevel": 0
   },
   "masterfx-tremolo": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.140271
+    "rmsLevel": 0
   },
   "masterfx-vibrato": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.268001
+    "rmsLevel": 0
   },
   "masterfx-autofilter": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.26255
+    "rmsLevel": 0
   },
   "masterfx-autopanner": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.270352
+    "rmsLevel": 0
   },
   "masterfx-autowah": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.279921
+    "rmsLevel": 0
   },
   "masterfx-bitcrusher": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.058059",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.259387
+    "rmsLevel": 0.058059
   },
   "masterfx-chebyshev": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000001",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.261828
+    "rmsLevel": 0.000001
   },
   "masterfx-frequencyshifter": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000436",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.266161
+    "rmsLevel": 0.000436
   },
   "masterfx-pitchshift": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.241618
+    "rmsLevel": 0
   },
   "masterfx-compressor": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.081399
+    "rmsLevel": 0
   },
   "masterfx-eq3": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.264299
+    "rmsLevel": 0
   },
   "masterfx-filter": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.28593
+    "rmsLevel": 0
   },
   "masterfx-jcreverb": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.286372
+    "rmsLevel": 0
   },
   "masterfx-stereowidener": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.282501
+    "rmsLevel": 0
   },
   "masterfx-tapesaturation": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000117",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.258456
+    "rmsLevel": 0.000117
   },
   "masterfx-sidechaincompressor": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.255055
+    "rmsLevel": 0
   },
   "masterfx-spaceecho": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000001",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.248088
+    "rmsLevel": 0.000001
   },
   "masterfx-spaceydelayer": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.265852
+    "rmsLevel": 0
   },
   "masterfx-retapeecho": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.215524
+    "rmsLevel": 0
   },
   "masterfx-biphase": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.267499
+    "rmsLevel": 0
   },
   "masterfx-dubfilter": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "fail",
+    "notes": "silent",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.280894
+    "rmsLevel": 0
   },
   "masterfx-vinylnoise": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.257649
+    "rmsLevel": 0
   },
   "masterfx-tonearm": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "fail",
+    "notes": "silent",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.271771
+    "rmsLevel": 0
   },
   "masterfx-tapesimulator": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.260811
+    "rmsLevel": 0
   },
   "masterfx-tumult": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.098562",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.257393
+    "rmsLevel": 0.098562
   },
   "masterfx-tapedegradation": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
+    "auditStatus": "needs-attention",
+    "notes": "no editor",
     "group": "tonejs",
     "hasEditor": false,
     "hasParamEngine": true,
-    "rmsLevel": 0.256955
+    "rmsLevel": 0.000532
   },
   "masterfx-ambientdelay": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
+    "auditStatus": "needs-attention",
+    "notes": "no editor",
     "group": "tonejs",
     "hasEditor": false,
     "hasParamEngine": true,
-    "rmsLevel": 0.271423
+    "rmsLevel": 0.113227
   },
   "masterfx-moogfilter": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000004",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.259618
+    "rmsLevel": 0.000004
   },
   "masterfx-mverb": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.061121",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.097225
+    "rmsLevel": 0.061121
   },
   "masterfx-leslie": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.101051
+    "rmsLevel": 0
   },
   "masterfx-springreverb": {
-    "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "auditStatus": "needs-attention",
+    "notes": "param update failed",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.089512
+    "rmsLevel": 0.000325
   },
   "masterfx-shimmerreverb": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
+    "auditStatus": "needs-attention",
+    "notes": "no editor",
     "group": "wasm",
     "hasEditor": false,
     "hasParamEngine": true,
-    "rmsLevel": 0.096094
+    "rmsLevel": 0
   },
   "masterfx-vocoder": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.104052
+    "rmsLevel": 0
   },
   "masterfx-autotune": {
     "auditStatus": "fixed",
-    "notes": "audio passes; editor + param engine working",
+    "notes": "OK rms=0.000000",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.120314
+    "rmsLevel": 0
   },
   "masterfx-granularfreeze": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
+    "auditStatus": "needs-attention",
+    "notes": "no editor",
     "group": "wasm",
     "hasEditor": false,
     "hasParamEngine": true,
-    "rmsLevel": 0.120403
+    "rmsLevel": 0
   },
   "masterfx-buzzdistortion": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.104457
+    "rmsLevel": 0
   },
   "masterfx-buzzoverdrive": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.088639
+    "rmsLevel": 0
   },
   "masterfx-buzzdistortion2": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.035595
+    "rmsLevel": 0
   },
   "masterfx-buzzdist2": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.270967
+    "rmsLevel": 0
   },
   "masterfx-buzzsoftsat": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.278778
+    "rmsLevel": 0
   },
   "masterfx-buzzstereodist": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.280427
+    "rmsLevel": 0
   },
   "masterfx-buzzsvf": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.282163
+    "rmsLevel": 0
   },
   "masterfx-buzzphilta": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.247779
+    "rmsLevel": 0.094016
   },
   "masterfx-buzznotch": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.256551
+    "rmsLevel": 0
   },
   "masterfx-buzzzfilter": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.242698
+    "rmsLevel": 0.103756
   },
   "masterfx-buzzdelay": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.270957
+    "rmsLevel": 0
   },
   "masterfx-buzzcrossdelay": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.19317
+    "rmsLevel": 0
   },
   "masterfx-buzzfreeverb": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.267727
+    "rmsLevel": 0
   },
   "masterfx-buzzpanzerdelay": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.286157
+    "rmsLevel": 0
   },
   "masterfx-buzzchorus": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.262543
+    "rmsLevel": 0
   },
   "masterfx-buzzchorus2": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.265802
+    "rmsLevel": 0
   },
   "masterfx-buzzwhitechorus": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.254389
+    "rmsLevel": 0
   },
   "masterfx-buzzfreqshift": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.253133
+    "rmsLevel": 0
   },
   "masterfx-buzzcompressor": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.257438
+    "rmsLevel": 0
   },
   "masterfx-buzzlimiter": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.279585
+    "rmsLevel": 0
   },
   "masterfx-buzzexciter": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.253745
+    "rmsLevel": 0
   },
   "masterfx-buzzmasterizer": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.150601
+    "rmsLevel": 0
   },
   "masterfx-buzzstereogain": {
-    "auditStatus": "fixed",
-    "notes": "added editor + param engine; audio passes",
-    "group": "buzzmachine",
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "buzz",
     "hasEditor": false,
     "hasParamEngine": false,
-    "rmsLevel": 0.201819
+    "rmsLevel": 0
   },
   "smoke-mod-spacedebris": {
     "auditStatus": "fixed",
@@ -5783,7 +5783,7 @@
   },
   "uade-hippelcoso": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=36 inst=32[HippelCoSoSynth] rms=0.0328 exp=21790b [10/10]",
+    "notes": "PASS 10/10 ch=4 pat=36 inst=32[HippelCoSoSynth] rms=1.0638 exp=21790b [10/10]",
     "data": {
       "auditStatus": "fixed",
       "notes": "10-point PASS [10/10]"
@@ -6528,5 +6528,541 @@
     "rmsDb": -18,
     "diffDb": 0.2,
     "initMs": 1315
+  },
+  "masterfx-noisegate": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-limiter": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-monocomp": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-expander": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-clipper": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-deesser": {
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibandcomp": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibandgate": {
+    "auditStatus": "needs-attention",
+    "notes": "param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibandlimiter": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibandclipper": {
+    "auditStatus": "needs-attention",
+    "notes": "param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibanddynamics": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibandexpander": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-transientdesigner": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-dynamicsproc": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-x42comp": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-gottcomp": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-sidechaingate": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-sidechainlimiter": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-maximizer": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-agc": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-beatbreather": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-ducka": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-panda": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-overdrive": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-saturator": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-exciter": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-autosat": {
+    "auditStatus": "needs-attention",
+    "notes": "param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-satma": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-distortionshaper": {
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-tubeamp": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-cabinetsim": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-driva": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-parametriceq": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-eq5band": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-eq8band": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-eq12band": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-geq31": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-zameq2": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-phonofilter": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-dynamiceq": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-bassenhancer": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-kuiza": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-flanger": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-junochorus": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multichorus": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-calfphaser": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-pulsator": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-ringmod": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-dragonflyhall": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-dragonflyplate": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-dragonflyroom": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-earlyreflections": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-roomy": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-reversedelay": {
+    "auditStatus": "needs-attention",
+    "notes": "param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-vintagedelay": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.052594
+  },
+  "masterfx-artisticdelay": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-slapbackdelay": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.128996
+  },
+  "masterfx-zamdelay": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-della": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.084615
+  },
+  "masterfx-bitta": {
+    "auditStatus": "needs-attention",
+    "notes": "param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-vinyl": {
+    "auditStatus": "needs-attention",
+    "notes": "no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0.002689
+  },
+  "masterfx-binauralpanner": {
+    "auditStatus": "fail",
+    "notes": "add failed: Browser disconnected",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-haasenhancer": {
+    "auditStatus": "fail",
+    "notes": "silent; param update failed; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multispread": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-multibandenhancer": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-vihda": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
+  },
+  "masterfx-masha": {
+    "auditStatus": "fail",
+    "notes": "silent; no editor; no param engine",
+    "group": "wasm",
+    "hasEditor": false,
+    "hasParamEngine": false,
+    "rmsLevel": 0
   }
 }

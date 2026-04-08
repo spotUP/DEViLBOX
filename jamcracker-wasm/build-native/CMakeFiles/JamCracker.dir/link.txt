@@ -1,0 +1,1 @@
+/usr/bin/cc -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/JamCracker.dir/src/jc_harness.c.o CMakeFiles/JamCracker.dir/src/paula_soft.c.o -o JamCracker

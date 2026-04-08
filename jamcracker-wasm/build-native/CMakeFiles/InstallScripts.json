@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/spot/Code/DEViLBOX/jamcracker-wasm/build-native/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
