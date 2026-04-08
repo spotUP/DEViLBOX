@@ -273,6 +273,8 @@ async function loadWithNativeParser(
         patterns: result.patterns as unknown[][],
       };
     } else if (ext === '.mod') {
+      const { isMODFormat } = await import('./formats/MODParser');
+      if (!isMODFormat(buffer)) return null; // No valid MOD signature — let UADE handle it
       const result = await parseMOD(buffer);
       return {
         format: 'MOD',

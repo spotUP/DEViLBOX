@@ -92,8 +92,25 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   try {
     return await parseTrackerModule(buffer, file.name);
   } catch {
-    // If libopenmpt fails, try UADE as last resort (magic byte detection)
+    // If libopenmpt fails, try UADE as last resort
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    // For .mod files without a standard MOD signature at offset 1080 (M.K., FLT4,
+    // etc.), use the mod_comp prefix so UADE's PTK-Prowiz replayer can content-detect
+    // the packed format (Startrekker Packer, SKYT, etc.)
+    let uadeFileName = file.name;
+    if (filename.endsWith('.mod') && buffer.byteLength > 1084) {
+      const sig = new Uint8Array(buffer, 1080, 4);
+      const sigStr = String.fromCharCode(sig[0], sig[1], sig[2], sig[3]);
+      const validMODSigs = ['M.K.', 'M!K!', 'FLT4', 'FLT8', '4CHN', '6CHN', '8CHN', 'OCTA',
+        '2CHN', 'CD81', 'TDZ1', 'TDZ2', 'TDZ3', '5CHN', '7CHN', '9CHN', '10CH', '11CH',
+        '12CH', '13CH', '14CH', '15CH', '16CH', '18CH', '20CH', '22CH', '24CH', '26CH',
+        '28CH', '30CH', '32CH'];
+      if (!validMODSigs.some(s => sigStr.startsWith(s.slice(0, 4)))) {
+        const baseName = file.name.replace(/\.mod$/i, '');
+        uadeFileName = `mod_comp.${baseName}`;
+        console.log(`[parseModuleToSong] No MOD signature at 1080, trying UADE as packed MOD: ${uadeFileName}`);
+      }
+    }
+    return await parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 }
