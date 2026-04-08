@@ -1,0 +1,22 @@
+CMakeFiles/JamCracker.dir/src/paula_soft.c.o: \
+  /Users/spot/Code/DEViLBOX/jamcracker-wasm/src/paula_soft.c \
+  /Users/spot/Code/DEViLBOX/jamcracker-wasm/src/paula_soft.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/stdint.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/stdint.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/bits/alltypes.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/bits/stdint.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/compat/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/features.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/strings.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/stdio.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/wasi/api.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/stddef.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/stddef.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_header_macro.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_ptrdiff_t.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_size_t.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_wchar_t.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_null.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_max_align_t.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/__stddef_offsetof.h

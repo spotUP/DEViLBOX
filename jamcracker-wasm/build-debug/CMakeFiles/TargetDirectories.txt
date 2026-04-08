@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/jamcracker-wasm/build-debug/CMakeFiles/JamCracker.dir
+/Users/spot/Code/DEViLBOX/jamcracker-wasm/build-debug/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/jamcracker-wasm/build-debug/CMakeFiles/rebuild_cache.dir
