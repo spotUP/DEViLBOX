@@ -389,24 +389,15 @@ export async function createEffect(
       break;
 
     case 'JCReverb': {
-      const jcr = new Tone.JCReverb({
-        roomSize: p.roomSize || 0.5,
+      // Use Tone.Reverb (ConvolverNode-based) instead of Tone.JCReverb which
+      // depends on FeedbackCombFilter AudioWorklets that fail to initialize.
+      const roomVal = Math.max(0, Math.min(Number(p.roomSize) || 0.5, 0.99));
+      const jcr = new Tone.Reverb({
+        decay: 0.5 + roomVal * 9.5,  // roomSize 0-1 → decay 0.5-10s
+        preDelay: 0.01,
         wet: wetValue,
       });
-      // JCReverb uses 4 FeedbackCombFilter AudioWorklets that load async.
-      // Wait for Tone.js to finish registering all worklet modules first,
-      // then poll for the actual AudioWorkletNode instances to be created.
-      try { await Tone.loaded(); } catch { /* ignore */ }
-      const combFilters = (jcr as unknown as { _feedbackCombFilters: { _worklet?: AudioWorkletNode }[] })._feedbackCombFilters;
-      if (combFilters?.length) {
-        for (let attempt = 0; attempt < 150; attempt++) {
-          if (combFilters.every(f => f._worklet)) break;
-          await new Promise(r => setTimeout(r, 20));
-        }
-        if (!combFilters.every(f => f._worklet)) {
-          console.warn('[EffectFactory] JCReverb worklets did not load after 3s — reverb wet path may be silent');
-        }
-      }
+      await jcr.ready;
       node = jcr;
       break;
     }
