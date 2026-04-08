@@ -11,6 +11,7 @@ import { EffectOscilloscope } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const DYN_PRIMARY = '#3b82f6';
 const DYN_SECONDARY = '#60a5fa';
@@ -576,7 +577,7 @@ export const SidechainGateEditor: React.FC<VisualEffectEditorProps> = ({ effect,
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
-  const channelNames = useTrackerStore(s =>
+  const channelNames = useTrackerStore(useShallow(s =>
     s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
   );
 
@@ -644,7 +645,7 @@ export const SidechainLimiterEditor: React.FC<VisualEffectEditorProps> = ({ effe
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
-  const channelNames = useTrackerStore(s =>
+  const channelNames = useTrackerStore(useShallow(s =>
     s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
   );
 
