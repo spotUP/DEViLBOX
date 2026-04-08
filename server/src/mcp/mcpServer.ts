@@ -1163,8 +1163,19 @@ export function createMcpServer(): McpServer {
         try {
           const dirFiles = await readdir(dir);
 
-          // Prefix-pair formats: mdat↔smpl, MIDI↔SMPL
-          const prefixPairs: [string, string][] = [['mdat.', 'smpl.'], ['smpl.', 'mdat.'], ['midi.', 'smpl.'], ['smpl.', 'midi.']];
+          // Prefix-pair formats: mdat↔smpl, MIDI↔SMPL, jpn↔smp, thm↔smp, mfp↔smp,
+          // sjs↔smp, MAX↔SMP, mcr↔mcs
+          const prefixPairs: [string, string][] = [
+            ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
+            ['midi.', 'smpl.'], ['smpl.', 'midi.'],
+            ['jpn.', 'smp.'], ['smp.', 'jpn.'],
+            ['jpnd.', 'smp.'], ['smp.', 'jpnd.'],
+            ['thm.', 'smp.'], ['smp.', 'thm.'],
+            ['mfp.', 'smp.'], ['smp.', 'mfp.'],
+            ['sjs.', 'smp.'], ['smp.', 'sjs.'],
+            ['max.', 'smp.'], ['smp.', 'max.'],
+            ['mcr.', 'mcs.'], ['mcs.', 'mcr.'],
+          ];
           for (const [myPrefix, pairPrefix] of prefixPairs) {
             if (lowerFilename.startsWith(myPrefix)) {
               const suffix = filename.slice(myPrefix.length);
@@ -1173,6 +1184,42 @@ export function createMcpServer(): McpServer {
                 const pairData = await readFile(join(dir, pairName));
                 companionFiles[pairName] = pairData.toString('base64');
               }
+            }
+          }
+
+          // Extension-pair companions: .sng↔.ins, .dum↔.ins, .4v↔.set
+          const extensionPairs: [string, string][] = [
+            ['.sng', '.ins'], ['.ins', '.sng'],
+            ['.dum', '.ins'], ['.ins', '.dum'],
+            ['.4v', '.set'], ['.set', '.4v'],
+          ];
+          for (const [myExt, pairExt] of extensionPairs) {
+            if (lowerFilename.endsWith(myExt)) {
+              const baseName = filename.slice(0, filename.length - myExt.length);
+              const pairName = dirFiles.find(f => f.toLowerCase() === `${baseName.toLowerCase()}${pairExt}`);
+              if (pairName) {
+                const pairData = await readFile(join(dir, pairName));
+                companionFiles[pairName] = pairData.toString('base64');
+              }
+            }
+          }
+
+          // Shared sample set companions: smp.set or SMP.set (used by Synth Pack, Quartet,
+          // Maximum Effect). Loaded when the main file is NOT already smp.set itself.
+          if (lowerFilename !== 'smp.set') {
+            const smpSet = dirFiles.find(f => f.toLowerCase() === 'smp.set');
+            if (smpSet) {
+              const data = await readFile(join(dir, smpSet));
+              companionFiles[smpSet] = data.toString('base64');
+            }
+          }
+
+          // Kris Hatlelid: .kh song + songplay companion
+          if (lowerFilename.endsWith('.kh')) {
+            const songplay = dirFiles.find(f => f.toLowerCase() === 'songplay');
+            if (songplay) {
+              const data = await readFile(join(dir, songplay));
+              companionFiles[songplay] = data.toString('base64');
             }
           }
 
@@ -1471,7 +1518,20 @@ export function createMcpServer(): McpServer {
         const companionFiles: Record<string, string> = {};
         const lowerFilename = filename.toLowerCase();
         const dirPath = remotePath.slice(0, remotePath.lastIndexOf('/'));
-        const prefixPairs: [string, string][] = [['mdat.', 'smpl.'], ['smpl.', 'mdat.'], ['midi.', 'smpl.'], ['smpl.', 'midi.']];
+
+        // Prefix-pair formats: mdat↔smpl, MIDI↔SMPL, jpn↔smp, thm↔smp, mfp↔smp,
+        // sjs↔smp, MAX↔SMP, mcr↔mcs
+        const prefixPairs: [string, string][] = [
+          ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
+          ['midi.', 'smpl.'], ['smpl.', 'midi.'],
+          ['jpn.', 'smp.'], ['smp.', 'jpn.'],
+          ['jpnd.', 'smp.'], ['smp.', 'jpnd.'],
+          ['thm.', 'smp.'], ['smp.', 'thm.'],
+          ['mfp.', 'smp.'], ['smp.', 'mfp.'],
+          ['sjs.', 'smp.'], ['smp.', 'sjs.'],
+          ['max.', 'smp.'], ['smp.', 'max.'],
+          ['mcr.', 'mcs.'], ['mcs.', 'mcr.'],
+        ];
         for (const [myPrefix, pairPrefix] of prefixPairs) {
           if (lowerFilename.startsWith(myPrefix)) {
             const suffix = filename.slice(myPrefix.length);
@@ -1485,6 +1545,49 @@ export function createMcpServer(): McpServer {
               }
             } catch { /* companion download is best-effort */ }
           }
+        }
+
+        // Extension-pair companions: .sng↔.ins, .dum↔.ins, .4v↔.set
+        const extensionPairs: [string, string][] = [
+          ['.sng', '.ins'], ['.dum', '.ins'], ['.4v', '.set'],
+        ];
+        for (const [myExt, pairExt] of extensionPairs) {
+          if (lowerFilename.endsWith(myExt)) {
+            const baseName = filename.slice(0, filename.length - myExt.length);
+            const pairName = `${baseName}${pairExt}`;
+            const pairPath = `${dirPath}/${pairName}`;
+            try {
+              const pairResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(pairPath)}`);
+              if (pairResp.ok) {
+                const pairBuf = Buffer.from(await pairResp.arrayBuffer());
+                companionFiles[pairName] = pairBuf.toString('base64');
+              }
+            } catch { /* companion download is best-effort */ }
+          }
+        }
+
+        // Shared sample set: smp.set (Synth Pack, Quartet, Maximum Effect)
+        if (lowerFilename !== 'smp.set') {
+          const smpSetPath = `${dirPath}/smp.set`;
+          try {
+            const smpResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(smpSetPath)}`);
+            if (smpResp.ok) {
+              const smpBuf = Buffer.from(await smpResp.arrayBuffer());
+              companionFiles['smp.set'] = smpBuf.toString('base64');
+            }
+          } catch { /* best-effort */ }
+        }
+
+        // Kris Hatlelid: .kh + songplay companion
+        if (lowerFilename.endsWith('.kh')) {
+          const songplayPath = `${dirPath}/songplay`;
+          try {
+            const spResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(songplayPath)}`);
+            if (spResp.ok) {
+              const spBuf = Buffer.from(await spResp.arrayBuffer());
+              companionFiles['songplay'] = spBuf.toString('base64');
+            }
+          } catch { /* best-effort */ }
         }
 
         // Send to browser for loading
