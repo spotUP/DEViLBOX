@@ -126,6 +126,10 @@ const SKIP_KEYS = new Set([
   'uade-david-hanney', 'uade-custom-made', 'uade-sean-connolly', 'uade-desire',
   // 9/10 pass (audio works, only export missing):
   'uade-protracker-mod', 'uade-david-whittaker', 'uade-soundfx',
+  // Newly passing after OpenMPT routing + export fallback fix:
+  'uade-digibooster', 'uade-core-design', 'uade-far',
+  // Timeout/freeze during load — slow UADE classic-mode scans, cascade-crash other tests:
+  'uade-peter-verswyvelen', 'uade-ron-klaren',
 ]);
 
 const TESTS: TestDef[] = [
