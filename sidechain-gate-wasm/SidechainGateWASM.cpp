@@ -74,7 +74,33 @@ struct Instance {
     }
 
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
-        processExt(inL, inR, inL, inR, outL, outR, n);
+        // Self-sidechain: use raw input (no bandpass) for more reliable gating
+        float threshLin = std::pow(10.0f, threshold / 20.0f);
+        for (int i = 0; i < n; i++) {
+            float scPeak = std::max(std::abs(inL[i]), std::abs(inR[i]));
+
+            if (scPeak > envLin)
+                envLin = scPeak + attackCoeff * (envLin - scPeak);
+            else
+                envLin = scPeak + releaseCoeff * (envLin - scPeak);
+
+            float targetGain;
+            if (envLin >= threshLin) {
+                targetGain = 1.0f;
+                holdCounter = holdSamples;
+            } else if (holdCounter > 0) {
+                targetGain = 1.0f;
+                holdCounter--;
+            } else {
+                targetGain = range;
+            }
+
+            float coeff = (targetGain > gateGain) ? (1.0f - attackCoeff) : (1.0f - releaseCoeff);
+            gateGain += coeff * (targetGain - gateGain);
+
+            outL[i] = inL[i] * gateGain * mix + inL[i] * (1.0f - mix);
+            outR[i] = inR[i] * gateGain * mix + inR[i] * (1.0f - mix);
+        }
     }
 
     void processExt(const float* inL, const float* inR, const float* scInL, const float* scInR, float* outL, float* outR, int n) {
