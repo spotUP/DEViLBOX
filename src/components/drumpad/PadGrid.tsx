@@ -22,6 +22,7 @@ import {
   djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
 } from '../../engine/keyboard/commands/djScratch';
+import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
 
 const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
   // Basic patterns
@@ -173,6 +174,10 @@ export const PadGrid: React.FC<PadGridProps> = ({
         if (pad.scratchAction) {
           SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
         }
+        // Fire DJ FX action if assigned (engage on press)
+        if (pad.djFxAction) {
+          DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
+        }
         // Trigger sample playback if sample is loaded
         if (pad.sample) {
           engineRef.current.triggerPad(pad, curvedVelocity);
@@ -247,25 +252,31 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad && pad.playMode === 'sustain') {
-        // Release sample voice
-        engineRef.current.stopPad(padId, pad.release / 1000);
-        // Release synth voice
-        if (pad.synthConfig) {
-          try {
-            const padInstId = PAD_INSTRUMENT_BASE + pad.id;
-            const config = { ...pad.synthConfig, id: padInstId };
-            const note = pad.instrumentNote || 'C3';
-            getToneEngine().triggerNoteRelease(padInstId, note, 0, config);
-          } catch { /* ignore release errors */ }
-        } else if (pad.instrumentId != null) {
-          try {
-            const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
-            if (config) {
+      if (pad) {
+        // Disengage DJ FX on release (always, regardless of play mode)
+        if (pad.djFxAction) {
+          DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+        }
+        if (pad.playMode === 'sustain') {
+          // Release sample voice
+          engineRef.current.stopPad(padId, pad.release / 1000);
+          // Release synth voice
+          if (pad.synthConfig) {
+            try {
+              const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+              const config = { ...pad.synthConfig, id: padInstId };
               const note = pad.instrumentNote || 'C3';
-              getToneEngine().triggerNoteRelease(pad.instrumentId, note, 0, config);
-            }
-          } catch { /* ignore release errors */ }
+              getToneEngine().triggerNoteRelease(padInstId, note, 0, config);
+            } catch { /* ignore release errors */ }
+          } else if (pad.instrumentId != null) {
+            try {
+              const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
+              if (config) {
+                const note = pad.instrumentNote || 'C3';
+                getToneEngine().triggerNoteRelease(pad.instrumentId, note, 0, config);
+              }
+            } catch { /* ignore release errors */ }
+          }
         }
       }
     }

@@ -12,7 +12,7 @@ import type {
   SampleData,
   PadBank,
 } from '../types/drumpad';
-import { createEmptyProgram, createEmptyPad, create808Program, create909Program, getBankPads } from '../types/drumpad';
+import { createEmptyProgram, createEmptyPad, create808Program, create909Program, createDJFXProgram, getBankPads } from '../types/drumpad';
 import {
   saveAllPrograms,
   loadAllPrograms,
@@ -101,6 +101,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   programs: new Map([
     ['A-01', create808Program()],
     ['B-01', create909Program()],
+    ['C-01', createDJFXProgram()],
     ['C-01', createEmptyProgram('C-01', 'Empty Kit')],
   ]),
   currentProgramId: 'A-01',
@@ -161,6 +162,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       veloToPitch: clipboardPad.veloToPitch,
       layers: clipboardPad.layers.map(l => ({ ...l, sample: { ...l.sample } })),
       scratchAction: clipboardPad.scratchAction,
+      djFxAction: clipboardPad.djFxAction,
     });
     get().saveToIndexedDB();
   },

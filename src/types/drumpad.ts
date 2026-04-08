@@ -5,6 +5,7 @@
 import type { InstrumentConfig } from './instrument/defaults';
 import type { SynthType, EnvelopeConfig } from './instrument/base';
 import type { DrumType, DrumMachineType } from './instrument/drums';
+import type { DjFxActionId } from '../engine/drumpad/DjFxActions';
 
 export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
@@ -99,6 +100,9 @@ export interface DrumPad {
 
   // DJ scratch action (optional — fires in addition to any sample)
   scratchAction?: ScratchActionId;
+
+  // DJ FX action (optional — momentary effect triggered on pad press/release)
+  djFxAction?: DjFxActionId;
 }
 
 export interface DrumProgram {
@@ -355,6 +359,46 @@ export function create909Program(): DrumProgram {
     const cfg = makeDrumMachineConfig(pad.id, name, drumType, M, note, subType);
     pad.synthConfig = cfg.synthConfig;
     pad.instrumentNote = cfg.instrumentNote;
+  });
+
+  return program;
+}
+
+/**
+ * Factory preset: DJ FX Kit — Momentary performance effects on pads
+ */
+export function createDJFXProgram(): DrumProgram {
+  const program = createEmptyProgram('C-01', 'DJ FX');
+
+  const fxPads: { name: string; color: string; action: DjFxActionId }[] = [
+    // Row 1: Stutter & Echo
+    { name: 'Stutter 1/8',  color: '#ef4444', action: 'fx_stutter_8th' },
+    { name: 'Stutter 1/16', color: '#f97316', action: 'fx_stutter_16th' },
+    { name: 'Stutter 1/32', color: '#eab308', action: 'fx_stutter_32nd' },
+    { name: 'Dub Echo',     color: '#22c55e', action: 'fx_dub_echo' },
+    // Row 2: Delay & Filter
+    { name: 'Tape Echo',    color: '#14b8a6', action: 'fx_tape_echo' },
+    { name: 'Ping Pong',    color: '#06b6d4', action: 'fx_ping_pong' },
+    { name: 'HP Sweep',     color: '#3b82f6', action: 'fx_filter_hp_sweep' },
+    { name: 'LP Sweep',     color: '#6366f1', action: 'fx_filter_lp_sweep' },
+    // Row 3: Modulation & FX
+    { name: 'Reverb Wash',  color: '#8b5cf6', action: 'fx_reverb_wash' },
+    { name: 'Flanger',      color: '#a855f7', action: 'fx_flanger' },
+    { name: 'Phaser',       color: '#d946ef', action: 'fx_phaser' },
+    { name: 'Ring Mod',     color: '#ec4899', action: 'fx_ring_mod' },
+    // Row 4: Wild FX & Sounds
+    { name: 'Bitcrush',     color: '#f43f5e', action: 'fx_bitcrush' },
+    { name: 'Dub Siren',    color: '#fb923c', action: 'fx_dub_siren' },
+    { name: 'Air Horn',     color: '#fbbf24', action: 'fx_air_horn' },
+    { name: 'Noise Riser',  color: '#a3e635', action: 'fx_noise_riser' },
+  ];
+
+  fxPads.forEach((fx, i) => {
+    const pad = program.pads[i];
+    pad.name = fx.name;
+    pad.color = fx.color;
+    pad.djFxAction = fx.action;
+    pad.playMode = 'sustain'; // Hold to engage
   });
 
   return program;
