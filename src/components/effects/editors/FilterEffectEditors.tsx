@@ -273,13 +273,35 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
   const frequency = getParam(effect, 'frequency', 350);
   const Q = getParam(effect, 'Q', 1);
   const gain = getParam(effect, 'gain', 0);
+  const type = (effect.parameters?.type as string) || 'lowpass';
+  const rolloff = Number(effect.parameters?.rolloff ?? -12);
   const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass', 'notch', 'allpass', 'peaking', 'lowshelf', 'highshelf'] as const;
+  const TYPE_SHORT: Record<string, string> = { lowpass: 'LP', highpass: 'HP', bandpass: 'BP', notch: 'Notch', allpass: 'AP', peaking: 'Peak', lowshelf: 'LoS', highshelf: 'HiS' };
+  const ROLLOFFS = [-12, -24, -48, -96] as const;
 
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#f97316" />
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f97316" title="Filter" />
+        <div className="grid grid-cols-4 gap-1.5 mb-3">
+          {FILTER_TYPES.map((t) => (
+            <button key={t} onClick={() => onUpdateParameter('type', t)}
+              className={`px-2 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                type === t ? 'bg-orange-700/70 border-orange-500 text-orange-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-orange-700'
+              }`}>{TYPE_SHORT[t] || t}</button>
+          ))}
+        </div>
+        <div className="flex justify-center gap-2 mb-4">
+          {ROLLOFFS.map((r) => (
+            <button key={r} onClick={() => onUpdateParameter('rolloff', r)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
+                rolloff === r ? 'bg-orange-700/70 border-orange-500 text-orange-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-orange-700'
+              }`}>{r}dB</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob
             value={frequency}
