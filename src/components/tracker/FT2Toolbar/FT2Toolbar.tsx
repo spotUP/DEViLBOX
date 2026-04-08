@@ -674,8 +674,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   return (
     <div className="ft2-toolbar">
-      <div className="flex flex-1 min-w-0 overflow-hidden justify-between">
-        <div className="flex-shrink min-w-0">
+      <div className="flex flex-1 min-w-0 justify-between">
+        <div className="flex-shrink-0 min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
@@ -785,7 +785,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             </div>
         </div>
 
-        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-shrink border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ alignItems: 'stretch', justifyContent: 'center' }}>
+        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 overflow-hidden border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
           const currentIndex = modes.indexOf(vizMode);
