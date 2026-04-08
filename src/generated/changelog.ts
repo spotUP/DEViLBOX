@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-07T22:16:13.783Z
+ * Generated: 2026-04-08T13:28:38.409Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4562';
-export const BUILD_NUMBER = '4562';
-export const BUILD_HASH = '96384ff2c';
-export const BUILD_DATE = '2026-04-07';
+export const BUILD_VERSION = '1.0.4605';
+export const BUILD_NUMBER = '4605';
+export const BUILD_HASH = '33126b769';
+export const BUILD_DATE = '2026-04-08';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,185 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4562',
+    version: '1.0.4605',
+    date: '2026-04-08',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix sidechain effects routing, gate audio kill, compressor rewrite, GEQ31 layout"
+      },
+      {
+        type: 'fix',
+        "description": "Route Pumatracker to OpenMPT WASM (UADE can't play .puma)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix EQ parameter routing, oversample mapping, PhonoFilter 4-curve support"
+      },
+      {
+        type: 'fix',
+        "description": "PC tracker export + DMF routing + OpenMPT WASM fallback"
+      },
+      {
+        type: 'feature',
+        "description": "Add PC tracker format audit (23 formats, 12 PASS)"
+      },
+      {
+        type: 'fix',
+        "description": "Enable tick snapshots during short scan"
+      },
+      {
+        type: 'fix',
+        "description": "Fix short-scan: full WASM reinit after scan + tick snapshot passthrough"
+      },
+      {
+        type: 'feature',
+        "description": "Reapply \"Implement short-scan mode for compiled 68k replayers (Phase 1)\""
+      },
+      {
+        type: 'feature',
+        "description": "Revert \"Implement short-scan mode for compiled 68k replayers (Phase 1)\""
+      },
+      {
+        type: 'feature',
+        "description": "Implement short-scan mode for compiled 68k replayers (Phase 1)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove extra vertical padding from FT2 toolbar button row"
+      },
+      {
+        type: 'fix',
+        "description": "Infinite render loop in sidechain editors (useShallow for array selectors)"
+      },
+      {
+        type: 'feature',
+        "description": "Add jpn/jp/jpnd (JasonPage) to SKIP_SCAN and FORCE_CLASSIC"
+      },
+      {
+        type: 'fix',
+        "description": "Use string size prop for Knob in EQ editors"
+      },
+      {
+        type: 'feature',
+        "description": "Add sjs (SoundPlayer) to SKIP_SCAN and FORCE_CLASSIC lists"
+      },
+      {
+        type: 'fix',
+        "description": "Register companion files in UADESynth.setInstrument() before load"
+      },
+      {
+        type: 'feature',
+        "description": "Add missing controls to 7 effect editors found by audit"
+      },
+      {
+        type: 'fix',
+        "description": "Add sb/ps/sng to FORCE_CLASSIC lists for defense-in-depth"
+      },
+      {
+        type: 'feature',
+        "description": "Add sidechain source channel selector to SidechainCompressor editor"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add crashing formats to audit skip list to prevent cascade failures"
+      },
+      {
+        type: 'fix',
+        "description": "Inject UADESynth stub instrument for injectUADE parsers with 0 instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Add sb/ps/sng to SKIP_SCAN lists to prevent browser crashes during scan"
+      },
+      {
+        type: 'feature',
+        "description": "Add waveform selectors, BPM sync, and mode controls to effect editors"
+      },
+      {
+        type: 'fix',
+        "description": "Fix audio measurement + audit resilience: all 132 effects pass audio"
+      },
+      {
+        type: 'feature',
+        "description": "Comprehensive two-file format companion detection"
+      },
+      {
+        type: 'fix',
+        "description": "Route SynthPack through withNativeThenUADE for companion file support"
+      },
+      {
+        type: 'fix',
+        "description": "Propagate UADE companion files through store for two-file format playback"
+      },
+      {
+        type: 'fix',
+        "description": "Fix connect-first pattern in all 67 WASM effects + update audit script"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: update UADE audit skip list with newly passing formats"
+      },
+      {
+        type: 'feature',
+        "description": "Add 66 custom hardware-style editors for Zynthian WASM effects + audit tool"
+      },
+      {
+        type: 'fix',
+        "description": "Export fallback for libopenmptFileData + Quartet two-file companion support"
+      },
+      {
+        type: 'fix',
+        "description": "Add libopenmptFileData to ALL native parsers for OpenMPT-supported formats"
+      },
+      {
+        type: 'feature',
+        "description": "Add 72 Zynthian-ported effects to UI dropdown"
+      },
+      {
+        type: 'fix',
+        "description": "Fix silent SpaceyDelayer/RETapeEcho + JCReverb replacement"
+      },
+      {
+        type: 'fix',
+        "description": "UADE two-file formats, crash-prone scan skips, Quartet 4v ext"
+      },
+      {
+        type: 'fix',
+        "description": "Suppress WAM plugin SortableJS clone errors in global handler"
+      },
+      {
+        type: 'fix',
+        "description": "Fix batch effect bugs: TapeSimulator, WAM audio/UI, knob params, race condition"
+      },
+      {
+        type: 'improvement',
+        "description": "Update audit skip list: 8 more formats passing (41/66 total)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix silent classic-mode UADE formats and scan crashes"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: update audit skip list with 3 newly passing formats"
+      },
+      {
+        type: 'fix',
+        "description": "Reinit UADE WASM after failed load to prevent protocol state corruption"
+      },
+      {
+        type: 'fix',
+        "description": "Guard subscribeToCoordinator call + improve audit resilience"
+      },
+      {
+        type: 'fix',
+        "description": "SpaceEcho rate overflow, play-pattern position, silent effects"
+      }
+    ]
+  },
+  {
+    version: '2026-04-07',
     date: '2026-04-07',
     changes: [
       {
@@ -60,158 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: update format-state.json with FX audit results"
-      },
-      {
-        type: 'fix',
-        "description": "Effect chain, MCP bridge, and visualizer improvements"
-      },
-      {
-        type: 'fix',
-        "description": "Narrow hardware preset select dropdown width"
-      },
-      {
-        type: 'feature',
-        "description": "FX audit — test all 100 effects + report to dashboard"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-infer effect UI knobs + enclosure colors + gain compensation"
-      },
-      {
-        type: 'feature',
-        "description": "Register 67 WASM effects in registry and parameter engine"
-      },
-      {
-        type: 'feature',
-        "description": "Add 67 effect TypeScript AudioWorklet wrapper classes"
-      },
-      {
-        type: 'feature',
-        "description": "Add 67 compiled WASM binaries, JS glue, and worklet processors"
-      },
-      {
-        type: 'feature',
-        "description": "Add 67 WASM effect C++ DSP sources"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add wildcard *-wasm/build/ to gitignore"
-      },
-      {
-        type: 'improvement',
-        "description": "Phase 5: Binary pattern extraction for David Whittaker and Rob Hubbard"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve pattern display for streaming UADE formats"
-      },
-      {
-        type: 'feature',
-        "description": "Extend UADE audit to 10-point verification"
-      },
-      {
-        type: 'fix',
-        "description": "Build missing SidMon1/Fred replayer WASMs, fix DigiBooster NoneSynth"
-      },
-      {
-        type: 'fix',
-        "description": "Add all WASM player-pool synths to native dedup sets"
-      },
-      {
-        type: 'fix',
-        "description": "Exclude native whole-song players from hybrid replacement"
-      },
-      {
-        type: 'fix',
-        "description": "Add TFMXSynth, FCSynth, C64SID to native player dedup"
-      },
-      {
-        type: 'fix',
-        "description": "Dedup native player creation in preloadInstruments"
-      },
-      {
-        type: 'fix',
-        "description": "JAM WASM crash + HVL/TFMX player pool exhaustion"
-      },
-      {
-        type: 'fix',
-        "description": "Sync Knob refs during render to eliminate race condition"
-      },
-      {
-        type: 'fix',
-        "description": "StructuredClone crash blocking all knob/param updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add editors for all 27 missing master effects"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing parameter handlers for 6 effects"
-      },
-      {
-        type: 'feature',
-        "description": "Channel insert effects editor modal"
-      },
-      {
-        type: 'feature',
-        "description": "Add channel insert effect parameter update pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "Add dedicated Furnace dispatch routing for ES5506, MultiPCM, QSound, OPZ"
-      },
-      {
-        type: 'fix',
-        "description": "Param queuing for WASM effects, JamCracker retry, dialog keyboard hooks"
-      },
-      {
-        type: 'fix',
-        "description": "BiPhase knob wiring + TapeSimulator overflow"
-      },
-      {
-        type: 'fix',
-        "description": "Apply configRef pattern to 4 stale-state components"
-      },
-      {
-        type: 'improvement',
-        "description": "Test(smoke): strict pattern + audio checks; SID engineDriven flag"
-      },
-      {
-        type: 'fix',
-        "description": "Phase 5.3 — gate scheduler-skip on hasActiveDispatch"
-      },
-      {
-        type: 'feature',
-        "description": "Expose pcmData preview + loop points + finetune knob"
-      },
-      {
-        type: 'feature',
-        "description": "Expose wavePCM canvas + pcmData loop points + finetune/transpose"
-      },
-      {
-        type: 'feature',
-        "description": "DM1 sampleData preview + DM2 waveformPCM draw editor"
-      },
-      {
-        type: 'feature',
-        "description": "Expose waveformData canvas + pcmData preview + loop points"
-      },
-      {
-        type: 'improvement',
-        "description": "Phase 5.3 — WASM-backed formats skip TS scheduler"
-      },
-      {
-        type: 'improvement',
-        "description": "Phase 5.2 — automation player moves to coordinator"
-      },
-      {
-        type: 'feature',
-        "description": "Default to bar-quantize and key-lock-on for easy mixing"
-      },
-      {
-        type: 'improvement',
-        "description": "Phase 5.1 — VU meter triggering moves to coordinator"
       }
     ]
   }
