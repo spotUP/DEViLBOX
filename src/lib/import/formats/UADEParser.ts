@@ -500,6 +500,7 @@ export async function parseUADEFile(
     'ps',     // PaulShields — compiled 68k replayer, scan crashes browser
     'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
     'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
+    'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -521,6 +522,8 @@ export async function parseUADEFile(
     'sb',     // SteveBarrett — compiled 68k replayer
     'ps',     // PaulShields — compiled 68k replayer
     'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
+    'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
+    'sjs',    // SoundPlayer — compiled 68k replayer
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
   // hangs indefinitely, crashes the browser, or corrupts engine state. Skip scan for these.
@@ -1064,6 +1067,7 @@ export async function parseUADEFile(
     'ps',     // PaulShields — compiled 68k replayer
     'sng',    // RichardJoseph/ZoundMonitor — compiled 68k replayer
     'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
+    'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -1124,6 +1128,7 @@ export async function parseUADEFile(
     'sb',     // SteveBarrett — compiled 68k replayer
     'ps',     // PaulShields — compiled 68k replayer
     'sjs',    // SoundPlayer — compiled 68k replayer
+    'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);

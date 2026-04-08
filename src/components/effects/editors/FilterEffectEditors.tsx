@@ -8,6 +8,7 @@ import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
 import { EffectSpectrum, EffectOscilloscope, GainReductionMeter } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
 
 // ============================================================================
@@ -435,9 +436,9 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
-  const channelNames = useTrackerStore(s =>
+  const channelNames = useTrackerStore(useShallow(s =>
     s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
-  );
+  ));
 
   return (
     <div className="space-y-4">
