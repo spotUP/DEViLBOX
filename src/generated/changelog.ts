@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-06T15:09:21.533Z
+ * Generated: 2026-04-07T22:16:13.783Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4325';
-export const BUILD_NUMBER = '4325';
-export const BUILD_HASH = 'd9fec10ca';
-export const BUILD_DATE = '2026-04-06';
+export const BUILD_VERSION = '1.0.4562';
+export const BUILD_NUMBER = '4562';
+export const BUILD_HASH = '96384ff2c';
+export const BUILD_DATE = '2026-04-07';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,208 +30,188 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4325',
-    date: '2026-04-06',
+    version: '1.0.4562',
+    date: '2026-04-07',
     changes: [
       {
         type: 'fix',
-        "description": "Polyfill TextDecoder in worklet + redeploy libopenmpt WASM with channel state API"
+        "description": "Render Big Muff WAM GUI at 1:1 scale, centered"
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern extraction and metadata for 14 UADE format parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Smart warnings + channel-type validation + instrument badges"
+      },
+      {
+        type: 'feature',
+        "description": "Add full pattern extraction for Ben Daglish format"
+      },
+      {
+        type: 'fix',
+        "description": "Show channel names by default and auto-enable on hardware preset"
+      },
+      {
+        type: 'feature',
+        "description": "Add build-effects-wasm.sh convenience script for 70 WASM effects"
       },
       {
         type: 'improvement',
-        "description": "Revert: restore original working libopenmpt WASM binary"
-      },
-      {
-        type: 'feature',
-        "description": "Worklet channel state extraction + LibopenmptEngine callback"
-      },
-      {
-        type: 'feature',
-        "description": "Deploy rebuilt libopenmpt WASM with per-channel state API"
-      },
-      {
-        type: 'feature',
-        "description": "UADE full editability — sample extraction, pattern parsing, uadeEditableFileData for 115+ formats"
+        "description": "Chore: update format-state.json with FX audit results"
       },
       {
         type: 'fix',
-        "description": "Use std::uint32_t in libopenmpt channel state GetFreqFromPeriod call"
+        "description": "Effect chain, MCP bridge, and visualizer improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Narrow hardware preset select dropdown width"
       },
       {
         type: 'feature',
-        "description": "Operator macro subtabs, NES DPCM viewer, old format macro parsing"
+        "description": "FX audit — test all 100 effects + report to dashboard"
       },
       {
         type: 'feature',
-        "description": "Add fireHybridNotesFromChannelState and wire onChannelState in libopenmpt path"
+        "description": "Auto-infer effect UI knobs + enclosure colors + gain compensation"
       },
       {
         type: 'feature',
-        "description": "Full Furnace instrument format parity — all 27 feature blocks, signed types, UI panels"
+        "description": "Register 67 WASM effects in registry and parameter engine"
       },
       {
         type: 'feature',
-        "description": "Add per-channel state C API functions to libopenmpt"
+        "description": "Add 67 effect TypeScript AudioWorklet wrapper classes"
+      },
+      {
+        type: 'feature',
+        "description": "Add 67 compiled WASM binaries, JS glue, and worklet processors"
+      },
+      {
+        type: 'feature',
+        "description": "Add 67 WASM effect C++ DSP sources"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add wildcard *-wasm/build/ to gitignore"
       },
       {
         type: 'improvement',
-        "description": "Phase 1 implementation plan — libopenmpt channel state export"
+        "description": "Phase 5: Binary pattern extraction for David Whittaker and Rob Hubbard"
       },
       {
         type: 'improvement',
-        "description": "OpenMPT as core engine — design spec"
+        "description": "Improve pattern display for streaming UADE formats"
+      },
+      {
+        type: 'feature',
+        "description": "Extend UADE audit to 10-point verification"
+      },
+      {
+        type: 'fix',
+        "description": "Build missing SidMon1/Fred replayer WASMs, fix DigiBooster NoneSynth"
+      },
+      {
+        type: 'fix',
+        "description": "Add all WASM player-pool synths to native dedup sets"
+      },
+      {
+        type: 'fix',
+        "description": "Exclude native whole-song players from hybrid replacement"
+      },
+      {
+        type: 'fix',
+        "description": "Add TFMXSynth, FCSynth, C64SID to native player dedup"
+      },
+      {
+        type: 'fix',
+        "description": "Dedup native player creation in preloadInstruments"
+      },
+      {
+        type: 'fix',
+        "description": "JAM WASM crash + HVL/TFMX player pool exhaustion"
+      },
+      {
+        type: 'fix',
+        "description": "Sync Knob refs during render to eliminate race condition"
+      },
+      {
+        type: 'fix',
+        "description": "StructuredClone crash blocking all knob/param updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add editors for all 27 missing master effects"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing parameter handlers for 6 effects"
+      },
+      {
+        type: 'feature',
+        "description": "Channel insert effects editor modal"
+      },
+      {
+        type: 'feature',
+        "description": "Add channel insert effect parameter update pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "Add dedicated Furnace dispatch routing for ES5506, MultiPCM, QSound, OPZ"
+      },
+      {
+        type: 'fix',
+        "description": "Param queuing for WASM effects, JamCracker retry, dialog keyboard hooks"
+      },
+      {
+        type: 'fix',
+        "description": "BiPhase knob wiring + TapeSimulator overflow"
+      },
+      {
+        type: 'fix',
+        "description": "Apply configRef pattern to 4 stale-state components"
       },
       {
         type: 'improvement',
-        "description": "Hybrid playback driven by WASM engine position callbacks"
+        "description": "Test(smoke): strict pattern + audio checks; SID engineDriven flag"
       },
       {
         type: 'fix',
-        "description": "Make hybrid playback universal — not libopenmpt-only"
-      },
-      {
-        type: 'fix',
-        "description": "Hybrid playback — cut synth notes when channel switches to non-replaced instrument"
+        "description": "Phase 5.3 — gate scheduler-skip on hasActiveDispatch"
       },
       {
         type: 'feature',
-        "description": "Complete mute/solo coverage — add remaining 6 engines"
+        "description": "Expose pcmData preview + loop points + finetune knob"
       },
       {
         type: 'feature',
-        "description": "Add setMuteMask to 5 WASM engines and register in mixer store"
+        "description": "Expose wavePCM canvas + pcmData loop points + finetune/transpose"
       },
       {
         type: 'feature',
-        "description": "Mute/solo forwards to ALL 29 WASM engines"
-      },
-      {
-        type: 'fix',
-        "description": "Mute/solo for all WASM engines — use dynamic import() instead of require()"
-      },
-      {
-        type: 'fix',
-        "description": "Sync AudioContext in getInstrument() to prevent cross-context errors"
-      },
-      {
-        type: 'fix',
-        "description": "Hybrid playback reads live pattern data from tracker store"
-      },
-      {
-        type: 'fix',
-        "description": "Start TS scheduler alongside libopenmpt when instruments are replaced"
-      },
-      {
-        type: 'fix',
-        "description": "Hybrid playback — rebuild replacedInstruments at play(), fix channel config"
+        "description": "DM1 sampleData preview + DM2 waveformPCM draw editor"
       },
       {
         type: 'feature',
-        "description": "Furnace editor parity — SSG-EG modes, N163 per-channel, FDS compat, GB double wave"
-      },
-      {
-        type: 'fix',
-        "description": "Silence replaced instrument samples BEFORE libopenmpt loads module"
-      },
-      {
-        type: 'fix',
-        "description": "Remove OPLL preset dropdown from Chip Settings tab"
-      },
-      {
-        type: 'feature',
-        "description": "Synth module panels now use per-synth brand colors for borders"
-      },
-      {
-        type: 'feature',
-        "description": "Apply panelStyle from useInstrumentColors for brand-colored module borders"
-      },
-      {
-        type: 'fix',
-        "description": "Remove C64SID player from synth browser, add OPLL hardware presets"
-      },
-      {
-        type: 'feature',
-        "description": "Preset dropdown shows current name, per-preset V2 volumes, showcase defaults"
-      },
-      {
-        type: 'fix',
-        "description": "Replace white synth module borders with design system border token"
-      },
-      {
-        type: 'fix',
-        "description": "Replace all raw Tailwind grays with design system tokens across instrument UI"
-      },
-      {
-        type: 'fix',
-        "description": "Replace raw Tailwind gray colors with design system tokens"
-      },
-      {
-        type: 'fix',
-        "description": "Remove ugly white/faded dividers from lists across the app"
-      },
-      {
-        type: 'fix',
-        "description": "Remove ugly white dividers from manual sidebar"
-      },
-      {
-        type: 'feature',
-        "description": "Bump manual tab fonts to match fullscreen help dialog"
-      },
-      {
-        type: 'feature',
-        "description": "Make help dialog fullscreen with bigger fonts (DOM + GL)"
-      },
-      {
-        type: 'feature',
-        "description": "V2 synth — real Farbrausch presets with full parameter support"
-      },
-      {
-        type: 'feature',
-        "description": "Route 21 more stub UADE formats through enhanced scan"
+        "description": "Expose waveformData canvas + pcmData preview + loop points"
       },
       {
         type: 'improvement',
-        "description": "Add comprehensive C64/SID music tutorial for beginners"
+        "description": "Phase 5.3 — WASM-backed formats skip TS scheduler"
+      },
+      {
+        type: 'improvement',
+        "description": "Phase 5.2 — automation player moves to coordinator"
       },
       {
         type: 'feature',
-        "description": "Route 12 stub UADE formats through enhanced scan for pattern reconstruction"
+        "description": "Default to bar-quantize and key-lock-on for easy mixing"
       },
       {
-        type: 'feature',
-        "description": "Add per-channel muting to SC68, EUPMini, Ixalance, SunVox WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "UADE format audit — fix parsers, add sample extraction, route BD/JT through enhanced scan"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel mute for 8 song-based WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-channel muting to 4 song-based WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "Wire setMuteMask to per-channel WASM calls for 4 song-based engines"
-      },
-      {
-        type: 'feature',
-        "description": "DBX persistence + export warnings for replaced instruments"
-      },
-      {
-        type: 'feature',
-        "description": "Add setMuteMask to 20 WASM engines for per-channel muting"
-      },
-      {
-        type: 'feature',
-        "description": "Universal synth replacement routing for ALL WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "Universal hybrid playback infrastructure — replaced instruments API + dynamic WASM muting"
+        type: 'improvement',
+        "description": "Phase 5.1 — VU meter triggering moves to coordinator"
       }
     ]
   }
