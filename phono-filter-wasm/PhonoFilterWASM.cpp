@@ -71,7 +71,7 @@ struct PhonoFilterInstance {
     Biquad lowL, lowR;     // bass shelf
     Biquad highL, highR;   // treble shelf
 
-    int mode = 0; // 0=playback, 1=recording
+    int mode = 0; // 0=RIAA, 1=NAB, 2=Columbia, 3=IEC
     float mix = 1.0f;
 
     void init(float sr) {
@@ -83,18 +83,41 @@ struct PhonoFilterInstance {
     }
 
     void recalc() {
-        // RIAA corner frequencies
-        // Playback: boost bass, cut treble
-        // Recording: cut bass, boost treble (inverse)
-        float bassGain = (mode == 0) ? 19.9f : -19.9f;
-        float trebleGain = (mode == 0) ? -19.6f : 19.6f;
+        // Each standard has different time constants → different corner frequencies and gains
+        float bassFreq, bassGain, trebleFreq, trebleGain;
 
-        hpL.setHP(20.0f, sampleRate);
-        hpR.setHP(20.0f, sampleRate);
-        lowL.setLowShelf(50.0f, bassGain, sampleRate);
-        lowR.setLowShelf(50.0f, bassGain, sampleRate);
-        highL.setHighShelf(2122.0f, trebleGain, sampleRate);
-        highR.setHighShelf(2122.0f, trebleGain, sampleRate);
+        switch (mode) {
+        case 0: // RIAA (1954) — standard vinyl playback
+            bassFreq = 50.0f; bassGain = 19.9f;
+            trebleFreq = 2122.0f; trebleGain = -19.6f;
+            break;
+        case 1: // NAB (1942) — earlier US standard, warmer
+            bassFreq = 100.0f; bassGain = 16.0f;
+            trebleFreq = 1590.0f; trebleGain = -16.0f;
+            break;
+        case 2: // Columbia (1938) — heavy bass boost, gentle treble cut
+            bassFreq = 63.0f; bassGain = 22.0f;
+            trebleFreq = 1590.0f; trebleGain = -12.0f;
+            break;
+        case 3: // IEC (modified RIAA) — adds subsonic rolloff at 20Hz
+            bassFreq = 50.0f; bassGain = 19.9f;
+            trebleFreq = 2122.0f; trebleGain = -19.6f;
+            break;
+        default:
+            bassFreq = 50.0f; bassGain = 19.9f;
+            trebleFreq = 2122.0f; trebleGain = -19.6f;
+            break;
+        }
+
+        // IEC has steeper subsonic filter (3rd order HP at 20Hz)
+        float hpFreq = (mode == 3) ? 40.0f : 20.0f;
+
+        hpL.setHP(hpFreq, sampleRate);
+        hpR.setHP(hpFreq, sampleRate);
+        lowL.setLowShelf(bassFreq, bassGain, sampleRate);
+        lowR.setLowShelf(bassFreq, bassGain, sampleRate);
+        highL.setHighShelf(trebleFreq, trebleGain, sampleRate);
+        highR.setHighShelf(trebleFreq, trebleGain, sampleRate);
     }
 
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
@@ -129,7 +152,7 @@ EMSCRIPTEN_KEEPALIVE void phono_filter_process(int h, float* inL, float* inR, fl
 
 EMSCRIPTEN_KEEPALIVE void phono_filter_set_mode(int h, float v) {
     if (h >= 0 && h < MAX_INSTANCES && instances[h].active) {
-        instances[h].mode = (v >= 0.5f) ? 1 : 0;
+        instances[h].mode = std::clamp(static_cast<int>(v + 0.5f), 0, 3);
         instances[h].recalc();
     }
 }

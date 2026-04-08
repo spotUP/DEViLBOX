@@ -59,7 +59,10 @@ export function applyEffectParametersDiff(
     case 'Distortion':
       if (node instanceof Tone.Distortion) {
         if ('drive' in changed) node.distortion = changed.drive as number;
-        if ('oversample' in changed) node.oversample = changed.oversample as OverSampleType;
+        if ('oversample' in changed) {
+          const v = changed.oversample;
+          node.oversample = (v === '2x' || v === '4x' ? v : 'none') as 'none' | '2x' | '4x';
+        }
       }
       break;
 
@@ -398,7 +401,10 @@ export function applyEffectParametersDiff(
     case 'Chebyshev':
       if (node instanceof Tone.Chebyshev) {
         if ('order' in changed) node.order = changed.order as number;
-        if ('oversample' in changed) node.oversample = changed.oversample as OverSampleType;
+        if ('oversample' in changed) {
+          const v = changed.oversample;
+          node.oversample = (v === '2x' || v === '4x' ? v : 'none') as 'none' | '2x' | '4x';
+        }
       }
       break;
 
@@ -799,15 +805,21 @@ export function applyEffectParametersDiff(
       break;
 
     case 'EQ8Band':
-      // No params to update
+      for (const key of Object.keys(changed)) {
+        (node as any).setParam(key, Number(changed[key]));
+      }
       break;
 
     case 'EQ12Band':
-        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      for (const key of Object.keys(changed)) {
+        (node as any).setParam(key, Number(changed[key]));
+      }
       break;
 
     case 'GEQ31':
-        if ('mix' in changed) (node as any).setParam('mix', Number(changed.mix));
+      for (const key of Object.keys(changed)) {
+        (node as any).setParam(key, Number(changed[key]));
+      }
       break;
 
     case 'ZamEQ2':
