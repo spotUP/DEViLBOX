@@ -1120,27 +1120,38 @@ const GEQ31_FREQS = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
 export const GEQ31Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
+  // Split 31 bands into rows of 8 for responsive layout
+  const rows: number[][] = [];
+  for (let i = 0; i < GEQ31_FREQS.length; i += 8) {
+    rows.push(Array.from({ length: Math.min(8, GEQ31_FREQS.length - i) }, (_, j) => i + j));
+  }
+
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
       <Section>
         <SectionHeader size="lg" color="#3b82f6" title="31-Band Graphic EQ" />
-        <div className="flex gap-0.5 items-end justify-center overflow-x-auto pb-2">
-          {GEQ31_FREQS.map((freq, i) => {
-            const gain = getParam(effect, `band_${i}`, 0);
-            const hue = 210 + (i / 30) * 60;
-            const color = `hsl(${hue}, 70%, 55%)`;
-            return (
-              <div key={i} className="flex flex-col items-center gap-0.5 min-w-[22px]">
-                <Knob value={gain} min={-12} max={12} onChange={(v) => onUpdateParameter(`band_${i}`, v)}
-                  label="" color={color} size="sm"
-                  formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
-                <span className="text-[7px] text-text-muted leading-none" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                  {freq >= 1000 ? `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 1)}k` : `${freq}`}
-                </span>
-              </div>
-            );
-          })}
+        <div className="space-y-3">
+          {rows.map((bandIndices, rowIdx) => (
+            <div key={rowIdx} className="flex gap-1 items-end justify-center flex-wrap">
+              {bandIndices.map((i) => {
+                const freq = GEQ31_FREQS[i];
+                const gain = getParam(effect, `band_${i}`, 0);
+                const hue = 210 + (i / 30) * 60;
+                const color = `hsl(${hue}, 70%, 55%)`;
+                return (
+                  <div key={i} className="flex flex-col items-center gap-0.5">
+                    <Knob value={gain} min={-12} max={12} onChange={(v) => onUpdateParameter(`band_${i}`, v)}
+                      label="" color={color} size="sm"
+                      formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+                    <span className="text-[8px] text-text-muted leading-none text-center whitespace-nowrap">
+                      {freq >= 1000 ? `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 1)}k` : `${freq}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </Section>
       <Section>

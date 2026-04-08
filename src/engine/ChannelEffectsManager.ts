@@ -65,19 +65,8 @@ class ChannelEffectsManager {
 
     // Wire sidechain source if this effect supports external sidechain input
     const scSource = config.sidechainSource ?? Number(config.parameters?.sidechainSource);
-    const scTypes = ['SidechainCompressor', 'SidechainGate', 'SidechainLimiter'];
-    if (scTypes.includes(config.type) && scSource != null && scSource >= 0 && !isNaN(scSource)) {
-      try {
-        const { getToneEngine } = await import('./ToneEngine');
-        const engine = getToneEngine();
-        const sourceOutput = engine.getChannelOutputByIndex(scSource);
-        if (sourceOutput && 'getSidechainInput' in node) {
-          const scInput = (node as any).getSidechainInput() as Tone.Gain;
-          sourceOutput.channel.connect(scInput);
-        }
-      } catch {
-        // Engine not ready yet — sidechain will need to be wired later
-      }
+    if (!isNaN(scSource) && scSource >= 0) {
+      await this.wireSidechain(node, scSource);
     }
   }
 
@@ -213,13 +202,44 @@ class ChannelEffectsManager {
       }
     }
 
-    // Apply diff to audio node
-    if (Object.keys(changedParams).length > 0) {
-      applyEffectParametersDiff(effect.node, config.type, changedParams);
+    // Re-wire sidechain routing if sidechainSource changed
+    if ('sidechainSource' in changedParams && 'getSidechainInput' in effect.node) {
+      void this.wireSidechain(effect.node as Tone.ToneAudioNode, Number(changedParams.sidechainSource));
+    }
+
+    // Apply diff to audio node (skip sidechainSource — it's a routing param, not a DSP param)
+    const dspParams = { ...changedParams };
+    delete dspParams.sidechainSource;
+    if (Object.keys(dspParams).length > 0) {
+      applyEffectParametersDiff(effect.node, config.type, dspParams);
     }
 
     // Update stored config
     effect.config = config;
+  }
+
+  /**
+   * Wire or re-wire the sidechain input of an effect to a source channel.
+   */
+  private async wireSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
+    if (!('getSidechainInput' in node)) return;
+    const scInput = (node as any).getSidechainInput() as Tone.Gain;
+
+    // Disconnect any existing sidechain source
+    try { scInput.disconnect(); } catch { /* nothing connected */ }
+
+    if (sourceChannel < 0 || isNaN(sourceChannel)) return;
+
+    try {
+      const { getToneEngine } = await import('./ToneEngine');
+      const engine = getToneEngine();
+      const sourceOutput = engine.getChannelOutputByIndex(sourceChannel);
+      if (sourceOutput) {
+        sourceOutput.channel.connect(scInput);
+      }
+    } catch {
+      // Engine not ready
+    }
   }
 
   /**

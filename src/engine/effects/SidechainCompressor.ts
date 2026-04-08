@@ -1,11 +1,15 @@
 /**
  * SidechainCompressor - Compressor with external sidechain input
  *
- * Uses an external audio source to trigger compression on the main signal.
+ * Uses an external audio source to trigger gain ducking on the main signal.
  * Classic use: route kick drum to sidechain to create "pumping" effect on bass.
+ *
+ * Architecture: sidechain → meter → fast polling → gain duck on main signal.
+ * Uses 4ms polling interval + low smoothing for responsive dynamics.
  */
 
 import * as Tone from 'tone';
+import { getNativeAudioNode } from '@utils/audio-context';
 
 export interface SidechainCompressorOptions {
   threshold?: number;        // -60 to 0 dB
@@ -20,15 +24,16 @@ export interface SidechainCompressorOptions {
 export class SidechainCompressor extends Tone.ToneAudioNode {
   readonly name = 'SidechainCompressor';
 
-  // Main signal chain
-  private compressor: Tone.Compressor;
+  // Main signal chain — gain ducking
+  private duckGain: GainNode;
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
 
   // Sidechain detection
   private sidechainInput: Tone.Gain;
   private sidechainGainNode: Tone.Gain;
-  private sidechainAnalyser: Tone.Meter;
+  private analyser: AnalyserNode;
+  private analyserBuffer: Float32Array;
 
   // Parameters
   private _threshold: number;
@@ -39,18 +44,16 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
   private _sidechainGain: number;
   private _wet: number;
 
-  // Animation frame for sidechain polling
-  private animationFrame: number | null = null;
-  private baseThreshold: number;
+  // Envelope state
+  private envelope = 0;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Required by ToneAudioNode
   readonly input: Tone.Gain;
   readonly output: Tone.Gain;
 
   constructor(options: SidechainCompressorOptions = {}) {
     super();
 
-    // Initialize parameters with defaults
     this._threshold = options.threshold ?? -24;
     this._ratio = options.ratio ?? 4;
     this._attack = options.attack ?? 0.003;
@@ -58,179 +61,149 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this._knee = options.knee ?? 6;
     this._sidechainGain = options.sidechainGain ?? 1;
     this._wet = options.wet ?? 1;
-    this.baseThreshold = this._threshold;
 
-    // Create input/output
+    const rawCtx = Tone.getContext().rawContext as AudioContext;
+
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
-
-    // Create compressor
-    this.compressor = new Tone.Compressor({
-      threshold: this._threshold,
-      ratio: this._ratio,
-      attack: this._attack,
-      release: this._release,
-      knee: this._knee,
-    });
-
-    // Dry/wet mix
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
 
-    // Sidechain input chain
+    // Gain node for ducking (audio-rate parameter automation)
+    this.duckGain = rawCtx.createGain();
+    this.duckGain.gain.value = 1;
+
+    // Sidechain chain
     this.sidechainInput = new Tone.Gain(1);
     this.sidechainGainNode = new Tone.Gain(this._sidechainGain);
-    this.sidechainAnalyser = new Tone.Meter({
-      smoothing: 0.8,
-      normalRange: false,
-    });
+    this.analyser = rawCtx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.analyserBuffer = new Float32Array(this.analyser.fftSize);
 
-    // Connect main signal path
-    // Wet: input -> compressor -> wetGain -> output
-    this.input.connect(this.compressor);
-    this.compressor.connect(this.wetGain);
+    // Main signal: input → duckGain → wetGain → output
+    const rawInputNode = getNativeAudioNode(this.input);
+    const rawWetNode = getNativeAudioNode(this.wetGain);
+    if (rawInputNode) rawInputNode.connect(this.duckGain);
+    if (rawWetNode) this.duckGain.connect(rawWetNode);
     this.wetGain.connect(this.output);
 
-    // Dry: input -> dryGain -> output
+    // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // Connect sidechain detection chain
+    // Sidechain detection: sidechainInput → gain → analyser
+    const rawScGain = getNativeAudioNode(this.sidechainGainNode);
     this.sidechainInput.connect(this.sidechainGainNode);
-    this.sidechainGainNode.connect(this.sidechainAnalyser);
+    if (rawScGain) rawScGain.connect(this.analyser);
 
-    // Start sidechain polling
-    this.startSidechainPolling();
+    // Fast polling at 4ms (~250Hz) for responsive dynamics
+    this.pollTimer = setInterval(this.updateDucking, 4);
   }
 
-  /**
-   * Get the sidechain input node for external connection
-   * Connect another audio source to this to trigger compression
-   */
   getSidechainInput(): Tone.Gain {
     return this.sidechainInput;
   }
 
-  /**
-   * Poll sidechain level and modulate compression
-   */
-  private startSidechainPolling = (): void => {
-    this.updateSidechain();
-  };
-
-  private updateSidechain = (): void => {
-    // Get current sidechain level in dB
-    const level = this.sidechainAnalyser.getValue();
-    const levelDb = typeof level === 'number' ? level : level[0];
-
-    // Only modulate if sidechain is active (above noise floor)
-    if (levelDb > -60) {
-      // Calculate threshold modulation based on sidechain level
-      // Higher sidechain level = lower threshold = more compression
-      const normalizedLevel = Math.min(1, Math.max(0, (levelDb + 60) / 60));
-      const modulation = normalizedLevel * 24 * this._sidechainGain; // Up to 24dB modulation
-
-      // Apply modulation to threshold
-      this.compressor.threshold.value = this.baseThreshold - modulation;
-    } else {
-      // Return to base threshold when sidechain is quiet
-      this.compressor.threshold.value = this.baseThreshold;
+  private updateDucking = (): void => {
+    // Get peak level from analyser
+    this.analyser.getFloatTimeDomainData(this.analyserBuffer as Float32Array<ArrayBuffer>);
+    let peak = 0;
+    for (let i = 0; i < this.analyserBuffer.length; i++) {
+      const abs = Math.abs(this.analyserBuffer[i]);
+      if (abs > peak) peak = abs;
     }
 
-    // Continue polling
-    this.animationFrame = requestAnimationFrame(this.updateSidechain);
+    // Convert to dB
+    const peakDb = peak > 0.00001 ? 20 * Math.log10(peak) : -100;
+
+    // Envelope follower (attack/release in seconds, polling at ~250Hz)
+    const dt = 0.004; // 4ms polling interval
+    const attackCoeff = 1 - Math.exp(-dt / Math.max(this._attack, 0.0001));
+    const releaseCoeff = 1 - Math.exp(-dt / Math.max(this._release, 0.001));
+
+    if (peakDb > this.envelope) {
+      this.envelope += attackCoeff * (peakDb - this.envelope);
+    } else {
+      this.envelope += releaseCoeff * (peakDb - this.envelope);
+    }
+
+    // Compute gain reduction
+    let gainDb = 0;
+    const overDb = this.envelope - this._threshold;
+
+    if (overDb > 0) {
+      // Soft knee
+      if (this._knee > 0 && overDb < this._knee) {
+        const x = overDb / this._knee;
+        gainDb = -(overDb * x * (1 - 1 / this._ratio)) / 2;
+      } else {
+        gainDb = -(overDb * (1 - 1 / this._ratio));
+      }
+    }
+
+    // Apply gain with fast ramp to avoid clicks
+    const gainLin = Math.pow(10, gainDb / 20);
+    const now = Tone.getContext().rawContext!.currentTime;
+    this.duckGain.gain.setTargetAtTime(gainLin, now, 0.003);
   };
 
-  // Getters and setters
-  get threshold(): number {
-    return this._threshold;
-  }
-
+  get threshold(): number { return this._threshold; }
   set threshold(value: number) {
     this._threshold = Math.max(-60, Math.min(0, value));
-    this.baseThreshold = this._threshold;
-    this.compressor.threshold.value = this._threshold;
   }
 
-  get ratio(): number {
-    return this._ratio;
-  }
-
+  get ratio(): number { return this._ratio; }
   set ratio(value: number) {
     this._ratio = Math.max(1, Math.min(20, value));
-    this.compressor.ratio.value = this._ratio;
   }
 
-  get attack(): number {
-    return this._attack;
-  }
-
+  get attack(): number { return this._attack; }
   set attack(value: number) {
     this._attack = Math.max(0.001, Math.min(0.5, value));
-    this.compressor.attack.value = this._attack;
   }
 
-  get release(): number {
-    return this._release;
-  }
-
+  get release(): number { return this._release; }
   set release(value: number) {
     this._release = Math.max(0.01, Math.min(1, value));
-    this.compressor.release.value = this._release;
   }
 
-  get knee(): number {
-    return this._knee;
-  }
-
+  get knee(): number { return this._knee; }
   set knee(value: number) {
     this._knee = Math.max(0, Math.min(40, value));
-    this.compressor.knee.value = this._knee;
   }
 
-  get sidechainGain(): number {
-    return this._sidechainGain;
-  }
-
+  get sidechainGain(): number { return this._sidechainGain; }
   set sidechainGain(value: number) {
     this._sidechainGain = Math.max(0, Math.min(2, value));
     this.sidechainGainNode.gain.value = this._sidechainGain;
   }
 
-  get wet(): number {
-    return this._wet;
-  }
-
+  get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = Math.max(0, Math.min(1, value));
     this.wetGain.gain.value = this._wet;
     this.dryGain.gain.value = 1 - this._wet;
   }
 
-  /**
-   * Get current gain reduction in dB
-   */
   getReduction(): number {
-    return this.compressor.reduction;
+    return this.duckGain.gain.value < 1 ? 20 * Math.log10(this.duckGain.gain.value) : 0;
   }
 
-  /**
-   * Clean up all nodes
-   */
   dispose(): this {
-    // Stop polling
-    if (this.animationFrame !== null) {
-      cancelAnimationFrame(this.animationFrame);
-      this.animationFrame = null;
+    if (this.pollTimer !== null) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
 
-    super.dispose();
-    this.compressor.dispose();
+    try { this.duckGain.disconnect(); } catch { /* */ }
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.sidechainInput.dispose();
     this.sidechainGainNode.dispose();
-    this.sidechainAnalyser.dispose();
+    try { this.analyser.disconnect(); } catch { /* */ }
+    this.input.dispose();
+    this.output.dispose();
+    super.dispose();
 
     return this;
   }
