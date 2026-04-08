@@ -314,7 +314,7 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   // DirkBialluch
   'tpu',
   // Quartet
-  'qpa', 'qts', 'sqt',
+  'qpa', 'qts', 'sqt', '4v',
   // ZoundMonitor
   'sng',
   // Formats with native parsers — also registering extension for UADE fallback
@@ -492,6 +492,10 @@ export async function parseUADEFile(
     'vss',    // VoodooSupremeSynthesizer
     'synmod', // SynTracker
     'scn',    // SeanConnolly
+    'mc', 'mcr', 'mco',  // MarkCooksey — compiled 68k replayer, crashes browser
+    'jmf',    // JankoMrsicFlogel — compiled 68k replayer, crashes browser
+    'kh',     // KrisHatlelid — compiled 68k replayer
+    'thm',    // ThomasHermann — compiled 68k replayer
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -505,6 +509,11 @@ export async function parseUADEFile(
     'vss',    // VoodooSupremeSynthesizer
     'synmod', // SynTracker
     'scn',    // SeanConnolly
+    'mc', 'mcr', 'mco',  // MarkCooksey
+    'jmf',    // JankoMrsicFlogel
+    'kh',     // KrisHatlelid
+    'thm', 'smp',  // ThomasHermann (thm.* and smp.* prefixes)
+    'mfp',    // MagneticFieldsPacker (needs companion smp.* file)
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
   // hangs indefinitely, crashes the browser, or corrupts engine state. Skip scan for these.
@@ -1025,6 +1034,10 @@ export async function parseUADEFile(
     'cm',     // CustomMade variant
     'rk',     // CustomMade (Richard Karsmakers) variant
     'rkb',    // CustomMade variant
+    'mc', 'mcr', 'mco',  // MarkCooksey — compiled 68k replayer
+    'jmf',    // JankoMrsicFlogel — compiled 68k replayer
+    'kh',     // KrisHatlelid — compiled 68k replayer
+    'thm',    // ThomasHermann — compiled 68k replayer
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -1074,6 +1087,11 @@ export async function parseUADEFile(
     'cm',     // CustomMade variant
     'rk',     // CustomMade (Richard Karsmakers) variant
     'rkb',    // CustomMade variant
+    'mc', 'mcr', 'mco',  // MarkCooksey
+    'jmf',    // JankoMrsicFlogel
+    'kh',     // KrisHatlelid
+    'thm', 'smp',  // ThomasHermann (thm.* and smp.* prefixes)
+    'mfp',    // MagneticFieldsPacker
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
