@@ -499,6 +499,7 @@ export async function parseUADEFile(
     'sb',     // SteveBarrett — compiled 68k replayer, scan crashes browser
     'ps',     // PaulShields — compiled 68k replayer, scan crashes browser
     'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
+    'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -1062,6 +1063,7 @@ export async function parseUADEFile(
     'sb',     // SteveBarrett — compiled 68k replayer
     'ps',     // PaulShields — compiled 68k replayer
     'sng',    // RichardJoseph/ZoundMonitor — compiled 68k replayer
+    'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -1121,6 +1123,7 @@ export async function parseUADEFile(
     'mfp',    // MagneticFieldsPacker
     'sb',     // SteveBarrett — compiled 68k replayer
     'ps',     // PaulShields — compiled 68k replayer
+    'sjs',    // SoundPlayer — compiled 68k replayer
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);

@@ -16,7 +16,7 @@ target_link_options(SidechainGate PRIVATE
   "SHELL:-s ALLOW_MEMORY_GROWTH=1"
   "SHELL:-s ENVIRONMENT='web,worker'"
   "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-  "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_sidechain_gate_create','_sidechain_gate_destroy','_sidechain_gate_process','_sidechain_gate_set_threshold','_sidechain_gate_set_attack','_sidechain_gate_set_hold','_sidechain_gate_set_release','_sidechain_gate_set_range','_sidechain_gate_set_scFreq','_sidechain_gate_set_scQ','_sidechain_gate_set_mix']"
+  "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_sidechain_gate_create','_sidechain_gate_destroy','_sidechain_gate_process','_sidechain_gate_process_ext','_sidechain_gate_set_threshold','_sidechain_gate_set_attack','_sidechain_gate_set_hold','_sidechain_gate_set_release','_sidechain_gate_set_range','_sidechain_gate_set_scFreq','_sidechain_gate_set_scQ','_sidechain_gate_set_mix']"
   "SHELL:-s INITIAL_MEMORY=4194304"
   "SHELL:-s STACK_SIZE=262144"
   "SHELL:-s NO_EXIT_RUNTIME=1"

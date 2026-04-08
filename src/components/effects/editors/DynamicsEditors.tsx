@@ -10,6 +10,7 @@ import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
 import { EffectOscilloscope } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
+import { useTrackerStore } from '@stores/useTrackerStore';
 
 const DYN_PRIMARY = '#3b82f6';
 const DYN_SECONDARY = '#60a5fa';
@@ -571,7 +572,13 @@ export const SidechainGateEditor: React.FC<VisualEffectEditorProps> = ({ effect,
   const range = getParam(effect, 'range', 0);
   const scFreq = getParam(effect, 'scFreq', 200);
   const scQ = getParam(effect, 'scQ', 1);
+  const sidechainSource = getParam(effect, 'sidechainSource', -1);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
+  const channelNames = useTrackerStore(s =>
+    s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
+  );
 
   return (
     <div className="space-y-4">
@@ -598,6 +605,19 @@ export const SidechainGateEditor: React.FC<VisualEffectEditorProps> = ({ effect,
       </Section>
       <Section>
         <SectionHeader size="lg" color="#22d3ee" title="Sidechain" />
+        <div className="mb-3">
+          <label className="block text-xs text-text-muted mb-1.5">Sidechain Source</label>
+          <select
+            value={Math.round(sidechainSource)}
+            onChange={(e) => onUpdateParameter('sidechainSource', Number(e.target.value))}
+            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-cyan-500 focus:outline-none"
+          >
+            <option value={-1}>Self (Internal)</option>
+            {Array.from({ length: channelCount }, (_, i) => (
+              <option key={i} value={i}>{channelNames[i] || `CH ${i + 1}`}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex justify-around items-end">
           <Knob value={scFreq} min={20} max={10000} onChange={(v) => onUpdateParameter('scFreq', v)}
             label="SC Freq" color="#22d3ee" formatValue={(v) => `${Math.round(v)} Hz`} />
@@ -620,7 +640,13 @@ export const SidechainLimiterEditor: React.FC<VisualEffectEditorProps> = ({ effe
   const release = getParam(effect, 'release', 50);
   const scFreq = getParam(effect, 'scFreq', 1000);
   const scGain = getParam(effect, 'scGain', 0);
+  const sidechainSource = getParam(effect, 'sidechainSource', -1);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
+  const channelNames = useTrackerStore(s =>
+    s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
+  );
 
   return (
     <div className="space-y-4">
@@ -636,6 +662,19 @@ export const SidechainLimiterEditor: React.FC<VisualEffectEditorProps> = ({ effe
       </Section>
       <Section>
         <SectionHeader size="lg" color="#06b6d4" title="Sidechain" />
+        <div className="mb-3">
+          <label className="block text-xs text-text-muted mb-1.5">Sidechain Source</label>
+          <select
+            value={Math.round(sidechainSource)}
+            onChange={(e) => onUpdateParameter('sidechainSource', Number(e.target.value))}
+            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-cyan-500 focus:outline-none"
+          >
+            <option value={-1}>Self (Internal)</option>
+            {Array.from({ length: channelCount }, (_, i) => (
+              <option key={i} value={i}>{channelNames[i] || `CH ${i + 1}`}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex justify-around items-end">
           <Knob value={scFreq} min={20} max={10000} onChange={(v) => onUpdateParameter('scFreq', v)}
             label="SC Freq" color="#06b6d4" formatValue={(v) => `${Math.round(v)} Hz`} />
