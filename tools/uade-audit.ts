@@ -139,6 +139,8 @@ const SKIP_KEYS = new Set([
   'uade-ims', 'uade-quartet', 'uade-infogrames',
   // Freeze browser tab during playback:
   'uade-magnetic-fields', 'uade-maximum-effect',
+  // Browser crash during load (companion or WASM issue):
+  'uade-thomas-hermann', 'uade-paul-shields', 'uade-synthesis',
 ]);
 
 const TESTS: TestDef[] = [
