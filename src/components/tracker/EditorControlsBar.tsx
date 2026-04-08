@@ -91,8 +91,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const { quality, averageFps: avgFps } = fps;
 
   return (
-    <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px]">
-      <div className="flex items-center gap-2">
+    <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px] overflow-hidden">
+      <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-hidden">
         {/* Hardware System Preset Selector */}
         <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
@@ -339,7 +339,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
       {/* FPS / Quality Indicator - Compact */}
       <div
         className={`
-          flex items-center gap-1 px-2 py-0.5 text-xs rounded font-mono
+          flex-shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded font-mono
           ${quality === 'low'
             ? 'bg-accent-error/20 text-accent-error'
             : quality === 'medium'
