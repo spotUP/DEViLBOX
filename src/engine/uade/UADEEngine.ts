@@ -605,6 +605,10 @@ export class UADEEngine {
       'aps', 'sas', 'mso', 'ml', 'rho', 'dln', 'core', 'hot', 'wb', 'dh',
       'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
       'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+      'mc', 'mcr', 'mco',  // MarkCooksey
+      'jmf',    // JankoMrsicFlogel
+      'kh',     // KrisHatlelid
+      'thm',    // ThomasHermann
     ]);
     const SKIP_SCAN_PREFIXES = new Set([
       'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
@@ -613,6 +617,11 @@ export class UADEEngine {
       'dns', 'mk2', 'mkii', 'ash', 'rho', 'core', 'hot', 'wb', 'dh',
       'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
       'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+      'mc', 'mcr', 'mco',  // MarkCooksey
+      'jmf',    // JankoMrsicFlogel
+      'kh',     // KrisHatlelid
+      'thm', 'smp',  // ThomasHermann
+      'mfp',    // MagneticFieldsPacker
     ]);
     const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
     await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong);

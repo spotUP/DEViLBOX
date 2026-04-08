@@ -720,6 +720,8 @@ export async function tryRouteFormat(
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);
+    song.uadeEditableFileData = buffer.slice(0) as ArrayBuffer;
+    song.uadeEditableFileName = originalFileName;
     return song;
   }
 
@@ -1399,9 +1401,9 @@ export async function tryRouteFormat(
 
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
   // UADE enhanced scan reconstructs patterns from Paula register captures.
-  if (matchesExt(filename, ['qpa', 'sqt', 'qts'])) {
+  if (matchesExt(filename, ['qpa', 'sqt', 'qts', '4v'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const qFile = toUADEPrefixName(originalFileName, ['qpa', 'sqt', 'qts']);
+    const qFile = toUADEPrefixName(originalFileName, ['qpa', 'sqt', 'qts', '4v']);
     const song = await parseUADEFile(buffer, qFile, 'enhanced', subsong, preScannedMeta);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = qFile;
@@ -1601,15 +1603,6 @@ export async function tryRouteFormat(
     return withNativeThenUADE('tomyTracker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTomyTrackerFormat(buf as ArrayBuffer)) return parseTomyTrackerFile(buf as ArrayBuffer, name); return null; },
       'TomyTrackerParser', { injectUADE: true });
-  }
-
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
-  if (matchesExt(filename, ['ims'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = originalFileName;
-    return song;
   }
 
   // ── Fashion Tracker (EX.* prefix) ────────────────────────────────────────
