@@ -159,13 +159,17 @@ export async function tryRouteFormat(
 
   // ── DigiBooster ──────────────────────────────────────────────────────────
   // .digi files come in two sub-formats:
-  //   DBMX / DBM0 magic  → DigiBoosterParser (native, full decode)
+  //   DBMX / DBM0 magic  → DigiBoosterParser (native, full decode) + OpenMPT audio
   //   "DIGI Boo..." text  → old DigiBooster 1.x text-header; handled by OpenMPT
+  // OpenMPT handles audio for both — UADE produces silence for DigiBooster.
   if (filename.endsWith('.digi')) {
     if (ctx.prefs.digi !== 'uade') {
       const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
       try {
-        return injectUADEPlayback(parseDigiBoosterFile(ctx.buffer, ctx.originalFileName), ctx);
+        const song = parseDigiBoosterFile(ctx.buffer, ctx.originalFileName);
+        // Use OpenMPT for audio (UADE produces silence for DigiBooster)
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
       } catch {
         // Not DBMX/DBM0 magic — fall through to OpenMPT (handles old text-header format)
         const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
@@ -682,7 +686,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isComposer667Format(bytes)) {
           const result = parseComposer667File(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[Composer667Parser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
@@ -844,7 +848,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['unic'])) {
     try {
       const { isUNICFormat, parseUNICFile } = await import('@lib/import/formats/UNICParser');
-      if (isUNICFormat(buffer)) return parseUNICFile(buffer, originalFileName);
+      if (isUNICFormat(buffer)) {
+        const song = await parseUNICFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[UNICParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -855,7 +863,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['mtm'])) {
     try {
       const { isMTMFormat, parseMTMFile } = await import('@lib/import/formats/MTMParser');
-      if (isMTMFormat(buffer)) return parseMTMFile(buffer, originalFileName);
+      if (isMTMFormat(buffer)) {
+        const song = await parseMTMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[MTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -866,7 +878,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['669'])) {
     try {
       const { is669Format, parse669File } = await import('@lib/import/formats/Format669Parser');
-      if (is669Format(buffer)) return parse669File(buffer, originalFileName);
+      if (is669Format(buffer)) {
+        const song = await parse669File(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[Format669Parser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -877,7 +893,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['far'])) {
     try {
       const { isFARFormat, parseFARFile } = await import('@lib/import/formats/FARParser');
-      if (isFARFormat(buffer)) return parseFARFile(buffer, originalFileName);
+      if (isFARFormat(buffer)) {
+        const song = await parseFARFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[FARParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -888,7 +908,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['plm'])) {
     try {
       const { isPLMFormat, parsePLMFile } = await import('@lib/import/formats/PLMParser');
-      if (isPLMFormat(buffer)) return parsePLMFile(buffer, originalFileName);
+      if (isPLMFormat(buffer)) {
+        const song = await parsePLMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[PLMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -899,7 +923,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['ult'])) {
     try {
       const { isULTFormat, parseULTFile } = await import('@lib/import/formats/ULTParser');
-      if (isULTFormat(buffer)) return parseULTFile(buffer, originalFileName);
+      if (isULTFormat(buffer)) {
+        const song = await parseULTFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[ULTParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -910,7 +938,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['rtm'])) {
     try {
       const { isRTMFormat, parseRTMFile } = await import('@lib/import/formats/RTMParser');
-      if (isRTMFormat(buffer)) return parseRTMFile(buffer, originalFileName);
+      if (isRTMFormat(buffer)) {
+        const song = await parseRTMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[RTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -921,7 +953,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['dsm'])) {
     try {
       const { isDSMFormat, parseDSMFile } = await import('@lib/import/formats/DSMParser');
-      if (isDSMFormat(buffer)) return parseDSMFile(buffer, originalFileName);
+      if (isDSMFormat(buffer)) {
+        const song = await parseDSMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[DSMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -932,7 +968,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['dtm'])) {
     try {
       const { isDTMFormat, parseDTMFile } = await import('@lib/import/formats/DTMParser');
-      if (isDTMFormat(buffer)) return parseDTMFile(buffer, originalFileName);
+      if (isDTMFormat(buffer)) {
+        const song = await parseDTMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[DTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -943,7 +983,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['stm'])) {
     try {
       const { isSTMFormat, parseSTMFile } = await import('@lib/import/formats/STMParser');
-      if (isSTMFormat(buffer)) return parseSTMFile(buffer, originalFileName);
+      if (isSTMFormat(buffer)) {
+        const song = await parseSTMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[STMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -954,7 +998,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['stx'])) {
     try {
       const { isSTXFormat, parseSTXFile } = await import('@lib/import/formats/STXParser');
-      if (isSTXFormat(buffer)) return parseSTXFile(buffer, originalFileName);
+      if (isSTXFormat(buffer)) {
+        const song = parseSTXFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[STXParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -965,7 +1013,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['nru'])) {
     try {
       const { isNRUFormat, parseNRUFile } = await import('@lib/import/formats/NRUParser');
-      if (isNRUFormat(buffer)) return parseNRUFile(buffer, originalFileName);
+      if (isNRUFormat(buffer)) {
+        const song = await parseNRUFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[NRUParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -976,7 +1028,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['ptm'])) {
     try {
       const { isPTMFormat, parsePTMFile } = await import('@lib/import/formats/PTMParser');
-      if (isPTMFormat(buffer)) return parsePTMFile(buffer, originalFileName);
+      if (isPTMFormat(buffer)) {
+        const song = await parsePTMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[PTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -987,7 +1043,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['gdm'])) {
     try {
       const { isGDMFormat, parseGDMFile } = await import('@lib/import/formats/GDMParser');
-      if (isGDMFormat(buffer)) return parseGDMFile(buffer, originalFileName);
+      if (isGDMFormat(buffer)) {
+        const song = await parseGDMFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[GDMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -998,7 +1058,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['stk'])) {
     try {
       const { isSTKFormat, parseSTKFile } = await import('@lib/import/formats/STKParser');
-      if (isSTKFormat(buffer)) return parseSTKFile(buffer, originalFileName);
+      if (isSTKFormat(buffer)) {
+        const song = await parseSTKFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[STKParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -1009,7 +1073,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['stp'])) {
     try {
       const { isSTPFormat, parseSTPFile } = await import('@lib/import/formats/STPParser');
-      if (isSTPFormat(buffer)) return parseSTPFile(buffer, originalFileName);
+      if (isSTPFormat(buffer)) {
+        const song = await parseSTPFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[STPParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -1020,7 +1088,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['mdl'])) {
     try {
       const { isMDLFormat, parseMDLFile } = await import('@lib/import/formats/MDLParser');
-      if (isMDLFormat(buffer)) return parseMDLFile(buffer, originalFileName);
+      if (isMDLFormat(buffer)) {
+        const song = await parseMDLFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[MDLParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -1031,7 +1103,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['amf'])) {
     try {
       const { isAMFFormat, parseAMFFile } = await import('@lib/import/formats/AMFParser');
-      if (isAMFFormat(buffer)) return parseAMFFile(buffer, originalFileName);
+      if (isAMFFormat(buffer)) {
+        const song = await parseAMFFile(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
     } catch (err) {
       console.warn(`[AMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
@@ -1046,7 +1122,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isImagoOrpheusFormat(bytes)) {
           const result = parseImagoOrpheusFile(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[ImagoOrpheusParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
@@ -1063,7 +1139,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isCDFM67Format(bytes)) {
           const result = parseCDFM67File(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[CDFM67Parser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
@@ -1080,7 +1156,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isEasyTraxFormat(bytes)) {
           const result = parseEasyTraxFile(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[EasyTraxParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
@@ -1097,7 +1173,7 @@ export async function tryRouteFormat(
       const bytes = new Uint8Array(buffer);
       if (isKarlMortonFormat(bytes)) {
         const result = parseKarlMortonFile(bytes, originalFileName);
-        if (result) return result;
+        if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
       }
     } catch (err) {
       console.warn(`[KarlMortonParser] Native parse failed for ${filename}:`, err);
@@ -1125,7 +1201,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isXMFFormat(bytes)) {
           const result = parseXMFFile(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[XMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
@@ -1142,7 +1218,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isUAXFormat(bytes)) {
           const result = parseUAXFile(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         throw new Error(`[UAXParser] Failed to parse ${filename}: ${err}`);
@@ -1160,7 +1236,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isFMTrackerFormat(bytes)) {
           const result = parseFMTrackerFile(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[FMTrackerParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
@@ -1178,7 +1254,7 @@ export async function tryRouteFormat(
         const bytes = new Uint8Array(buffer);
         if (isMadTracker2Format(bytes)) {
           const result = parseMadTracker2File(bytes, originalFileName);
-          if (result) return result;
+          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
         }
       } catch (err) {
         console.warn(`[MadTracker2Parser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
@@ -1197,7 +1273,7 @@ export async function tryRouteFormat(
       const bytes = new Uint8Array(buffer);
       if (isPSMFormat(bytes)) {
         const result = parsePSMFile(bytes, originalFileName);
-        if (result) return result;
+        if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
       }
     } catch (err) {
       console.warn(`[PSMParser] Native parse failed for ${filename}, falling back:`, err);
