@@ -31,6 +31,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private sidechainInput: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ param: string; value: number }> = [];
@@ -58,6 +59,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
     this.output  = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
+    this.sidechainInput = new Tone.Gain(1);
 
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
@@ -73,7 +75,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
       await SidechainLimiterEffect.ensureInitialized(rawCtx);
 
       this.workletNode = new AudioWorkletNode(rawCtx, 'sidechain-limiter-processor', {
-        numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+        numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [2],
       });
 
       this.workletNode.port.onmessage = (e) => {
@@ -89,6 +91,9 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
+            // Connect sidechain input to worklet's 2nd input
+            const rawSc = getNativeAudioNode(this.sidechainInput)!;
+            if (rawSc) rawSc.connect(this.workletNode!, 0, 1);
             // Now safe to disconnect passthrough
             try { this.input.disconnect(this.wetGain); } catch { /* */ }
             // Keepalive: ensure Chrome schedules the worklet
@@ -161,6 +166,10 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._wet;
   }
 
+  getSidechainInput(): Tone.Gain {
+    return this.sidechainInput;
+  }
+
   setParam(param: string, value: number): void {
     switch (param) {
       case 'ceiling': this.ceiling = value; break;
@@ -177,7 +186,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
       try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
-    this.dryGain.dispose(); this.wetGain.dispose();
+    this.dryGain.dispose(); this.wetGain.dispose(); this.sidechainInput.dispose();
     this.input.dispose(); this.output.dispose();
     super.dispose();
     return this;

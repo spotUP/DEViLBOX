@@ -57,6 +57,7 @@ import {
   ReverseDelayEditor, VintageDelayEditor, ArtisticDelayEditor, SlapbackDelayEditor, ZamDelayEditor, DellaEditor,
   BinauralPannerEditor, HaasEnhancerEditor, MultiSpreadEditor, MultibandEnhancerEditor, VihdaEditor,
   MashaEditor, BittaEditor, VinylEditor,
+  EQ8BandEditor, EQ12BandEditor, GEQ31Editor,
 } from './EQModReverbEditors';
 
 // Re-export all editors
@@ -161,9 +162,9 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   // Zynthian-ported EQ effects
   ParametricEQ: ParametricEQEditor,
   EQ5Band: EQ5BandEditor,
-  EQ8Band: GenericEffectEditor,
-  EQ12Band: GenericEffectEditor,
-  GEQ31: GenericEffectEditor,
+  EQ8Band: EQ8BandEditor,
+  EQ12Band: EQ12BandEditor,
+  GEQ31: GEQ31Editor,
   ZamEQ2: ZamEQ2Editor,
   PhonoFilter: PhonoFilterEditor,
   DynamicEQ: DynamicEQEditor,

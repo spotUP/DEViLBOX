@@ -823,12 +823,40 @@ const wasmEffects: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const { EQ8BandEffect } = await import('@engine/effects/EQ8BandEffect');
+      const p = c.parameters;
       return new EQ8BandEffect({
-
+        hpFreq: Number(p.hpFreq) || 20,
+        lpFreq: Number(p.lpFreq) || 20000,
+        lowShelfFreq: Number(p.lowShelfFreq) || 100,
+        lowShelfGain: Number(p.lowShelfGain) || 0,
+        peak1Freq: Number(p.peak1Freq) || 250,
+        peak1Gain: Number(p.peak1Gain) || 0,
+        peak1Q: Number(p.peak1Q) || 1,
+        peak2Freq: Number(p.peak2Freq) || 1000,
+        peak2Gain: Number(p.peak2Gain) || 0,
+        peak2Q: Number(p.peak2Q) || 1,
+        peak3Freq: Number(p.peak3Freq) || 3500,
+        peak3Gain: Number(p.peak3Gain) || 0,
+        peak3Q: Number(p.peak3Q) || 1,
+        peak4Freq: Number(p.peak4Freq) || 8000,
+        peak4Gain: Number(p.peak4Gain) || 0,
+        peak4Q: Number(p.peak4Q) || 1,
+        highShelfFreq: Number(p.highShelfFreq) || 8000,
+        highShelfGain: Number(p.highShelfGain) || 0,
+        mix: Number(p.mix) ?? 1,
         wet: c.wet / 100,
       });
     },
-    getDefaultParameters: () => ({  }),
+    getDefaultParameters: () => ({
+      hpFreq: 20, lpFreq: 20000,
+      lowShelfFreq: 100, lowShelfGain: 0,
+      peak1Freq: 250, peak1Gain: 0, peak1Q: 1,
+      peak2Freq: 1000, peak2Gain: 0, peak2Q: 1,
+      peak3Freq: 3500, peak3Gain: 0, peak3Q: 1,
+      peak4Freq: 8000, peak4Gain: 0, peak4Q: 1,
+      highShelfFreq: 8000, highShelfGain: 0,
+      mix: 1,
+    }),
   },
   {
     id: 'EQ12Band', name: '12-Band EQ', category: 'wasm', group: 'EQ & Filter',
@@ -836,12 +864,21 @@ const wasmEffects: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const { EQ12BandEffect } = await import('@engine/effects/EQ12BandEffect');
       const p = c.parameters;
-      return new EQ12BandEffect({
+      const eq = new EQ12BandEffect({
         mix: Number(p.mix) ?? 1,
         wet: c.wet / 100,
       });
+      for (let i = 0; i < 12; i++) {
+        if (p[`gain_${i}`] != null) eq.setBandGain(i, Number(p[`gain_${i}`]));
+        if (p[`q_${i}`] != null) eq.setBandQ(i, Number(p[`q_${i}`]));
+      }
+      return eq;
     },
-    getDefaultParameters: () => ({ mix: 1 }),
+    getDefaultParameters: () => {
+      const params: Record<string, number> = { mix: 1 };
+      for (let i = 0; i < 12; i++) { params[`gain_${i}`] = 0; params[`q_${i}`] = 1; }
+      return params;
+    },
   },
   {
     id: 'GEQ31', name: '31-Band Graphic EQ', category: 'wasm', group: 'EQ & Filter',
@@ -849,12 +886,20 @@ const wasmEffects: EffectDescriptor[] = [
     create: async (c: EffectConfig) => {
       const { GEQ31Effect } = await import('@engine/effects/GEQ31Effect');
       const p = c.parameters;
-      return new GEQ31Effect({
+      const eq = new GEQ31Effect({
         mix: Number(p.mix) ?? 1,
         wet: c.wet / 100,
       });
+      for (let i = 0; i < 31; i++) {
+        if (p[`band_${i}`] != null) eq.setBandGain(i, Number(p[`band_${i}`]));
+      }
+      return eq;
     },
-    getDefaultParameters: () => ({ mix: 1 }),
+    getDefaultParameters: () => {
+      const params: Record<string, number> = { mix: 1 };
+      for (let i = 0; i < 31; i++) { params[`band_${i}`] = 0; }
+      return params;
+    },
   },
   {
     id: 'ZamEQ2', name: 'ZAM EQ2', category: 'wasm', group: 'EQ & Filter',

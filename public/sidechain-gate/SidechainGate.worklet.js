@@ -1,5 +1,6 @@
 /**
  * SidechainGate.worklet.js — AudioWorklet processor for SidechainGate WASM effect.
+ * Supports 2 inputs: input[0] = audio, input[1] = external sidechain (optional).
  */
 if (typeof URL === 'undefined') {
   globalThis.URL = class URL {
@@ -37,11 +38,15 @@ async function getOrCreateModule(wasmBinary, jsCode) {
 }
 
 class SidechainGateProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() { return []; }
+
   constructor() {
     super();
     this.handle = -1; this.isInitialized = false; this.pendingMessages = []; this.Module = null;
     this.inputPtrL = 0; this.inputPtrR = 0; this.outputPtrL = 0; this.outputPtrR = 0;
+    this.scPtrL = 0; this.scPtrR = 0;
     this.inputBufferL = null; this.inputBufferR = null; this.outputBufferL = null; this.outputBufferR = null;
+    this.scBufferL = null; this.scBufferR = null;
     this._wasmMemory = null;
     this.port.onmessage = this.handleMessage.bind(this);
   }
@@ -65,6 +70,8 @@ class SidechainGateProcessor extends AudioWorkletProcessor {
       if (this.inputPtrR) this.Module._free(this.inputPtrR);
       if (this.outputPtrL) this.Module._free(this.outputPtrL);
       if (this.outputPtrR) this.Module._free(this.outputPtrR);
+      if (this.scPtrL) this.Module._free(this.scPtrL);
+      if (this.scPtrR) this.Module._free(this.scPtrR);
     }
     this.handle = -1; this.isInitialized = false;
   }
@@ -77,6 +84,7 @@ class SidechainGateProcessor extends AudioWorkletProcessor {
       const bs = 128 * 4;
       this.inputPtrL = M._malloc(bs); this.inputPtrR = M._malloc(bs);
       this.outputPtrL = M._malloc(bs); this.outputPtrR = M._malloc(bs);
+      this.scPtrL = M._malloc(bs); this.scPtrR = M._malloc(bs);
       const mem = M.wasmMemory;
       const buf = M.HEAPF32 ? M.HEAPF32.buffer : (mem ? mem.buffer : null);
       if (!buf) throw new Error('No WASM memory');
@@ -85,6 +93,8 @@ class SidechainGateProcessor extends AudioWorkletProcessor {
       this.inputBufferR = new Float32Array(buf, this.inputPtrR, 128);
       this.outputBufferL = new Float32Array(buf, this.outputPtrL, 128);
       this.outputBufferR = new Float32Array(buf, this.outputPtrR, 128);
+      this.scBufferL = new Float32Array(buf, this.scPtrL, 128);
+      this.scBufferR = new Float32Array(buf, this.scPtrR, 128);
       this.Module = M; this.isInitialized = true;
       for (const msg of this.pendingMessages) this.handleMessage({ data: msg });
       this.pendingMessages = [];
@@ -108,9 +118,21 @@ class SidechainGateProcessor extends AudioWorkletProcessor {
         this.inputBufferR = new Float32Array(cur, this.inputPtrR, 128);
         this.outputBufferL = new Float32Array(cur, this.outputPtrL, 128);
         this.outputBufferR = new Float32Array(cur, this.outputPtrR, 128);
+        this.scBufferL = new Float32Array(cur, this.scPtrL, 128);
+        this.scBufferR = new Float32Array(cur, this.scPtrR, 128);
       }
       this.inputBufferL.set(inL.subarray(0, n)); this.inputBufferR.set(inR.subarray(0, n));
-      this.Module._sidechain_gate_process(this.handle, this.inputPtrL, this.inputPtrR, this.outputPtrL, this.outputPtrR, n);
+
+      // Check if external sidechain input is connected (inputs[1])
+      const sc = inputs[1];
+      const hasExtSc = sc && sc[0] && sc[0].length > 0;
+      if (hasExtSc) {
+        this.scBufferL.set(sc[0].subarray(0, n));
+        this.scBufferR.set((sc[1] || sc[0]).subarray(0, n));
+        this.Module._sidechain_gate_process_ext(this.handle, this.inputPtrL, this.inputPtrR, this.scPtrL, this.scPtrR, this.outputPtrL, this.outputPtrR, n);
+      } else {
+        this.Module._sidechain_gate_process(this.handle, this.inputPtrL, this.inputPtrR, this.outputPtrL, this.outputPtrR, n);
+      }
       outL.set(this.outputBufferL.subarray(0, n)); outR.set(this.outputBufferR.subarray(0, n));
     } catch (e) { outL.set(inL); outR.set(inR); }
     return true;

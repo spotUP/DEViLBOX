@@ -74,11 +74,15 @@ struct Instance {
     }
 
     void process(const float* inL, const float* inR, float* outL, float* outR, int n) {
+        processExt(inL, inR, inL, inR, outL, outR, n);
+    }
+
+    void processExt(const float* inL, const float* inR, const float* scInL, const float* scInR, float* outL, float* outR, int n) {
         float threshLin = std::pow(10.0f, threshold / 20.0f);
         for (int i = 0; i < n; i++) {
-            // Sidechain: bandpass filtered input
-            float scL = bpL.process(inL[i]);
-            float scR = bpR.process(inR[i]);
+            // Sidechain: bandpass filtered sidechain input
+            float scL = bpL.process(scInL[i]);
+            float scR = bpR.process(scInR[i]);
             float scPeak = std::max(std::abs(scL), std::abs(scR));
 
             // Envelope follower
@@ -126,6 +130,12 @@ EMSCRIPTEN_KEEPALIVE void sidechain_gate_process(int h, float* iL, float* iR, fl
         if (oL && iL) std::memcpy(oL, iL, n * 4); if (oR && iR) std::memcpy(oR, iR, n * 4); return;
     }
     instances[h].process(iL, iR, oL, oR, n);
+}
+EMSCRIPTEN_KEEPALIVE void sidechain_gate_process_ext(int h, float* iL, float* iR, float* scL, float* scR, float* oL, float* oR, int n) {
+    if (h < 0 || h >= MAX_INSTANCES || !instances[h].active) {
+        if (oL && iL) std::memcpy(oL, iL, n * 4); if (oR && iR) std::memcpy(oR, iR, n * 4); return;
+    }
+    instances[h].processExt(iL, iR, scL, scR, oL, oR, n);
 }
 EMSCRIPTEN_KEEPALIVE void sidechain_gate_set_threshold(int h, float v) {
     if (h >= 0 && h < MAX_INSTANCES && instances[h].active) instances[h].threshold = std::clamp(v, -80.0f, 0.0f);

@@ -55,6 +55,7 @@ export class UADESynth implements DevilboxSynth {
         'sb',     // SteveBarrett
         'ps',     // PaulShields
         'sng',    // RichardJoseph
+        'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
       ]);
       const SKIP_SCAN_PREFIXES = new Set([
         'dl', 'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
@@ -69,6 +70,7 @@ export class UADESynth implements DevilboxSynth {
         'mfp',    // MagneticFieldsPacker
         'sb',     // SteveBarrett
         'ps',     // PaulShields
+        'sjs',    // SoundPlayer — compiled 68k replayer
       ]);
       const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
       // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading.
