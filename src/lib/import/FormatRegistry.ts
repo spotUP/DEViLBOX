@@ -9,6 +9,7 @@
  */
 
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
+import { isUADEFormat } from './formats/UADEParser';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2260,9 +2261,12 @@ export function isSupportedFormat(filename: string): boolean {
   // Check prefix-based formats (both prefix.name and name.prefix)
   const base = getBasename(lower);
   const extNoDot = ext.slice(1); // '.sog' → 'sog'
-  return FORMAT_REGISTRY.some(fmt =>
+  if (FORMAT_REGISTRY.some(fmt =>
     fmt.prefixes?.some(p => base.startsWith(p) || p === `${extNoDot}.`)
-  );
+  )) return true;
+  // Fallback: check UADE extension/prefix list (covers ~80 PTK-Prowiz packed
+  // format variants and other UADE-only formats not in the FORMAT_REGISTRY)
+  return isUADEFormat(lower);
 }
 
 /**
