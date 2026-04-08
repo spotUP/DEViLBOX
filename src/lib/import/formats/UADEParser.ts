@@ -496,6 +496,9 @@ export async function parseUADEFile(
     'jmf',    // JankoMrsicFlogel — compiled 68k replayer, crashes browser
     'kh',     // KrisHatlelid — compiled 68k replayer
     'thm',    // ThomasHermann — compiled 68k replayer
+    'sb',     // SteveBarrett — compiled 68k replayer, scan crashes browser
+    'ps',     // PaulShields — compiled 68k replayer, scan crashes browser
+    'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -514,6 +517,9 @@ export async function parseUADEFile(
     'kh',     // KrisHatlelid
     'thm', 'smp',  // ThomasHermann (thm.* and smp.* prefixes)
     'mfp',    // MagneticFieldsPacker (needs companion smp.* file)
+    'sb',     // SteveBarrett — compiled 68k replayer
+    'ps',     // PaulShields — compiled 68k replayer
+    'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
   // hangs indefinitely, crashes the browser, or corrupts engine state. Skip scan for these.

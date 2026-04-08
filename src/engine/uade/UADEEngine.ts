@@ -609,6 +609,9 @@ export class UADEEngine {
       'jmf',    // JankoMrsicFlogel
       'kh',     // KrisHatlelid
       'thm',    // ThomasHermann
+      'sb',     // SteveBarrett — compiled 68k replayer
+      'ps',     // PaulShields — compiled 68k replayer
+      'sng',    // RichardJoseph — compiled 68k replayer
     ]);
     const SKIP_SCAN_PREFIXES = new Set([
       'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
@@ -622,6 +625,8 @@ export class UADEEngine {
       'kh',     // KrisHatlelid
       'thm', 'smp',  // ThomasHermann
       'mfp',    // MagneticFieldsPacker
+      'sb',     // SteveBarrett — compiled 68k replayer
+      'ps',     // PaulShields — compiled 68k replayer
     ]);
     const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
 

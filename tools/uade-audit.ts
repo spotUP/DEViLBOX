@@ -137,6 +137,8 @@ const SKIP_KEYS = new Set([
   'uade-peter-verswyvelen', 'uade-ron-klaren',
   // Timeout or browser crash during load:
   'uade-ims', 'uade-quartet', 'uade-infogrames',
+  // Freeze browser tab during playback:
+  'uade-magnetic-fields', 'uade-maximum-effect',
 ]);
 
 const TESTS: TestDef[] = [
