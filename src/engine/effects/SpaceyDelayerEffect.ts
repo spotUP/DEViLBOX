@@ -2,8 +2,15 @@
  * SpaceyDelayerEffect - WASM-backed multitap tape delay effect
  *
  * Wraps the SpaceyDelayer C++ DSP engine compiled to WebAssembly.
- * Provides a Tone.ToneAudioNode-compatible interface for use in
- * instrument, channel, and master effect chains.
+ * Uses a native WebAudio DelayNode fallback that runs immediately,
+ * then upgrades to WASM when available.
+ *
+ * Follows MVerb's proven pattern:
+ *   - rawContext for WASM, getNativeAudioNode for node connections
+ *   - Connect WASM first, then disconnect fallback (no silent gap)
+ *   - Keepalive connection to destination (ensures worklet scheduling)
+ *   - Send wetness=1.0 to WASM (external dryGain/wetGain handles mix)
+ *   - Last-resort Tone.js fallback if native node access fails
  *
  * Parameters:
  *   - firstTap: Delay time before first echo (10-2000 ms)
@@ -15,7 +22,7 @@
  */
 
 import * as Tone from 'tone';
-import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
+import { getNativeAudioNode } from '@utils/audio-context';
 
 export interface SpaceyDelayerOptions {
   firstTap?: number;    // ms (10-2000)
@@ -44,6 +51,12 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
   private _wasmReady = false;
   private _options: Required<SpaceyDelayerOptions>;
 
+  // JS fallback nodes (native WebAudio delay)
+  private fallbackDelay: DelayNode | null = null;
+  private fallbackFeedback: GainNode | null = null;
+  private fallbackFilter: BiquadFilterNode | null = null;
+  private _usingFallback = false;
+
   constructor(options: SpaceyDelayerOptions = {}) {
     super();
 
@@ -59,32 +72,109 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // Dry/wet mixing via parallel paths
-    // WASM outputs wet-only signal; we mix externally.
-    // Start full-dry until worklet is ready — prevents silence while WASM loads.
-    this.dryGain = new Tone.Gain(1);
-    this.wetGain = new Tone.Gain(0);
+    // Start with correct dry/wet from the beginning
+    this.dryGain = new Tone.Gain(1 - this._options.wet);
+    this.wetGain = new Tone.Gain(this._options.wet);
 
-    // Dry path: input → dryGain → output (always connected)
+    // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
-
-    // Wet path output connected immediately so audio isn't silent while WASM loads
     this.wetGain.connect(this.output);
 
-    this.initialize();
+    // Initialize JS fallback immediately, then try WASM
+    this.initFallback();
+    this.initWasm();
   }
 
-  private async initialize(): Promise<void> {
+  /** JS fallback using native WebAudio DelayNode — runs immediately */
+  private initFallback(): void {
     try {
-      const nativeCtx = getNativeContext(this.context);
-      if (!nativeCtx) throw new Error('Could not get native AudioContext');
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+      const inputNode = getNativeAudioNode(this.input);
+      const wetNode = getNativeAudioNode(this.wetGain);
 
-      await SpaceyDelayerEffect.ensureModuleLoaded(nativeCtx);
+      if (!inputNode || !wetNode) {
+        // Last resort: pure Tone.js connection (no delay, but at least not silent)
+        console.warn('[SpaceyDelayer] Native node access failed — using Tone.js passthrough');
+        this.input.connect(this.wetGain);
+        return;
+      }
+
+      this.fallbackDelay = rawContext.createDelay(2.0);
+      this.fallbackFeedback = rawContext.createGain();
+      this.fallbackFilter = rawContext.createBiquadFilter();
+
+      // Configure
+      this.fallbackDelay.delayTime.value = this._options.firstTap / 1000;
+      this.fallbackFeedback.gain.value = this._options.feedback / 100;
+      this.fallbackFilter.type = 'lowpass';
+      this.fallbackFilter.frequency.value = this._options.tapeFilter ? 3000 : 20000;
+
+      // Routing: input → delay → filter → wetGain, with feedback loop
+      inputNode.connect(this.fallbackDelay);
+      this.fallbackDelay.connect(this.fallbackFilter);
+      this.fallbackFilter.connect(wetNode);
+      this.fallbackFilter.connect(this.fallbackFeedback);
+      this.fallbackFeedback.connect(this.fallbackDelay);
+
+      this._usingFallback = true;
+    } catch (err) {
+      console.warn('[SpaceyDelayer] JS fallback init failed:', err);
+      // Last resort: Tone.js passthrough
+      try { this.input.connect(this.wetGain); } catch { /* ignored */ }
+    }
+  }
+
+  /** Disconnect JS fallback when WASM takes over */
+  private disconnectFallback(): void {
+    if (!this._usingFallback) return;
+    try {
+      this.fallbackDelay?.disconnect();
+      this.fallbackFeedback?.disconnect();
+      this.fallbackFilter?.disconnect();
+    } catch { /* already disconnected */ }
+    this._usingFallback = false;
+  }
+
+  /** Swap from JS fallback to WASM — connect first, then disconnect (MVerb pattern) */
+  private swapToWasm(): void {
+    if (!this.workletNode) return;
+    try {
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+      const rawInput = getNativeAudioNode(this.input);
+      const rawWet = getNativeAudioNode(this.wetGain);
+
+      if (!rawInput || !rawWet) {
+        console.warn('[SpaceyDelayer] Cannot swap to WASM — native node access failed');
+        return;
+      }
+
+      // Connect WASM FIRST, then disconnect fallback (avoids silent gap)
+      rawInput.connect(this.workletNode);
+      this.workletNode.connect(rawWet);
+
+      // Keepalive: ensure AudioWorklet is scheduled even if chain is complex
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.workletNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+
+      // Now safe to disconnect fallback
+      this.disconnectFallback();
+    } catch (err) {
+      console.warn('[SpaceyDelayer] WASM swap failed, staying on fallback:', err);
+    }
+  }
+
+  /** Try to initialize WASM worklet in background */
+  private async initWasm(): Promise<void> {
+    try {
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+
+      await SpaceyDelayerEffect.ensureModuleLoaded(rawContext);
       if (this._disposed) return;
 
-      // Create AudioWorkletNode
-      this.workletNode = new AudioWorkletNode(nativeCtx, 'spacey-delayer-processor', {
+      this.workletNode = new AudioWorkletNode(rawContext, 'spacey-delayer-processor', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [2],
@@ -95,49 +185,35 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this._wasmReady = true;
-          // WASM ready — send params and apply the true wet/dry levels
+          // WASM handles DSP only — external dryGain/wetGain handles mix
+          this.sendParam('wetness', 1.0);
           this.sendParam('firstTap', this._options.firstTap);
           this.sendParam('tapSize', this._options.tapSize);
           this.sendParam('feedback', this._options.feedback);
           this.sendParam('multiTap', this._options.multiTap);
           this.sendParam('tapeFilter', this._options.tapeFilter);
-          // Worklet producing output — apply correct wet/dry mix
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+
+          this.swapToWasm();
         } else if (event.data.type === 'error') {
-          console.error('[SpaceyDelayer] Worklet error:', event.data.message);
-          // WASM failed — enable wet path as passthrough so effect isn't stuck silent
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+          console.warn('[SpaceyDelayer] WASM init error, keeping JS fallback:', event.data.message);
         }
       };
 
-      // Send init with WASM data
       this.workletNode.port.postMessage({
         type: 'init',
-        sampleRate: nativeCtx.sampleRate,
+        sampleRate: rawContext.sampleRate,
         wasmBinary: wasmBinary,
         jsCode: jsCode,
       });
 
-      // Connect wet path: input → workletNode → wetGain (already connected to output)
-      // Use getNativeAudioNode() to extract the underlying native AudioNode — Tone.connect()
-      // silently fails when crossing standardized-audio-context ↔ native AudioContext.
-      getNativeAudioNode(this.input)!.connect(this.workletNode);
-      this.workletNode.connect(getNativeAudioNode(this.wetGain)!);
-
-      // Safety timeout: if WASM doesn't report ready within 5s, enable wet path
-      // (worklet does passthrough when not initialized, so audio still flows)
       setTimeout(() => {
-        if (!this._wasmReady && !this._disposed) {
-          console.warn('[SpaceyDelayer] WASM not ready after 5s — enabling wet path as passthrough');
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+        if (!this._wasmReady && !this._disposed && this.workletNode) {
+          console.warn('[SpaceyDelayer] WASM not ready after 5s — keeping JS fallback');
         }
       }, 5000);
 
     } catch (err) {
-      console.error('[SpaceyDelayer] Init failed:', err);
+      console.warn('[SpaceyDelayer] WASM init failed, using JS fallback:', err);
     }
   }
 
@@ -148,7 +224,6 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
     moduleLoadPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
 
-      // Load worklet module
       try {
         await context.audioWorklet.addModule(`${baseUrl}spacey-delayer/SpaceyDelayer.worklet.js`);
       } catch (e: unknown) {
@@ -158,7 +233,6 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
         }
       }
 
-      // Fetch WASM and JS
       if (!wasmBinary || !jsCode) {
         const [wasmResponse, jsResponse] = await Promise.all([
           fetch(`${baseUrl}spacey-delayer/SpaceyDelayer.wasm`),
@@ -166,7 +240,6 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
         ]);
 
         if (!wasmResponse.ok || !jsResponse.ok) {
-          // Reset so retry is possible
           moduleLoadPromise = null;
           throw new Error(`Failed to fetch SpaceyDelayer WASM/JS: wasm=${wasmResponse.status} js=${jsResponse.status}`);
         }
@@ -186,7 +259,6 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
     try {
       await moduleLoadPromise;
     } catch (err) {
-      // Reset on failure so future instances can retry
       moduleLoadPromise = null;
       moduleLoaded = false;
       throw err;
@@ -199,11 +271,31 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
     }
   }
 
+  /** Update JS fallback delay time to match firstTap */
+  private updateFallbackDelay(): void {
+    if (this.fallbackDelay) {
+      this.fallbackDelay.delayTime.value = Math.max(0.01, this._options.firstTap / 1000);
+    }
+  }
+
+  private updateFallbackFeedback(): void {
+    if (this.fallbackFeedback) {
+      this.fallbackFeedback.gain.value = this._options.feedback / 100;
+    }
+  }
+
+  private updateFallbackFilter(): void {
+    if (this.fallbackFilter) {
+      this.fallbackFilter.frequency.value = this._options.tapeFilter ? 3000 : 20000;
+    }
+  }
+
   // ---- Public parameter setters ----
 
   setFirstTap(ms: number): void {
     this._options.firstTap = Math.max(10, Math.min(ms, 2000));
     this.sendParam('firstTap', this._options.firstTap);
+    this.updateFallbackDelay();
   }
 
   setTapSize(ms: number): void {
@@ -214,6 +306,7 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
   setFeedback(pct: number): void {
     this._options.feedback = Math.max(0, Math.min(pct, 95));
     this.sendParam('feedback', this._options.feedback);
+    this.updateFallbackFeedback();
   }
 
   setMultiTap(on: boolean | number): void {
@@ -224,6 +317,7 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
   setTapeFilter(on: boolean | number): void {
     this._options.tapeFilter = on ? 1 : 0;
     this.sendParam('tapeFilter', on ? 1 : 0);
+    this.updateFallbackFilter();
   }
 
   get wet(): number { return this._options.wet; }
@@ -235,6 +329,7 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
 
   dispose(): this {
     this._disposed = true;
+    this.disconnectFallback();
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
       this.workletNode.disconnect();
