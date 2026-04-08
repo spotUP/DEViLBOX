@@ -4691,7 +4691,7 @@
   },
   "uade-gmc": {
     "auditStatus": "fail",
-    "notes": "Error: timeout:clear_console_errors"
+    "notes": "Needs retest — browser was disconnected"
   },
   "uade-graoumf-tracker": {
     "auditStatus": "fixed",
@@ -4711,7 +4711,7 @@
   },
   "uade-ims": {
     "auditStatus": "fail",
-    "notes": "Crash: timeout:load_file",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -4819,7 +4819,7 @@
   },
   "uade-ron-klaren": {
     "auditStatus": "fail",
-    "notes": "9/10 — slow load timeout",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
@@ -4907,7 +4907,7 @@
   },
   "uade-synthesis": {
     "auditStatus": "fail",
-    "notes": "Crash: Browser disconnected",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4915,7 +4915,7 @@
   },
   "uade-symphonie-pro": {
     "auditStatus": "fail",
-    "notes": "Crash: 404"
+    "notes": "Needs retest — browser was disconnected"
   },
   "uade-tcb-tracker": {
     "auditStatus": "fixed",
@@ -5019,7 +5019,7 @@
   },
   "uade-paul-shields": {
     "auditStatus": "fail",
-    "notes": "Crash: Browser disconnected",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5043,7 +5043,7 @@
   },
   "uade-thomas-hermann": {
     "auditStatus": "fail",
-    "notes": "Crash: Browser disconnected",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5079,7 +5079,7 @@
   },
   "uade-fm-tracker": {
     "auditStatus": "fail",
-    "notes": "Error: timeout:clear_console_errors"
+    "notes": "Needs retest — browser crashed during audit"
   },
   "uade-sound-master": {
     "auditStatus": "fixed",
@@ -5091,7 +5091,7 @@
   },
   "uade-sound-player": {
     "auditStatus": "fail",
-    "notes": "Error: timeout:clear_console_errors"
+    "notes": "Needs retest — browser was disconnected"
   },
   "uade-time-tracker": {
     "auditStatus": "fixed",
@@ -5111,7 +5111,7 @@
   },
   "uade-quartet": {
     "auditStatus": "fail",
-    "notes": "Crash: timeout:load_file",
+    "notes": "Needs retest — two-file format (.4v+.set)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -5171,7 +5171,7 @@
   },
   "uade-magnetic-fields": {
     "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + UADE play fail"
@@ -5207,7 +5207,7 @@
   },
   "uade-peter-verswyvelen": {
     "auditStatus": "fail",
-    "notes": "9/10 — slow load timeout, audio near-silent",
+    "notes": "Needs retest — browser was disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
@@ -7179,11 +7179,11 @@
   },
   "uade-infogrames": {
     "auditStatus": "fail",
-    "notes": "Crash: Browser disconnected"
+    "notes": "Needs retest — two-file format (.dum+.ins)"
   },
   "uade-maximum-effect": {
     "auditStatus": "fail",
-    "notes": "Crash: timeout:load_file"
+    "notes": "Needs retest — browser was disconnected"
   },
   "uade-synth-pack": {
     "auditStatus": "fixed",
