@@ -778,15 +778,73 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       // Reload the song for playback (scan consumed the song state).
       // Not needed when skipScan=true since the song state is untouched.
+      let shortScanTickData = null;
       if (!skipScan) {
-        this._wasm._uade_wasm_stop();
-        const ret2 = this._loadIntoWasm(data, filenameHint);
-        if (ret2 !== 0) {
-          console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
-        }
-        // After a short scan (compiled replayer), re-enable looping for playback.
-        if (typeof scanTimeoutSec === 'number' && scanTimeoutSec < 600) {
+        const isShortScan = typeof scanTimeoutSec === 'number' && scanTimeoutSec < 600;
+
+        if (isShortScan) {
+          // Short scan (compiled 68k replayers): the scan consumed the song state and
+          // a simple stop+reload leaves UADE's IPC/state machine corrupted. We need a
+          // full WASM reinit to get a clean playback start.
+          // First, extract tick snapshots before reinit destroys the ring buffer.
+          if (this._wasm._uade_wasm_get_tick_snapshots) {
+            const maxDrain = 32768;
+            const wordsPerSnap = 13;
+            const tickBuf = this._wasm._malloc(maxDrain * wordsPerSnap * 4);
+            if (tickBuf) {
+              const count = this._wasm._uade_wasm_get_tick_snapshots(tickBuf, maxDrain);
+              if (count > 0) {
+                const raw = new Uint32Array(this._wasm.HEAPU8.buffer, tickBuf, count * wordsPerSnap);
+                shortScanTickData = [];
+                for (let i = 0; i < count; i++) {
+                  const base = i * wordsPerSnap;
+                  const channels = [];
+                  for (let ch = 0; ch < 4; ch++) {
+                    const w0 = raw[base + 1 + ch * 3 + 0];
+                    const w1 = raw[base + 1 + ch * 3 + 1];
+                    const w2 = raw[base + 1 + ch * 3 + 2];
+                    channels.push({
+                      period:    (w0 >>> 16) & 0xFFFF,
+                      volume:    w0 & 0xFFFF,
+                      lc:        w1,
+                      len:       (w2 >>> 8) & 0xFFFF,
+                      dmaEn:     (w2 >>> 1) & 1,
+                      triggered: w2 & 1,
+                    });
+                  }
+                  shortScanTickData.push({ tick: raw[base], channels });
+                }
+                console.log('[UADE.worklet] Short scan captured ' + shortScanTickData.length + ' tick snapshots');
+              }
+              this._wasm._free(tickBuf);
+            }
+          }
+
+          // Full WASM reinit for clean playback
+          console.log('[UADE.worklet] Short scan: reinitializing WASM for clean playback...');
+          this._wasm = null;
+          this._ready = false;
+          this._hasRendered = false;
+          this._lastLoadFailed = false;
+          await this._init(this._sampleRate, this._wasmBinary, null);
+          if (!this._wasm || !this._ready) {
+            this.port.postMessage({ type: 'error', message: 'WASM reinit after short scan failed' });
+            return;
+          }
+          this._restoreCompanionFiles();
+
+          const ret2 = this._loadIntoWasm(data, filenameHint);
+          if (ret2 !== 0) {
+            console.warn('[UADE.worklet] Reload after reinit failed (ret=' + ret2 + ')');
+          }
           this._wasm._uade_wasm_set_looping(1);
+        } else {
+          // Normal scan: simple stop+reload (song completed naturally)
+          this._wasm._uade_wasm_stop();
+          const ret2 = this._loadIntoWasm(data, filenameHint);
+          if (ret2 !== 0) {
+            console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
+          }
         }
       } else {
         // Compiled replayers (skipScan=true) should loop indefinitely.
@@ -826,6 +884,11 @@ class UADEProcessor extends AudioWorkletProcessor {
           firstTick: scanResult.firstTick ?? 0,
           warnings: scanResult.warnings || [],
         };
+      }
+
+      // Include tick snapshots from short scan (ring buffer was lost during reinit)
+      if (shortScanTickData && shortScanTickData.length > 0) {
+        msg.shortScanTicks = shortScanTickData;
       }
 
       this.port.postMessage(msg);
