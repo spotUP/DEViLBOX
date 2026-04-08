@@ -19,7 +19,10 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const drive = getParam(effect, 'drive', 0.4);
+  const oversample = (effect.parameters?.oversample as string) || 'none';
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const OVERSAMPLE_OPTS = ['none', '2x', '4x'] as const;
 
   return (
     <div className="space-y-4">
@@ -27,6 +30,14 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
       <WaveshaperCurve type="Distortion" drive={drive} color="#ef4444" height={100} />
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ef4444" title="Distortion" />
+        <div className="flex justify-center gap-2 mb-4">
+          {OVERSAMPLE_OPTS.map((o) => (
+            <button key={o} onClick={() => onUpdateParameter('oversample', o)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                oversample === o ? 'bg-red-700/70 border-red-500 text-red-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-red-700'
+              }`}>{o === 'none' ? 'Off' : o}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob
             value={drive}

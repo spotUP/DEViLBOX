@@ -206,7 +206,10 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const order = getParam(effect, 'order', 2);
+  const oversample = (effect.parameters?.oversample as string) || 'none';
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const OVERSAMPLE_OPTS = ['none', '2x', '4x'] as const;
 
   return (
     <div className="space-y-4">
@@ -214,6 +217,14 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
       <WaveshaperCurve type="Chebyshev" order={order} color="#f59e0b" height={100} />
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#f59e0b" title="Chebyshev Waveshaper" />
+        <div className="flex justify-center gap-2 mb-4">
+          {OVERSAMPLE_OPTS.map((o) => (
+            <button key={o} onClick={() => onUpdateParameter('oversample', o)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                oversample === o ? 'bg-amber-700/70 border-amber-500 text-amber-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-700'
+              }`}>{o === 'none' ? 'Off' : o}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob
             value={order}

@@ -62,6 +62,7 @@ export const SaturatorEditor: React.FC<VisualEffectEditorProps> = ({ effect, onU
   const blend = getParam(effect, 'blend', 0.5);
   const preFreq = getParam(effect, 'preFreq', 20000);
   const postFreq = getParam(effect, 'postFreq', 20000);
+  const mix = getParam(effect, 'mix', 1);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
@@ -74,6 +75,8 @@ export const SaturatorEditor: React.FC<VisualEffectEditorProps> = ({ effect, onU
             label="Drive" color="#ea580c" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={blend} min={0} max={1} onChange={(v) => onUpdateParameter('blend', v)}
             label="Blend" color="#f97316" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={mix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)}
+            label="Int. Mix" color="#fb923c" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </Section>
       <Section>
@@ -100,6 +103,7 @@ export const ExciterEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
   const amount = getParam(effect, 'amount', 0.5);
   const blend = getParam(effect, 'blend', 0.5);
   const ceil = getParam(effect, 'ceil', 16000);
+  const mix = getParam(effect, 'mix', 1);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
@@ -107,7 +111,7 @@ export const ExciterEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
       <EffectOscilloscope pre={pre} post={post} color="#eab308" />
       <Section>
         <SectionHeader size="lg" color="#eab308" title="Exciter" />
-        <div className="flex justify-around items-end">
+        <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={frequency} min={500} max={12000} onChange={(v) => onUpdateParameter('frequency', v)}
             label="Frequency" color="#eab308" formatValue={(v) => `${(v / 1000).toFixed(1)}k`} />
           <Knob value={amount} min={0} max={1} onChange={(v) => onUpdateParameter('amount', v)}
@@ -116,6 +120,8 @@ export const ExciterEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
             label="Blend" color="#fde047" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={ceil} min={2000} max={20000} onChange={(v) => onUpdateParameter('ceil', v)}
             label="Ceiling" color="#fef08a" formatValue={(v) => `${(v / 1000).toFixed(1)}k`} />
+          <Knob value={mix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)}
+            label="Int. Mix" color="#fbbf24" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </Section>
       <Section>
@@ -189,29 +195,49 @@ export const SatmaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
 export const DistortionShaperEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
   const inputGain = getParam(effect, 'inputGain', 1);
   const outputGain = getParam(effect, 'outputGain', 1);
+  const point1x = getParam(effect, 'point1x', -0.5);
+  const point1y = getParam(effect, 'point1y', -0.8);
+  const point2x = getParam(effect, 'point2x', 0.5);
+  const point2y = getParam(effect, 'point2y', 0.8);
   const preLpf = getParam(effect, 'preLpf', 20000);
   const postLpf = getParam(effect, 'postLpf', 20000);
+  const mix = getParam(effect, 'mix', 1);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#991b1b" />
       <Section>
-        <SectionHeader size="lg" color="#991b1b" title="Shaper" />
+        <SectionHeader size="lg" color="#991b1b" title="Gain" />
         <div className="flex justify-around items-end">
           <Knob value={inputGain} min={0} max={4} onChange={(v) => onUpdateParameter('inputGain', v)}
             label="Input" color="#991b1b" formatValue={(v) => v.toFixed(2)} />
           <Knob value={outputGain} min={0} max={4} onChange={(v) => onUpdateParameter('outputGain', v)}
             label="Output" color="#b91c1c" formatValue={(v) => v.toFixed(2)} />
+          <Knob value={mix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)}
+            label="Int. Mix" color="#dc2626" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </Section>
       <Section>
-        <SectionHeader size="lg" color="#dc2626" title="Filters" />
+        <SectionHeader size="lg" color="#dc2626" title="Curve Shape" />
+        <div className="flex justify-around items-end flex-wrap gap-y-4">
+          <Knob value={point1x} min={-1} max={0} onChange={(v) => onUpdateParameter('point1x', v)}
+            label="P1 X" size="sm" color="#dc2626" formatValue={(v) => v.toFixed(2)} />
+          <Knob value={point1y} min={-1} max={0} onChange={(v) => onUpdateParameter('point1y', v)}
+            label="P1 Y" size="sm" color="#ef4444" formatValue={(v) => v.toFixed(2)} />
+          <Knob value={point2x} min={0} max={1} onChange={(v) => onUpdateParameter('point2x', v)}
+            label="P2 X" size="sm" color="#dc2626" formatValue={(v) => v.toFixed(2)} />
+          <Knob value={point2y} min={0} max={1} onChange={(v) => onUpdateParameter('point2y', v)}
+            label="P2 Y" size="sm" color="#ef4444" formatValue={(v) => v.toFixed(2)} />
+        </div>
+      </Section>
+      <Section>
+        <SectionHeader size="lg" color="#ef4444" title="Filters" />
         <div className="flex justify-around items-end">
           <Knob value={preLpf} min={200} max={20000} onChange={(v) => onUpdateParameter('preLpf', v)}
-            label="Pre LPF" color="#dc2626" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
+            label="Pre LPF" color="#ef4444" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
           <Knob value={postLpf} min={200} max={20000} onChange={(v) => onUpdateParameter('postLpf', v)}
-            label="Post LPF" color="#ef4444" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
+            label="Post LPF" color="#f87171" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
             label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
         </div>
