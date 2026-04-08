@@ -100,6 +100,28 @@ export async function withNativeThenUADE(
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;
           }
+          // Ensure at least a UADESynth instrument exists for audio playback.
+          // Native stub parsers may return 0 instruments — without at least one
+          // instrument the format store won't start the UADE engine.
+          if (result.instruments.length === 0) {
+            result.instruments = [{
+              id: 0,
+              name: 'UADE Audio',
+              type: 'synth' as const,
+              synthType: 'UADESynth' as const,
+              effects: [],
+              volume: -6,
+              pan: 0,
+              uade: {
+                type: 'uade' as const,
+                fileData: ctx.buffer.slice(0),
+                filename: ctx.originalFileName,
+                subsongCount: 1,
+                currentSubsong: 0,
+                metadata: { player: 'Unknown', formatName: 'Unknown', minSubsong: 0, maxSubsong: 0 },
+              },
+            }];
+          }
           return injectUADEPlayback(result, ctx);
         }
       }
