@@ -176,27 +176,77 @@ const EFFECTS: EffectTest[] = [
 
 // Effects that have custom editors (from EFFECT_EDITORS mapping)
 const HAS_EDITOR = new Set([
+  // Core Tone.js effects
   'Distortion', 'Reverb', 'Delay', 'FeedbackDelay', 'PingPongDelay', 'Chorus',
   'Phaser', 'Tremolo', 'Vibrato', 'AutoFilter', 'AutoPanner', 'AutoWah',
   'BitCrusher', 'Chebyshev', 'FrequencyShifter', 'PitchShift', 'Compressor',
-  'EQ3', 'Filter', 'JCReverb', 'StereoWidener', 'SpaceEcho', 'BiPhase',
-  'DubFilter', 'TapeSaturation', 'Tumult', 'VinylNoise', 'ToneArm',
-  'TapeSimulator', 'SidechainCompressor', 'SpaceyDelayer', 'RETapeEcho',
-  'MoogFilter', 'Vocoder', 'AutoTune', 'MVerb', 'Leslie', 'SpringReverb',
+  'EQ3', 'Filter', 'JCReverb', 'StereoWidener', 'SidechainCompressor',
+  // Custom effects
+  'SpaceEcho', 'BiPhase', 'DubFilter', 'TapeSaturation', 'Tumult', 'VinylNoise',
+  'ToneArm', 'TapeSimulator', 'SpaceyDelayer', 'RETapeEcho', 'MoogFilter',
+  'Vocoder', 'AutoTune', 'MVerb', 'Leslie', 'SpringReverb',
+  'TapeDegradation', 'AmbientDelay', 'ShimmerReverb', 'GranularFreeze',
+  // Zynthian dynamics
+  'NoiseGate', 'Limiter', 'MonoComp', 'Expander', 'Clipper', 'DeEsser',
+  'MultibandComp', 'TransientDesigner', 'DynamicsProc', 'X42Comp', 'GOTTComp',
+  'SidechainGate', 'SidechainLimiter', 'MultibandGate', 'MultibandLimiter',
+  'Maximizer', 'AGC', 'BeatBreather', 'Ducka', 'Panda', 'MultibandClipper',
+  'MultibandDynamics', 'MultibandExpander',
+  // Zynthian distortion/saturation
+  'Overdrive', 'Saturator', 'Exciter', 'AutoSat', 'Satma', 'DistortionShaper',
+  'TubeAmp', 'CabinetSim', 'Driva', 'BassEnhancer',
+  // Zynthian EQ
+  'ParametricEQ', 'EQ5Band', 'EQ8Band', 'EQ12Band', 'GEQ31', 'ZamEQ2',
+  'PhonoFilter', 'DynamicEQ', 'Kuiza',
+  // Zynthian modulation
+  'Flanger', 'JunoChorus', 'MultiChorus', 'CalfPhaser', 'Pulsator', 'RingMod',
+  // Zynthian reverb/delay
+  'DragonflyHall', 'DragonflyPlate', 'DragonflyRoom', 'EarlyReflections', 'Roomy',
+  'ReverseDelay', 'VintageDelay', 'ArtisticDelay', 'SlapbackDelay', 'ZamDelay', 'Della',
+  // Zynthian stereo/spatial
+  'BinauralPanner', 'HaasEnhancer', 'MultiSpread', 'MultibandEnhancer', 'Vihda',
+  // Zynthian creative/lo-fi
+  'Masha', 'Bitta', 'Vinyl',
+  // Buzzmachine WASM
+  'BuzzDistortion', 'BuzzOverdrive', 'BuzzDistortion2', 'BuzzDist2', 'BuzzSoftSat',
+  'BuzzStereoDist', 'BuzzSVF', 'BuzzPhilta', 'BuzzNotch', 'BuzzZfilter',
+  'BuzzDelay', 'BuzzCrossDelay', 'BuzzFreeverb', 'BuzzPanzerDelay',
+  'BuzzChorus', 'BuzzChorus2', 'BuzzWhiteChorus', 'BuzzFreqShift',
+  'BuzzCompressor', 'BuzzLimiter', 'BuzzExciter', 'BuzzMasterizer', 'BuzzStereoGain',
+  // WAM 2.0 effects
+  'WAMBigMuff', 'WAMTS9', 'WAMDistoMachine', 'WAMQuadraFuzz', 'WAMVoxAmp',
+  'WAMStonePhaser', 'WAMPingPongDelay', 'WAMFaustDelay', 'WAMPitchShifter',
+  'WAMGraphicEQ', 'WAMPedalboard',
 ]);
 
-// Effects that have EffectParameterEngine case (parameter routing)
+// Effects that have EffectParameterEngine case (parameter routing) — 144 cases
 const HAS_PARAM_ENGINE = new Set([
-  'Distortion', 'Delay', 'FeedbackDelay', 'Chorus', 'Phaser', 'Tremolo',
-  'Vibrato', 'BitCrusher', 'PingPongDelay', 'PitchShift', 'Compressor',
-  'EQ3', 'Filter', 'AutoFilter', 'AutoPanner', 'StereoWidener',
-  'SpaceyDelayer', 'RETapeEcho', 'SpaceEcho', 'BiPhase', 'DubFilter',
-  'MoogFilter', 'MVerb', 'Leslie', 'SpringReverb', 'Reverb', 'JCReverb',
-  'SidechainCompressor', 'TapeSaturation', 'VinylNoise', 'Tumult',
-  'TapeSimulator', 'ToneArm', 'AutoWah', 'Chebyshev', 'FrequencyShifter',
-  // Just added in last commit:
-  'AmbientDelay', 'AutoTune', 'GranularFreeze', 'ShimmerReverb',
-  'TapeDegradation', 'Vocoder',
+  'AGC', 'AmbientDelay', 'ArtisticDelay', 'AutoFilter', 'AutoPanner', 'AutoSat',
+  'AutoTune', 'AutoWah', 'BassEnhancer', 'BeatBreather', 'BiPhase', 'BinauralPanner',
+  'BitCrusher', 'Bitta', 'BuzzChorus', 'BuzzChorus2', 'BuzzCompressor', 'BuzzCrossDelay',
+  'BuzzDelay', 'BuzzDist2', 'BuzzDistortion', 'BuzzDistortion2', 'BuzzExciter',
+  'BuzzFreeverb', 'BuzzFreqShift', 'BuzzLimiter', 'BuzzMasterizer', 'BuzzNotch',
+  'BuzzOverdrive', 'BuzzPanzerDelay', 'BuzzPhilta', 'BuzzSVF', 'BuzzSoftSat',
+  'BuzzStereoDist', 'BuzzStereoGain', 'BuzzWhiteChorus', 'BuzzZfilter',
+  'CabinetSim', 'CalfPhaser', 'Chebyshev', 'Chorus', 'Clipper', 'Compressor',
+  'DeEsser', 'Delay', 'Della', 'Distortion', 'DistortionShaper', 'DragonflyHall',
+  'DragonflyPlate', 'DragonflyRoom', 'Driva', 'DubFilter', 'Ducka', 'DynamicEQ',
+  'DynamicsProc', 'EQ12Band', 'EQ3', 'EQ5Band', 'EQ8Band', 'EarlyReflections',
+  'Exciter', 'Expander', 'FeedbackDelay', 'Filter', 'Flanger', 'FrequencyShifter',
+  'GEQ31', 'GOTTComp', 'GranularFreeze', 'HaasEnhancer', 'JCReverb', 'JunoChorus',
+  'Kuiza', 'Leslie', 'Limiter', 'MVerb', 'Masha', 'Maximizer', 'MonoComp',
+  'MoogFilter', 'MultiChorus', 'MultiSpread', 'MultibandClipper', 'MultibandComp',
+  'MultibandDynamics', 'MultibandEnhancer', 'MultibandExpander', 'MultibandGate',
+  'MultibandLimiter', 'Neural', 'NoiseGate', 'Overdrive', 'Panda', 'ParametricEQ',
+  'Phaser', 'PhonoFilter', 'PingPongDelay', 'PitchShift', 'Pulsator', 'RETapeEcho',
+  'Reverb', 'ReverseDelay', 'RingMod', 'Roomy', 'Satma', 'Saturator', 'ShimmerReverb',
+  'SidechainCompressor', 'SidechainGate', 'SidechainLimiter', 'SlapbackDelay',
+  'SpaceEcho', 'SpaceyDelayer', 'SpringReverb', 'StereoWidener', 'TapeDegradation',
+  'TapeSaturation', 'TapeSimulator', 'ToneArm', 'TransientDesigner', 'Tremolo',
+  'TubeAmp', 'Tumult', 'Vibrato', 'Vihda', 'VintageDelay', 'Vinyl', 'VinylNoise',
+  'Vocoder', 'WAMBigMuff', 'WAMDistoMachine', 'WAMFaustDelay', 'WAMGraphicEQ',
+  'WAMPedalboard', 'WAMPingPongDelay', 'WAMPitchShifter', 'WAMQuadraFuzz',
+  'WAMStonePhaser', 'WAMTS9', 'WAMVoxAmp', 'X42Comp', 'ZamDelay', 'ZamEQ2',
 ]);
 
 class MCPClient {
@@ -304,16 +354,14 @@ async function main() {
   const client = new MCPClient();
   await client.connect();
 
-  // Check playback
-  const pbState = await client.call<any>('get_playback_state');
-  if (!pbState?.isPlaying) {
-    console.log('⚠ Nothing playing — starting playback...');
-    try {
-      await client.call('play');
-      await sleep(1000);
-    } catch {
-      console.log('⚠ Could not start playback. Load a song first!');
-    }
+  // Start test tone routed through master effects chain
+  console.log('Starting test tone (440 Hz, -12 dBFS)...');
+  try {
+    await client.call('test_tone', { action: 'start', frequency: 440, level: -12 });
+    await sleep(1000);
+  } catch (err: any) {
+    console.log(`⚠ Could not start test tone: ${err.message}`);
+    console.log('  Make sure the browser tab is open and AudioContext is unlocked.');
   }
 
   // Baseline audio level (no master FX)
@@ -321,10 +369,10 @@ async function main() {
   await sleep(500);
   const baseline = await client.call<any>('get_audio_level', { durationMs: 1000 });
   const baseRms = baseline?.rmsAvg ?? 0;
-  console.log(`\nBaseline RMS: ${baseRms.toFixed(6)} (silent: ${baseline?.isSilent})`);
+  console.log(`\nBaseline RMS: ${baseRms.toFixed(6)} (silent: ${baseline?.silent})`);
 
-  if (baseline?.isSilent) {
-    console.log('⚠ No audio playing! Load a song and start playback first.');
+  if (baseline?.silent) {
+    console.log('⚠ No audio detected! Click in the browser to unlock AudioContext.');
     console.log('  Continuing anyway — silence results will be unreliable.\n');
   }
 
@@ -369,7 +417,7 @@ async function main() {
       try {
         const level = await client.call<any>('get_audio_level', { durationMs: 800 });
         result.rmsLevel = level?.rmsAvg ?? 0;
-        result.audioOk = !level?.isSilent;
+        result.audioOk = !level?.silent;
       } catch {
         result.rmsLevel = 0;
         result.audioOk = false;
@@ -400,12 +448,12 @@ async function main() {
 
       // Determine status
       const issues: string[] = [];
-      if (!result.audioOk && !baseline?.isSilent) issues.push('silent');
+      if (!result.audioOk && !baseline?.silent) issues.push('silent');
       if (!result.paramUpdateOk) issues.push('param update failed');
       if (!result.hasEditor) issues.push('no editor');
       if (!result.hasParamEngine) issues.push('no param engine');
 
-      if (!result.audioOk && !baseline?.isSilent) {
+      if (!result.audioOk && !baseline?.silent) {
         result.status = 'silent';
       } else if (issues.length > 0) {
         result.status = 'partial';
@@ -428,6 +476,7 @@ async function main() {
 
   // Clean up
   await clearMasterEffects(client);
+  try { await client.call('test_tone', { action: 'stop' }); } catch { /* */ }
 
   // Summary
   const works = results.filter(r => r.status === 'works').length;
