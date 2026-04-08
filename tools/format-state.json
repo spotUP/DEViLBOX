@@ -4646,8 +4646,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-dtm": {
-    "auditStatus": "fixed",
-    "notes": "9/10 — OpenMPT audio (export fixed)",
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4678,8 +4678,8 @@
     }
   },
   "uade-format-669": {
-    "auditStatus": "fixed",
-    "notes": "9/10 — OpenMPT audio (export fixed)",
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4710,8 +4710,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-ims": {
-    "auditStatus": "fixed",
-    "notes": "10/10 — OpenMPT path export fix",
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:load_file",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -4774,8 +4774,8 @@
     }
   },
   "uade-mtm": {
-    "auditStatus": "fixed",
-    "notes": "9/10 — OpenMPT audio (export fixed)",
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4890,8 +4890,8 @@
     }
   },
   "uade-stm": {
-    "auditStatus": "fixed",
-    "notes": "9/10 — OpenMPT audio (export fixed)",
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4907,7 +4907,7 @@
   },
   "uade-synthesis": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming (noteDensity only fail)",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4971,7 +4971,7 @@
   },
   "uade-ben-daglish-sid": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming, no notes extracted",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4995,7 +4995,7 @@
   },
   "uade-jason-page": {
     "auditStatus": "fail",
-    "notes": "7/10 — UADE can't play jpn.empiresoccer94 (two-file)",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000037)",
     "data": {
       "auditStatus": "fail",
       "notes": "7/10 silent + UADE play fail + no notes"
@@ -5003,7 +5003,7 @@
   },
   "uade-mark-cooksey": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming, has subsongs",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5019,7 +5019,7 @@
   },
   "uade-paul-shields": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5035,7 +5035,7 @@
   },
   "uade-steve-barrett": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming",
+    "notes": "FAIL 9/10: first 1 patterns have no notes",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5043,7 +5043,7 @@
   },
   "uade-thomas-hermann": {
     "auditStatus": "fail",
-    "notes": "7/10 — UADE score died on thm.blueangel69 (two-file)",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000326)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5111,7 +5111,7 @@
   },
   "uade-quartet": {
     "auditStatus": "fail",
-    "notes": "5/10 — two-file format, companion .set needed",
+    "notes": "Crash: timeout:load_file",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -5151,7 +5151,7 @@
   },
   "uade-janko-mrsic-flogel": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming, has subsongs",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5159,7 +5159,7 @@
   },
   "uade-kris-hatlelid": {
     "auditStatus": "fail",
-    "notes": "9/10 — pat=1 streaming",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes"
@@ -5171,7 +5171,7 @@
   },
   "uade-magnetic-fields": {
     "auditStatus": "fail",
-    "notes": "9/10 — UADE score died on mfp.crystaldragon",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + UADE play fail"
@@ -5222,8 +5222,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-richard-joseph": {
-    "auditStatus": "fail",
-    "notes": "8/10 — UADE score died on cannon fodder 2.sng",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=5 inst=36[Synth,Sampler] rms=0.0274 exp=2989b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "5/10 no instruments + silent + no export + UADE play fail"
@@ -7172,5 +7172,29 @@
   "fx-buzzstereogain": {
     "auditStatus": "fixed",
     "notes": "passes audio with test tone (connect-first fix applied)"
+  },
+  "uade-soundplayer": {
+    "auditStatus": "fail",
+    "notes": "FAIL 7/10: no instruments | first 1 patterns have no notes | silent (rms=0.000000)"
+  },
+  "uade-infogrames": {
+    "auditStatus": "fail",
+    "notes": "Crash: Browser disconnected"
+  },
+  "uade-maximum-effect": {
+    "auditStatus": "fail",
+    "notes": "Crash: timeout:load_file"
+  },
+  "uade-synth-pack": {
+    "auditStatus": "fail",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)"
+  },
+  "fur": {
+    "status": "works",
+    "notes": ""
+  },
+  "goatTracker": {
+    "status": "works",
+    "notes": ""
   }
 }

@@ -91,6 +91,7 @@ export function applyEffectParametersDiff(
       if (node instanceof Tone.Tremolo) {
         if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
         if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
+        if ('type' in changed) node.type = changed.type as Tone.ToneOscillatorType;
       }
       break;
 
@@ -98,6 +99,7 @@ export function applyEffectParametersDiff(
       if (node instanceof Tone.Vibrato) {
         if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
         if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
+        if ('type' in changed) node.type = changed.type as Tone.ToneOscillatorType;
       }
       break;
 
@@ -174,6 +176,7 @@ export function applyEffectParametersDiff(
         if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
         if ('baseFrequency' in changed) node.baseFrequency = changed.baseFrequency as number;
         if ('octaves' in changed) node.octaves = changed.octaves as number;
+        if ('type' in changed) node.type = changed.type as Tone.ToneOscillatorType;
       }
       break;
 
@@ -181,6 +184,7 @@ export function applyEffectParametersDiff(
       if (node instanceof Tone.AutoPanner) {
         if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
         if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
+        if ('type' in changed) node.type = changed.type as Tone.ToneOscillatorType;
       }
       break;
 

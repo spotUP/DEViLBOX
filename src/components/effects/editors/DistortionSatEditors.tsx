@@ -281,14 +281,22 @@ export const CabinetSimEditor: React.FC<VisualEffectEditorProps> = ({ effect, on
   const mix = getParam(effect, 'mix', 100);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
+  const CAB_MODELS = ['1x8', '1x12', '2x12', '4x10', '4x12', '8x10', 'Open', 'Closed'] as const;
+
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#78350f" />
       <Section>
         <SectionHeader size="lg" color="#78350f" title="Cabinet" />
+        <div className="grid grid-cols-4 gap-1.5 mb-4">
+          {CAB_MODELS.map((label, i) => (
+            <button key={i} onClick={() => onUpdateParameter('cabinet', i)}
+              className={`px-2 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                Math.round(cabinet) === i ? 'bg-amber-800/70 border-amber-600 text-amber-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-800'
+              }`}>{label}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
-          <Knob value={cabinet} min={0} max={7} step={1} onChange={(v) => onUpdateParameter('cabinet', Math.round(v))}
-            label="Model" color="#78350f" formatValue={(v) => `${Math.round(v)}`} />
           <Knob value={brightness} min={0} max={100} onChange={(v) => onUpdateParameter('brightness', v)}
             label="Bright" color="#92400e" formatValue={(v) => `${Math.round(v)}%`} />
           <Knob value={mix} min={0} max={100} onChange={(v) => onUpdateParameter('mix', v)}

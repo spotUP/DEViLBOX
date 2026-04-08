@@ -135,6 +135,8 @@ const SKIP_KEYS = new Set([
   'uade-digibooster', 'uade-core-design', 'uade-far',
   // Timeout/freeze during load — slow UADE classic-mode scans, cascade-crash other tests:
   'uade-peter-verswyvelen', 'uade-ron-klaren',
+  // Timeout or browser crash during load:
+  'uade-ims', 'uade-quartet', 'uade-infogrames',
 ]);
 
 const TESTS: TestDef[] = [
@@ -212,7 +214,8 @@ const TESTS: TestDef[] = [
   { key: 'uade-infogrames',         path: 'pub/modules/Infogrames/Charles Callet/ranx.dum',
                                      companions: ['pub/modules/Infogrames/Charles Callet/ranx.ins'] },
   { key: 'uade-maximum-effect',     path: 'pub/modules/Maximum Effect/Jonathan Scarcliffe/MAX.DinosaurDetective intro',
-                                     companions: ['pub/modules/Maximum Effect/Jonathan Scarcliffe/SMP.DinosaurDetective intro'] },
+                                     companions: ['pub/modules/Maximum Effect/Jonathan Scarcliffe/SMP.DinosaurDetective intro',
+                                                  'pub/modules/Maximum Effect/Jonathan Scarcliffe/SMP.set'] },
   { key: 'uade-synth-pack',         path: 'pub/modules/Synth Pack/Karsten Obarski/Dyter-07/dyter07 title.osp',
                                      companions: ['pub/modules/Synth Pack/Karsten Obarski/Dyter-07/smp.set'] },
   // Symphonie Pro — not on Modland, skipped

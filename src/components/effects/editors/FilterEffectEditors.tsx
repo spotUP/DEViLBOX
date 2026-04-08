@@ -21,13 +21,24 @@ export const AutoFilterEditor: React.FC<VisualEffectEditorProps> = ({
   const frequency = getParam(effect, 'frequency', 1);
   const baseFrequency = getParam(effect, 'baseFrequency', 200);
   const octaves = getParam(effect, 'octaves', 2.6);
+  const type = (effect.parameters?.type as string) || 'sine';
   const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const WAVE_TYPES = ['sine', 'triangle', 'square', 'sawtooth'] as const;
 
   return (
     <div className="space-y-4">
       <EffectSpectrum pre={pre} post={post} color="#eab308" />
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#eab308" title="Auto Filter" />
+        <div className="flex justify-center gap-2 mb-4">
+          {WAVE_TYPES.map((w) => (
+            <button key={w} onClick={() => onUpdateParameter('type', w)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
+                type === w ? 'bg-yellow-700/70 border-yellow-500 text-yellow-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-yellow-700'
+              }`}>{w === 'sawtooth' ? 'saw' : w}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob
             value={frequency}

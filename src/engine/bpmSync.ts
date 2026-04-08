@@ -78,6 +78,12 @@ export const SYNCABLE_EFFECT_PARAMS: Record<string, { param: string; unit: 'seco
   RETapeEcho:     [{ param: 'repeatRate', unit: 'normalized' }],
   Chorus:         [{ param: 'frequency', unit: 'hz' }],
   BiPhase:        [{ param: 'rateA', unit: 'hz' }],
+  VintageDelay:   [{ param: 'time', unit: 'ms' }],
+  ArtisticDelay:  [{ param: 'timeL', unit: 'ms' }, { param: 'timeR', unit: 'ms' }],
+  ReverseDelay:   [{ param: 'time', unit: 'ms' }],
+  SlapbackDelay:  [{ param: 'time', unit: 'ms' }],
+  ZamDelay:       [{ param: 'time', unit: 'ms' }],
+  Della:          [{ param: 'time', unit: 'ms' }],
 };
 
 /**
