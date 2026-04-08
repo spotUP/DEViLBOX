@@ -2284,11 +2284,12 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     // This is the raw binary as loaded from disk — identical to the original file.
     // For live edits, use the UI export dialog (which has access to chip RAM readback).
     if (!result) {
-      const { uadeEditableFileData, uadeEditableFileName } = fmt;
-      if (uadeEditableFileData) {
-        const ext = (uadeEditableFileName || '').split('.').pop() || 'bin';
+      const rawData = fmt.uadeEditableFileData || fmt.libopenmptFileData;
+      const rawName = fmt.uadeEditableFileName || '';
+      if (rawData) {
+        const ext = rawName.split('.').pop() || 'bin';
         result = {
-          data: new Blob([new Uint8Array(uadeEditableFileData)], { type: blobType }),
+          data: new Blob([new Uint8Array(rawData)], { type: blobType }),
           filename: `${baseName}.${ext}`,
           warnings: [],
         };
