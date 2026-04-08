@@ -101,6 +101,11 @@ const EXPECTED_SYNTH: Record<string, string[]> = {
   'uade-chuck-biscuits':     ['Sampler'],
   'uade-mfp':                ['Sampler', 'UADEEditableSynth', 'Synth', 'UADESynth'],
   'uade-symphonie-pro':      ['SymphonieSynth', 'Sampler'],
+  // Two-file formats (newly discovered)
+  'uade-soundplayer':        ['Sampler', 'UADEEditableSynth', 'Synth', 'UADESynth'],
+  'uade-infogrames':         ['Sampler', 'UADEEditableSynth', 'Synth', 'UADESynth'],
+  'uade-maximum-effect':     ['Sampler', 'UADEEditableSynth', 'Synth', 'UADESynth'],
+  'uade-synth-pack':         ['Sampler', 'UADEEditableSynth', 'Synth', 'UADESynth'],
 };
 
 /* ── Test file paths (hand-verified on Modland) ─────────────────────────── */
@@ -201,6 +206,15 @@ const TESTS: TestDef[] = [
   { key: 'uade-tomy-tracker',       path: 'pub/modules/Tomy Tracker/Stargazer/inconvenient intro.sg' },
   { key: 'uade-david-hanney',       path: 'pub/modules/David Hanney/David Hanney/tearaway thomas jingles.dh' },
   { key: 'uade-synthesis',          path: 'pub/modules/Beathoven Synthesizer/- unknown/letsdance.bss' },
+  // Two-file formats (newly discovered)
+  { key: 'uade-soundplayer',        path: 'pub/modules/SoundPlayer/Scott Johnston/sjs.awesome',
+                                     companions: ['pub/modules/SoundPlayer/Scott Johnston/smp.awesome'] },
+  { key: 'uade-infogrames',         path: 'pub/modules/Infogrames/Charles Callet/ranx.dum',
+                                     companions: ['pub/modules/Infogrames/Charles Callet/ranx.ins'] },
+  { key: 'uade-maximum-effect',     path: 'pub/modules/Maximum Effect/Jonathan Scarcliffe/MAX.DinosaurDetective intro',
+                                     companions: ['pub/modules/Maximum Effect/Jonathan Scarcliffe/SMP.DinosaurDetective intro'] },
+  { key: 'uade-synth-pack',         path: 'pub/modules/Synth Pack/Karsten Obarski/Dyter-07/dyter07 title.osp',
+                                     companions: ['pub/modules/Synth Pack/Karsten Obarski/Dyter-07/smp.set'] },
   // Symphonie Pro — not on Modland, skipped
   // openmpt-handled
   { key: 'uade-format-669',         path: 'pub/modules/Composer 669/Maelcum/669 bliss.669' },
