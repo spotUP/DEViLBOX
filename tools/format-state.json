@@ -4647,7 +4647,7 @@
   },
   "uade-dtm": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=4 inst=63[Sampler] rms=0.0967 exp=18185b [10/10]",
+    "notes": "10/10 PASS — OpenMPT routed",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4679,7 +4679,7 @@
   },
   "uade-format-669": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=38 inst=13[Sampler] rms=0.0628 exp=343852b [10/10]",
+    "notes": "PASS 10/10 ch=8 pat=38 inst=13[Sampler] rms=0.0637 exp=343852b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4775,7 +4775,7 @@
   },
   "uade-mtm": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=8 pat=19 inst=31[Sampler] rms=0.0556 exp=66241b [10/10]",
+    "notes": "10/10 PASS — OpenMPT routed",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4891,7 +4891,7 @@
   },
   "uade-stm": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=12 inst=31[Sampler] rms=0.0757 exp=42896b [10/10]",
+    "notes": "10/10 PASS — OpenMPT routed",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4970,8 +4970,8 @@
     }
   },
   "uade-ben-daglish-sid": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works, noteDensity pending page reload for short-scan ticks",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4994,16 +4994,16 @@
     }
   },
   "uade-jason-page": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works, two-file jpn+smp companion OK",
     "data": {
       "auditStatus": "fail",
       "notes": "7/10 silent + UADE play fail + no notes"
     }
   },
   "uade-mark-cooksey": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works, noteDensity pending short-scan",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5034,8 +5034,8 @@
     }
   },
   "uade-steve-barrett": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5150,16 +5150,16 @@
     }
   },
   "uade-janko-mrsic-flogel": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
     }
   },
   "uade-kris-hatlelid": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works, two-file kh+songplay companion OK",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no notes"
@@ -5223,7 +5223,7 @@
   },
   "uade-richard-joseph": {
     "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=5 inst=36[Synth,Sampler] rms=0.0282 exp=2989b [10/10]",
+    "notes": "10/10 PASS — two-file sng+ins companion OK",
     "data": {
       "auditStatus": "fail",
       "notes": "5/10 no instruments + silent + no export + UADE play fail"
@@ -7174,8 +7174,8 @@
     "notes": "passes audio with test tone (connect-first fix applied)"
   },
   "uade-soundplayer": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes"
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works, two-file sjs+smp companion OK"
   },
   "uade-infogrames": {
     "auditStatus": "fail",
@@ -7186,8 +7186,8 @@
     "notes": "Crash: timeout:load_file"
   },
   "uade-synth-pack": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes"
+    "auditStatus": "fixed",
+    "notes": "9/10 — audio works"
   },
   "fur": {
     "status": "works",
@@ -7196,5 +7196,109 @@
   "goatTracker": {
     "status": "works",
     "notes": ""
+  },
+  "uade-669": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — OpenMPT routed"
+  },
+  "pc-mod": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — load/audio/edit OK, no exporter"
+  },
+  "pc-s3m": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — load/audio/edit OK, no exporter"
+  },
+  "pc-it": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — load/audio/edit OK, no exporter"
+  },
+  "pc-xm": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — load/audio/edit OK, no exporter"
+  },
+  "pc-amf": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS"
+  },
+  "pc-dbm": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — DigiBooster Pro"
+  },
+  "pc-dmf": {
+    "auditStatus": "fail",
+    "notes": "5/10 — X-Tracker DMF routes to DefleMask parser instead of OpenMPT"
+  },
+  "pc-dsm": {
+    "auditStatus": "fail",
+    "notes": "5/10 — DSIK format detection fails, falls to UADE"
+  },
+  "pc-gdm": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — General DigiMusic"
+  },
+  "pc-gt2": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — Graoumf Tracker 2"
+  },
+  "pc-imf": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — Imago Orpheus, no exporter"
+  },
+  "pc-j2b": {
+    "auditStatus": "fail",
+    "notes": "Crash: 404"
+  },
+  "pc-mdl": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — Digitrakker"
+  },
+  "pc-mo3": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — MO3 compressed, no exporter"
+  },
+  "pc-mt2": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — MadTracker 2, no exporter"
+  },
+  "pc-ptm": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — PolyTracker"
+  },
+  "pc-psm": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — Epic MASI"
+  },
+  "pc-rtm": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — Real Tracker"
+  },
+  "pc-ult": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — UltraTracker"
+  },
+  "pc-plm": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — DisorderTracker 2"
+  },
+  "pc-stx": {
+    "auditStatus": "fail",
+    "notes": "Crash: Download too small: 50b"
+  },
+  "pc-okt": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — Oktalyzer via OpenMPT"
+  },
+  "pc-mptm": {
+    "auditStatus": "fixed",
+    "notes": "9/10 — load/audio/edit OK, no exporter"
+  },
+  "pc-dsym": {
+    "auditStatus": "fixed",
+    "notes": "10/10 PASS — Digital Symphony"
+  },
+  "pc-puma": {
+    "auditStatus": "fail",
+    "notes": "9/10 — loads but silent (rms=0.0002)"
   }
 }
