@@ -123,7 +123,9 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           return;
         }
 
-        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.dmf' || ext === '.xrns';
+        const isDefleMask = ext === '.dmf' && arrayBuffer.byteLength >= 16 &&
+          new TextDecoder().decode(new Uint8Array(arrayBuffer, 0, 11)) === '.DeFleMask.';
+        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || isDefleMask || ext === '.xrns';
         // Try native parser for XM/MOD/XRNS
         if (useNativeParser) {
           console.log('[ModuleLoader] Trying native parser for', ext);
@@ -138,7 +140,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               // Create metadata for compatibility
               const metadata: ModuleMetadata = {
                 title: nativeData.importMetadata.sourceFile,
-                type: ext === '.fur' ? 'Furnace' : ext === '.dmf' ? 'DefleMask' : nativeData.format,
+                type: ext === '.fur' ? 'Furnace' : isDefleMask ? 'DefleMask' : nativeData.format,
                 channels: nativeData.importMetadata.originalChannelCount,
                 patterns: nativeData.importMetadata.originalPatternCount,
                 orders: nativeData.importMetadata.modData?.songLength || 1,
@@ -150,7 +152,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
 
               // Load with libopenmpt for playback (skip for formats not supported by libopenmpt)
               let player: ChiptunePlayer | undefined;
-              if (ext !== '.fur' && ext !== '.dmf' && ext !== '.xrns') {
+              if (ext !== '.fur' && !isDefleMask && ext !== '.xrns') {
                 player = await loadWithLibopenmpt(arrayBuffer);
               }
 
@@ -166,7 +168,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           } catch (nativeError) {
             console.warn(`[ModuleLoader] Native parser failed:`, nativeError);
             // Don't fall back to libopenmpt for formats it doesn't support
-            if (ext === '.fur' || ext === '.dmf' || ext === '.xrns') {
+            if (ext === '.fur' || isDefleMask || ext === '.xrns') {
               reject(new Error(`Failed to parse ${ext} file: ${nativeError instanceof Error ? nativeError.message : 'unknown error'}`));
               return;
             }
