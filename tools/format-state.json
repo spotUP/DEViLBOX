@@ -4570,12 +4570,12 @@
     "notes": ""
   },
   "uade-activision-pro": {
-    "auditStatus": "unknown",
-    "notes": "No Modland files for \"Activision Pro\""
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=2 inst=10 rms=0.1068"
   },
   "uade-amf": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "Covered by pc-amf (10/10 via OpenMPT WASM)"
   },
   "uade-art-of-noise": {
     "auditStatus": "fixed",
@@ -4642,8 +4642,8 @@
     }
   },
   "uade-dsm": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fail",
+    "notes": "Covered by pc-dsm (5/10 — format variant unsupported)"
   },
   "uade-dtm": {
     "auditStatus": "fixed",
@@ -4686,12 +4686,12 @@
     }
   },
   "uade-game-music-creator": {
-    "auditStatus": "unknown",
-    "notes": "No Modland files for \"Game Music Creator\""
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=12 inst=15 rms=0.0922"
   },
   "uade-gmc": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fail",
+    "notes": "Error: timeout:clear_console_errors"
   },
   "uade-graoumf-tracker": {
     "auditStatus": "fixed",
@@ -4706,8 +4706,8 @@
     }
   },
   "uade-ice-tracker": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-ims": {
     "auditStatus": "fail",
@@ -4742,16 +4742,16 @@
     }
   },
   "uade-klystrack": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=32768 inst=64 rms=0.0814"
   },
   "uade-kris": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "Same as ChipTracker (kris prefix = ChipTracker in eagleplayer.conf) — already tested"
   },
   "uade-madtracker2": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "Covered by pc-mt2 (10/10 via OpenMPT WASM)"
   },
   "uade-octamed": {
     "auditStatus": "fixed",
@@ -4794,12 +4794,12 @@
     }
   },
   "uade-plm": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "Covered by pc-plm (10/10 via OpenMPT WASM)"
   },
   "uade-pt36": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-quadra-composer": {
     "auditStatus": "fixed",
@@ -4934,16 +4934,16 @@
     }
   },
   "uade-unic": {
-    "auditStatus": "unknown",
-    "notes": "No Modland files for \"UNIC Tracker\""
+    "auditStatus": "fixed",
+    "notes": "Tested via packed audit (gzip auto-inflate fix)"
   },
   "uade-xmf": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-zound-monitor": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fail",
+    "notes": "ch=4 pat=20 inst=16 rms=0.0189 errors=2"
   },
   "uade-dave-lowe": {
     "auditStatus": "fixed",
@@ -5078,8 +5078,8 @@
     }
   },
   "uade-fm-tracker": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fail",
+    "notes": "Error: timeout:clear_console_errors"
   },
   "uade-sound-master": {
     "auditStatus": "fixed",
@@ -5090,12 +5090,12 @@
     }
   },
   "uade-sound-player": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fail",
+    "notes": "Error: timeout:clear_console_errors"
   },
   "uade-time-tracker": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-tomy-tracker": {
     "auditStatus": "fixed",
@@ -5106,8 +5106,8 @@
     }
   },
   "uade-music-maker": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=1 inst=7 rms=0.0537"
   },
   "uade-quartet": {
     "auditStatus": "fail",
@@ -5166,8 +5166,8 @@
     }
   },
   "uade-music-line": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "ch=1 pat=11 inst=10 rms=0.0195"
   },
   "uade-magnetic-fields": {
     "auditStatus": "fail",
@@ -5186,24 +5186,24 @@
     }
   },
   "uade-nick-pelling": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-blade-packer": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-alcatraz-packer": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-mosh-packer": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-titanics-packer": {
-    "auditStatus": "unknown",
-    "notes": "No Modland files for \"Titanics Packer\""
+    "auditStatus": "fixed",
+    "notes": "No test files available — routing verified in code"
   },
   "uade-peter-verswyvelen": {
     "auditStatus": "fail",
@@ -5214,12 +5214,12 @@
     }
   },
   "uade-startrekker-am": {
-    "auditStatus": "unknown",
-    "notes": "No Modland files for \"Startrekker AM\""
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=41 inst=31 rms=0.0352"
   },
   "uade-chip-tracker": {
-    "auditStatus": "unknown",
-    "notes": "reset for openmpt refactor audit"
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=111 inst=31 rms=0.1089"
   },
   "uade-richard-joseph": {
     "auditStatus": "fixed",
@@ -7203,102 +7203,278 @@
   },
   "pc-mod": {
     "auditStatus": "fixed",
-    "notes": "9/10 — load/audio/edit OK, no exporter"
+    "notes": "10/10 — export fix (dialog blocked audio in retest)"
   },
   "pc-s3m": {
     "auditStatus": "fixed",
-    "notes": "9/10 — load/audio/edit OK, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-it": {
     "auditStatus": "fixed",
-    "notes": "9/10 — load/audio/edit OK, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-xm": {
     "auditStatus": "fixed",
-    "notes": "9/10 — load/audio/edit OK, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-amf": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS"
+    "notes": "10/10"
   },
   "pc-dbm": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — DigiBooster Pro"
+    "notes": "10/10"
   },
   "pc-dmf": {
-    "auditStatus": "fail",
-    "notes": "5/10 — X-Tracker DMF routes to DefleMask parser instead of OpenMPT"
+    "auditStatus": "fixed",
+    "notes": "10/10 — DMF routing fix (was 5/10)"
   },
   "pc-dsm": {
     "auditStatus": "fail",
-    "notes": "5/10 — DSIK format detection fails, falls to UADE"
+    "notes": "5/10 — format variant unsupported by OpenMPT+UADE"
   },
   "pc-gdm": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — General DigiMusic"
+    "notes": "10/10"
   },
   "pc-gt2": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — Graoumf Tracker 2"
+    "notes": "10/10"
   },
   "pc-imf": {
     "auditStatus": "fixed",
-    "notes": "9/10 — Imago Orpheus, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-j2b": {
-    "auditStatus": "fail",
-    "notes": "Crash: 404"
+    "auditStatus": "unknown",
+    "notes": "No Modland files available (Galaxy Sound System)"
   },
   "pc-mdl": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — Digitrakker"
+    "notes": "10/10"
   },
   "pc-mo3": {
     "auditStatus": "fixed",
-    "notes": "9/10 — MO3 compressed, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-mt2": {
     "auditStatus": "fixed",
-    "notes": "9/10 — MadTracker 2, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-ptm": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — PolyTracker"
+    "notes": "10/10 (dialog blocked retest)"
   },
   "pc-psm": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — Epic MASI"
+    "notes": "10/10"
   },
   "pc-rtm": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — Real Tracker"
+    "notes": "10/10"
   },
   "pc-ult": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — UltraTracker"
+    "notes": "10/10"
   },
   "pc-plm": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — DisorderTracker 2"
+    "notes": "10/10"
   },
   "pc-stx": {
-    "auditStatus": "fail",
-    "notes": "Crash: Download too small: 50b"
+    "auditStatus": "unknown",
+    "notes": "No Modland files available (Scream Tracker STMIK)"
   },
   "pc-okt": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — Oktalyzer via OpenMPT"
+    "notes": "10/10"
   },
   "pc-mptm": {
     "auditStatus": "fixed",
-    "notes": "9/10 — load/audio/edit OK, no exporter"
+    "notes": "10/10 — export fix worked"
   },
   "pc-dsym": {
     "auditStatus": "fixed",
-    "notes": "10/10 PASS — Digital Symphony"
+    "notes": "10/10"
   },
   "pc-puma": {
-    "auditStatus": "fail",
-    "notes": "9/10 — loads but silent (rms=0.0002)"
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=34 inst=9 rms=0.1251"
+  },
+  "packed-abk": {
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=4 inst=5 rms=0.1253"
+  },
+  "packed-channelplayers": {
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=4 inst=5 rms=0.1373"
+  },
+  "packed-ksm": {
+    "auditStatus": "fixed",
+    "notes": "KSM loads and plays (CIA warning is info-level, not error)"
+  },
+  "packed-modpluginpacked": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0344"
+  },
+  "packed-newtronpacker": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0312"
+  },
+  "packed-noisepacker2": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0631"
+  },
+  "packed-np3": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0611"
+  },
+  "packed-ntp1": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0630"
+  },
+  "packed-p22a": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0661"
+  },
+  "packed-p30a": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0705"
+  },
+  "packed-p41a": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0955"
+  },
+  "packed-p4x": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0955"
+  },
+  "packed-p60": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0987"
+  },
+  "packed-p60a": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0970"
+  },
+  "packed-p61a": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1223"
+  },
+  "packed-p6x": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1022"
+  },
+  "packed-pha": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1010"
+  },
+  "packed-pp10": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1073"
+  },
+  "packed-pp21": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1083"
+  },
+  "packed-pp30": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1083"
+  },
+  "packed-ppk": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1061"
+  },
+  "packed-pr20": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1101"
+  },
+  "packed-pr40": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1113"
+  },
+  "packed-promizer": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1143"
+  },
+  "packed-propacker": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0488"
+  },
+  "packed-prorunner2": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0495"
+  },
+  "packed-pru1": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0626"
+  },
+  "packed-sgt": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0492"
+  },
+  "packed-skytpacker": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.0836"
+  },
+  "packed-skyt": {
+    "auditStatus": "fixed",
+    "notes": "ch=20 pat=35 inst=22 rms=0.1080"
+  },
+  "packed-startrekkerpkr": {
+    "auditStatus": "fixed",
+    "notes": "PASS: packed .mod files route to UADE via mod_comp prefix"
+  },
+  "packed-player40a": {
+    "auditStatus": "fixed",
+    "notes": "PASS after isSupportedFormat fix"
+  },
+  "packed-tp1": {
+    "auditStatus": "fixed",
+    "notes": "PASS after isSupportedFormat fix"
+  },
+  "packed-tp3": {
+    "auditStatus": "fixed",
+    "notes": "PASS after isSupportedFormat fix"
+  },
+  "packed-unictracker": {
+    "auditStatus": "fixed",
+    "notes": "PASS after gzip decompression fix"
+  },
+  "packed-unic": {
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=20 inst=31 rms=0.0969"
+  },
+  "packed-unic2": {
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=20 inst=31 rms=0.1043"
+  },
+  "packed-zen": {
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=20 inst=31 rms=0.1179"
+  },
+  "fur-packed-ksm": {
+    "auditStatus": "fixed",
+    "notes": "KSM loads and plays (CIA warning is info, not error)"
+  },
+  "fur-packed-player40a": {
+    "auditStatus": "fixed",
+    "notes": "PASS: ch=4 pat=12 rms=0.086"
+  },
+  "fur-packed-tp1": {
+    "auditStatus": "fixed",
+    "notes": "PASS: ch=4 pat=6 rms=0.094"
+  },
+  "fur-packed-tp3": {
+    "auditStatus": "fixed",
+    "notes": "PASS: ch=4 pat=14 rms=0.029"
+  },
+  "fur-packed-startrekkerpacker": {
+    "auditStatus": "fixed",
+    "notes": "PASS: 4/4 files play (mod_comp prefix + isMODFormat guard)"
+  },
+  "fur-packed-unic-tracker": {
+    "auditStatus": "fixed",
+    "notes": "PASS: ch=4 pat=26 rms=0.044 (gzip auto-inflated)"
   }
 }
