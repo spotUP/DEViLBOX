@@ -2314,8 +2314,10 @@ export async function tryRouteFormat(
   // Magic: "OBISYNTHPACK" at byte offset 0.
   // NOTE: UADE does not include the SynthPack eagleplayer — native stub parser only.
   if (matchesExt(filename, ['osp'])) {
-    const { parseSynthPackFile } = await import('@lib/import/formats/SynthPackParser');
-    return parseSynthPackFile(buffer, originalFileName);
+    const { isSynthPackFormat, parseSynthPackFile } = await import('@lib/import/formats/SynthPackParser');
+    return withNativeThenUADE('synthPack' as any, ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSynthPackFormat(buf as ArrayBuffer, name)) return parseSynthPackFile(buf as ArrayBuffer, name); return null; },
+      'SynthPackParser', { injectUADE: true });
   }
 
   // ── Fred Gray (gray.* prefix) ────────────────────────────────────────────
