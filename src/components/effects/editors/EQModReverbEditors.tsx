@@ -4,7 +4,9 @@
 
 import React from 'react';
 import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
-import { EffectOscilloscope } from '../EffectVisualizer';
+import { EffectOscilloscope, EffectSpectrum } from '../EffectVisualizer';
+import { EQCurve, type EQBand } from '../EQCurve';
+import { EQSlider } from '../EQSlider';
 import { Knob } from '@components/controls/Knob';
 import { SectionHeader, getParam, renderBpmSync, type VisualEffectEditorProps } from './shared';
 
@@ -25,11 +27,19 @@ export const ParametricEQEditor: React.FC<VisualEffectEditorProps> = ({ effect, 
     { freq: 'b3Freq', gain: 'b3Gain', q: 'b3Q', label: 'Band 3', defF: 2000, color: '#eab308' },
     { freq: 'b4Freq', gain: 'b4Gain', q: 'b4Q', label: 'Band 4', defF: 8000, color: '#22c55e' },
   ];
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const eqBands: EQBand[] = bands.map(b => ({
+    type: 'peaking' as const,
+    freq: getParam(effect, b.freq, b.defF),
+    gain: getParam(effect, b.gain, 0),
+    q: getParam(effect, b.q, 0.7),
+  }));
 
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#f97316" />
+      <EQCurve bands={eqBands} color="#f97316" />
+      <EffectSpectrum pre={pre} post={post} color="#f97316" height={60} />
       {bands.map((b) => (
         <Section key={b.freq}>
           <SectionHeader size="lg" color={b.color} title={b.label} />
@@ -37,9 +47,8 @@ export const ParametricEQEditor: React.FC<VisualEffectEditorProps> = ({ effect, 
             <Knob value={getParam(effect, b.freq, b.defF)} min={20} max={20000}
               onChange={(v) => onUpdateParameter(b.freq, v)} label="Freq" color={b.color}
               formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
-            <Knob value={getParam(effect, b.gain, 0)} min={-18} max={18}
-              onChange={(v) => onUpdateParameter(b.gain, v)} label="Gain" color={b.color}
-              formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+            <EQSlider value={getParam(effect, b.gain, 0)} min={-18} max={18}
+              onChange={(v) => onUpdateParameter(b.gain, v)} label="Gain" color={b.color} />
             <Knob value={getParam(effect, b.q, 0.7)} min={0.1} max={10}
               onChange={(v) => onUpdateParameter(b.q, v)} label="Q" color={b.color}
               formatValue={(v) => v.toFixed(2)} />
@@ -61,19 +70,28 @@ export const ParametricEQEditor: React.FC<VisualEffectEditorProps> = ({ effect, 
 // ============================================================================
 
 export const EQ5BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const eqBands: EQBand[] = [
+    { type: 'lowShelf', freq: getParam(effect, 'lowShelfFreq', 100), gain: getParam(effect, 'lowShelfGain', 0), q: 0.7 },
+    { type: 'peaking', freq: getParam(effect, 'peak1Freq', 500), gain: getParam(effect, 'peak1Gain', 0), q: getParam(effect, 'peak1Q', 1) },
+    { type: 'peaking', freq: getParam(effect, 'peak2Freq', 1500), gain: getParam(effect, 'peak2Gain', 0), q: getParam(effect, 'peak2Q', 1) },
+    { type: 'peaking', freq: getParam(effect, 'peak3Freq', 5000), gain: getParam(effect, 'peak3Gain', 0), q: getParam(effect, 'peak3Q', 1) },
+    { type: 'highShelf', freq: getParam(effect, 'highShelfFreq', 8000), gain: getParam(effect, 'highShelfGain', 0), q: 0.7 },
+  ];
+
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#10b981" />
+      <EQCurve bands={eqBands} color="#10b981" />
+      <EffectSpectrum pre={pre} post={post} color="#10b981" height={60} />
       <Section>
         <SectionHeader size="lg" color="#10b981" title="Low Shelf" />
         <div className="flex justify-around items-end">
           <Knob value={getParam(effect, 'lowShelfFreq', 100)} min={20} max={500}
             onChange={(v) => onUpdateParameter('lowShelfFreq', v)} label="Freq" color="#059669"
             formatValue={(v) => `${Math.round(v)} Hz`} />
-          <Knob value={getParam(effect, 'lowShelfGain', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('lowShelfGain', v)} label="Gain" color="#059669"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+          <EQSlider value={getParam(effect, 'lowShelfGain', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('lowShelfGain', v)} label="Gain" color="#059669" />
         </div>
       </Section>
       <Section>
@@ -88,9 +106,8 @@ export const EQ5BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
               <Knob value={getParam(effect, p.f, p.def)} min={20} max={20000}
                 onChange={(v) => onUpdateParameter(p.f, v)} label="Freq" color={p.c}
                 formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
-              <Knob value={getParam(effect, p.g, 0)} min={-18} max={18}
-                onChange={(v) => onUpdateParameter(p.g, v)} label="Gain" color={p.c}
-                formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+              <EQSlider value={getParam(effect, p.g, 0)} min={-18} max={18}
+                onChange={(v) => onUpdateParameter(p.g, v)} label="Gain" color={p.c} />
             </React.Fragment>
           ))}
         </div>
@@ -101,9 +118,8 @@ export const EQ5BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
           <Knob value={getParam(effect, 'highShelfFreq', 8000)} min={1000} max={18000}
             onChange={(v) => onUpdateParameter('highShelfFreq', v)} label="Freq" color="#6ee7b7"
             formatValue={(v) => `${(v / 1000).toFixed(1)}k`} />
-          <Knob value={getParam(effect, 'highShelfGain', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('highShelfGain', v)} label="Gain" color="#6ee7b7"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+          <EQSlider value={getParam(effect, 'highShelfGain', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('highShelfGain', v)} label="Gain" color="#6ee7b7" />
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
             label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
         </div>
@@ -117,19 +133,26 @@ export const EQ5BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
 // ============================================================================
 
 export const ZamEQ2Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const bwToQ = (bw: number) => 1 / (2 * Math.sinh(Math.log(2) / 2 * bw));
+  const eqBands: EQBand[] = [
+    { type: 'peaking', freq: getParam(effect, 'lowFreq', 200), gain: getParam(effect, 'lowGain', 0), q: bwToQ(getParam(effect, 'lowBw', 1)) },
+    { type: 'peaking', freq: getParam(effect, 'highFreq', 4000), gain: getParam(effect, 'highGain', 0), q: bwToQ(getParam(effect, 'highBw', 1)) },
+  ];
+
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#0ea5e9" />
+      <EQCurve bands={eqBands} color="#0ea5e9" />
+      <EffectSpectrum pre={pre} post={post} color="#0ea5e9" height={60} />
       <Section>
         <SectionHeader size="lg" color="#0ea5e9" title="Low Band" />
         <div className="flex justify-around items-end">
           <Knob value={getParam(effect, 'lowFreq', 200)} min={20} max={2000}
             onChange={(v) => onUpdateParameter('lowFreq', v)} label="Freq" color="#0284c7"
             formatValue={(v) => `${Math.round(v)} Hz`} />
-          <Knob value={getParam(effect, 'lowGain', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('lowGain', v)} label="Gain" color="#0284c7"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+          <EQSlider value={getParam(effect, 'lowGain', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('lowGain', v)} label="Gain" color="#0284c7" />
           <Knob value={getParam(effect, 'lowBw', 1)} min={0.1} max={6}
             onChange={(v) => onUpdateParameter('lowBw', v)} label="BW" color="#0ea5e9"
             formatValue={(v) => v.toFixed(1)} />
@@ -141,9 +164,8 @@ export const ZamEQ2Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpda
           <Knob value={getParam(effect, 'highFreq', 4000)} min={500} max={16000}
             onChange={(v) => onUpdateParameter('highFreq', v)} label="Freq" color="#38bdf8"
             formatValue={(v) => `${(v / 1000).toFixed(1)}k`} />
-          <Knob value={getParam(effect, 'highGain', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('highGain', v)} label="Gain" color="#38bdf8"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+          <EQSlider value={getParam(effect, 'highGain', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('highGain', v)} label="Gain" color="#38bdf8" />
           <Knob value={getParam(effect, 'highBw', 1)} min={0.1} max={6}
             onChange={(v) => onUpdateParameter('highBw', v)} label="BW" color="#7dd3fc"
             formatValue={(v) => v.toFixed(1)} />
@@ -194,10 +216,16 @@ export const PhonoFilterEditor: React.FC<VisualEffectEditorProps> = ({ effect, o
 // ============================================================================
 
 export const DynamicEQEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const eqBands: EQBand[] = [
+    { type: 'peaking', freq: getParam(effect, 'processFreq', 1000), gain: getParam(effect, 'maxGain', 0), q: getParam(effect, 'processQ', 1) },
+  ];
+
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#8b5cf6" />
+      <EQCurve bands={eqBands} color="#8b5cf6" />
+      <EffectSpectrum pre={pre} post={post} color="#8b5cf6" height={60} />
       <Section>
         <SectionHeader size="lg" color="#8b5cf6" title="Detection" />
         <div className="flex justify-around items-end">
@@ -243,25 +271,30 @@ export const DynamicEQEditor: React.FC<VisualEffectEditorProps> = ({ effect, onU
 // ============================================================================
 
 export const KuizaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const eqBands: EQBand[] = [
+    { type: 'lowShelf', freq: 200, gain: getParam(effect, 'low', 0), q: 0.7 },
+    { type: 'peaking', freq: 800, gain: getParam(effect, 'lowMid', 0), q: 1 },
+    { type: 'peaking', freq: 3000, gain: getParam(effect, 'highMid', 0), q: 1 },
+    { type: 'highShelf', freq: 8000, gain: getParam(effect, 'high', 0), q: 0.7 },
+  ];
+
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#14b8a6" />
+      <EQCurve bands={eqBands} color="#14b8a6" />
+      <EffectSpectrum pre={pre} post={post} color="#14b8a6" height={60} />
       <Section>
         <SectionHeader size="lg" color="#14b8a6" title="Kuiza EQ" />
         <div className="flex justify-around items-end">
-          <Knob value={getParam(effect, 'low', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('low', v)} label="Low" color="#0d9488"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
-          <Knob value={getParam(effect, 'lowMid', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('lowMid', v)} label="Lo-Mid" color="#14b8a6"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
-          <Knob value={getParam(effect, 'highMid', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('highMid', v)} label="Hi-Mid" color="#2dd4bf"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
-          <Knob value={getParam(effect, 'high', 0)} min={-18} max={18}
-            onChange={(v) => onUpdateParameter('high', v)} label="High" color="#5eead4"
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
+          <EQSlider value={getParam(effect, 'low', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('low', v)} label="Low" color="#0d9488" />
+          <EQSlider value={getParam(effect, 'lowMid', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('lowMid', v)} label="Lo-Mid" color="#14b8a6" />
+          <EQSlider value={getParam(effect, 'highMid', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('highMid', v)} label="Hi-Mid" color="#2dd4bf" />
+          <EQSlider value={getParam(effect, 'high', 0)} min={-18} max={18}
+            onChange={(v) => onUpdateParameter('high', v)} label="High" color="#5eead4" />
         </div>
       </Section>
       <Section>
@@ -1000,11 +1033,26 @@ export const EQ8BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
   const lowShelfGain = getParam(effect, 'lowShelfGain', 0);
   const highShelfFreq = getParam(effect, 'highShelfFreq', 8000);
   const highShelfGain = getParam(effect, 'highShelfGain', 0);
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const peakDefaults = [250, 1000, 3500, 8000];
+  const eqBands: EQBand[] = [
+    { type: 'highpass', freq: hpFreq, gain: 0, q: 0.7 },
+    { type: 'lowShelf', freq: lowShelfFreq, gain: lowShelfGain, q: 0.7 },
+    ...[1, 2, 3, 4].map(b => ({
+      type: 'peaking' as const,
+      freq: getParam(effect, `peak${b}Freq`, peakDefaults[b - 1]),
+      gain: getParam(effect, `peak${b}Gain`, 0),
+      q: getParam(effect, `peak${b}Q`, 1),
+    })),
+    { type: 'highShelf' as const, freq: highShelfFreq, gain: highShelfGain, q: 0.7 },
+    { type: 'lowpass' as const, freq: lpFreq, gain: 0, q: 0.7 },
+  ];
 
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
+      <EQCurve bands={eqBands} color="#3b82f6" height={130} dbRange={24} />
+      <EffectSpectrum pre={pre} post={post} color="#3b82f6" height={60} />
       <Section>
         <SectionHeader size="lg" color="#3b82f6" title="Filters" />
         <div className="flex justify-around items-end">
@@ -1019,16 +1067,16 @@ export const EQ8BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
         <div className="flex justify-around items-end">
           <Knob value={lowShelfFreq} min={20} max={1000} onChange={(v) => onUpdateParameter('lowShelfFreq', v)}
             label="Lo Freq" color="#3b82f6" formatValue={fmtFreq} />
-          <Knob value={lowShelfGain} min={-36} max={36} onChange={(v) => onUpdateParameter('lowShelfGain', v)}
-            label="Lo Gain" color="#3b82f6" formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+          <EQSlider value={lowShelfGain} min={-36} max={36}
+            onChange={(v) => onUpdateParameter('lowShelfGain', v)} label="Lo Gain" color="#3b82f6" />
           <Knob value={highShelfFreq} min={1000} max={20000} onChange={(v) => onUpdateParameter('highShelfFreq', v)}
             label="Hi Freq" color="#60a5fa" formatValue={fmtFreq} />
-          <Knob value={highShelfGain} min={-36} max={36} onChange={(v) => onUpdateParameter('highShelfGain', v)}
-            label="Hi Gain" color="#60a5fa" formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+          <EQSlider value={highShelfGain} min={-36} max={36}
+            onChange={(v) => onUpdateParameter('highShelfGain', v)} label="Hi Gain" color="#60a5fa" />
         </div>
       </Section>
       {[1, 2, 3, 4].map((band) => {
-        const freq = getParam(effect, `peak${band}Freq`, [250, 1000, 3500, 8000][band - 1]);
+        const freq = getParam(effect, `peak${band}Freq`, peakDefaults[band - 1]);
         const gain = getParam(effect, `peak${band}Gain`, 0);
         const q = getParam(effect, `peak${band}Q`, 1);
         const colors = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'];
@@ -1038,8 +1086,8 @@ export const EQ8BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
             <div className="flex justify-around items-end">
               <Knob value={freq} min={20} max={20000} onChange={(v) => onUpdateParameter(`peak${band}Freq`, v)}
                 label="Freq" color={colors[band - 1]} formatValue={fmtFreq} />
-              <Knob value={gain} min={-36} max={36} onChange={(v) => onUpdateParameter(`peak${band}Gain`, v)}
-                label="Gain" color={colors[band - 1]} formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
+              <EQSlider value={gain} min={-36} max={36}
+                onChange={(v) => onUpdateParameter(`peak${band}Gain`, v)} label="Gain" color={colors[band - 1]} />
               <Knob value={q} min={0.1} max={10} onChange={(v) => onUpdateParameter(`peak${band}Q`, v)}
                 label="Q" color={colors[band - 1]} formatValue={(v) => v.toFixed(2)} />
             </div>
@@ -1065,23 +1113,28 @@ const EQ12_COLORS = ['#1e3a5f', '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93
                      '#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#075985'];
 
 export const EQ12BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
+
+  const eqBands: EQBand[] = EQ12_FREQS.map((freq, i) => ({
+    type: 'peaking' as const,
+    freq,
+    gain: getParam(effect, `gain_${i}`, 0),
+    q: getParam(effect, `q_${i}`, 1),
+  }));
 
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
+      <EQCurve bands={eqBands} color="#3b82f6" height={130} dbRange={24} />
+      <EffectSpectrum pre={pre} post={post} color="#3b82f6" height={60} />
       <Section>
         <SectionHeader size="lg" color="#3b82f6" title="12-Band EQ" />
-        <div className="grid grid-cols-6 gap-x-2 gap-y-4">
+        <div className="flex justify-around items-end gap-1">
           {EQ12_FREQS.map((defaultFreq, i) => {
             const gain = getParam(effect, `gain_${i}`, 0);
             return (
-              <div key={i} className="flex flex-col items-center gap-1">
-                <span className="text-[9px] text-text-muted">{fmtFreq(defaultFreq)}</span>
-                <Knob value={gain} min={-36} max={36} onChange={(v) => onUpdateParameter(`gain_${i}`, v)}
-                  label="" color={EQ12_COLORS[i]} size="sm"
-                  formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
-              </div>
+              <EQSlider key={i} value={gain} min={-36} max={36}
+                onChange={(v) => onUpdateParameter(`gain_${i}`, v)}
+                label={fmtFreq(defaultFreq)} color={EQ12_COLORS[i]} height={120} />
             );
           })}
         </div>
@@ -1118,40 +1171,33 @@ const GEQ31_FREQS = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
   2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000];
 
 export const GEQ31Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
-  // Split 31 bands into rows of 8 for responsive layout
-  const rows: number[][] = [];
-  for (let i = 0; i < GEQ31_FREQS.length; i += 8) {
-    rows.push(Array.from({ length: Math.min(8, GEQ31_FREQS.length - i) }, (_, j) => i + j));
-  }
+  const eqBands: EQBand[] = GEQ31_FREQS.map((freq, i) => ({
+    type: 'peaking' as const,
+    freq,
+    gain: getParam(effect, `band_${i}`, 0),
+    q: 2.5,
+  }));
 
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
+      <EQCurve bands={eqBands} color="#3b82f6" height={130} dbRange={12} />
+      <EffectSpectrum pre={pre} post={post} color="#3b82f6" height={60} />
       <Section>
         <SectionHeader size="lg" color="#3b82f6" title="31-Band Graphic EQ" />
-        <div className="space-y-3">
-          {rows.map((bandIndices, rowIdx) => (
-            <div key={rowIdx} className="flex gap-1 items-end justify-center flex-wrap">
-              {bandIndices.map((i) => {
-                const freq = GEQ31_FREQS[i];
-                const gain = getParam(effect, `band_${i}`, 0);
-                const hue = 210 + (i / 30) * 60;
-                const color = `hsl(${hue}, 70%, 55%)`;
-                return (
-                  <div key={i} className="flex flex-col items-center gap-0.5">
-                    <Knob value={gain} min={-12} max={12} onChange={(v) => onUpdateParameter(`band_${i}`, v)}
-                      label="" color={color} size="sm"
-                      formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
-                    <span className="text-[8px] text-text-muted leading-none text-center whitespace-nowrap">
-                      {freq >= 1000 ? `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 1)}k` : `${freq}`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+        <div className="flex gap-[2px] items-end justify-center overflow-x-auto py-2">
+          {GEQ31_FREQS.map((freq, i) => {
+            const gain = getParam(effect, `band_${i}`, 0);
+            const hue = 210 + (i / 30) * 60;
+            const color = `hsl(${hue}, 70%, 55%)`;
+            return (
+              <EQSlider key={i} value={gain} min={-12} max={12}
+                onChange={(v) => onUpdateParameter(`band_${i}`, v)}
+                label={freq >= 1000 ? `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 1)}k` : `${freq}`}
+                color={color} height={140} width={22} />
+            );
+          })}
         </div>
       </Section>
       <Section>
