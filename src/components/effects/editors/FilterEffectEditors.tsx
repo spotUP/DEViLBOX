@@ -7,6 +7,7 @@ import React from 'react';
 import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
 import { EffectSpectrum, EffectOscilloscope, GainReductionMeter } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
 
 // ============================================================================
@@ -408,7 +409,13 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const release = getParam(effect, 'release', 0.25);
   const knee = getParam(effect, 'knee', 6);
   const sidechainGain = getParam(effect, 'sidechainGain', 100);
+  const sidechainSource = getParam(effect, 'sidechainSource', -1);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
+  const channelNames = useTrackerStore(s =>
+    s.patterns[0]?.channels.map((ch: { name?: string }, i: number) => ch.name || `CH ${i + 1}`) ?? []
+  );
 
   return (
     <div className="space-y-4">
@@ -448,6 +455,19 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#34d399" title="Envelope & Sidechain" />
+        <div className="mb-3">
+          <label className="block text-xs text-text-muted mb-1.5">Sidechain Source</label>
+          <select
+            value={Math.round(sidechainSource)}
+            onChange={(e) => onUpdateParameter('sidechainSource', Number(e.target.value))}
+            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-emerald-500 focus:outline-none"
+          >
+            <option value={-1}>Self (Internal)</option>
+            {Array.from({ length: channelCount }, (_, i) => (
+              <option key={i} value={i}>{channelNames[i] || `CH ${i + 1}`}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex justify-around items-end">
           <Knob
             value={attack}

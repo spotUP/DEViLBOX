@@ -4646,8 +4646,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-dtm": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=8 pat=4 inst=63[Sampler] rms=0.0974 exp=18185b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4678,8 +4678,8 @@
     }
   },
   "uade-format-669": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=8 pat=38 inst=13[Sampler] rms=0.0638 exp=343852b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4774,8 +4774,8 @@
     }
   },
   "uade-mtm": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=8 pat=19 inst=31[Sampler] rms=0.0552 exp=66241b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4890,8 +4890,8 @@
     }
   },
   "uade-stm": {
-    "auditStatus": "fail",
-    "notes": "FAIL 9/10: silent (rms=0.000000)",
+    "auditStatus": "fixed",
+    "notes": "PASS 10/10 ch=4 pat=12 inst=31[Sampler] rms=0.0758 exp=42896b [10/10]",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt)"
@@ -4907,7 +4907,7 @@
   },
   "uade-synthesis": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "notes": "Crash: Browser disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -4995,7 +4995,7 @@
   },
   "uade-jason-page": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000037)",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000026)",
     "data": {
       "auditStatus": "fail",
       "notes": "7/10 silent + UADE play fail + no notes"
@@ -5003,7 +5003,7 @@
   },
   "uade-mark-cooksey": {
     "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5019,7 +5019,7 @@
   },
   "uade-paul-shields": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
+    "notes": "Crash: Browser disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5035,7 +5035,7 @@
   },
   "uade-steve-barrett": {
     "auditStatus": "fail",
-    "notes": "FAIL 9/10: first 1 patterns have no notes",
+    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5043,7 +5043,7 @@
   },
   "uade-thomas-hermann": {
     "auditStatus": "fail",
-    "notes": "FAIL 8/10: first 1 patterns have no notes | silent (rms=0.000326)",
+    "notes": "Crash: Browser disconnected",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5222,8 +5222,8 @@
     "notes": "reset for openmpt refactor audit"
   },
   "uade-richard-joseph": {
-    "auditStatus": "fixed",
-    "notes": "PASS 10/10 ch=4 pat=5 inst=36[Synth,Sampler] rms=0.0274 exp=2989b [10/10]",
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: silent (rms=0.000000)",
     "data": {
       "auditStatus": "fail",
       "notes": "5/10 no instruments + silent + no export + UADE play fail"
