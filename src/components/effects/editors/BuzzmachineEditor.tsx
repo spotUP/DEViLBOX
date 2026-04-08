@@ -9,6 +9,8 @@ import React, { useMemo } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { SectionHeader, type VisualEffectEditorProps } from './shared';
 import { BUZZMACHINE_INFO, type BuzzmachineType } from '@engine/buzzmachines/BuzzmachineEngine';
+import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
+import { EffectOscilloscope } from '../EffectVisualizer';
 
 /** Map effect type ID → machine type key in BUZZMACHINE_INFO */
 const BUZZ_TYPE_MAP: Record<string, BuzzmachineType> = {
@@ -45,6 +47,7 @@ export const BuzzmachineEditor: React.FC<VisualEffectEditorProps> = ({
   const machineType = BUZZ_TYPE_MAP[effect.type];
   const info = machineType ? BUZZMACHINE_INFO[machineType] : undefined;
   const params = info?.parameters ?? [];
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   // Group params into rows of 3-4 for layout
   const rows = useMemo(() => {
@@ -58,6 +61,7 @@ export const BuzzmachineEditor: React.FC<VisualEffectEditorProps> = ({
   if (!info || params.length === 0) {
     return (
       <div className="space-y-4">
+        <EffectOscilloscope pre={pre} post={post} color="#ff9800" />
         <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
           <SectionHeader size="lg" color="#ff9800" title={effect.type} />
           <p className="text-xs text-text-muted text-center">No parameters available</p>
@@ -83,6 +87,7 @@ export const BuzzmachineEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#ff9800" />
       {/* Machine name header */}
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ff9800" title={info.name} />

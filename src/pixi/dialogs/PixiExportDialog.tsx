@@ -798,7 +798,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
                 {/* Warnings display */}
                 {exportWarnings.length > 0 && (
-                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 120, overflow: 'scroll' }}>
                     <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />
                     {exportWarnings.map((w, i) => (
                       <PixiLabel key={i} text={`• ${w}`} size="xs" color="textMuted" layout={{ maxWidth: CONTENT_W - 44 }} />
@@ -872,7 +872,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
                 {/* Warnings display */}
                 {exportWarnings.length > 0 && (
-                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 120, overflow: 'scroll' }}>
                     <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />
                     {exportWarnings.map((w, i) => (
                       <PixiLabel key={i} text={`• ${w}`} size="xs" color="textMuted" layout={{ maxWidth: CONTENT_W - 44 }} />
@@ -928,7 +928,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 )}
 
                 {exportWarnings.length > 0 && (
-                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 120, overflow: 'scroll' }}>
                     <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />
                     {exportWarnings.map((w, i) => (
                       <PixiLabel key={i} text={`• ${w}`} size="xs" color="textMuted" layout={{ maxWidth: CONTENT_W - 44 }} />
