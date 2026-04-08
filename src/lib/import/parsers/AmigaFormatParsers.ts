@@ -122,13 +122,23 @@ export async function tryRouteFormat(
       return parseDefleMaskToTrackerSong(buffer, originalFileName);
     }
     if (!isDDMF) {
-      // Unknown .dmf variant → try Furnace WASM
-      const { parseFurnaceFile } = await import('./FurnaceToSong');
-      return parseFurnaceFile(buffer, originalFileName, subsong);
+      // Unknown .dmf variant → try OpenMPT WASM first, then Furnace WASM
+      try {
+        const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+        return await parseWithOpenMPT(buffer, originalFileName);
+      } catch {
+        const { parseFurnaceFile } = await import('./FurnaceToSong');
+        return parseFurnaceFile(buffer, originalFileName, subsong);
+      }
     }
-    // X-Tracker DMF that wasn't handled above → UADE fallback
-    const { parseUADEFile: parseUADE_dmf } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_dmf(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    // X-Tracker DMF that wasn't handled above → try OpenMPT WASM
+    try {
+      const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+      return await parseWithOpenMPT(buffer, originalFileName);
+    } catch {
+      const { parseUADEFile: parseUADE_dmf } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_dmf(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    }
   }
 
   // ── Furnace / DefleMask ─────────────────────────────────────────────────
