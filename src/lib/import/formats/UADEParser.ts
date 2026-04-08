@@ -467,16 +467,19 @@ export async function parseUADEFile(
   }
 
   // Compiled 68k replayer formats loop indefinitely without an end signal.
-  // Skip the worklet's built-in scan for these to avoid a 600-second hang.
-  // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
+  // Two tiers of scan control:
+  //   SCAN_CRASH: genuinely crashes browser or corrupts engine — skip entirely
+  //   SHORT_SCAN: loops but doesn't crash — use 30s timeout to capture tick data
   //
-  // NOTE: Only formats that genuinely CRASH, HANG, or CORRUPT the engine are listed here.
+  // NOTE: Only formats that genuinely CRASH or CORRUPT the engine are in SCAN_CRASH.
   // Formats that merely produce "wrong audio" during scan are NOT skipped — their scan
   // still captures valid CIA tick snapshots for pattern reconstruction, even though the
   // extracted PCM is unusable. Those formats are handled by FORCE_CLASSIC_FORMATS instead,
   // which routes audio to UADESynth streaming while using tick data for pattern display.
   const prefix = basename.split('.')[0]?.toLowerCase() ?? '';
-  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
+
+  // Formats that CRASH the browser or corrupt WASM state during scan
+  const SCAN_CRASH_EXTS = new Set([
     'mon',   // ManiacsOfNoise — enhanced scan crashes browser
     'sa',    // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
@@ -485,29 +488,34 @@ export async function parseUADEFile(
     'ml',    // Medley (alternate ext) — enhanced scan crashes browser
     'sun',   // SunTronic/TSM — compiled 68k synth, enhanced scan corrupts engine
     'tsm',   // SunTronic/TSM — suffix-form variant
-    // FORCE_CLASSIC compiled replayer formats whose enhanced scan may hang or crash:
-    'cm', 'cus', 'cust', 'custom', 'rk', 'rkb',  // CustomMade variants
-    'pvp',    // PeterVerswyvelenPacker
-    'dns',    // DynamicSynthesizer
-    'vss',    // VoodooSupremeSynthesizer
-    'synmod', // SynTracker
-    'scn',    // SeanConnolly
-    'mc', 'mcr', 'mco',  // MarkCooksey — compiled 68k replayer, crashes browser
-    'jmf',    // JankoMrsicFlogel — compiled 68k replayer, crashes browser
-    'kh',     // KrisHatlelid — compiled 68k replayer
-    'thm',    // ThomasHermann — compiled 68k replayer
-    'sb',     // SteveBarrett — compiled 68k replayer, scan crashes browser
-    'ps',     // PaulShields — compiled 68k replayer, scan crashes browser
-    'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
-    'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
-    'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
+    'thm',   // ThomasHermann — scan crashes browser
+    'sb',    // SteveBarrett — scan crashes browser
+    'ps',    // PaulShields — scan crashes browser
   ]);
-  const SKIP_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
-    'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
-    'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
-    'ash',   // AshleyHogg — compiled 68k replayer, enhanced scan crashes browser
-    'tsm',   // SunTronic/TSM — compiled 68k synth replayer, enhanced scan corrupts engine state
-    // FORCE_CLASSIC prefix-form compiled replayers whose enhanced scan may hang or crash:
+  const SCAN_CRASH_PREFIXES = new Set([
+    'sas',   // SonicArranger prefix-form — scan crashes browser
+    'ash',   // AshleyHogg — scan crashes browser
+    'tsm',   // SunTronic/TSM — scan corrupts engine state
+    'thm',   // ThomasHermann — scan crashes browser
+    'sb',    // SteveBarrett — scan crashes browser
+    'ps',    // PaulShields — scan crashes browser
+  ]);
+
+  // Formats that loop indefinitely but don't crash — safe for short 30s scan
+  const SHORT_SCAN_EXTS = new Set([
+    'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
+    'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+    'rho', 'dln', 'core', 'hot', 'wb', 'dh',
+    'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
+    'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+    'mc', 'mcr', 'mco',  // MarkCooksey
+    'jmf',    // JankoMrsicFlogel
+    'kh',     // KrisHatlelid
+    'sng',    // RichardJoseph (two-file .sng/.ins)
+    'sjs',    // SoundPlayer (two-file sjs.*+smp.*)
+    'jpn', 'jpnd', 'jp',  // JasonPage (two-file jpn.*+smp.*)
+  ]);
+  const SHORT_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
     'cm', 'cus', 'cust', 'custom', 'rk', 'rkb',  // CustomMade variants
     'pvp',    // PeterVerswyvelenPacker
     'dns',    // DynamicSynthesizer
@@ -517,19 +525,19 @@ export async function parseUADEFile(
     'mc', 'mcr', 'mco',  // MarkCooksey
     'jmf',    // JankoMrsicFlogel
     'kh',     // KrisHatlelid
-    'thm', 'smp',  // ThomasHermann (thm.* and smp.* prefixes)
-    'mfp',    // MagneticFieldsPacker (needs companion smp.* file)
-    'sb',     // SteveBarrett — compiled 68k replayer
-    'ps',     // PaulShields — compiled 68k replayer
-    'sng',    // RichardJoseph — compiled 68k replayer (two-file .sng/.ins)
-    'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
-    'sjs',    // SoundPlayer — compiled 68k replayer
+    'mfp',    // MagneticFieldsPacker
+    'smp',    // ThomasHermann companion prefix
+    'sng',    // RichardJoseph
+    'jpn', 'jpnd', 'jp',  // JasonPage
+    'sjs',    // SoundPlayer
   ]);
-  // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
-  // hangs indefinitely, crashes the browser, or corrupts engine state. Skip scan for these.
-  const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
 
-  const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
+  const scanCrashes = SCAN_CRASH_EXTS.has(ext) || SCAN_CRASH_PREFIXES.has(prefix);
+  const shortScan = SHORT_SCAN_EXTS.has(ext) || SHORT_SCAN_PREFIXES.has(prefix);
+  const skipScan = scanCrashes;
+  const scanTimeoutSec = shortScan ? 30 : undefined;
+
+  const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan, 0, scanTimeoutSec);
   const scanRows = metadata.scanData ?? [];
 
   // Helper: inject subsong info onto song result when format has multiple subsongs.
