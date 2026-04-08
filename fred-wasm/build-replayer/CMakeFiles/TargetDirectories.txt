@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/fred-wasm/build-replayer/CMakeFiles/FredEditorReplayer.dir
+/Users/spot/Code/DEViLBOX/fred-wasm/build-replayer/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/fred-wasm/build-replayer/CMakeFiles/rebuild_cache.dir

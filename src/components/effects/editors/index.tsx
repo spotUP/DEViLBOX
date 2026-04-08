@@ -33,6 +33,32 @@ import { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, Granula
 import { BuzzmachineEditor } from './BuzzmachineEditor';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
+// Zynthian-ported dynamics editors
+import {
+  NoiseGateEditor, LimiterEditor, MonoCompEditor, ExpanderEditor, ClipperEditor,
+  DeEsserEditor, MultibandCompEditor, TransientDesignerEditor, DynamicsProcEditor,
+  X42CompEditor, GOTTCompEditor, SidechainGateEditor, SidechainLimiterEditor,
+  MultibandGateEditor, MultibandLimiterEditor, MaximizerEditor, AGCEditor,
+  BeatBreatherEditor, DuckaEditor, PandaEditor, MultibandClipperEditor,
+  MultibandDynamicsEditor, MultibandExpanderEditor,
+} from './DynamicsEditors';
+
+// Zynthian-ported distortion/saturation editors
+import {
+  OverdriveEditor, SaturatorEditor, ExciterEditor, AutoSatEditor, SatmaEditor,
+  DistortionShaperEditor, TubeAmpEditor, CabinetSimEditor, DrivaEditor, BassEnhancerEditor,
+} from './DistortionSatEditors';
+
+// Zynthian-ported EQ, modulation, reverb, delay, stereo, creative editors
+import {
+  ParametricEQEditor, EQ5BandEditor, ZamEQ2Editor, PhonoFilterEditor, DynamicEQEditor, KuizaEditor,
+  FlangerEditor, JunoChorusEditor, MultiChorusEditor, CalfPhaserEditor, PulsatorEditor, RingModEditor,
+  DragonflyHallEditor, DragonflyPlateEditor, DragonflyRoomEditor, EarlyReflectionsEditor, RoomyEditor,
+  ReverseDelayEditor, VintageDelayEditor, ArtisticDelayEditor, SlapbackDelayEditor, ZamDelayEditor, DellaEditor,
+  BinauralPannerEditor, HaasEnhancerEditor, MultiSpreadEditor, MultibandEnhancerEditor, VihdaEditor,
+  MashaEditor, BittaEditor, VinylEditor,
+} from './EQModReverbEditors';
+
 // Re-export all editors
 export { DistortionEditor, ReverbEditor, DelayEditor, ChorusEditor, PhaserEditor, TremoloEditor, VibratoEditor } from './BasicEffectEditors';
 export { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterEditor, SidechainCompressorEditor, MoogFilterEditor } from './FilterEffectEditors';
@@ -97,6 +123,80 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   AmbientDelay: AmbientDelayEditor,
   ShimmerReverb: ShimmerReverbEditor,
   GranularFreeze: GranularFreezeEditor,
+  // Zynthian-ported dynamics effects
+  NoiseGate: NoiseGateEditor,
+  Limiter: LimiterEditor,
+  MonoComp: MonoCompEditor,
+  Expander: ExpanderEditor,
+  Clipper: ClipperEditor,
+  DeEsser: DeEsserEditor,
+  MultibandComp: MultibandCompEditor,
+  TransientDesigner: TransientDesignerEditor,
+  DynamicsProc: DynamicsProcEditor,
+  X42Comp: X42CompEditor,
+  GOTTComp: GOTTCompEditor,
+  SidechainGate: SidechainGateEditor,
+  SidechainLimiter: SidechainLimiterEditor,
+  MultibandGate: MultibandGateEditor,
+  MultibandLimiter: MultibandLimiterEditor,
+  Maximizer: MaximizerEditor,
+  AGC: AGCEditor,
+  BeatBreather: BeatBreatherEditor,
+  Ducka: DuckaEditor,
+  Panda: PandaEditor,
+  MultibandClipper: MultibandClipperEditor,
+  MultibandDynamics: MultibandDynamicsEditor,
+  MultibandExpander: MultibandExpanderEditor,
+  // Zynthian-ported distortion/saturation effects
+  Overdrive: OverdriveEditor,
+  Saturator: SaturatorEditor,
+  Exciter: ExciterEditor,
+  AutoSat: AutoSatEditor,
+  Satma: SatmaEditor,
+  DistortionShaper: DistortionShaperEditor,
+  TubeAmp: TubeAmpEditor,
+  CabinetSim: CabinetSimEditor,
+  Driva: DrivaEditor,
+  BassEnhancer: BassEnhancerEditor,
+  // Zynthian-ported EQ effects
+  ParametricEQ: ParametricEQEditor,
+  EQ5Band: EQ5BandEditor,
+  EQ8Band: GenericEffectEditor,
+  EQ12Band: GenericEffectEditor,
+  GEQ31: GenericEffectEditor,
+  ZamEQ2: ZamEQ2Editor,
+  PhonoFilter: PhonoFilterEditor,
+  DynamicEQ: DynamicEQEditor,
+  Kuiza: KuizaEditor,
+  // Zynthian-ported modulation effects
+  Flanger: FlangerEditor,
+  JunoChorus: JunoChorusEditor,
+  MultiChorus: MultiChorusEditor,
+  CalfPhaser: CalfPhaserEditor,
+  Pulsator: PulsatorEditor,
+  RingMod: RingModEditor,
+  // Zynthian-ported reverb/delay effects
+  DragonflyHall: DragonflyHallEditor,
+  DragonflyPlate: DragonflyPlateEditor,
+  DragonflyRoom: DragonflyRoomEditor,
+  EarlyReflections: EarlyReflectionsEditor,
+  Roomy: RoomyEditor,
+  ReverseDelay: ReverseDelayEditor,
+  VintageDelay: VintageDelayEditor,
+  ArtisticDelay: ArtisticDelayEditor,
+  SlapbackDelay: SlapbackDelayEditor,
+  ZamDelay: ZamDelayEditor,
+  Della: DellaEditor,
+  // Zynthian-ported stereo/spatial effects
+  BinauralPanner: BinauralPannerEditor,
+  HaasEnhancer: HaasEnhancerEditor,
+  MultiSpread: MultiSpreadEditor,
+  MultibandEnhancer: MultibandEnhancerEditor,
+  Vihda: VihdaEditor,
+  // Zynthian-ported creative/lo-fi effects
+  Masha: MashaEditor,
+  Bitta: BittaEditor,
+  Vinyl: VinylEditor,
   // Buzzmachine WASM effects — dynamic knob editor
   BuzzDistortion: BuzzmachineEditor,
   BuzzOverdrive: BuzzmachineEditor,
