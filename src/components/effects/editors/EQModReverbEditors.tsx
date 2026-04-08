@@ -1079,7 +1079,7 @@ export const EQ12BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUp
               <div key={i} className="flex flex-col items-center gap-1">
                 <span className="text-[9px] text-text-muted">{fmtFreq(defaultFreq)}</span>
                 <Knob value={gain} min={-36} max={36} onChange={(v) => onUpdateParameter(`gain_${i}`, v)}
-                  label="" color={EQ12_COLORS[i]} size={36}
+                  label="" color={EQ12_COLORS[i]} size="sm"
                   formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`} />
               </div>
             );
@@ -1094,7 +1094,7 @@ export const EQ12BandEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUp
             return (
               <div key={i} className="flex flex-col items-center gap-1">
                 <Knob value={q} min={0.1} max={10} onChange={(v) => onUpdateParameter(`q_${i}`, v)}
-                  label="" color="#6b7280" size={28}
+                  label="" color="#6b7280" size="sm"
                   formatValue={(v) => `Q ${v.toFixed(1)}`} />
               </div>
             );
@@ -1133,7 +1133,7 @@ export const GEQ31Editor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
             return (
               <div key={i} className="flex flex-col items-center gap-0.5 min-w-[22px]">
                 <Knob value={gain} min={-12} max={12} onChange={(v) => onUpdateParameter(`band_${i}`, v)}
-                  label="" color={color} size={22}
+                  label="" color={color} size="sm"
                   formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} />
                 <span className="text-[7px] text-text-muted leading-none" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
                   {freq >= 1000 ? `${(freq / 1000).toFixed(freq >= 10000 ? 0 : 1)}k` : `${freq}`}
