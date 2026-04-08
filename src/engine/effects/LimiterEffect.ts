@@ -91,11 +91,23 @@ export class LimiterEffect extends Tone.ToneAudioNode {
             this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
           }
           this.pendingParams = [];
-          try { this.input.disconnect(this.wetGain); } catch { /* */ }
-          const rawInput = getNativeAudioNode(this.input)!;
-          const rawWet = getNativeAudioNode(this.wetGain)!;
-          rawInput.connect(this.workletNode!);
-          this.workletNode!.connect(rawWet);
+          // Connect WASM first, then disconnect passthrough (avoids silent gap)
+          try {
+            const rawInput = getNativeAudioNode(this.input)!;
+            const rawWet = getNativeAudioNode(this.wetGain)!;
+            rawInput.connect(this.workletNode!);
+            this.workletNode!.connect(rawWet);
+            // Now safe to disconnect passthrough
+            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            // Keepalive: ensure Chrome schedules the worklet
+            const rawCtx = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx.createGain();
+            keepalive.gain.value = 0;
+            this.workletNode!.connect(keepalive);
+            keepalive.connect(rawCtx.destination);
+          } catch (swapErr) {
+            console.warn('[Limiter] WASM swap failed, staying on passthrough:', swapErr);
+          }
         }
       };
 
