@@ -962,6 +962,9 @@ export async function parseUADEFile(
           console.log(`[UADEParser] '${fmt}' → native parser`);
           nativeSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
           nativeSong.uadeEditableFileName ??= filename;
+          if (companionFiles && companionFiles.size > 0) {
+            (nativeSong as any).uadeCompanionFiles = companionFiles;
+          }
           return nativeSong;
         }
       } catch (err) {
@@ -1046,6 +1049,9 @@ export async function parseUADEFile(
     // Without this, no engine calls play() and the song is silent.
     classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
     classicSong.uadeEditableFileName ??= filename;
+    if (companionFiles && companionFiles.size > 0) {
+      (classicSong as any).uadeCompanionFiles = companionFiles;
+    }
     return await reconstructClassicPatterns(classicSong, engine, basename);
   }
 
@@ -1098,6 +1104,9 @@ export async function parseUADEFile(
     const classicSong = buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
     classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
     classicSong.uadeEditableFileName ??= filename;
+    if (companionFiles && companionFiles.size > 0) {
+      (classicSong as any).uadeCompanionFiles = companionFiles;
+    }
     return await reconstructClassicPatterns(classicSong, engine, basename);
   }
 
@@ -1161,6 +1170,9 @@ export async function parseUADEFile(
 
     classicSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
     classicSong.uadeEditableFileName ??= filename;
+    if (companionFiles && companionFiles.size > 0) {
+      (classicSong as any).uadeCompanionFiles = companionFiles;
+    }
     return classicSong;
   }
   // Note: .fc files with FC13/FC14/SMOD magic are routed to parseFCFile via NATIVE_ROUTES above.
@@ -1277,6 +1289,9 @@ export async function parseUADEFile(
       }
       song.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
       song.uadeEditableFileName ??= filename;
+      if (companionFiles && companionFiles.size > 0) {
+        (song as any).uadeCompanionFiles = companionFiles;
+      }
       return song;
     }
     console.warn('[UADEParser] Enhanced scan yielded no playable instruments, falling back to classic');
@@ -1288,6 +1303,9 @@ export async function parseUADEFile(
   );
   classicResult.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
   classicResult.uadeEditableFileName ??= filename;
+  if (companionFiles && companionFiles.size > 0) {
+    (classicResult as any).uadeCompanionFiles = companionFiles;
+  }
   return classicResult;
 }
 
