@@ -522,6 +522,18 @@ export async function parseUADEFile(
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
   const scanRows = metadata.scanData ?? [];
 
+  // Helper: inject subsong info onto song result when format has multiple subsongs.
+  // Called at each exit point so the UI shows the subsong selector.
+  const injectSubsongs = (song: TrackerSong): TrackerSong => {
+    if (metadata.subsongCount > 1) {
+      (song as any).uadeEditableSubsongs = {
+        count: metadata.subsongCount,
+        speeds: Array(metadata.subsongCount).fill(song.initialSpeed || 6),
+      };
+    }
+    return song;
+  };
+
   // Phase 3a: Route to native parser when UADE detects a format with native support.
   // Native parsers deliver more accurate instrument names, effects, and pattern data
   // than the Paula-register heuristic scan can provide.
@@ -965,7 +977,7 @@ export async function parseUADEFile(
           if (companionFiles && companionFiles.size > 0) {
             (nativeSong as any).uadeCompanionFiles = companionFiles;
           }
-          return nativeSong;
+          return injectSubsongs(nativeSong);
         }
       } catch (err) {
         console.warn(`[UADEParser] Native parser for '${fmt}' failed, falling back to UADE scan:`, err);
@@ -1052,7 +1064,7 @@ export async function parseUADEFile(
     if (companionFiles && companionFiles.size > 0) {
       (classicSong as any).uadeCompanionFiles = companionFiles;
     }
-    return await reconstructClassicPatterns(classicSong, engine, basename);
+    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename));
   }
 
   const FORCE_CLASSIC_PREFIXES = new Set<string>([
@@ -1107,7 +1119,7 @@ export async function parseUADEFile(
     if (companionFiles && companionFiles.size > 0) {
       (classicSong as any).uadeCompanionFiles = companionFiles;
     }
-    return await reconstructClassicPatterns(classicSong, engine, basename);
+    return injectSubsongs(await reconstructClassicPatterns(classicSong, engine, basename));
   }
 
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
@@ -1173,7 +1185,7 @@ export async function parseUADEFile(
     if (companionFiles && companionFiles.size > 0) {
       (classicSong as any).uadeCompanionFiles = companionFiles;
     }
-    return classicSong;
+    return injectSubsongs(classicSong);
   }
   // Note: .fc files with FC13/FC14/SMOD magic are routed to parseFCFile via NATIVE_ROUTES above.
   // FC 2.0 (real PCM samples) does not carry those magic bytes and falls through to enhanced scan.
@@ -1292,7 +1304,7 @@ export async function parseUADEFile(
       if (companionFiles && companionFiles.size > 0) {
         (song as any).uadeCompanionFiles = companionFiles;
       }
-      return song;
+      return injectSubsongs(song);
     }
     console.warn('[UADEParser] Enhanced scan yielded no playable instruments, falling back to classic');
   }
@@ -1306,7 +1318,7 @@ export async function parseUADEFile(
   if (companionFiles && companionFiles.size > 0) {
     (classicResult as any).uadeCompanionFiles = companionFiles;
   }
-  return classicResult;
+  return injectSubsongs(classicResult);
 }
 
 /**
