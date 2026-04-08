@@ -1476,11 +1476,12 @@ export async function tryRouteFormat(
   }
 
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
+  // Two-file format: song data (.4v/.qpa/.sqt/.qts) + samples (SMP.set).
   // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['qpa', 'sqt', 'qts', '4v'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     const qFile = toUADEPrefixName(originalFileName, ['qpa', 'sqt', 'qts', '4v']);
-    const song = await parseUADEFile(buffer, qFile, 'enhanced', subsong, preScannedMeta);
+    const song = await parseUADEFile(buffer, qFile, 'enhanced', subsong, preScannedMeta, companionFiles);
     song.uadeEditableFileData = buffer.slice(0);
     song.uadeEditableFileName = qFile;
     return song;
