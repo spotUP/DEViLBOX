@@ -14,6 +14,8 @@ import { Knob } from '@components/controls/Knob';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
 import { VOCODER_EFFECT_PRESETS } from '@engine/effects/VocoderEffect';
 import type { CarrierType as StoreCarrierType } from '@/stores/useVocoderStore';
+import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
+import { EffectOscilloscope } from '../EffectVisualizer';
 
 // ============================================================================
 // VOCODER
@@ -48,6 +50,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
   const carrierFreq = getParam(effect, 'carrierFreq', 130.81);
   const formantShift = getParam(effect, 'formantShift', 1.0);
   const reactionTime = getParam(effect, 'reactionTime', 30); // stored as ms
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   /** When a preset is chosen, push all of its values into the effect params */
   const applyPreset = (name: string) => {
@@ -71,6 +74,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#a855f7" />
       {/* Preset + Source */}
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#a855f7" title="Voice Preset" />
@@ -217,9 +221,11 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
   const scale = getStringParam(effect, 'scale', 'major');
   const strength = getParam(effect, 'strength', 100);
   const speed = getParam(effect, 'speed', 70);
+  const { pre: atPre, post: atPost } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={atPre} post={atPost} color="#ec4899" />
       {/* Key */}
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#ec4899" title="Key" />
