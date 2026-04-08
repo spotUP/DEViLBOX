@@ -478,7 +478,7 @@ const wasmEffects: EffectDescriptor[] = [
   },
   {
     id: 'ReverseDelay', name: 'Reverse Delay', category: 'wasm', group: 'Reverb & Delay',
-    loadMode: 'eager',
+    loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const { ReverseDelayEffect } = await import('@engine/effects/ReverseDelayEffect');
       const p = c.parameters;
@@ -493,7 +493,7 @@ const wasmEffects: EffectDescriptor[] = [
   },
   {
     id: 'VintageDelay', name: 'Vintage Delay', category: 'wasm', group: 'Reverb & Delay',
-    loadMode: 'eager',
+    loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const { VintageDelayEffect } = await import('@engine/effects/VintageDelayEffect');
       const p = c.parameters;
@@ -510,7 +510,7 @@ const wasmEffects: EffectDescriptor[] = [
   },
   {
     id: 'ArtisticDelay', name: 'Artistic Delay', category: 'wasm', group: 'Reverb & Delay',
-    loadMode: 'eager',
+    loadMode: 'eager', bpmSyncParams: ['timeL', 'timeR'],
     create: async (c: EffectConfig) => {
       const { ArtisticDelayEffect } = await import('@engine/effects/ArtisticDelayEffect');
       const p = c.parameters;
@@ -529,7 +529,7 @@ const wasmEffects: EffectDescriptor[] = [
   },
   {
     id: 'SlapbackDelay', name: 'Slapback Delay', category: 'wasm', group: 'Reverb & Delay',
-    loadMode: 'eager',
+    loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const { SlapbackDelayEffect } = await import('@engine/effects/SlapbackDelayEffect');
       const p = c.parameters;
@@ -545,7 +545,7 @@ const wasmEffects: EffectDescriptor[] = [
   },
   {
     id: 'ZamDelay', name: 'ZAM Delay', category: 'wasm', group: 'Reverb & Delay',
-    loadMode: 'eager',
+    loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const { ZamDelayEffect } = await import('@engine/effects/ZamDelayEffect');
       const p = c.parameters;
@@ -1184,7 +1184,7 @@ const wasmEffects: EffectDescriptor[] = [
   },
   {
     id: 'Della', name: 'Della Delay', category: 'wasm', group: 'Reverb & Delay',
-    loadMode: 'eager',
+    loadMode: 'eager', bpmSyncParams: ['time'],
     create: async (c: EffectConfig) => {
       const { DellaEffect } = await import('@engine/effects/DellaEffect');
       const p = c.parameters;
