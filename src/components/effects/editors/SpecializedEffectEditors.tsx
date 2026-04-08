@@ -20,13 +20,24 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const frequency = getParam(effect, 'frequency', 1);
   const depth = getParam(effect, 'depth', 1);
+  const type = (effect.parameters?.type as string) || 'sine';
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const WAVE_TYPES = ['sine', 'triangle', 'square', 'sawtooth'] as const;
 
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#22c55e" />
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#22c55e" title="Auto Panner" />
+        <div className="flex justify-center gap-2 mb-4">
+          {WAVE_TYPES.map((w) => (
+            <button key={w} onClick={() => onUpdateParameter('type', w)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
+                type === w ? 'bg-green-700/70 border-green-500 text-green-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-green-700'
+              }`}>{w === 'sawtooth' ? 'saw' : w}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob
             value={frequency}

@@ -6,7 +6,7 @@ import React from 'react';
 import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
 import { EffectOscilloscope } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
-import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
+import { SectionHeader, getParam, renderBpmSync, type VisualEffectEditorProps } from './shared';
 
 const Section: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
@@ -426,13 +426,24 @@ export const PulsatorEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUp
   const depth = getParam(effect, 'depth', 0.5);
   const stereoPhase = getParam(effect, 'stereoPhase', 180);
   const offset = getParam(effect, 'offset', 0);
+  const waveform = getParam(effect, 'waveform', 0);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const WAVE_LABELS = ['Sine', 'Tri', 'Square', 'Saw', 'Rev Saw'] as const;
 
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#f43f5e" />
       <Section>
         <SectionHeader size="lg" color="#f43f5e" title="Pulsator" />
+        <div className="flex justify-center gap-2 mb-4">
+          {WAVE_LABELS.map((label, i) => (
+            <button key={i} onClick={() => onUpdateParameter('waveform', i)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                Math.round(waveform) === i ? 'bg-rose-700/70 border-rose-500 text-rose-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-rose-700'
+              }`}>{label}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob value={rate} min={0.1} max={20} onChange={(v) => onUpdateParameter('rate', v)}
             label="Rate" color="#f43f5e" formatValue={(v) => `${v.toFixed(1)} Hz`} />
@@ -462,13 +473,24 @@ export const RingModEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
   const frequency = getParam(effect, 'frequency', 440);
   const lfoRate = getParam(effect, 'lfoRate', 0);
   const lfoDepth = getParam(effect, 'lfoDepth', 0);
+  const waveform = getParam(effect, 'waveform', 0);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const WAVE_LABELS = ['Sine', 'Square', 'Tri', 'Saw'] as const;
 
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#be185d" />
       <Section>
         <SectionHeader size="lg" color="#be185d" title="Ring Modulator" />
+        <div className="flex justify-center gap-2 mb-4">
+          {WAVE_LABELS.map((label, i) => (
+            <button key={i} onClick={() => onUpdateParameter('waveform', i)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                Math.round(waveform) === i ? 'bg-pink-700/70 border-pink-500 text-pink-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-pink-700'
+              }`}>{label}</button>
+          ))}
+        </div>
         <div className="flex justify-around items-end">
           <Knob value={frequency} min={20} max={5000} onChange={(v) => onUpdateParameter('frequency', v)}
             label="Frequency" color="#be185d" formatValue={(v) => `${Math.round(v)} Hz`} />
@@ -596,6 +618,7 @@ export const ReverseDelayEditor: React.FC<VisualEffectEditorProps> = ({ effect, 
       <EffectOscilloscope pre={pre} post={post} color="#7c3aed" />
       <Section>
         <SectionHeader size="lg" color="#7c3aed" title="Reverse Delay" />
+        {renderBpmSync(effect, onUpdateParameter)}
         <div className="flex justify-around items-end">
           <Knob value={getParam(effect, 'time', 500)} min={50} max={2000}
             onChange={(v) => onUpdateParameter('time', v)} label="Time" color="#7c3aed" formatValue={(v) => `${Math.round(v)} ms`} />
@@ -616,6 +639,7 @@ export const VintageDelayEditor: React.FC<VisualEffectEditorProps> = ({ effect, 
       <EffectOscilloscope pre={pre} post={post} color="#a1887f" />
       <Section>
         <SectionHeader size="lg" color="#a1887f" title="Vintage Delay" />
+        {renderBpmSync(effect, onUpdateParameter)}
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={getParam(effect, 'time', 400)} min={50} max={2000}
             onChange={(v) => onUpdateParameter('time', v)} label="Time" color="#a1887f" formatValue={(v) => `${Math.round(v)} ms`} />
@@ -645,6 +669,7 @@ export const ArtisticDelayEditor: React.FC<VisualEffectEditorProps> = ({ effect,
       <EffectOscilloscope pre={pre} post={post} color="#4f46e5" />
       <Section>
         <SectionHeader size="lg" color="#4f46e5" title="Artistic Delay" />
+        {renderBpmSync(effect, onUpdateParameter)}
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={getParam(effect, 'timeL', 500)} min={10} max={2000}
             onChange={(v) => onUpdateParameter('timeL', v)} label="Time L" color="#4f46e5" formatValue={(v) => `${Math.round(v)} ms`} />
@@ -678,6 +703,7 @@ export const SlapbackDelayEditor: React.FC<VisualEffectEditorProps> = ({ effect,
       <EffectOscilloscope pre={pre} post={post} color="#ca8a04" />
       <Section>
         <SectionHeader size="lg" color="#ca8a04" title="Slapback" />
+        {renderBpmSync(effect, onUpdateParameter)}
         <div className="flex justify-around items-end">
           <Knob value={getParam(effect, 'time', 60)} min={10} max={200}
             onChange={(v) => onUpdateParameter('time', v)} label="Time" color="#ca8a04" formatValue={(v) => `${Math.round(v)} ms`} />
@@ -701,6 +727,7 @@ export const ZamDelayEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUp
       <EffectOscilloscope pre={pre} post={post} color="#16a34a" />
       <Section>
         <SectionHeader size="lg" color="#16a34a" title="ZamDelay" />
+        {renderBpmSync(effect, onUpdateParameter)}
         <div className="flex justify-around items-end flex-wrap gap-y-4">
           <Knob value={getParam(effect, 'time', 500)} min={10} max={2000}
             onChange={(v) => onUpdateParameter('time', v)} label="Time" color="#16a34a" formatValue={(v) => `${Math.round(v)} ms`} />
@@ -730,6 +757,7 @@ export const DellaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
       <EffectOscilloscope pre={pre} post={post} color="#0891b2" />
       <Section>
         <SectionHeader size="lg" color="#0891b2" title="Della" />
+        {renderBpmSync(effect, onUpdateParameter)}
         <div className="flex justify-around items-end">
           <Knob value={getParam(effect, 'time', 300)} min={10} max={2000}
             onChange={(v) => onUpdateParameter('time', v)} label="Time" color="#0891b2" formatValue={(v) => `${Math.round(v)} ms`} />
@@ -859,17 +887,28 @@ export const VihdaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
 // ============================================================================
 
 export const MashaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
+  const active = getParam(effect, 'active', 0);
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#dc2626" />
       <Section>
         <SectionHeader size="lg" color="#dc2626" title="Masha" />
+        <div className="flex justify-center mb-4">
+          <button onClick={() => onUpdateParameter('active', active >= 0.5 ? 0 : 1)}
+            className={`px-6 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+              active >= 0.5
+                ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-600/40 animate-pulse'
+                : 'bg-black/40 border-dark-border text-text-muted hover:border-red-700'
+            }`}>{active >= 0.5 ? 'ACTIVE' : 'BYPASS'}</button>
+        </div>
         <div className="flex justify-around items-end">
-          <Knob value={getParam(effect, 'time', 100)} min={1} max={1000}
+          <Knob value={getParam(effect, 'time', 100)} min={1} max={500}
             onChange={(v) => onUpdateParameter('time', v)} label="Time" color="#dc2626" formatValue={(v) => `${Math.round(v)} ms`} />
           <Knob value={getParam(effect, 'volume', 1)} min={0} max={2}
             onChange={(v) => onUpdateParameter('volume', v)} label="Volume" color="#ef4444" formatValue={(v) => v.toFixed(2)} />
+          <Knob value={getParam(effect, 'passthrough', 0)} min={0} max={1}
+            onChange={(v) => onUpdateParameter('passthrough', v)} label="Pass" color="#f87171" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
             label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
         </div>
