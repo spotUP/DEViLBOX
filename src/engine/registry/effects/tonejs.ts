@@ -136,14 +136,9 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const jcr = new Tone.JCReverb({ roomSize: Math.min(0.9, Number(p.roomSize) || 0.7), wet: c.wet / 100 });
-      const combFilters = (jcr as unknown as { _feedbackCombFilters: { _worklet?: AudioWorkletNode }[] })._feedbackCombFilters;
-      if (combFilters?.length) {
-        for (let attempt = 0; attempt < 50; attempt++) {
-          if (combFilters.every(f => f._worklet)) break;
-          await new Promise(r => setTimeout(r, 20));
-        }
-      }
+      const roomVal = Math.max(0, Math.min(Number(p.roomSize) || 0.7, 0.99));
+      const jcr = new Tone.Reverb({ decay: 0.5 + roomVal * 9.5, preDelay: 0.01, wet: c.wet / 100 });
+      await jcr.ready;
       return jcr;
     },
     getDefaultParameters: () => ({ roomSize: 0.7 }),

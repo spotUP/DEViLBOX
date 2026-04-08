@@ -2,8 +2,14 @@
  * RETapeEchoEffect - WASM-backed Roland RE-150/201 tape echo effect
  *
  * Wraps the RE-Tape-Echo C++ DSP engine compiled to WebAssembly.
- * Provides a Tone.ToneAudioNode-compatible interface for use in
- * instrument, channel, and master effect chains.
+ * Uses a native WebAudio DelayNode fallback that runs immediately,
+ * then upgrades to WASM when available.
+ *
+ * Follows MVerb's proven pattern:
+ *   - rawContext for WASM, getNativeAudioNode for node connections
+ *   - Connect WASM first, then disconnect fallback (no silent gap)
+ *   - Keepalive connection to destination (ensures worklet scheduling)
+ *   - Last-resort Tone.js fallback if native node access fails
  *
  * Parameters:
  *   - mode: Echo mode 0-5 (head/feedback combinations)
@@ -20,7 +26,7 @@
  */
 
 import * as Tone from 'tone';
-import { getNativeContext, getNativeAudioNode } from '@utils/audio-context';
+import { getNativeAudioNode } from '@utils/audio-context';
 
 export interface RETapeEchoOptions {
   mode?: number;           // 0-5
@@ -54,6 +60,13 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
   private _wasmReady = false;
   private _options: Required<RETapeEchoOptions>;
 
+  // JS fallback nodes (native WebAudio delay)
+  private fallbackDelay: DelayNode | null = null;
+  private fallbackFeedback: GainNode | null = null;
+  private fallbackFilter: BiquadFilterNode | null = null;
+  private fallbackEchoGain: GainNode | null = null;
+  private _usingFallback = false;
+
   constructor(options: RETapeEchoOptions = {}) {
     super();
 
@@ -74,31 +87,121 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // WASM outputs wet-only signal; we mix externally.
-    // Start full-dry until worklet is ready — prevents silence while WASM loads.
-    this.dryGain = new Tone.Gain(1);
-    this.wetGain = new Tone.Gain(0);
+    // Start with correct dry/wet from the beginning
+    this.dryGain = new Tone.Gain(1 - this._options.wet);
+    this.wetGain = new Tone.Gain(this._options.wet);
 
     // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
-
-    // Wet path output must be connected immediately so audio isn't silent
-    // while WASM loads (initialize() connects input → worklet → wetGain async)
     this.wetGain.connect(this.output);
 
-    this.initialize();
+    // Initialize JS fallback immediately, then try WASM
+    this.initFallback();
+    this.initWasm();
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      const nativeCtx = getNativeContext(this.context);
-      if (!nativeCtx) throw new Error('Could not get native AudioContext');
+  /** Convert repeatRate (0-1) to delay time in seconds */
+  private rateToDelaySec(): number {
+    // Match the WASM formula: offset = 1 - (rate * 2.3), delay_ms = (offset + 1) * 47
+    const offset = 1 - (this._options.repeatRate * 2.3);
+    const delayMs = (offset + 1) * 47;
+    return Math.max(0.01, Math.min(delayMs / 1000, 0.5));
+  }
 
-      await RETapeEchoEffect.ensureModuleLoaded(nativeCtx);
+  /** JS fallback using native WebAudio DelayNode — runs immediately */
+  private initFallback(): void {
+    try {
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+      const inputNode = getNativeAudioNode(this.input);
+      const wetNode = getNativeAudioNode(this.wetGain);
+
+      if (!inputNode || !wetNode) {
+        // Last resort: pure Tone.js connection (no delay, but at least not silent)
+        console.warn('[RETapeEcho] Native node access failed — using Tone.js passthrough');
+        this.input.connect(this.wetGain);
+        return;
+      }
+
+      this.fallbackDelay = rawContext.createDelay(1.0);
+      this.fallbackFeedback = rawContext.createGain();
+      this.fallbackFilter = rawContext.createBiquadFilter();
+      this.fallbackEchoGain = rawContext.createGain();
+
+      // Configure
+      this.fallbackDelay.delayTime.value = this.rateToDelaySec();
+      this.fallbackFeedback.gain.value = this._options.intensity * 0.9;
+      this.fallbackEchoGain.gain.value = this._options.echoVolume;
+      this.fallbackFilter.type = 'lowpass';
+      this.fallbackFilter.frequency.value = this._options.playheadFilter ? 4000 : 20000;
+
+      // Routing: input → delay → echoGain → filter → wetGain, with feedback loop
+      inputNode.connect(this.fallbackDelay);
+      this.fallbackDelay.connect(this.fallbackEchoGain);
+      this.fallbackEchoGain.connect(this.fallbackFilter);
+      this.fallbackFilter.connect(wetNode);
+      this.fallbackFilter.connect(this.fallbackFeedback);
+      this.fallbackFeedback.connect(this.fallbackDelay);
+
+      this._usingFallback = true;
+    } catch (err) {
+      console.warn('[RETapeEcho] JS fallback init failed:', err);
+      // Last resort: Tone.js passthrough
+      try { this.input.connect(this.wetGain); } catch { /* ignored */ }
+    }
+  }
+
+  /** Disconnect JS fallback when WASM takes over */
+  private disconnectFallback(): void {
+    if (!this._usingFallback) return;
+    try {
+      this.fallbackDelay?.disconnect();
+      this.fallbackFeedback?.disconnect();
+      this.fallbackFilter?.disconnect();
+      this.fallbackEchoGain?.disconnect();
+    } catch { /* already disconnected */ }
+    this._usingFallback = false;
+  }
+
+  /** Swap from JS fallback to WASM — connect first, then disconnect (MVerb pattern) */
+  private swapToWasm(): void {
+    if (!this.workletNode) return;
+    try {
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+      const rawInput = getNativeAudioNode(this.input);
+      const rawWet = getNativeAudioNode(this.wetGain);
+
+      if (!rawInput || !rawWet) {
+        console.warn('[RETapeEcho] Cannot swap to WASM — native node access failed');
+        return;
+      }
+
+      // Connect WASM FIRST, then disconnect fallback (avoids silent gap)
+      rawInput.connect(this.workletNode);
+      this.workletNode.connect(rawWet);
+
+      // Keepalive: ensure AudioWorklet is scheduled even if chain is complex
+      const keepalive = rawContext.createGain();
+      keepalive.gain.value = 0;
+      this.workletNode.connect(keepalive);
+      keepalive.connect(rawContext.destination);
+
+      // Now safe to disconnect fallback
+      this.disconnectFallback();
+    } catch (err) {
+      console.warn('[RETapeEcho] WASM swap failed, staying on fallback:', err);
+    }
+  }
+
+  /** Try to initialize WASM worklet in background */
+  private async initWasm(): Promise<void> {
+    try {
+      const rawContext = Tone.getContext().rawContext as AudioContext;
+
+      await RETapeEchoEffect.ensureModuleLoaded(rawContext);
       if (this._disposed) return;
 
-      this.workletNode = new AudioWorkletNode(nativeCtx, 're-tape-echo-processor', {
+      this.workletNode = new AudioWorkletNode(rawContext, 're-tape-echo-processor', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [2],
@@ -109,7 +212,6 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this._wasmReady = true;
-          // WASM ready — send params and apply the true wet/dry levels
           this.sendParam('mode', this._options.mode);
           this.sendParam('repeatRate', this._options.repeatRate);
           this.sendParam('intensity', this._options.intensity);
@@ -120,41 +222,28 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
           this.sendParam('inputBleed', this._options.inputBleed);
           this.sendParam('loopAmount', this._options.loopAmount);
           this.sendParam('playheadFilter', this._options.playheadFilter);
-          // Worklet producing output — apply correct wet/dry mix
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+
+          this.swapToWasm();
         } else if (event.data.type === 'error') {
-          console.error('[RETapeEcho] Worklet error:', event.data.message);
-          // WASM failed — enable wet path as passthrough so effect isn't stuck silent
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+          console.warn('[RETapeEcho] WASM init error, keeping JS fallback:', event.data.message);
         }
       };
 
       this.workletNode.port.postMessage({
         type: 'init',
-        sampleRate: nativeCtx.sampleRate,
+        sampleRate: rawContext.sampleRate,
         wasmBinary: wasmBinary,
         jsCode: jsCode,
       });
 
-      // Connect wet path: input → workletNode → wetGain (already connected to output)
-      // Use getNativeAudioNode() to extract the underlying native AudioNode — Tone.connect()
-      // silently fails when crossing standardized-audio-context ↔ native AudioContext.
-      getNativeAudioNode(this.input)!.connect(this.workletNode);
-      this.workletNode.connect(getNativeAudioNode(this.wetGain)!);
-
-      // Safety timeout: if WASM doesn't report ready within 5s, enable wet path
       setTimeout(() => {
-        if (!this._wasmReady && !this._disposed) {
-          console.warn('[RETapeEcho] WASM not ready after 5s — enabling wet path as passthrough');
-          this.dryGain.gain.value = 1 - this._options.wet;
-          this.wetGain.gain.value = this._options.wet;
+        if (!this._wasmReady && !this._disposed && this.workletNode) {
+          console.warn('[RETapeEcho] WASM not ready after 5s — keeping JS fallback');
         }
       }, 5000);
 
     } catch (err) {
-      console.error('[RETapeEcho] Init failed:', err);
+      console.warn('[RETapeEcho] WASM init failed, using JS fallback:', err);
     }
   }
 
@@ -222,16 +311,25 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
   setRepeatRate(rate: number): void {
     this._options.repeatRate = Math.max(0, Math.min(rate, 1));
     this.sendParam('repeatRate', this._options.repeatRate);
+    if (this.fallbackDelay) {
+      this.fallbackDelay.delayTime.value = this.rateToDelaySec();
+    }
   }
 
   setIntensity(val: number): void {
     this._options.intensity = Math.max(0, Math.min(val, 1));
     this.sendParam('intensity', this._options.intensity);
+    if (this.fallbackFeedback) {
+      this.fallbackFeedback.gain.value = val * 0.9;
+    }
   }
 
   setEchoVolume(vol: number): void {
     this._options.echoVolume = Math.max(0, Math.min(vol, 1));
     this.sendParam('echoVolume', this._options.echoVolume);
+    if (this.fallbackEchoGain) {
+      this.fallbackEchoGain.gain.value = vol;
+    }
   }
 
   setWow(val: number): void {
@@ -262,6 +360,9 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
   setPlayheadFilter(on: boolean | number): void {
     this._options.playheadFilter = on ? 1 : 0;
     this.sendParam('playheadFilter', on ? 1 : 0);
+    if (this.fallbackFilter) {
+      this.fallbackFilter.frequency.value = on ? 4000 : 20000;
+    }
   }
 
   get wet(): number { return this._options.wet; }
@@ -273,6 +374,7 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
 
   dispose(): this {
     this._disposed = true;
+    this.disconnectFallback();
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
       this.workletNode.disconnect();

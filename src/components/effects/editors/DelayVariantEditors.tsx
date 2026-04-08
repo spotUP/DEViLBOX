@@ -304,17 +304,18 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
             color="#6366f1"
             formatValue={(v) => `${Math.round(v)}`}
           />
-          <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
-            <Knob
-              value={rate}
-              min={50}
-              max={1000}
-              onChange={(v) => onUpdateParameter('rate', v)}
-              label="Rate"
-              color="#6366f1"
-              formatValue={(v) => `${Math.round(v)}ms`}
-            />
-          </div>
+          <Knob
+            value={rate}
+            min={50}
+            max={1000}
+            onChange={(v) => {
+              if (synced) onUpdateParameter('bpmSync', 0);
+              onUpdateParameter('rate', v);
+            }}
+            label="Rate"
+            color="#6366f1"
+            formatValue={(v) => synced ? 'SYNC' : `${Math.round(v)}ms`}
+          />
           <Knob
             value={intensity}
             min={0}
