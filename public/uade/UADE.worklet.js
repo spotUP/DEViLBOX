@@ -762,6 +762,11 @@ class UADEProcessor extends AudioWorkletProcessor {
       let scanData = [];
       if (!skipScan) {
         const effectiveTimeout = (typeof scanTimeoutSec === 'number') ? scanTimeoutSec : 600;
+        // Enable tick snapshots during short scan so we capture note triggers
+        const isShortScanMode = typeof scanTimeoutSec === 'number' && scanTimeoutSec < 600;
+        if (isShortScanMode && this._wasm._uade_wasm_enable_tick_snapshots) {
+          this._wasm._uade_wasm_enable_tick_snapshots(1);
+        }
         console.log('[UADE.worklet] Starting song scan (timeout=' + effectiveTimeout + 's)...');
         const scanStart = performance.now();
         scanResult = this._scanSong(subsongIndex, effectiveTimeout);
