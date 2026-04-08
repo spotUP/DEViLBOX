@@ -57,7 +57,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'load':
-        await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false);
+        await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false, data.scanTimeoutSec);
         break;
 
       case 'reinit':
@@ -688,7 +688,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     return ret;
   }
 
-  async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false) {
+  async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false, scanTimeoutSec = undefined) {
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -755,15 +755,16 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       // Fast-scan the entire song to extract pattern data before playback.
       // skipScan=true is used for formats (e.g. compiled 68k replayers) where the
-      // player loops indefinitely without an end signal — running the scan would
-      // hang the worklet thread for up to MAX_SECONDS (600s).
+      // scan crashes or corrupts engine state. scanTimeoutSec overrides the default
+      // 600s limit — use 30s for FORCE_CLASSIC formats that loop but don't crash.
       let scanResult = null;
       let isEnhanced = false;
       let scanData = [];
       if (!skipScan) {
-        console.log('[UADE.worklet] Starting song scan...');
+        const effectiveTimeout = (typeof scanTimeoutSec === 'number') ? scanTimeoutSec : 600;
+        console.log('[UADE.worklet] Starting song scan (timeout=' + effectiveTimeout + 's)...');
         const scanStart = performance.now();
-        scanResult = this._scanSong(subsongIndex);
+        scanResult = this._scanSong(subsongIndex, effectiveTimeout);
         isEnhanced = !!(scanResult && scanResult.isEnhanced);
         scanData = isEnhanced ? scanResult.rows : (scanResult ?? []);
         const scanDuration = Math.round(performance.now() - scanStart);
@@ -782,6 +783,10 @@ class UADEProcessor extends AudioWorkletProcessor {
         const ret2 = this._loadIntoWasm(data, filenameHint);
         if (ret2 !== 0) {
           console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
+        }
+        // After a short scan (compiled replayer), re-enable looping for playback.
+        if (typeof scanTimeoutSec === 'number' && scanTimeoutSec < 600) {
+          this._wasm._uade_wasm_set_looping(1);
         }
       } else {
         // Compiled replayers (skipScan=true) should loop indefinitely.
@@ -845,22 +850,22 @@ class UADEProcessor extends AudioWorkletProcessor {
    * Captures Paula channel state at regular row intervals (~5292 frames at 125BPM/speed 6).
    * Returns array of rows, each containing 4 channels of {period, volume, samplePtr}.
    */
-  _scanSong(subsongIndex = 0) {
+  _scanSong(subsongIndex = 0, maxSeconds = 600) {
     // Try enhanced scan first; fall back to basic scan if new WASM exports aren't available
     if (typeof this._wasm._uade_wasm_get_channel_extended === 'function') {
-      return this._scanSongEnhanced(subsongIndex);
+      return this._scanSongEnhanced(subsongIndex, maxSeconds);
     }
-    return this._scanSongBasic();
+    return this._scanSongBasic(maxSeconds);
   }
 
   /**
    * Basic scan — original row-based scan for older WASM builds without extended exports.
    */
-  _scanSongBasic() {
+  _scanSongBasic(maxSeconds = 600) {
     const CHUNK = 256;
     const FRAMES_PER_ROW = Math.round((sampleRate || 44100) * 2.5 * 6 / 125); // ~5292
     const MAX_ROWS = 64 * 256; // 256 patterns max
-    const MAX_SECONDS = 600;   // 10 minute safety limit
+    const MAX_SECONDS = maxSeconds;
     const maxFrames = (sampleRate || 44100) * MAX_SECONDS;
 
     // Ensure channel snapshot buffer exists
@@ -933,14 +938,14 @@ class UADEProcessor extends AudioWorkletProcessor {
    *   samples: { [samplePtr]: { pcm: Uint8Array, length, loopStart, loopLength, typicalPeriod } }
    *   tempoChanges: [{ row, bpm, speed }]
    */
-  _scanSongEnhanced(subsongIndex = 0) {
+  _scanSongEnhanced(subsongIndex = 0, maxSeconds = 600) {
     // Seek to the requested subsong before scanning
     if (subsongIndex > 0) {
       this._wasm._uade_wasm_set_subsong(subsongIndex);
     }
 
     const CHUNK = 128;  // Smaller chunks = higher tick resolution
-    const MAX_SECONDS = 600;
+    const MAX_SECONDS = maxSeconds;
     const sr = sampleRate || 44100;
     const maxFrames = sr * MAX_SECONDS;
     const MAX_ROWS = 64 * 256;

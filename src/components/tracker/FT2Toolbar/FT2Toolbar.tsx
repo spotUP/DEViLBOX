@@ -758,12 +758,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
           <div className="ft2-toolbar-row">
               <div className="ft2-section ft2-col-1">
-                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
-              </div>
-              <div className="ft2-section ft2-col-2">
-                <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
-              </div>
-              <div className="ft2-section ft2-col-3">
                 <FT2NumericInput
                   label="Length"
                   value={patternLength}
@@ -782,13 +776,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                   ]}
                 />
               </div>
-              <div className="ft2-section ft2-col-4">
+              <div className="ft2-section ft2-col-2">
+                <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
+              </div>
+              <div className="ft2-section ft2-col-3">
                 <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
               </div>
             </div>
         </div>
 
-        <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[350px] flex-shrink-0 border-l border-dark-border cursor-pointer group ml-auto" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
+        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-shrink border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
           const currentIndex = modes.indexOf(vizMode);

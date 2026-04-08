@@ -565,7 +565,7 @@ export class UADEEngine {
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
    */
-  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
 
@@ -577,7 +577,7 @@ export class UADEEngine {
     // Clone buffer before transferring (caller may need it later for subsong switching)
     const transferBuf = data.slice(0);
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint, skipScan, subsong },
+      { type: 'load', buffer: transferBuf, filenameHint, skipScan, subsong, scanTimeoutSec },
       [transferBuf]
     );
 
@@ -592,47 +592,66 @@ export class UADEEngine {
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const state = useFormatStore.getState();
     const fileName = state.uadeEditableFileName || 'module.mod';
-    // Skip the worklet scan for compiled 68k replayer formats that loop indefinitely.
-    // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
     const prefix = fileName.split('.')[0]?.toLowerCase() ?? '';
-    // Skip scan for compiled 68k replayer formats that hang or crash during enhanced scan.
-    // Must stay in sync with FORCE_CLASSIC_FORMATS/PREFIXES in UADEParser.ts.
-    const SKIP_SCAN_EXTS = new Set([
+
+    // SCAN_CRASH: formats where the enhanced scan crashes the browser or corrupts
+    // engine state. These MUST be skipped entirely (skipScan=true).
+    const SCAN_CRASH_EXTS = new Set([
+      'mon',    // ManiacsOfNoise — scan crashes browser
+      'sa',     // SonicArranger — scan crashes browser
+      'sas',    // SonicArranger suffix — scan crashes browser
+      'aps',    // AProSys — scan reads garbage from packed binary
+      'mso',    // Medley — scan crashes browser
+      'ml',     // Medley alternate — scan crashes browser
+      'thm',    // ThomasHermann — scan crashes browser
+      'sb',     // SteveBarrett — scan crashes browser
+      'ps',     // PaulShields — scan crashes browser
+    ]);
+    const SCAN_CRASH_PREFIXES = new Set([
+      'sas',    // SonicArranger prefix — scan crashes browser
+      'ash',    // AshleyHogg — scan crashes browser
+      'tsm',    // SunTronic/TSM — scan corrupts engine state
+      'thm',    // ThomasHermann — scan crashes browser
+      'sb',     // SteveBarrett — scan crashes browser
+      'ps',     // PaulShields — scan crashes browser
+    ]);
+    const scanCrashes = SCAN_CRASH_EXTS.has(ext) || SCAN_CRASH_PREFIXES.has(prefix);
+
+    // SHORT_SCAN: compiled 68k replayers that loop indefinitely but don't crash.
+    // Use a 30-second scan to capture tick data for pattern reconstruction.
+    const SHORT_SCAN_EXTS = new Set([
       'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-      // FORCE_CLASSIC suffix-form formats:
-      'mon', 'sa', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-      'aps', 'sas', 'mso', 'ml', 'rho', 'dln', 'core', 'hot', 'wb', 'dh',
+      'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+      'rho', 'dln', 'core', 'hot', 'wb', 'dh',
       'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
       'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
       'mc', 'mcr', 'mco',  // MarkCooksey
       'jmf',    // JankoMrsicFlogel
       'kh',     // KrisHatlelid
-      'thm',    // ThomasHermann
-      'sb',     // SteveBarrett — compiled 68k replayer
-      'ps',     // PaulShields — compiled 68k replayer
-      'sng',    // RichardJoseph — compiled 68k replayer
-      'sjs',    // SoundPlayer — compiled 68k replayer (two-file sjs.*+smp.*)
-      'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer (two-file jpn.*+smp.*)
+      'sng',    // RichardJoseph
+      'sjs',    // SoundPlayer (two-file sjs.*+smp.*)
+      'jpn', 'jpnd', 'jp',  // JasonPage (two-file jpn.*+smp.*)
     ]);
-    const SKIP_SCAN_PREFIXES = new Set([
+    const SHORT_SCAN_PREFIXES = new Set([
       'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-      // FORCE_CLASSIC prefix-form formats:
-      'fw', 'sas', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-      'dns', 'mk2', 'mkii', 'ash', 'rho', 'core', 'hot', 'wb', 'dh',
+      'fw', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
+      'dns', 'mk2', 'mkii', 'rho', 'core', 'hot', 'wb', 'dh',
       'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
       'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
       'mc', 'mcr', 'mco',  // MarkCooksey
       'jmf',    // JankoMrsicFlogel
       'kh',     // KrisHatlelid
-      'thm', 'smp',  // ThomasHermann
       'mfp',    // MagneticFieldsPacker
-      'sb',     // SteveBarrett — compiled 68k replayer
-      'ps',     // PaulShields — compiled 68k replayer
-      'sjs',    // SoundPlayer — compiled 68k replayer
-      'jpn', 'jpnd', 'jp',  // JasonPage — compiled 68k replayer
+      'smp',    // ThomasHermann companion prefix (smp.*)
+      'sjs',    // SoundPlayer
+      'jpn', 'jpnd', 'jp',  // JasonPage
+      'sng',    // RichardJoseph
     ]);
-    const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
+    const shortScan = SHORT_SCAN_EXTS.has(ext) || SHORT_SCAN_PREFIXES.has(prefix);
+
+    const skipScan = scanCrashes;
+    const scanTimeoutSec = shortScan ? 30 : undefined;
 
     // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading
     const companions = state.uadeCompanionFiles;
@@ -642,7 +661,7 @@ export class UADEEngine {
       }
     }
 
-    await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong);
+    await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong, scanTimeoutSec);
   }
 
   /**
