@@ -13,7 +13,6 @@ import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import { channelLayout } from './channelLayout';
 
 const STRIP_HEIGHT = 36;
 
@@ -126,10 +125,6 @@ export const TrackScopesStrip: React.FC = memo(() => {
       const playing = isPlayingRef.current;
       const useOsc = oscActiveRef.current;
 
-      const layout = channelLayout;
-      const hasLayout = layout.numChannels > 0 && layout.offsets.length >= nc;
-      const scrollX = layout.scrollLeft;
-
       const oscSnapshot = useOsc ? useOscilloscopeStore.getState().channelData : null;
       const mixState = useMixerStore.getState().channels;
       const trackerState = useTrackerStore.getState();
@@ -151,21 +146,12 @@ export const TrackScopesStrip: React.FC = memo(() => {
       }
 
       for (let i = 0; i < nc; i++) {
-        let x: number, w: number;
-        if (hasLayout) {
-          x = layout.offsets[i] - scrollX;
-          w = layout.widths[i] - 1;
-        } else {
-          const equalW = Math.max(40, (cw - 4) / nc - 1);
-          x = 2 + i * (equalW + 1);
-          w = equalW;
-        }
-
-        if (x + w < 0 || x > cw) continue;
-
-        const clipX = Math.max(0, x);
-        const clipW = Math.min(cw, x + w) - clipX;
-        if (clipW < 4) continue;
+        // Always stretch to full width — equal spacing across canvas
+        const gap = 1;
+        const totalGaps = nc - 1;
+        const scopeW = (cw - totalGaps * gap) / nc;
+        const x = i * (scopeW + gap);
+        const w = scopeW;
 
         const y = 1;
         const h = ch - 2;
@@ -175,14 +161,14 @@ export const TrackScopesStrip: React.FC = memo(() => {
 
         // Scope cell background
         ctx.fillStyle = theme.bg;
-        ctx.fillRect(clipX, y, clipW, h);
+        ctx.fillRect(x, y, w, h);
 
         // Center line
         ctx.strokeStyle = theme.border;
         ctx.lineWidth = 0.5;
         ctx.beginPath();
-        ctx.moveTo(clipX, y + h / 2);
-        ctx.lineTo(clipX + clipW, y + h / 2);
+        ctx.moveTo(x, y + h / 2);
+        ctx.lineTo(x + w, y + h / 2);
         ctx.stroke();
 
         // Per-channel WASM oscilloscope waveform
@@ -195,7 +181,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
           const start = i * segLen;
           const segment = masterWaveform.subarray(start, start + segLen);
           if (segment.length > 0) {
-            drawWaveform(ctx, clipX, y, clipW, h, segment, color, true);
+            drawWaveform(ctx, x, y, w, h, segment, color, true);
           }
         }
 
@@ -208,7 +194,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.globalAlpha = 0.5;
-        ctx.fillText(label, clipX + 3, y + 2);
+        ctx.fillText(label, x + 3, y + 2);
         ctx.globalAlpha = 1;
       }
 
