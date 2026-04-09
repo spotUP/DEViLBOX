@@ -194,6 +194,10 @@ export const TrackScopesStrip: React.FC = memo(() => {
       const oscSnapshot = useOsc ? useOscilloscopeStore.getState().channelData : null;
       const mixState = useMixerStore.getState().channels;
 
+      // Read channel colors from pattern
+      const trackerState = useTrackerStore.getState();
+      const patternChannels = trackerState.patterns[trackerState.currentPatternIndex]?.channels;
+
       for (let i = 0; i < nc; i++) {
         // Use real channel layout if available, otherwise fall back to equal spacing
         let x: number, w: number;
@@ -216,7 +220,8 @@ export const TrackScopesStrip: React.FC = memo(() => {
 
         const y = 2;
         const h = ch - 4;
-        const color = CH_COLORS[i % CH_COLORS.length];
+        // Use channel color from pattern editor, fall back to palette
+        const color = patternChannels?.[i]?.color || CH_COLORS[i % CH_COLORS.length];
         const isMuted = mixState[i]?.muted ?? false;
         const displayColor = isMuted ? theme.textMuted : color;
 
