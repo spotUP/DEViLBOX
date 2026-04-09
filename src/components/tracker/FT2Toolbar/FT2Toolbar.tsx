@@ -676,8 +676,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   return (
     <div className="ft2-toolbar">
-      <div className="flex flex-1 min-w-0 justify-between">
-        <div className="flex-shrink-0 min-w-0">
+      <div className="flex flex-1 min-w-0 flex-wrap gap-y-1">
+        <div className="min-w-0 flex-1">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
