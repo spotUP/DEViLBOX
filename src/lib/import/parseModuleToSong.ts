@@ -87,7 +87,20 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       const { parseAdPlugFile } = await import('./formats/AdPlugParser');
       const result = parseAdPlugFile(buffer, file.name);
       if (result) return result;
-    } catch { /* fall through to other parsers */ }
+    } catch { /* fall through to WASM extraction */ }
+  }
+
+  // AdPlug WASM extraction — for CmodPlayer-based formats (A2M, AMD, CFF, etc.)
+  // Try extracting editable patterns from the WASM module before falling back to streaming
+  const { isAdPlugWasmFormat } = await import('@lib/file/UnifiedFileLoader');
+  if (isAdPlugWasmFormat(filename)) {
+    try {
+      const { extractAdPlugPatterns } = await import('./formats/AdPlugWasmExtractor');
+      const extracted = await extractAdPlugPatterns(buffer, file.name);
+      if (extracted) return extracted;
+    } catch (err) {
+      console.warn('[parseModuleToSong] AdPlug WASM extraction failed:', err);
+    }
   }
 
   const { tryRouteFormat } = await import('./parsers/AmigaFormatParsers');
