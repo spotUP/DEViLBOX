@@ -68,7 +68,6 @@ const HoverableHeaderBtn: React.FC<{
       eventMode="static"
       cursor="pointer"
       onClick={(e: FederatedPointerEvent) => { e.stopPropagation(); onPress(e); }}
-      onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onPress(e); }}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       layout={LAYOUT_BTN}
