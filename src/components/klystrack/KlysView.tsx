@@ -23,6 +23,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getToneEngine } from '@engine/ToneEngine';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 const POSITION_H = KLYS_MATRIX_HEIGHT;
 
@@ -246,17 +247,15 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-1 px-2 py-1 bg-[#1a1a1a] border-b border-[#222]">
         <span className="text-[10px] text-text-muted">Inst:</span>
-        <select
+        <CustomSelect
           className="flex-1 bg-[#111] text-xs text-text-secondary border border-[#333] rounded px-1"
-          value={selectedInstrument}
-          onChange={e => setSelectedInstrument(parseInt(e.target.value, 10))}
-        >
-          {nativeData.instruments.map((inst, i) => (
-            <option key={i} value={i}>
-              {i.toString(16).toUpperCase().padStart(2, '0')}: {inst.name || 'Unnamed'}
-            </option>
-          ))}
-        </select>
+          value={String(selectedInstrument)}
+          onChange={(v) => setSelectedInstrument(parseInt(v, 10))}
+          options={nativeData.instruments.map((inst, i) => ({
+            value: String(i),
+            label: `${i.toString(16).toUpperCase().padStart(2, '0')}: ${inst.name || 'Unnamed'}`,
+          }))}
+        />
       </div>
       <div className="flex-1 overflow-y-auto">
         <KlysInstrumentEditor instrumentIndex={selectedInstrument} />

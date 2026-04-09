@@ -22,6 +22,7 @@ import * as DJActions from '@engine/dj/DJActions';
 import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music, Zap } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -396,16 +397,13 @@ export const VJControls: React.FC<VJControlsProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 mr-4 min-w-0">
               {/* View switcher — since NavBar is hidden in VJ fullscreen mode */}
-              <select
+              <CustomSelect
                 value="vj"
-                onChange={(e) => switchView(e.target.value, 'vj')}
+                onChange={(v) => switchView(v, 'vj')}
                 className="bg-white/10 text-white text-xs border border-white/20 rounded px-2 py-1 outline-none cursor-pointer"
                 title="Switch view"
-              >
-                {VIEW_OPTIONS.map((v) => (
-                  <option key={v.value} value={v.value} className="bg-gray-900 text-white">{v.label}</option>
-                ))}
-              </select>
+                options={VIEW_OPTIONS.map((v) => ({ value: v.value, label: v.label }))}
+              />
               <div className="text-white/90 text-sm font-mono truncate">
                 {currentName}
               </div>

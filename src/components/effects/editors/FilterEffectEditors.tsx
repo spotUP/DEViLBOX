@@ -10,6 +10,7 @@ import { Knob } from '@components/controls/Knob';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ============================================================================
 // AUTO FILTER
@@ -480,16 +481,18 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
         <SectionHeader size="lg" color="#34d399" title="Envelope & Sidechain" />
         <div className="mb-3">
           <label className="block text-xs text-text-muted mb-1.5">Sidechain Source</label>
-          <select
-            value={Math.round(sidechainSource)}
-            onChange={(e) => onUpdateParameter('sidechainSource', Number(e.target.value))}
+          <CustomSelect
+            value={String(Math.round(sidechainSource))}
+            onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
+            options={[
+              { value: '-1', label: 'Self (Internal)' },
+              ...Array.from({ length: channelCount }, (_, i) => ({
+                value: String(i),
+                label: channelNames[i] || `CH ${i + 1}`,
+              })),
+            ]}
             className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-emerald-500 focus:outline-none"
-          >
-            <option value={-1}>Self (Internal)</option>
-            {Array.from({ length: channelCount }, (_, i) => (
-              <option key={i} value={i}>{channelNames[i] || `CH ${i + 1}`}</option>
-            ))}
-          </select>
+          />
         </div>
         <div className="flex justify-around items-end">
           <Knob

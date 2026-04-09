@@ -15,6 +15,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useFormatStore, useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -212,19 +213,11 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
         {validSubsongs.length > 1 && (
           <>
             <span style={{ color: 'var(--color-text-muted)' }}>|</span>
-            <select
-              value={native.activeSubsong}
-              onChange={(e) => handleSubsongChange(Number(e.target.value))}
-              style={{
-                fontSize: '11px', padding: '1px 4px',
-                background: 'var(--color-bg)', color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border)', borderRadius: '3px',
-              }}
-            >
-              {validSubsongs.map(i => (
-                <option key={i} value={i}>Song {i}</option>
-              ))}
-            </select>
+            <CustomSelect
+              value={String(native.activeSubsong)}
+              onChange={(v) => handleSubsongChange(Number(v))}
+              options={validSubsongs.map(i => ({ value: String(i), label: `Song ${i}` }))}
+            />
           </>
         )}
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>

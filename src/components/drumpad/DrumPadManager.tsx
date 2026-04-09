@@ -18,6 +18,7 @@ import {
 import { useInstrumentStore, useAllSamplePacks } from '../../stores';
 import { X, Download, Piano, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface DrumPadManagerProps {
   onClose?: () => void;
@@ -332,26 +333,26 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
           <div className="flex items-center gap-3">
             {isViewMode && !performanceMode && (
               <>
-                <select
+                <CustomSelect
                   value="drumpad"
-                  onChange={(e) => {
-                    const val = e.target.value;
+                  onChange={(val) => {
                     if (val !== 'drumpad') {
                       useUIStore.getState().setActiveView(val as any);
                     }
                   }}
+                  options={[
+                    { value: 'tracker', label: 'Tracker' },
+                    { value: 'grid', label: 'Grid' },
+                    { value: 'pianoroll', label: 'Piano Roll' },
+                    { value: 'tb303', label: 'TB-303' },
+                    { value: 'arrangement', label: 'Arrangement' },
+                    { value: 'dj', label: 'DJ Mixer' },
+                    { value: 'drumpad', label: 'Drum Pads' },
+                    { value: 'vj', label: 'VJ View' },
+                  ]}
                   className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
                   title="Switch view"
-                >
-                  <option value="tracker">Tracker</option>
-                  <option value="grid">Grid</option>
-                  <option value="pianoroll">Piano Roll</option>
-                  <option value="tb303">TB-303</option>
-                  <option value="arrangement">Arrangement</option>
-                  <option value="dj">DJ Mixer</option>
-                  <option value="drumpad">Drum Pads</option>
-                  <option value="vj">VJ View</option>
-                </select>
+                />
                 <div className="h-4 w-px bg-dark-border" />
               </>
             )}
@@ -430,17 +431,15 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               {/* Program Selector */}
               <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
                 <div className="text-xs font-mono text-text-muted mb-2">PROGRAM</div>
-                <select
+                <CustomSelect
                   value={currentProgramId}
-                  onChange={(e) => handleProgramChange(e.target.value)}
+                  onChange={(v) => handleProgramChange(v)}
+                  options={Array.from(programs.entries()).map(([id, program]) => ({
+                    value: id,
+                    label: `${id} - ${program.name}`,
+                  }))}
                   className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                >
-                  {Array.from(programs.entries()).map(([id, program]) => (
-                    <option key={id} value={id}>
-                      {id} - {program.name}
-                    </option>
-                  ))}
-                </select>
+                />
 
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   <button
@@ -467,18 +466,15 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 {/* Kit Selector */}
                 <div className="mt-3">
                   <label className="block text-xs text-text-muted mb-1">Kit Source</label>
-                  <select
+                  <CustomSelect
                     value={selectedKitSourceId}
-                    onChange={(e) => setSelectedKitSourceId(e.target.value)}
+                    onChange={(v) => setSelectedKitSourceId(v)}
+                    options={allKitSources.map((source) => ({
+                      value: source.id,
+                      label: `${source.type === 'preset' ? '🎵 ' : '📦 '}${source.name}`,
+                    }))}
                     className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                  >
-                    {allKitSources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.type === 'preset' ? '🎵 ' : '📦 '}
-                        {source.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <p className="text-xs text-text-muted mt-1">
                     {allKitSources.find(s => s.id === selectedKitSourceId)?.description || ''}
                   </p>
@@ -632,27 +628,28 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 {programs.get(currentProgramId)?.mpcResample?.enabled && (
                   <div>
                     <label className="block text-xs text-text-muted mb-1">Model</label>
-                    <select
+                    <CustomSelect
                       value={programs.get(currentProgramId)?.mpcResample?.model ?? 'MPC60'}
-                      onChange={(e) => {
+                      onChange={(v) => {
                         const currentProg = programs.get(currentProgramId);
                         if (currentProg) {
                           saveProgram({
                             ...currentProg,
                             mpcResample: {
                               enabled: true,
-                              model: e.target.value as MpcResampleConfig['model'],
+                              model: v as MpcResampleConfig['model'],
                             },
                           });
                         }
                       }}
+                      options={[
+                        { value: 'MPC60', label: 'MPC 60 (12-bit, 40kHz)' },
+                        { value: 'MPC3000', label: 'MPC 3000 (16-bit, 44.1kHz)' },
+                        { value: 'SP1200', label: 'SP-1200 (12-bit, 26kHz)' },
+                        { value: 'MPC2000XL', label: 'MPC 2000XL (16-bit, 44.1kHz)' },
+                      ]}
                       className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-                    >
-                      <option value="MPC60">MPC 60 (12-bit, 40kHz)</option>
-                      <option value="MPC3000">MPC 3000 (16-bit, 44.1kHz)</option>
-                      <option value="SP1200">SP-1200 (12-bit, 26kHz)</option>
-                      <option value="MPC2000XL">MPC 2000XL (16-bit, 44.1kHz)</option>
-                    </select>
+                    />
                     <p className="text-[10px] text-text-muted mt-1">
                       Samples loaded to pads will be processed through the selected MPC emulation.
                     </p>

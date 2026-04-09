@@ -50,6 +50,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useFormatStore } from '@stores';
 import { TFMX_MACRO_COMMANDS } from '@/types/tfmxNative';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type {
   TFMXMacroCommand,
   TFMXMacroCommandDef,
@@ -709,40 +710,26 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
             {/* Opcode selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
               <label style={{ width: '70px', color: 'var(--color-text-muted)' }}>Opcode</label>
-              <select
-                value={cmd.opcode}
-                onChange={(e) => handleOpcodeChange(Number(e.target.value))}
-                style={{
-                  flex: 1, fontSize: '11px', padding: '2px 4px',
-                  background: 'var(--color-bg)', color: 'var(--color-text-secondary)',
-                  border: '1px solid var(--color-border)', borderRadius: '2px',
-                }}
-              >
-                {TFMX_MACRO_COMMANDS.map(d => (
-                  <option key={d.opcode} value={d.opcode}>
-                    {hex2(d.opcode)} — {d.mnemonic}
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={String(cmd.opcode)}
+                onChange={(v) => handleOpcodeChange(Number(v))}
+                options={TFMX_MACRO_COMMANDS.map(d => ({ value: String(d.opcode), label: `${hex2(d.opcode)} — ${d.mnemonic}` }))}
+              />
             </div>
 
             {/* Flag bits */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
               <label style={{ width: '70px', color: 'var(--color-text-muted)' }}>Flags</label>
-              <select
-                value={cmd.flags}
-                onChange={(e) => handleFlagsChange(Number(e.target.value))}
-                style={{
-                  flex: 1, fontSize: '11px', padding: '2px 4px',
-                  background: 'var(--color-bg)', color: 'var(--color-text-secondary)',
-                  border: '1px solid var(--color-border)', borderRadius: '2px',
-                }}
-              >
-                <option value={0x00}>00 — none</option>
-                <option value={0x40}>40 — keyup wait</option>
-                <option value={0x80}>80 — pause flag</option>
-                <option value={0xC0}>C0 — both</option>
-              </select>
+              <CustomSelect
+                value={String(cmd.flags)}
+                onChange={(v) => handleFlagsChange(Number(v))}
+                options={[
+                  { value: String(0x00), label: '00 — none' },
+                  { value: String(0x40), label: '40 — keyup wait' },
+                  { value: String(0x80), label: '80 — pause flag' },
+                  { value: String(0xC0), label: 'C0 — both' },
+                ]}
+              />
             </div>
 
             {/* Named parameter fields */}

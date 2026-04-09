@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Upload, Download, AlertTriangle, Check, Loader2, FileUp, FileDown } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { useCursorStore } from '../../stores/useCursorStore';
@@ -443,17 +444,15 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
               <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">
                 Pattern (1-16)
               </label>
-              <select
-                value={selectedPattern}
-                onChange={(e) => setSelectedPattern(Number(e.target.value))}
+              <CustomSelect
+                value={String(selectedPattern)}
+                onChange={(v) => setSelectedPattern(Number(v))}
+                options={Array.from({ length: 16 }, (_, i) => ({
+                  value: String(i),
+                  label: i < 8 ? `A${i + 1}` : `B${i - 7}`,
+                }))}
                 className="w-full px-3 py-2 rounded bg-dark-bgTertiary border border-dark-border text-text-primary"
-              >
-                {Array.from({ length: 16 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {i < 8 ? `A${i + 1}` : `B${i - 7}`}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -465,33 +464,32 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
                   <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">
                     Source Channel
                   </label>
-                  <select
-                    value={selectedChannel}
-                    onChange={(e) => setSelectedChannel(Number(e.target.value))}
+                  <CustomSelect
+                    value={String(selectedChannel)}
+                    onChange={(v) => setSelectedChannel(Number(v))}
+                    options={channels.map((ch, idx) => ({
+                      value: String(idx),
+                      label: ch.name || `Channel ${idx + 1}`,
+                    }))}
                     className="w-full px-3 py-2 rounded bg-dark-bgTertiary border border-dark-border text-text-primary"
-                  >
-                    {channels.map((ch, idx) => (
-                      <option key={idx} value={idx}>
-                        {ch.name || `Channel ${idx + 1}`}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">
                     Base Octave
                   </label>
-                  <select
-                    value={baseOctave}
-                    onChange={(e) => setBaseOctave(Number(e.target.value))}
+                  <CustomSelect
+                    value={String(baseOctave)}
+                    onChange={(v) => setBaseOctave(Number(v))}
+                    options={[
+                      { value: '1', label: 'C1 - C4' },
+                      { value: '2', label: 'C2 - C5' },
+                      { value: '3', label: 'C3 - C6' },
+                      { value: '4', label: 'C4 - C7' },
+                    ]}
                     className="w-full px-3 py-2 rounded bg-dark-bgTertiary border border-dark-border text-text-primary"
-                  >
-                    <option value={1}>C1 - C4</option>
-                    <option value={2}>C2 - C5</option>
-                    <option value={3}>C3 - C6</option>
-                    <option value={4}>C4 - C7</option>
-                  </select>
+                  />
                 </div>
               </div>
 
@@ -538,17 +536,15 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
                 <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">
                   Target Channel
                 </label>
-                <select
-                  value={selectedChannel}
-                  onChange={(e) => setSelectedChannel(Number(e.target.value))}
+                <CustomSelect
+                  value={String(selectedChannel)}
+                  onChange={(v) => setSelectedChannel(Number(v))}
+                  options={channels.map((ch, idx) => ({
+                    value: String(idx),
+                    label: ch.name || `Channel ${idx + 1}`,
+                  }))}
                   className="w-full px-3 py-2 rounded bg-dark-bg border border-dark-border text-text-primary"
-                >
-                  {channels.map((ch, idx) => (
-                    <option key={idx} value={idx}>
-                      {ch.name || `Channel ${idx + 1}`}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
           )}

@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useAutomationStore } from '@stores';
 import type { AutomationCurve, AutomationParameter, AutomationShape, InterpolationType } from '@typedefs/automation';
 
@@ -452,16 +453,17 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
         <div className="w-px h-6 bg-ft2-border"></div>
 
         {/* Interpolation */}
-        <select
+        <CustomSelect
           value={curve.interpolation}
-          onChange={(e) => handleInterpolationChange(e.target.value as InterpolationType)}
+          onChange={(v) => handleInterpolationChange(v as InterpolationType)}
           className="px-2 py-1 text-xs font-mono bg-ft2-bg text-ft2-text border border-ft2-border"
-        >
-          <option value="linear">Linear</option>
-          <option value="exponential">Exponential</option>
-          <option value="easeIn">Ease In</option>
-          <option value="easeOut">Ease Out</option>
-        </select>
+          options={[
+            { value: 'linear', label: 'Linear' },
+            { value: 'exponential', label: 'Exponential' },
+            { value: 'easeIn', label: 'Ease In' },
+            { value: 'easeOut', label: 'Ease Out' },
+          ]}
+        />
 
         <div className="w-px h-6 bg-ft2-border"></div>
 
