@@ -30,9 +30,9 @@ export const PatternOrderSidebar: React.FC = () => {
   }, [currentPositionIndex]);
 
   return (
-    <div className="flex flex-col bg-ft2-bg border-r border-ft2-border h-full" style={{ width: 56 }}>
+    <div className="flex flex-col bg-ft2-bg border-r border-dark-border h-full" style={{ width: 56 }}>
       {/* Header */}
-      <div className="text-[9px] font-mono text-ft2-textDim uppercase tracking-wider px-1.5 py-1 border-b border-ft2-border bg-ft2-header text-center flex-shrink-0">
+      <div className="text-[9px] font-mono text-ft2-textDim uppercase tracking-wider px-1.5 py-1 border-b border-dark-border bg-ft2-header text-center flex-shrink-0">
         SEQ
       </div>
 
@@ -45,7 +45,7 @@ export const PatternOrderSidebar: React.FC = () => {
               key={posIdx}
               ref={isCurrent ? currentRef : undefined}
               onClick={() => setCurrentPosition(posIdx, true)}
-              className={`w-full font-mono text-center border-b border-ft2-border/50 transition-colors relative
+              className={`w-full font-mono text-center border-b border-dark-border transition-colors relative
                 ${isCurrent
                   ? 'bg-accent-primary/20 text-accent-primary'
                   : 'text-ft2-textDim hover:bg-ft2-highlight hover:text-text-primary'
@@ -76,7 +76,7 @@ export const PatternOrderSidebar: React.FC = () => {
           const currentPat = patternOrder[currentPositionIndex] ?? 0;
           addToOrder(currentPat);
         }}
-        className="flex-shrink-0 w-full text-[10px] font-mono text-ft2-textDim hover:text-accent-primary py-1.5 hover:bg-ft2-highlight transition-colors border-t border-ft2-border"
+        className="flex-shrink-0 w-full text-[10px] font-mono text-ft2-textDim hover:text-accent-primary py-1.5 hover:bg-ft2-highlight transition-colors border-t border-dark-border"
         title="Add current pattern to order"
       >
         +
