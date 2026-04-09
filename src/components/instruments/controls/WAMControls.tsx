@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { WAMSynth } from '@engine/wam/WAMSynth';
 import { Globe, RefreshCw, AlertCircle, Sliders, ChevronDown } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type { InstrumentConfig, WAMConfig } from '@typedefs/instrument';
 import { WAM_SYNTH_PLUGINS, type WAMPluginEntry } from '@constants/wamPlugins';
 
@@ -214,8 +215,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
     engine.invalidateInstrument(instrument.id);
   }, [instrument, onChange, engine]);
 
-  const handlePluginSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedUrl = e.target.value;
+  const handlePluginSelect = useCallback((selectedUrl: string) => {
     if (!selectedUrl) return;
     loadPlugin(selectedUrl);
   }, [loadPlugin]);
@@ -245,24 +245,20 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
 
           {/* Plugin dropdown (synths only — effects are in the effect browser) */}
           <div className="relative">
-            <select
+            <CustomSelect
               value={instrument.wam?.moduleUrl || ''}
               onChange={handlePluginSelect}
               disabled={isLoading}
-              className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors appearance-none cursor-pointer disabled:opacity-50"
-            >
-              <option value="">Select a WAM plugin...</option>
-              {Object.entries(groupedPlugins).map(([group, plugins]) => (
-                <optgroup key={group} label={group}>
-                  {plugins.map(p => (
-                    <option key={p.url} value={p.url}>
-                      {p.name} — {p.description}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors cursor-pointer disabled:opacity-50"
+              placeholder="Select a WAM plugin..."
+              options={Object.entries(groupedPlugins).map(([group, plugins]) => ({
+                label: group,
+                options: plugins.map(p => ({
+                  value: p.url,
+                  label: `${p.name} — ${p.description}`,
+                })),
+              }))}
+            />
           </div>
 
           {/* Custom URL (collapsible) */}

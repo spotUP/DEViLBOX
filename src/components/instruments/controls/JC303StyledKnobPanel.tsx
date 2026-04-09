@@ -8,6 +8,7 @@ import { Knob } from '@components/controls/Knob';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useMIDIStore } from '@stores';
 import { clsx } from 'clsx';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { CURRENT_VERSION } from '@generated/changelog';
 
 interface JC303StyledKnobPanelProps {
@@ -553,9 +554,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <div className="w-px h-14 bg-white/5 flex-shrink-0" />
                 <div className="flex flex-col gap-1">
                   <label className="text-[8px] font-bold text-orange-500/70">FILTER</label>
-                  <select value={config.devilFish?.filterSelect ?? 1} onChange={(e) => updateDevilFish('filterSelect', parseInt(e.target.value))} className="bg-[#111] text-[10px] text-orange-400 border border-orange-900/30 rounded px-1 py-1 outline-none focus:border-orange-500">
-                    <option value={0}>DiodeLadder</option><option value={5}>MissThang-20</option>
-                  </select>
+                  <CustomSelect value={String(config.devilFish?.filterSelect ?? 1)} onChange={(v) => updateDevilFish('filterSelect', parseInt(v))} className="bg-[#111] text-[10px] text-orange-400 border border-orange-900/30 rounded px-1 py-1 outline-none focus:border-orange-500" options={[{ value: '0', label: 'DiodeLadder' }, { value: '5', label: 'MissThang-20' }]} />
                 </div>
                 <label className="flex items-center gap-1 cursor-pointer flex-shrink-0">
                   <input type="checkbox" checked={config.devilFish?.korgEnabled ?? false} onChange={(e) => updateDevilFish('korgEnabled', e.target.checked)} className="w-3 h-3 accent-orange-500 rounded" />
@@ -665,21 +664,15 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <div className="flex flex-col gap-1.5 flex-shrink-0">
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] text-red-400/60 font-bold w-10">Speed</span>
-                    <select value={config.devilFish?.sweepSpeed ?? 'normal'} onChange={(e) => updateDevilFish('sweepSpeed', e.target.value)} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none">
-                      <option value="fast">Fast</option><option value="normal">Normal</option><option value="slow">Slow</option>
-                    </select>
+                    <CustomSelect value={config.devilFish?.sweepSpeed ?? 'normal'} onChange={(v) => updateDevilFish('sweepSpeed', v)} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none" options={[{ value: 'fast', label: 'Fast' }, { value: 'normal', label: 'Normal' }, { value: 'slow', label: 'Slow' }]} />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] text-red-400/60 font-bold w-10">Muffler</span>
-                    <select value={config.devilFish?.muffler ?? 'off'} onChange={(e) => updateDevilFish('muffler', e.target.value)} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none">
-                      <option value="off">Off</option><option value="soft">Soft</option><option value="hard">Hard</option><option value="dark">Dark</option><option value="mid">Mid</option><option value="bright">Bright</option>
-                    </select>
+                    <CustomSelect value={config.devilFish?.muffler ?? 'off'} onChange={(v) => updateDevilFish('muffler', v)} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none" options={[{ value: 'off', label: 'Off' }, { value: 'soft', label: 'Soft' }, { value: 'hard', label: 'Hard' }, { value: 'dark', label: 'Dark' }, { value: 'mid', label: 'Mid' }, { value: 'bright', label: 'Bright' }]} />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] text-red-400/60 font-bold w-10">OS</span>
-                    <select value={config.devilFish?.oversamplingOrder ?? 2} onChange={(e) => updateDevilFish('oversamplingOrder', parseInt(e.target.value))} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none">
-                      <option value={0}>None</option><option value={1}>2x</option><option value={2}>4x</option><option value={3}>8x</option><option value={4}>16x</option>
-                    </select>
+                    <CustomSelect value={String(config.devilFish?.oversamplingOrder ?? 2)} onChange={(v) => updateDevilFish('oversamplingOrder', parseInt(v))} className="bg-[#111] text-[9px] text-red-400 border border-red-900/30 rounded px-1 py-0.5 outline-none" options={[{ value: '0', label: 'None' }, { value: '1', label: '2x' }, { value: '2', label: '4x' }, { value: '3', label: '8x' }, { value: '4', label: '16x' }]} />
                   </div>
                 </div>
               </div>
@@ -804,15 +797,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <div className="h-8 w-px bg-white/5"></div>
           <div className="flex flex-col">
             <label className="text-[8px] font-bold text-text-muted mb-1">ENGINE</label>
-            <select value={config.engineType ?? 'db303'} onChange={(e) => onChange({ engineType: e.target.value as 'jc303' | 'db303' })} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors">
-              <option value="db303">DB-303</option><option value="jc303">JC-303</option>
-            </select>
+            <CustomSelect value={config.engineType ?? 'db303'} onChange={(v) => onChange({ engineType: v as 'jc303' | 'db303' })} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors" options={[{ value: 'db303', label: 'DB-303' }, { value: 'jc303', label: 'JC-303' }]} />
           </div>
           <div className="flex flex-col">
             <label className="text-[8px] font-bold text-text-muted mb-1">PRESET</label>
-            <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p) { if (onPresetLoad) { onPresetLoad(p); } else if (p.tb303) { onChange(p.tb303 as Partial<TB303Config>); } } }} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[160px]">
-              <option value="" disabled>Load Preset...</option>{TB303_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}{p.effects?.length ? ` [${p.effects.length} FX]` : ''}</option>))}
-            </select>
+            <CustomSelect value="" onChange={(v) => { const p = TB303_PRESETS.find(pr => pr.name === v); if (p) { if (onPresetLoad) { onPresetLoad(p); } else if (p.tb303) { onChange(p.tb303 as Partial<TB303Config>); } } }} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[160px]" placeholder="Load Preset..." options={TB303_PRESETS.map((p) => ({ value: p.name ?? '', label: `${p.name ?? ''}${p.effects?.length ? ` [${p.effects.length} FX]` : ''}` }))} />
           </div>
         </div>
         {/* Waveform Scope + Filter Response */}

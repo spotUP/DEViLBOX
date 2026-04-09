@@ -13,6 +13,7 @@ import type { SymphonieConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ── Instrument type labels ─────────────────────────────────────────────────
 
@@ -75,18 +76,19 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Instrument Type" />
         <div className="flex items-center gap-3">
-          <select
-            value={config.type}
-            onChange={(e) => upd('type', parseInt(e.target.value, 10))}
+          <CustomSelect
+            value={String(config.type)}
+            onChange={(v) => upd('type', parseInt(v, 10))}
+            options={[
+              { value: '0', label: 'Normal (one-shot)' },
+              { value: '4', label: 'Loop' },
+              { value: '8', label: 'Sustain' },
+              { value: '-4', label: 'Kill' },
+              { value: '-8', label: 'Silent' },
+            ]}
             className="text-xs px-2 py-1 rounded bg-black/30 border border-white/10 outline-none"
             style={{ color: accent }}
-          >
-            <option value={0}>Normal (one-shot)</option>
-            <option value={4}>Loop</option>
-            <option value={8}>Sustain</option>
-            <option value={-4}>Kill</option>
-            <option value={-8}>Silent</option>
-          </select>
+          />
           <span className="text-[10px] text-text-muted">{getTypeLabel(config.type)}</span>
         </div>
       </div>
@@ -228,17 +230,18 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Channel Routing" />
         <div className="flex items-center gap-3">
-          <select
-            value={config.multiChannel}
-            onChange={(e) => upd('multiChannel', parseInt(e.target.value, 10))}
+          <CustomSelect
+            value={String(config.multiChannel)}
+            onChange={(v) => upd('multiChannel', parseInt(v, 10))}
+            options={[
+              { value: '0', label: 'Mono' },
+              { value: '1', label: 'Stereo L' },
+              { value: '2', label: 'Stereo R' },
+              { value: '3', label: 'Line Source' },
+            ]}
             className="text-xs px-2 py-1 rounded bg-black/30 border border-white/10 outline-none"
             style={{ color: accent }}
-          >
-            <option value={0}>Mono</option>
-            <option value={1}>Stereo L</option>
-            <option value={2}>Stereo R</option>
-            <option value={3}>Line Source</option>
-          </select>
+          />
           <span className="text-[10px] text-text-muted">
             {MULTI_CHANNEL_LABELS[config.multiChannel] ?? 'Unknown'}
           </span>

@@ -6,6 +6,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type { FluidSynthConfig } from '@/engine/fluidsynth/FluidSynthSynth';
 import { DEFAULT_FLUIDSYNTH } from '@/engine/fluidsynth/FluidSynthSynth';
 
@@ -64,15 +65,12 @@ export const FluidSynthControls: React.FC<FluidSynthControlsProps> = ({ config, 
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-col gap-1">
             <label className="text-text-muted text-[10px]">Instrument</label>
-            <select
+            <CustomSelect
               className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-2 py-1 text-xs w-52"
-              value={merged.program}
-              onChange={(e) => updateParam('program', parseInt(e.target.value, 10))}
-            >
-              {GM_PROGRAMS.map(({ value, label }) => (
-                <option key={value} value={value}>{value}: {label}</option>
-              ))}
-            </select>
+              value={String(merged.program)}
+              onChange={(v) => updateParam('program', parseInt(v, 10))}
+              options={GM_PROGRAMS.map(({ value, label }) => ({ value: String(value), label: `${value}: ${label}` }))}
+            />
           </div>
           <Knob label="Bank" value={merged.bank} min={0} max={128} defaultValue={0}
             onChange={(v) => updateParam('bank', Math.round(v))} color="#38bdf8" />

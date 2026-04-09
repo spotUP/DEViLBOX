@@ -3,6 +3,7 @@ import type { WobbleBassConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { InstrumentOscilloscope } from '@components/visualization/InstrumentOscilloscope';
 import { WOBBLE_BASS_PRESETS } from '@constants/synthPresets/wobbleBass';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface WobbleBassControlsProps {
   config: WobbleBassConfig;
@@ -203,10 +204,9 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
           <BtnGroup items={LFO_SHAPES} labels={LFO_SHAPE_LABELS} value={config.wobbleLFO.shape} onSelect={v => set(['wobbleLFO', 'shape'], v)} />
           <div className="flex items-end gap-1">
             <span className="text-[9px] text-zinc-500 uppercase">Sync</span>
-            <select value={config.wobbleLFO.sync} onChange={e => set(['wobbleLFO', 'sync'], e.target.value)}
-              className="text-[10px] rounded px-1 py-0.5 border-none outline-none" style={{ background: '#2a2a40', color: 'var(--color-text-secondary)' }}>
-              {SYNC_VALUES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <CustomSelect value={config.wobbleLFO.sync} onChange={v => set(['wobbleLFO', 'sync'], v)}
+              className="text-[10px] rounded px-1 py-0.5 border-none outline-none" style={{ background: '#2a2a40', color: 'var(--color-text-secondary)' }}
+              options={SYNC_VALUES.map(s => ({ value: s, label: s }))} />
           </div>
           <Toggle on={config.wobbleLFO.retrigger} onToggle={() => set(['wobbleLFO', 'retrigger'], !configRef.current.wobbleLFO.retrigger)} label="Retrig" />
         </>}>
