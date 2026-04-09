@@ -14,7 +14,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
-const STRIP_HEIGHT = 36;
+const STRIP_HEIGHT = 72;
 
 export const TrackScopesStrip: React.FC = memo(() => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
