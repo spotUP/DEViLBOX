@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-08T13:28:38.409Z
+ * Generated: 2026-04-09T09:27:41.553Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4605';
-export const BUILD_NUMBER = '4605';
-export const BUILD_HASH = '33126b769';
-export const BUILD_DATE = '2026-04-08';
+export const BUILD_VERSION = '1.0.4619';
+export const BUILD_NUMBER = '4619';
+export const BUILD_HASH = '904714419';
+export const BUILD_DATE = '2026-04-09';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,71 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4605',
+    version: '1.0.4619',
+    date: '2026-04-09',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix ghosted rate knobs + robust mute forwarding for WASM engines"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update format tracker (revert stale retest entries)"
+      }
+    ]
+  },
+  {
+    version: '2026-04-08',
     date: '2026-04-08',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: update format audit state (packed formats + missing formats)"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Fix visualizer overlapping play buttons on narrow windows"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add packed format audit script (38 PTK-Prowiz formats)"
+      },
+      {
+        type: 'fix',
+        "description": "Auto-detect and inflate gzip-compressed module files"
+      },
+      {
+        type: 'fix',
+        "description": "Recognize UADE-only extensions in isSupportedFormat"
+      },
+      {
+        type: 'fix',
+        "description": "Fix VisualBgCycler hidden behind channel headers"
+      },
+      {
+        type: 'fix',
+        "description": "Add PTK-Prowiz packed format prefixes to UADE routing"
+      },
+      {
+        type: 'feature',
+        "description": "Add GL EQ editors with sliders + frequency response curves"
+      },
+      {
+        type: 'fix',
+        "description": "Add oscilloscope visualizers to all remaining editors + fix export warning freeze"
+      },
+      {
+        type: 'feature',
+        "description": "Replace EQ knobs with sliders + add frequency response curve visualization"
+      },
+      {
+        type: 'feature',
+        "description": "Add BPM sync for 10 effects + DJ FX pad system with 20 performance effects"
+      },
       {
         type: 'fix',
         "description": "Fix sidechain effects routing, gate audio kill, compressor rewrite, GEQ31 layout"
@@ -176,68 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Suppress WAM plugin SortableJS clone errors in global handler"
-      },
-      {
-        type: 'fix',
-        "description": "Fix batch effect bugs: TapeSimulator, WAM audio/UI, knob params, race condition"
-      },
-      {
-        type: 'improvement',
-        "description": "Update audit skip list: 8 more formats passing (41/66 total)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent classic-mode UADE formats and scan crashes"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: update audit skip list with 3 newly passing formats"
-      },
-      {
-        type: 'fix',
-        "description": "Reinit UADE WASM after failed load to prevent protocol state corruption"
-      },
-      {
-        type: 'fix',
-        "description": "Guard subscribeToCoordinator call + improve audit resilience"
-      },
-      {
-        type: 'fix',
-        "description": "SpaceEcho rate overflow, play-pattern position, silent effects"
-      }
-    ]
-  },
-  {
-    version: '2026-04-07',
-    date: '2026-04-07',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Render Big Muff WAM GUI at 1:1 scale, centered"
-      },
-      {
-        type: 'feature',
-        "description": "Add pattern extraction and metadata for 14 UADE format parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Smart warnings + channel-type validation + instrument badges"
-      },
-      {
-        type: 'feature',
-        "description": "Add full pattern extraction for Ben Daglish format"
-      },
-      {
-        type: 'fix',
-        "description": "Show channel names by default and auto-enable on hardware preset"
-      },
-      {
-        type: 'feature',
-        "description": "Add build-effects-wasm.sh convenience script for 70 WASM effects"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update format-state.json with FX audit results"
       }
     ]
   }
