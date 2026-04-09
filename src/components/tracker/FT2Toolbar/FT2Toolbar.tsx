@@ -16,7 +16,6 @@ import { FT2NumericInput } from './FT2NumericInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
-import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
@@ -25,7 +24,7 @@ import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { Maximize2, Minimize2, MousePointerClick, ExternalLink, Gamepad2, X } from 'lucide-react';
+import { Maximize2, Minimize2, ExternalLink, Gamepad2, X } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
@@ -90,8 +89,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     currentPositionIndex,
     setCurrentPosition,
     reset: resetTracker,
-    duplicatePosition,
-    removeFromOrder,
     replacePattern,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
@@ -104,8 +101,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     reset: s.reset,
-    duplicatePosition: s.duplicatePosition,
-    removeFromOrder: s.removeFromOrder,
     replacePattern: s.replacePattern,
   })));
 
@@ -202,9 +197,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
   const [showNibbles, setShowNibbles] = useState(false);
-
-  // Tap Tempo
-  const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
 
   // ASID hardware toggle
   const asidEnabled = useSettingsStore((s) => s.asidEnabled);
@@ -483,8 +475,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     setCurrentPosition(newPos);
   };
 
-  const handleInsertPosition = () => duplicatePosition(currentPositionIndex);
-  const handleDeletePosition = () => { if (patternOrder.length > 1) removeFromOrder(currentPositionIndex); };
   const handlePatternChange = (newPat: number) => {
     // Update the pattern index at the current order position
     const newOrder = [...patternOrder];
@@ -659,19 +649,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
-              <div className="flex gap-1 ml-auto">
-                <Button
-                  variant={tapActive ? 'primary' : 'default'}
-                  size="sm"
-                  onClick={handleTapTempo}
-                  title={`Tap Tempo (${tapCount} taps)`}
-                  className="min-w-[32px]"
-                >
-                  <MousePointerClick size={14} />
-                </Button>
-                <Button variant="default" size="sm" onClick={handleInsertPosition} className="min-w-[32px]">Ins</Button>
-                <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={patternOrder.length <= 1} className="min-w-[32px]">Del</Button>
-              </div>
             </div>
             <div className="ft2-section ft2-col-2">
               <FT2NumericInput
