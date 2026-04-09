@@ -40,6 +40,7 @@ import type { Pattern } from '../../types/tracker';
 import type { PianoRollNote } from '../../types/pianoRoll';import { NOTE_LENGTH_PRESETS, getNoteNameFromMidi } from '../../types/pianoRoll';
 import { SCALES, getScaleNotes } from '../../lib/scales';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
+import { CustomSelect } from '@components/common/CustomSelect';
 import {
   ZoomIn,
   ZoomOut,
@@ -1008,20 +1009,21 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         {/* View mode selector */}
         <div className="flex items-center gap-1">
           <Piano size={14} className="shrink-0 text-text-secondary" />
-          <select
+          <CustomSelect
             value="pianoroll"
-            onChange={(e) => useUIStore.getState().setActiveView(e.target.value as any)}
+            onChange={(v) => useUIStore.getState().setActiveView(v as any)}
+            options={[
+              { value: 'tracker', label: 'Tracker' },
+              { value: 'pianoroll', label: 'Piano Roll' },
+              { value: 'arrangement', label: 'Arrangement' },
+              { value: 'dj', label: 'DJ Mixer' },
+              { value: 'drumpad', label: 'Drum Pads' },
+              { value: 'vj', label: 'VJ View' },
+              { value: 'mixer', label: 'Mixer' },
+            ]}
             className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             title="Select editor view"
-          >
-            <option value="tracker">Tracker</option>
-            <option value="pianoroll">Piano Roll</option>
-            <option value="arrangement">Arrangement</option>
-            <option value="dj">DJ Mixer</option>
-            <option value="drumpad">Drum Pads</option>
-            <option value="vj">VJ View</option>
-            <option value="mixer">Mixer</option>
-          </select>
+          />
         </div>
 
         <div className="w-px h-4 bg-dark-border" />
@@ -1120,61 +1122,58 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
           >
             <Grid3X3 size={14} />
           </button>
-          <select
-            value={view.gridDivision}
-            onChange={(e) => setGridDivision(Number(e.target.value))}
+          <CustomSelect
+            value={String(view.gridDivision)}
+            onChange={(v) => setGridDivision(Number(v))}
+            options={[
+              { value: '1', label: '1/1' },
+              { value: '2', label: '1/2' },
+              { value: '4', label: '1/4' },
+              { value: '8', label: '1/8' },
+              { value: '16', label: '1/16' },
+            ]}
             className="px-1.5 py-0.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary"
             title="Grid division"
-            aria-label="Grid division"
-          >
-            <option value={1}>1/1</option>
-            <option value={2}>1/2</option>
-            <option value={4}>1/4</option>
-            <option value={8}>1/8</option>
-            <option value={16}>1/16</option>
-          </select>
+          />
         </div>
 
         {/* Note length preset */}
-        <select
-          value={view.noteLengthPreset}
-          onChange={(e) => setNoteLengthPreset(Number(e.target.value))}
+        <CustomSelect
+          value={String(view.noteLengthPreset)}
+          onChange={(v) => setNoteLengthPreset(Number(v))}
+          options={NOTE_LENGTH_PRESETS.map(p => ({
+            value: String(p.value),
+            label: p.label,
+          }))}
           className="px-1.5 py-0.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary"
           title="Note length"
-          aria-label="Note length preset"
-        >
-          {NOTE_LENGTH_PRESETS.map(p => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </select>
+        />
 
         <div className="w-px h-4 bg-dark-border" />
 
         {/* Scale constraint */}
         <div className="flex items-center gap-1">
           <Music size={12} className="text-text-muted" />
-          <select
-            value={view.scaleRoot}
-            onChange={(e) => setScaleRoot(Number(e.target.value))}
+          <CustomSelect
+            value={String(view.scaleRoot)}
+            onChange={(v) => setScaleRoot(Number(v))}
+            options={['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map((n, i) => ({
+              value: String(i),
+              label: n,
+            }))}
             className="px-1 py-0.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary w-10"
             title="Root note"
-            aria-label="Scale root note"
-          >
-            {['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map((n, i) => (
-              <option key={i} value={i}>{n}</option>
-            ))}
-          </select>
-          <select
+          />
+          <CustomSelect
             value={view.scaleKey}
-            onChange={(e) => setScaleKey(e.target.value)}
+            onChange={(v) => setScaleKey(v)}
+            options={scaleOptions.map(s => ({
+              value: s.value,
+              label: s.label,
+            }))}
             className="px-1 py-0.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary"
             title="Scale"
-            aria-label="Scale type"
-          >
-            {scaleOptions.map(s => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
+          />
         </div>
 
         <div className="w-px h-4 bg-dark-border" />
@@ -1225,18 +1224,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             <div className="w-px h-4 bg-dark-border" />
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-text-muted">CH</span>
-              <select
-                value={view.channelIndex}
-                onChange={(e) => setChannelIndex(Number(e.target.value))}
+              <CustomSelect
+                value={String(view.channelIndex)}
+                onChange={(v) => setChannelIndex(Number(v))}
+                options={pattern.channels.map((ch, idx) => ({
+                  value: String(idx),
+                  label: `${String(idx + 1).padStart(2, '0')} ${ch.name ? `- ${ch.name}` : ''}`,
+                }))}
                 className="px-1.5 py-0.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary"
-                aria-label="Channel"
-              >
-                {pattern.channels.map((ch, idx) => (
-                  <option key={idx} value={idx}>
-                    {String(idx + 1).padStart(2, '0')} {ch.name ? `- ${ch.name}` : ''}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </>
         )}

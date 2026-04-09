@@ -32,6 +32,7 @@ import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { precachePlaylist, type PrecacheProgress } from '@/engine/dj/DJPlaylistPrecache';
 import { getCachedFilenames } from '@/engine/dj/DJAudioCache';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -404,26 +405,23 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       {/* Header: dropdown + actions in one row */}
       <div className="flex items-center gap-1.5">
         {playlists.length > 0 ? (
-          <select
+          <CustomSelect
             value={activePlaylistId ?? ''}
-            onChange={(e) => setActivePlaylist(e.target.value)}
-            className="flex-1 px-2 py-1 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
-                       rounded text-text-primary cursor-pointer min-w-0"
-          >
-            {playlists.map((pl) => {
+            onChange={(v) => setActivePlaylist(v)}
+            options={playlists.map((pl) => {
               const totalSec = pl.tracks.reduce((s, t) => s + (t.duration || 0), 0);
               const durStr = totalSec > 0
                 ? totalSec >= 3600
                   ? `${Math.floor(totalSec / 3600)}h${String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0')}m`
                   : `${Math.floor(totalSec / 60)}m`
                 : '';
-              return (
-                <option key={pl.id} value={pl.id}>
-                  {pl.name} ({pl.tracks.length}{durStr ? ` · ${durStr}` : ''})
-                </option>
-              );
+              return {
+                value: pl.id,
+                label: `${pl.name} (${pl.tracks.length}${durStr ? ` · ${durStr}` : ''})`,
+              };
             })}
-          </select>
+            className="flex-1 px-2 py-1 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-primary cursor-pointer min-w-0"
+          />
         ) : (
           <span className="flex-1 text-[10px] font-mono text-text-muted">No playlists</span>
         )}

@@ -7,6 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { useYouTubeStore } from '@/stores/useYouTubeStore';
 import { authenticate, disconnect, uploadVideo } from '@/lib/youtubeApi';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface DJYouTubeUploadProps {
   videoBlob: Blob | null;
@@ -127,15 +128,16 @@ export const DJYouTubeUpload: React.FC<DJYouTubeUploadProps> = ({
 
                   <div>
                     <label className="text-[10px] text-text-muted uppercase">Privacy</label>
-                    <select
+                    <CustomSelect
                       value={privacy}
-                      onChange={e => setPrivacy(e.target.value as 'public' | 'unlisted' | 'private')}
+                      onChange={(v) => setPrivacy(v as 'public' | 'unlisted' | 'private')}
+                      options={[
+                        { value: 'unlisted', label: 'Unlisted' },
+                        { value: 'public', label: 'Public' },
+                        { value: 'private', label: 'Private' },
+                      ]}
                       className="w-full mt-1 px-2 py-1.5 bg-dark-bg border border-dark-border rounded text-sm text-text-primary"
-                    >
-                      <option value="unlisted">Unlisted</option>
-                      <option value="public">Public</option>
-                      <option value="private">Private</option>
-                    </select>
+                    />
                   </div>
 
                   <div className="text-xs text-text-muted">

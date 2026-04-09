@@ -18,6 +18,7 @@ import {
   type SeratoTrack,
 } from '@/lib/serato';
 import { useDJStore } from '@/stores/useDJStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ============================================================================
 // TYPES
@@ -279,21 +280,19 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
                        focus:border-purple-600 focus:outline-none transition-colors"
           />
         </div>
-        {/* Crate selector */}
-        <select
+       {/* Crate selector */}
+        <CustomSelect
           value={selectedCrate || ''}
-          onChange={(e) => setSelectedCrate(e.target.value || null)}
-          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
-                     rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors
-                     max-w-[160px]"
-        >
-          <option value="">All Tracks</option>
-          {library!.crates.map(c => (
-            <option key={c.fileName} value={c.name}>
-              {c.name} ({c.tracks.length})
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setSelectedCrate(v || null)}
+          options={[
+            { value: '', label: 'All Tracks' },
+            ...library!.crates.map(c => ({
+              value: c.name,
+              label: `${c.name} (${c.tracks.length})`,
+            })),
+          ]}
+          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors max-w-[160px]"
+        />
       </div>
 
       {/* Column headers */}

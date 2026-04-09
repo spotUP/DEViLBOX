@@ -32,6 +32,7 @@ import { useDeckStateSync } from '@/hooks/dj/useDeckStateSync';
 import { useDJHealth } from '@/hooks/dj/useDJHealth';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import { onNextBeat } from '@/engine/dj/DJAutoSync';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 /** Headless bridge — polls engine state and updates the store for one deck. */
 function DeckStateSyncBridge({ deckId }: { deckId: DeckId }) {
@@ -324,17 +325,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         <div className="flex items-center gap-2 flex-wrap">
           <DJControllerSelector />
           <DJFxQuickPresets />
-          <select
+          <CustomSelect
             value={deckViewMode}
-            onChange={(e) => useDJStore.getState().setDeckViewMode(e.target.value as 'visualizer' | 'vinyl' | '3d')}
-            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer
-              border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+            onChange={(v) => useDJStore.getState().setDeckViewMode(v as 'visualizer' | 'vinyl' | '3d')}
+            options={[
+              { value: 'visualizer', label: 'Deck: Visualizer' },
+              { value: 'vinyl', label: 'Deck: Vinyl' },
+              { value: '3d', label: 'Deck: 3D' },
+            ]}
+            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             title="Select deck view mode"
-          >
-            <option value="visualizer">Deck: Visualizer</option>
-            <option value="vinyl">Deck: Vinyl</option>
-            <option value="3d">Deck: 3D</option>
-          </select>
+          />
           <button
             onClick={() => setThirdDeckActive(!thirdDeckActive)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
