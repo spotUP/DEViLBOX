@@ -742,7 +742,18 @@ function App() {
     // and bypass confirmation — they route directly to the GTUltra engine.
     // Non-GT .sng files fall through to the default tracker module path below.
 
-    const result = await loadFile(file, { requireConfirmation: true });
+    // Read any pending companion files (set by folder/multi-file drops)
+    const pendingCompanions = useUIStore.getState().pendingCompanionFiles;
+    let companionFiles: Map<string, ArrayBuffer> | undefined;
+    if (pendingCompanions.length > 0) {
+      companionFiles = new Map();
+      for (const cf of pendingCompanions) {
+        companionFiles.set(cf.name, await cf.arrayBuffer());
+      }
+      useUIStore.getState().setPendingCompanionFiles([]);
+    }
+
+    const result = await loadFile(file, { requireConfirmation: true, companionFiles });
 
     if (result.success === 'pending-confirmation' || result.success === 'pending-import') {
       useUIStore.getState().setPendingModuleFile(result.file);

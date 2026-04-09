@@ -1506,9 +1506,25 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
   try {
     const arrayBuffer = await file.arrayBuffer();
 
-    // Build companion list for formats that need them
+    // Build companion list for formats that need them.
+    // If no companions were passed explicitly, check the UI store
+    // (populated by folder/multi-file drops via GlobalDragDropHandler).
     const companions: Array<{ name: string; data: ArrayBuffer }> = [];
     const fnLower = file.name.toLowerCase();
+
+    if (!companionFiles) {
+      try {
+        const { useUIStore } = await import('@stores/useUIStore');
+        const pending = useUIStore.getState().pendingCompanionFiles;
+        if (pending.length > 0) {
+          companionFiles = new Map();
+          for (const cf of pending) {
+            companionFiles.set(cf.name, await cf.arrayBuffer());
+          }
+          useUIStore.getState().setPendingCompanionFiles([]);
+        }
+      } catch { /* store unavailable */ }
+    }
 
     // SCI needs <prefix>patch.003
     if (fnLower.endsWith('.sci') && companionFiles) {
@@ -1603,6 +1619,11 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
     const ok = await player.load(arrayBuffer, file.name, streamCompanions);
 
     if (!ok) {
+      // Provide helpful hint for formats that need companion files
+      const needsCompanion = fnLower.endsWith('.sng') || fnLower.endsWith('.sci');
+      if (needsCompanion && companions.length === 0) {
+        return { success: false, error: `AdPlug could not load: ${file.name} — this format needs a companion file (.ins or .003). Drop the entire folder instead of a single file.` };
+      }
       return { success: false, error: `AdPlug could not load: ${file.name}` };
     }
 
