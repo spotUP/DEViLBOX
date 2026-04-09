@@ -117,8 +117,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     const style = getComputedStyle(sel);
     ctx.font = `${style.fontSize} ${style.fontFamily}`;
     const textW = ctx.measureText(opt.text).width;
-    // px padding (px-1.5 = 6px each side) + border (1px each) + dropdown arrow+gap (~26px)
-    sel.style.width = `${Math.ceil(textW) + 40}px`;
+    // pl-1.5 (6px) + pr-5 (20px) + border (2px) + dropdown arrow (~16px)
+    sel.style.width = `${Math.ceil(textW) + 44}px`;
   }, []);
 
   useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
@@ -210,7 +210,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
             ref={hwSelectRef}
-            className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+            className="pl-1.5 pr-5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             onChange={(e) => {
               const v = e.target.value;
               if (v.startsWith('format:') || v.startsWith('mode:')) return; // Info-only, not selectable
