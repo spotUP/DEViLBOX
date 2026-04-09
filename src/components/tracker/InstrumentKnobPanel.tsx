@@ -701,7 +701,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         flexDirection: 'column',
         ...(isAutoHeight ? {} : { height: `${expandedHeight}px` }),
       }}>
-        {/* Tab bar */}
+        {/* Header bar with instrument info */}
         <TabBar
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -711,10 +711,11 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
           rightContent={tabRightContent}
         />
 
-        {/* Tab content */}
-        <div className="flex-1 min-h-0 overflow-auto">
-          {activeTab === 'synth' ? (
-            isTB303 && targetInstrument.tb303 ? (
+        {/* Horizontal layout — synth controls, inst FX, master FX side by side */}
+        <div className="flex-1 min-h-0 flex overflow-hidden">
+          {/* Synth controls */}
+          <div className="flex-1 min-w-0 overflow-auto border-r border-dark-border">
+            {isTB303 && targetInstrument.tb303 ? (
               <ScrollLockContainer className="w-full">
                 <JC303StyledKnobPanel
                   key={targetInstrument.id}
@@ -726,8 +727,11 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
               </ScrollLockContainer>
             ) : (
               <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
-            )
-          ) : activeTab === 'instFx' ? (
+            )}
+          </div>
+
+          {/* Instrument FX */}
+          <div className="flex-1 min-w-0 overflow-auto border-r border-dark-border">
             <Suspense fallback={<FxLoadingFallback />}>
               <div className="fx-horizontal-layout p-2 h-full">
                 <InstrumentEffectsPanel
@@ -739,13 +743,16 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
                 />
               </div>
             </Suspense>
-          ) : (
+          </div>
+
+          {/* Master FX */}
+          <div className="flex-1 min-w-0 overflow-auto">
             <Suspense fallback={<FxLoadingFallback />}>
               <div className="fx-horizontal-layout p-2 h-full">
                 <MasterEffectsPanel ref={masterFxRef} hideHeader />
               </div>
             </Suspense>
-          )}
+          </div>
         </div>
       </div>
     </div>
