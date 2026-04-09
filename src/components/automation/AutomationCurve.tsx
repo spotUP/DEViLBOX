@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type { AutomationCurve as AutomationCurveType, AutomationPoint } from '@typedefs/automation';
 import { useThemeStore } from '@stores';
 
@@ -695,17 +696,18 @@ export const AutomationCurveCanvas: React.FC<AutomationCurveCanvasProps> = ({
         >
           Snap
         </button>
-        <select
-          value={valueQuantize}
-          onChange={(e) => setValueQuantize(Number(e.target.value))}
+        <CustomSelect
+          value={String(valueQuantize)}
+          onChange={(v) => setValueQuantize(Number(v))}
           className="px-1.5 py-1 text-xs bg-dark-bgTertiary text-text-secondary border border-dark-border rounded-md"
           title="Value quantization"
-        >
-          <option value={0}>Free</option>
-          <option value={4}>1/4</option>
-          <option value={8}>1/8</option>
-          <option value={16}>1/16</option>
-        </select>
+          options={[
+            { value: '0', label: 'Free' },
+            { value: '4', label: '1/4' },
+            { value: '8', label: '1/8' },
+            { value: '16', label: '1/16' },
+          ]}
+        />
 
         {selectedPoints.size > 0 && (
           <>

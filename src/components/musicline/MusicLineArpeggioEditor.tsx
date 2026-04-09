@@ -39,6 +39,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
 import type { MusicLineArpEntry } from '@/engine/musicline/MusicLineEngine';
 
@@ -314,11 +315,6 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
 
   // ── Table selector change ──────────────────────────────────────────────────
 
-  const handleTableChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const idx = parseInt(e.target.value, 10);
-    setSelectedTable(idx);
-    onTableChange?.(idx);
-  }, [onTableChange]);
 
   // ── Cell click (with shift-click for mark selection) ──────────────────────
 
@@ -765,25 +761,11 @@ export const MusicLineArpeggioEditor: React.FC<MusicLineArpeggioEditorProps> = (
       >
         <label style={{ color: '#7a7a9a', fontSize: 10 }}>
           Table:
-          <select
-            value={selectedTable}
-            onChange={handleTableChange}
-            style={{
-              marginLeft: 4,
-              background: '#14141e',
-              color: '#a0a0ff',
-              border: '1px solid #2a2a3e',
-              borderRadius: 3,
-              padding: '2px 4px',
-              fontSize: 10,
-              fontFamily: 'monospace',
-              cursor: 'pointer',
-            }}
-          >
-            {Array.from({ length: numArps }, (_, i) => (
-              <option key={i} value={i}>{i}</option>
-            ))}
-          </select>
+          <CustomSelect
+            value={String(selectedTable)}
+            onChange={(v) => { const idx = parseInt(v, 10); setSelectedTable(idx); onTableChange?.(idx); }}
+            options={Array.from({ length: numArps }, (_, i) => ({ value: String(i), label: String(i) }))}
+          />
         </label>
         <span style={{ color: '#7a7a9a', fontSize: 10 }}>
           Oct: <span style={{ color: '#60e060' }}>{octave + 1}</span>

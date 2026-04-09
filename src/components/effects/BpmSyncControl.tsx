@@ -12,6 +12,7 @@ import {
   bpmToMs,
   type SyncDivision,
 } from '@engine/bpmSync';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface BpmSyncControlProps {
   /** Current bpmSync value (0 or 1) */
@@ -66,21 +67,18 @@ export const BpmSyncControl: React.FC<BpmSyncControlProps> = ({
       {isOn && (
         <>
           {/* Division dropdown */}
-          <select
+          <CustomSelect
             value={syncDivision}
-            onChange={(e) => onChangeDivision(e.target.value as SyncDivision)}
+            onChange={(v) => onChangeDivision(v as SyncDivision)}
+            options={Object.entries(grouped).map(([cat, divs]) => ({
+              label: cat,
+              options: divs.map((d) => ({
+                value: d.value,
+                label: d.label,
+              })),
+            }))}
             className="bg-dark-bgTertiary text-text-secondary text-xs rounded px-2 py-1 border border-dark-borderLight focus:outline-none focus:border-emerald-500"
-          >
-            {Object.entries(grouped).map(([cat, divs]) => (
-              <optgroup key={cat} label={cat}>
-                {divs.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          />
 
           {/* Computed ms readout */}
           {computedMs !== null && (

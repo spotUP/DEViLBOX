@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { AcidPattern } from '@engine/AcidSequencer';
 
 interface AcidPatternEditorProps {
@@ -172,17 +173,12 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
                   <label className="block text-ft2-textDim text-sm mb-1">
                     Note
                   </label>
-                  <select
-                    value={pattern.getKey(selectedStep)}
-                    onChange={(e) => handleNoteChange(selectedStep, parseInt(e.target.value))}
+                  <CustomSelect
+                    value={String(pattern.getKey(selectedStep))}
+                    onChange={(v) => handleNoteChange(selectedStep, parseInt(v))}
                     className="w-full bg-ft2-bg text-ft2-text border border-ft2-border rounded p-2"
-                  >
-                    {noteNames.map((name, key) => (
-                      <option key={key} value={key}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                    options={noteNames.map((name, key) => ({ value: String(key), label: name }))}
+                  />
                 </div>
 
                 {/* Octave */}
@@ -190,15 +186,16 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
                   <label className="block text-ft2-textDim text-sm mb-1">
                     Octave (relative)
                   </label>
-                  <select
-                    value={pattern.getOctave(selectedStep)}
-                    onChange={(e) => handleOctaveChange(selectedStep, parseInt(e.target.value))}
+                  <CustomSelect
+                    value={String(pattern.getOctave(selectedStep))}
+                    onChange={(v) => handleOctaveChange(selectedStep, parseInt(v))}
                     className="w-full bg-ft2-bg text-ft2-text border border-ft2-border rounded p-2"
-                  >
-                    <option value="-1">-1 (Down)</option>
-                    <option value="0">0 (Root)</option>
-                    <option value="1">+1 (Up)</option>
-                  </select>
+                    options={[
+                      { value: '-1', label: '-1 (Down)' },
+                      { value: '0', label: '0 (Root)' },
+                      { value: '1', label: '+1 (Up)' },
+                    ]}
+                  />
                 </div>
 
                 {/* Accent */}

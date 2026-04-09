@@ -3,6 +3,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { NIBBLES_LEVELS } from './nibblesLevels';
 import { scoreLibrary, type NibblesScore } from '@/lib/scoreLibrary';
 import { useAudioStore } from '@stores';
@@ -1146,27 +1147,29 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
           <div className="grid grid-cols-2 gap-2 text-[9px] font-mono uppercase text-text-secondary">
             <div className="flex flex-col gap-1">
               <span>Speed:</span>
-              <select 
-                value={speed} 
-                onChange={e => { e.stopPropagation(); setSpeed(parseInt(e.target.value)); }} 
+              <CustomSelect 
+                value={String(speed)} 
+                onChange={v => { setSpeed(parseInt(v)); }} 
                 className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary"
-              >
-                <option value={0}>Novice</option>
-                <option value={1}>Average</option>
-                <option value={2}>Pro</option>
-                <option value={3}>Up Rough</option>
-              </select>
+                options={[
+                  { value: '0', label: 'Novice' },
+                  { value: '1', label: 'Average' },
+                  { value: '2', label: 'Pro' },
+                  { value: '3', label: 'Up Rough' },
+                ]}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <span>Players:</span>
-              <select 
-                value={numPlayers} 
-                onChange={e => { e.stopPropagation(); setNumPlayers(parseInt(e.target.value)); }} 
+              <CustomSelect 
+                value={String(numPlayers)} 
+                onChange={v => { setNumPlayers(parseInt(v)); }} 
                 className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary"
-              >
-                <option value={1}>1 Player</option>
-                <option value={2}>2 Players</option>
-              </select>
+                options={[
+                  { value: '1', label: '1 Player' },
+                  { value: '2', label: '2 Players' },
+                ]}
+              />
             </div>
           </div>
 

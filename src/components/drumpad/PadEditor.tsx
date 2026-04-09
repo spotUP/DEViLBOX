@@ -13,6 +13,7 @@ import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { getMIDIManager } from '../../midi/MIDIManager';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type { MIDIMessage } from '../../midi/types';
 
 const SPEECH_SYNTH_TYPES = new Set(['Sam', 'DECtalk', 'PinkTrombone', 'V2Speech']);
@@ -367,10 +368,9 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               {/* Synth Type Picker */}
               <div>
                 <label className="block text-xs text-text-muted mb-1">Synth Type</label>
-                <select
+                <CustomSelect
                   value={pad.synthConfig?.synthType ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
+                  onChange={(val) => {
                     if (val === '') {
                       handleUpdate({ synthConfig: undefined, instrumentId: undefined, instrumentNote: undefined });
                     } else {
@@ -398,39 +398,40 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                       });
                     }
                   }}
+                  options={[
+                    { value: '', label: 'None' },
+                    ...SYNTH_TYPE_GROUPS.map(group => ({
+                      label: group.label,
+                      options: group.types.map(t => ({
+                        value: t.value,
+                        label: t.label,
+                      })),
+                    })),
+                  ]}
                   className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-                >
-                  <option value="">None</option>
-                  {SYNTH_TYPE_GROUPS.map(group => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.types.map(t => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Trigger Note */}
               {(pad.synthConfig || pad.instrumentId != null) && (
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Trigger Note</label>
-                  <select
+                  <CustomSelect
                     value={pad.instrumentNote || 'C3'}
-                    onChange={(e) => handleUpdate({ instrumentNote: e.target.value })}
-                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-                  >
-                    {(() => {
-                      const notes: string[] = [];
+                    onChange={(v) => handleUpdate({ instrumentNote: v })}
+                    options={(() => {
+                      const notes: { value: string; label: string }[] = [];
                       const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
                       for (let oct = 1; oct <= 7; oct++) {
                         for (const n of noteNames) {
-                          notes.push(`${n}${oct}`);
+                          const note = `${n}${oct}`;
+                          notes.push({ value: note, label: note });
                         }
                       }
-                      return notes.map(n => <option key={n} value={n}>{n}</option>);
+                      return notes;
                     })()}
-                  </select>
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                  />
                 </div>
               )}
 
@@ -590,17 +591,15 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <label className="block text-xs text-text-muted mb-1">
                 Velocity Curve: {VELOCITY_CURVE_OPTIONS.find(v => v.value === (pad.velocityCurve || 'linear'))?.label || 'Linear'}
               </label>
-              <select
+              <CustomSelect
                 value={pad.velocityCurve || 'linear'}
-                onChange={(e) => handleUpdate({ velocityCurve: e.target.value as VelocityCurve })}
+                onChange={(v) => handleUpdate({ velocityCurve: v as VelocityCurve })}
+                options={VELOCITY_CURVE_OPTIONS.map(opt => ({
+                  value: opt.value,
+                  label: `${opt.label} — ${opt.desc}`,
+                }))}
                 className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-              >
-                {VELOCITY_CURVE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label} — {opt.desc}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>
@@ -647,17 +646,18 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
 
             <div>
               <label className="block text-xs text-text-muted mb-1">Output Bus</label>
-              <select
+              <CustomSelect
                 value={pad.output}
-                onChange={(e) => handleUpdate({ output: e.target.value as OutputBus })}
+                onChange={(v) => handleUpdate({ output: v as OutputBus })}
+                options={[
+                  { value: 'stereo', label: 'Stereo Mix' },
+                  { value: 'out1', label: 'Output 1' },
+                  { value: 'out2', label: 'Output 2' },
+                  { value: 'out3', label: 'Output 3' },
+                  { value: 'out4', label: 'Output 4' },
+                ]}
                 className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-              >
-                <option value="stereo">Stereo Mix</option>
-                <option value="out1">Output 1</option>
-                <option value="out2">Output 2</option>
-                <option value="out3">Output 3</option>
-                <option value="out4">Output 4</option>
-              </select>
+              />
             </div>
 
             {/* MPC Controls */}
@@ -666,27 +666,30 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Mute Group</label>
-                  <select
-                    value={pad.muteGroup}
-                    onChange={(e) => handleUpdate({ muteGroup: parseInt(e.target.value) })}
+                  <CustomSelect
+                    value={String(pad.muteGroup)}
+                    onChange={(v) => handleUpdate({ muteGroup: parseInt(v) })}
+                    options={[
+                      { value: '0', label: 'Off' },
+                      ...[1,2,3,4,5,6,7,8].map(g => ({
+                        value: String(g),
+                        label: `Group ${g}`,
+                      })),
+                    ]}
                     className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                  >
-                    <option value={0}>Off</option>
-                    {[1,2,3,4,5,6,7,8].map(g => (
-                      <option key={g} value={g}>Group {g}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Play Mode</label>
-                  <select
+                  <CustomSelect
                     value={pad.playMode}
-                    onChange={(e) => handleUpdate({ playMode: e.target.value as PlayMode })}
+                    onChange={(v) => handleUpdate({ playMode: v as PlayMode })}
+                    options={[
+                      { value: 'oneshot', label: 'One-Shot' },
+                      { value: 'sustain', label: 'Sustain' },
+                    ]}
                     className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                  >
-                    <option value="oneshot">One-Shot</option>
-                    <option value="sustain">Sustain</option>
-                  </select>
+                  />
                 </div>
               </div>
 
@@ -855,16 +858,17 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
           <div className="space-y-4">
             <div>
               <label className="block text-xs text-text-muted mb-1">Filter Type</label>
-              <select
+              <CustomSelect
                 value={pad.filterType}
-                onChange={(e) => handleUpdate({ filterType: e.target.value as FilterType })}
+                onChange={(v) => handleUpdate({ filterType: v as FilterType })}
+                options={[
+                  { value: 'off', label: 'Off' },
+                  { value: 'lpf', label: 'Low Pass' },
+                  { value: 'hpf', label: 'High Pass' },
+                  { value: 'bpf', label: 'Band Pass' },
+                ]}
                 className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-              >
-                <option value="off">Off</option>
-                <option value="lpf">Low Pass</option>
-                <option value="hpf">High Pass</option>
-                <option value="bpf">Band Pass</option>
-              </select>
+              />
             </div>
 
             {pad.filterType !== 'off' && (
@@ -1130,15 +1134,15 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
 
             <div>
               <label className="block text-xs text-text-muted mb-1">Scratch / Fader Action</label>
-              <select
+              <CustomSelect
                 value={pad.scratchAction ?? ''}
-                onChange={(e) => handleUpdate({ scratchAction: (e.target.value as ScratchActionId) || undefined })}
+                onChange={(v) => handleUpdate({ scratchAction: (v as ScratchActionId) || undefined })}
+                options={SCRATCH_ACTION_OPTIONS.map(({ value, label }) => ({
+                  value,
+                  label,
+                }))}
                 className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-              >
-                {SCRATCH_ACTION_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+              />
             </div>
 
             {pad.scratchAction && (
@@ -1167,25 +1171,29 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
 
               <div>
                 <label className="block text-xs text-text-muted mb-1">DJ FX Action</label>
-                <select
+                <CustomSelect
                   value={pad.djFxAction ?? ''}
-                  onChange={(e) => handleUpdate({ djFxAction: (e.target.value as DjFxActionId) || undefined })}
-                  className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-                >
-                  {(() => {
+                  onChange={(v) => handleUpdate({ djFxAction: (v as DjFxActionId) || undefined })}
+                  options={(() => {
+                    const groups: { label: string; options: { value: string; label: string }[] }[] = [];
+                    const topLevel: { value: string; label: string }[] = [];
+                    let currentGroup: { label: string; options: { value: string; label: string }[] } | null = null;
                     let lastCategory = '';
-                    return DJ_FX_OPTIONS.map(({ value, label, category }) => {
-                      const showGroup = category !== lastCategory && category !== '';
+                    for (const { value, label, category } of DJ_FX_OPTIONS) {
+                      if (category === '') {
+                        topLevel.push({ value, label });
+                      } else if (category !== lastCategory) {
+                        currentGroup = { label: FX_CATEGORY_LABELS[category] ?? category, options: [{ value, label }] };
+                        groups.push(currentGroup);
+                      } else {
+                        currentGroup!.options.push({ value, label });
+                      }
                       lastCategory = category;
-                      return (
-                        <React.Fragment key={value}>
-                          {showGroup && <option disabled className="font-bold">{FX_CATEGORY_LABELS[category] ?? category}</option>}
-                          <option value={value}>{value ? `  ${label}` : label}</option>
-                        </React.Fragment>
-                      );
-                    });
+                    }
+                    return [...topLevel, ...groups];
                   })()}
-                </select>
+                  className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                />
               </div>
 
               {pad.djFxAction && (

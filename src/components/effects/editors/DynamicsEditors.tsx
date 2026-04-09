@@ -12,6 +12,7 @@ import { Knob } from '@components/controls/Knob';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useShallow } from 'zustand/react/shallow';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 const DYN_PRIMARY = '#3b82f6';
 const DYN_SECONDARY = '#60a5fa';
@@ -608,16 +609,18 @@ export const SidechainGateEditor: React.FC<VisualEffectEditorProps> = ({ effect,
         <SectionHeader size="lg" color="#22d3ee" title="Sidechain" />
         <div className="mb-3">
           <label className="block text-xs text-text-muted mb-1.5">Sidechain Source</label>
-          <select
-            value={Math.round(sidechainSource)}
-            onChange={(e) => onUpdateParameter('sidechainSource', Number(e.target.value))}
+          <CustomSelect
+            value={String(Math.round(sidechainSource))}
+            onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
+            options={[
+              { value: '-1', label: 'Self (Internal)' },
+              ...Array.from({ length: channelCount }, (_, i) => ({
+                value: String(i),
+                label: channelNames[i] || `CH ${i + 1}`,
+              })),
+            ]}
             className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-cyan-500 focus:outline-none"
-          >
-            <option value={-1}>Self (Internal)</option>
-            {Array.from({ length: channelCount }, (_, i) => (
-              <option key={i} value={i}>{channelNames[i] || `CH ${i + 1}`}</option>
-            ))}
-          </select>
+          />
         </div>
         <div className="flex justify-around items-end">
           <Knob value={scFreq} min={20} max={10000} onChange={(v) => onUpdateParameter('scFreq', v)}
@@ -665,16 +668,18 @@ export const SidechainLimiterEditor: React.FC<VisualEffectEditorProps> = ({ effe
         <SectionHeader size="lg" color="#06b6d4" title="Sidechain" />
         <div className="mb-3">
           <label className="block text-xs text-text-muted mb-1.5">Sidechain Source</label>
-          <select
-            value={Math.round(sidechainSource)}
-            onChange={(e) => onUpdateParameter('sidechainSource', Number(e.target.value))}
+          <CustomSelect
+            value={String(Math.round(sidechainSource))}
+            onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
+            options={[
+              { value: '-1', label: 'Self (Internal)' },
+              ...Array.from({ length: channelCount }, (_, i) => ({
+                value: String(i),
+                label: channelNames[i] || `CH ${i + 1}`,
+              })),
+            ]}
             className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-cyan-500 focus:outline-none"
-          >
-            <option value={-1}>Self (Internal)</option>
-            {Array.from({ length: channelCount }, (_, i) => (
-              <option key={i} value={i}>{channelNames[i] || `CH ${i + 1}`}</option>
-            ))}
-          </select>
+          />
         </div>
         <div className="flex justify-around items-end">
           <Knob value={scFreq} min={20} max={10000} onChange={(v) => onUpdateParameter('scFreq', v)}

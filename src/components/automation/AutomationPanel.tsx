@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore, useAutomationStore, useThemeStore } from '@stores';
 import { AutomationCurveCanvas } from './AutomationCurve';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
@@ -279,15 +280,15 @@ const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string;
         {/* Channel dropdown — pick which register channel's params to show */}
         <label className="flex items-center gap-1.5 text-[10px] text-text-muted">
           <span>Channel:</span>
-          <select
-            value={selectedRegCh}
-            onChange={(e) => setSelectedRegCh(Number(e.target.value))}
+          <CustomSelect
+            value={String(selectedRegCh)}
+            onChange={(v) => setSelectedRegCh(Number(v))}
             className="px-1.5 py-0.5 text-[10px] bg-dark-bgTertiary border border-dark-border rounded text-text-secondary focus:outline-none focus:border-accent-primary"
-          >
-            {Array.from({ length: numChannels }, (_, i) => (
-              <option key={i} value={i}>Channel {i + 1}</option>
-            ))}
-          </select>
+            options={Array.from({ length: numChannels }, (_, i) => ({
+              value: String(i),
+              label: `Channel ${i + 1}`,
+            }))}
+          />
         </label>
       </div>
       <div className="flex gap-4 flex-wrap max-h-32 overflow-y-auto scrollbar-modern">
