@@ -1710,11 +1710,11 @@
 
 /* Tablet styles (640px - 1024px) */
 @media (min-width: 640px) and (max-width: 1024px) {
-  /* FT2 Toolbar: tighter columns on tablet */
-  .ft2-col-1 { flex-basis: 220px; }
-  .ft2-col-2 { flex-basis: 160px; }
-  .ft2-col-3 { flex-basis: 160px; }
-  .ft2-col-4 { flex-basis: 160px; }
+  /* FT2 Toolbar: auto-width columns on tablet */
+  .ft2-col-1 { flex-basis: auto; }
+  .ft2-col-2 { flex-basis: auto; }
+  .ft2-col-3 { flex-basis: auto; }
+  .ft2-col-4 { flex-basis: auto; }
 
   /* Pattern Order: Reduce columns on tablet */
   .pattern-order-grid {
@@ -1868,7 +1868,7 @@
 
 .ft2-toolbar-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0;
   min-height: 32px;
@@ -1906,11 +1906,11 @@
   min-width: 0;
 }
 
-/* Column width preferences — flex-basis instead of fixed width */
-.ft2-col-1 { flex: 0 0 260px; border-right: none; }
-.ft2-col-2 { flex: 0 0 200px; }
-.ft2-col-3 { flex: 0 0 200px; }
-.ft2-col-4 { flex: 0 0 200px; }
+/* Column width preferences — allow shrinking to fit single row */
+.ft2-col-1 { flex: 0 1 auto; border-right: none; }
+.ft2-col-2 { flex: 0 1 auto; }
+.ft2-col-3 { flex: 0 1 auto; }
+.ft2-col-4 { flex: 0 1 auto; }
 
 .ft2-section-playback {
   flex-shrink: 0;
