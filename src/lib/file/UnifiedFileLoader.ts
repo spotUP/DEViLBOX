@@ -1602,6 +1602,19 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
     // Try WASM extraction first — for CmodPlayer-based formats this gives us
     // editable patterns + OPL3 instruments instead of stream-only audio
     try {
+      // Stop ALL audio immediately — streaming player, transport, and synth voices.
+      // This must happen BEFORE extraction starts so the old song doesn't keep
+      // playing while the async extraction runs.
+      try {
+        const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+        getAdPlugPlayer().stop();
+      } catch { /* player may not be initialized */ }
+
+      const { useTransportStore } = await import('@stores/useTransportStore');
+      const { getToneEngine } = await import('@/engine/ToneEngine');
+      useTransportStore.getState().stop();
+      getToneEngine().releaseAll();
+
       const { extractAdPlugPatterns } = await import('@/lib/import/formats/AdPlugWasmExtractor');
       const extractCompanions = companions.length > 0 ? companions : undefined;
       const song = await extractAdPlugPatterns(arrayBuffer, file.name, extractCompanions);
@@ -1625,12 +1638,6 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
 
         stop();
         engine.releaseAll();
-
-        // Stop any running AdPlug streaming player from a previous song
-        try {
-          const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
-          getAdPlugPlayer().stop();
-        } catch { /* player may not be initialized */ }
 
         resetAutomation();
         resetTransport();

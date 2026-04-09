@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-09T18:12:09.201Z
+ * Generated: 2026-04-09T21:37:17.962Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4703';
-export const BUILD_NUMBER = '4703';
-export const BUILD_HASH = 'b33e31e63';
+export const BUILD_VERSION = '1.0.4730';
+export const BUILD_NUMBER = '4730';
+export const BUILD_HASH = '2906a340a';
 export const BUILD_DATE = '2026-04-09';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,117 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4703',
+    version: '1.0.4730',
     date: '2026-04-09',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix AdLib capture: note-offs, volume, instrument fingerprinting"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AdLib capture visual tempo — use speed to target ~10 rows/sec"
+      },
+      {
+        type: 'fix',
+        "description": "Fix clear not resetting song name + show dialog on load failure"
+      },
+      {
+        type: 'fix',
+        "description": "Enable mute/solo for MOD/XM/IT/S3M (libopenmpt ext API)"
+      },
+      {
+        type: 'fix',
+        "description": "Wire companion files through drag-drop for AdLib SNG/SCI formats"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing AdLib extension aliases (edl, dtl, as3m, adlib, wlf)"
+      },
+      {
+        type: 'improvement',
+        "description": "Centralize UADE scan lists into shared module (Phase 1)"
+      },
+      {
+        type: 'feature',
+        "description": "Add RAW exporter and integrate AdLib export (RAD/IMF/RAW)"
+      },
+      {
+        type: 'fix',
+        "description": "OPL3 allNotesOff now forces instant silence"
+      },
+      {
+        type: 'fix',
+        "description": "OPL3 per-voice patches — multi-instrument songs no longer corrupt"
+      },
+      {
+        type: 'feature',
+        "description": "Add right-click context menu to Pixi instrument panel"
+      },
+      {
+        type: 'fix',
+        "description": "AdLib BPM/speed computation and DMO instrument extraction"
+      },
+      {
+        type: 'improvement',
+        "description": "VU fill meters use theme accent color instead of hardcoded green"
+      },
+      {
+        type: 'improvement',
+        "description": "Hold-to-preview instruments: click selects, hold plays until release"
+      },
+      {
+        type: 'fix',
+        "description": "All 36 AdLib formats now editable (ADL subsong iter, SCI/SNG companions)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 43 double-fire bugs across all Pixi components"
+      },
+      {
+        type: 'feature',
+        "description": "OPL register capture — 33/36 AdLib formats now editable"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ProTracker mod mute + solo gain cache bug"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AddChannelBtn double-fire, remove diagnostic logs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix double-fire: HoverableHeaderBtn called onPress twice per click"
+      },
+      {
+        type: 'feature',
+        "description": "Add diagnostic logging to mute forwarding chain"
+      },
+      {
+        type: 'feature',
+        "description": "Multi-player AdLib WASM extraction — 15 formats now editable"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace ALL require() with cached dynamic imports in useMixerStore"
+      },
+      {
+        type: 'fix',
+        "description": "Fix require() → ESM import for mute/solo in browser"
+      },
+      {
+        type: 'fix',
+        "description": "OPL3Synth singleton — share one WASM instance across all AdLib instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Fix nested setState: move resetMuteState outside immer set()"
+      },
+      {
+        type: 'fix',
+        "description": "Add sanity checks to prevent WASM crashes on HSP/MTK formats"
+      },
       {
         type: 'feature',
         "description": "Add master bus limiter + enable auto-gain by default"
@@ -124,114 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Correct AdPlug extension mapping from source registry"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify all badge designs to match format badge style"
-      },
-      {
-        type: 'fix',
-        "description": "Embed insts.dat for KSM (Ken Silverman Music) support"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add standard.bnk and generated header for ROL support"
-      },
-      {
-        type: 'fix',
-        "description": "AdPlug WASM companion files, ROL/SCI support, remove FMT"
-      },
-      {
-        type: 'fix',
-        "description": "Remove visual mode badge from pattern editor, fix bg bleeding into headers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix instrument list action icon colors when selected"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore AdPlug extracted source directories"
-      },
-      {
-        type: 'feature',
-        "description": "Compile AdPlug C++ library to WASM for 50+ OPL/AdLib format support"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify all toolbar button fonts to 10px mono"
-      },
-      {
-        type: 'fix',
-        "description": "Unify button font sizes — all variants use 10px mono font"
-      },
-      {
-        type: 'fix',
-        "description": "View selector in nav header uses default CustomSelect styling"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent text wrapping in dropdown buttons and menu items"
-      },
-      {
-        type: 'feature',
-        "description": "Format tracker auto-collapses finished categories with ✓ done badge"
-      },
-      {
-        type: 'fix',
-        "description": "FM Tracker (.fmt) always uses native parser — UADE can't play PC OPL formats"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate remaining selects to CustomSelect"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate instrument editor/shared selects to CustomSelect"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate instrument control selects to CustomSelect"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate dialog selects to CustomSelect"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate piano roll, grid, and DJ selects to CustomSelect"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate toolbar/nav/controls selects to CustomSelect"
-      },
-      {
-        type: 'feature',
-        "description": "Add CustomSelect component and extend DropdownButton with style prop"
-      },
-      {
-        type: 'fix',
-        "description": "Route 8 missing chip-dump formats to native parsers + fix VGZ gzip"
-      },
-      {
-        type: 'fix',
-        "description": "Dropdown menu uses text-xs font-mono to match toolbar buttons"
-      },
-      {
-        type: 'fix',
-        "description": "Dropdown menu items don't wrap text — use w-max + whitespace-nowrap"
-      },
-      {
-        type: 'improvement',
-        "description": "Hardware selector uses custom DropdownButton instead of native select"
-      },
-      {
-        type: 'fix',
-        "description": "More right space after dropdown arrow (40→48px total extra)"
-      },
-      {
-        type: 'fix',
-        "description": "Dropdown sizes to selected text only, not widest option"
       }
     ]
   }
