@@ -174,7 +174,6 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
   return (
     <pixiContainer
       eventMode="static"
-      onPointerUp={() => useUIStore.getState().setViewExposeActive(false)}
       onClick={() => useUIStore.getState().setViewExposeActive(false)}
       layout={{ position: 'absolute', width, height }}
     >

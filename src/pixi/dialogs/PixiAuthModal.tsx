@@ -95,7 +95,6 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
           cursor="pointer"
           onPointerOver={() => setCloseHovered(true)}
           onPointerOut={() => setCloseHovered(false)}
-          onPointerUp={onClose}
           onClick={onClose}
           layout={{
             width: 28,
@@ -258,7 +257,6 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
         <layoutContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={handleToggleMode}
           onClick={handleToggleMode}
           layout={{
             width: INPUT_W,

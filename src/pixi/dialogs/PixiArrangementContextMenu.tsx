@@ -280,7 +280,6 @@ export const PixiArrangementContextMenu: React.FC = () => {
           cursor="pointer"
           onPointerEnter={() => setHoveredItem(id)}
           onPointerLeave={() => setHoveredItem(null)}
-          onPointerUp={onClick}
           onClick={onClick}
           layout={{
             position: 'absolute',
@@ -314,7 +313,6 @@ export const PixiArrangementContextMenu: React.FC = () => {
           cursor="pointer"
           onPointerEnter={() => setHoveredItem(id)}
           onPointerLeave={() => setHoveredItem(null)}
-          onPointerUp={() => setShowColorPicker(v => !v)}
           onClick={() => setShowColorPicker(v => !v)}
           layout={{
             position: 'absolute',
@@ -510,7 +508,6 @@ const ColorPickerGrid: React.FC<{
         cursor="pointer"
         onPointerEnter={() => setHoveredSwatch(idx)}
         onPointerLeave={() => setHoveredSwatch(null)}
-        onPointerUp={() => isReset ? onResetColor() : onSetColor(item)}
         onClick={() => isReset ? onResetColor() : onSetColor(item)}
         scale={scale}
         layout={{

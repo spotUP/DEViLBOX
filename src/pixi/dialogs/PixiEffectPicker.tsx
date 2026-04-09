@@ -270,7 +270,6 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
                   key={eff.isFurnace ? `f-${eff.key}` : eff.isExtended ? `e-${eff.key}` : `n-${eff.key}`}
                   eventMode="static"
                   cursor="pointer"
-                  onPointerUp={() => handleSelect(eff)}
                   onClick={() => handleSelect(eff)}
                   layout={{
                     position: 'absolute',

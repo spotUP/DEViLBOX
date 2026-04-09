@@ -82,7 +82,6 @@ export const PixiToggle: React.FC<PixiToggleProps> = ({
     <pixiContainer
       eventMode={disabled ? 'none' : 'static'}
       cursor={disabled ? 'not-allowed' : 'pointer'}
-      onPointerUp={handleClick}
       onClick={handleClick}
       onPointerOver={() => !disabled && setHovered(true)}
       onPointerOut={() => setHovered(false)}

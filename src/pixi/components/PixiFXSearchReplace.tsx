@@ -287,7 +287,6 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         <pixiContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={() => setScope('current')}
           onClick={() => setScope('current')}
           layout={{ width: 100, height: 20, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
         >
@@ -302,7 +301,6 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         <pixiContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={() => setScope('all')}
           onClick={() => setScope('all')}
           layout={{ width: 100, height: 20, flexDirection: 'row', alignItems: 'center', paddingLeft: 6 }}
         >
