@@ -100,8 +100,11 @@ export function createTR909Instrument(config: InstrumentConfig): Tone.ToneAudioN
   // Resolve the configured drum type (used as fallback and for pitch mode)
   const defaultDrumType = resolveTR909Type(config);
 
-  // Note mode: 'kit' = note name picks drum, 'pitch' = note controls tuning
-  const noteMode = config.drumMachine?.noteMode ?? 'kit';
+  // Note mode: 'kit' = note name picks drum, 'pitch' = note controls tuning.
+  // When an explicit tr909Type is set (from a preset), force pitch mode so the
+  // preset's drum type is always used regardless of the played note.
+  const hasExplicitType = !!config.parameters?.tr909Type;
+  const noteMode = hasExplicitType ? 'pitch' : (config.drumMachine?.noteMode ?? 'kit');
 
   // Extract default params from config
   const baseParams = extractTR909Params(config);

@@ -112,8 +112,11 @@ export function createIO808Instrument(config: InstrumentConfig): Tone.ToneAudioN
   // Resolve the configured drum type (used as fallback and for pitch mode)
   const defaultDrumType = resolveIO808Type(config);
 
-  // Note mode: 'kit' = note name picks drum, 'pitch' = note controls tuning
-  const noteMode = config.drumMachine?.noteMode ?? 'kit';
+  // Note mode: 'kit' = note name picks drum, 'pitch' = note controls tuning.
+  // When an explicit io808Type is set (from a preset), force pitch mode so the
+  // preset's drum type is always used regardless of the played note.
+  const hasExplicitType = !!config.parameters?.io808Type;
+  const noteMode = hasExplicitType ? 'pitch' : (config.drumMachine?.noteMode ?? 'kit');
 
   // Extract default params from config (level comes from velocity at trigger time)
   const baseParams = extractIO808Params(config);
