@@ -148,7 +148,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ref={menuRef}
       data-context-menu
       className={`
-        fixed z-[100] min-w-[180px] w-max py-1
+        fixed z-[100] min-w-[180px] w-max py-1 text-xs font-mono
         bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl
         ${className}
       `}
@@ -186,7 +186,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             <div
               key={item.id}
               className={`
-                flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer transition-colors whitespace-nowrap
+                flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors whitespace-nowrap
                 ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-dark-bgHover'}
                 ${item.danger ? 'text-accent-error hover:bg-accent-error/10' : 'text-text-secondary'}
                 ${activeSubmenu === item.id ? 'bg-dark-bgHover' : ''}
@@ -234,7 +234,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
               {/* Shortcut */}
               {item.shortcut && (
-                <span className="text-xs text-text-muted ml-4">{item.shortcut}</span>
+                <span className="text-[10px] text-text-muted ml-4">{item.shortcut}</span>
               )}
 
               {/* Submenu arrow */}
