@@ -56,6 +56,11 @@ const SCROLL_SIGNIFICANT_THRESHOLD = 2;
  *  so a continuous gesture doesn't accidentally drop touch state between events. */
 const SCROLL_RELEASE_MS = 150;
 
+/** Grace period after playback starts before scratch can activate (ms).
+ *  Prevents stray trackpad inertia from the file-drop gesture from
+ *  immediately muting the new song. */
+const PLAYBACK_START_GRACE_MS = 800;
+
 // ─── Controller ──────────────────────────────────────────────────────────────
 
 export class TrackerScratchController {
@@ -65,6 +70,9 @@ export class TrackerScratchController {
   /** Whether we're actively scratching (user has interacted during playback) */
   private _isActive = false;
   private _pendingStop = false;  // Set when e-brake/power-cut stop is in progress
+
+  /** Timestamp when playback last started — scratch is suppressed during grace period */
+  private _playbackStartTime = 0;
 
   /** Timestamp of last input event */
   private lastEventTime = 0;
@@ -116,6 +124,12 @@ export class TrackerScratchController {
 
   /** Expose physics for external queries (e.g., UI visualization) */
   get turntable(): TurntablePhysics { return this.physics; }
+
+  /** Notify the controller that playback just started.
+   *  Starts a grace period during which scratch activation is suppressed. */
+  notifyPlaybackStarted(): void {
+    this._playbackStartTime = performance.now();
+  }
 
   /**
    * Get the current display position during scratch.
@@ -217,6 +231,13 @@ export class TrackerScratchController {
 
     // Only enter scratch mode when transport is playing
     if (!replayer.isPlaying()) return false;
+
+    // Grace period: suppress scratch activation shortly after playback starts.
+    // Prevents stray trackpad inertia from a file-drop gesture from immediately
+    // muting the new song.
+    if (!this._isActive && (timestamp - this._playbackStartTime) < PLAYBACK_START_GRACE_MS) {
+      return false;
+    }
 
     // First significant event — enter scratch mode
     if (!this._isActive) {

@@ -20,6 +20,7 @@ export class OPL3Synth implements DevilboxSynth {
   private _disposed = false;
   private _ready = false;
   private _pendingMessages: Array<Record<string, unknown>> = [];
+  private _channelIndex = -1; // -1 = keyboard mode, 0+ = tracker channel
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -97,11 +98,17 @@ export class OPL3Synth implements DevilboxSynth {
 
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    this.send({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127) });
+    if (this._channelIndex >= 0) {
+      this.send({ type: 'chNoteOn', ch: this._channelIndex, note: midi, velocity: Math.round(velocity * 127) });
+    } else {
+      this.send({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127) });
+    }
   }
 
   triggerRelease(note?: string | number, _time?: number) {
-    if (note !== undefined) {
+    if (this._channelIndex >= 0) {
+      this.send({ type: 'chNoteOff', ch: this._channelIndex });
+    } else if (note !== undefined) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
       this.send({ type: 'noteOff', note: midi });
     } else {
@@ -121,7 +128,18 @@ export class OPL3Synth implements DevilboxSynth {
 
   /** Set patch registers directly (11 OPL2 registers) */
   setPatchRegisters(regs: number[]) {
-    this.send({ type: 'setPatch', regs });
+    if (this._channelIndex >= 0) {
+      this.send({ type: 'chSetPatch', ch: this._channelIndex, regs });
+    } else {
+      this.send({ type: 'setPatch', regs });
+    }
+  }
+
+  /** Set the OPL channel index for tracker playback (0-17).
+   *  When set, noteOn/noteOff/setPatch address that specific OPL voice
+   *  instead of using round-robin voice allocation. */
+  setChannel(ch: number) {
+    this._channelIndex = ch;
   }
 
   pitchBend(semitones: number) {
@@ -181,13 +199,13 @@ export class OPL3Synth implements DevilboxSynth {
         (this.patchState as Record<string, number>)[k] = Math.round(v);
       }
     }
-    this.send({ type: 'setPatch', regs: this.packRegisters() });
+    this.setPatchRegisters(this.packRegisters());
   }
 
   set(param: string, value: number) {
     if (param in this.patchState) {
       (this.patchState as Record<string, number>)[param] = Math.round(value);
-      this.send({ type: 'setPatch', regs: this.packRegisters() });
+      this.setPatchRegisters(this.packRegisters());
     }
   }
 

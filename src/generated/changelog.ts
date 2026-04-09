@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-09T21:37:17.962Z
+ * Generated: 2026-04-09T22:10:33.797Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4730';
-export const BUILD_NUMBER = '4730';
-export const BUILD_HASH = '2906a340a';
+export const BUILD_VERSION = '1.0.4735';
+export const BUILD_NUMBER = '4735';
+export const BUILD_HASH = 'bddc389c5';
 export const BUILD_DATE = '2026-04-09';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,35 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4730',
+    version: '1.0.4735',
+    date: '2026-04-10',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Instrument list context menu + double-click + scope channel colors"
+      },
+      {
+        type: 'fix',
+        "description": "Align track scopes strip with pattern editor channels"
+      }
+    ]
+  },
+  {
+    version: '2026-04-09',
     date: '2026-04-09',
     changes: [
+      {
+        type: 'fix',
+        "description": "Stop all audio immediately when loading new AdLib song"
+      },
+      {
+        type: 'fix',
+        "description": "Flanger/doubling on WASM-backed formats + worklet memory leak"
+      },
+      {
+        type: 'feature',
+        "description": "Stop AdPlug streaming player when loading new song"
+      },
       {
         type: 'fix',
         "description": "Fix AdLib capture: note-offs, volume, instrument fingerprinting"
@@ -212,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: update format-state.json with AdPlug audit entries"
-      },
-      {
-        type: 'fix',
-        "description": "Replace TextEncoder with manual strToBytes in AdPlug AudioWorklet"
-      },
-      {
-        type: 'fix',
-        "description": "Use border-dark-border for sidebar dividers"
-      },
-      {
-        type: 'fix',
-        "description": "Use ft2 design tokens in pattern order sidebar"
-      },
-      {
-        type: 'feature',
-        "description": "Add Renoise-style pattern sequencer sidebar"
-      },
-      {
-        type: 'fix',
-        "description": "Correct AdPlug extension mapping from source registry"
       }
     ]
   }
