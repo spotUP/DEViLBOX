@@ -10,6 +10,7 @@
 
 import React, { useCallback, useRef, memo, useState, useMemo, Suspense, lazy } from 'react';
 import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
+import { useAudioStore } from '@stores/useAudioStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronUp, X, ExternalLink, Undo2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
@@ -39,6 +40,69 @@ const SC_TYPES: SynthType[] = ['SuperCollider'];
 const COLLAPSED_HEIGHT = 40;
 const SECTION_HEADER_HEIGHT = 24;
 const TB303_EXPANDED_HEIGHT = 512;
+
+// ─── Tabbed FX Pane ──────────────────────────────────────────────────────────
+// Shows one effect at a time with tab buttons when there are multiple effects
+const TabbedFxPane: React.FC<{
+  effects: EffectConfig[];
+  children: React.ReactNode;
+}> = ({ effects, children }) => {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const safeIdx = Math.min(selectedIdx, Math.max(0, effects.length - 1));
+
+  // Hide all effect items except the selected one
+  React.useEffect(() => {
+    if (!contentRef.current || effects.length <= 1) return;
+
+    const applyVisibility = () => {
+      if (!contentRef.current) return;
+      const containers = contentRef.current.querySelectorAll('.space-y-3, .overflow-y-auto');
+      containers.forEach(container => {
+        const items = Array.from(container.children) as HTMLElement[];
+        items.forEach((item, i) => {
+          item.style.display = i === safeIdx ? '' : 'none';
+        });
+      });
+    };
+
+    applyVisibility();
+
+    // Re-apply when lazy content loads (Suspense resolves)
+    const observer = new MutationObserver(applyVisibility);
+    observer.observe(contentRef.current, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [safeIdx, effects.length, effects]);
+
+  if (effects.length <= 1) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex flex-col">
+      {/* Tab bar */}
+      <div className="flex gap-0.5 px-2 pt-1 pb-0 overflow-x-auto flex-shrink-0">
+        {effects.map((fx, i) => (
+          <button
+            key={fx.id}
+            onClick={() => setSelectedIdx(i)}
+            className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-t transition-colors whitespace-nowrap ${
+              i === safeIdx
+                ? 'bg-dark-bgTertiary text-accent-highlight border border-b-0 border-dark-border'
+                : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            {fx.type}
+          </button>
+        ))}
+      </div>
+      {/* Content */}
+      <div ref={contentRef}>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 // ─── Generic Synth Knobs ─────────────────────────────────────────────────────
 // Shows oscillator, envelope, filter knobs for Tone.js-based synths
@@ -319,6 +383,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   );
 
   const { controlledInstrumentId } = useMIDIStore();
+  const masterEffects = useAudioStore(s => s.masterEffects);
   const contentRef = useRef<HTMLDivElement>(null);
   const instFxRef = useRef<InstrumentEffectsPanelHandle>(null);
   const masterFxRef = useRef<MasterEffectsPanelHandle>(null);
@@ -652,10 +717,10 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             </div>
           </div>
 
-          {/* Instrument FX — horizontal scroll for effect chain */}
+          {/* Instrument FX — tabbed when multiple effects */}
           <div className="flex-1 min-w-0 flex flex-col border-l border-dark-border">
             <SectionHeader label="Inst FX" badge={fxCount > 0 ? String(fxCount) : undefined} actions={instFxActions} />
-            <div className="overflow-x-auto overflow-y-hidden">
+            <TabbedFxPane effects={targetInstrument.effects || []}>
               <Suspense fallback={<FxLoadingFallback />}>
                 <div className="fx-horizontal-layout p-2">
                   <InstrumentEffectsPanel
@@ -667,19 +732,19 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
                   />
                 </div>
               </Suspense>
-            </div>
+            </TabbedFxPane>
           </div>
 
-          {/* Master FX — horizontal scroll for effect chain */}
+          {/* Master FX — tabbed when multiple effects */}
           <div className="flex-1 min-w-0 flex flex-col border-l border-dark-border">
             <SectionHeader label="Master FX" actions={masterFxActions} />
-            <div className="overflow-x-auto overflow-y-hidden">
+            <TabbedFxPane effects={masterEffects}>
               <Suspense fallback={<FxLoadingFallback />}>
                 <div className="fx-horizontal-layout p-2">
                   <MasterEffectsPanel ref={masterFxRef} hideHeader />
                 </div>
               </Suspense>
-            </div>
+            </TabbedFxPane>
           </div>
         </div>
       </div>
