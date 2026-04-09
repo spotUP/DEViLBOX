@@ -252,3 +252,8 @@ public/models/
 # Basis texture transcoder
 public/basis/
 third-party/retromulator/
+
+# AdPlug WASM build - extracted sources (downloaded during build)
+adplug-wasm/adplug-adplug-2.4/
+adplug-wasm/libbinio-libbinio-1.5/
+adplug-wasm/build/
