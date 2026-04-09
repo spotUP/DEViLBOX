@@ -17,6 +17,7 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { Waves, Plus, Trash2, Copy, Wand2, FileUp } from 'lucide-react';
 import { WaveformThumbnail } from '@components/instruments/shared';
+import { CustomSelect } from '@components/common/CustomSelect';
 import {
   StudioToolbar, DrawCanvas, HarmonicPanel, MathPanel, PresetBrowser, LivePanels,
   type StudioMode, type StudioLayout,
@@ -404,20 +405,21 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-text-muted">Height:</span>
-              <select
-                value={maxValue}
-                onChange={(e) => setMaxValueHandler(parseInt(e.target.value))}
+              <CustomSelect
+                value={String(maxValue)}
+                onChange={(v) => setMaxValueHandler(parseInt(v))}
                 disabled={targetConfig.lockedDepth}
                 className="bg-dark-bgSecondary border border-dark-border rounded px-1 py-0.5 text-text-primary disabled:opacity-50"
-              >
-                <option value={3}>4</option>
-                <option value={7}>8</option>
-                <option value={15}>16</option>
-                <option value={31}>32</option>
-                <option value={63}>64</option>
-                <option value={127}>128</option>
-                <option value={255}>256</option>
-              </select>
+                options={[
+                  { value: '3', label: '4' },
+                  { value: '7', label: '8' },
+                  { value: '15', label: '16' },
+                  { value: '31', label: '32' },
+                  { value: '63', label: '64' },
+                  { value: '127', label: '128' },
+                  { value: '255', label: '256' },
+                ]}
+              />
             </div>
             <div className="text-text-subtle text-[9px]">
               {targetConfig.description}

@@ -15,6 +15,7 @@ import {
   Split, RotateCcw, Contrast, Maximize, Minimize, X,
 } from 'lucide-react';
 import { CHIP_TARGET_ORDER, CHIP_TARGETS, type ChipTargetId } from './chipTargets';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 export type StudioMode = 'draw' | 'harmonic' | 'math' | 'presets';
 export type StudioLayout = 'compact' | 'studio';
@@ -112,17 +113,15 @@ export const StudioToolbar: React.FC<StudioToolbarProps> = ({
       {/* Chip target dropdown */}
       <div className="flex items-center gap-1">
         <span className="text-[9px] font-mono text-text-muted uppercase">Chip:</span>
-        <select
+        <CustomSelect
           value={chipTarget}
-          onChange={(e) => onChipTargetChange(e.target.value as ChipTargetId)}
+          onChange={(v) => onChipTargetChange(v as ChipTargetId)}
+          options={CHIP_TARGET_ORDER.map((id) => ({
+            value: id,
+            label: CHIP_TARGETS[id].name,
+          }))}
           className="bg-dark-bgSecondary border border-dark-border rounded px-1.5 py-1 text-[10px] font-mono text-text-primary hover:border-accent-highlight/50 focus:outline-none focus:border-accent-highlight/50"
-        >
-          {CHIP_TARGET_ORDER.map((id) => (
-            <option key={id} value={id}>
-              {CHIP_TARGETS[id].name}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       {/* Separator */}

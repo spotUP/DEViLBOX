@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface SelectControlProps {
   label: string;
@@ -15,12 +16,11 @@ interface SelectControlProps {
 export const SelectControl: React.FC<SelectControlProps> = ({ label, value, options, onChange }) => (
   <div className="flex flex-col gap-1">
     <label className="text-text-muted text-[10px]">{label}</label>
-    <select
+    <CustomSelect
       className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-      value={Math.round(value)}
-      onChange={(e) => onChange(parseInt(e.target.value))}
-    >
-      {options.map((n, i) => <option key={i} value={i}>{n}</option>)}
-    </select>
+      value={String(Math.round(value))}
+      onChange={(v) => onChange(Number(v))}
+      options={options.map((n, i) => ({ value: String(i), label: n }))}
+    />
   </div>
 );

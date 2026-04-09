@@ -15,6 +15,7 @@ import type { InstrumentConfig, DrumKitConfig, DrumKitKeyMapping } from '@typede
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Trash2, Volume2, Sliders, Music } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
 
@@ -204,14 +205,15 @@ export const DrumKitEditor: React.FC<DrumKitEditorProps> = ({ instrument, onUpda
         <div className="flex items-center gap-4 text-xs">
           <label className="flex items-center gap-2">
             <span className="text-text-muted">Polyphony:</span>
-            <select
+            <CustomSelect
               value={drumKit.polyphony}
-              onChange={(e) => handleUpdateSettings({ polyphony: e.target.value as 'poly' | 'mono' })}
+              onChange={(v) => handleUpdateSettings({ polyphony: v as 'poly' | 'mono' })}
               className="bg-dark-bgActive border border-dark-border rounded px-2 py-1 text-text-primary"
-            >
-              <option value="poly">Polyphonic</option>
-              <option value="mono">Monophonic</option>
-            </select>
+              options={[
+                { value: 'poly', label: 'Polyphonic' },
+                { value: 'mono', label: 'Monophonic' },
+              ]}
+            />
           </label>
 
           <label className="flex items-center gap-2">

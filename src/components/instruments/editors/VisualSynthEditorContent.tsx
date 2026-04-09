@@ -27,6 +27,7 @@ import {
 } from '@typedefs/instrument';
 import type { VowelType } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { WaveformSelector } from '@components/ui/WaveformSelector';
 import { LFOControls } from '../LFOControls';
 import type { SynthEditorTab } from '../shared/SynthEditorTabs';
@@ -1051,9 +1052,7 @@ export function renderSpecialParameters(
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col items-center">
                 <p className="text-[9px] text-text-muted mb-1">Sync</p>
-                <select value={wbConfig.wobbleLFO.sync} onChange={(e) => onChange({ wobbleBass: { ...wbConfig, wobbleLFO: { ...wbConfig.wobbleLFO, sync: e.target.value as typeof wbConfig.wobbleLFO.sync } } })} className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight">
-                  {syncOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-                </select>
+                <CustomSelect value={wbConfig.wobbleLFO.sync} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, wobbleLFO: { ...wbConfig.wobbleLFO, sync: v as typeof wbConfig.wobbleLFO.sync } } })} className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight" options={syncOptions.map((opt) => ({ value: opt.value, label: opt.label }))} />
               </div>
               <Knob value={wbConfig.wobbleLFO.amount} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, wobbleLFO: { ...wbConfig.wobbleLFO, amount: v } } })} label="Filter" color="#ec4899" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={wbConfig.wobbleLFO.pitchAmount} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, wobbleLFO: { ...wbConfig.wobbleLFO, pitchAmount: v } } })} label="Pitch" color="#ec4899" formatValue={(v) => `${Math.round(v)}¢`} />
