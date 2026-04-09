@@ -1,8 +1,7 @@
 /**
  * TrackScopesStrip — Renoise-style per-channel mini oscilloscopes/VU strip.
  * Sits between the toolbar and pattern editor.
- * Uses oscilloscope store (WASM/Furnace) or channel levels (Tone.js) as data source.
- * Single canvas for performance.
+ * Aligns with actual pattern editor channel columns via shared channelLayout.
  */
 
 import React, { useEffect, useRef, memo, useCallback } from 'react';
@@ -11,18 +10,18 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useMixerStore } from '@stores/useMixerStore';
+import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { channelLayout } from './channelLayout';
 
 const STRIP_HEIGHT = 40;
-const SCOPE_PAD = 2;
-const MIN_SCOPE_WIDTH = 40;
 
-/** Per-channel accent colors */
+/** Per-channel muted accent colors (low-saturation, professional) */
 const CH_COLORS = [
-  '#00ffcc', '#00ccff', '#44ff88', '#ff44aa',
-  '#88ff44', '#ffaa44', '#cc88ff', '#ff8844',
-  '#44ccff', '#88ffcc', '#ffcc44', '#ff4488',
-  '#44ff44', '#8844ff', '#ff8888', '#4488ff',
+  '#5ec4b0', '#5eb0d8', '#6ec88a', '#d87aa8',
+  '#8ec86e', '#d8a060', '#a88ad8', '#d89060',
+  '#60b4d8', '#80d8b0', '#d8b060', '#d870a0',
+  '#60c870', '#7860d8', '#d88888', '#6088d8',
 ];
 
 /** Smoothed level state per channel */
@@ -30,6 +29,15 @@ interface ScopeState {
   level: number;
   peak: number;
   peakAge: number;
+}
+
+/** Parse CSS hex color to [r, g, b] */
+function hexToRgb(hex: string): [number, number, number] {
+  const c = hex.replace('#', '');
+  if (c.length === 3) {
+    return [parseInt(c[0]+c[0], 16), parseInt(c[1]+c[1], 16), parseInt(c[2]+c[2], 16)];
+  }
+  return [parseInt(c.slice(0,2), 16), parseInt(c.slice(2,4), 16), parseInt(c.slice(4,6), 16)];
 }
 
 export const TrackScopesStrip: React.FC = memo(() => {
@@ -40,8 +48,6 @@ export const TrackScopesStrip: React.FC = memo(() => {
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
   const isPlaying = useTransportStore(s => s.isPlaying);
-
-  // Oscilloscope store for WASM engines — subscribe to trigger re-render on activity change
   const oscActive = useOscilloscopeStore(s => s.isActive);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -55,7 +61,6 @@ export const TrackScopesStrip: React.FC = memo(() => {
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { oscActiveRef.current = oscActive; }, [oscActive]);
 
-  // Init scope states
   useEffect(() => {
     scopeStates.current = Array.from({ length: numChannels }, () => ({
       level: 0, peak: 0, peakAge: 0,
@@ -90,7 +95,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
   ) => {
     const midY = y + h / 2;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.lineJoin = 'round';
     ctx.beginPath();
     const step = data.length / w;
@@ -112,15 +117,18 @@ export const TrackScopesStrip: React.FC = memo(() => {
   ) => {
     const midY = y + h / 2;
     const barH = level * (h / 2) * 0.85;
+    const [r, g, b] = hexToRgb(color);
 
     // Symmetrical bar from center
-    ctx.fillStyle = color + '60';
+    ctx.fillStyle = `rgba(${r},${g},${b},0.3)`;
     ctx.fillRect(x + 2, midY - barH, w - 4, barH * 2);
 
     // Brighter core
+    ctx.fillStyle = `rgba(${r},${g},${b},0.6)`;
+    const coreW = Math.max(2, w * 0.5);
+    const coreX = x + (w - coreW) / 2;
     const coreH = barH * 0.6;
-    ctx.fillStyle = color + 'a0';
-    ctx.fillRect(x + w * 0.25, midY - coreH, w * 0.5, coreH * 2);
+    ctx.fillRect(coreX, midY - coreH, coreW, coreH * 2);
 
     // Peak line
     if (peak > 0.01) {
@@ -139,7 +147,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
   // Animation loop
   useEffect(() => {
     let lastTime = 0;
-    const FPS_INTERVAL = 1000 / 30; // 30fps
+    const FPS_INTERVAL = 1000 / 30;
 
     const tick = (now: number) => {
       animRef.current = requestAnimationFrame(tick);
@@ -159,14 +167,21 @@ export const TrackScopesStrip: React.FC = memo(() => {
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+      // Read theme colors
+      const theme = useThemeStore.getState().getCurrentTheme().colors;
+
       // Background
-      ctx.fillStyle = '#1a1a1e';
+      ctx.fillStyle = theme.bgSecondary;
       ctx.fillRect(0, 0, cw, ch);
 
       const nc = numChRef.current;
-      const scopeW = Math.max(MIN_SCOPE_WIDTH, (cw - SCOPE_PAD) / nc - SCOPE_PAD);
       const playing = isPlayingRef.current;
       const useOsc = oscActiveRef.current;
+
+      // Read shared channel layout from PatternEditorCanvas
+      const layout = channelLayout;
+      const hasLayout = layout.numChannels > 0 && layout.offsets.length >= nc;
+      const scrollX = layout.scrollLeft;
 
       // Get Tone.js levels for non-WASM engines
       let toneLevels: number[] | null = null;
@@ -176,37 +191,51 @@ export const TrackScopesStrip: React.FC = memo(() => {
         } catch { /* engine not ready */ }
       }
 
-      // Get oscilloscope data snapshot
       const oscSnapshot = useOsc ? useOscilloscopeStore.getState().channelData : null;
       const mixState = useMixerStore.getState().channels;
 
       for (let i = 0; i < nc; i++) {
-        const x = SCOPE_PAD + i * (scopeW + SCOPE_PAD);
-        const y = SCOPE_PAD;
-        const w = scopeW;
-        const h = ch - SCOPE_PAD * 2;
+        // Use real channel layout if available, otherwise fall back to equal spacing
+        let x: number, w: number;
+        if (hasLayout) {
+          x = layout.offsets[i] - scrollX;
+          w = layout.widths[i] - 2; // 2px gap between channels
+        } else {
+          const equalW = Math.max(40, (cw - 4) / nc - 2);
+          x = 2 + i * (equalW + 2);
+          w = equalW;
+        }
+
+        // Skip if fully off-screen
+        if (x + w < 0 || x > cw) continue;
+
+        // Clip to visible area
+        const clipX = Math.max(0, x);
+        const clipW = Math.min(cw, x + w) - clipX;
+        if (clipW < 4) continue;
+
+        const y = 2;
+        const h = ch - 4;
         const color = CH_COLORS[i % CH_COLORS.length];
         const isMuted = mixState[i]?.muted ?? false;
-        const displayColor = isMuted ? '#444' : color;
+        const displayColor = isMuted ? theme.textMuted : color;
 
         // Scope background
-        ctx.fillStyle = '#0e0e10';
-        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = theme.bg;
+        ctx.fillRect(clipX, y, clipW, h);
 
         // Center line
-        ctx.strokeStyle = '#2a2a30';
+        ctx.strokeStyle = theme.border;
         ctx.lineWidth = 0.5;
         ctx.beginPath();
-        ctx.moveTo(x, y + h / 2);
-        ctx.lineTo(x + w, y + h / 2);
+        ctx.moveTo(clipX, y + h / 2);
+        ctx.lineTo(clipX + clipW, y + h / 2);
         ctx.stroke();
 
-        // Draw content
+        // Draw content (use full x/w for proper waveform, canvas clips naturally)
         if (useOsc && oscSnapshot && oscSnapshot[i] && oscSnapshot[i]!.length > 0) {
-          // WASM oscilloscope waveform
           drawWaveform(ctx, x, y, w, h, oscSnapshot[i]!, displayColor);
         } else if (toneLevels && playing) {
-          // Tone.js level bar
           const rawDb = toneLevels[i] ?? -60;
           const normalized = Math.max(0, Math.min(1, (rawDb + 60) / 60));
 
@@ -220,15 +249,14 @@ export const TrackScopesStrip: React.FC = memo(() => {
               state.peakAge++;
               if (state.peakAge > 30) state.peak *= 0.95;
             }
-            drawLevelBar(ctx, x, y, w, h, state.level, state.peak, displayColor);
+            drawLevelBar(ctx, clipX, y, clipW, h, state.level, state.peak, displayColor);
           }
         } else if (!playing) {
-          // Decay when stopped
           const state = scopeStates.current[i];
           if (state && state.level > 0.001) {
             state.level *= 0.9;
             state.peak *= 0.95;
-            drawLevelBar(ctx, x, y, w, h, state.level, state.peak, displayColor);
+            drawLevelBar(ctx, clipX, y, clipW, h, state.level, state.peak, displayColor);
           }
         }
 
@@ -236,15 +264,17 @@ export const TrackScopesStrip: React.FC = memo(() => {
         const label = (useOsc && useOscilloscopeStore.getState().channelNames[i])
           || mixState[i]?.name
           || `${i + 1}`;
-        ctx.fillStyle = isMuted ? '#555' : displayColor + '80';
-        ctx.font = '8px monospace';
+        ctx.fillStyle = isMuted ? theme.textMuted : displayColor;
+        ctx.font = '9px monospace';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(label, x + 2, y + 1);
+        ctx.globalAlpha = 0.7;
+        ctx.fillText(label, clipX + 3, y + 2);
+        ctx.globalAlpha = 1;
       }
 
-      // Bottom border line
-      ctx.strokeStyle = '#2a2a30';
+      // Bottom border
+      ctx.strokeStyle = theme.border;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, ch - 0.5);
@@ -261,10 +291,10 @@ export const TrackScopesStrip: React.FC = memo(() => {
       <canvas
         ref={canvasRef}
         className="w-full h-full block"
-        style={{ imageRendering: 'pixelated' }}
       />
     </div>
   );
 });
 
 TrackScopesStrip.displayName = 'TrackScopesStrip';
+
