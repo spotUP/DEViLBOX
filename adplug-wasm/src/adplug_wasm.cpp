@@ -1145,8 +1145,15 @@ int adplug_get_instrument_regs(uint32_t index, uint8_t* outRegs) {
     // ── Cs3mPlayer ── inst[99] has d00-d0b = 12 OPL register bytes
     if (auto* sp = asS3mPlayer()) {
         if (index >= sp->header.insnum || index >= 99) return 0;
-        // S3M OPL instrument: type must be 0 (OPL melody)
-        if (sp->inst[index].type != 0) return 0;
+        // S3M OPL instrument types: 2=OPL2 melody, 3=OPL2 drum, 0=unused
+        // DMO (packed S3M) may also store as type 2 or 3
+        if (sp->inst[index].type != 2 && sp->inst[index].type != 3) {
+            // Still try reading if type=0 — some formats don't set type correctly
+            bool anyData = sp->inst[index].d00 || sp->inst[index].d01 ||
+                           sp->inst[index].d02 || sp->inst[index].d03 ||
+                           sp->inst[index].d04 || sp->inst[index].d05;
+            if (!anyData) return 0;
+        }
         // d00-d0a map to standard OPL register layout
         outRegs[0] = sp->inst[index].d00;  // mod char
         outRegs[1] = sp->inst[index].d01;  // car char
@@ -1351,6 +1358,14 @@ uint32_t adplug_capture_get_total_ticks() {
 EMSCRIPTEN_KEEPALIVE
 float adplug_capture_get_refresh_rate() {
     return g_captureRefreshRate;
+}
+
+/** Get player refresh rate (ticks per second) for any loaded format */
+EMSCRIPTEN_KEEPALIVE
+float adplug_get_refresh_rate() {
+    if (!g_player) return 0.0f;
+    float r = g_player->getrefresh();
+    return r > 0.0f ? r : 70.0f;
 }
 
 // ── Player Type Query ──────────────────────────────────────────────────────
