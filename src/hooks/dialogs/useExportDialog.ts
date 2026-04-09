@@ -449,6 +449,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     } else if (layoutFmtId === 'xmf') {
       const { exportXMF } = await import('@lib/export/XMFExporter');
       result = await exportXMF(song);
+    } else if (format === 'AdPlug' as string) {
+      const { exportAdPlug } = await import('@lib/export/AdPlugExporter');
+      result = exportAdPlug(song, 'rad');
     }
 
     // Fallback: UADE chip RAM readback (works for any running UADE format)

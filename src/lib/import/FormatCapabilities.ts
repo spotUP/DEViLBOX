@@ -89,6 +89,9 @@ const NATIVE_EXPORTABLE_LABELS = new Set([
 
   // ── Native parsers with dedicated exporters ──
   'AMOS Music Bank',
+
+  // ── AdLib/OPL with OPL3 exporters (RAD, IMF, RAW) ──
+  'AdPlug',
 ]);
 
 /** Format families that can export via libopenmpt WASM (to IT/S3M) */

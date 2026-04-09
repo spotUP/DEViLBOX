@@ -8252,12 +8252,12 @@
   },
   "adplug-a2m": {
     "status": "works",
-    "notes": "WASM OK, peak=3766",
+    "notes": "browser OK [AdLib Tracker 2] rms=0.0170",
     "auditStatus": "fixed"
   },
   "adplug-d00": {
     "status": "works",
-    "notes": "WASM OK, peak=20701",
+    "notes": "browser OK [EdLib packed (version 4)] rms=0.0648",
     "auditStatus": "fixed"
   },
   "adplug-hsc": {
@@ -8282,90 +8282,90 @@
   },
   "adplug-lds": {
     "status": "works",
-    "notes": "WASM OK, peak=8867",
+    "notes": "browser OK [LOUDNESS Sound System] rms=0.0301",
     "auditStatus": "fixed"
   },
   "adplug-mtk": {
     "status": "works",
-    "notes": "WASM OK, peak=21691",
+    "notes": "browser OK [MPU-401 Trakker] rms=0.0977",
     "auditStatus": "fixed"
   },
   "adplug-dfm": {
     "status": "works",
-    "notes": "WASM OK, peak=10969",
+    "notes": "browser OK [Digital-FM 1.1] rms=0.0334",
     "auditStatus": "fixed"
   },
   "adplug-amd": {
     "status": "works",
-    "notes": "WASM OK, peak=18815",
+    "notes": "browser OK [AMUSIC Adlib Tracker] rms=0.0553",
     "auditStatus": "fixed"
   },
   "adplug-sat": {
     "status": "works",
-    "notes": "WASM OK, peak=32768",
+    "notes": "browser OK [Surprise! Adlib Tracker 2 (version 1)] rms=0.1287",
     "auditStatus": "fixed"
   },
   "adplug-mkj": {
     "status": "works",
-    "notes": "WASM OK, peak=26990",
+    "notes": "browser OK [MKJamz Audio File] rms=0.0525",
     "auditStatus": "fixed"
   },
   "adplug-sa2": {
     "status": "works",
-    "notes": "WASM OK, peak=5662",
+    "notes": "browser OK [Surprise! Adlib Tracker 2 (version 9)] rms=0.0227",
     "auditStatus": "fixed"
   },
   "adplug-bam": {
     "status": "works",
-    "notes": "WASM OK, peak=5227",
+    "notes": "browser OK [Bob's Adlib Music] rms=0.0264",
     "auditStatus": "fixed"
   },
   "adplug-raw": {
     "status": "works",
-    "notes": "WASM OK, peak=3982",
+    "notes": "browser OK [Raw AdLib Capture] rms=0.0090",
     "auditStatus": "fixed"
   },
   "adplug-jbm": {
     "status": "works",
-    "notes": "WASM OK, peak=11342",
+    "notes": "browser OK [JBM Adlib Music] rms=0.0341",
     "auditStatus": "fixed"
   },
   "adplug-xad": {
     "status": "works",
-    "notes": "WASM OK, peak=32768",
+    "notes": "browser OK [xad: Domark Player] rms=0.0882",
     "auditStatus": "fixed"
   },
   "adplug-laa": {
     "status": "works",
-    "notes": "WASM OK, peak=29533",
+    "notes": "browser OK [LucasArts AdLib MIDI] rms=0.0890",
     "auditStatus": "fixed"
   },
   "adplug-xms": {
     "status": "works",
-    "notes": "WASM OK, peak=130",
+    "notes": "browser OK [AMUSIC Adlib Tracker] rms=0.0264",
     "auditStatus": "fixed"
   },
   "adplug-rol": {
     "status": "partial",
-    "notes": "WASM OK, peak=8110",
+    "notes": "browser OK [AdLib Visual Composer] rms=0.0313",
     "auditStatus": "fixed"
   },
   "adplug-sci": {
     "status": "partial",
-    "notes": "needs companion patch.003 file",
+    "notes": "load failed: loadFile failed: AdPlug could not load: kq1 march.sci",
     "auditStatus": "fail"
   },
   "adplug-ksm": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=32768"
+    "notes": "browser OK [Ken Silverman's Music Format] rms=0.0508"
   },
   "adplug-adl": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=1433"
+    "notes": "browser OK [Westwood ADL (version 3)] rms=0.0001"
   },
   "adplug-sng": {
     "auditStatus": "fail",
-    "notes": "format variant mismatch (multiple .sng formats)"
+    "notes": "load failed: loadFile failed: AdPlug could not load: song1.sng"
   },
   "adplug-adt": {
     "auditStatus": "unknown",
@@ -8377,7 +8377,7 @@
   },
   "adplug-bmf": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=16615"
+    "notes": "browser OK [xad: BMF Adlib Tracker] rms=0.0354"
   },
   "adplug-herad": {
     "auditStatus": "unknown",
@@ -8385,7 +8385,7 @@
   },
   "adplug-hsp": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=20674"
+    "notes": "browser OK [HSC Adlib Composer / HSC-Tracker] rms=0.0363"
   },
   "adplug-hybrid": {
     "auditStatus": "unknown",
@@ -8397,11 +8397,11 @@
   },
   "adplug-mdi": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=8169"
+    "notes": "browser OK [AdLib Visual Composer: MIDIPlay File] rms=0.0239"
   },
   "adplug-msc": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=25865"
+    "notes": "browser OK [AdLib MSCplay (version 0)] rms=0.0706"
   },
   "adplug-psi": {
     "auditStatus": "unknown",
@@ -8413,7 +8413,7 @@
   },
   "adplug-sop": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=564"
+    "notes": "browser OK [Note Sequencer v2.0 by sopepos] rms=0.0211"
   },
   "adplug-u6m": {
     "auditStatus": "unknown",
@@ -8421,11 +8421,11 @@
   },
   "adplug-got": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=21006"
+    "notes": "browser OK [God of Thunder Music] rms=0.0515"
   },
   "adplug-rix": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=11199"
+    "notes": "browser OK [Softstar RIX OPL Music Format] rms=0.0143"
   },
   "adplug-sdb": {
     "auditStatus": "fixed",
@@ -8445,38 +8445,38 @@
   },
   "adplug-agd": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=11351"
+    "notes": "browser OK [HERAD System AGD (version 1, HSQ packed)] rms=0.0153"
   },
   "adplug-cff": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=32767"
+    "notes": "browser OK [BoomTracker 4] rms=0.1960"
   },
   "adplug-dmo": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=26172"
+    "notes": "browser OK [TwinTeam (packed S3M)] rms=0.1237"
   },
   "adplug-dtm": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=14806"
+    "notes": "browser OK [DeFy Adlib Tracker] rms=0.0413"
   },
   "adplug-mad": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=2149"
+    "notes": "browser OK [Mlat Adlib Tracker] rms=0.0125"
   },
   "adplug-mtr": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=32767"
+    "notes": "browser OK [Master Tracker (version 2)] rms=0.0941"
   },
   "adplug-pis": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=5799"
+    "notes": "browser OK [Beni Tracker PIS module] rms=0.0238"
   },
   "adplug-plx": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=8171"
+    "notes": "browser OK [PALLADIX Sound System] rms=0.0182"
   },
   "adplug-xsm": {
     "auditStatus": "fixed",
-    "notes": "WASM OK, peak=8714"
+    "notes": "browser OK [eXtra Simple Music] rms=0.0442"
   }
 }
