@@ -10,6 +10,7 @@ import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
+import type { EffectConfig } from '@/types/instrument/effects';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ export interface DJPlaylist {
   createdAt: number;
   updatedAt: number;
   tracks: PlaylistTrack[];
+  /** Master FX chain saved with this playlist — applied when Auto DJ starts */
+  masterEffects?: EffectConfig[];
 }
 
 interface DJPlaylistState {
@@ -62,6 +65,8 @@ interface DJPlaylistState {
   updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
+  /** Save master FX chain to a playlist (applied when Auto DJ starts) */
+  setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
 }
 
 // ── Store ────────────────────────────────────────────────────────────────────
@@ -123,6 +128,14 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           if (p) {
             p.tracks.push(track);
             p.updatedAt = Date.now();
+            // Auto-snapshot master FX to playlist if none saved yet
+            if (!p.masterEffects) {
+              const { useAudioStore } = require('@/stores/useAudioStore');
+              const fx = useAudioStore.getState().masterEffects;
+              if (fx.length > 0) {
+                p.masterEffects = JSON.parse(JSON.stringify(fx));
+              }
+            }
           }
         });
         syncPlaylists();
@@ -192,6 +205,17 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             }
           }
         });
+      },
+
+      setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p) {
+            p.masterEffects = effects ? JSON.parse(JSON.stringify(effects)) : undefined;
+            p.updatedAt = Date.now();
+          }
+        });
+        syncPlaylists();
       },
     })),
     {
