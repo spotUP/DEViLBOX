@@ -211,6 +211,14 @@ export function xmEffectToString(effTyp: number, eff: number): string {
     return `${DSP_CHARS[effTyp - 0x50] ?? 'D'}${HEX_BYTE[eff] ?? '00'}`;
   }
 
+  // OPL native effects: 0x30-0x3F → display with ~ prefix
+  // 0x30=feedback, 0x31=carrier vol, 0x32=mod vol, 0x33=inst vol
+  if (effTyp >= 0x30 && effTyp <= 0x3F) {
+    const OPL_CHARS = ['F', 'C', 'M', 'V']; // Feedback, Carrier, Modulator, Volume
+    const ch = OPL_CHARS[effTyp - 0x30] ?? '?';
+    return `~${ch}${(eff & 0xF).toString(16).toUpperCase()}`;
+  }
+
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
 }

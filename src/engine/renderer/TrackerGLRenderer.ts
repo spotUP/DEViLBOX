@@ -847,6 +847,10 @@ export class TrackerGLRenderer {
               if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
                 const DSP_CHARS = ['D', 'E', 'C', 'L', 'X'];
                 effStr = (DSP_CHARS[colEffTyp - 0x50] ?? 'D') + HEX_TABLE[colEff & 0xFF];
+              } else if (colEffTyp >= 0x30 && colEffTyp <= 0x3F) {
+                // OPL native effects: ~F=feedback, ~C=carrier vol, ~M=mod vol, ~V=inst vol
+                const OPL_CHARS = ['F', 'C', 'M', 'V'];
+                effStr = '~' + (OPL_CHARS[colEffTyp - 0x30] ?? '?') + ((colEff & 0xF).toString(16).toUpperCase());
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }
