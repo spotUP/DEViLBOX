@@ -235,6 +235,8 @@ export async function extractAdPlugPatterns(
     const playerRefresh = M._adplug_get_refresh_rate();
     let usedCapture = false;
 
+    console.log(`[AdPlug] WASM returned: type="${type}" pat=${numPatterns} ord=${numOrders} ch=${numChannels} rows=${numRows} speed=${rawSpeed} bpm=${rawBpm}`);
+
     // If native extraction yields no patterns, try OPL capture
     if (numPatterns === 0 || numOrders === 0 || numChannels === 0) {
       const capturedEvents = M._adplug_capture_song();
