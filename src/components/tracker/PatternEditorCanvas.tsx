@@ -246,6 +246,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   })));
 
   const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
+  const channelColorBlend = useSettingsStore(s => s.channelColorBlend);
+  // Convert blend % (0-100) to 2-digit hex alpha for CSS color suffix
+  const blendHex = Math.round(channelColorBlend * 2.55).toString(16).padStart(2, '0');
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
@@ -2967,7 +2970,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                             ${channel?.solo ? 'bg-accent-primary/10' : ''}`}
                           style={{
                             width: channelWidth,
-                            backgroundColor: channel?.color ? `${channel.color}15` : undefined,
+                            backgroundColor: channel?.color ? `${channel.color}${blendHex}` : undefined,
                             boxShadow: shadowParts.length > 0 ? shadowParts.join(', ') : undefined,
                           }}
                         >
@@ -3172,7 +3175,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           ${channel.solo ? 'bg-accent-primary/10' : ''}`}
                         style={{
                           width: channelWidth,
-                          backgroundColor: channel.color ? `${channel.color}15` : undefined,
+                          backgroundColor: channel.color ? `${channel.color}${blendHex}` : undefined,
                           boxShadow: shadowParts.length > 0 ? shadowParts.join(', ') : undefined,
                         }}
                       >

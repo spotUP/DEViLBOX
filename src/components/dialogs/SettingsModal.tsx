@@ -434,6 +434,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1" />
                     </div>
                   )}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Channel Color Blend:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Track color tint on header background ({s.channelColorBlend}%)</span>
+                    </div>
+                    <input type="range" min={0} max={50} step={1} value={s.channelColorBlend}
+                      onChange={(e) => s.setChannelColorBlend(Number(e.target.value))}
+                      className="w-24 accent-accent-primary" />
+                  </div>
                 </div>
               </section>
 
