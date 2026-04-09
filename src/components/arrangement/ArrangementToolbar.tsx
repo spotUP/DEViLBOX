@@ -23,6 +23,7 @@ import { useArrangementStore } from '@stores/useArrangementStore';
 import { useUIStore, useTransportStore, useTrackerStore } from '@stores';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { ArrangementToolMode } from '@/types/arrangement';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 const SNAP_BASE_OPTIONS = [
   { label: 'Row', value: 1 },
@@ -91,26 +92,26 @@ export const ArrangementToolbar: React.FC = () => {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 bg-dark-bgSecondary border-b border-dark-border text-xs select-none">
       {/* View switcher */}
-      <select
+      <CustomSelect
         value="arrangement"
-        onChange={(e) => {
-          const val = e.target.value;
-          if (val !== 'arrangement') {
-            useUIStore.getState().setActiveView(val as any);
+        onChange={(v) => {
+          if (v !== 'arrangement') {
+            useUIStore.getState().setActiveView(v as any);
           }
         }}
+        options={[
+          { value: 'tracker', label: 'Tracker' },
+          { value: 'grid', label: 'Grid' },
+          { value: 'pianoroll', label: 'Piano Roll' },
+          { value: 'tb303', label: 'TB-303' },
+          { value: 'arrangement', label: 'Arrangement' },
+          { value: 'dj', label: 'DJ Mixer' },
+          { value: 'drumpad', label: 'Drum Pads' },
+          { value: 'vj', label: 'VJ View' },
+        ]}
         className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
         title="Switch view"
-      >
-        <option value="tracker">Tracker</option>
-        <option value="grid">Grid</option>
-        <option value="pianoroll">Piano Roll</option>
-        <option value="tb303">TB-303</option>
-        <option value="arrangement">Arrangement</option>
-        <option value="dj">DJ Mixer</option>
-        <option value="drumpad">Drum Pads</option>
-        <option value="vj">VJ View</option>
-      </select>
+      />
 
       <div className="w-px h-5 bg-border opacity-50" />
 
@@ -182,15 +183,15 @@ export const ArrangementToolbar: React.FC = () => {
       {/* Snap */}
       <div className="flex items-center gap-1">
         <span className="text-text-muted">Snap:</span>
-        <select
+        <CustomSelect
+          value={String(view.snapDivision)}
+          onChange={(v) => setSnapDivision(Number(v))}
+          options={snapOptions.map(opt => ({
+            value: String(opt.value),
+            label: opt.label,
+          }))}
           className="bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-0.5 text-text-primary text-xs"
-          value={view.snapDivision}
-          onChange={(e) => setSnapDivision(Number(e.target.value))}
-        >
-          {snapOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        />
       </div>
 
       <div className="w-px h-5 bg-border opacity-50" />

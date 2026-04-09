@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Music2 } from 'lucide-react';
 import { notify } from '@stores/useNotificationStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 export const SubsongSelector: React.FC = React.memo(() => {
   const { loadPatterns, setPatternOrder, } = useTrackerStore(
@@ -60,18 +61,16 @@ export const SubsongSelector: React.FC = React.memo(() => {
     <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
       <Music2 size={14} className="shrink-0 text-accent-primary" />
       <span className="text-[10px] text-text-secondary font-medium">SUBSONG:</span>
-      <select
-        value={furnaceActiveSubsong}
-        onChange={(e) => handleSubsongChange(Number(e.target.value))}
-        className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer outline-none"
+      <CustomSelect
+        value={String(furnaceActiveSubsong)}
+        onChange={(v) => handleSubsongChange(Number(v))}
+        options={furnaceSubsongs.map((sub, idx) => ({
+          value: String(idx),
+          label: `${idx + 1}. ${sub.name || `Subsong ${idx + 1}`}`,
+        }))}
+        className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
         title="Select subsong (Furnace multi-song module)"
-      >
-        {furnaceSubsongs.map((sub, idx) => (
-          <option key={idx} value={idx}>
-            {idx + 1}. {sub.name || `Subsong ${idx + 1}`}
-          </option>
-        ))}
-      </select>
+      />
       <span className="text-[10px] text-text-muted">
         ({furnaceActiveSubsong + 1}/{furnaceSubsongs.length})
       </span>

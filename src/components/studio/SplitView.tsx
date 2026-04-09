@@ -10,6 +10,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // Lazy-load heavy sub-views
 const TrackerView = lazy(() =>
@@ -220,16 +221,13 @@ export const SplitView: React.FC = () => {
       <div className="flex items-center gap-2 px-2 py-1 bg-dark-bgTertiary border-b border-dark-border shrink-0">
         <span className="text-[10px] font-mono text-text-muted tracking-widest">SPLIT VIEW</span>
         <div className="flex-1" />
-        <select
+        <CustomSelect
           value="split"
-          onChange={(e) => switchView(e.target.value, 'split')}
+          onChange={(v) => switchView(v, 'split')}
+          options={VIEW_OPTIONS.map(opt => ({ value: opt.value, label: opt.label }))}
           className="px-3 py-1.5 rounded-md text-xs font-mono font-bold tracking-widest uppercase border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
           title="Switch view"
-        >
-          {VIEW_OPTIONS.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        />
       </div>
 
       {/* Panels */}

@@ -18,6 +18,7 @@ import { getSendBusPresetsByCategory } from '../../constants/sendBusPresets';
 import { getChannelFxPresetsByCategory } from '../../constants/channelFxPresets';
 
 import { ChannelInsertEffectsModal } from '@components/effects/ChannelInsertEffectsModal';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,17 +65,18 @@ const FxSlotDropdown: React.FC<{
   value: string | null;
   onChange: (v: string | null) => void;
 }> = ({ value, onChange }) => (
-  <select
+  <CustomSelect
     value={value ?? ''}
-    onChange={(e) => onChange(e.target.value || null)}
-    className="bg-[#1a1a24] text-[8px] font-mono text-white/50 border border-white/10 rounded px-0.5 py-0 w-full cursor-pointer hover:border-white/20 focus:outline-none"
-    style={{ height: 16 }}
-  >
-    <option value="">---</option>
-    {FX_TYPES.filter(Boolean).map((fx) => (
-      <option key={fx} value={fx!}>{fx!.toUpperCase()}</option>
-    ))}
-  </select>
+    onChange={(v) => onChange(v || null)}
+    options={[
+      { value: '', label: '---' },
+      ...FX_TYPES.filter(Boolean).map((fx) => ({
+        value: fx!,
+        label: fx!.toUpperCase(),
+      })),
+    ]}
+    className="bg-[#1a1a24] text-[8px] font-mono text-white/50 border border-white/10 rounded px-0.5 py-0 w-full cursor-pointer hover:border-white/20"
+  />
 );
 
 // ─── ChannelFxPresetDropdown ─────────────────────────────────────────────────

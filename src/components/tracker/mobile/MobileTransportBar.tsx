@@ -10,6 +10,7 @@ import * as Tone from 'tone';
 import { useTransportStore, useTrackerStore, useEditorStore, useInstrumentStore } from '@stores';
 import { haptics } from '@/utils/haptics';
 import { useShallow } from 'zustand/react/shallow';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface MobileTransportBarProps {
   /** Channel index for portrait mode navigation */
@@ -167,17 +168,15 @@ export const MobileTransportBar: React.FC<MobileTransportBarProps> = ({
       <div className="flex-1 min-w-0" />
 
       {/* Instrument selector */}
-      <select
-        value={currentInstrumentId ?? 1}
-        onChange={(e) => { haptics.selection(); setCurrentInstrument(parseInt(e.target.value, 10)); }}
+      <CustomSelect
+        value={String(currentInstrumentId ?? 1)}
+        onChange={(v) => { haptics.selection(); setCurrentInstrument(parseInt(v, 10)); }}
+        options={instruments.map((inst) => ({
+          value: String(inst.id),
+          label: inst.name.substring(0, 12),
+        }))}
         className="text-[10px] bg-dark-bgTertiary border border-dark-border rounded h-8 px-1.5 text-text-primary font-mono truncate flex-shrink min-w-0 max-w-[90px]"
-      >
-        {instruments.map((inst) => (
-          <option key={inst.id} value={inst.id}>
-            {inst.name.substring(0, 12)}
-          </option>
-        ))}
-      </select>
+      />
 
       {/* Spacer for hamburger menu */}
       <div className="w-8 flex-shrink-0" />
