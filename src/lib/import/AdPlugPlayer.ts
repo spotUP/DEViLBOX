@@ -143,9 +143,10 @@ export class AdPlugPlayer {
    * Load and play a file from an ArrayBuffer.
    * @param buffer Raw file data
    * @param filename Filename with extension (used for format detection)
+   * @param companions Optional companion files (e.g. patch.003 for SCI)
    * @returns true if loaded successfully
    */
-  async load(buffer: ArrayBuffer, filename: string): Promise<boolean> {
+  async load(buffer: ArrayBuffer, filename: string, companions?: Array<{ name: string; data: Uint8Array }>): Promise<boolean> {
     const ok = await this.ensureInitialized();
     if (!ok || !this.processNode) return false;
 
@@ -167,7 +168,7 @@ export class AdPlugPlayer {
       this.processNode!.port.addEventListener('message', handler);
 
       const data = new Uint8Array(buffer);
-      this.processNode!.port.postMessage({ type: 'load', data, filename });
+      this.processNode!.port.postMessage({ type: 'load', data, filename, companions: companions || [] });
     });
   }
 
