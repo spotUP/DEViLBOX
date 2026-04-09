@@ -4690,8 +4690,8 @@
     "notes": "ch=4 pat=12 inst=15 rms=0.0922"
   },
   "uade-gmc": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected"
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=2 rms=0.0606"
   },
   "uade-graoumf-tracker": {
     "auditStatus": "fixed",
@@ -4710,8 +4710,8 @@
     "notes": "No test files available — routing verified in code"
   },
   "uade-ims": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=4 rms=0.1238",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -4762,8 +4762,8 @@
     }
   },
   "uade-mfp": {
-    "auditStatus": "silent",
-    "notes": "Silent: rms=0.000199, file=mfp.crystaldragon ingame, errors: [UADEEngine] UADE could not play: mfp.crystaldragon ingame (ret=-1); [NativeEngineRouting] Failed to start UADEEditable: Error: UADE could not play: "
+    "auditStatus": "fixed",
+    "notes": "Crystal Dragon plays with companion smp.* file (rms=0.18)"
   },
   "uade-protracker-mod": {
     "auditStatus": "fixed",
@@ -4818,8 +4818,8 @@
     }
   },
   "uade-ron-klaren": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=2 rms=0.0652",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
@@ -4906,16 +4906,16 @@
     }
   },
   "uade-synthesis": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=412 rms=0.0603",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
     }
   },
   "uade-symphonie-pro": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected"
+    "auditStatus": "fixed",
+    "notes": "ch=8 pat=6 rms=0.0136"
   },
   "uade-tcb-tracker": {
     "auditStatus": "fixed",
@@ -5018,8 +5018,8 @@
     }
   },
   "uade-paul-shields": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=1 rms=0.0988",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5042,8 +5042,8 @@
     }
   },
   "uade-thomas-hermann": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=1 rms=0.0465 (thm+smp companion)",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 noteDensity only (pat=1 streaming)"
@@ -5079,7 +5079,7 @@
   },
   "uade-fm-tracker": {
     "auditStatus": "fail",
-    "notes": "Needs retest — browser crashed during audit"
+    "notes": "UADE ret=-1 (294b file, likely unsupported)"
   },
   "uade-sound-master": {
     "auditStatus": "fixed",
@@ -5090,8 +5090,8 @@
     }
   },
   "uade-sound-player": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected"
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=1 rms=0.0901 (sjs+smp companion)"
   },
   "uade-time-tracker": {
     "auditStatus": "fixed",
@@ -5111,7 +5111,7 @@
   },
   "uade-quartet": {
     "auditStatus": "fail",
-    "notes": "Needs retest — two-file format (.4v+.set)",
+    "notes": "UADE ret=-1 even with .set companion",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -5170,8 +5170,8 @@
     "notes": "ch=1 pat=11 inst=10 rms=0.0195"
   },
   "uade-magnetic-fields": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "Crystal Dragon plays with companion smp.* file",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + UADE play fail"
@@ -5206,8 +5206,8 @@
     "notes": "No test files available — routing verified in code"
   },
   "uade-peter-verswyvelen": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected",
+    "auditStatus": "fixed",
+    "notes": "ch=4 pat=1 rms=0.0672",
     "data": {
       "auditStatus": "fail",
       "notes": "8/10 silent + no export"
@@ -7178,12 +7178,12 @@
     "notes": "9/10 — audio works, two-file sjs+smp companion OK"
   },
   "uade-infogrames": {
-    "auditStatus": "fail",
-    "notes": "Needs retest — two-file format (.dum+.ins)"
+    "auditStatus": "fixed",
+    "notes": "Captain Blood + Advantage Tennis play with companion .ins files"
   },
   "uade-maximum-effect": {
     "auditStatus": "fail",
-    "notes": "Needs retest — browser was disconnected"
+    "notes": "UADE ret=-1 even with SMP companion"
   },
   "uade-synth-pack": {
     "auditStatus": "fixed",
