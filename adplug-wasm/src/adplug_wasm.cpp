@@ -391,12 +391,10 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     g_opl->init();
 
     // Use AdPlug factory to auto-detect format and create player
+    // NOTE: companions are NOT cleared here — they stay available for capture.
+    // They are cleared at the START of the next adplug_load() call.
     CProvider_Memory provider(g_fileData, g_fileSize, std::string(filename));
     g_player = CAdPlug::factory(std::string(filename), g_opl, CAdPlug::players, provider);
-
-    // Clear companions after load attempt
-    for (auto& c : g_companions) { free(c.data); }
-    g_companions.clear();
 
     if (!g_player) {
         free(g_fileData);
@@ -1302,22 +1300,29 @@ uint32_t adplug_capture_song() {
 
     if (!capturePlayer) { delete captureRealOpl; return 0; }
 
-    capturePlayer->rewind(0);
     g_captureRefreshRate = capturePlayer->getrefresh();
 
-    // Play through the song tick-by-tick, capturing all OPL writes
-    // Safety limit: 50000 ticks (~16 minutes at 50Hz)
+    // Try all subsongs — some formats (ADL/Sierra) default to an empty subsong
+    int numSubsongs = capturePlayer->getsubsongs();
     const uint32_t MAX_TICKS = 50000;
-    uint32_t tick = 0;
-    bool playing = true;
 
-    while (playing && tick < MAX_TICKS) {
-        captureOpl.currentTick = tick;
-        playing = capturePlayer->update();
-        tick++;
+    for (int sub = 0; sub < std::max(1, numSubsongs); sub++) {
+        captureOpl.init();
+        capturePlayer->rewind(sub);
+
+        uint32_t tick = 0;
+        bool playing = true;
+        while (playing && tick < MAX_TICKS) {
+            captureOpl.currentTick = g_captureTotalTicks + tick;
+            playing = capturePlayer->update();
+            tick++;
+        }
+        g_captureTotalTicks += tick;
+
+        // If we got events from this subsong, stop (use the first productive one)
+        if (!g_capturedNotes.empty()) break;
     }
 
-    g_captureTotalTicks = tick;
     delete capturePlayer;
     delete captureRealOpl;
 

@@ -116,6 +116,7 @@ function cmodCmdToXM(cmd: number, param: number): [number, number] {
 interface AdPlugWasmModule {
   _adplug_init(sampleRate: number): number;
   _adplug_shutdown(): void;
+  _adplug_add_companion(dataPtr: number, length: number, namePtr: number): void;
   _adplug_load(dataPtr: number, length: number, filenamePtr: number): number;
   _adplug_get_patterns(): number;
   _adplug_get_orders(): number;
@@ -169,16 +170,40 @@ async function getModule(): Promise<AdPlugWasmModule> {
 
 // ── Main Extraction Function ──────────────────────────────────────────────────
 
+/** Companion file to load alongside the main music file */
+export interface CompanionFile {
+  name: string;
+  data: ArrayBuffer;
+}
+
 /**
  * Try to extract editable pattern data from an AdPlug-supported file.
  * Returns null if the format is not a CmodPlayer-based tracker (stream-only formats).
+ * Pass companions for formats that need them (SCI needs patch.003, SNG needs .ins).
  */
 export async function extractAdPlugPatterns(
   buffer: ArrayBuffer,
   filename: string,
+  companions?: CompanionFile[],
 ): Promise<TrackerSong | null> {
   const M = await getModule();
   const data = new Uint8Array(buffer);
+
+  // Load companion files first (before adplug_load)
+  if (companions) {
+    for (const comp of companions) {
+      const compData = new Uint8Array(comp.data);
+      const compPtr = M._malloc(compData.length);
+      M.HEAPU8.set(compData, compPtr);
+      const compNameBytes = new TextEncoder().encode(comp.name);
+      const compNamePtr = M._malloc(compNameBytes.length + 1);
+      M.HEAPU8.set(compNameBytes, compNamePtr);
+      M.HEAPU8[compNamePtr + compNameBytes.length] = 0;
+      M._adplug_add_companion(compPtr, compData.length, compNamePtr);
+      M._free(compPtr);
+      M._free(compNamePtr);
+    }
+  }
 
   // Allocate and copy file data
   const dataPtr = M._malloc(data.length);
