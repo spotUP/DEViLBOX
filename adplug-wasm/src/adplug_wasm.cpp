@@ -24,6 +24,9 @@
 // Embedded standard.bnk for ROL/SCI support (generated from AdPlug test data)
 #include "standard_bnk.h"
 
+// Embedded insts.dat for KSM (Ken Silverman Music) support
+#include "insts_dat.h"
+
 // Helper: case-insensitive ends-with check
 static bool iends_with(const std::string& str, const std::string& suffix) {
     if (suffix.size() > str.size()) return false;
@@ -62,6 +65,11 @@ public:
         // Serve standard.bnk for ROL files
         if (iends_with(filename, "standard.bnk") || iends_with(filename, ".bnk")) {
             return makeStream(standard_bnk_data, standard_bnk_size);
+        }
+
+        // Serve insts.dat for KSM (Ken Silverman Music) files
+        if (iends_with(filename, "insts.dat")) {
+            return makeStream(insts_dat, insts_dat_len);
         }
 
         return nullptr;
