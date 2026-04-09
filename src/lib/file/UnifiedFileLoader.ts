@@ -1498,7 +1498,7 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
 // Excludes rad/hsc/dro/imf/cmf which use TS parser for pattern editing
 const ADPLUG_WASM_EXTS = /\.(adl|agd|a2m|a2t|amd|bam|bmf|cff|d00|dfm|dmo|dtm|got|ha2|hsp|hsq|jbm|ksm|laa|lds|m|mad|mdi|mkf|mkj|msc|mtk|mtr|mus|mdy|ims|pis|plx|rac|raw|rix|rol|sa2|sat|sci|sdb|sng|sop|sqx|xad|xms|xsm)$/i;
 
-function isAdPlugWasmFormat(filename: string): boolean {
+export function isAdPlugWasmFormat(filename: string): boolean {
   return ADPLUG_WASM_EXTS.test(filename);
 }
 
