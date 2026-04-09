@@ -265,23 +265,16 @@ export async function extractAdPlugPatterns(
     if (usedCapture) {
       // Capture quantized ticks to rows using ticksPerRow = round(refresh/50)
       const ticksPerRow = Math.max(1, Math.round(refresh / 50));
-      const rowRate = refresh / ticksPerRow; // rows per second
+      const rawRowRate = refresh / ticksPerRow; // rows per second
 
-      // Choose speed to get BPM in comfortable range (80-200)
-      // BPM = rowRate * 5 * speed / 2 → speed = BPM * 2 / (5 * rowRate)
-      // Target BPM=125: speed = 125 * 2 / (5 * rowRate) = 50 / rowRate
-      if (rowRate < 20) {
-        // Very slow refresh — use speed to compensate
-        finalSpeed = Math.max(1, Math.min(31, Math.round(50 / rowRate)));
-        finalBpm = Math.round(rowRate * 5 * finalSpeed / 2);
-      } else if (rowRate > 200) {
-        // Very fast refresh (e.g. MDI at 840Hz) — increase speed to reduce row rate
-        finalSpeed = Math.max(1, Math.min(31, Math.round(rowRate / 50)));
-        finalBpm = Math.round(rowRate * 5 / (2 * finalSpeed));
-      } else {
-        finalSpeed = 1;
-        finalBpm = Math.round(rowRate * 5 / 2);
-      }
+      // Target a comfortable visual row rate (~8-12 rows/sec like a normal tracker).
+      // Use speed to slow down the visual cursor to match the audio duration.
+      const targetRowRate = 10;
+      finalSpeed = Math.max(1, Math.min(31, Math.round(rawRowRate / targetRowRate)));
+      finalBpm = Math.round(rawRowRate * 5 * finalSpeed / (2 * finalSpeed));
+      // Simplifies to: finalBpm = round(rawRowRate * 5 / 2) — speed cancels out.
+      // But the visual rowRate = BPM * 2 / (5 * speed) = rawRowRate / speed ≈ targetRowRate.
+      finalBpm = Math.round(rawRowRate * 5 / 2);
     } else {
       // Native format — use player speed if valid, compute BPM from refresh
       finalSpeed = (rawSpeed > 0 && rawSpeed <= 31) ? rawSpeed : 6;
