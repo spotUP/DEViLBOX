@@ -8,7 +8,7 @@
  * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -94,40 +94,20 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const activeSystemPreset = useUIStore((s) => s.activeSystemPreset);
   const sourceFormat = useTrackerStore((s) => s.patterns[0]?.importMetadata?.sourceFormat);
 
-  // Derive the current dropdown value from loaded song state
-  const currentHardwareValue = useMemo(() => {
-    // Hardware preset selected (Furnace chip or manual selection)
-    if (activeSystemPreset) return activeSystemPreset;
-    // Non-furnace: derive a synthetic "format:" value from sourceFormat or editorMode
-    if (sourceFormat) return `format:${sourceFormat}`;
-    if (editorMode !== 'classic') return `mode:${editorMode}`;
-    return 'none';
-  }, [editorMode, activeSystemPreset, sourceFormat]);
-
-  // Auto-size the select to fit the currently selected option text
-  const hwSelectRef = useRef<HTMLSelectElement>(null);
-  const autoSizeSelect = useCallback(() => {
-    const sel = hwSelectRef.current;
-    if (!sel) return;
-    const opt = sel.options[sel.selectedIndex];
-    if (!opt) return;
-    // Measure selected text with a hidden span using the same font
-    const span = document.createElement('span');
-    span.style.visibility = 'hidden';
-    span.style.position = 'absolute';
-    span.style.whiteSpace = 'nowrap';
-    const cs = getComputedStyle(sel);
-    span.style.font = cs.font;
-    span.style.letterSpacing = cs.letterSpacing;
-    span.textContent = opt.text;
-    document.body.appendChild(span);
-    const textW = span.offsetWidth;
-    document.body.removeChild(span);
-    // text + left pad (6px) + right pad (6px) + border (2px) + arrow (~18px) + right space (16px)
-    sel.style.width = `${textW + 48}px`;
-  }, []);
-
-  useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
+  // Build DropdownButton menu items from grouped presets (with submenus)
+  const hwMenuItems = useMemo<MenuItemType[]>(() => {
+    return groupedPresets.map(group => ({
+      id: `group:${group.label}`,
+      label: group.label,
+      submenu: group.presets.map(preset => ({
+        id: preset.id,
+        label: preset.name.toUpperCase(),
+        radio: true,
+        checked: activeSystemPreset === preset.id,
+        onClick: () => c.handleHardwarePresetChange(preset.id),
+      })),
+    }));
+  }, [groupedPresets, activeSystemPreset, c]);
 
   // Format info labels for tracker/platform formats
   const FORMAT_LABELS: Record<string, { name: string; platform: string }> = useMemo(() => ({
@@ -205,6 +185,18 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     return null;
   }, [sourceFormat, editorMode, FORMAT_LABELS]);
 
+  // Compute the display label for the hardware button
+  const hwButtonLabel = useMemo(() => {
+    if (activeSystemPreset) {
+      for (const g of groupedPresets) {
+        const p = g.presets.find(p => p.id === activeSystemPreset);
+        if (p) return p.name.toUpperCase();
+      }
+    }
+    if (currentFormatLabel) return currentFormatLabel.toUpperCase();
+    return 'SELECT HARDWARE...';
+  }, [activeSystemPreset, groupedPresets, currentFormatLabel]);
+
   const { fps } = c;
   const { quality, averageFps: avgFps } = fps;
 
@@ -214,32 +206,12 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Hardware System Preset Selector */}
         <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
-          <select
-            ref={hwSelectRef}
-            className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v.startsWith('format:') || v.startsWith('mode:')) return; // Info-only, not selectable
-              c.handleHardwarePresetChange(v);
-            }}
-            value={currentHardwareValue}
-            title={currentFormatLabel ? `Current: ${currentFormatLabel}` : 'Select Hardware System Preset'}
+          <DropdownButton
+            items={hwMenuItems}
+            className="h-6 px-2 bg-dark-bgSecondary text-text-secondary text-[10px] font-mono border border-dark-border rounded cursor-pointer hover:text-text-primary hover:border-accent-highlight/50 transition-colors"
           >
-            {/* Show current format as a disabled option when it's not a hardware preset */}
-            {currentFormatLabel && !activeSystemPreset && (
-              <option value={currentHardwareValue} disabled>
-                {currentFormatLabel.toUpperCase()}
-              </option>
-            )}
-            <option value="none" disabled>SELECT HARDWARE...</option>
-            {groupedPresets.map(group => (
-              <optgroup key={group.label} label={group.label}>
-                {group.presets.map(preset => (
-                  <option key={preset.id} value={preset.id} className="bg-dark-bgPrimary text-text-primary">{preset.name.toUpperCase()}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            {hwButtonLabel} ▾
+          </DropdownButton>
         </div>
 
         {/* Subsong Selector */}
