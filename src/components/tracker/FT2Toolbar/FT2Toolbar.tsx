@@ -676,8 +676,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   return (
     <div className="ft2-toolbar">
-      <div className="flex flex-1 min-w-0 flex-wrap gap-y-1">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-1 min-w-0 flex-wrap gap-y-1 items-start">
+        <div className="min-w-0 flex-1" style={{ flexBasis: '680px' }}>
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
@@ -711,51 +711,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             <div className="ft2-section ft2-col-4">
               <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
             </div>
-            <div className="ft2-section ft2-section-playback">
-              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => {
-                  if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                  else if (isPlaying && (e.altKey || e.metaKey)) {
-                    // Alt/Option+click or Cmd+click while playing: restart from beginning
-                    e.preventDefault();
-                    const replayer = getTrackerReplayer();
-                    replayer.forcePosition(0, 0);
-                    setIsLooping(false);
-                  }
-                  else { handlePlaySong(); }
-                }}
-                onContextMenu={(e) => {
-                  if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                }}
-                title={isPlayingSong ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
-                className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
-              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => {
-                  if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                  else if (isPlaying && (e.altKey || e.metaKey)) {
-                    // Alt/Option+click or Cmd+click while playing: restart pattern from row 0
-                    e.preventDefault();
-                    const replayer = getTrackerReplayer();
-                    replayer.forcePosition(replayer.getSongPos(), 0);
-                    setIsLooping(true);
-                  }
-                  else { handlePlayPattern(); }
-                }}
-                onContextMenu={(e) => {
-                  if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                }}
-                title={isPlayingPattern ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
-                className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
-              <Button
-                variant={asidEnabled ? 'primary' : 'default'}
-                size="sm"
-                onClick={handleToggleASID}
-                title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
-                className={`min-w-[72px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
-              >
-                Hardware
-              </Button>
-            </div>
           </div>
 
           <div className="ft2-toolbar-row">
@@ -785,6 +740,51 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
               </div>
             </div>
+        </div>
+
+        {/* Playback buttons — separate block so they wrap below inputs on narrow windows */}
+        <div className="flex items-center gap-2 flex-shrink-0 py-1">
+              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
+                onClick={(e) => {
+                  if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                  else if (isPlaying && (e.altKey || e.metaKey)) {
+                    e.preventDefault();
+                    const replayer = getTrackerReplayer();
+                    replayer.forcePosition(0, 0);
+                    setIsLooping(false);
+                  }
+                  else { handlePlaySong(); }
+                }}
+                onContextMenu={(e) => {
+                  if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                }}
+                title={isPlayingSong ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
+                className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
+                onClick={(e) => {
+                  if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                  else if (isPlaying && (e.altKey || e.metaKey)) {
+                    e.preventDefault();
+                    const replayer = getTrackerReplayer();
+                    replayer.forcePosition(replayer.getSongPos(), 0);
+                    setIsLooping(true);
+                  }
+                  else { handlePlayPattern(); }
+                }}
+                onContextMenu={(e) => {
+                  if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                }}
+                title={isPlayingPattern ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
+                className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+              <Button
+                variant={asidEnabled ? 'primary' : 'default'}
+                size="sm"
+                onClick={handleToggleASID}
+                title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
+                className={`min-w-[72px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
+              >
+                Hardware
+              </Button>
         </div>
 
         <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ alignItems: 'stretch', justifyContent: 'center' }}>
