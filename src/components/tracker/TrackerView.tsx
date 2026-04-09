@@ -146,7 +146,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setGridChannelIndex,
     editorMode,
     blockOps,
-    handleExportML,
   } = useTrackerView();
 
   // MPK Mini pad LED feedback + OLED display sync
@@ -632,10 +631,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                       >
                         Follow: {mlFormatData.followMode === 0 ? 'Off' : mlFormatData.followMode === 1 ? 'Pattern' : 'Tune'}
                       </button>
-                      <button
-                        className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
-                        onClick={handleExportML}
-                      >Export .ml</button>
                       <button
                         className="px-2 py-0.5 text-xs bg-dark-bgSecondary hover:bg-dark-bgTertiary text-text-muted rounded border border-dark-border"
                         onClick={handleRemoveUnusedParts}
