@@ -1505,12 +1505,73 @@ export function isAdPlugWasmFormat(filename: string): boolean {
 async function loadAdPlugFile(file: File): Promise<FileLoadResult> {
   try {
     const arrayBuffer = await file.arrayBuffer();
+
+    // Try WASM extraction first — for CmodPlayer-based formats this gives us
+    // editable patterns + OPL3 instruments instead of stream-only audio
+    try {
+      const { extractAdPlugPatterns } = await import('@/lib/import/formats/AdPlugWasmExtractor');
+      const song = await extractAdPlugPatterns(arrayBuffer, file.name);
+      if (song) {
+        // Route through the standard tracker import path
+        const { useTrackerStore } = await import('@stores/useTrackerStore');
+        const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+        const { useTransportStore } = await import('@stores/useTransportStore');
+        const { useProjectStore } = await import('@stores/useProjectStore');
+        const { useFormatStore } = await import('@stores/useFormatStore');
+        const { useAutomationStore } = await import('@stores/useAutomationStore');
+        const { getToneEngine } = await import('@/engine/ToneEngine');
+        const engine = getToneEngine();
+
+        const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+        const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
+        const { setBPM, setSpeed, stop, reset: resetTransport } = useTransportStore.getState();
+        const { setMetadata } = useProjectStore.getState();
+        const { reset: resetAutomation } = useAutomationStore.getState();
+        const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
+
+        stop();
+        engine.releaseAll();
+        resetAutomation();
+        resetTransport();
+        resetInstruments();
+        engine.disposeAllInstruments();
+
+        if (song.patterns.length > 0 && song.format) {
+          song.patterns[0].importMetadata = {
+            ...song.patterns[0].importMetadata,
+            sourceFormat: song.format,
+          } as typeof song.patterns[0]['importMetadata'];
+        }
+
+        loadInstruments(song.instruments);
+        loadPatterns(song.patterns);
+        setCurrentPattern(0);
+        if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+        setOriginalModuleData(null);
+        setBPM(song.initialBPM);
+        setSpeed(song.initialSpeed);
+        setMetadata({
+          name: song.name,
+          author: '',
+          description: `Imported from ${file.name}`,
+        });
+        applyEditorMode({});
+
+        // Preload OPL3 synth instruments
+        await engine.preloadInstruments(song.instruments);
+
+        notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+        return { success: true, message: `Imported editable: ${song.name}` };
+      }
+    } catch (err) {
+      console.warn('[AdPlug] WASM extraction failed, falling back to streaming:', err);
+    }
+
+    // Fall back to WASM streaming for non-extractable formats
     const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
     const player = getAdPlugPlayer();
 
     // Auto-discover companion files for SCI format
-    // SCI needs patch.003 from the same directory (first 3 chars of filename + "patch.003")
-    // TODO: When loaded via directory picker, resolve companion from sibling files
     const companions: Array<{ name: string; data: Uint8Array }> = [];
     if (file.name.toLowerCase().endsWith('.sci') && file.webkitRelativePath) {
       const prefix = file.name.substring(0, 3);

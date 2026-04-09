@@ -289,3 +289,136 @@ void adplug_free(uint8_t* ptr) {
 }
 
 } // extern "C"
+
+// ── Pattern/Instrument Extraction ──────────────────────────────────────────
+// CmodPlayer-based formats (A2M, CFF, D00, DTM, etc.) all inherit from
+// CmodPlayer which has uniform `tracks[][]` and `inst[]` arrays.
+// We expose these via a struct-offset hack since they're protected.
+
+#include "protrack.h"
+
+// Expose CmodPlayer's protected members for extraction.
+// This works because CmodPlayer's layout is known at compile time.
+class CmodPlayerAccessor : public CmodPlayer {
+public:
+    using CmodPlayer::inst;
+    using CmodPlayer::tracks;
+    using CmodPlayer::order;
+    using CmodPlayer::trackord;
+    using CmodPlayer::nop;
+    using CmodPlayer::length;
+    using CmodPlayer::restartpos;
+    using CmodPlayer::tempo;
+    using CmodPlayer::bpm;
+};
+
+static CmodPlayerAccessor* asModPlayer() {
+    if (!g_player) return nullptr;
+    // Dynamic cast is not available (no RTTI in WASM build).
+    // Check if the player type string matches known CmodPlayer subclasses.
+    std::string type = g_player->gettype();
+    // All protrack-based formats identify with specific type strings.
+    // We check if getpatterns() returns >0 as a heuristic — CPlayer base returns 0,
+    // CmodPlayer overrides it to return nop.
+    if (g_player->getpatterns() > 0 && g_player->getorders() > 0) {
+        return reinterpret_cast<CmodPlayerAccessor*>(g_player);
+    }
+    return nullptr;
+}
+
+extern "C" {
+
+// ── Structural Queries ─────────────────────────────────────────────────────
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_patterns() {
+    return g_player ? g_player->getpatterns() : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_orders() {
+    return g_player ? g_player->getorders() : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_rows() {
+    auto* mp = asModPlayer();
+    if (!mp) return 64;
+    return (uint32_t)mp->getNrows();
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_channels() {
+    auto* mp = asModPlayer();
+    if (!mp) return 9;
+    return (uint32_t)mp->getNchans();
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_speed() {
+    return g_player ? g_player->getspeed() : 6;
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_bpm_value() {
+    auto* mp = asModPlayer();
+    return mp ? mp->bpm : 125;
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_restart_pos() {
+    auto* mp = asModPlayer();
+    return mp ? (uint32_t)mp->restartpos : 0;
+}
+
+// ── Order List ─────────────────────────────────────────────────────────────
+
+/** Get order at position idx. Returns pattern index. */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_order_entry(uint32_t idx) {
+    auto* mp = asModPlayer();
+    if (!mp || !mp->order || idx >= mp->length) return 0;
+    return mp->order[idx];
+}
+
+// ── Pattern Data ───────────────────────────────────────────────────────────
+
+/**
+ * Get a single note from a pattern.
+ * Returns packed: note(8) | inst(8) | command(8) | param1(4)<<4|param2(4) (32 bits)
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
+    auto* mp = asModPlayer();
+    if (!mp || !mp->tracks || !mp->trackord) return 0;
+    if (pattern >= mp->nop) return 0;
+    if (channel >= mp->getNchans()) return 0;
+    if (row >= mp->getNrows()) return 0;
+
+    unsigned short trackIdx = mp->trackord[pattern][channel];
+    if (!mp->tracks[trackIdx]) return 0;
+
+    auto& t = mp->tracks[trackIdx][row];
+    return ((uint32_t)t.note) |
+           ((uint32_t)t.inst << 8) |
+           ((uint32_t)t.command << 16) |
+           ((uint32_t)((t.param1 << 4) | t.param2) << 24);
+}
+
+// ── Instrument Data ────────────────────────────────────────────────────────
+
+/**
+ * Get instrument OPL register data (11 bytes).
+ * Writes into caller-provided buffer. Returns 1 on success, 0 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int adplug_get_instrument_regs(uint32_t index, uint8_t* outRegs) {
+    auto* mp = asModPlayer();
+    if (!mp || !mp->inst) return 0;
+    if (index >= (uint32_t)g_player->getinstruments()) return 0;
+
+    memcpy(outRegs, mp->inst[index].data, 11);
+    return 1;
+}
+
+} // extern "C"
