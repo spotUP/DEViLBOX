@@ -232,7 +232,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
                 value: String(idx),
                 label: (idx + 1).toString().padStart(2, '0'),
               }))}
-              className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+              className="px-3 py-1.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             />
           </>
         )}
@@ -242,7 +242,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <button
             onClick={c.handleToggleGhosts}
             className={`
-              flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
+              flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors
               ${c.showGhostPatterns
                 ? 'bg-accent-primary/20 text-accent-primary'
                 : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -260,7 +260,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <button
             onClick={onToggleAdvancedEdit}
             className={`
-              flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
+              flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors
               ${showAdvancedEdit
                 ? 'bg-accent-primary/20 text-accent-primary'
                 : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -277,7 +277,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {viewMode === 'tracker' && (
           <button
             onClick={c.handleShowAutoEditor}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+            className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
             title="Open Automation Editor"
           >
             <Activity size={12} />
@@ -289,7 +289,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {onShowCleanup && (
           <button
             onClick={onShowCleanup}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+            className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
             title="Analyze song and remove unused data"
           >
             <Trash2 size={12} />
@@ -302,7 +302,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <button
             onClick={c.handleToggleRecord}
             className={`
-              px-2 py-1 text-xs rounded font-medium transition-colors flex items-center gap-1
+              px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors flex items-center gap-1
               ${c.recordMode
                 ? 'bg-accent-error text-text-primary animate-pulse'
                 : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -329,7 +329,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <button
           onClick={c.handleToggleMute}
           className={`
-            px-2 py-1 text-xs rounded font-medium transition-colors
+            px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors
             ${c.masterMuted
               ? 'bg-accent-error/20 text-accent-error'
               : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -366,7 +366,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             ] as const).map(([label, bit]) => (
               <button
                 key={label}
-                className={`px-1 h-5 text-[9px] font-mono rounded transition-colors ${
+                className={`px-1 h-5 text-[10px] font-mono rounded transition-colors ${
                   pasteMask & (bit as number)
                     ? 'bg-accent-primary/30 text-accent-primary'
                     : 'bg-dark-bgSecondary text-text-muted hover:text-text-secondary'
@@ -384,7 +384,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <button
           onClick={c.handleToggleSmooth}
           className={`
-            px-2 py-1 text-xs rounded font-medium transition-colors
+            px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors
             ${c.smoothScrolling
               ? 'bg-accent-primary/20 text-accent-primary'
               : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
@@ -439,7 +439,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
       {/* FPS / Quality Indicator - Compact */}
       <div
         className={`
-          flex-shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded font-mono
+          flex-shrink-0 flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded
           ${quality === 'low'
             ? 'bg-accent-error/20 text-accent-error'
             : quality === 'medium'
@@ -481,7 +481,7 @@ const VisualBgCycler: React.FC = () => {
       <button onClick={prev} className="p-0.5 text-text-muted hover:text-text-primary" title="Previous visual mode">
         <ChevronLeft size={12} />
       </button>
-      <span className="text-[9px] font-mono text-text-secondary min-w-[60px] text-center">{label}</span>
+      <span className="text-[10px] font-mono text-text-secondary min-w-[60px] text-center">{label}</span>
       <button onClick={next} className="p-0.5 text-text-muted hover:text-text-primary" title="Next visual mode">
         <ChevronRight size={12} />
       </button>
