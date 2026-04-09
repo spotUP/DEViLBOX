@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Headphones, RotateCcw } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface SIDStereoTabProps {
   className?: string;
@@ -64,16 +65,13 @@ export const SIDStereoTab: React.FC<SIDStereoTabProps> = ({ className }) => {
       {/* Top row: Stereo mode + Headphones */}
       <div className="flex items-center gap-3">
         <label className="text-[10px] font-mono text-text-secondary shrink-0">Stereo Enhance</label>
-        <select
+        <CustomSelect
           value={stereoMode}
-          onChange={e => setStereoMode(e.target.value)}
+          onChange={(v) => setStereoMode(v)}
+          options={STEREO_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           className="bg-dark-bg border border-dark-border text-text-primary text-[10px] font-mono
-                     px-2 py-1 rounded focus:outline-none focus:border-accent-primary"
-        >
-          {STEREO_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+                     px-2 py-1 rounded"
+        />
 
         <div className="flex-1" />
 

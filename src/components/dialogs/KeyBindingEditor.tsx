@@ -8,6 +8,7 @@ import { useKeyboardStore, type CustomBindings } from '@stores/useKeyboardStore'
 import { SchemeLoader } from '@engine/keyboard/SchemeLoader';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { KEYBOARD_SCHEMES } from '@hooks/dialogs/useSettingsDialog';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 /** Human-readable labels for command names */
 function formatCommandName(cmd: string): string {
@@ -169,17 +170,12 @@ export const KeyBindingEditor: React.FC<KeyBindingEditorProps> = ({ platform }) 
       {/* Copy from + Reset */}
       <div className="flex items-center gap-2">
         <label className="text-ft2-text text-[10px] font-mono shrink-0">Copy from:</label>
-        <select
+        <CustomSelect
           value={copyFromScheme}
-          onChange={(e) => setCopyFromScheme(e.target.value)}
-          className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 flex-1 focus:outline-none focus:border-ft2-highlight"
-        >
-          {COPY_SOURCES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setCopyFromScheme(v)}
+          options={COPY_SOURCES.map((s) => ({ value: s.id, label: s.name }))}
+          className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 flex-1"
+        />
         <button
           onClick={handleCopyFrom}
           disabled={isCopying}

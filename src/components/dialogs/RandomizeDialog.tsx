@@ -9,6 +9,7 @@ import { useTrackerStore } from '@stores';
 import { ALL_SCALES, getScaleName, noteNameToMidi, type Scale } from '@lib/generators/acidPatternGenerator';
 import { midiToXMNote } from '@lib/xmConversions';
 import type { TrackerCell } from '@typedefs/tracker';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface RandomizeDialogProps {
   channelIndex: number;
@@ -297,18 +298,15 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
           {/* Channel selector */}
           <div>
             <label className="block text-sm font-medium mb-1 text-ft2-text">Channel</label>
-            <select
-              value={selectedChannel}
-              onChange={(e) => setSelectedChannel(parseInt(e.target.value))}
+            <CustomSelect
+              value={String(selectedChannel)}
+              onChange={(v) => setSelectedChannel(parseInt(v))}
+              options={currentPattern.channels.map((ch, idx) => ({
+                value: String(idx),
+                label: `${(idx + 1).toString().padStart(2, '0')}: ${ch.name}${channelHasData(ch.rows) ? ' *' : ''}`,
+              }))}
               className={selectClass}
-            >
-              {currentPattern.channels.map((ch, idx) => (
-                <option key={ch.id} value={idx}>
-                  {(idx + 1).toString().padStart(2, '0')}: {ch.name}
-                  {channelHasData(ch.rows) ? ' *' : ''}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Density */}
@@ -330,26 +328,20 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
               <input type="checkbox" checked={noteEnabled} onChange={(e) => setNoteEnabled(e.target.checked)} className={checkboxClass} />
               <span className="text-sm text-ft2-text w-16 shrink-0">Note</span>
               <div className="flex-1 flex gap-2">
-                <select
+                <CustomSelect
                   value={scale}
-                  onChange={(e) => setScale(e.target.value as Scale)}
+                  onChange={(v) => setScale(v as Scale)}
+                  options={ALL_SCALES.map((s) => ({ value: s, label: getScaleName(s) }))}
                   className={selectClass}
                   disabled={!noteEnabled}
-                >
-                  {ALL_SCALES.map((s) => (
-                    <option key={s} value={s}>{getScaleName(s)}</option>
-                  ))}
-                </select>
-                <select
+                />
+                <CustomSelect
                   value={rootNote}
-                  onChange={(e) => setRootNote(e.target.value)}
+                  onChange={(v) => setRootNote(v)}
+                  options={ROOT_NOTES.map((n) => ({ value: n, label: n }))}
                   className={`${selectClass} w-20 shrink-0`}
                   disabled={!noteEnabled}
-                >
-                  {ROOT_NOTES.map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
 

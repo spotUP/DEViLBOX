@@ -8,6 +8,7 @@ import { useCursorStore } from '@stores';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { MacroSlotsPanel } from '../tracker/MacroSlotsPanel';
 import { Sliders, Shuffle, Download, X, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator, BookOpen } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface AdvancedEditModalProps {
   onClose: () => void;
@@ -193,14 +194,15 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                     Math Operations
                   </div>
                   <div className="flex items-center gap-1 mb-2">
-                    <select
+                    <CustomSelect
                       value={mathColumn}
-                      onChange={(e) => setMathColumn(e.target.value as 'volume' | 'eff')}
+                      onChange={(v) => setMathColumn(v as 'volume' | 'eff')}
+                      options={[
+                        { value: 'volume', label: 'Volume' },
+                        { value: 'eff', label: 'Effect' },
+                      ]}
                       className="bg-dark-bg border border-ft2-border rounded px-2 py-1 text-xs text-ft2-text"
-                    >
-                      <option value="volume">Volume</option>
-                      <option value="eff">Effect</option>
-                    </select>
+                    />
                     <input
                       type="number"
                       value={mathValue}

@@ -23,6 +23,7 @@ import { SIDVisualsTab } from './sid/SIDVisualsTab';
 import { SIDSTILTab } from './sid/SIDSTILTab';
 import { SIDPlayerTab } from './sid/SIDPlayerTab';
 import { SIDCSDbTab } from './sid/SIDCSDbTab';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { SIDGB64Tab } from './sid/SIDGB64Tab';
 import { SIDRemixTab } from './sid/SIDRemixTab';
 import { SIDSettingsTab } from './sid/SIDSettingsTab';
@@ -181,17 +182,15 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                         <span className="text-xs text-text-muted">of {sidMetadata.subsongs}</span>
                       </div>
                     ) : (
-                      <select
-                        value={sidMetadata.currentSubsong}
-                        onChange={(e) => handleSubsongChange(Number(e.target.value))}
+                      <CustomSelect
+                        value={String(sidMetadata.currentSubsong)}
+                        onChange={(v) => handleSubsongChange(Number(v))}
+                        options={Array.from({ length: sidMetadata.subsongs }, (_, i) => ({
+                          value: String(i),
+                          label: `Subsong ${i + 1}${i === sidMetadata.defaultSubsong ? ' (default)' : ''}`,
+                        }))}
                         className="flex-1 text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
-                      >
-                        {Array.from({ length: sidMetadata.subsongs }, (_, i) => (
-                          <option key={i} value={i}>
-                            Subsong {i + 1}{i === sidMetadata.defaultSubsong ? ' (default)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     )}
                   </div>
                 </div>
@@ -203,21 +202,19 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                   <Zap className="w-3.5 h-3.5 text-blue-400/60" />
                   <label className="text-xs text-text-muted font-medium">SID Engine</label>
                 </div>
-                <select
+                <CustomSelect
                   value={sidEngine}
-                  onChange={(e) => {
-                    const engine = e.target.value as SIDEngineType;
+                  onChange={(v) => {
+                    const engine = v as SIDEngineType;
                     setSidEngine(engine);
                     notify.success(`SID engine changed to ${SID_ENGINES[engine].name}`);
                   }}
+                  options={Object.values(SID_ENGINES).map(eng => ({
+                    value: eng.id,
+                    label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
+                  }))}
                   className="w-full text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1.5 text-text-primary mb-2"
-                >
-                  {Object.values(SID_ENGINES).map(eng => (
-                    <option key={eng.id} value={eng.id}>
-                      {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size}){eng.features.asidHardware ? ' ★ HW' : ''}
-                    </option>
-                  ))}
-                </select>
+                />
                 <p className="text-[10px] text-text-muted/60 leading-tight">
                   {SID_ENGINES[sidEngine].description}
                 </p>

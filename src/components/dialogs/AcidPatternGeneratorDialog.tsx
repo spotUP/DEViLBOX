@@ -7,6 +7,7 @@ import { generateAcidPattern, ALL_SCALES, getScaleName, type AcidPatternParams, 
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTrackerStore, useInstrumentStore } from '@stores';
 import { Wand2, X, RefreshCw, AlertTriangle } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface AcidPatternGeneratorDialogProps {
   channelIndex: number;
@@ -190,35 +191,32 @@ export const AcidPatternGeneratorDialog: React.FC<AcidPatternGeneratorDialogProp
             {/* Channel Selection */}
             <div>
               <label className="block text-sm font-medium mb-2 text-ft2-text">Channel</label>
-              <select
-                value={selectedChannel}
-                onChange={(e) => setSelectedChannel(parseInt(e.target.value))}
-                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary"
-              >
-                {currentPattern.channels.map((ch, idx) => (
-                  <option key={ch.id} value={idx}>
-                    {(idx + 1).toString().padStart(2, '0')}: {ch.name}
-                    {channelHasData(ch.rows) ? ' *' : ''}
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={String(selectedChannel)}
+                onChange={(v) => setSelectedChannel(parseInt(v))}
+                options={currentPattern.channels.map((ch, idx) => ({
+                  value: String(idx),
+                  label: `${(idx + 1).toString().padStart(2, '0')}: ${ch.name}${channelHasData(ch.rows) ? ' *' : ''}`,
+                }))}
+                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded"
+              />
             </div>
 
             {/* Instrument Selection */}
             <div>
               <label className="block text-sm font-medium mb-2 text-ft2-text">Instrument</label>
-              <select
-                value={selectedInstrumentId}
-                onChange={(e) => setSelectedInstrumentId(parseInt(e.target.value))}
-                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary"
-              >
-                <option value={CREATE_NEW_303}>+ New TB-303</option>
-                {instruments.map((inst) => (
-                  <option key={inst.id} value={inst.id}>
-                    {inst.id}: {inst.name} ({inst.synthType})
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                value={String(selectedInstrumentId)}
+                onChange={(v) => setSelectedInstrumentId(parseInt(v))}
+                options={[
+                  { value: String(CREATE_NEW_303), label: '+ New TB-303' },
+                  ...instruments.map((inst) => ({
+                    value: String(inst.id),
+                    label: `${inst.id}: ${inst.name} (${inst.synthType})`,
+                  })),
+                ]}
+                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded"
+              />
             </div>
           </div>
 
@@ -226,32 +224,22 @@ export const AcidPatternGeneratorDialog: React.FC<AcidPatternGeneratorDialogProp
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-2 text-ft2-text">Scale</label>
-              <select
+              <CustomSelect
                 value={scale}
-                onChange={(e) => setScale(e.target.value as Scale)}
-                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary"
-              >
-                {ALL_SCALES.map((s) => (
-                  <option key={s} value={s}>
-                    {getScaleName(s)}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setScale(v as Scale)}
+                options={ALL_SCALES.map((s) => ({ value: s, label: getScaleName(s) }))}
+                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded"
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2 text-ft2-text">Root Note</label>
-              <select
+              <CustomSelect
                 value={rootNote}
-                onChange={(e) => setRootNote(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded focus:outline-none focus:ring-2 focus:ring-accent-primary"
-              >
-                {rootNotes.map((note) => (
-                  <option key={note} value={note}>
-                    {note}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setRootNote(v)}
+                options={rootNotes.map((note) => ({ value: note, label: note }))}
+                className="w-full px-3 py-2 bg-dark-bgTertiary text-ft2-text border border-ft2-border rounded"
+              />
             </div>
           </div>
 

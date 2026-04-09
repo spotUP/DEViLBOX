@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import {
   searchModland,
   getModlandFormats,
@@ -192,19 +193,19 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                        focus:border-green-600 focus:outline-none transition-colors"
           />
         </div>
-        <select
+        <CustomSelect
           value={modlandFormat}
-          onChange={(e) => setModlandFormat(e.target.value)}
+          onChange={(v) => setModlandFormat(v)}
+          options={[
+            { value: '', label: 'All formats' },
+            ...[...modlandFormats].sort((a, b) => a.format.localeCompare(b.format)).map((f) => ({
+              value: f.format,
+              label: `${f.format} (${f.count.toLocaleString()})`,
+            })),
+          ]}
           className="px-2 py-1.5 text-[11px] font-mono bg-dark-bg border border-dark-borderLight
                      rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
-        >
-          <option value="">All formats</option>
-          {[...modlandFormats].sort((a, b) => a.format.localeCompare(b.format)).map((f) => (
-            <option key={f.format} value={f.format}>
-              {f.format} ({f.count.toLocaleString()})
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       {/* Modland results */}

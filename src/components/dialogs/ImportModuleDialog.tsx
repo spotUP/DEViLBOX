@@ -6,6 +6,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Music, FileAudio, AlertCircle, Folder } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { CustomSelect } from '@components/common/CustomSelect';
 import {
   loadModuleFile,
   getSupportedExtensions,
@@ -771,17 +772,15 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       <span className="text-xs text-text-muted">of {uadeMetadata.subsongCount}</span>
                     </div>
                   ) : (
-                    <select
-                      value={selectedSubsong}
-                      onChange={(e) => setSelectedSubsong(Number(e.target.value))}
+                    <CustomSelect
+                      value={String(selectedSubsong)}
+                      onChange={(v) => setSelectedSubsong(Number(v))}
+                      options={Array.from({ length: uadeMetadata.subsongCount }, (_, i) => ({
+                        value: String(i),
+                        label: `Subsong ${i + 1}${i === 0 ? ' (default)' : ''}`,
+                      }))}
                       className="flex-1 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
-                    >
-                      {Array.from({ length: uadeMetadata.subsongCount }, (_, i) => (
-                        <option key={i} value={i}>
-                          {`Subsong ${i + 1}${i === 0 ? ' (default)' : ''}`}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   )}
                 </div>
               )}
