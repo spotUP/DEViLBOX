@@ -78,6 +78,18 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // ── Format-specific routing ────────────────────────────────────────────────
   // Covers HVL/AHX, DMF/X-Tracker, Furnace, OKT, MED, FC, UADE formats,
   // S3M, IT, XM, MOD native parsers, and UADE catch-all.
+
+  // AdPlug OPL formats — try TS parser for editable pattern import
+  const { detectFormat } = await import('./FormatRegistry');
+  const fmt = detectFormat(filename);
+  if (fmt?.nativeParser?.parseFn === 'parseAdPlugFile') {
+    try {
+      const { parseAdPlugFile } = await import('./formats/AdPlugParser');
+      const result = parseAdPlugFile(buffer, file.name);
+      if (result) return result;
+    } catch { /* fall through to other parsers */ }
+  }
+
   const { tryRouteFormat } = await import('./parsers/AmigaFormatParsers');
   const routed = await tryRouteFormat(buffer, filename, file.name, prefs, subsong, preScannedMeta, companionFiles);
   if (routed) return routed;

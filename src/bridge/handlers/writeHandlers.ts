@@ -876,6 +876,32 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
           subsong,
           companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
         });
+      } else if (format?.nativeParser) {
+        // Direct native parser path — format has a dedicated TS parser (e.g. AdPlug OPL formats)
+        const { parseAdPlugFile } = await import('../../lib/import/formats/AdPlugParser');
+        const song = parseAdPlugFile(arrayBuffer, filename);
+
+        const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
+        const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
+        const { useTransportStore: trs } = await import('../../stores/useTransportStore');
+        const { useProjectStore: ps } = await import('../../stores/useProjectStore');
+        const { useFormatStore: fs } = await import('../../stores/useFormatStore');
+        const { getToneEngine } = await import('../../engine/ToneEngine');
+        const engine = getToneEngine();
+
+        if (trs.getState().isPlaying) trs.getState().stop();
+        engine.releaseAll();
+        trs.getState().reset();
+        ts.getState().reset();
+        is.getState().reset();
+        engine.disposeAllInstruments();
+
+        is.getState().loadInstruments(song.instruments);
+        ts.getState().loadPatterns(song.patterns);
+        if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
+        trs.getState().setBPM(song.initialBPM ?? 125);
+        ps.getState().setMetadata({ name: song.name });
+        fs.getState().applyEditorMode(song);
       } else {
         // Native parser path for Amiga/UADE formats that libopenmpt can't read
         const { parseModuleToSong } = await import('../../lib/import/parseModuleToSong');
