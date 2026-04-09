@@ -348,3 +348,137 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   const output = new Uint8Array(sections);
   return output.buffer as ArrayBuffer;
 }
+
+// ── IMF (id Music Format) Exporter ──────────────────────────────────────────
+// IMF Type-1: 2-byte length header + 4-byte records [register, value, delay_lo, delay_hi]
+// Used by Wolfenstein 3D, Commander Keen, Duke Nukem II, etc.
+
+const IMF_RATE = 560; // Standard IMF playback rate (Hz)
+
+// OPL2 channel → register offset mapping
+const OPL_CH_TO_OP_OFFSET: number[][] = [
+  [0x00, 0x03], [0x01, 0x04], [0x02, 0x05], // Ch 0-2
+  [0x08, 0x0B], [0x09, 0x0C], [0x0A, 0x0D], // Ch 3-5
+  [0x10, 0x13], [0x11, 0x14], [0x12, 0x15], // Ch 6-8
+];
+
+// Note frequency table (F-number for each semitone at octave 0)
+const OPL_FNUM: number[] = [
+  0x157, 0x16B, 0x181, 0x198, 0x1B0, 0x1CA, // C  C# D  D# E  F
+  0x1E5, 0x202, 0x220, 0x241, 0x263, 0x287, // F# G  G# A  A# B
+];
+
+/**
+ * Check if a song can be exported to IMF format
+ */
+export function canExportIMF(song: TrackerSong): boolean {
+  return song.instruments.some(inst => isOPLInstrument(inst));
+}
+
+/**
+ * Export a TrackerSong to IMF Type-1 format.
+ * Renders all patterns in order, writing OPL register commands for each note.
+ */
+export function exportToIMF(song: TrackerSong): ArrayBuffer {
+  const records: number[] = [];
+  const speed = song.initialSpeed || 6;
+  const bpm = song.initialBPM || 125;
+  const ticksPerRow = speed;
+  const rowDelayTicks = Math.round((IMF_RATE * 60) / (bpm * ticksPerRow * 4));
+
+  // Build instrument register cache
+  const instRegs = new Map<number, Uint8Array>();
+  for (const inst of song.instruments) {
+    if (inst.opl3) {
+      instRegs.set(inst.id, encodeOPL3Instrument(inst.opl3));
+    } else if (inst.furnace) {
+      instRegs.set(inst.id, encodeOPLInstrument(inst.furnace));
+    }
+  }
+
+  // Track current channel state for key-on/off
+  const chanInst = new Array<number>(9).fill(0);
+
+  function writeReg(reg: number, val: number, delay: number) {
+    records.push(reg & 0xFF, val & 0xFF, delay & 0xFF, (delay >> 8) & 0xFF);
+  }
+
+  function programInstrument(ch: number, regs: Uint8Array) {
+    const [modOff, carOff] = OPL_CH_TO_OP_OFFSET[ch];
+    writeReg(0x20 + modOff, regs[0], 0);
+    writeReg(0x20 + carOff, regs[1], 0);
+    writeReg(0x40 + modOff, regs[2], 0);
+    writeReg(0x40 + carOff, regs[3], 0);
+    writeReg(0x60 + modOff, regs[4], 0);
+    writeReg(0x60 + carOff, regs[5], 0);
+    writeReg(0x80 + modOff, regs[6], 0);
+    writeReg(0x80 + carOff, regs[7], 0);
+    writeReg(0xE0 + modOff, regs[8], 0);
+    writeReg(0xE0 + carOff, regs[9], 0);
+    writeReg(0xC0 + ch, regs[10], 0);
+  }
+
+  function noteOn(ch: number, note: number) {
+    if (note < 1 || note > 96) return;
+    const semitone = (note - 1) % 12;
+    const octave = Math.min(7, Math.floor((note - 1) / 12));
+    const fnum = OPL_FNUM[semitone];
+    writeReg(0xA0 + ch, fnum & 0xFF, 0);
+    writeReg(0xB0 + ch, 0x20 | ((octave & 7) << 2) | ((fnum >> 8) & 3), 0);
+  }
+
+  function noteOff(ch: number) {
+    writeReg(0xB0 + ch, 0, 0);
+  }
+
+  // Render each pattern in song order
+  for (const patIdx of song.songPositions) {
+    const pat = song.patterns[patIdx];
+    if (!pat) continue;
+    const numCh = Math.min(pat.channels.length, 9);
+    const numRows = pat.length || 64;
+
+    for (let row = 0; row < numRows; row++) {
+      for (let ch = 0; ch < numCh; ch++) {
+        const cell = pat.channels[ch]?.rows[row];
+        if (!cell) continue;
+
+        // Program instrument if changed
+        if (cell.instrument > 0 && cell.instrument !== chanInst[ch]) {
+          const regs = instRegs.get(cell.instrument);
+          if (regs) {
+            programInstrument(ch, regs);
+            chanInst[ch] = cell.instrument;
+          }
+        }
+
+        if (cell.note === 97) {
+          noteOff(ch);
+        } else if (cell.note > 0 && cell.note <= 96) {
+          noteOff(ch); // key-off before re-trigger
+          noteOn(ch, cell.note);
+        }
+      }
+
+      // Add row delay to last record
+      if (records.length >= 4) {
+        const lastIdx = records.length - 2;
+        const delay = rowDelayTicks;
+        records[lastIdx] = delay & 0xFF;
+        records[lastIdx + 1] = (delay >> 8) & 0xFF;
+      } else {
+        // Empty row — emit a delay-only record
+        writeReg(0, 0, rowDelayTicks);
+      }
+    }
+  }
+
+  // Type-1 IMF: 2-byte length header + data
+  const dataLen = records.length;
+  const output = new Uint8Array(2 + dataLen);
+  output[0] = dataLen & 0xFF;
+  output[1] = (dataLen >> 8) & 0xFF;
+  for (let i = 0; i < dataLen; i++) output[2 + i] = records[i];
+
+  return output.buffer as ArrayBuffer;
+}
