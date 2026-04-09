@@ -8,13 +8,15 @@
  * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorControls } from '@hooks/views/useEditorControls';
 import { BG_MODES, getBgModeLabel } from './TrackerVisualBackground';
 import { getGroupedPresets } from '@/constants/systemPresets';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SubsongSelector } from './SubsongSelector';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
@@ -87,6 +89,97 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Grouped hardware presets ─────────────────────────────────────────────
   const groupedPresets = React.useMemo(() => getGroupedPresets(), []);
 
+  // ── Current format detection for dropdown display ────────────────────────
+  const editorMode = useFormatStore((s) => s.editorMode);
+  const activeSystemPreset = useUIStore((s) => s.activeSystemPreset);
+  const sourceFormat = useTrackerStore((s) => s.patterns[0]?.importMetadata?.sourceFormat);
+
+  // Derive the current dropdown value from loaded song state
+  const currentHardwareValue = useMemo(() => {
+    // Furnace mode: show the active chip preset
+    if (editorMode === 'furnace' && activeSystemPreset) return activeSystemPreset;
+    // Non-furnace: derive a synthetic "format:" value from sourceFormat or editorMode
+    if (sourceFormat) return `format:${sourceFormat}`;
+    if (editorMode !== 'classic') return `mode:${editorMode}`;
+    return 'none';
+  }, [editorMode, activeSystemPreset, sourceFormat]);
+
+  // Format info labels for tracker/platform formats
+  const FORMAT_LABELS: Record<string, { name: string; platform: string }> = useMemo(() => ({
+    // Amiga tracker formats
+    'MOD': { name: 'ProTracker', platform: 'Amiga' },
+    'STK': { name: 'SoundTracker', platform: 'Amiga' },
+    'OKT': { name: 'Oktalyzer', platform: 'Amiga' },
+    'MED': { name: 'OctaMED', platform: 'Amiga' },
+    'DIGI': { name: 'DIGI Booster', platform: 'Amiga' },
+    'DBM': { name: 'DigiBooster Pro', platform: 'Amiga' },
+    'FC': { name: 'Future Composer', platform: 'Amiga' },
+    'SFX': { name: 'SoundFX', platform: 'Amiga' },
+    'SMON': { name: 'Sidmon I', platform: 'Amiga' },
+    'SIDMON2': { name: 'Sidmon II', platform: 'Amiga' },
+    'FRED': { name: 'Fred Editor', platform: 'Amiga' },
+    'STP': { name: 'Soundtracker Pro II', platform: 'Amiga' },
+    'HVL': { name: 'HivelyTracker', platform: 'Amiga' },
+    'AHX': { name: 'AHX', platform: 'Amiga' },
+    'TFMX': { name: 'TFMX', platform: 'Amiga' },
+    'JamCracker': { name: 'JamCracker', platform: 'Amiga' },
+    'SonicArranger': { name: 'Sonic Arranger', platform: 'Amiga' },
+    'TCBTracker': { name: 'TCB Tracker', platform: 'Atari ST' },
+    'AON': { name: 'Art of Noise', platform: 'Amiga' },
+    'BD': { name: 'Ben Daglish', platform: 'Amiga' },
+    'UADE': { name: 'UADE Replayer', platform: 'Amiga' },
+    'Symphonie': { name: 'Symphonie', platform: 'Amiga' },
+    'PumaTracker': { name: 'Puma Tracker', platform: 'Amiga' },
+    'QuadraComposer': { name: 'Quadra Composer', platform: 'Amiga' },
+    'DigitalSymphony': { name: 'Digital Symphony', platform: 'Amiga' },
+    'FaceTheMusic': { name: 'Face the Music', platform: 'Amiga' },
+    'GameMusicCreator': { name: 'Game Music Creator', platform: 'Amiga' },
+    'ICE': { name: 'ICE Tracker', platform: 'Amiga' },
+    // PC tracker formats
+    'XM': { name: 'FastTracker II', platform: 'PC' },
+    'IT': { name: 'Impulse Tracker', platform: 'PC' },
+    'S3M': { name: 'Scream Tracker 3', platform: 'PC' },
+    'STM': { name: 'Scream Tracker 2', platform: 'PC' },
+    'MTM': { name: 'MultiTracker', platform: 'PC' },
+    'ULT': { name: 'Ultra Tracker', platform: 'PC' },
+    'AMS': { name: 'Extreme Tracker', platform: 'PC' },
+    'DMF': { name: 'X-Tracker', platform: 'PC' },
+    'PTM': { name: 'Poly Tracker', platform: 'PC' },
+    'RTM': { name: 'Real Tracker', platform: 'PC' },
+    'MadTracker2': { name: 'MadTracker 2', platform: 'PC' },
+    'GraoumfTracker': { name: 'Graoumf Tracker', platform: 'PC' },
+    'GraoumfTracker2': { name: 'Graoumf Tracker 2', platform: 'PC' },
+    'IMF': { name: 'Imago Orpheus', platform: 'PC' },
+    'XRNS': { name: 'Renoise', platform: 'PC' },
+    // Chip/CPU formats
+    'FUR': { name: 'Furnace', platform: 'Multi-chip' },
+    'SID': { name: 'SID Player', platform: 'C64' },
+    'NSF': { name: 'NES Sound Format', platform: 'NES' },
+    'VGM': { name: 'Video Game Music', platform: 'Multi-chip' },
+    'YM': { name: 'YM Player', platform: 'Atari ST' },
+    'SAP': { name: 'SAP Player', platform: 'Atari 8-bit' },
+    'AY': { name: 'AY Player', platform: 'ZX Spectrum' },
+    // Editor modes without sourceFormat
+    'MusicLine': { name: 'MusicLine', platform: 'PC' },
+  }), []);
+
+  // Build the display label for the current format
+  const currentFormatLabel = useMemo(() => {
+    if (sourceFormat && FORMAT_LABELS[sourceFormat]) {
+      const f = FORMAT_LABELS[sourceFormat];
+      return `${f.name} · ${f.platform}`;
+    }
+    if (sourceFormat) return sourceFormat.toUpperCase();
+    if (editorMode === 'hively') return 'HivelyTracker · Amiga';
+    if (editorMode === 'klystrack') return 'Klystrack · PC';
+    if (editorMode === 'musicline') return 'MusicLine · PC';
+    if (editorMode === 'goattracker') return 'GoatTracker · C64';
+    if (editorMode === 'jamcracker') return 'JamCracker · Amiga';
+    if (editorMode === 'sc68') return 'SC68 · Atari ST';
+    if (editorMode === 'tfmx') return 'TFMX · Amiga';
+    return null;
+  }, [sourceFormat, editorMode, FORMAT_LABELS]);
+
   const { fps } = c;
   const { quality, averageFps: avgFps } = fps;
 
@@ -97,11 +190,21 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
-            className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary max-w-[180px]"
-            onChange={(e) => c.handleHardwarePresetChange(e.target.value)}
-            defaultValue="none"
-            title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
+            className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v.startsWith('format:') || v.startsWith('mode:')) return; // Info-only, not selectable
+              c.handleHardwarePresetChange(v);
+            }}
+            value={currentHardwareValue}
+            title={currentFormatLabel ? `Current: ${currentFormatLabel}` : 'Select Hardware System Preset'}
           >
+            {/* Show current format as a disabled option when it's not a hardware preset */}
+            {currentFormatLabel && !activeSystemPreset && (
+              <option value={currentHardwareValue} disabled>
+                {currentFormatLabel.toUpperCase()}
+              </option>
+            )}
             <option value="none" disabled>SELECT HARDWARE...</option>
             {groupedPresets.map(group => (
               <optgroup key={group.label} label={group.label}>
