@@ -1496,10 +1496,51 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
  */
 // All AdPlug WASM-supported extensions (from adplug.cpp player registry)
 // Excludes rad/hsc/dro/imf/cmf which use TS parser for pattern editing
-const ADPLUG_WASM_EXTS = /\.(adl|agd|a2m|a2t|amd|bam|bmf|cff|d00|dfm|dmo|dtm|got|ha2|hsp|hsq|jbm|ksm|laa|lds|m|mad|mdi|mkf|mkj|msc|mtk|mtr|mus|mdy|ims|pis|plx|rac|raw|rix|rol|sa2|sat|sci|sdb|sng|sop|sqx|xad|xms|xsm)$/i;
+const ADPLUG_WASM_EXTS = /\.(adl|agd|a2m|a2t|amd|bam|bmf|cff|d00|dfm|dmo|dtm|got|ha2|hsp|hsq|jbm|ksm|laa|lds|m|mad|mdi|mkf|mkj|msc|mtk|mtr|mus|mdy|ims|pis|plx|rac|raw|rix|rol|sa2|sat|sci|sdb|sng|sop|sqx|xad|xms|xsm|edl|dtl|as3m|adlib|wlf)$/i;
 
 export function isAdPlugWasmFormat(filename: string): boolean {
   return ADPLUG_WASM_EXTS.test(filename);
+}
+
+/**
+ * Prompt the user to select a companion file via a file input dialog.
+ * Returns null if the user cancels.
+ */
+function promptForCompanionFile(ext: string, mainFileName: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = ext;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    // Show a toast to guide the user
+    notify.info(`${mainFileName} needs a companion ${ext} file — please select it`);
+
+    let resolved = false;
+    input.addEventListener('change', () => {
+      resolved = true;
+      const file = input.files?.[0] ?? null;
+      document.body.removeChild(input);
+      resolve(file);
+    });
+
+    // Handle cancel — the input fires no 'change' event on cancel,
+    // but focus returns to the window
+    const handleFocus = () => {
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          document.body.removeChild(input);
+          resolve(null);
+        }
+        window.removeEventListener('focus', handleFocus);
+      }, 500);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    input.click();
+  });
 }
 
 async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuffer>): Promise<FileLoadResult> {
@@ -1616,15 +1657,83 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
       data: new Uint8Array(c.data),
     }));
 
-    const ok = await player.load(arrayBuffer, file.name, streamCompanions);
+    let ok = await player.load(arrayBuffer, file.name, streamCompanions);
 
     if (!ok) {
-      // Provide helpful hint for formats that need companion files
+      // For companion-dependent formats, prompt user to select the companion file
       const needsCompanion = fnLower.endsWith('.sng') || fnLower.endsWith('.sci');
       if (needsCompanion && companions.length === 0) {
-        return { success: false, error: `AdPlug could not load: ${file.name} — this format needs a companion file (.ins or .003). Drop the entire folder instead of a single file.` };
+        const companionExt = fnLower.endsWith('.sng') ? '.ins' : '.003';
+        const companionFile = await promptForCompanionFile(companionExt, file.name);
+        if (companionFile) {
+          const companionData = await companionFile.arrayBuffer();
+          companions.push({ name: companionFile.name, data: companionData });
+
+          // Retry WASM extraction with companion
+          try {
+            const { extractAdPlugPatterns } = await import('@/lib/import/formats/AdPlugWasmExtractor');
+            const song = await extractAdPlugPatterns(arrayBuffer, file.name, companions);
+            if (song) {
+              const { useTrackerStore } = await import('@stores/useTrackerStore');
+              const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+              const { useTransportStore } = await import('@stores/useTransportStore');
+              const { useProjectStore } = await import('@stores/useProjectStore');
+              const { useFormatStore } = await import('@stores/useFormatStore');
+              const { useAutomationStore } = await import('@stores/useAutomationStore');
+              const { getToneEngine } = await import('@/engine/ToneEngine');
+              const engine = getToneEngine();
+
+              const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+              const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
+              const { setBPM, setSpeed, stop, reset: resetTransport } = useTransportStore.getState();
+              const { setMetadata } = useProjectStore.getState();
+              const { reset: resetAutomation } = useAutomationStore.getState();
+              const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
+
+              stop();
+              engine.releaseAll();
+              resetAutomation();
+              resetTransport();
+              resetInstruments();
+              engine.disposeAllInstruments();
+
+              if (song.patterns.length > 0 && song.format) {
+                song.patterns[0].importMetadata = {
+                  ...song.patterns[0].importMetadata,
+                  sourceFormat: song.format,
+                } as typeof song.patterns[0]['importMetadata'];
+              }
+
+              loadInstruments(song.instruments);
+              loadPatterns(song.patterns);
+              setCurrentPattern(0);
+              if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+              setOriginalModuleData(null);
+              setBPM(song.initialBPM);
+              setSpeed(song.initialSpeed);
+              setMetadata({
+                name: song.name,
+                author: '',
+                description: `Imported from ${file.name}`,
+              });
+              applyEditorMode({});
+              await engine.preloadInstruments(song.instruments);
+              notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+              return { success: true, message: `Imported editable: ${song.name}` };
+            }
+          } catch { /* extraction failed, try streaming */ }
+
+          // Retry streaming with companion
+          const retryCompanions = companions.map(c => ({
+            name: c.name,
+            data: new Uint8Array(c.data),
+          }));
+          ok = await player.load(arrayBuffer, file.name, retryCompanions);
+        }
       }
-      return { success: false, error: `AdPlug could not load: ${file.name}` };
+      if (!ok) {
+        return { success: false, error: `AdPlug could not load: ${file.name}` };
+      }
     }
 
     const meta = player.meta;

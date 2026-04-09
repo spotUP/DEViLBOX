@@ -61,6 +61,7 @@ import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
 import { ExposeOverlay } from '@components/ui/ExposeOverlay';
 import { GlobalConfirmDialog } from '@components/common/GlobalConfirmDialog';
+import { showAlert } from '@stores/useConfirmStore';
 import { DJErrorBoundary } from './components/dj/DJErrorBoundary';
 
 // Lazy-loaded components for better startup performance
@@ -705,7 +706,7 @@ function App() {
     if (result.success === true) {
       notify.success(result.message);
     } else if (result.success === false) {
-      notify.error(result.error);
+      void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
     }
   }, []);
 
@@ -760,7 +761,7 @@ function App() {
     } else if (result.success === true) {
       notify.success(result.message);
     } else if (result.success === false) {
-      notify.error(result.error);
+      void showAlert({ title: 'Load Failed', message: result.error || `Could not load ${file.name}` });
     }
   }, []);
 
@@ -915,7 +916,7 @@ function App() {
               useUIStore.getState().setPendingTD3File(null);
               const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
               if (result.success === true) notify.success(result.message);
-              else if (result.success === false) notify.error(result.error);
+              else if (result.success === false) void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
             }}
           />
 
@@ -1329,11 +1330,11 @@ function App() {
                 if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
-                  notify.error(result.error);
+                  void showAlert({ title: 'Load Failed', message: result.error || 'Could not load project' });
                 }
               } catch (error) {
                 console.error('Failed to load project:', error);
-                notify.error('Failed to load project');
+                void showAlert({ title: 'Load Failed', message: 'Failed to load project' });
               }
             }}
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
@@ -1367,11 +1368,11 @@ function App() {
                 } else if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
-                  notify.error(result.error);
+                  void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
                 }
               } catch (error) {
                 console.error('Failed to load tracker module:', error);
-                notify.error('Failed to load file');
+                void showAlert({ title: 'Load Failed', message: 'Failed to load file' });
               }
             }}
           />
@@ -1430,7 +1431,7 @@ function App() {
             useUIStore.getState().setPendingTD3File(null);
             const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
             if (result.success === true) notify.success(result.message);
-            else if (result.success === false) notify.error(result.error);
+            else if (result.success === false) void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
           }}
         />
       </Suspense>

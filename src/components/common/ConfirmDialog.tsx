@@ -13,12 +13,13 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   danger?: boolean;
+  alertOnly?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-  isOpen, title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onClose,
+  isOpen, title, message, confirmLabel = 'Confirm', danger = false, alertOnly = false, onConfirm, onClose,
 }) => {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -58,13 +59,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         </div>
         <p className="text-sm text-text-secondary mb-4">{message}</p>
         <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary
-                     hover:bg-dark-bgTertiary rounded transition-colors"
-          >
-            Cancel
-          </button>
+          {!alertOnly && (
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary
+                       hover:bg-dark-bgTertiary rounded transition-colors"
+            >
+              Cancel
+            </button>
+          )}
           <button
             onClick={() => {
               onConfirm();
