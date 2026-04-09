@@ -244,7 +244,17 @@ EMSCRIPTEN_KEEPALIVE
 void oplAllNotesOff() {
     if (!g_opl) return;
     for (uint8_t i = 0; i < NUM_CHANNELS; i++) {
-        if (g_opl->voices[i].active) { oplKeyOff(i); g_opl->voices[i] = {}; }
+        if (g_opl->voices[i].active) {
+            uint16_t bank; uint8_t chInBank;
+            channelToBank(i, bank, chInBank);
+            const uint8_t so = SLOT_OFFSET[chInBank];
+            const uint8_t sc = so + 3;
+            // Set maximum release rate for instant silence
+            writeReg(bank | (0x80 + so), static_cast<uint8_t>((g_opl->voices[i].patch.modSLRR & 0xF0) | 0x0F));
+            writeReg(bank | (0x80 + sc), static_cast<uint8_t>((g_opl->voices[i].patch.carSLRR & 0xF0) | 0x0F));
+            oplKeyOff(i);
+            g_opl->voices[i] = {};
+        }
     }
     g_opl->sustainPedal = false;
 }
