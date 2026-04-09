@@ -116,9 +116,14 @@ static double g_sampleAccum = 0.0;
 // Title/type string buffers for JS access
 static char g_title[256] = {};
 static char g_type[128] = {};
+static char g_filename[512] = {};  // original filename for OPL capture re-load
 
 // Forward declarations for extraction support
-enum PlayerType { PT_UNKNOWN = 0, PT_CMOD, PT_HSC, PT_S3M, PT_PIS, PT_D00, PT_LDS };
+enum PlayerType {
+    PT_UNKNOWN = 0, PT_CMOD, PT_HSC, PT_S3M, PT_PIS, PT_D00, PT_LDS,
+    PT_BMF, PT_HERAD, PT_SOP, PT_JBM, PT_ROL,
+    PT_OPL_CAPTURE  // fallback: OPL register capture for any format
+};
 static PlayerType g_playerType = PT_UNKNOWN;
 static void detectPlayerType();
 
@@ -129,6 +134,12 @@ static void detectPlayerType();
 #include "pis.h"
 #include "d00.h"
 #include "lds.h"
+#include "bmf.h"
+#include "xad.h"
+#include "herad.h"
+#include "sop.h"
+#include "jbm.h"
+#include "rol.h"
 
 // Accessor class for PIS (needed in both extern "C" blocks)
 class CpisPlayerAccessor : public CpisPlayer {
@@ -141,6 +152,189 @@ static CpisPlayerAccessor* asPisPlayer() {
     if (g_playerType != PT_PIS) return nullptr;
     return reinterpret_cast<CpisPlayerAccessor*>(g_player);
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// OPL Register Capture — generic extraction for ALL formats
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Plays the song tick-by-tick, intercepts OPL register writes to detect
+// note-on/note-off events, and reconstructs tracker patterns from the
+// captured data. Works for any format, including MIDI, raw, and event-based.
+
+// OPL frequency number table (one octave, matching OPL chip standard)
+static const uint16_t OPL_FNUM_TABLE[12] = {
+    343, 363, 385, 408, 432, 458, 485, 514, 544, 577, 611, 647
+};
+
+// Convert OPL fnum+block to MIDI-like note number (C-0 = 0, C-1 = 12, etc.)
+static uint8_t fnum_to_note(uint16_t fnum, uint8_t block) {
+    if (fnum == 0) return 0;
+    // Find closest note in the fnum table
+    int bestNote = 0;
+    int bestDist = 9999;
+    for (int n = 0; n < 12; n++) {
+        int dist = abs((int)fnum - (int)OPL_FNUM_TABLE[n]);
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestNote = n;
+        }
+    }
+    return (uint8_t)(block * 12 + bestNote + 1); // +1 so 0 = empty
+}
+
+// Captured note event
+struct CapturedNote {
+    uint32_t tick;
+    uint8_t  channel;    // 0-8 (OPL2) or 0-17 (OPL3)
+    uint8_t  note;       // MIDI-like note (1-based, 0=empty)
+    uint8_t  instrument; // instrument fingerprint index
+    uint8_t  volume;     // 0-63 (from carrier TL)
+    bool     isNoteOn;   // true=on, false=off
+};
+
+// Instrument fingerprint (11 OPL register bytes)
+struct InstrumentFingerprint {
+    uint8_t regs[11];
+    bool operator==(const InstrumentFingerprint& o) const {
+        return memcmp(regs, o.regs, 11) == 0;
+    }
+};
+
+// OPL operator register offset table (channel 0-8 → operator offset)
+static const uint8_t OPL_OP_OFFSETS[9][2] = {
+    {0x00, 0x03}, {0x01, 0x04}, {0x02, 0x05},
+    {0x08, 0x0B}, {0x09, 0x0C}, {0x0A, 0x0D},
+    {0x10, 0x13}, {0x11, 0x14}, {0x12, 0x15}
+};
+
+// Capture state
+static std::vector<CapturedNote> g_capturedNotes;
+static std::vector<InstrumentFingerprint> g_capturedInstruments;
+static uint32_t g_captureTotalTicks = 0;
+static float g_captureRefreshRate = 0.0f;
+
+// OPL shadow registers for capture
+static uint8_t g_oplRegs[2][256];  // [chip][register]
+static bool g_oplKeyOn[2][9];      // per-chip per-channel key-on state
+
+// Reconstruct instrument from shadow registers for a given channel
+static InstrumentFingerprint getChannelInstrument(int chip, int ch) {
+    InstrumentFingerprint fp = {};
+    if (ch < 0 || ch >= 9) return fp;
+    uint8_t modOff = OPL_OP_OFFSETS[ch][0];
+    uint8_t carOff = OPL_OP_OFFSETS[ch][1];
+    fp.regs[0]  = g_oplRegs[chip][0x20 + modOff]; // mod AM/VIB/EG/KSR/MULT
+    fp.regs[1]  = g_oplRegs[chip][0x20 + carOff]; // car AM/VIB/EG/KSR/MULT
+    fp.regs[2]  = g_oplRegs[chip][0x40 + modOff]; // mod KSL/TL
+    fp.regs[3]  = g_oplRegs[chip][0x40 + carOff]; // car KSL/TL
+    fp.regs[4]  = g_oplRegs[chip][0x60 + modOff]; // mod AR/DR
+    fp.regs[5]  = g_oplRegs[chip][0x60 + carOff]; // car AR/DR
+    fp.regs[6]  = g_oplRegs[chip][0x80 + modOff]; // mod SL/RR
+    fp.regs[7]  = g_oplRegs[chip][0x80 + carOff]; // car SL/RR
+    fp.regs[8]  = g_oplRegs[chip][0xE0 + modOff]; // mod waveform
+    fp.regs[9]  = g_oplRegs[chip][0xE0 + carOff]; // car waveform
+    fp.regs[10] = g_oplRegs[chip][0xC0 + ch];     // feedback/connection
+    return fp;
+}
+
+// Find or add instrument fingerprint, return index
+static uint8_t findOrAddInstrument(const InstrumentFingerprint& fp) {
+    // Check if all regs are zero → skip
+    bool allZero = true;
+    for (int i = 0; i < 11; i++) if (fp.regs[i]) { allZero = false; break; }
+    if (allZero) return 0;
+
+    for (size_t i = 0; i < g_capturedInstruments.size(); i++) {
+        if (g_capturedInstruments[i] == fp) return (uint8_t)(i + 1); // 1-based
+    }
+    if (g_capturedInstruments.size() < 255) {
+        g_capturedInstruments.push_back(fp);
+        return (uint8_t)g_capturedInstruments.size(); // 1-based
+    }
+    return 0;
+}
+
+// Process an OPL register write during capture
+static void captureOplWrite(int chip, int reg, int val, uint32_t tick) {
+    if (chip < 0 || chip > 1) return;
+    g_oplRegs[chip][reg & 0xFF] = (uint8_t)val;
+
+    // Detect key-on/key-off on registers 0xB0-0xB8
+    if (reg >= 0xB0 && reg <= 0xB8) {
+        int ch = reg - 0xB0;
+        bool keyOn = (val & 0x20) != 0;
+        bool wasOn = g_oplKeyOn[chip][ch];
+
+        if (keyOn && !wasOn) {
+            // Note ON
+            uint16_t fnum = g_oplRegs[chip][0xA0 + ch] |
+                           ((g_oplRegs[chip][0xB0 + ch] & 0x03) << 8);
+            uint8_t block = (g_oplRegs[chip][0xB0 + ch] >> 2) & 0x07;
+            uint8_t note = fnum_to_note(fnum, block);
+
+            InstrumentFingerprint fp = getChannelInstrument(chip, ch);
+            uint8_t instIdx = findOrAddInstrument(fp);
+
+            // Volume from carrier TL (0x40 + carrier offset), inverted: 0=loud, 63=silent
+            uint8_t carrierTL = g_oplRegs[chip][0x40 + OPL_OP_OFFSETS[ch][1]];
+            uint8_t vol = 63 - (carrierTL & 0x3F);
+
+            CapturedNote cn;
+            cn.tick = tick;
+            cn.channel = (uint8_t)(chip * 9 + ch);
+            cn.note = note;
+            cn.instrument = instIdx;
+            cn.volume = vol;
+            cn.isNoteOn = true;
+            g_capturedNotes.push_back(cn);
+        }
+        else if (!keyOn && wasOn) {
+            // Note OFF
+            CapturedNote cn;
+            cn.tick = tick;
+            cn.channel = (uint8_t)(chip * 9 + ch);
+            cn.note = 0;
+            cn.instrument = 0;
+            cn.volume = 0;
+            cn.isNoteOn = false;
+            g_capturedNotes.push_back(cn);
+        }
+
+        g_oplKeyOn[chip][ch] = keyOn;
+    }
+}
+
+// Capturing OPL wrapper — intercepts writes and forwards to real OPL
+class CCapturingOpl : public Copl {
+public:
+    CEmuopl* realOpl;
+    uint32_t currentTick;
+
+    CCapturingOpl(CEmuopl* real) : realOpl(real), currentTick(0) {
+        currType = real->gettype();
+    }
+
+    void write(int reg, int val) override {
+        captureOplWrite(currChip, reg, val, currentTick);
+        realOpl->setchip(currChip);
+        realOpl->write(reg, val);
+    }
+
+    void setchip(int n) override {
+        Copl::setchip(n);
+        realOpl->setchip(n);
+    }
+
+    void init() override {
+        realOpl->init();
+        memset(g_oplRegs, 0, sizeof(g_oplRegs));
+        memset(g_oplKeyOn, 0, sizeof(g_oplKeyOn));
+    }
+
+    void update(short* buf, int samples) override {
+        realOpl->update(buf, samples);
+    }
+};
 
 extern "C" {
 
@@ -219,6 +413,9 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     strncpy(g_type, type.c_str(), sizeof(g_type) - 1);
     g_type[sizeof(g_type) - 1] = '\0';
 
+    strncpy(g_filename, filename, sizeof(g_filename) - 1);
+    g_filename[sizeof(g_filename) - 1] = '\0';
+
     // Calculate samples per tick
     float refresh = g_player->getrefresh();
     if (refresh <= 0.0f) refresh = 70.0f;
@@ -296,15 +493,8 @@ float adplug_get_refresh() {
     return g_player ? g_player->getrefresh() : 0.0f;
 }
 
-EMSCRIPTEN_KEEPALIVE
-uint32_t adplug_get_num_instruments() {
-    // PIS has instruments in its module struct
-    if (g_playerType == PT_PIS) {
-        auto* pp = asPisPlayer();
-        return pp ? (uint32_t)pp->module.number_of_instruments : 0;
-    }
-    return g_player ? (uint32_t)g_player->getinstruments() : 0;
-}
+// adplug_get_num_instruments is defined in the second extern "C" block
+// where accessor functions are available
 
 EMSCRIPTEN_KEEPALIVE
 const char* adplug_get_instrument_name(uint32_t index) {
@@ -339,6 +529,12 @@ void adplug_free(uint8_t* ptr) {
 //   CpisPlayer — PIS (Beni Tracker)
 //   Cd00Player — D00 (EdLib)
 //   CldsPlayer — LDS (Loudness Sound System)
+//   CxadbmfPlayer — BMF (Bob's Music Format via XAD shell)
+//   CheradPlayer — AGD/HERAD (Herbulot AdLib)
+//   CsopPlayer — SOP (Note Sequencer)
+//   CjbmPlayer — JBM (Johannes Bjerregaard Music)
+//   CrolPlayer — ROL (AdLib Visual Composer)
+//   OPL Capture — generic fallback for all other formats
 
 // (Headers already included above via forward declarations)
 
@@ -402,13 +598,50 @@ public:
     using CldsPlayer::tempo;
 };
 
+class CxadbmfPlayerAccessor : public CxadbmfPlayer {
+public:
+    using CxadbmfPlayer::bmf;
+};
+
+class CheradPlayerAccessor : public CheradPlayer {
+public:
+    using CheradPlayer::track;
+    using CheradPlayer::chn;
+    using CheradPlayer::inst;
+    using CheradPlayer::nTracks;
+    using CheradPlayer::nInsts;
+    using CheradPlayer::wSpeed;
+    using CheradPlayer::AGD;
+    using CheradPlayer::v2;
+};
+
+class CsopPlayerAccessor : public CsopPlayer {
+public:
+    using CsopPlayer::track;
+    using CsopPlayer::inst;
+    using CsopPlayer::nTracks;
+    using CsopPlayer::nInsts;
+    using CsopPlayer::basicTempo;
+    using CsopPlayer::tickBeat;
+    using CsopPlayer::percussive;
+};
+
+class CjbmPlayerAccessor : public CjbmPlayer {
+public:
+    using CjbmPlayer::voice;
+    using CjbmPlayer::m;
+    using CjbmPlayer::sequences;
+    using CjbmPlayer::seqtable;
+    using CjbmPlayer::seqcount;
+    using CjbmPlayer::instable;
+    using CjbmPlayer::inscount;
+    using CjbmPlayer::voicemask;
+};
+
 // ── Player type detection ──────────────────────────────────────────────────
-// We identify the player type by checking virtual method overrides and
-// returned type strings, since RTTI is not available in Emscripten builds.
 
 static CmodPlayerAccessor* asModPlayer() {
-    if (!g_player) return nullptr;
-    if (g_playerType != PT_CMOD) return nullptr;
+    if (!g_player || g_playerType != PT_CMOD) return nullptr;
     auto* mp = reinterpret_cast<CmodPlayerAccessor*>(g_player);
     auto ch = mp->getNchans();
     auto rows = mp->getNrows();
@@ -417,21 +650,38 @@ static CmodPlayerAccessor* asModPlayer() {
 }
 
 static ChscPlayerAccessor* asHscPlayer() {
-    if (!g_player) return nullptr;
-    if (g_playerType != PT_HSC) return nullptr;
+    if (!g_player || g_playerType != PT_HSC) return nullptr;
     return reinterpret_cast<ChscPlayerAccessor*>(g_player);
 }
 
 static Cs3mPlayerAccessor* asS3mPlayer() {
-    if (!g_player) return nullptr;
-    if (g_playerType != PT_S3M) return nullptr;
+    if (!g_player || g_playerType != PT_S3M) return nullptr;
     return reinterpret_cast<Cs3mPlayerAccessor*>(g_player);
 }
 
 static CldsPlayerAccessor* asLdsPlayer() {
-    if (!g_player) return nullptr;
-    if (g_playerType != PT_LDS) return nullptr;
+    if (!g_player || g_playerType != PT_LDS) return nullptr;
     return reinterpret_cast<CldsPlayerAccessor*>(g_player);
+}
+
+static CxadbmfPlayerAccessor* asBmfPlayer() {
+    if (!g_player || g_playerType != PT_BMF) return nullptr;
+    return reinterpret_cast<CxadbmfPlayerAccessor*>(g_player);
+}
+
+static CheradPlayerAccessor* asHeradPlayer() {
+    if (!g_player || g_playerType != PT_HERAD) return nullptr;
+    return reinterpret_cast<CheradPlayerAccessor*>(g_player);
+}
+
+static CsopPlayerAccessor* asSopPlayer() {
+    if (!g_player || g_playerType != PT_SOP) return nullptr;
+    return reinterpret_cast<CsopPlayerAccessor*>(g_player);
+}
+
+static CjbmPlayerAccessor* asJbmPlayer() {
+    if (!g_player || g_playerType != PT_JBM) return nullptr;
+    return reinterpret_cast<CjbmPlayerAccessor*>(g_player);
 }
 
 // Detect player type after loading by checking the type string
@@ -450,7 +700,6 @@ static void detectPlayerType() {
         type.find("Mlat") != std::string::npos ||
         type.find("Master Tracker") != std::string::npos ||
         type.find("Surprise!") != std::string::npos) {
-        // Validate it's actually CmodPlayer by checking patterns > 0
         if (g_player->getpatterns() > 0 && g_player->getorders() > 0) {
             auto* mp = reinterpret_cast<CmodPlayerAccessor*>(g_player);
             auto ch = mp->getNchans();
@@ -470,7 +719,7 @@ static void detectPlayerType() {
         return;
     }
 
-    // Cs3mPlayer (DMO = packed S3M, also native S3M)
+    // Cs3mPlayer (DMO = packed S3M)
     if (type.find("TwinTeam") != std::string::npos ||
         type.find("Scream Tracker 3") != std::string::npos) {
         g_playerType = PT_S3M;
@@ -495,6 +744,43 @@ static void detectPlayerType() {
         g_playerType = PT_LDS;
         return;
     }
+
+    // CxadbmfPlayer (BMF via XAD shell) — NOT the same as BAM (Bob's Adlib Music)
+    if (type.find("BMF Adlib Tracker") != std::string::npos) {
+        g_playerType = PT_BMF;
+        return;
+    }
+
+    // CheradPlayer (AGD/HERAD)
+    if (type.find("HERAD") != std::string::npos ||
+        type.find("Herbulot") != std::string::npos) {
+        g_playerType = PT_HERAD;
+        return;
+    }
+
+    // CsopPlayer (SOP)
+    if (type.find("Note Sequencer") != std::string::npos ||
+        type.find("sopepos") != std::string::npos) {
+        g_playerType = PT_SOP;
+        return;
+    }
+
+    // CjbmPlayer (JBM)
+    if (type.find("Johannes Bjerregaard") != std::string::npos) {
+        g_playerType = PT_JBM;
+        return;
+    }
+
+    // CrolPlayer (ROL)
+    if (type.find("AdLib Visual Composer") != std::string::npos ||
+        type.find("ROL") != std::string::npos) {
+        g_playerType = PT_ROL;
+        return;
+    }
+
+    // Fallback: if none of the above matched, use OPL capture
+    // (covers ADL, BAM, GOT, KSM, LAA, MDI, MKJ, MSC, PLX, RAW, RIX, XAD, XSM)
+    g_playerType = PT_OPL_CAPTURE;
 }
 
 extern "C" {
@@ -510,6 +796,30 @@ uint32_t adplug_get_patterns() {
         if (!lp->patterns || lp->pattlen == 0) return 0;
         return lp->patterns_size / (lp->pattlen * 9 * sizeof(uint16_t));
     }
+    // BMF: count sequential non-empty events as a single virtual pattern per stream position
+    if (auto* bp = asBmfPlayer()) {
+        // BMF has streams[9][1024] — treat as one big pattern per song
+        // Determine length from active_streams and longest event sequence
+        uint32_t maxLen = 0;
+        for (int ch = 0; ch < bp->bmf.active_streams; ch++) {
+            for (uint32_t i = 0; i < 1024; i++) {
+                if (bp->bmf.streams[ch][i].note || bp->bmf.streams[ch][i].delay)
+                    maxLen = std::max(maxLen, i + 1);
+            }
+        }
+        // Split into 64-row patterns
+        return maxLen > 0 ? (maxLen + 63) / 64 : 0;
+    }
+    // SOP/HERAD/JBM/ROL: OPL capture provides pattern count
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_SOP ||
+        g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
+        if (g_captureTotalTicks == 0) return 0;
+        // 64 rows per pattern, ticks_per_row from refresh rate
+        float refresh = g_captureRefreshRate > 0 ? g_captureRefreshRate : 70.0f;
+        uint32_t ticksPerRow = std::max(1u, (uint32_t)(refresh / 50.0f + 0.5f));
+        uint32_t totalRows = g_captureTotalTicks / ticksPerRow;
+        return totalRows > 0 ? (totalRows + 63) / 64 : 0;
+    }
     return g_player ? g_player->getpatterns() : 0;
 }
 
@@ -520,24 +830,37 @@ uint32_t adplug_get_orders() {
         uint32_t len = pp->module.length;
         return len > 0 ? len : 0;
     }
+    // For OPL capture and BMF, orders = identity (pattern 0, 1, 2, ...)
+    if (g_playerType == PT_BMF || g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 ||
+        g_playerType == PT_SOP || g_playerType == PT_HERAD ||
+        g_playerType == PT_JBM || g_playerType == PT_ROL) {
+        return adplug_get_patterns();
+    }
     return g_player ? g_player->getorders() : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_rows() {
     if (auto* mp = asModPlayer()) return (uint32_t)mp->getNrows();
-    // HSC/S3M/PIS/LDS all use 64 rows per pattern
+    // All other formats use 64 rows per pattern
     return 64;
 }
 
 EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_channels() {
     if (auto* mp = asModPlayer()) return (uint32_t)mp->getNchans();
-    if (g_playerType == PT_HSC) return 9;
-    if (auto* sp = asS3mPlayer()) return 9;  // S3M OPL uses 9 channels
-    if (g_playerType == PT_PIS) return 9;
-    if (g_playerType == PT_D00) return 9;
-    if (g_playerType == PT_LDS) return 9;
+    if (auto* bp = asBmfPlayer()) return (uint32_t)bp->bmf.active_streams;
+    if (auto* hp = asHeradPlayer()) return (uint32_t)hp->nTracks;
+    if (auto* sp = asSopPlayer()) return (uint32_t)sp->nTracks;
+    if (g_playerType == PT_JBM) return 9;  // JBM uses up to 11 but OPL2 has 9 melody
+    // OPL capture: count channels that have notes
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_ROL) {
+        uint8_t maxCh = 0;
+        for (const auto& n : g_capturedNotes) {
+            if (n.isNoteOn && n.channel + 1 > maxCh) maxCh = n.channel + 1;
+        }
+        return maxCh > 0 ? maxCh : 9;
+    }
     return 9;
 }
 
@@ -588,6 +911,13 @@ uint32_t adplug_get_order_entry(uint32_t idx) {
     if (auto* pp = asPisPlayer()) {
         if (idx >= (uint32_t)pp->module.length) return 0xFFFF;
         return idx;
+    }
+    // BMF, SOP, HERAD, JBM, ROL, OPL capture — identity mapping
+    if (g_playerType == PT_BMF || g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 ||
+        g_playerType == PT_SOP || g_playerType == PT_HERAD ||
+        g_playerType == PT_JBM || g_playerType == PT_ROL) {
+        uint32_t numPats = adplug_get_patterns();
+        return (idx < numPats) ? idx : 0xFFFF;
     }
     return 0xFFFF;
 }
@@ -733,6 +1063,59 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
                ((uint32_t)param << 24);
     }
 
+    // ── BMF ── streams[9][1024] with {note, delay, volume, instrument, cmd, cmd_data}
+    if (auto* bp = asBmfPlayer()) {
+        if (channel >= (uint32_t)bp->bmf.active_streams) return 0;
+        // Linear event index = pattern * 64 + row
+        uint32_t eventIdx = pattern * 64 + row;
+        if (eventIdx >= 1024) return 0;
+        auto& ev = bp->bmf.streams[channel][eventIdx];
+        if (!ev.note && !ev.instrument && !ev.cmd) return 0;
+
+        uint8_t note = ev.note;
+        uint8_t inst = ev.instrument + 1; // 1-based
+        uint8_t cmd = ev.cmd;
+        uint8_t param = ev.cmd_data;
+
+        return ((uint32_t)note) |
+               ((uint32_t)inst << 8) |
+               ((uint32_t)cmd << 16) |
+               ((uint32_t)param << 24);
+    }
+
+    // ── OPL Capture (SOP, HERAD, JBM, ROL, D00, and all stream formats) ──
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_SOP ||
+        g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
+        if (g_capturedNotes.empty() || g_captureTotalTicks == 0) return 0;
+
+        float refresh = g_captureRefreshRate > 0 ? g_captureRefreshRate : 70.0f;
+        uint32_t ticksPerRow = std::max(1u, (uint32_t)(refresh / 50.0f + 0.5f));
+        uint32_t targetRow = pattern * 64 + row;
+        uint32_t tickStart = targetRow * ticksPerRow;
+        uint32_t tickEnd = tickStart + ticksPerRow;
+
+        // Find note-on events in this tick range for this channel
+        // Binary search for approximate start position
+        size_t lo = 0, hi = g_capturedNotes.size();
+        while (lo < hi) {
+            size_t mid = (lo + hi) / 2;
+            if (g_capturedNotes[mid].tick < tickStart) lo = mid + 1;
+            else hi = mid;
+        }
+
+        for (size_t i = lo; i < g_capturedNotes.size(); i++) {
+            auto& cn = g_capturedNotes[i];
+            if (cn.tick >= tickEnd) break;
+            if (cn.channel == channel && cn.isNoteOn) {
+                return ((uint32_t)cn.note) |
+                       ((uint32_t)cn.instrument << 8) |
+                       ((uint32_t)0 << 16) |
+                       ((uint32_t)0 << 24);
+            }
+        }
+        return 0;
+    }
+
     return 0;
 }
 
@@ -819,7 +1202,150 @@ int adplug_get_instrument_regs(uint32_t index, uint8_t* outRegs) {
         return 1;
     }
 
+    // ── BMF ── instruments[32] with 13 bytes of OPL data
+    if (auto* bp = asBmfPlayer()) {
+        if (index >= 32) return 0;
+        // BMF instrument data[13]: OPL register layout
+        memcpy(outRegs, bp->bmf.instruments[index].data, 11);
+        return 1;
+    }
+
+    // ── HERAD ── herad_inst with detailed OPL params
+    if (auto* hp = asHeradPlayer()) {
+        if (index >= hp->nInsts) return 0;
+        auto& p = hp->inst[index].param;
+        if (p.mode < 0) return 0; // keymap, not a normal instrument
+        // Build standard 11-byte OPL register layout
+        outRegs[0] = (p.mod_am << 7) | (p.mod_vib << 6) | (p.mod_eg << 5) |
+                     (p.mod_ksr << 4) | (p.mod_mul & 0x0F);
+        outRegs[1] = (p.car_am << 7) | (p.car_vib << 6) | (p.car_eg << 5) |
+                     (p.car_ksr << 4) | (p.car_mul & 0x0F);
+        outRegs[2] = (p.mod_ksl << 6) | (p.mod_out & 0x3F);
+        outRegs[3] = (p.car_ksl << 6) | (p.car_out & 0x3F);
+        outRegs[4] = (p.mod_A << 4) | (p.mod_D & 0x0F);
+        outRegs[5] = (p.car_A << 4) | (p.car_D & 0x0F);
+        outRegs[6] = (p.mod_S << 4) | (p.mod_R & 0x0F);
+        outRegs[7] = (p.car_S << 4) | (p.car_R & 0x0F);
+        outRegs[8] = p.mod_wave;
+        outRegs[9] = p.car_wave;
+        outRegs[10] = (p.feedback << 1) | (p.con & 0x01);
+        return 1;
+    }
+
+    // ── SOP ── sop_inst with 11 or 22 bytes of OPL data
+    if (auto* sp = asSopPlayer()) {
+        if (index >= sp->nInsts) return 0;
+        // SOP instrument data is stored in inst[n].data (11 bytes for 2OP)
+        memcpy(outRegs, sp->inst[index].data, 11);
+        return 1;
+    }
+
+    // ── OPL Capture ── instruments from captured fingerprints
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_SOP ||
+        g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
+        // index is 0-based, but captured instruments use 1-based indexing
+        if (index >= g_capturedInstruments.size()) return 0;
+        memcpy(outRegs, g_capturedInstruments[index].regs, 11);
+        return 1;
+    }
+
     return 0;
+}
+
+// ── Number of instruments ──────────────────────────────────────────────────
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_num_instruments() {
+    // PIS has instruments in its module struct
+    if (g_playerType == PT_PIS) {
+        auto* pp = asPisPlayer();
+        return pp ? (uint32_t)pp->module.number_of_instruments : 0;
+    }
+    if (g_playerType == PT_BMF) return 32;
+    if (auto* hp = asHeradPlayer()) return hp->nInsts;
+    if (auto* sp = asSopPlayer()) return sp->nInsts;
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_JBM || g_playerType == PT_ROL)
+        return (uint32_t)g_capturedInstruments.size();
+    return g_player ? (uint32_t)g_player->getinstruments() : 0;
+}
+
+// ── OPL Capture API ────────────────────────────────────────────────────────
+
+/**
+ * Run OPL capture: plays through the entire song tick-by-tick,
+ * intercepting OPL register writes to detect note-on/note-off events.
+ * Call after adplug_load(). Returns number of note events captured.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_capture_song() {
+    if (!g_player || !g_opl) return 0;
+
+    // Clear previous capture
+    g_capturedNotes.clear();
+    g_capturedInstruments.clear();
+    g_captureTotalTicks = 0;
+    memset(g_oplRegs, 0, sizeof(g_oplRegs));
+    memset(g_oplKeyOn, 0, sizeof(g_oplKeyOn));
+
+    // Create a SEPARATE OPL emulator for capture — don't touch g_opl
+    CEmuopl* captureRealOpl = new CEmuopl(static_cast<int>(g_sampleRate), true, true);
+    CCapturingOpl captureOpl(captureRealOpl);
+
+    // Re-create player with the capturing OPL using the stored filename
+    CProvider_Memory provider(g_fileData, g_fileSize, std::string(g_filename));
+    CPlayer* capturePlayer = CAdPlug::factory(
+        std::string(g_filename),
+        &captureOpl,
+        CAdPlug::players,
+        provider
+    );
+
+    if (!capturePlayer) { delete captureRealOpl; return 0; }
+
+    capturePlayer->rewind(0);
+    g_captureRefreshRate = capturePlayer->getrefresh();
+
+    // Play through the song tick-by-tick, capturing all OPL writes
+    // Safety limit: 50000 ticks (~16 minutes at 50Hz)
+    const uint32_t MAX_TICKS = 50000;
+    uint32_t tick = 0;
+    bool playing = true;
+
+    while (playing && tick < MAX_TICKS) {
+        captureOpl.currentTick = tick;
+        playing = capturePlayer->update();
+        tick++;
+    }
+
+    g_captureTotalTicks = tick;
+    delete capturePlayer;
+    delete captureRealOpl;
+
+    return (uint32_t)g_capturedNotes.size();
+}
+
+/** Get number of captured note events */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_capture_get_num_events() {
+    return (uint32_t)g_capturedNotes.size();
+}
+
+/** Get number of unique captured instruments */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_capture_get_num_instruments() {
+    return (uint32_t)g_capturedInstruments.size();
+}
+
+/** Get total ticks captured */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_capture_get_total_ticks() {
+    return g_captureTotalTicks;
+}
+
+/** Get capture refresh rate (ticks per second) */
+EMSCRIPTEN_KEEPALIVE
+float adplug_capture_get_refresh_rate() {
+    return g_captureRefreshRate;
 }
 
 // ── Player Type Query ──────────────────────────────────────────────────────

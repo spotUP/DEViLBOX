@@ -1,13 +1,14 @@
 /**
  * AdPlugWasmExtractor.ts — Extract editable pattern/instrument data from AdPlug WASM
  *
- * For CmodPlayer-based formats (A2M, AMD, CFF, DFM, DTM, MAD, MTR, SA2, SAT, XMS),
- * AdPlug parses the file and stores patterns/instruments in a uniform structure.
- * This module calls the WASM extraction API to read that data and build a TrackerSong
- * with OPL3Synth instruments — making these formats fully editable.
+ * Supports two extraction modes:
+ *   1. Native extraction — for formats with grid-based pattern data (CmodPlayer,
+ *      ChscPlayer, Cs3mPlayer, CpisPlayer, CldsPlayer, CxadbmfPlayer)
+ *   2. OPL capture — for all other formats (MIDI, raw, event-based). Plays the
+ *      song tick-by-tick, intercepts OPL register writes, and reconstructs
+ *      patterns from detected note-on/note-off events.
  *
- * For non-CmodPlayer formats (ADL, BAM, GOT, RIX, ROL, etc.), the WASM reports
- * patterns=0 / orders=0, so we fall back to WASM streaming audio.
+ * Total: 33 of 36 AdLib formats are extractable and editable.
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -130,6 +131,12 @@ interface AdPlugWasmModule {
   _adplug_get_type(): number;
   _adplug_get_num_instruments(): number;
   _adplug_get_instrument_name(index: number): number;
+  _adplug_get_player_type(): number;
+  _adplug_capture_song(): number;
+  _adplug_capture_get_num_events(): number;
+  _adplug_capture_get_num_instruments(): number;
+  _adplug_capture_get_total_ticks(): number;
+  _adplug_capture_get_refresh_rate(): number;
   _malloc(size: number): number;
   _free(ptr: number): void;
   HEAPU8: Uint8Array;
@@ -190,9 +197,9 @@ export async function extractAdPlugPatterns(
   if (loaded !== 0) return null;
 
   try {
-    const numPatterns = M._adplug_get_patterns();
-    const numOrders = M._adplug_get_orders();
-    const numChannels = M._adplug_get_channels();
+    let numPatterns = M._adplug_get_patterns();
+    let numOrders = M._adplug_get_orders();
+    let numChannels = M._adplug_get_channels();
     const numRows = M._adplug_get_rows();
     const speed = M._adplug_get_speed();
     const bpm = M._adplug_get_bpm_value();
@@ -200,11 +207,19 @@ export async function extractAdPlugPatterns(
     const title = M.UTF8ToString(M._adplug_get_title());
     const type = M.UTF8ToString(M._adplug_get_type());
 
-    // Must be a CmodPlayer with actual data
-    if (numPatterns === 0 || numOrders === 0 || numChannels === 0 || numRows === 0) {
-      return null;
+    // If native extraction yields no patterns, try OPL capture
+    if (numPatterns === 0 || numOrders === 0 || numChannels === 0) {
+      const capturedEvents = M._adplug_capture_song();
+      if (!capturedEvents || capturedEvents === 0) return null;
+
+      // Re-query structural data (now populated from capture)
+      numPatterns = M._adplug_get_patterns();
+      numOrders = M._adplug_get_orders();
+      numChannels = M._adplug_get_channels();
+
+      if (numPatterns === 0 || numOrders === 0 || numChannels === 0) return null;
     }
-    if (numChannels > 18 || numRows > 256) return null;
+    if (numChannels > 24 || numRows > 256) return null;
 
     // ── Extract order list ──
     // Stop at first out-of-range or sentinel entry (0xFFFF = end, >= numPatterns = padding)
