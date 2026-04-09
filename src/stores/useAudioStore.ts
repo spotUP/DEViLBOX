@@ -58,7 +58,7 @@ export const useAudioStore = create<AudioStore>()(
     masterMuted: false,
     sampleBusGain: 0,
     synthBusGain: 0,
-    autoGain: false,
+    autoGain: true,
     analyserNode: null,
     fftNode: null,
     toneEngineInstance: null,
@@ -122,6 +122,10 @@ export const useAudioStore = create<AudioStore>()(
     setToneEngineInstance: (instance) =>
       set((state) => {
         state.toneEngineInstance = instance;
+        // Apply autoGain default when engine first becomes available
+        if (instance && state.autoGain) {
+          instance.setAutoGain(true);
+        }
       }),
 
     setSampleBusGain: (db) =>
