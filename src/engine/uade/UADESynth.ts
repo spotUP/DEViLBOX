@@ -43,37 +43,11 @@ export class UADESynth implements DevilboxSynth {
       const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
       const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
 
-      // SCAN_CRASH: formats that crash the browser during scan
-      const SCAN_CRASH_EXTS = new Set([
-        'mon', 'sa', 'aps', 'sas', 'mso', 'ml', 'sun', 'tsm',
-        'thm', 'sb', 'ps',
-      ]);
-      const SCAN_CRASH_PREFIXES = new Set([
-        'sas', 'ash', 'tsm', 'thm', 'sb', 'ps',
-      ]);
+      // Scan control: centralized in uadeScanLists.ts
+      const { shouldSkipScan, isShortScan } = await import('./uadeScanLists');
 
-      // SHORT_SCAN: compiled 68k replayers that loop but don't crash — 30s timeout
-      const SHORT_SCAN_EXTS = new Set([
-        'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-        'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-        'rho', 'dln', 'core', 'hot', 'wb', 'dh',
-        'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
-        'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
-        'mc', 'mcr', 'mco', 'jmf', 'kh',
-        'sng', 'sjs', 'jpn', 'jpnd', 'jp',
-      ]);
-      const SHORT_SCAN_PREFIXES = new Set([
-        'dl', 'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-        'fw', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-        'dns', 'mk2', 'mkii', 'rho', 'core', 'hot', 'wb', 'dh',
-        'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
-        'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
-        'mc', 'mcr', 'mco', 'jmf', 'kh',
-        'mfp', 'smp', 'sng', 'jpn', 'jpnd', 'jp', 'sjs',
-      ]);
-
-      const skipScan = SCAN_CRASH_EXTS.has(ext) || SCAN_CRASH_PREFIXES.has(prefix);
-      const shortScan = SHORT_SCAN_EXTS.has(ext) || SHORT_SCAN_PREFIXES.has(prefix);
+      const skipScan = shouldSkipScan(ext, prefix);
+      const shortScan = isShortScan(ext, prefix);
       const scanTimeoutSec = shortScan ? 30 : undefined;
 
       // Register companion files (two-file formats: smp.*, .ins, .set) BEFORE loading.
