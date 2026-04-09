@@ -109,10 +109,22 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const autoSizeSelect = useCallback(() => {
     const sel = hwSelectRef.current;
     if (!sel) return;
-    // Let browser compute natural width for current selection, then add right margin
-    sel.style.width = 'auto';
-    const natural = sel.offsetWidth;
-    sel.style.width = `${natural + 8}px`; // 8px breathing room after the arrow
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+    // Measure selected text with a hidden span using the same font
+    const span = document.createElement('span');
+    span.style.visibility = 'hidden';
+    span.style.position = 'absolute';
+    span.style.whiteSpace = 'nowrap';
+    const cs = getComputedStyle(sel);
+    span.style.font = cs.font;
+    span.style.letterSpacing = cs.letterSpacing;
+    span.textContent = opt.text;
+    document.body.appendChild(span);
+    const textW = span.offsetWidth;
+    document.body.removeChild(span);
+    // text + left pad (6px) + right pad (6px) + border (2px) + arrow (~18px) + right space (8px)
+    sel.style.width = `${textW + 40}px`;
   }, []);
 
   useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
