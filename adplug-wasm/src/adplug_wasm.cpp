@@ -886,7 +886,9 @@ EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_bpm_value() {
     if (auto* mp = asModPlayer()) return mp->bpm;
     if (auto* sp = asS3mPlayer()) return sp->tempo;
-    return 125;
+    // HSC, D00, LDS etc. don't have a BPM concept — return 0 to signal
+    // the TS extractor to derive BPM from the refresh rate instead
+    return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
