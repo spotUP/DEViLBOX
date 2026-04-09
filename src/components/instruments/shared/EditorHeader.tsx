@@ -13,6 +13,7 @@ import React from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2, Download, Zap } from 'lucide-react';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
 import { getSynthHelp } from '@constants/synthHelp';
 import { ToneEngine } from '@engine/ToneEngine';
@@ -247,25 +248,21 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               {/* Synth Type Selector with Categories */}
-              <select
+              <CustomSelect
                 value={instrument.synthType}
-                onChange={(e) => handleSynthTypeChange(instrument, e.target.value as SynthType, onChange)}
+                onChange={(v) => handleSynthTypeChange(instrument, v as SynthType, onChange)}
                 className="px-2 py-1 text-sm font-medium bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary hover:border-dark-borderLight focus:border-blue-500 focus:outline-none cursor-pointer"
                 title="Switch synth type"
-              >
-                {SYNTH_CATEGORIES
-                  .map((category) => (
-                    <optgroup key={category.id} label={category.name}>
-                      {category.synths
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((synth) => (
-                          <option key={`${category.id}-${synth.name}`} value={synth.type}>
-                            {synth.name}
-                          </option>
-                        ))}
-                    </optgroup>
-                  ))}
-              </select>
+                options={SYNTH_CATEGORIES.map((category) => ({
+                  label: category.name,
+                  options: category.synths
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((synth) => ({
+                      value: synth.type,
+                      label: synth.name,
+                    })),
+                }))}
+              />
             </div>
             <p className="text-xs text-text-secondary truncate">{synthInfo.description}</p>
           </div>

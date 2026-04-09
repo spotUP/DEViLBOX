@@ -3,6 +3,7 @@ import { Knob } from '@components/controls/Knob';
 import { Cpu, Zap, Music, Layers, FileUp } from 'lucide-react';
 import { SectionHeader, useBuzzmachineParam } from './shared';
 import type { GeneratorEditorProps } from './shared';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ============================================================================
 // MADBRAIN 4FM2F - 4-Operator FM Synthesizer
@@ -60,15 +61,15 @@ export const MadBrain4FM2FEditor: React.FC<GeneratorEditorProps> = ({ config, on
           <SectionHeader color="#6366f1" title="Oscillator 4" />
           <div className="mb-4">
             <span className="text-xs text-text-secondary mb-2 block">Waveform</span>
-            <select
-              value={osc4Wave}
-              onChange={(e) => updateParam(1, parseInt(e.target.value))}
+            <CustomSelect
+              value={String(osc4Wave)}
+              onChange={(v) => updateParam(1, parseInt(v))}
               className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded-lg px-3 py-2 text-sm text-text-primary"
-            >
-              {waveLabels.slice(1).map((label, idx) => (
-                <option key={idx + 1} value={idx + 1}>{label}</option>
-              ))}
-            </select>
+              options={waveLabels.slice(1).map((label, idx) => ({
+                value: String(idx + 1),
+                label,
+              }))}
+            />
           </div>
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -418,15 +419,15 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
             />
             <div className="flex flex-col items-center">
               <span className="text-[10px] text-text-muted mb-1">Sub Wave</span>
-              <select
-                value={subOscWave}
-                onChange={(e) => updateParam(9, parseInt(e.target.value))}
+              <CustomSelect
+                value={String(subOscWave)}
+                onChange={(v) => updateParam(9, parseInt(v))}
                 className="bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary"
-              >
-                {subWaveLabels.map((label, idx) => (
-                  <option key={idx} value={idx}>{label}</option>
-                ))}
-              </select>
+                options={subWaveLabels.map((label, idx) => ({
+                  value: String(idx),
+                  label,
+                }))}
+              />
             </div>
             <Knob
               value={subOscVol}

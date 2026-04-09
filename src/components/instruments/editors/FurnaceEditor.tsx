@@ -11,6 +11,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro, FurnaceAmigaConfig, FurnaceN163Config, FurnaceFDSConfig, FurnaceESFMConfig, FurnaceESFMOperatorConfig, FurnaceMultiPCMConfig, FurnaceSoundUnitConfig, FurnaceSID2Config, FurnaceES5506Config, FurnaceWaveSynthConfig, FurnaceSID3Config, FurnaceSID3Filter } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -868,22 +869,23 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
           <div className="flex justify-center gap-2">
             <ToggleButton label="AM" value={op.am ?? false} onChange={(v) => onUpdate({ am: v })} />
             {ranges.hasSSG && (
-              <select
-                value={op.ssg ?? 0}
-                onChange={(e) => onUpdate({ ssg: parseInt(e.target.value) })}
+              <CustomSelect
+                value={String(op.ssg ?? 0)}
+                onChange={(v) => onUpdate({ ssg: parseInt(v) })}
                 className="text-[9px] font-mono px-1 py-0.5 rounded border bg-dark-bg border-dark-border text-text-primary"
                 title="SSG-EG Mode"
-              >
-                <option value={0}>SSG Off</option>
-                <option value={8}>SSG \\\\</option>
-                <option value={9}>SSG \\‾‾</option>
-                <option value={10}>SSG \\/\\/</option>
-                <option value={11}>SSG \\‾</option>
-                <option value={12}>SSG ////</option>
-                <option value={13}>SSG /‾‾</option>
-                <option value={14}>SSG /\\/\\</option>
-                <option value={15}>SSG /‾</option>
-              </select>
+                options={[
+                  { value: '0', label: 'SSG Off' },
+                  { value: '8', label: 'SSG \\\\\\\\' },
+                  { value: '9', label: 'SSG \\‾‾' },
+                  { value: '10', label: 'SSG \\/\\/' },
+                  { value: '11', label: 'SSG \\‾' },
+                  { value: '12', label: 'SSG ////' },
+                  { value: '13', label: 'SSG /‾‾' },
+                  { value: '14', label: 'SSG /\\/\\' },
+                  { value: '15', label: 'SSG /‾' },
+                ]}
+              />
             )}
             {ranges.hasWS && (
               <>
@@ -1264,15 +1266,12 @@ const GBHWSeqRow: React.FC<{
   return (
     <div className="flex items-center gap-1 py-0.5 px-1 rounded bg-dark-bg/50 border border-dark-border/50">
       <span className="text-[8px] text-emerald-400 font-mono w-4 text-right">{index}</span>
-      <select
-        value={cmd}
-        onChange={(e) => onChange(parseInt(e.target.value), 0)}
+      <CustomSelect
+        value={String(cmd)}
+        onChange={(v) => onChange(parseInt(v), 0)}
         className="bg-dark-bg border border-dark-border rounded px-1 py-0.5 text-[9px] text-text-primary font-mono"
-      >
-        {GB_HWSEQ_CMD_NAMES.map((name, i) => (
-          <option key={i} value={i}>{name}</option>
-        ))}
-      </select>
+        options={GB_HWSEQ_CMD_NAMES.map((name, i) => ({ value: String(i), label: name }))}
+      />
       <div className="flex items-center gap-1 flex-1">
         {renderParams()}
       </div>
@@ -1452,18 +1451,15 @@ const WaveSynthPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Fu
           {/* Effect selector */}
           <div>
             <label className="text-[10px] text-text-muted font-mono block mb-1">Effect</label>
-            <select
-              value={effectIndex}
-              onChange={(e) => {
-                const idx = parseInt(e.target.value);
+            <CustomSelect
+              value={String(effectIndex)}
+              onChange={(v) => {
+                const idx = parseInt(v);
                 updateWS({ effect: isDual ? 128 + idx : idx });
               }}
               className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary w-full"
-            >
-              {effectNames.map((name, i) => (
-                <option key={i} value={i}>{name}</option>
-              ))}
-            </select>
+              options={effectNames.map((name, i) => ({ value: String(i), label: name }))}
+            />
           </div>
 
           {/* Wave selectors and knobs */}
@@ -2100,15 +2096,12 @@ const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
           <div className="flex items-center gap-4">
             <div>
               <label className="text-[10px] text-text-muted font-mono block mb-1">Gain Mode</label>
-              <select
-                value={typeof snes.gainMode === 'number' ? snes.gainMode : 0}
-                onChange={(e) => updateSNES({ gainMode: parseInt(e.target.value) })}
+              <CustomSelect
+                value={String(typeof snes.gainMode === 'number' ? snes.gainMode : 0)}
+                onChange={(v) => updateSNES({ gainMode: parseInt(v) })}
                 className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-              >
-                {gainModes.map((mode, i) => (
-                  <option key={i} value={i}>{mode}</option>
-                ))}
-              </select>
+                options={gainModes.map((mode, i) => ({ value: String(i), label: mode }))}
+              />
             </div>
             <Knob label="GAIN" value={snes.gain} min={0} max={127}
               onChange={(v) => updateSNES({ gain: Math.round(v) })}
@@ -2233,15 +2226,12 @@ const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
           size="sm" color="#6d28d9" formatValue={(v) => String(Math.round(v))} />
         <div className="flex flex-col items-center justify-center gap-1">
           <span className="text-[9px] font-bold text-text-muted uppercase">Bit Depth</span>
-          <select
-            value={pcm.bitDepth}
-            onChange={(e) => updatePCM({ bitDepth: parseInt(e.target.value) })}
+          <CustomSelect
+            value={String(pcm.bitDepth)}
+            onChange={(v) => updatePCM({ bitDepth: parseInt(v) })}
             className="bg-dark-bg px-2 py-1 rounded border border-dark-border text-xs font-mono text-violet-400"
-          >
-            {bitDepths.map((d) => (
-              <option key={d} value={d}>{d}-BIT</option>
-            ))}
-          </select>
+            options={bitDepths.map((d) => ({ value: String(d), label: `${d}-BIT` }))}
+          />
         </div>
       </div>
 
@@ -2382,15 +2372,12 @@ const N163Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
           <div className="flex items-center gap-4 pt-2 border-t border-dark-border">
             <div>
               <label className="text-[10px] text-text-muted font-mono block mb-1">Wave Mode</label>
-              <select
-                value={n163.waveMode}
-                onChange={(e) => updateN163({ waveMode: parseInt(e.target.value) })}
+              <CustomSelect
+                value={String(n163.waveMode)}
+                onChange={(v) => updateN163({ waveMode: parseInt(v) })}
                 className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-              >
-                {waveModes.map((mode, i) => (
-                  <option key={i} value={i}>{mode}</option>
-                ))}
-              </select>
+                options={waveModes.map((mode, i) => ({ value: String(i), label: mode }))}
+              />
             </div>
             <button
               onClick={() => updateN163({ perChPos: !n163.perChPos })}
@@ -2822,15 +2809,12 @@ const ES5506Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furna
         <div className="flex items-center gap-4">
           <div>
             <label className="text-[10px] text-text-muted font-mono block mb-1">Mode</label>
-            <select
-              value={es.filter.mode}
-              onChange={(e) => updateFilter({ mode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(es.filter.mode)}
+              onChange={(v) => updateFilter({ mode: parseInt(v) })}
               className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-            >
-              {filterModes.map((mode, i) => (
-                <option key={i} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={filterModes.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
           <Knob label="K1" value={es.filter.k1} min={0} max={0xFFFF}
             onChange={(v) => updateFilter({ k1: Math.round(v) })}
@@ -2926,27 +2910,21 @@ const SID2Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
             formatValue={(v) => String(Math.round(v))} />
           <div>
             <label className="text-[10px] text-text-muted font-mono block mb-1">Mix Mode</label>
-            <select
-              value={sid2.mixMode}
-              onChange={(e) => updateSID2({ mixMode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(sid2.mixMode)}
+              onChange={(v) => updateSID2({ mixMode: parseInt(v) })}
               className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-            >
-              {mixModes.map((mode, i) => (
-                <option key={i} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={mixModes.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
           <div>
             <label className="text-[10px] text-text-muted font-mono block mb-1">Noise Mode</label>
-            <select
-              value={sid2.noiseMode}
-              onChange={(e) => updateSID2({ noiseMode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(sid2.noiseMode)}
+              onChange={(v) => updateSID2({ noiseMode: parseInt(v) })}
               className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-            >
-              {noiseModes.map((mode, i) => (
-                <option key={i} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={noiseModes.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
         </div>
       </div>

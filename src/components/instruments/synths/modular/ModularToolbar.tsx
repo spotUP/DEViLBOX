@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 import type { ModularPatchConfig, ModularViewMode } from '../../../../types/modular';
 import { ModuleShelf } from './widgets/ModuleShelf';
 import { MODULAR_PRESETS } from '../../../../constants/modularPresets';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface ModularToolbarProps {
   config: ModularPatchConfig;
@@ -62,21 +63,20 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
       {/* Preset selector — hidden for SunVox mode */}
       {!shelfPrefix && <div className="flex items-center gap-2">
         <span className="text-xs text-text-secondary">Preset:</span>
-        <select
-          onChange={(e) => handleLoadPreset(e.target.value)}
+        <CustomSelect
+          onChange={(v) => handleLoadPreset(v)}
           value=""
           className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-        >
-          <option value="" disabled className="bg-dark-bgSecondary">
-            Load preset...
-          </option>
-          <option value="init" className="bg-dark-bgSecondary">Init</option>
-          <option value="bass" className="bg-dark-bgSecondary">Bass</option>
-          <option value="pad" className="bg-dark-bgSecondary">Pad</option>
-          <option value="percussion" className="bg-dark-bgSecondary">Percussion</option>
-          <option value="fmBell" className="bg-dark-bgSecondary">FM Bell</option>
-          <option value="lead" className="bg-dark-bgSecondary">Lead</option>
-        </select>
+          placeholder="Load preset..."
+          options={[
+            { value: 'init', label: 'Init' },
+            { value: 'bass', label: 'Bass' },
+            { value: 'pad', label: 'Pad' },
+            { value: 'percussion', label: 'Percussion' },
+            { value: 'fmBell', label: 'FM Bell' },
+            { value: 'lead', label: 'Lead' },
+          ]}
+        />
       </div>}
 
       {/* Add Module */}
@@ -85,17 +85,15 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
       {/* Polyphony selector — hidden for SunVox */}
       {!shelfPrefix && <div className="flex items-center gap-2">
         <span className="text-xs text-text-secondary">Voices:</span>
-        <select
-          value={config.polyphony}
-          onChange={(e) => handlePolyphonyChange(parseInt(e.target.value, 10))}
+        <CustomSelect
+          value={String(config.polyphony)}
+          onChange={(v) => handlePolyphonyChange(parseInt(v, 10))}
           className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-        >
-          {[1, 2, 4, 8].map((n) => (
-            <option key={n} value={n} className="bg-dark-bgSecondary">
-              {n}
-            </option>
-          ))}
-        </select>
+          options={[1, 2, 4, 8].map((n) => ({
+            value: String(n),
+            label: String(n),
+          }))}
+        />
       </div>}
 
       {/* View mode selector */}
