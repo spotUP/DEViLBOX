@@ -204,7 +204,6 @@ const NavBarComponent: React.FC = () => {
             value={n.activeView}
             onChange={(v) => switchView(v, n.activeView)}
             options={VIEW_OPTIONS.map((v) => ({ value: v.value, label: v.label }))}
-            className="bg-dark-bgTertiary text-text-primary text-sm border border-dark-border rounded px-2 py-1"
             title="Switch view"
           />
 
