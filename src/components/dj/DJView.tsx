@@ -8,6 +8,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Tone from 'tone';
 import { useDJStore } from '@/stores/useDJStore';
+import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
@@ -205,6 +206,13 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       engine.mixer.rebuildMasterEffects(masterEffects);
     }
   }, [masterEffectsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save master FX to the active playlist whenever they change in DJ view
+  const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
+  useEffect(() => {
+    if (!activePlaylistId) return;
+    useDJPlaylistStore.getState().setPlaylistMasterEffects(activePlaylistId, masterEffects);
+  }, [masterEffectsKey, activePlaylistId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle loading a Serato track to a deck
   // Detects audio files vs tracker modules, and parses Serato metadata (cue points, beatgrid)

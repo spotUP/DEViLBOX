@@ -13,6 +13,7 @@
 
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
+import { useAudioStore } from '@/stores/useAudioStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngine } from './DJEngine';
 import {
@@ -110,6 +111,12 @@ class DJAutoDJ {
     store.setAutoDJEnabled(true);
     store.setAutoDJStatus('playing');
     store.setAutoDJTrackIndices(currentIndex, nextIndex);
+
+    // Apply playlist's saved master FX if present
+    if (playlist.masterEffects && playlist.masterEffects.length > 0) {
+      console.log(`[AutoDJ] Applying playlist master FX (${playlist.masterEffects.length} effects)`);
+      useAudioStore.getState().setMasterEffects(playlist.masterEffects);
+    }
 
     // If shuffle, generate shuffle order
     if (store.autoDJShuffle) {
