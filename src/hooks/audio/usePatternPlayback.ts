@@ -17,6 +17,7 @@ import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPl
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import { processArrangementAutomation, hasArrangementAutomation } from '@engine/ArrangementAutomationPlayer';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
@@ -373,6 +374,7 @@ export const usePatternPlayback = () => {
             linearPeriods,
             jamCrackerFileData,
           });
+          getTrackerScratchController().notifyPlaybackStarted();
           replayer.play().catch((err) => {
             console.error('Failed to start JamCracker playback:', err);
           });
@@ -411,6 +413,7 @@ export const usePatternPlayback = () => {
               musiclineFileData,
             });
           }
+          getTrackerScratchController().notifyPlaybackStarted();
           replayer.play().catch((err) => {
             console.error('Failed to start MusicLine playback:', err);
           });
@@ -666,6 +669,7 @@ export const usePatternPlayback = () => {
 
         // Start or resume real-time playback
         // Always call play() - initial start OR after reload
+        getTrackerScratchController().notifyPlaybackStarted();
         replayer.play().catch((err) => {
           console.error('Failed to start playback:', err);
         });
