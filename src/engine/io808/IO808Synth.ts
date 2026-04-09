@@ -161,7 +161,9 @@ class ADGenerator {
 
   trigger(time: number): void {
     this.param.cancelScheduledValues(0);
-    this.param.linearRampToValueAtTime(this.start, time);
+    // Use setValueAtTime (not linearRamp) for the initial value — more reliable
+    // after cancelScheduledValues in Chrome where the "previous value" is undefined.
+    this.param.setValueAtTime(this.start, time);
     const attackTime = time + this.attack / 1000;
     const decayTime = attackTime + this.decay / 1000;
     this.param.linearRampToValueAtTime(this.start + this.amount, attackTime);
@@ -183,7 +185,8 @@ class ADGenerator {
 type VCOType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'whitenoise' | 'pinknoise';
 
 function createWhiteNoiseOsc(audioCtx: AudioContext): AudioBufferSourceNode {
-  const buffer = audioCtx.createBuffer(1, 44100, 44100);
+  const sr = audioCtx.sampleRate;
+  const buffer = audioCtx.createBuffer(1, sr, sr);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
   const source = audioCtx.createBufferSource();
@@ -194,7 +197,8 @@ function createWhiteNoiseOsc(audioCtx: AudioContext): AudioBufferSourceNode {
 
 function createPinkNoiseOsc(audioCtx: AudioContext): AudioBufferSourceNode {
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-  const buffer = audioCtx.createBuffer(1, 44100, 44100);
+  const sr = audioCtx.sampleRate;
+  const buffer = audioCtx.createBuffer(1, sr, sr);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) {
     const white = Math.random() * 2 - 1;
