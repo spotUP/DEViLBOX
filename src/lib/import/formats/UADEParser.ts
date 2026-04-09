@@ -467,7 +467,7 @@ export async function parseUADEFile(
   }
 
   // Compiled 68k replayer formats loop indefinitely without an end signal.
-  // Two tiers of scan control:
+  // Two tiers of scan control (defined in uadeScanLists.ts):
   //   SCAN_CRASH: genuinely crashes browser or corrupts engine — skip entirely
   //   SHORT_SCAN: loops but doesn't crash — use 30s timeout to capture tick data
   //
@@ -478,62 +478,9 @@ export async function parseUADEFile(
   // which routes audio to UADESynth streaming while using tick data for pattern display.
   const prefix = basename.split('.')[0]?.toLowerCase() ?? '';
 
-  // Formats that CRASH the browser or corrupt WASM state during scan
-  const SCAN_CRASH_EXTS = new Set([
-    'mon',   // ManiacsOfNoise — enhanced scan crashes browser
-    'sa',    // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
-    'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
-    'sas',   // SonicArranger suffix-form compiled binary — scan crashes browser
-    'mso',   // Medley — enhanced scan crashes browser
-    'ml',    // Medley (alternate ext) — enhanced scan crashes browser
-    'sun',   // SunTronic/TSM — compiled 68k synth, enhanced scan corrupts engine
-    'tsm',   // SunTronic/TSM — suffix-form variant
-    'thm',   // ThomasHermann — scan crashes browser
-    'sb',    // SteveBarrett — scan crashes browser
-    'ps',    // PaulShields — scan crashes browser
-  ]);
-  const SCAN_CRASH_PREFIXES = new Set([
-    'sas',   // SonicArranger prefix-form — scan crashes browser
-    'ash',   // AshleyHogg — scan crashes browser
-    'tsm',   // SunTronic/TSM — scan corrupts engine state
-    'thm',   // ThomasHermann — scan crashes browser
-    'sb',    // SteveBarrett — scan crashes browser
-    'ps',    // PaulShields — scan crashes browser
-  ]);
-
-  // Formats that loop indefinitely but don't crash — safe for short 30s scan
-  const SHORT_SCAN_EXTS = new Set([
-    'jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray',
-    'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
-    'rho', 'dln', 'core', 'hot', 'wb', 'dh',
-    'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
-    'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
-    'mc', 'mcr', 'mco',  // MarkCooksey
-    'jmf',    // JankoMrsicFlogel
-    'kh',     // KrisHatlelid
-    'sng',    // RichardJoseph (two-file .sng/.ins)
-    'sjs',    // SoundPlayer (two-file sjs.*+smp.*)
-    'jpn', 'jpnd', 'jp',  // JasonPage (two-file jpn.*+smp.*)
-  ]);
-  const SHORT_SCAN_PREFIXES = new Set(['dl_deli', 'dln', 'rh',
-    'cm', 'cus', 'cust', 'custom', 'rk', 'rkb',  // CustomMade variants
-    'pvp',    // PeterVerswyvelenPacker
-    'dns',    // DynamicSynthesizer
-    'vss',    // VoodooSupremeSynthesizer
-    'synmod', // SynTracker
-    'scn',    // SeanConnolly
-    'mc', 'mcr', 'mco',  // MarkCooksey
-    'jmf',    // JankoMrsicFlogel
-    'kh',     // KrisHatlelid
-    'mfp',    // MagneticFieldsPacker
-    'smp',    // ThomasHermann companion prefix
-    'sng',    // RichardJoseph
-    'jpn', 'jpnd', 'jp',  // JasonPage
-    'sjs',    // SoundPlayer
-  ]);
-
-  const scanCrashes = SCAN_CRASH_EXTS.has(ext) || SCAN_CRASH_PREFIXES.has(prefix);
-  const shortScan = SHORT_SCAN_EXTS.has(ext) || SHORT_SCAN_PREFIXES.has(prefix);
+  const { shouldSkipScan, isShortScan } = await import('@engine/uade/uadeScanLists');
+  const scanCrashes = shouldSkipScan(ext, prefix);
+  const shortScan = isShortScan(ext, prefix);
   const skipScan = scanCrashes;
   const scanTimeoutSec = shortScan ? 30 : undefined;
 
