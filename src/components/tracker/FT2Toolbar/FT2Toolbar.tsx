@@ -24,12 +24,10 @@ import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { Maximize2, Minimize2, ExternalLink, Gamepad2, X } from 'lucide-react';
-import { focusPopout } from '@components/ui/PopOutWindow';
-import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
+import { Maximize2, Minimize2, X } from 'lucide-react';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
+import { SineScroller } from '@components/visualization/SineScroller';
 import { NibblesGame } from '@components/visualization/NibblesGame';
-import { JingleVisualizer } from '@components/visualization/JingleVisualizer';
 
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
@@ -174,10 +172,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const { oscilloscopeVisible, jingleActive } = useUIStore(useShallow((s) => ({
-    oscilloscopeVisible: s.oscilloscopeVisible,
-    jingleActive: s.jingleActive,
-  })));
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     curves: s.curves,
     reset: s.reset,
@@ -197,6 +191,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
   const [showNibbles, setShowNibbles] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   // ASID hardware toggle
   const asidEnabled = useSettingsStore((s) => s.asidEnabled);
@@ -242,9 +237,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const toggleAI = useAIStore((s) => s.toggle);
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
-  const handleLogoAnimationComplete = useCallback(() => {
-    // Logo animation stays visible — no mode cycling needed
-  }, []);
 
   // Handle fullscreen changes from keyboard (F11) or other sources
   React.useEffect(() => {
@@ -741,56 +733,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 Hardware
               </Button>
         </div>
-
-        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 border-l border-dark-border group ml-auto hidden lg:flex" style={{ height: 68, alignItems: 'stretch', justifyContent: 'center' }}>
-        <div className="relative w-full h-full flex items-center justify-center">
-          {/* Nibbles button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowNibbles(true);
-            }}
-            className="absolute top-1 left-1 p-0.5 rounded text-text-muted/0 group-hover:text-text-muted hover:!text-accent-highlight transition-all z-10"
-            title="Play Nibbles 🐍"
-          >
-            <Gamepad2 size={12} />
-          </button>
-          {/* Pop out button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const already = useUIStore.getState().oscilloscopePoppedOut;
-              if (already) {
-                focusPopout('DEViLBOX — Visualizer');
-              } else {
-                useUIStore.getState().setOscilloscopePoppedOut(true);
-              }
-            }}
-            className="absolute top-1 right-1 p-0.5 rounded text-text-muted/0 group-hover:text-text-muted hover:!text-accent-highlight transition-all z-10"
-            title="Pop out visualizer"
-          >
-            <ExternalLink size={12} />
-          </button>
-          {/* Version Number */}
-          <div className="absolute bottom-1 right-2 text-[9px] font-mono text-text-muted opacity-40 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-            v{CURRENT_VERSION}
-          </div>
-
-          {/* Jingle overlay — covers logo during startup jingle */}
-          {jingleActive && (
-            <div className="absolute inset-0 z-20">
-              <JingleVisualizer height={100} />
-            </div>
-          )}
-
-          {/* SVG logo animation */}
-          {oscilloscopeVisible && (
-            <LogoAnimation height={100} onComplete={handleLogoAnimationComplete} />
-          )}
         </div>
-        </VisualizerFrame>
-      </div>
-
       <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
         <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
         <input
@@ -814,6 +757,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects chain">Master FX</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.()} title="Help & keyboard shortcuts (?)">Help</Button>
+        <Button variant={showAbout ? 'primary' : 'ghost'} size="sm" onClick={() => setShowAbout(true)} title="About DEViLBOX">About</Button>
+        <Button variant={showNibbles ? 'primary' : 'ghost'} size="sm" onClick={() => setShowNibbles(true)} title="Play Nibbles">Nibbles</Button>
 
         <Button
           variant={useUIStore.getState().modalOpen === 'moduleInfo' ? 'primary' : 'ghost'}
@@ -1125,6 +1070,33 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               </button>
             </div>
             <NibblesGame height={400} onExit={() => setShowNibbles(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* About Dialog */}
+      {showAbout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowAbout(false)}>
+          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl overflow-hidden w-[600px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border bg-dark-bgSecondary">
+              <span className="text-sm font-bold text-text-primary">About DEViLBOX</span>
+              <button onClick={() => setShowAbout(false)} className="text-text-muted hover:text-text-primary transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="w-full h-[200px] flex items-center justify-center">
+                <LogoAnimation height={200} onComplete={() => {}} />
+              </div>
+              <div className="text-center py-3 px-4">
+                <div className="text-lg font-bold text-text-primary">DEViLBOX</div>
+                <div className="text-xs text-text-muted">v{CURRENT_VERSION}</div>
+                <div className="text-xs text-text-muted mt-2">Music tracker &amp; chiptune workstation</div>
+              </div>
+              <div className="w-full border-t border-dark-border">
+                <SineScroller height={50} />
+              </div>
+            </div>
           </div>
         </div>
       )}
