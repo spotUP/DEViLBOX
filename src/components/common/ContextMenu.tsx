@@ -148,7 +148,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ref={menuRef}
       data-context-menu
       className={`
-        fixed z-[100] min-w-[180px] w-max py-1 text-xs font-mono
+        fixed z-[100] min-w-[180px] w-max max-w-[calc(100vw-20px)] py-1 text-xs font-mono whitespace-nowrap
         bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl
         ${className}
       `}
@@ -329,7 +329,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
         ref={buttonRef}
         onClick={handleClick}
         disabled={disabled}
-        className={className}
+        className={`whitespace-nowrap ${className}`}
         style={style}
       >
         {children}
