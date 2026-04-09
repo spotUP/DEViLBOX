@@ -11,6 +11,7 @@ import type { SongDBResult } from '@/lib/songdb';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface SIDInfoPanelProps {
   header: SIDHeaderInfo;
@@ -114,20 +115,15 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
                 )}
               </div>
             ) : (
-              <select
-                value={selectedSubsong}
-                onChange={(e) => onSubsongChange(Number(e.target.value))}
+              <CustomSelect
+                value={String(selectedSubsong)}
+                onChange={(v) => onSubsongChange(Number(v))}
+                options={Array.from({ length: header.subsongs }, (_, i) => ({
+                  value: String(i),
+                  label: `Subsong ${i + 1}${i === header.defaultSubsong ? ' (default)' : ''}${songDBInfo?.found && songDBInfo?.subsongs?.[i] ? ` — ${Math.floor(songDBInfo.subsongs[i].duration_ms / 60000)}:${String(Math.floor((songDBInfo.subsongs[i].duration_ms % 60000) / 1000)).padStart(2, '0')}` : ''}`,
+                }))}
                 className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
-              >
-                {Array.from({ length: header.subsongs }, (_, i) => (
-                  <option key={i} value={i}>
-                    {`Subsong ${i + 1}${i === header.defaultSubsong ? ' (default)' : ''}`}
-                    {songDBInfo?.found && songDBInfo?.subsongs?.[i]
-                      ? ` — ${Math.floor(songDBInfo.subsongs[i].duration_ms / 60000)}:${String(Math.floor((songDBInfo.subsongs[i].duration_ms % 60000) / 1000)).padStart(2, '0')}`
-                      : ''}
-                  </option>
-                ))}
-              </select>
+              />
             )}
           </div>
         )}
@@ -138,17 +134,15 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
             <Zap className="w-3 h-3 text-blue-400/60" />
             <label className="text-xs text-text-muted whitespace-nowrap">Engine:</label>
           </div>
-          <select
+          <CustomSelect
             value={sidEngine}
-            onChange={(e) => setSidEngine(e.target.value as SIDEngineType)}
+            onChange={(v) => setSidEngine(v as SIDEngineType)}
+            options={Object.values(SID_ENGINES).map(eng => ({
+              value: eng.id,
+              label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
+            }))}
             className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
-          >
-            {Object.values(SID_ENGINES).map(eng => (
-              <option key={eng.id} value={eng.id}>
-                {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size}){eng.features.asidHardware ? ' ★ HW' : ''}
-              </option>
-            ))}
-          </select>
+          />
           {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (
             <p className="text-[10px] text-yellow-400 leading-tight mt-1">
               ⚠ Hardware SID output requires jsSID engine. Select jsSID ★ HW above.

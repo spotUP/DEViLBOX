@@ -8,6 +8,7 @@ import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { notify } from '@stores/useNotificationStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface SIDSettingsTabProps {
   className?: string;
@@ -28,8 +29,8 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
   const [voiceMask, setVoiceMask] = useState([true, true, true]);
   const [bufferSize, setBufferSize] = useState<BufferSize>(8192);
 
-  const handleEngineChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const engine = e.target.value as SIDEngineType;
+  const handleEngineChange = useCallback((value: string) => {
+    const engine = value as SIDEngineType;
     setSidEngine(engine);
     notify.success(`SID engine changed to ${SID_ENGINES[engine].name}`);
   }, [setSidEngine]);
@@ -53,17 +54,15 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
         {/* Engine Selection */}
         <div className={sectionClass}>
           <label className={labelClass}>SID Engine</label>
-          <select
+          <CustomSelect
             value={sidEngine}
             onChange={handleEngineChange}
+            options={Object.values(SID_ENGINES).map((eng) => ({
+              value: eng.id,
+              label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
+            }))}
             className={selectClass}
-          >
-            {Object.values(SID_ENGINES).map((eng) => (
-              <option key={eng.id} value={eng.id}>
-                {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size}){eng.features.asidHardware ? ' ★ HW' : ''}
-              </option>
-            ))}
-          </select>
+          />
           <p className="text-[10px] text-text-muted/60 leading-tight">
             {SID_ENGINES[sidEngine].description}
           </p>
@@ -77,15 +76,16 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
         {/* Chip Model Override */}
         <div className={sectionClass}>
           <label className={labelClass}>Chip Model Override</label>
-          <select
+          <CustomSelect
             value={chipModel}
-            onChange={(e) => setChipModel(e.target.value as ChipModelOverride)}
+            onChange={(v) => setChipModel(v as ChipModelOverride)}
+            options={[
+              { value: 'auto', label: 'Auto (use file header)' },
+              { value: '6581', label: 'MOS 6581' },
+              { value: '8580', label: 'MOS 8580' },
+            ]}
             className={selectClass}
-          >
-            <option value="auto">Auto (use file header)</option>
-            <option value="6581">MOS 6581</option>
-            <option value="8580">MOS 8580</option>
-          </select>
+          />
           <p className="text-[10px] text-text-muted/60 leading-tight">
             {chipModel === 'auto'
               ? 'Uses the chip model specified in the SID file header.'
@@ -98,15 +98,16 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
         {/* Clock Speed Override */}
         <div className={sectionClass}>
           <label className={labelClass}>Clock Speed Override</label>
-          <select
+          <CustomSelect
             value={clockSpeed}
-            onChange={(e) => setClockSpeed(e.target.value as ClockSpeedOverride)}
+            onChange={(v) => setClockSpeed(v as ClockSpeedOverride)}
+            options={[
+              { value: 'auto', label: 'Auto (use file header)' },
+              { value: 'PAL', label: 'PAL (50 Hz)' },
+              { value: 'NTSC', label: 'NTSC (60 Hz)' },
+            ]}
             className={selectClass}
-          >
-            <option value="auto">Auto (use file header)</option>
-            <option value="PAL">PAL (50 Hz)</option>
-            <option value="NTSC">NTSC (60 Hz)</option>
-          </select>
+          />
           <p className="text-[10px] text-text-muted/60 leading-tight">
             {clockSpeed === 'auto'
               ? 'Uses the clock speed specified in the SID file header.'
@@ -177,15 +178,16 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
         {/* Buffer Size */}
         <div className={sectionClass}>
           <label className={labelClass}>Audio Buffer Size</label>
-          <select
-            value={bufferSize}
-            onChange={(e) => setBufferSize(Number(e.target.value) as BufferSize)}
+          <CustomSelect
+            value={String(bufferSize)}
+            onChange={(v) => setBufferSize(Number(v) as BufferSize)}
+            options={[
+              { value: '4096', label: '4096 samples (~93ms)' },
+              { value: '8192', label: '8192 samples (~186ms)' },
+              { value: '16384', label: '16384 samples (~372ms)' },
+            ]}
             className={selectClass}
-          >
-            <option value={4096}>4096 samples (~93ms)</option>
-            <option value={8192}>8192 samples (~186ms)</option>
-            <option value={16384}>16384 samples (~372ms)</option>
-          </select>
+          />
           <p className="text-[10px] text-text-muted/60 leading-tight">
             Smaller buffers reduce latency but may cause audio glitches on slower devices.
           </p>

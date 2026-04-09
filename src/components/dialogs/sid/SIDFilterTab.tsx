@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface SIDFilterTabProps {
   className?: string;
@@ -136,16 +137,13 @@ export const SIDFilterTab: React.FC<SIDFilterTabProps> = ({ className }) => {
       {/* Top row: Revision select + Reset */}
       <div className="flex items-center gap-3">
         <label className="text-[10px] font-mono text-text-secondary shrink-0">SID Revision</label>
-        <select
+        <CustomSelect
           value={revision}
-          onChange={e => handleRevisionChange(e.target.value)}
+          onChange={(v) => handleRevisionChange(v)}
+          options={REVISION_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           className="bg-dark-bg border border-dark-border text-text-primary text-[10px] font-mono
-                     px-2 py-1 rounded focus:outline-none focus:border-accent-primary"
-        >
-          {REVISION_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+                     px-2 py-1 rounded"
+        />
 
         <div className="flex-1" />
 

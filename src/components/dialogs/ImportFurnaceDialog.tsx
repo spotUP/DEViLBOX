@@ -7,7 +7,8 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Cpu, FileAudio, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Cpu, FileAudio, AlertCircle } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
@@ -341,21 +342,15 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
               {module.subsongs.length > 1 && (
                 <div className="bg-dark-bg rounded-lg p-3 space-y-2">
                   <p className="text-xs font-medium text-text-primary">Import Subsong</p>
-                  <div className="relative">
-                    <select
-                      value={selectedSubsong}
-                      onChange={(e) => setSelectedSubsong(Number(e.target.value))}
-                      className="w-full text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-2 pr-8 text-text-primary appearance-none cursor-pointer"
-                    >
-                      {module.subsongs.map((ss, i) => (
-                        <option key={i} value={i}>
-                          {i + 1}. {ss.name || `Subsong ${i + 1}`}
-                          {i === 0 ? ' (default)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-                  </div>
+                  <CustomSelect
+                    value={String(selectedSubsong)}
+                    onChange={(v) => setSelectedSubsong(Number(v))}
+                    options={module.subsongs.map((ss, i) => ({
+                      value: String(i),
+                      label: `${i + 1}. ${ss.name || `Subsong ${i + 1}`}${i === 0 ? ' (default)' : ''}`,
+                    }))}
+                    className="w-full text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-2 text-text-primary cursor-pointer"
+                  />
                   {subsong?.comment && (
                     <p className="text-xs text-text-muted italic">{subsong.comment}</p>
                   )}

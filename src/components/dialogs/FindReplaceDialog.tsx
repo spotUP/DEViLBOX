@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { Search, Replace } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore, useCursorStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
@@ -189,15 +190,16 @@ export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, on
         {/* Scope */}
         <div>
           <label className="block text-xs text-text-muted mb-1">Scope</label>
-          <select
+          <CustomSelect
             value={scope}
-            onChange={(e) => setScope(e.target.value as SearchScope)}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-          >
-            <option value="selection" disabled={!selection}>Selection {!selection && '(none)'}</option>
-            <option value="pattern">Current Pattern</option>
-            <option value="all">All Patterns</option>
-          </select>
+            onChange={(v) => setScope(v as SearchScope)}
+            options={[
+              { value: 'selection', label: `Selection ${!selection ? '(none)' : ''}`, disabled: !selection },
+              { value: 'pattern', label: 'Current Pattern' },
+              { value: 'all', label: 'All Patterns' },
+            ]}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary"
+          />
         </div>
 
         {/* Find value */}

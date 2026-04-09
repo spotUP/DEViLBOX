@@ -12,7 +12,8 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Volume2, FileAudio, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Volume2, FileAudio, AlertCircle } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import type { InstrumentConfig } from '@/types/instrument';
@@ -396,18 +397,12 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
                 <p className="text-sm text-text-primary">Root Note</p>
                 <p className="text-xs text-text-muted">Note played at original pitch</p>
               </div>
-              <div className="relative">
-                <select
-                  value={rootNote}
-                  onChange={(e) => setRootNote(e.target.value)}
-                  className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 pr-7 text-text-primary appearance-none cursor-pointer"
-                >
-                  {ROOT_NOTE_OPTIONS.map(n => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={rootNote}
+                onChange={(v) => setRootNote(v)}
+                options={ROOT_NOTE_OPTIONS.map(n => ({ value: n, label: n }))}
+                className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 text-text-primary cursor-pointer"
+              />
             </div>
 
             {/* Loop type */}
@@ -418,18 +413,12 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
                   {parsed8SVX?.hasLoop ? 'Loop points pre-filled from file' : 'Looping mode'}
                 </p>
               </div>
-              <div className="relative">
-                <select
-                  value={loopType}
-                  onChange={(e) => setLoopType(e.target.value as 'off' | 'forward' | 'pingpong')}
-                  className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 pr-7 text-text-primary appearance-none cursor-pointer"
-                >
-                  {LOOP_TYPE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={loopType}
+                onChange={(v) => setLoopType(v as 'off' | 'forward' | 'pingpong')}
+                options={LOOP_TYPE_OPTIONS.map(opt => ({ value: opt.value, label: opt.label }))}
+                className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 text-text-primary cursor-pointer"
+              />
             </div>
 
             {/* IFF loop point display (read-only — editable in sample editor after import) */}

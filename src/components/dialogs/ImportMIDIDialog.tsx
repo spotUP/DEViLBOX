@@ -7,7 +7,8 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, Music, FileAudio, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Upload, Music, FileAudio, AlertCircle } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
@@ -259,18 +260,12 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
                 <p className="text-sm text-text-primary">Quantize</p>
                 <p className="text-xs text-text-muted">Snap notes to grid</p>
               </div>
-              <div className="relative">
-                <select
-                  value={quantize}
-                  onChange={(e) => setQuantize(Number(e.target.value))}
-                  className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 pr-7 text-text-primary appearance-none cursor-pointer"
-                >
-                  {QUANTIZE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={String(quantize)}
+                onChange={(v) => setQuantize(Number(v))}
+                options={QUANTIZE_OPTIONS.map(opt => ({ value: String(opt.value), label: opt.label }))}
+                className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 text-text-primary cursor-pointer"
+              />
             </div>
 
             {/* Pattern length */}
@@ -279,18 +274,12 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
                 <p className="text-sm text-text-primary">Pattern Length</p>
                 <p className="text-xs text-text-muted">Rows per pattern</p>
               </div>
-              <div className="relative">
-                <select
-                  value={patternLength}
-                  onChange={(e) => setPatternLength(Number(e.target.value))}
-                  className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 pr-7 text-text-primary appearance-none cursor-pointer"
-                >
-                  {PATTERN_LENGTH_OPTIONS.map(len => (
-                    <option key={len} value={len}>{len} rows</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={String(patternLength)}
+                onChange={(v) => setPatternLength(Number(v))}
+                options={PATTERN_LENGTH_OPTIONS.map(len => ({ value: String(len), label: `${len} rows` }))}
+                className="text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-1.5 text-text-primary cursor-pointer"
+              />
             </div>
 
             {/* Velocity to Volume */}
