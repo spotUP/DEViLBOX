@@ -17,6 +17,7 @@ import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { useTransportStore } from '../../stores/useTransportStore';
 import type { PadBank, ScratchActionId } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
+import { CustomSelect } from '@components/common/CustomSelect';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -201,15 +202,15 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
             Sampler
           </span>
           {/* Program selector */}
-          <select
+          <CustomSelect
             value={currentProgramId}
-            onChange={(e) => loadProgram(e.target.value)}
+            onChange={(v) => loadProgram(v)}
+            options={programList.map(p => ({
+              value: p.id,
+              label: p.name,
+            }))}
             className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-surface border border-dark-border rounded text-text-secondary cursor-pointer"
-          >
-            {programList.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          />
         </div>
         <div className="flex items-center gap-1.5">
           {/* Bank buttons */}

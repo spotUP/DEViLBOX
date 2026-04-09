@@ -39,6 +39,7 @@ import {
 } from '@/lib/ratingsApi';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { StarRating } from '@/components/shared/StarRating';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ── Unified result type ──────────────────────────────────────────────────────
 
@@ -478,31 +479,29 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                        focus:border-green-600 focus:outline-none transition-colors"
           />
         </div>
-        <select
+        <CustomSelect
           value={source}
-          onChange={(e) => setSource(e.target.value as SearchSource)}
-          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
-                     rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
-        >
-          <option value="all">All sources</option>
-          <option value="modland">Modland (190K+)</option>
-          <option value="hvsc">HVSC / SID (80K+)</option>
-        </select>
-        <select
+          onChange={(v) => setSource(v as SearchSource)}
+          options={[
+            { value: 'all', label: 'All sources' },
+            { value: 'modland', label: 'Modland (190K+)' },
+            { value: 'hvsc', label: 'HVSC / SID (80K+)' },
+          ]}
+          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
+        />
+        <CustomSelect
           value={format}
-          onChange={(e) => setFormat(e.target.value)}
+          onChange={(v) => setFormat(v)}
           disabled={source === 'hvsc'}
-          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight
-                     rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors
-                     disabled:opacity-50"
-        >
-          <option value="">All formats</option>
-          {formats.map((f) => (
-            <option key={f.format} value={f.format}>
-              {f.format} ({f.count.toLocaleString()})
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: 'All formats' },
+            ...formats.map((f) => ({
+              value: f.format,
+              label: `${f.format} (${f.count.toLocaleString()})`,
+            })),
+          ]}
+          className="px-2 py-1.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
+        />
       </div>
 
       {/* Error display */}

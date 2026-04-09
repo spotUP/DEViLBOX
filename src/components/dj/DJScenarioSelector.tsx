@@ -15,6 +15,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { getScenarioById, getScenariosByCategory } from '@/midi/djScenarioPresets';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { useDJStore } from '@/stores/useDJStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 const STORAGE_KEY = 'devilbox-dj-scenario-preset';
 
@@ -68,8 +69,7 @@ export const DJScenarioSelector: React.FC = () => {
 
   }, []);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
+  const handleChange = useCallback((id: string) => {
     setSelectedId(id);
 
     if (id) {
@@ -94,23 +94,22 @@ export const DJScenarioSelector: React.FC = () => {
           {currentScenario.icon}
         </span>
       )}
-      <select
+      <CustomSelect
         value={selectedId}
         onChange={handleChange}
+        options={[
+          { value: '', label: 'Scenario: Default' },
+          ...Object.entries(grouped).map(([category, presets]) => ({
+            label: category,
+            options: presets.map(p => ({
+              value: p.id,
+              label: `${p.icon} ${p.name}`,
+            })),
+          })),
+        ]}
         className="px-2 py-1 text-[10px] font-mono bg-dark-bgTertiary text-text-secondary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
         title="Select DJ scenario / performance style"
-      >
-        <option value="">Scenario: Default</option>
-        {Object.entries(grouped).map(([category, presets]) => (
-          <optgroup key={category} label={category}>
-            {presets.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.icon} {p.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+      />
     </div>
   );
 };
