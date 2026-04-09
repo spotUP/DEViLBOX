@@ -132,6 +132,8 @@ export default defineConfig({
     },
   },
   build: {
+    // Target older Chromium for Tesla/embedded browser compatibility
+    target: 'chrome90',
     // Clean dist/ before each build to prevent recursive nesting
     emptyOutDir: true,
     minify: 'terser',
