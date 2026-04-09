@@ -68,6 +68,37 @@ const isChipDumpFormat = (filename: string): boolean => {
 };
 
 /**
+ * Compute the companion file name relative to the main file's directory.
+ * When files come from a directory picker (webkitRelativePath is set), we
+ * preserve subdirectory structure (e.g. "Samples/electom" for ZoundMonitor).
+ * When files come from a flat file picker, we fall back to just the filename.
+ */
+function companionRelativeName(mainFile: File, companion: File): string {
+  const mainRel = (mainFile as any).webkitRelativePath as string | undefined;
+  const compRel = (companion as any).webkitRelativePath as string | undefined;
+  if (mainRel && compRel) {
+    // Both have relative paths from directory picker.
+    // Main: "Zoundmonitor/AJ/hittheroad.sng" → dir = "Zoundmonitor/AJ"
+    // Companion: "Zoundmonitor/Samples/electom" → relative from main's dir = "Samples/electom"
+    const mainDir = mainRel.substring(0, mainRel.lastIndexOf('/'));
+    if (compRel.startsWith(mainDir + '/')) {
+      // Companion is under the same directory tree as main — use relative path from main's dir
+      return compRel.substring(mainDir.length + 1);
+    }
+    // Companion is in a different subtree — find common ancestor
+    const mainParts = mainDir.split('/');
+    const compParts = compRel.split('/');
+    let common = 0;
+    while (common < mainParts.length && common < compParts.length && mainParts[common] === compParts[common]) {
+      common++;
+    }
+    // Return path from one level above main's dir (the common parent)
+    return compParts.slice(common).join('/');
+  }
+  return companion.name;
+}
+
+/**
  * For two-file Amiga formats, derive the expected companion filename from the main file.
  * TFMX: mdat.songname → smpl.songname, MFP: mfp.songname → smp.songname
  */
@@ -107,6 +138,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [sidHeader, setSidHeader] = useState<SIDHeaderInfo | null>(null);
   // Track the companions used for the currently loaded file
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
+  // Track the main File object for computing companion relative paths
+  const activeMainFileRef = useRef<File | null>(null);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
   const uadeScanActiveRef = useRef(false);
   // Keep companion files fresh in callbacks without re-creating handleFileSelect
@@ -130,7 +163,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Formats that require companion files (e.g. external Instruments/ folder)
   // Shown as a warning when none were loaded alongside the module.
-  const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus']);
+  const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus', 'zoundMonitor']);
   const needsCompanionFiles =
     activeCompanions.length === 0 && (
       (nativeFmt !== null && MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key)) ||
@@ -146,6 +179,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     // Determine which companions apply: explicit overrides take precedence over prop companions
     const companions = overrideCompanions ?? companionFilesRef.current;
     setActiveCompanions(companions);
+    activeMainFileRef.current = file;
 
     const fname = file.name.toLowerCase();
     const nativeFmtForFile = detectNativeFormat(fname);
@@ -219,7 +253,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         // Register all companion files into UADE's virtual FS before loading the module
         for (const companion of companions) {
           const companionBuf = await companion.arrayBuffer();
-          await engine.addCompanionFile(companion.name, companionBuf);
+          const cfName = companionRelativeName(file, companion);
+          await engine.addCompanionFile(cfName, companionBuf);
         }
         // Enable CIA tick snapshot capture so pattern reconstruction works
         // when parseUADEFile is called later with this preScannedMeta.
@@ -348,8 +383,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     let companionMap: Map<string, ArrayBuffer> | undefined;
     if (activeCompanions.length > 0) {
       companionMap = new Map();
+      const mainFile = activeMainFileRef.current ?? moduleInfo.file;
       for (const f of activeCompanions) {
-        companionMap.set(f.name, await f.arrayBuffer());
+        const cfName = companionRelativeName(mainFile, f);
+        companionMap.set(cfName, await f.arrayBuffer());
       }
     }
     // Block the dialog until import completes so UADE engine is fully ready
@@ -755,8 +792,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       return (
                         <span>
                           <span className="font-semibold">Audio requires companion files.</span>
-                          {' '}Samples live in an{' '}
-                          <span className="font-mono bg-dark-bg px-1 rounded">Instruments/</span>
+                          {' '}Samples live in a{' '}
+                          <span className="font-mono bg-dark-bg px-1 rounded">
+                            {nativeFmt?.key === 'zoundMonitor' ? 'Samples/' : 'Instruments/'}
+                          </span>
                           {' '}folder next to this module. Drop the parent folder or use{' '}
                           <span className="font-semibold">Pick Folder</span>
                           {' '}below to load them.

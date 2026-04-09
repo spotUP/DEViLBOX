@@ -50,7 +50,17 @@ function isSupportedFile(filename: string): boolean {
 async function readFilesFromEntry(entry: FileSystemEntry): Promise<File[]> {
   if (entry.isFile) {
     return new Promise<File[]>((resolve, reject) => {
-      (entry as FileSystemFileEntry).file((f) => resolve([f]), reject);
+      (entry as FileSystemFileEntry).file((f) => {
+        // Attach the entry's fullPath so companion files preserve directory structure
+        // (e.g. "/Zoundmonitor/Samples/electom" → "Samples/electom" relative to main)
+        if (entry.fullPath && !(f as any).webkitRelativePath) {
+          Object.defineProperty(f, 'webkitRelativePath', {
+            value: entry.fullPath.replace(/^\//, ''),
+            writable: false,
+          });
+        }
+        resolve([f]);
+      }, reject);
     });
   } else if (entry.isDirectory) {
     const reader = (entry as FileSystemDirectoryEntry).createReader();
