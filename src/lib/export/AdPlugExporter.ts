@@ -13,12 +13,9 @@
  * OPL2 supports 9 melody channels, each with 2 operators (modulator + carrier).
  */
 
-import type { RegisterWrite } from './VGMExporter';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, FurnaceOperatorConfig, FurnaceConfig } from '@/types';
 import type { OPL3Config } from '@/types/instrument';
-
-void (undefined as unknown as RegisterWrite); // Satisfy import usage
 
 // RAD v1 header magic
 const RAD_HEADER = 'RAD by REALiTY!!';
@@ -481,4 +478,176 @@ export function exportToIMF(song: TrackerSong): ArrayBuffer {
   for (let i = 0; i < dataLen; i++) output[2 + i] = records[i];
 
   return output.buffer as ArrayBuffer;
+}
+
+// ── RAW (RdosPlay Raw OPL Capture) Exporter ────────────────────────────────────
+// RAW format: "RAWADATA" header + 2-byte clock + pairs of (value, register) bytes
+// Special commands: register=0x00 → delay, register=0x02 → chip select/speed
+// EOF marker: 0xFF 0xFF
+
+const RAW_MAGIC = 'RAWADATA';
+const RAW_DEFAULT_CLOCK = 0xFFFF; // ~18.2 Hz timer (1193180/0xFFFF)
+
+/**
+ * Check if a song can be exported to RAW format
+ */
+export function canExportRAW(song: TrackerSong): boolean {
+  return song.instruments.some(inst => isOPLInstrument(inst));
+}
+
+/**
+ * Export a TrackerSong to RdosPlay RAW format.
+ * Renders all patterns in order, writing OPL register pairs.
+ */
+export function exportToRAW(song: TrackerSong): ArrayBuffer {
+  const encoder = new TextEncoder();
+  const records: number[] = [];
+  const speed = song.initialSpeed || 6;
+  const bpm = song.initialBPM || 125;
+  const timerHz = 1193180.0 / RAW_DEFAULT_CLOCK;
+  const rowsPerSec = (bpm * 2) / (5 * speed);
+  const ticksPerRow = Math.max(1, Math.round(timerHz / rowsPerSec));
+
+  const instRegs = new Map<number, Uint8Array>();
+  for (const inst of song.instruments) {
+    if (inst.opl3) {
+      instRegs.set(inst.id, encodeOPL3Instrument(inst.opl3));
+    } else if (inst.furnace) {
+      instRegs.set(inst.id, encodeOPLInstrument(inst.furnace));
+    }
+  }
+
+  const chanInst = new Array<number>(9).fill(0);
+
+  function writeRegPair(reg: number, val: number) {
+    records.push(val & 0xFF, reg & 0xFF);
+  }
+
+  function writeDelay(ticks: number) {
+    while (ticks > 0) {
+      const d = Math.min(256, ticks);
+      records.push(d - 1, 0x00); // register 0x00 = delay, value = ticks-1
+      ticks -= d;
+    }
+  }
+
+  function programInstrumentRaw(ch: number, regs: Uint8Array) {
+    const [modOff, carOff] = OPL_CH_TO_OP_OFFSET[ch];
+    writeRegPair(0x20 + modOff, regs[0]);
+    writeRegPair(0x20 + carOff, regs[1]);
+    writeRegPair(0x40 + modOff, regs[2]);
+    writeRegPair(0x40 + carOff, regs[3]);
+    writeRegPair(0x60 + modOff, regs[4]);
+    writeRegPair(0x60 + carOff, regs[5]);
+    writeRegPair(0x80 + modOff, regs[6]);
+    writeRegPair(0x80 + carOff, regs[7]);
+    writeRegPair(0xE0 + modOff, regs[8]);
+    writeRegPair(0xE0 + carOff, regs[9]);
+    writeRegPair(0xC0 + ch, regs[10]);
+  }
+
+  function noteOnRaw(ch: number, note: number) {
+    if (note < 1 || note > 96) return;
+    const semitone = (note - 1) % 12;
+    const octave = Math.min(7, Math.floor((note - 1) / 12));
+    const fnum = OPL_FNUM[semitone];
+    writeRegPair(0xA0 + ch, fnum & 0xFF);
+    writeRegPair(0xB0 + ch, 0x20 | ((octave & 7) << 2) | ((fnum >> 8) & 3));
+  }
+
+  function noteOffRaw(ch: number) {
+    writeRegPair(0xB0 + ch, 0);
+  }
+
+  for (const patIdx of song.songPositions) {
+    const pat = song.patterns[patIdx];
+    if (!pat) continue;
+    const numCh = Math.min(pat.channels.length, 9);
+    const numRows = pat.length || 64;
+
+    for (let row = 0; row < numRows; row++) {
+      for (let ch = 0; ch < numCh; ch++) {
+        const cell = pat.channels[ch]?.rows[row];
+        if (!cell) continue;
+
+        if (cell.instrument > 0 && cell.instrument !== chanInst[ch]) {
+          const regs = instRegs.get(cell.instrument);
+          if (regs) {
+            programInstrumentRaw(ch, regs);
+            chanInst[ch] = cell.instrument;
+          }
+        }
+
+        if (cell.note === 97) {
+          noteOffRaw(ch);
+        } else if (cell.note > 0 && cell.note <= 96) {
+          noteOffRaw(ch);
+          noteOnRaw(ch, cell.note);
+        }
+      }
+
+      writeDelay(ticksPerRow);
+    }
+  }
+
+  // EOF marker
+  records.push(0xFF, 0xFF);
+
+  // Build output: 8-byte magic + 2-byte clock + data
+  const magicBytes = encoder.encode(RAW_MAGIC);
+  const output = new Uint8Array(8 + 2 + records.length);
+  output.set(magicBytes, 0);
+  output[8] = RAW_DEFAULT_CLOCK & 0xFF;
+  output[9] = (RAW_DEFAULT_CLOCK >> 8) & 0xFF;
+  for (let i = 0; i < records.length; i++) output[10 + i] = records[i];
+
+  return output.buffer as ArrayBuffer;
+}
+
+// ── Unified AdPlug Export Entry Point ──────────────────────────────────────────
+
+export type AdPlugExportFormat = 'rad' | 'imf' | 'raw';
+
+const ADPLUG_FORMAT_EXTENSIONS: Record<AdPlugExportFormat, string> = {
+  rad: '.rad',
+  imf: '.imf',
+  raw: '.raw',
+};
+
+/**
+ * Export a TrackerSong to the specified AdLib format.
+ * Default: RAD v1 (most complete OPL tracker format).
+ */
+export function exportAdPlug(
+  song: TrackerSong,
+  format: AdPlugExportFormat = 'rad',
+): { data: Blob; filename: string; warnings: string[] } {
+  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const ext = ADPLUG_FORMAT_EXTENSIONS[format];
+  const warnings: string[] = [];
+
+  let buf: ArrayBuffer;
+  switch (format) {
+    case 'imf':
+      buf = exportToIMF(song);
+      break;
+    case 'raw':
+      buf = exportToRAW(song);
+      break;
+    case 'rad':
+    default:
+      buf = exportToRAD(song);
+      break;
+  }
+
+  const numOpl = song.instruments.filter(i => isOPLInstrument(i)).length;
+  if (numOpl === 0) {
+    warnings.push('No OPL instruments found — exported file may be empty');
+  }
+
+  return {
+    data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }),
+    filename: `${baseName}${ext}`,
+    warnings,
+  };
 }
