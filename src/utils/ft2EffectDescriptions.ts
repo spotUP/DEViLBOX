@@ -3,7 +3,7 @@
  * Provides human-readable descriptions for FT2 effect commands
  */
 
-export type EffectCategory = 'pitch' | 'volume' | 'panning' | 'timing' | 'global' | 'sample' | 'misc';
+export type EffectCategory = 'pitch' | 'volume' | 'panning' | 'timing' | 'global' | 'sample' | 'misc' | 'opl';
 
 export interface EffectDescription {
   command: string;
@@ -25,6 +25,7 @@ export const EFFECT_CATEGORY_COLORS: Record<EffectCategory, string> = {
   global:  'text-red-400',      // Speed, BPM, position jump, pattern break
   sample:  'text-accent-highlight',     // Sample offset, finetune
   misc:    'text-orange-400',   // Arpeggio, filter, loop
+  opl:     'text-amber-400',    // OPL register effects (feedback, volume)
 };
 
 /**
@@ -335,6 +336,21 @@ export const FT2_E_COMMAND_DESCRIPTIONS: Record<string, EffectDescription> = {
 export function getFT2EffectDescription(effectString: string | null, synthType?: string): EffectDescription | null {
   if (!effectString || effectString === '...' || effectString.length < 3) {
     return null;
+  }
+
+  // Check for OPL native effects (display as ~Fx, ~Cx, ~Mx, ~Vx)
+  if (effectString.startsWith('~')) {
+    const OPL_DESCS: Record<string, EffectDescription> = {
+      'F': { command: effectString, name: 'OPL Set Feedback', category: 'opl', description: 'Set OPL feedback level (0-7)', parameters: '0-7', tick: 'tick-0' },
+      'C': { command: effectString, name: 'OPL Carrier Volume', category: 'opl', description: 'Set carrier (operator 2) volume (0-F)', parameters: '0-F', tick: 'tick-0' },
+      'M': { command: effectString, name: 'OPL Modulator Volume', category: 'opl', description: 'Set modulator (operator 1) volume (0-F)', parameters: '0-F', tick: 'tick-0' },
+      'V': { command: effectString, name: 'OPL Instrument Volume', category: 'opl', description: 'Set volume for both operators (0-F)', parameters: '0-F', tick: 'tick-0' },
+    };
+    const oplChar = effectString[1]?.toUpperCase();
+    if (oplChar && OPL_DESCS[oplChar]) {
+      return { ...OPL_DESCS[oplChar], command: effectString };
+    }
+    return { command: effectString, name: 'OPL Effect', category: 'opl', description: 'OPL register effect', parameters: '', tick: 'tick-0' };
   }
 
   const command = effectString[0].toUpperCase();

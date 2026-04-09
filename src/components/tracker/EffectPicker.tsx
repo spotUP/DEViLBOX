@@ -36,6 +36,7 @@ const CATEGORY_LABELS: Record<ExtendedCategory, string> = {
   sample: 'Sample',
   misc: 'Misc',
   chip: 'Chip',
+  opl: 'OPL',
 };
 
 const CATEGORY_ORDER: EffectCategory[] = ['pitch', 'volume', 'panning', 'timing', 'global', 'sample', 'misc'];
