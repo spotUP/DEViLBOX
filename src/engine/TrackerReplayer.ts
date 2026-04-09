@@ -1115,6 +1115,14 @@ export class TrackerReplayer {
    */
   setChannelMuteMask(mask: number): void {
     this.channelMuteMask = mask;
+    // Forward to LibopenmptEngine if it's the active audio renderer.
+    // When libopenmptFileData is set, WASM renders all audio — this mask
+    // must reach the worklet via setMuteMask for actual channel muting.
+    import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+      if (LibopenmptEngine.hasInstance()) {
+        LibopenmptEngine.getInstance().setMuteMask(mask);
+      }
+    }).catch(() => {});
   }
 
   // ==========================================================================
