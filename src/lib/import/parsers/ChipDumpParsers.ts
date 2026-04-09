@@ -1,8 +1,10 @@
 /**
- * ChipDumpParsers — Chip-dump format dispatchers (VGM, YM, NSF, SAP, AY)
+ * ChipDumpParsers — Chip-dump format dispatchers
  *
  * These are native-only formats with no UADE fallback — they each have
  * dedicated parsers that handle the chip register dump playback.
+ *
+ * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PMD, S98, SNDH
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -44,6 +46,54 @@ export async function tryChipDumpParse(
   if (/\.ay$/.test(filename)) {
     const { parseAYFile } = await import('@lib/import/formats/AYParser');
     return parseAYFile(buffer, originalFileName);
+  }
+
+  // ── KSS — MSX music (AY/SCC/FM) ──────────────────────────────────────────
+  if (/\.kss$/.test(filename)) {
+    const { parseKSSFile } = await import('@lib/import/formats/KSSParser');
+    return parseKSSFile(buffer, originalFileName);
+  }
+
+  // ── HES — PC Engine / TurboGrafx-16 ──────────────────────────────────────
+  if (/\.hes$/.test(filename)) {
+    const { parseHESFile } = await import('@lib/import/formats/HESParser');
+    return parseHESFile(buffer, originalFileName);
+  }
+
+  // ── GBS — Game Boy Sound System ──────────────────────────────────────────
+  if (/\.gbs$/.test(filename)) {
+    const { parseGBSFile } = await import('@lib/import/formats/GBSParser');
+    return parseGBSFile(buffer);
+  }
+
+  // ── SPC — Super Nintendo SPC700 ──────────────────────────────────────────
+  if (/\.spc$/.test(filename)) {
+    const { parseSPCFile } = await import('@lib/import/formats/SPCParser');
+    return parseSPCFile(buffer);
+  }
+
+  // ── MDX — Sharp X68000 (YM2151 + ADPCM) ─────────────────────────────────
+  if (/\.mdx$/.test(filename)) {
+    const { parseMDXFile } = await import('@lib/import/formats/MDXParser');
+    return parseMDXFile(buffer);
+  }
+
+  // ── PMD — PC-98 Professional Music Driver (YM2608) ───────────────────────
+  if (/\.(m|m2|mz|pmd)$/.test(filename)) {
+    const { parsePMDFile } = await import('@lib/import/formats/PMDParser');
+    return parsePMDFile(buffer);
+  }
+
+  // ── S98 — Japanese computer FM register dumps ────────────────────────────
+  if (/\.s98$/.test(filename)) {
+    const { parseS98File } = await import('@lib/import/formats/S98Parser');
+    return parseS98File(buffer);
+  }
+
+  // ── SNDH — Atari ST (routed here as fallback; SC68 container handled in AmigaFormatParsers)
+  if (/\.sndh$/.test(filename)) {
+    const { parseSNDHFile } = await import('@lib/import/formats/SNDHParser');
+    return parseSNDHFile(buffer);
   }
 
   return null;
