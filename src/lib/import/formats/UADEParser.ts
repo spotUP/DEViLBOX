@@ -276,7 +276,7 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   // SteveTurner
   'jpo', 'jpold',
   // SUN-Tronic
-  'sun',
+  'sun', 'tsm',
   // Synth / SynthDream / SynthPack
   'syn', 'sdr', 'osp',
   // SynTracker
@@ -286,7 +286,7 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   // TFMX variants
   'tfmx', 'mdat', 'tfmxpro', 'tfmx1.5', 'tfmx7v', 'tfhd1.5', 'tfhd7v', 'tfhdpro',
   // ThomasHermann
-  'thm',
+  'thm', 'smp',
   // TimeTracker
   'tmk',
   // TimFollin
