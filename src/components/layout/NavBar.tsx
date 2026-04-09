@@ -19,6 +19,7 @@ import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { useUIStore } from '@stores';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useTabsStore } from '@stores/useTabsStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -199,16 +200,13 @@ const NavBarComponent: React.FC = () => {
           </Button>
 
           {/* View Switcher */}
-          <select
+          <CustomSelect
             value={n.activeView}
-            onChange={(e) => switchView(e.target.value, n.activeView)}
-            className="bg-dark-bgTertiary text-text-primary text-sm border border-dark-border rounded px-2 py-1 outline-none focus:border-accent-primary"
+            onChange={(v) => switchView(v, n.activeView)}
+            options={VIEW_OPTIONS.map((v) => ({ value: v.value, label: v.label }))}
+            className="bg-dark-bgTertiary text-text-primary text-sm border border-dark-border rounded px-2 py-1"
             title="Switch view"
-          >
-            {VIEW_OPTIONS.map((v) => (
-              <option key={v.value} value={v.value}>{v.label}</option>
-            ))}
-          </select>
+          />
 
           {/* Settings */}
           <Button
