@@ -70,7 +70,6 @@ export const PixiSwitch3Way: React.FC<PixiSwitch3WayProps> = ({
     <pixiContainer
       eventMode={disabled ? 'none' : 'static'}
       cursor={disabled ? 'not-allowed' : 'pointer'}
-      onPointerUp={handleClick}
       onClick={handleClick}
       alpha={disabled ? 0.4 : 1}
       layout={{

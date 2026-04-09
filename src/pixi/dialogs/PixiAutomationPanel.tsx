@@ -590,7 +590,6 @@ const ParamButton: React.FC<ParamButtonProps> = ({
       cursor="pointer"
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      onPointerUp={onClick}
       onClick={onClick}
       layout={{ width: 80, height: PARAM_BTN_H }}
     >

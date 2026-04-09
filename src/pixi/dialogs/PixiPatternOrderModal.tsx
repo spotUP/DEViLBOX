@@ -223,7 +223,6 @@ export const PixiPatternOrderModal: React.FC<PixiPatternOrderModalProps> = ({
                         metaKey: ne.metaKey,
                       });
                     }}
-                    onPointerUp={() => handleCellPointerUp(posIdx)}
                     onClick={() => handleCellPointerUp(posIdx)}
                     onPointerEnter={() => handleCellPointerEnter(posIdx)}
                     layout={{

@@ -571,7 +571,6 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
           tint={theme.textMuted.color}
           eventMode="static"
           cursor="pointer"
-          onPointerUp={onClose}
           onClick={onClose}
         />
       </layoutContainer>
@@ -594,7 +593,6 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               key={tab.id}
               eventMode="static"
               cursor="pointer"
-              onPointerUp={() => h.setActiveTab(tab.id)}
               onClick={() => h.setActiveTab(tab.id)}
               layout={{
                 flex: 1,
@@ -855,7 +853,6 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
                                 key={chapter.id}
                                 eventMode="static"
                                 cursor="pointer"
-                                onPointerUp={() => h.setManualChapterIndex(globalIdx)}
                                 onClick={() => h.setManualChapterIndex(globalIdx)}
                                 layout={{
                                   paddingLeft: 6,

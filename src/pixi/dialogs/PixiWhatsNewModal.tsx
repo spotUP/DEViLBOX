@@ -203,7 +203,6 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
         <layoutContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={handleClose}
           onClick={handleClose}
           layout={{
             width: 28, height: 28,

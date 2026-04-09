@@ -1646,7 +1646,6 @@ const HeaderTab: React.FC<{
       }}
       eventMode="static"
       cursor="pointer"
-      onPointerUp={onSelect}
       onClick={onSelect}
     >
       <PixiLabel
