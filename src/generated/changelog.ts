@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-09T15:51:48.760Z
+ * Generated: 2026-04-09T18:12:09.201Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4676';
-export const BUILD_NUMBER = '4676';
-export const BUILD_HASH = '335a7f7ac';
+export const BUILD_VERSION = '1.0.4703';
+export const BUILD_NUMBER = '4703';
+export const BUILD_HASH = 'b33e31e63';
 export const BUILD_DATE = '2026-04-09';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,117 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4676',
+    version: '1.0.4703',
     date: '2026-04-09',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add master bus limiter + enable auto-gain by default"
+      },
+      {
+        type: 'improvement',
+        "description": "Bulletproof engine mute forwarding: cached refs + error logging"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify mute/solo: single source of truth in useMixerStore"
+      },
+      {
+        type: 'feature',
+        "description": "Add IMF (id Music Format) exporter for OPL songs"
+      },
+      {
+        type: 'fix',
+        "description": "Update RAD exporter to support OPL3Synth instruments"
+      },
+      {
+        type: 'feature',
+        "description": "Add WASM pattern/instrument extraction for AdPlug CmodPlayer formats"
+      },
+      {
+        type: 'improvement',
+        "description": "Consolidate bottom bars: move paste mode/mask to PatternBottomBar"
+      },
+      {
+        type: 'feature',
+        "description": "Make AdLib/OPL formats editable with OPL3Synth"
+      },
+      {
+        type: 'feature',
+        "description": "Add GUI layout presets (1-4 slots)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Renoise-style bottom control bar for pattern editor"
+      },
+      {
+        type: 'feature',
+        "description": "Add channel color blend slider in settings"
+      },
+      {
+        type: 'feature',
+        "description": "Add shift-click multi-select to pattern order sidebar"
+      },
+      {
+        type: 'fix',
+        "description": "Return streaming player metadata for AdPlug/V2M load_file"
+      },
+      {
+        type: 'feature',
+        "description": "Add Renoise-style track scopes strip"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update format-state with verified AdPlug WASM results"
+      },
+      {
+        type: 'fix',
+        "description": "Route AdPlug and V2M audio through ToneEngine master mixer"
+      },
+      {
+        type: 'feature',
+        "description": "Make pattern order sidebar fully interactive"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update format-state.json with AdPlug audit entries"
+      },
+      {
+        type: 'fix',
+        "description": "Replace TextEncoder with manual strToBytes in AdPlug AudioWorklet"
+      },
+      {
+        type: 'fix',
+        "description": "Use border-dark-border for sidebar dividers"
+      },
+      {
+        type: 'fix',
+        "description": "Use ft2 design tokens in pattern order sidebar"
+      },
+      {
+        type: 'feature',
+        "description": "Add Renoise-style pattern sequencer sidebar"
+      },
+      {
+        type: 'fix',
+        "description": "Correct AdPlug extension mapping from source registry"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify all badge designs to match format badge style"
+      },
+      {
+        type: 'fix',
+        "description": "Embed insts.dat for KSM (Ken Silverman Music) support"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add standard.bnk and generated header for ROL support"
+      },
+      {
+        type: 'fix',
+        "description": "AdPlug WASM companion files, ROL/SCI support, remove FMT"
+      },
       {
         type: 'fix',
         "description": "Remove visual mode badge from pattern editor, fix bg bleeding into headers"
@@ -124,114 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Dropdown sizes to selected text only, not widest option"
-      },
-      {
-        type: 'fix',
-        "description": "Dropdown auto-size uses browser's natural width + 8px right breathing room"
-      },
-      {
-        type: 'fix',
-        "description": "Right padding after dropdown arrow on hardware selector"
-      },
-      {
-        type: 'fix',
-        "description": "Add right padding after dropdown arrow in hardware selector"
-      },
-      {
-        type: 'fix',
-        "description": "Hardware selector auto-sizes width to fit selected option text"
-      },
-      {
-        type: 'fix',
-        "description": "Recategorize 8 formats from chip-dump to pc-tracker"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove 34 fake *_test format files"
-      },
-      {
-        type: 'fix',
-        "description": "Hardware selector shows selected preset instead of reverting to SELECT HARDWARE"
-      },
-      {
-        type: 'feature',
-        "description": "Hardware selector shows current format — tracker name + platform"
-      },
-      {
-        type: 'feature',
-        "description": "Tabs show full song names and are editable via double-click"
-      },
-      {
-        type: 'feature',
-        "description": "Save master FX to playlists — auto-save and apply on Auto DJ start"
-      },
-      {
-        type: 'fix',
-        "description": "Clip toolbar horizontal overflow so buttons don't leak over pattern editor"
-      },
-      {
-        type: 'fix',
-        "description": "Visualizer gets explicit 68px height to break 100% chain"
-      },
-      {
-        type: 'fix',
-        "description": "Visualizer stretches to toolbar height instead of collapsing"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update format tracker notes for fail/unknown entries"
-      },
-      {
-        type: 'fix',
-        "description": "Playback buttons wrap below inputs on narrow windows"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update UADE.js glue from WASM rebuild"
-      },
-      {
-        type: 'fix',
-        "description": "FT2 toolbar responsive — sections wrap instead of overflowing"
-      },
-      {
-        type: 'fix',
-        "description": "Remove verbose UADE file-lookup logging from WASM"
-      },
-      {
-        type: 'fix',
-        "description": "FT2 toolbar visualizer clipped to black line"
-      },
-      {
-        type: 'feature',
-        "description": "Pattern editor drag-to-select auto-scrolls at edges"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-prompt Samples/ folder for ZoundMonitor .sng imports"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing useClickOutside hook and structuredClone polyfill"
-      },
-      {
-        type: 'fix',
-        "description": "Preserve Samples/ subdirectory paths for companion files"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: update format tracker — Zound Monitor fixed"
-      },
-      {
-        type: 'fix',
-        "description": "IO808 noise buffer uses context sample rate + reliable trigger"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Drum machine instrument creation + mixer panel + arrangement view"
       }
     ]
   }

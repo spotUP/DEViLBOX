@@ -128,17 +128,25 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   if (_trackerReplayerMod) {
     try {
       _trackerReplayerMod.getTrackerReplayer().setChannelMuteMask(mask);
-    } catch { /* Replayer not initialized */ }
+    } catch (e: any) {
+      console.warn('[Mixer] TrackerReplayer.setChannelMuteMask error:', e?.message);
+    }
+  } else {
+    console.warn('[Mixer] _trackerReplayerMod is null — warm-up not complete?');
   }
 
-  if (!_engineCacheWarmedUp) return; // Imports still warming up
+  if (!_engineCacheWarmedUp) {
+    console.warn('[Mixer] engine cache not warmed up yet');
+    return;
+  }
 
   // Bitmask engines (setMuteMask)
-  for (const [, { Engine, chLimit }] of _muteMaskEngineCache) {
+  for (const [name, { Engine, chLimit }] of _muteMaskEngineCache) {
     try {
       if (Engine.hasInstance()) {
         const m = chLimit ? mask & ((1 << chLimit) - 1) : mask;
         Engine.getInstance().setMuteMask(m);
+        console.log(`[Mixer] ${name}.setMuteMask(0x${m.toString(16)}) ✓`);
       }
     } catch (e: any) {
       console.warn('[Mixer] setMuteMask error:', e?.message);

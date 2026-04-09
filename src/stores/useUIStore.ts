@@ -33,6 +33,17 @@ export type DialogCommand =
   | 'acid-pattern'
   | 'pattern-length';
 
+/** Snapshot of panel visibility for layout presets */
+export interface LayoutPreset {
+  name: string;
+  showInstrumentPanel: boolean;
+  showAutomationLanes: boolean;
+  showMacroLanes: boolean;
+  oscilloscopeVisible: boolean;
+  editorFullscreen: boolean;
+  trackerViewMode: TrackerViewMode;
+}
+
 interface UIStore {
   // State
   visiblePanels: PanelType[];
@@ -107,6 +118,10 @@ interface UIStore {
   pendingSunVoxFile: File | null;  // SunVox file pending import (.sunsynth / .sunvox)
   jingleActive: boolean;           // Startup jingle is playing (drives PixiVisualizer jingle mode)
   postJingleActive: boolean;       // Jingle just ended — switch visualizer to logo mode
+
+  // Layout presets (1-4)
+  layoutPresets: (LayoutPreset | null)[];
+  activeLayoutPreset: number | null;
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -189,6 +204,10 @@ interface UIStore {
   setJingleActive: (v: boolean) => void;
   setPostJingleActive: (v: boolean) => void;
 
+  // Layout preset actions
+  saveLayoutPreset: (slot: number, name?: string) => void;
+  loadLayoutPreset: (slot: number) => void;
+
   // Dialog command (keyboard → dialog bridge)
   dialogOpen: DialogCommand | null;
   showFileBrowser: boolean;
@@ -264,6 +283,10 @@ export const useUIStore = create<UIStore>()(
       trackerViewMode: 'tracker' as TrackerViewMode,
       gridChannelIndex: 0,
       showInstrumentPanel: true,
+
+      // Layout presets
+      layoutPresets: [null, null, null, null],
+      activeLayoutPreset: null,
 
       // View Exposé
       viewExposeActive: false,
@@ -687,6 +710,34 @@ export const useUIStore = create<UIStore>()(
           state.postJingleActive = v;
         }),
 
+      // Layout preset actions
+      saveLayoutPreset: (slot, name) =>
+        set((state) => {
+          state.layoutPresets[slot] = {
+            name: name || `Layout ${slot + 1}`,
+            showInstrumentPanel: state.showInstrumentPanel,
+            showAutomationLanes: state.showAutomationLanes,
+            showMacroLanes: state.showMacroLanes,
+            oscilloscopeVisible: state.oscilloscopeVisible,
+            editorFullscreen: state.editorFullscreen,
+            trackerViewMode: state.trackerViewMode,
+          };
+          state.activeLayoutPreset = slot;
+        }),
+
+      loadLayoutPreset: (slot) =>
+        set((state) => {
+          const preset = state.layoutPresets[slot];
+          if (!preset) return;
+          state.showInstrumentPanel = preset.showInstrumentPanel;
+          state.showAutomationLanes = preset.showAutomationLanes;
+          state.showMacroLanes = preset.showMacroLanes;
+          state.oscilloscopeVisible = preset.oscilloscopeVisible;
+          state.editorFullscreen = preset.editorFullscreen;
+          state.trackerViewMode = preset.trackerViewMode;
+          state.activeLayoutPreset = slot;
+        }),
+
       // Non-editable song dialog actions
       openNonEditableDialog: () =>
         set((state) => { state.nonEditableDialogOpen = true; }),
@@ -756,6 +807,8 @@ export const useUIStore = create<UIStore>()(
         trackerViewMode: state.trackerViewMode,
         gridChannelIndex: state.gridChannelIndex,
         showInstrumentPanel: state.showInstrumentPanel,
+        layoutPresets: state.layoutPresets,
+        activeLayoutPreset: state.activeLayoutPreset,
         uiVersion: state.uiVersion,
       }),
     }

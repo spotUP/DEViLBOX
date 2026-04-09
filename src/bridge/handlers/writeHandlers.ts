@@ -2262,6 +2262,9 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     } else if (format === 'IS10' as string || layoutFormatId === 'inStereo1') {
       const { exportInStereo1 } = await import('../../lib/export/InStereo1Exporter');
       result = await exportInStereo1(song);
+    } else if (format === 'AdPlug' as string) {
+      const { exportAdPlug } = await import('../../lib/export/AdPlugExporter');
+      result = exportAdPlug(song, 'rad');
     } else {
       // For all other formats, try dynamic lookup by layoutFormatId
       const exporterMap: Record<string, { module: string; fn: string }> = {
