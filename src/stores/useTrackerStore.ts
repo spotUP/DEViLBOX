@@ -23,6 +23,7 @@ import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
 import { useFormatStore } from './useFormatStore';
+import { useMixerStore } from './useMixerStore';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 
 // ── Debounced WASM engine re-export on cell edit ────────────────────────────
@@ -1447,37 +1448,27 @@ export const useTrackerStore = create<TrackerStore>()(
     toggleChannelMute: (channelIndex) => {
       // Delegate to useMixerStore — single source of truth for mute/solo.
       // MixerStore handles: engine forwarding + syncing back to pattern channels.
-      try {
-        const { useMixerStore } = require('./useMixerStore');
-        const mixerState = useMixerStore.getState();
-        const currentlyMuted = mixerState.channels[channelIndex]?.muted ?? false;
-        mixerState.setChannelMute(channelIndex, !currentlyMuted);
+      const mixerState = useMixerStore.getState();
+      const currentlyMuted = mixerState.channels[channelIndex]?.muted ?? false;
+      mixerState.setChannelMute(channelIndex, !currentlyMuted);
 
-        if (typeof window !== 'undefined') {
-          import('@stores/useUIStore').then(({ useUIStore }) => {
-            useUIStore.getState().setStatusMessage(!currentlyMuted ? 'MUTED' : 'UNMUTED');
-          });
-        }
-      } catch {
-        // MixerStore not ready
+      if (typeof window !== 'undefined') {
+        import('@stores/useUIStore').then(({ useUIStore }) => {
+          useUIStore.getState().setStatusMessage(!currentlyMuted ? 'MUTED' : 'UNMUTED');
+        });
       }
     },
 
     toggleChannelSolo: (channelIndex) => {
       // Delegate to useMixerStore — single source of truth for mute/solo.
-      try {
-        const { useMixerStore } = require('./useMixerStore');
-        const mixerState = useMixerStore.getState();
-        const currentlySoloed = mixerState.channels[channelIndex]?.soloed ?? false;
-        mixerState.setChannelSolo(channelIndex, !currentlySoloed);
+      const mixerState = useMixerStore.getState();
+      const currentlySoloed = mixerState.channels[channelIndex]?.soloed ?? false;
+      mixerState.setChannelSolo(channelIndex, !currentlySoloed);
 
-        if (typeof window !== 'undefined') {
-          import('@stores/useUIStore').then(({ useUIStore }) => {
-            useUIStore.getState().setStatusMessage(!currentlySoloed ? 'SOLO ON' : 'SOLO OFF');
-          });
-        }
-      } catch {
-        // MixerStore not ready
+      if (typeof window !== 'undefined') {
+        import('@stores/useUIStore').then(({ useUIStore }) => {
+          useUIStore.getState().setStatusMessage(!currentlySoloed ? 'SOLO ON' : 'SOLO OFF');
+        });
       }
     },
 
@@ -1756,10 +1747,7 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       // Reset mixer mute/solo AFTER set() completes to avoid nested setState
       if (patterns.length > 0) {
-        try {
-          const { useMixerStore } = require('./useMixerStore');
-          useMixerStore.getState().resetMuteState();
-        } catch { /* Mixer not ready */ }
+        useMixerStore.getState().resetMuteState();
       }
     },
 
