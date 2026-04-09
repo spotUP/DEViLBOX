@@ -1631,11 +1631,6 @@
 
   .ft2-toolbar-row > .ft2-section {
     flex-shrink: 0;
-    border-right: none;
-  }
-
-  .ft2-toolbar-row > .ft2-section:last-child {
-    border-right: none;
   }
 
   /* Hide less essential toolbar sections on mobile */
@@ -1882,7 +1877,6 @@
   gap: 8px;
   padding-left: 10px;
   padding-right: 10px;
-  border-right: 1px solid var(--color-border-light);
   height: 32px;
   white-space: nowrap;
   min-width: 0;
@@ -1894,20 +1888,18 @@
 }
 
 .ft2-section:last-child {
-  border-right: none;
   padding-right: 0;
 }
 
-/* Hide borders on empty sections */
+/* Hide empty sections */
 .ft2-section:empty {
-  border-right: none;
   padding: 0;
   width: 0;
   min-width: 0;
 }
 
 /* Column width preferences — allow shrinking to fit single row */
-.ft2-col-1 { flex: 0 1 auto; border-right: none; }
+.ft2-col-1 { flex: 0 1 auto; }
 .ft2-col-2 { flex: 0 1 auto; }
 .ft2-col-3 { flex: 0 1 auto; }
 .ft2-col-4 { flex: 0 1 auto; }
