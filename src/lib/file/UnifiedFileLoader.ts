@@ -113,6 +113,14 @@ export async function importTrackerModule(
 
   stop();
   engine.releaseAll();
+
+  // Stop any running AdPlug streaming player from a previous song — otherwise
+  // its worklet node stays connected and plays in parallel with the new song.
+  try {
+    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+    getAdPlugPlayer().stop();
+  } catch { /* player may not be initialized */ }
+
   resetAutomation();
   resetTransport();
   resetInstruments();
@@ -790,6 +798,12 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
   // === FULL STATE RESET (unless preserveInstruments) ===
   if (isPlaying) stopTransport();
   engine.releaseAll();
+
+  // Stop any running AdPlug streaming player from a previous song
+  try {
+    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+    getAdPlugPlayer().stop();
+  } catch { /* player may not be initialized */ }
 
   // TD-3 append mode: skip full reset — the TD-3 handler manages patterns itself
   const isTD3Append = (filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === false;
@@ -1611,6 +1625,13 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
 
         stop();
         engine.releaseAll();
+
+        // Stop any running AdPlug streaming player from a previous song
+        try {
+          const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+          getAdPlugPlayer().stop();
+        } catch { /* player may not be initialized */ }
+
         resetAutomation();
         resetTransport();
         resetInstruments();
