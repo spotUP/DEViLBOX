@@ -7,7 +7,7 @@
  * Connects to ToneEngine analysers on mount and tears down on unmount.
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
@@ -128,7 +128,6 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   const startTimeRef = useRef(performance.now() / 1000);
 
   const modeIndex = useSettingsStore((s) => s.trackerVisualMode);
-  const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
 
   const currentBg = BG_MODES[modeIndex % BG_MODES.length];
   const isAMMode = currentBg.type === 'am';
@@ -136,13 +135,6 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   // Use ref so RAF loop always reads current mode without restarting the effect
   const modeRef = useRef(currentBg);
   modeRef.current = currentBg;
-
-  const modeLabel = getBgModeLabel(currentBg);
-
-  // Cycle mode on click
-  const handleCycleMode = useCallback(() => {
-    setTrackerVisualMode((modeIndex + 1) % BG_MODES.length);
-  }, [modeIndex, setTrackerVisualMode]);
 
   // Single effect: connect analysers + WebGL init + RAF loop
   // Only restarts when canvas size changes (not on mode change — mode is read via ref)
@@ -258,28 +250,6 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
           />
         </div>
       )}
-      {/* Mode label / cycle button */}
-      <button
-        onClick={handleCycleMode}
-        style={{
-          position: 'absolute',
-          top: 4,
-          right: 4,
-          zIndex: 3,
-          background: 'rgba(0,0,0,0.6)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: 3,
-          color: 'rgba(255,255,255,0.5)',
-          fontSize: 9,
-          fontFamily: 'monospace',
-          padding: '2px 6px',
-          cursor: 'pointer',
-          lineHeight: 1.2,
-        }}
-        title="Cycle visual mode"
-      >
-        {modeLabel}
-      </button>
     </>
   );
 });
