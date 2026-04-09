@@ -1666,6 +1666,23 @@ export class ToneEngine {
       }
     }
 
+    // OPL3 singleton: one WASM instance handles all 18 voices via register addressing.
+    // Update the patch state and send a single setPatch before returning.
+    if (config.synthType === 'OPL3') {
+      for (const [existingKey, existingSynth] of this.instruments) {
+        const storedType = this.instrumentSynthTypes.get(existingKey);
+        if (storedType === 'OPL3' && existingSynth) {
+          const opl = config.opl3;
+          if (opl) {
+            (existingSynth as any).applyPatch?.(opl);
+          }
+          this.instruments.set(key, existingSynth);
+          this.instrumentSynthTypes.set(key, 'OPL3');
+          return existingSynth;
+        }
+      }
+    }
+
     // Create new instrument based on config
     let instrument: Tone.ToneAudioNode | DevilboxSynth | null = null;
 
