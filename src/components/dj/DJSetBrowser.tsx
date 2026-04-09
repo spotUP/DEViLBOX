@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDJSetStore } from '../../stores/useDJSetStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -60,16 +61,7 @@ export const DJSetBrowser: React.FC = () => {
   }, [open, fetchSets]);
 
   // Click-outside to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  useClickOutside(panelRef, () => setOpen(false), { enabled: open });
 
   // Escape to close
   useEffect(() => {

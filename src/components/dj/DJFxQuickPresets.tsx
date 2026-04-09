@@ -18,6 +18,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig, AudioEffectType } from '@typedefs/instrument';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 // ── User preset types ────────────────────────────────────────────────────────
 
@@ -174,17 +175,7 @@ export const DJFxQuickPresets: React.FC = () => {
   );
 
   // ── Click outside to close ─────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [isOpen]);
+  useClickOutside(dropdownRef, () => setIsOpen(false), { enabled: isOpen });
 
   // ── Render ─────────────────────────────────────────────────────────────
 

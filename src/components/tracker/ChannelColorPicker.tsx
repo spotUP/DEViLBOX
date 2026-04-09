@@ -33,9 +33,11 @@ export const ChannelColorPicker: React.FC<ChannelColorPickerProps> = ({
     }
   }, [isOpen]);
 
-  // Close popup when clicking outside
+  // Close popup when clicking outside (pointerdown for touch device compat)
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: PointerEvent) => {
       if (
         popupRef.current &&
         !popupRef.current.contains(e.target as Node) &&
@@ -46,10 +48,10 @@ export const ChannelColorPicker: React.FC<ChannelColorPickerProps> = ({
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+    };
   }, [isOpen]);
 
   // Close on escape

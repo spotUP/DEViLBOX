@@ -3,10 +3,11 @@
  * Renders as a compact button bar above each channel's automation lane area.
  */
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useAutomationStore } from '@stores';
 import { useChannelAutomationParams, groupParamsBySection } from '@hooks/useChannelAutomationParams';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 interface AutomationParameterPickerProps {
   channelIndex: number;
@@ -44,16 +45,7 @@ export const AutomationParameterPicker: React.FC<AutomationParameterPickerProps>
   const activeParams = getActiveParameters(channelIndex);
 
   // Close dropdown on outside click
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen]);
+  useClickOutside(dropdownRef, () => setIsOpen(false), { enabled: isOpen });
 
   if (params.length === 0) return null;
 
