@@ -453,7 +453,7 @@ export const useSettingsStore = create<SettingsStore>()(
         jasonPage: 'uade',          // JasonPageParser — dedicated Jason Page support
         infogrames: 'uade',         // InfogramesParser — dedicated Infogrames support
         sawteeth: 'uade',           // SawteethParser — dedicated Sawteeth support
-        fmTracker: 'uade',          // FMTrackerParser — dedicated FM Tracker support
+        fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker support (UADE can't play PC OPL formats)
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
         psm: 'native',              // PSMParser — dedicated PSM/PSM16 support
         composer667: 'uade',        // Composer667Parser — dedicated Composer 667 support
