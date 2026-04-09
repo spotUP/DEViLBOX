@@ -1243,19 +1243,18 @@ export async function tryRouteFormat(
   }
 
   // ── FM Tracker (.fmt) ─────────────────────────────────────────────────────
-  // PC format — OPL-based tracker, magic "FMT" at offset 0. Falls through to libopenmpt.
+  // PC format — OPL-based tracker, magic "FMTracker" at offset 0.
+  // Always try native parser (UADE cannot play PC OPL formats).
   if (matchesExt(filename, ['fmt'])) {
-    if (prefs.fmTracker === 'native') {
-      try {
-        const { isFMTrackerFormat, parseFMTrackerFile } = await import('@lib/import/formats/FMTrackerParser');
-        const bytes = new Uint8Array(buffer);
-        if (isFMTrackerFormat(bytes)) {
-          const result = parseFMTrackerFile(bytes, originalFileName);
-          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
-        }
-      } catch (err) {
-        console.warn(`[FMTrackerParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+    try {
+      const { isFMTrackerFormat, parseFMTrackerFile } = await import('@lib/import/formats/FMTrackerParser');
+      const bytes = new Uint8Array(buffer);
+      if (isFMTrackerFormat(bytes)) {
+        const result = parseFMTrackerFile(bytes, originalFileName);
+        if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
       }
+    } catch (err) {
+      console.warn(`[FMTrackerParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
     }
     // Fall through to libopenmpt
   }
