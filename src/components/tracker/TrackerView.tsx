@@ -65,6 +65,7 @@ import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
 import { TrackScopesStrip } from './TrackScopesStrip';
+import { PatternBottomBar } from './PatternBottomBar';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -800,9 +801,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             </div>
           )}
 
-        </div>
+          {/* Pattern Bottom Bar — edit step, octave, column toggles (tracker view only) */}
+          {!editorFullscreen && viewMode === 'tracker' && (
+            <PatternBottomBar />
+          )}
 
-        {/* Pattern Minimap - Flex item 2 (hidden in fullscreen) */}
+        </div>
         {!editorFullscreen && viewMode === 'tracker' && (
           <MinimapWrapper />
         )}
