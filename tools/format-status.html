@@ -625,6 +625,15 @@ function renderTable(fmts, familyKey) {
 }
 
 const collapsedFamilies = {};
+const manuallyToggled = {};
+
+function isFamilyFinished(fam, fmts) {
+  if (fmts.length === 0) return false;
+  if (AUDIT_FAMILIES.has(fam)) {
+    return fmts.every(f => (getState(f.key).auditStatus || 'untested') === 'fixed');
+  }
+  return fmts.every(f => (getState(f.key).status || 'untested') === 'works');
+}
 
 function render() {
   const search = document.getElementById('search').value.toLowerCase();
@@ -651,10 +660,18 @@ function render() {
     }
     if (fmts.length === 0) return;
     
+    // Auto-collapse finished categories (unless user manually toggled)
+    const allFmts = families[fam] || [];
+    const finished = isFamilyFinished(fam, allFmts);
+    if (!(fam in manuallyToggled)) {
+      collapsedFamilies[fam] = finished;
+    }
+    
     const collapsed = collapsedFamilies[fam];
+    const finishedBadge = finished ? ' <span style="color:var(--green);font-size:11px;margin-left:6px">✓ done</span>' : '';
     html += `<div class="family-group">
       <div class="family-header" onclick="toggleFamily('${fam}')">
-        <span>${collapsed ? '▶' : '▼'} ${familyLabels[fam] || fam}</span>
+        <span>${collapsed ? '▶' : '▼'} ${familyLabels[fam] || fam}${finishedBadge}</span>
         <span class="family-count">${fmts.length} formats</span>
       </div>
       <div class="${collapsed ? 'hidden' : ''}">${AUDIT_FAMILIES.has(fam) ? renderAuditTable(fmts) : renderTable(fmts, fam)}</div>
@@ -665,6 +682,7 @@ function render() {
 }
 
 function toggleFamily(fam) {
+  manuallyToggled[fam] = true;
   collapsedFamilies[fam] = !collapsedFamilies[fam];
   render();
 }
