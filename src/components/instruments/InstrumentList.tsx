@@ -579,10 +579,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
           if (isFT2) {
             // FT2 Styling
             return (
+              <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)}>
               <div
-                key={instrument.id}
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                onDoubleClick={() => onEditInstrument?.(instrument.id)}
                 onMouseDown={() => handlePreviewDown(instrument)}
                 onMouseUp={handlePreviewUp}
                 onMouseLeave={handlePreviewUp}
@@ -719,15 +720,17 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   </div>
                 )}
               </div>
+              </InstrumentContextMenu>
             );
           }
 
           // Default Styling
           return (
-            <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id}>
+            <InstrumentContextMenu key={instrument.id} instrumentId={instrument.id} onEdit={() => onEditInstrument?.(instrument.id)}>
               <div
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                onDoubleClick={() => onEditInstrument?.(instrument.id)}
                 onMouseDown={() => handlePreviewDown(instrument)}
                 onMouseUp={handlePreviewUp}
                 onMouseLeave={handlePreviewUp}
