@@ -7,7 +7,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { readFile, readdir } from 'fs/promises';
+import { readFile, readdir, stat as fsStat } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 import { callBrowser } from './wsRelay';
 
@@ -1253,6 +1253,32 @@ export function createMcpServer(): McpServer {
                 companionFiles[`instr/${instrFile}`] = data.toString('base64');
               }
             } catch { /* instr dir might not be readable */ }
+          }
+
+          // ZoundMonitor: look for Samples/ subdirectory with raw PCM sample files.
+          // Samples may be in the same dir OR the parent dir (Modland layout:
+          // artist/song.sng + Samples/ at the collection root).
+          if (lowerFilename.endsWith('.sng')) {
+            const searchDirs = [dir, dirname(dir)];
+            for (const searchDir of searchDirs) {
+              try {
+                const searchFiles = await readdir(searchDir);
+                const samplesDir = searchFiles.find(f => f.toLowerCase() === 'samples');
+                if (!samplesDir) continue;
+                const sampleFiles = await readdir(join(searchDir, samplesDir));
+                for (const sf of sampleFiles) {
+                  if (sf.startsWith('.')) continue;
+                  const sfPath = join(searchDir, samplesDir, sf);
+                  try {
+                    const st = await fsStat(sfPath);
+                    if (!st.isFile()) continue;
+                  } catch { continue; }
+                  const data = await readFile(sfPath);
+                  companionFiles[`Samples/${sf}`] = data.toString('base64');
+                }
+                break; // Found Samples/ dir, stop searching
+              } catch { /* dir might not be readable */ }
+            }
           }
         } catch { /* companion discovery is best-effort */ }
 

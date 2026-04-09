@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <setjmp.h>
 
 #include "player_registry.h"
@@ -1025,6 +1026,20 @@ EMSCRIPTEN_KEEPALIVE
 int uade_wasm_add_extra_file(const char *filename, const uint8_t *data, size_t len) {
     char path[512];
     snprintf(path, sizeof(path), "/uade/%s", filename);
+
+    /* Create intermediate directories (e.g. /uade/Samples/ for ZoundMonitor) */
+    {
+        char dir[512];
+        strncpy(dir, path, sizeof(dir) - 1);
+        dir[sizeof(dir) - 1] = '\0';
+        for (char *p = dir + 1; *p; p++) {
+            if (*p == '/') {
+                *p = '\0';
+                mkdir(dir, 0755);  /* ignore errors — may already exist */
+                *p = '/';
+            }
+        }
+    }
 
     FILE *f = fopen(path, "wb");
     if (!f) {
