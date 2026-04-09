@@ -14,6 +14,7 @@ import {
   Zap, Grid3X3, MousePointer2, Play, Trash2,
   Download, RefreshCw, ChevronDown, ChevronUp, X
 } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentStore, notify } from '../../stores';
 import { useTransportStore } from '../../stores/useTransportStore';
 import type { InstrumentConfig } from '../../types/instrument';
@@ -312,16 +313,17 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
           {config.mode === 'grid' && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-ft2-textDim w-20">Division:</span>
-              <select
-                value={config.gridDivision}
-                onChange={(e) => setConfig({ gridDivision: parseInt(e.target.value) })}
+              <CustomSelect
+                value={String(config.gridDivision)}
+                onChange={(v) => setConfig({ gridDivision: parseInt(v) })}
                 className="bg-ft2-bg border border-ft2-border rounded px-2 py-1 text-xs text-ft2-text"
-              >
-                <option value={4}>1/4 (Quarter)</option>
-                <option value={8}>1/8 (Eighth)</option>
-                <option value={16}>1/16 (Sixteenth)</option>
-                <option value={32}>1/32 (32nd)</option>
-              </select>
+                options={[
+                  { value: '4', label: '1/4 (Quarter)' },
+                  { value: '8', label: '1/8 (Eighth)' },
+                  { value: '16', label: '1/16 (Sixteenth)' },
+                  { value: '32', label: '1/32 (32nd)' },
+                ]}
+              />
               <span className="text-[10px] text-ft2-textDim">@ {bpm} BPM</span>
             </div>
           )}

@@ -14,6 +14,7 @@ import {
 } from '@engine/buzzmachines/BuzzmachineEngine';
 import { BUZZMACHINE_PRESETS, getBuzzmachinePresetNames } from '@constants/buzzmachinePresets';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { SectionHeader } from '@components/instruments/shared';
 
 interface BuzzmachineEditorProps {
@@ -163,17 +164,13 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
       {hasPresets && (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#06b6d4" title="Presets" />
-          <select
-            onChange={(e) => handlePresetChange(e.target.value)}
+          <CustomSelect
+            onChange={(v) => handlePresetChange(v)}
             className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-highlight focus:border-transparent transition-all"
-          >
-            <option value="">Select preset...</option>
-            {presetNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            placeholder="Select preset..."
+            value=""
+            options={presetNames.map((name) => ({ value: name, label: name }))}
+          />
         </section>
       )}
 

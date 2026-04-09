@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
 import { Button } from '@components/ui/Button';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentStore, useTrackerStore } from '../../stores';
 import { scan9xxOffsets } from '@/lib/analysis/scan9xxOffsets';
 import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
@@ -1608,26 +1609,24 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 <div>
                   <label className="block font-mono text-text-muted text-xs mb-1">BASE NOTE</label>
                   <div className="flex gap-1">
-                    <select
+                    <CustomSelect
                       value={baseNote.replace(/\d/, '')}
-                      onChange={(e) => {
+                      onChange={(v) => {
                         const oct = baseNote.match(/\d/)?.[0] || '4';
-                        updateParam('baseNote', e.target.value + oct);
+                        updateParam('baseNote', v + oct);
                       }}
                       className="input flex-1"
-                    >
-                      {NOTE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                    <select
+                      options={NOTE_OPTIONS.map((n) => ({ value: n, label: n }))}
+                    />
+                    <CustomSelect
                       value={baseNote.match(/\d/)?.[0] || '4'}
-                      onChange={(e) => {
+                      onChange={(v) => {
                         const note = baseNote.replace(/\d/, '');
-                        updateParam('baseNote', note + e.target.value);
+                        updateParam('baseNote', note + v);
                       }}
                       className="input w-14"
-                    >
-                      {OCTAVE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
+                      options={OCTAVE_OPTIONS.map((o) => ({ value: String(o), label: String(o) }))}
+                    />
                   </div>
                 </div>
                 <div>

@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ModularPatchConfig, ModularConnection } from '../../../../../types/modular';
 import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
 import { getSunVoxControlMeta } from '../../../../../engine/sunvox-modular/graphToConfig';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface ModularMatrixViewProps {
   config: ModularPatchConfig;
@@ -234,21 +235,19 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
           <h3 className="text-sm font-medium text-text-primary mb-4">Module Parameters</h3>
 
           {/* Module selector */}
-          <select
+          <CustomSelect
             value={selectedModuleId || ''}
-            onChange={(e) => setSelectedModuleId(e.target.value || null)}
+            onChange={(v) => setSelectedModuleId(v || null)}
             className="w-full px-2 py-1.5 mb-4 bg-dark-bg border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-          >
-            <option value="" className="bg-dark-bgSecondary">Select module...</option>
-            {config.modules.map((module) => {
+            placeholder="Select module..."
+            options={config.modules.map((module) => {
               const descriptor = ModuleRegistry.get(module.descriptorId);
-              return (
-                <option key={module.id} value={module.id} className="bg-dark-bgSecondary">
-                  {module.label || descriptor?.name || module.id}
-                </option>
-              );
+              return {
+                value: module.id,
+                label: module.label || descriptor?.name || module.id,
+              };
             })}
-          </select>
+          />
 
           {/* Parameters — use descriptor params, or fall back to SunVox dynamic controls */}
           {selectedModule && selectedDescriptor && (() => {

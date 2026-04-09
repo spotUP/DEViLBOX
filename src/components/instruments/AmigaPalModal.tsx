@@ -13,6 +13,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, FolderOpen, Folder, Trash2, Shuffle } from 'lucide-react';
 import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon, LimiterIcon } from '@components/icons/AmigaPalIcons';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useUIStore } from '@stores';
 import { applyAmigaPalPipeline } from '@utils/audio/SampleProcessing';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
@@ -539,17 +540,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
               {/* ProTracker note + Set all */}
               <div className="flex gap-1">
-                <select
+                <CustomSelect
                   value={globalPTNote}
-                  onChange={(e) => setGlobalPTNote(e.target.value)}
+                  onChange={(v) => setGlobalPTNote(v)}
                   className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border font-bold text-ft2-text outline-none focus:border-ft2-highlight"
-                >
-                  {PT_NOTES.map((n) => (
-                    <option key={n.note} value={n.note}>
-                      {n.note}
-                    </option>
-                  ))}
-                </select>
+                  options={PT_NOTES.map((n) => ({ value: n.note, label: n.note }))}
+                />
                 <span className="bg-ft2-header px-2 py-1 border border-ft2-border font-bold whitespace-nowrap">
                   Protracker note
                 </span>
@@ -978,10 +974,10 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
                     {/* PT Note + Delete/Process */}
                     <div className="w-[120px] space-y-1">
-                      <select
+                      <CustomSelect
                         value={sample.ptNote}
-                        onChange={(e) => {
-                          const newNote = e.target.value;
+                        onChange={(v) => {
+                          const newNote = v;
                           const ptData = PT_NOTES.find((n) => n.note === newNote);
                           setSamples((prev) =>
                             prev.map((s, i) =>
@@ -992,13 +988,8 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           );
                         }}
                         className="w-full bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold text-ft2-text outline-none"
-                      >
-                        {PT_NOTES.map((n) => (
-                          <option key={n.note} value={n.note}>
-                            {n.note}
-                          </option>
-                        ))}
-                      </select>
+                        options={PT_NOTES.map((n) => ({ value: n.note, label: n.note }))}
+                      />
 
                       <div className="flex gap-1">
                         <button

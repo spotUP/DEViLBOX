@@ -30,6 +30,7 @@ import {
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { PresetDropdown } from '../presets/PresetDropdown';
@@ -2376,16 +2377,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <h3 className={`font-bold ${toneAMAccentText} mb-4 text-xs uppercase tracking-widest`}>OSCILLATOR</h3>
             <div className="flex items-center gap-3">
               <label className="text-xs text-text-muted uppercase tracking-wide">Waveform</label>
-              <select
+              <CustomSelect
                 className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-sm text-text-primary focus:outline-none focus:border-accent-highlight"
                 value={toneAMOsc.type}
-                onChange={(e) => handleChange({ oscillator: { ...toneAMOsc, type: e.target.value as 'sine' | 'square' | 'sawtooth' | 'triangle' } })}
-              >
-                <option value="sine">Sine</option>
-                <option value="square">Square</option>
-                <option value="sawtooth">Sawtooth</option>
-                <option value="triangle">Triangle</option>
-              </select>
+                onChange={(v) => handleChange({ oscillator: { ...toneAMOsc, type: v as 'sine' | 'square' | 'sawtooth' | 'triangle' } })}
+                options={[
+                  { value: 'sine', label: 'Sine' },
+                  { value: 'square', label: 'Square' },
+                  { value: 'sawtooth', label: 'Sawtooth' },
+                  { value: 'triangle', label: 'Triangle' },
+                ]}
+              />
             </div>
           </div>
 
