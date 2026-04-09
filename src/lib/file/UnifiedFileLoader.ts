@@ -1664,17 +1664,19 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
         });
         applyEditorMode({});
 
-        // Preload OPL3 synth instruments
-        await engine.preloadInstruments(song.instruments);
+        // OPL3 audio comes from the WASM streaming player, not from individual
+        // OPL3 synth instances. Skip preloadInstruments — it would create hundreds
+        // of unnecessary WASM synths. The streaming player below handles all audio.
 
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-        return { success: true, message: `Imported editable: ${song.name}` };
+        // Don't return — fall through to start the streaming player for audio
       }
     } catch (err) {
       console.warn('[AdPlug] WASM extraction failed, falling back to streaming:', err);
     }
 
-    // Fall back to WASM streaming for non-extractable formats
+    // Start WASM streaming player for audio (always — even after successful extraction,
+    // since the pattern data is for display/editing only; audio comes from WASM player)
     const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
     const player = getAdPlugPlayer();
 
