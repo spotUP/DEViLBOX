@@ -516,7 +516,7 @@ export async function loadFile(
 
     // === ADPLUG WASM STREAMING — OPL/AdLib formats not handled by TS parser ===
     if (isAdPlugWasmFormat(filename)) {
-      return await loadAdPlugFile(file);
+      return await loadAdPlugFile(file, options.companionFiles);
     }
 
     // === SONG FORMATS (replace project) ===
@@ -1502,15 +1502,38 @@ export function isAdPlugWasmFormat(filename: string): boolean {
   return ADPLUG_WASM_EXTS.test(filename);
 }
 
-async function loadAdPlugFile(file: File): Promise<FileLoadResult> {
+async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuffer>): Promise<FileLoadResult> {
   try {
     const arrayBuffer = await file.arrayBuffer();
+
+    // Build companion list for formats that need them
+    const companions: Array<{ name: string; data: ArrayBuffer }> = [];
+    const fnLower = file.name.toLowerCase();
+
+    // SCI needs <prefix>patch.003
+    if (fnLower.endsWith('.sci') && companionFiles) {
+      for (const [name, data] of companionFiles) {
+        if (name.toLowerCase().endsWith('patch.003') || name.toLowerCase().endsWith('.003')) {
+          companions.push({ name, data });
+        }
+      }
+    }
+
+    // SNG (AdLib Tracker) needs .ins companion
+    if (fnLower.endsWith('.sng') && companionFiles) {
+      for (const [name, data] of companionFiles) {
+        if (name.toLowerCase().endsWith('.ins')) {
+          companions.push({ name, data });
+        }
+      }
+    }
 
     // Try WASM extraction first — for CmodPlayer-based formats this gives us
     // editable patterns + OPL3 instruments instead of stream-only audio
     try {
       const { extractAdPlugPatterns } = await import('@/lib/import/formats/AdPlugWasmExtractor');
-      const song = await extractAdPlugPatterns(arrayBuffer, file.name);
+      const extractCompanions = companions.length > 0 ? companions : undefined;
+      const song = await extractAdPlugPatterns(arrayBuffer, file.name, extractCompanions);
       if (song) {
         // Route through the standard tracker import path
         const { useTrackerStore } = await import('@stores/useTrackerStore');
@@ -1571,15 +1594,13 @@ async function loadAdPlugFile(file: File): Promise<FileLoadResult> {
     const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
     const player = getAdPlugPlayer();
 
-    // Auto-discover companion files for SCI format
-    const companions: Array<{ name: string; data: Uint8Array }> = [];
-    if (file.name.toLowerCase().endsWith('.sci') && file.webkitRelativePath) {
-      const prefix = file.name.substring(0, 3);
-      const patchName = prefix + 'patch.003';
-      console.log(`[AdPlug] SCI file detected, companion needed: ${patchName}`);
-    }
+    // Reuse companions built above for streaming player too
+    const streamCompanions: Array<{ name: string; data: Uint8Array }> = companions.map(c => ({
+      name: c.name,
+      data: new Uint8Array(c.data),
+    }));
 
-    const ok = await player.load(arrayBuffer, file.name, companions);
+    const ok = await player.load(arrayBuffer, file.name, streamCompanions);
 
     if (!ok) {
       return { success: false, error: `AdPlug could not load: ${file.name}` };

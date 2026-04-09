@@ -1244,6 +1244,16 @@ export function createMcpServer(): McpServer {
             }
           }
 
+          // SCI (Sierra) companion: <first3chars>patch.003 (e.g. kq1patch.003 for kq1 march.sci)
+          if (lowerFilename.endsWith('.sci')) {
+            const prefix = filename.slice(0, 3);
+            const patchName = dirFiles.find(f => f.toLowerCase() === `${prefix.toLowerCase()}patch.003`);
+            if (patchName) {
+              const data = await readFile(join(dir, patchName));
+              companionFiles[patchName] = data.toString('base64');
+            }
+          }
+
           // SUNTronic: look for instr/ subdirectory with .x sample files
           if (dirFiles.includes('instr')) {
             try {
