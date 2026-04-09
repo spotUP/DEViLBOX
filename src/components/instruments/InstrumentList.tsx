@@ -502,7 +502,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
             {showSamplePackButton && (
               <button
                 onClick={() => setShowSamplePackModal(true)}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-green-600 text-green-400 hover:bg-green-600 hover:text-ft2-bg transition-colors"
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
                 title="Browse sample packs"
               >
                 <Package size={14} />
