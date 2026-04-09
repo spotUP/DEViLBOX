@@ -29,17 +29,39 @@ import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 // ── WASM mute forwarding ─────────────────────────────────────────────────────
 // Forward mute/solo states to WASM engines.
 // ToneEngine path only handles DOM synths — WASM engines need direct mute/gain.
-let _furnaceDispatchEngine: { getInstance(): { mute(ch: number, m: boolean): void } } | null = null;
+// All lazy imports use cached dynamic import() (not require()) for Vite ESM compat.
 
-// Lazy import of getActiveGainEngine from useMixerStore (avoid circular at module level)
+let _furnaceDispatchEngine: { getInstance(): { mute(ch: number, m: boolean): void } } | null = null;
+let _furnaceImportDone = false;
+
+let _uadeEngine: { hasInstance(): boolean; getInstance(): { setMuteMask(mask: number): void } } | null = null;
+let _uadeImportDone = false;
+
 let _getActiveGainEngine: (() => { setChannelGain(ch: number, gain: number): void } | null) | null = null;
-function getGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
-  if (!_getActiveGainEngine) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('./useMixerStore');
-    _getActiveGainEngine = mod.getActiveGainEngine;
+let _gainImportDone = false;
+
+// Eagerly warm up all lazy imports so first mute click works
+void (async () => {
+  try {
+    const [uadeMod, furnaceMod, mixerMod] = await Promise.all([
+      import('../engine/uade/UADEEngine'),
+      import('../engine/furnace-dispatch/FurnaceDispatchEngine'),
+      import('./useMixerStore'),
+    ]);
+    _uadeEngine = uadeMod.UADEEngine as unknown as typeof _uadeEngine;
+    _uadeImportDone = true;
+    _furnaceDispatchEngine = furnaceMod.FurnaceDispatchEngine as unknown as typeof _furnaceDispatchEngine;
+    _furnaceImportDone = true;
+    _getActiveGainEngine = mixerMod.getActiveGainEngine;
+    _gainImportDone = true;
+  } catch {
+    // Individual imports handled below
   }
-  return _getActiveGainEngine!();
+})();
+
+function getGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
+  if (!_gainImportDone) return null;
+  return _getActiveGainEngine?.() ?? null;
 }
 
 /**
@@ -123,38 +145,34 @@ function forwardWasmMuteStates(channels: { muted: boolean; solo: boolean }[]): v
   const anySolo = channels.some(ch => ch.solo);
 
   // UADE: uses bitmask API — bit N=1 means Paula channel N is active (playing)
-  // Check for live UADE instance before other engines since UADE classic mode
-  // is 'classic' editorMode and wouldn't otherwise be caught below.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { UADEEngine } = require('../engine/uade/UADEEngine');
-    if (UADEEngine.hasInstance()) {
-      const engine = UADEEngine.getInstance();
-      let mask = 0;
-      channels.slice(0, 4).forEach((ch: { muted: boolean; solo: boolean }, i: number) => {
-        const effectiveMute = anySolo ? !ch.solo : ch.muted;
-        if (!effectiveMute) mask |= (1 << i);
-      });
-      engine.setMuteMask(mask);
+  if (_uadeImportDone && _uadeEngine) {
+    try {
+      if (_uadeEngine.hasInstance()) {
+        const engine = _uadeEngine.getInstance();
+        let mask = 0;
+        channels.slice(0, 4).forEach((ch: { muted: boolean; solo: boolean }, i: number) => {
+          const effectiveMute = anySolo ? !ch.solo : ch.muted;
+          if (!effectiveMute) mask |= (1 << i);
+        });
+        engine.setMuteMask(mask);
+      }
+    } catch {
+      // UADE not loaded
     }
-  } catch {
-    // UADE not loaded
   }
 
   // Furnace uses binary mute API
   if (editorMode === 'furnace') {
-    try {
-      if (!_furnaceDispatchEngine) {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        _furnaceDispatchEngine = require('../engine/furnace-dispatch/FurnaceDispatchEngine').FurnaceDispatchEngine;
+    if (_furnaceImportDone && _furnaceDispatchEngine) {
+      try {
+        const engine = _furnaceDispatchEngine.getInstance();
+        channels.forEach((ch, i) => {
+          const effectiveMute = anySolo ? !ch.solo : ch.muted;
+          engine.mute(i, effectiveMute);
+        });
+      } catch {
+        // Engine not ready
       }
-      const engine = _furnaceDispatchEngine!.getInstance();
-      channels.forEach((ch, i) => {
-        const effectiveMute = anySolo ? !ch.solo : ch.muted;
-        engine.mute(i, effectiveMute);
-      });
-    } catch {
-      // Engine not ready
     }
     return;
   }
