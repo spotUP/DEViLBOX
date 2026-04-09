@@ -14,8 +14,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
-import type { InstrumentConfig, FurnaceConfig } from '@/types/instrument';
-import { DEFAULT_FURNACE } from '@/types/instrument';
+import type { InstrumentConfig } from '@/types/instrument';
+import { DEFAULT_OPL3 } from '@/types/instrument';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,31 +50,63 @@ function oplFnumToNote(fnum: number, block: number): number {
   return Math.max(1, Math.min(96, note));
 }
 
-/** Create a default OPL2 Furnace instrument with 2 operators. */
+/** Create an OPL3Synth instrument with default patch. */
 function makeOPLInstrument(id: number, name: string): InstrumentConfig {
   return {
-    id, name, type: 'synth', synthType: 'FurnaceOPL',
-    furnace: {
-      ...DEFAULT_FURNACE,
-      chipType: 14, ops: 2, algorithm: 0, feedback: 0,
-      operators: [
-        // Modulator
-        {
-          enabled: true, mult: 1, tl: 32, ar: 15, dr: 4, d2r: 0, sl: 4, rr: 6,
-          dt: 0, dt2: 0, rs: 0, am: false, ksr: false, ksl: 0, sus: false,
-          vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 0,
-        },
-        // Carrier
-        {
-          enabled: true, mult: 1, tl: 0, ar: 15, dr: 6, d2r: 0, sl: 2, rr: 6,
-          dt: 0, dt2: 0, rs: 0, am: false, ksr: false, ksl: 0, sus: false,
-          vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 0,
-        },
-      ],
-      macros: [], opMacros: [{}, {}], wavetables: [],
-    } as FurnaceConfig,
+    id, name, type: 'synth', synthType: 'OPL3',
+    opl3: { ...DEFAULT_OPL3 },
     effects: [], volume: 0, pan: 0,
   };
+}
+
+/**
+ * Write 11 OPL register bytes into an instrument's OPL3Config.
+ * Standard OPL2 register layout:
+ *   [0] mod AM/VIB/EGT/KSR/MULT  [1] car AM/VIB/EGT/KSR/MULT
+ *   [2] mod KSL/TL               [3] car KSL/TL
+ *   [4] mod AR/DR                [5] car AR/DR
+ *   [6] mod SL/RR                [7] car SL/RR
+ *   [8] mod Waveform             [9] car Waveform
+ *   [10] Feedback/Connection (0xC0 register)
+ */
+function applyOPLRegisters(inst: InstrumentConfig, regs: Uint8Array, offset: number): void {
+  const o = inst.opl3;
+  if (!o) return;
+  const b = regs;
+  const p = offset;
+  // Operator 1 (modulator)
+  o.op1Tremolo = (b[p] >> 7) & 1;
+  o.op1Vibrato = (b[p] >> 6) & 1;
+  o.op1SustainHold = (b[p] >> 5) & 1;
+  o.op1KSR = (b[p] >> 4) & 1;
+  o.op1Multi = b[p] & 0x0F;
+  // Operator 2 (carrier)
+  o.op2Tremolo = (b[p + 1] >> 7) & 1;
+  o.op2Vibrato = (b[p + 1] >> 6) & 1;
+  o.op2SustainHold = (b[p + 1] >> 5) & 1;
+  o.op2KSR = (b[p + 1] >> 4) & 1;
+  o.op2Multi = b[p + 1] & 0x0F;
+  // KSL / Total Level
+  o.op1KSL = (b[p + 2] >> 6) & 0x03;
+  o.op1Level = b[p + 2] & 0x3F;
+  o.op2KSL = (b[p + 3] >> 6) & 0x03;
+  o.op2Level = b[p + 3] & 0x3F;
+  // Attack / Decay
+  o.op1Attack = (b[p + 4] >> 4) & 0x0F;
+  o.op1Decay = b[p + 4] & 0x0F;
+  o.op2Attack = (b[p + 5] >> 4) & 0x0F;
+  o.op2Decay = b[p + 5] & 0x0F;
+  // Sustain / Release
+  o.op1Sustain = (b[p + 6] >> 4) & 0x0F;
+  o.op1Release = b[p + 6] & 0x0F;
+  o.op2Sustain = (b[p + 7] >> 4) & 0x0F;
+  o.op2Release = b[p + 7] & 0x0F;
+  // Waveform
+  o.op1Waveform = b[p + 8] & 0x07;
+  o.op2Waveform = b[p + 9] & 0x07;
+  // Feedback / Connection
+  o.feedback = (b[p + 10] >> 1) & 0x07;
+  o.connection = b[p + 10] & 0x01;
 }
 
 /** Build a TrackerSong result. */
@@ -175,48 +207,7 @@ function parseRADv1(buf: Uint8Array, filename: string): TrackerSong {
     if (pos + 11 > buf.length) break;
 
     const inst = makeOPLInstrument(instruments.length + 1, `Inst ${instNum}`);
-    if (inst.furnace) {
-      const mod = inst.furnace.operators[0];
-      const car = inst.furnace.operators[1];
-      // RAD v1 instrument: 11 bytes of OPL2 register data
-      // Byte 0: mod characteristics (AM/VIB/EGT/KSR/MULT)
-      mod.am = (buf[pos] & 0x80) !== 0;
-      mod.vib = (buf[pos] & 0x40) !== 0;
-      mod.sus = (buf[pos] & 0x20) !== 0;
-      mod.ksr = (buf[pos] & 0x10) !== 0;
-      mod.mult = buf[pos] & 0x0F;
-      // Byte 1: car characteristics
-      car.am = (buf[pos + 1] & 0x80) !== 0;
-      car.vib = (buf[pos + 1] & 0x40) !== 0;
-      car.sus = (buf[pos + 1] & 0x20) !== 0;
-      car.ksr = (buf[pos + 1] & 0x10) !== 0;
-      car.mult = buf[pos + 1] & 0x0F;
-      // Byte 2: mod KSL/TL
-      mod.ksl = (buf[pos + 2] >> 6) & 0x03;
-      mod.tl = buf[pos + 2] & 0x3F;
-      // Byte 3: car KSL/TL
-      car.ksl = (buf[pos + 3] >> 6) & 0x03;
-      car.tl = buf[pos + 3] & 0x3F;
-      // Byte 4: mod AR/DR
-      mod.ar = (buf[pos + 4] >> 4) & 0x0F;
-      mod.dr = buf[pos + 4] & 0x0F;
-      // Byte 5: car AR/DR
-      car.ar = (buf[pos + 5] >> 4) & 0x0F;
-      car.dr = buf[pos + 5] & 0x0F;
-      // Byte 6: mod SL/RR
-      mod.sl = (buf[pos + 6] >> 4) & 0x0F;
-      mod.rr = buf[pos + 6] & 0x0F;
-      // Byte 7: car SL/RR
-      car.sl = (buf[pos + 7] >> 4) & 0x0F;
-      car.rr = buf[pos + 7] & 0x0F;
-      // Byte 8: mod waveform
-      mod.ws = buf[pos + 8] & 0x03;
-      // Byte 9: car waveform
-      car.ws = buf[pos + 9] & 0x03;
-      // Byte 10: feedback/connection
-      inst.furnace.feedback = (buf[pos + 10] >> 1) & 0x07;
-      inst.furnace.algorithm = buf[pos + 10] & 0x01;
-    }
+    applyOPLRegisters(inst, buf, pos);
     pos += 11;
     instruments.push(inst);
   }
@@ -352,36 +343,7 @@ function parseRADv2(buf: Uint8Array, filename: string): TrackerSong {
     if (pos + 11 > buf.length) break;
 
     const inst = makeOPLInstrument(instruments.length + 1, `Inst ${instNum}`);
-    if (inst.furnace) {
-      const mod = inst.furnace.operators[0];
-      const car = inst.furnace.operators[1];
-      mod.am = (buf[pos] & 0x80) !== 0;
-      mod.vib = (buf[pos] & 0x40) !== 0;
-      mod.sus = (buf[pos] & 0x20) !== 0;
-      mod.ksr = (buf[pos] & 0x10) !== 0;
-      mod.mult = buf[pos] & 0x0F;
-      car.am = (buf[pos + 1] & 0x80) !== 0;
-      car.vib = (buf[pos + 1] & 0x40) !== 0;
-      car.sus = (buf[pos + 1] & 0x20) !== 0;
-      car.ksr = (buf[pos + 1] & 0x10) !== 0;
-      car.mult = buf[pos + 1] & 0x0F;
-      mod.ksl = (buf[pos + 2] >> 6) & 0x03;
-      mod.tl = buf[pos + 2] & 0x3F;
-      car.ksl = (buf[pos + 3] >> 6) & 0x03;
-      car.tl = buf[pos + 3] & 0x3F;
-      mod.ar = (buf[pos + 4] >> 4) & 0x0F;
-      mod.dr = buf[pos + 4] & 0x0F;
-      car.ar = (buf[pos + 5] >> 4) & 0x0F;
-      car.dr = buf[pos + 5] & 0x0F;
-      mod.sl = (buf[pos + 6] >> 4) & 0x0F;
-      mod.rr = buf[pos + 6] & 0x0F;
-      car.sl = (buf[pos + 7] >> 4) & 0x0F;
-      car.rr = buf[pos + 7] & 0x0F;
-      mod.ws = buf[pos + 8] & 0x03;
-      car.ws = buf[pos + 9] & 0x03;
-      inst.furnace.feedback = (buf[pos + 10] >> 1) & 0x07;
-      inst.furnace.algorithm = buf[pos + 10] & 0x01;
-    }
+    applyOPLRegisters(inst, buf, pos);
     pos += 11;
     instruments.push(inst);
   }
@@ -435,49 +397,8 @@ function parseHSC(buf: Uint8Array, filename: string): TrackerSong {
     if (off + 12 > buf.length) break;
 
     const inst = makeOPLInstrument(i + 1, `HSC ${i + 1}`);
-    if (inst.furnace) {
-      const mod = inst.furnace.operators[0];
-      const car = inst.furnace.operators[1];
-      // HSC instrument format: 12 bytes per instrument
-      // Byte 0: mod AM/VIB/EGT/KSR/MULT
-      mod.am = (buf[off] & 0x80) !== 0;
-      mod.vib = (buf[off] & 0x40) !== 0;
-      mod.sus = (buf[off] & 0x20) !== 0;
-      mod.ksr = (buf[off] & 0x10) !== 0;
-      mod.mult = buf[off] & 0x0F;
-      // Byte 1: car AM/VIB/EGT/KSR/MULT
-      car.am = (buf[off + 1] & 0x80) !== 0;
-      car.vib = (buf[off + 1] & 0x40) !== 0;
-      car.sus = (buf[off + 1] & 0x20) !== 0;
-      car.ksr = (buf[off + 1] & 0x10) !== 0;
-      car.mult = buf[off + 1] & 0x0F;
-      // Byte 2: mod KSL/TL
-      mod.ksl = (buf[off + 2] >> 6) & 0x03;
-      mod.tl = buf[off + 2] & 0x3F;
-      // Byte 3: car KSL/TL
-      car.ksl = (buf[off + 3] >> 6) & 0x03;
-      car.tl = buf[off + 3] & 0x3F;
-      // Byte 4: mod AR/DR
-      mod.ar = (buf[off + 4] >> 4) & 0x0F;
-      mod.dr = buf[off + 4] & 0x0F;
-      // Byte 5: car AR/DR
-      car.ar = (buf[off + 5] >> 4) & 0x0F;
-      car.dr = buf[off + 5] & 0x0F;
-      // Byte 6: mod SL/RR
-      mod.sl = (buf[off + 6] >> 4) & 0x0F;
-      mod.rr = buf[off + 6] & 0x0F;
-      // Byte 7: car SL/RR
-      car.sl = (buf[off + 7] >> 4) & 0x0F;
-      car.rr = buf[off + 7] & 0x0F;
-      // Byte 8: mod waveform
-      mod.ws = buf[off + 8] & 0x03;
-      // Byte 9: car waveform
-      car.ws = buf[off + 9] & 0x03;
-      // Byte 10: feedback/connection
-      inst.furnace.feedback = (buf[off + 10] >> 1) & 0x07;
-      inst.furnace.algorithm = buf[off + 10] & 0x01;
-      // Byte 11: unused/padding
-    }
+    applyOPLRegisters(inst, buf, off);
+    // Byte 11: unused/padding
     instruments.push(inst);
   }
   if (instruments.length === 0) instruments.push(makeOPLInstrument(1, 'Default'));
@@ -785,48 +706,8 @@ function parseCMF(buf: Uint8Array, filename: string): TrackerSong {
     if (off + 16 > buf.length) break;
 
     const inst = makeOPLInstrument(i + 1, `CMF ${i + 1}`);
-    if (inst.furnace) {
-      const mod = inst.furnace.operators[0];
-      const car = inst.furnace.operators[1];
-      // CMF instrument: 16 bytes mapping to OPL registers
-      // Byte 0: mod char (AM/VIB/EGT/KSR/MULT)
-      mod.am = (buf[off] & 0x80) !== 0;
-      mod.vib = (buf[off] & 0x40) !== 0;
-      mod.sus = (buf[off] & 0x20) !== 0;
-      mod.ksr = (buf[off] & 0x10) !== 0;
-      mod.mult = buf[off] & 0x0F;
-      // Byte 1: car char
-      car.am = (buf[off + 1] & 0x80) !== 0;
-      car.vib = (buf[off + 1] & 0x40) !== 0;
-      car.sus = (buf[off + 1] & 0x20) !== 0;
-      car.ksr = (buf[off + 1] & 0x10) !== 0;
-      car.mult = buf[off + 1] & 0x0F;
-      // Byte 2: mod scaling/output
-      mod.ksl = (buf[off + 2] >> 6) & 0x03;
-      mod.tl = buf[off + 2] & 0x3F;
-      // Byte 3: car scaling/output
-      car.ksl = (buf[off + 3] >> 6) & 0x03;
-      car.tl = buf[off + 3] & 0x3F;
-      // Byte 4: mod AR/DR
-      mod.ar = (buf[off + 4] >> 4) & 0x0F;
-      mod.dr = buf[off + 4] & 0x0F;
-      // Byte 5: car AR/DR
-      car.ar = (buf[off + 5] >> 4) & 0x0F;
-      car.dr = buf[off + 5] & 0x0F;
-      // Byte 6: mod SL/RR
-      mod.sl = (buf[off + 6] >> 4) & 0x0F;
-      mod.rr = buf[off + 6] & 0x0F;
-      // Byte 7: car SL/RR
-      car.sl = (buf[off + 7] >> 4) & 0x0F;
-      car.rr = buf[off + 7] & 0x0F;
-      // Byte 8: mod waveform
-      mod.ws = buf[off + 8] & 0x03;
-      // Byte 9: car waveform
-      car.ws = buf[off + 9] & 0x03;
-      // Byte 10: feedback/connection
-      inst.furnace.feedback = (buf[off + 10] >> 1) & 0x07;
-      inst.furnace.algorithm = buf[off + 10] & 0x01;
-    }
+    // CMF instruments: 16 bytes, first 11 map to standard OPL registers
+    applyOPLRegisters(inst, buf, off);
     instruments.push(inst);
   }
   if (instruments.length === 0) instruments.push(makeOPLInstrument(1, 'Default'));
