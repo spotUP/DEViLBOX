@@ -105,7 +105,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   );
 
   const defaultClassName =
-    'h-6 px-2 bg-dark-bgSecondary text-text-secondary text-[10px] font-mono border border-dark-border rounded cursor-pointer hover:text-text-primary hover:border-accent-highlight/50 transition-colors';
+    'h-6 px-2 whitespace-nowrap bg-dark-bgSecondary text-text-secondary text-[10px] font-mono border border-dark-border rounded cursor-pointer hover:text-text-primary hover:border-accent-highlight/50 transition-colors';
 
   return (
     <DropdownButton
@@ -114,7 +114,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       style={style}
       disabled={disabled}
     >
-      <span title={title}>{selectedLabel} ▾</span>
+      <span className="whitespace-nowrap" title={title}>{selectedLabel} ▾</span>
     </DropdownButton>
   );
 };
