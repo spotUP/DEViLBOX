@@ -2953,6 +2953,15 @@ export class TrackerReplayer {
       // Fall through for global/pattern-flow effects — TS must handle these
     }
 
+    // OPL3 synth: forward OPL-native effects (0x30-0x3F) to the synth.
+    // Same pattern as Furnace — standard effects (slide, speed, pos jump) are handled
+    // by the TS replayer below; OPL register effects go directly to the WASM synth.
+    if (ch.instrument?.synthType === 'OPL3' && effect >= 0x30 && effect <= 0x3F) {
+      const engine = getToneEngine();
+      engine.applyOPLEffect(ch.instrument.id, effect, param, chIndex);
+      return;
+    }
+
     switch (effect) {
       case 0x0: // Arpeggio - nothing on tick 0
         break;
