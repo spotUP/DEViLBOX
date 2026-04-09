@@ -174,6 +174,16 @@ export class OPL3Synth implements DevilboxSynth {
     ];
   }
 
+  /** Batch-update all patch parameters and send a single setPatch message */
+  applyPatch(params: Record<string, number>) {
+    for (const [k, v] of Object.entries(params)) {
+      if (k in this.patchState) {
+        (this.patchState as Record<string, number>)[k] = Math.round(v);
+      }
+    }
+    this.send({ type: 'setPatch', regs: this.packRegisters() });
+  }
+
   set(param: string, value: number) {
     if (param in this.patchState) {
       (this.patchState as Record<string, number>)[param] = Math.round(value);
