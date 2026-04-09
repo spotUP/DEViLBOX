@@ -18,6 +18,107 @@ import { getSendBusManager } from '../engine/SendBusManager';
 // Forward effective mute state to TrackerReplayer's channelMuteMask.
 // This is essential for WASM synth engines (FC, TFMX, etc.) whose audio
 // bypasses per-channel Tone.Channel nodes and routes through synthBus.
+
+// ── Cached engine references for mute forwarding ───────────────────────────
+// Resolved once via dynamic import, then reused synchronously.
+// Each engine is a singleton — hasInstance() guards against calling before init.
+
+interface MuteMaskEngine {
+  hasInstance(): boolean;
+  getInstance(): { setMuteMask(mask: number): void };
+}
+
+interface GainEngine {
+  hasInstance(): boolean;
+  getInstance(): { setChannelGain(ch: number, gain: number): void };
+}
+
+interface ChannelOnEngine {
+  hasInstance(): boolean;
+  getInstance(): { setChannelOn(ch: number, on: boolean): void };
+}
+
+const _muteMaskEngineCache = new Map<string, { Engine: MuteMaskEngine; chLimit?: number }>();
+const _gainEngineCache = new Map<string, { Engine: GainEngine; maxCh: number }>();
+const _channelOnEngineCache = new Map<string, { Engine: ChannelOnEngine; maxCh: number }>();
+let _engineCacheWarmedUp = false;
+
+// Engine definitions — resolved once at warm-up
+const BITMASK_ENGINES: [string, string, number?][] = [
+  ['../engine/libopenmpt/LibopenmptEngine', 'LibopenmptEngine'],
+  ['../engine/uade/UADEEngine', 'UADEEngine', 4],
+  ['../engine/fc/FCEngine', 'FCEngine'],
+  ['../engine/soundmon/SoundMonEngine', 'SoundMonEngine'],
+  ['../engine/jamcracker/JamCrackerEngine', 'JamCrackerEngine'],
+  ['../engine/ma/MaEngine', 'MaEngine'],
+  ['../engine/hippel/HippelEngine', 'HippelEngine'],
+  ['../engine/sonix/SonixEngine', 'SonixEngine'],
+  ['../engine/pretracker/PreTrackerEngine', 'PreTrackerEngine'],
+  ['../engine/pumatracker/PumaTrackerEngine', 'PumaTrackerEngine'],
+  ['../engine/artofnoise/ArtOfNoiseEngine', 'ArtOfNoiseEngine'],
+  ['../engine/fred/FredEditorReplayerEngine', 'FredEditorReplayerEngine'],
+  ['../engine/steveturner/SteveTurnerEngine', 'SteveTurnerEngine'],
+  ['../engine/sidmon1/SidMon1ReplayerEngine', 'SidMon1ReplayerEngine'],
+  ['../engine/sidmon1/SidMon1Engine', 'SidMon1Engine'],
+  ['../engine/sidmon2/Sd2Engine', 'Sd2Engine'],
+  ['../engine/bd/BdEngine', 'BdEngine'],
+  ['../engine/futureplayer/FuturePlayerEngine', 'FuturePlayerEngine'],
+  ['../engine/robhubbard/RobHubbardEngine', 'RobHubbardEngine'],
+  ['../engine/davidwhittaker/DavidWhittakerEngine', 'DavidWhittakerEngine'],
+  ['../engine/octamed/OctaMEDEngine', 'OctaMEDEngine'],
+  ['../engine/startrekker-am/StartrekkerAMEngine', 'StartrekkerAMEngine'],
+  ['../engine/sc68/Sc68Engine', 'Sc68Engine'],
+  ['../engine/eupmini/EupminiEngine', 'EupminiEngine'],
+  ['../engine/ixalance/IxalanceEngine', 'IxalanceEngine'],
+  ['../engine/cpsycle/CpsycleEngine', 'CpsycleEngine'],
+  ['../engine/organya/OrganyaEngine', 'OrganyaEngine'],
+  ['../engine/pxtone/PxtoneEngine', 'PxtoneEngine'],
+  ['../engine/symphonie/SymphonieEngine', 'SymphonieEngine'],
+  ['../engine/zxtune/ZxtuneEngine', 'ZxtuneEngine'],
+  ['../engine/coredesign/CoreDesignEngine', 'CoreDesignEngine'],
+];
+
+// Eagerly warm up all engine imports so mute is synchronous
+void (async () => {
+  const promises: Promise<void>[] = [];
+
+  // Bitmask engines
+  for (const [path, name, chLimit] of BITMASK_ENGINES) {
+    promises.push(
+      import(/* @vite-ignore */ path)
+        .then((mod) => {
+          const Engine = mod[name];
+          if (Engine?.hasInstance) {
+            _muteMaskEngineCache.set(name, { Engine, chLimit });
+          }
+        })
+        .catch((e) => console.warn(`[Mixer] Failed to warm up ${name}:`, e.message))
+    );
+  }
+
+  // Gain-based engines
+  promises.push(
+    import('../engine/hively/HivelyEngine')
+      .then(({ HivelyEngine }) => { _gainEngineCache.set('HivelyEngine', { Engine: HivelyEngine as unknown as GainEngine, maxCh: 16 }); })
+      .catch((e) => console.warn('[Mixer] Failed to warm up HivelyEngine:', e.message))
+  );
+  promises.push(
+    import('../engine/klystrack/KlysEngine')
+      .then(({ KlysEngine }) => { _gainEngineCache.set('KlysEngine', { Engine: KlysEngine as unknown as GainEngine, maxCh: 32 }); })
+      .catch((e) => console.warn('[Mixer] Failed to warm up KlysEngine:', e.message))
+  );
+
+  // Channel on/off engine
+  promises.push(
+    import('../engine/musicline/MusicLineEngine')
+      .then(({ MusicLineEngine }) => { _channelOnEngineCache.set('MusicLineEngine', { Engine: MusicLineEngine as unknown as ChannelOnEngine, maxCh: 8 }); })
+      .catch((e) => console.warn('[Mixer] Failed to warm up MusicLineEngine:', e.message))
+  );
+
+  await Promise.allSettled(promises);
+  _engineCacheWarmedUp = true;
+})();
+
 function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
   let mask = 0;
   for (let i = 0; i < Math.min(channels.length, 32); i++) {
@@ -31,75 +132,47 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
     getTrackerReplayer().setChannelMuteMask(mask);
   } catch { /* Replayer not initialized */ }
 
-  // Forward to ALL WASM engines that support setMuteMask.
-  // Uses dynamic import() — require() can return wrong module instances in Vite ESM.
-  // Each engine is a singleton; hasInstance() returns true only if actively playing.
-  const muteEngines: [string, string, number?][] = [
-    // [module path, export name, optional channel limit for mask]
-    ['../engine/libopenmpt/LibopenmptEngine', 'LibopenmptEngine'],
-    ['../engine/uade/UADEEngine', 'UADEEngine', 4],            // Paula: 4 channels
-    ['../engine/fc/FCEngine', 'FCEngine'],
-    ['../engine/soundmon/SoundMonEngine', 'SoundMonEngine'],
-    ['../engine/jamcracker/JamCrackerEngine', 'JamCrackerEngine'],
-    ['../engine/ma/MaEngine', 'MaEngine'],
-    ['../engine/hippel/HippelEngine', 'HippelEngine'],
-    ['../engine/sonix/SonixEngine', 'SonixEngine'],
-    ['../engine/pretracker/PreTrackerEngine', 'PreTrackerEngine'],
-    ['../engine/pumatracker/PumaTrackerEngine', 'PumaTrackerEngine'],
-    ['../engine/artofnoise/ArtOfNoiseEngine', 'ArtOfNoiseEngine'],
-    ['../engine/fred/FredEditorReplayerEngine', 'FredEditorReplayerEngine'],
-    ['../engine/steveturner/SteveTurnerEngine', 'SteveTurnerEngine'],
-    ['../engine/sidmon1/SidMon1ReplayerEngine', 'SidMon1ReplayerEngine'],
-    ['../engine/sidmon1/SidMon1Engine', 'SidMon1Engine'],
-    ['../engine/sidmon2/Sd2Engine', 'Sd2Engine'],
-    ['../engine/bd/BdEngine', 'BdEngine'],
-    ['../engine/futureplayer/FuturePlayerEngine', 'FuturePlayerEngine'],
-    ['../engine/robhubbard/RobHubbardEngine', 'RobHubbardEngine'],
-    ['../engine/davidwhittaker/DavidWhittakerEngine', 'DavidWhittakerEngine'],
-    ['../engine/octamed/OctaMEDEngine', 'OctaMEDEngine'],
-    ['../engine/startrekker-am/StartrekkerAMEngine', 'StartrekkerAMEngine'],
-    ['../engine/sc68/Sc68Engine', 'Sc68Engine'],
-    ['../engine/eupmini/EupminiEngine', 'EupminiEngine'],
-    ['../engine/ixalance/IxalanceEngine', 'IxalanceEngine'],
-    ['../engine/cpsycle/CpsycleEngine', 'CpsycleEngine'],
-    ['../engine/organya/OrganyaEngine', 'OrganyaEngine'],
-    ['../engine/pxtone/PxtoneEngine', 'PxtoneEngine'],
-    ['../engine/symphonie/SymphonieEngine', 'SymphonieEngine'],
-    ['../engine/zxtune/ZxtuneEngine', 'ZxtuneEngine'],
-    ['../engine/coredesign/CoreDesignEngine', 'CoreDesignEngine'],
-  ];
+  if (!_engineCacheWarmedUp) return; // Imports still warming up
 
-  for (const [path, name, chLimit] of muteEngines) {
-    import(/* @vite-ignore */ path).then((mod) => {
-      const Engine = mod[name];
-      if (Engine?.hasInstance?.()) {
+  // Bitmask engines (setMuteMask)
+  for (const [, { Engine, chLimit }] of _muteMaskEngineCache) {
+    try {
+      if (Engine.hasInstance()) {
         const m = chLimit ? mask & ((1 << chLimit) - 1) : mask;
         Engine.getInstance().setMuteMask(m);
       }
-    }).catch(() => {});
+    } catch (e: any) {
+      console.warn('[Mixer] setMuteMask error:', e?.message);
+    }
   }
 
-  // Engines with setChannelGain (per-channel gain instead of bitmask)
-  import('../engine/hively/HivelyEngine').then(({ HivelyEngine }) => {
-    if (HivelyEngine.hasInstance()) {
-      const hv = HivelyEngine.getInstance();
-      for (let ch = 0; ch < 16; ch++) hv.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
+  // Gain-based engines (setChannelGain)
+  for (const [, { Engine, maxCh }] of _gainEngineCache) {
+    try {
+      if (Engine.hasInstance()) {
+        const inst = Engine.getInstance();
+        for (let ch = 0; ch < maxCh; ch++) {
+          inst.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[Mixer] setChannelGain error:', e?.message);
     }
-  }).catch(() => {});
-  import('../engine/klystrack/KlysEngine').then(({ KlysEngine }) => {
-    if (KlysEngine.hasInstance()) {
-      const kl = KlysEngine.getInstance();
-      for (let ch = 0; ch < 32; ch++) kl.setChannelGain(ch, (mask & (1 << ch)) !== 0 ? 1.0 : 0.0);
-    }
-  }).catch(() => {});
+  }
 
-  // MusicLine: uses binary on/off per channel
-  import('../engine/musicline/MusicLineEngine').then(({ MusicLineEngine }) => {
-    if (MusicLineEngine.hasInstance()) {
-      const ml = MusicLineEngine.getInstance();
-      for (let ch = 0; ch < 8; ch++) ml.setChannelOn(ch, (mask & (1 << ch)) !== 0);
+  // Channel on/off engines
+  for (const [, { Engine, maxCh }] of _channelOnEngineCache) {
+    try {
+      if (Engine.hasInstance()) {
+        const inst = Engine.getInstance();
+        for (let ch = 0; ch < maxCh; ch++) {
+          inst.setChannelOn(ch, (mask & (1 << ch)) !== 0);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[Mixer] setChannelOn error:', e?.message);
     }
-  }).catch(() => {});
+  }
 
   // C64 SID: instance-based (not singleton), access via replayer
   try {
@@ -366,8 +439,8 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
       const c = channels[ch];
       const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
       engine.mute(ch, effectiveMute);
-    } catch {
-      // Engine not ready
+    } catch (e: any) {
+      console.warn('[Mixer] Furnace mute error:', e?.message);
     }
     return;
   }
@@ -381,10 +454,14 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
   // Other WASM engines use gain API (0.0 - 1.0)
   const gainEngine = getActiveGainEngine();
   if (gainEngine) {
-    const c = channels[ch];
-    const effectiveMute = isSoloing ? !c.soloed : c.muted;
-    const gain = effectiveMute ? 0 : c.volume;
-    gainEngine.setChannelGain(ch, gain);
+    try {
+      const c = channels[ch];
+      const effectiveMute = isSoloing ? !c.soloed : c.muted;
+      const gain = effectiveMute ? 0 : c.volume;
+      gainEngine.setChannelGain(ch, gain);
+    } catch (e: any) {
+      console.warn('[Mixer] setChannelGain error:', e?.message);
+    }
   }
 }
 
@@ -402,8 +479,8 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
         const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
         engine.mute(i, effectiveMute);
       });
-    } catch {
-      // Engine not ready
+    } catch (e: any) {
+      console.warn('[Mixer] Furnace mute-all error:', e?.message);
     }
     return;
   }
