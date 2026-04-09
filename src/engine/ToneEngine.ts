@@ -170,6 +170,7 @@ export class ToneEngine {
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   private blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
+  private masterLimiter: DynamicsCompressorNode | null = null; // Soft limiter on master bus
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
   // FFT for frequency visualization
@@ -382,12 +383,29 @@ export class ToneEngine {
     this.blepInput = new Tone.Gain(1);
 
     // Default routing:
-    //   masterInput → amigaFilter → masterEffectsInput → blepInput → masterChannel
-    //   synthBus ──────────────────→ masterEffectsInput → blepInput → masterChannel
+    //   masterInput → amigaFilter → masterEffectsInput → blepInput → masterLimiter → masterChannel
+    //   synthBus ──────────────────→ masterEffectsInput → blepInput → masterLimiter → masterChannel
     this.masterInput.connect(this.amigaFilter);
     this.amigaFilter.connect(this.masterEffectsInput);
     this.masterEffectsInput.connect(this.blepInput);
-    this.blepInput.connect(this.masterChannel);
+
+    // Soft limiter prevents clipping — gentle compression above -3dB
+    try {
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      this.masterLimiter = ctx.createDynamicsCompressor();
+      this.masterLimiter.threshold.value = -3;   // Start compressing at -3 dB
+      this.masterLimiter.knee.value = 6;          // Soft knee for transparent limiting
+      this.masterLimiter.ratio.value = 12;        // Aggressive above threshold
+      this.masterLimiter.attack.value = 0.002;    // 2ms attack (fast, catches transients)
+      this.masterLimiter.release.value = 0.15;    // 150ms release
+      // Insert limiter between blepInput and masterChannel using Tone.js connect
+      Tone.connect(this.blepInput, this.masterLimiter);
+      Tone.connect(this.masterLimiter, this.masterChannel);
+    } catch {
+      // Fallback: direct connection without limiter
+      this.masterLimiter = null;
+      this.blepInput.connect(this.masterChannel);
+    }
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
     this.synthBus = new Tone.Gain(1);
