@@ -707,7 +707,9 @@ export class TrackerReplayer {
     // Restart directly — no React effect cycle needed.
     if (!this.playing && this.song && this._hasPlayedOnce) {
       this.playing = true;
-      this._suppressNotes = false;
+      // Restore _suppressNotes for WASM-backed formats so ToneEngine doesn't
+      // play samples in parallel with the WASM engine (causes flanger/doubling).
+      this._suppressNotes = this.useLibopenmptPlayback || this.coordinator.hasActiveDispatch;
       this.clearStateQueue();
       this.coordinator.stateRing.clearLastDequeued();
       // Restart libopenmpt if this is a libopenmpt-backed format
