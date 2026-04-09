@@ -4,6 +4,7 @@
  */
 
 import { getDevilboxAudioContext } from '@utils/audio-context';
+import { getToneEngine } from '@/engine/ToneEngine';
 
 export interface ChiptuneMetadata {
   dur: number;
@@ -117,9 +118,19 @@ export class ChiptunePlayer {
       this.processNode.port.onmessage = this.handleMessage.bind(this);
       this.processNode.port.postMessage({ cmd: 'config', val: this.config });
 
-      // Audio routing
+      // Audio routing — through ToneEngine master mixer for analyser visibility
       this.processNode.connect(this.gain);
-      this.gain.connect(this.context.destination);
+      try {
+        const engine = getToneEngine();
+        const masterInput = (engine.masterEffectsInput as any).input as AudioNode;
+        if (masterInput) {
+          this.gain.connect(masterInput);
+        } else {
+          this.gain.connect(this.context.destination);
+        }
+      } catch {
+        this.gain.connect(this.context.destination);
+      }
 
       this.initialized = true;
       this.fireEvent('onInitialized');

@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@utils/audio-context';
+import { getToneEngine } from '@/engine/ToneEngine';
 
 export interface AdPlugMetadata {
   title: string;
@@ -108,7 +109,20 @@ export class AdPlugPlayer {
       });
 
       this.processNode.connect(this.gain);
-      this.gain.connect(this.context.destination);
+
+      // Route through ToneEngine's master mixer so audio goes through the
+      // master effects chain, limiter, and is visible to AudioDataBus analyser.
+      try {
+        const engine = getToneEngine();
+        const masterInput = (engine.masterEffectsInput as any).input as AudioNode;
+        if (masterInput) {
+          this.gain.connect(masterInput);
+        } else {
+          this.gain.connect(this.context.destination);
+        }
+      } catch {
+        this.gain.connect(this.context.destination);
+      }
       this.initialized = true;
       console.log('[AdPlugPlayer] Initialized');
     } catch (err) {
