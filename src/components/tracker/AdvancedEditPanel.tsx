@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useCursorStore } from '@stores';
 import { MacroSlotsPanel } from './MacroSlotsPanel';
 import { Sliders, Shuffle, Download, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface AdvancedEditPanelProps {
   onShowScaleVolume?: (scope: 'block' | 'track' | 'pattern') => void;
@@ -170,14 +171,15 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
                 Math Operations
               </div>
               <div className="flex items-center gap-1 mb-2">
-                <select
+                <CustomSelect
                   value={mathColumn}
-                  onChange={(e) => setMathColumn(e.target.value as 'volume' | 'eff')}
+                  onChange={(v) => setMathColumn(v as 'volume' | 'eff')}
+                  options={[
+                    { value: 'volume', label: 'Volume' },
+                    { value: 'eff', label: 'Effect' },
+                  ]}
                   className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-                >
-                  <option value="volume">Volume</option>
-                  <option value="eff">Effect</option>
-                </select>
+                />
                 <input
                   type="number"
                   value={mathValue}

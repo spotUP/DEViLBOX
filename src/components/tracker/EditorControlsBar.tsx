@@ -18,6 +18,7 @@ import { getGroupedPresets } from '@/constants/systemPresets';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SubsongSelector } from './SubsongSelector';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
@@ -224,17 +225,15 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {(viewMode === 'grid' || viewMode === 'pianoroll') && (
           <>
             <span className="text-text-secondary text-[10px] font-medium">CH:</span>
-            <select
-              value={gridChannelIndex}
-              onChange={(e) => onGridChannelChange(Number(e.target.value))}
+            <CustomSelect
+              value={String(gridChannelIndex)}
+              onChange={(v) => onGridChannelChange(Number(v))}
+              options={Array.from({ length: c.channelCount }, (_, idx) => ({
+                value: String(idx),
+                label: (idx + 1).toString().padStart(2, '0'),
+              }))}
               className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            >
-              {Array.from({ length: c.channelCount }, (_, idx) => (
-                <option key={idx} value={idx}>
-                  {(idx + 1).toString().padStart(2, '0')}
-                </option>
-              ))}
-            </select>
+            />
           </>
         )}
 

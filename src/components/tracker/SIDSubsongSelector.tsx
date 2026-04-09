@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Cpu, Info } from 'lucide-react';
 import { notify } from '@stores/useNotificationStore';
 import { SIDInfoModal } from '@components/dialogs/SIDInfoModal';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 export const SIDSubsongSelector: React.FC = React.memo(() => {
   const { sidMetadata, setSidMetadata } = useFormatStore(
@@ -50,17 +51,15 @@ export const SIDSubsongSelector: React.FC = React.memo(() => {
         <Cpu size={12} className="text-blue-400 shrink-0" />
         <span className="text-[10px] text-blue-300/70 font-mono">{chipBadge}</span>
         {sidMetadata.subsongs > 1 && (
-          <select
-            value={sidMetadata.currentSubsong}
-            onChange={(e) => handleSubsongChange(Number(e.target.value))}
+          <CustomSelect
+            value={String(sidMetadata.currentSubsong)}
+            onChange={(v) => handleSubsongChange(Number(v))}
+            options={Array.from({ length: sidMetadata.subsongs }, (_, i) => ({
+              value: String(i),
+              label: `Sub ${i + 1}`,
+            }))}
             className="text-[10px] bg-dark-bgSecondary border border-blue-800/40 rounded px-1.5 py-0.5 text-text-primary min-w-[80px]"
-          >
-            {Array.from({ length: sidMetadata.subsongs }, (_, i) => (
-              <option key={i} value={i}>
-                Sub {i + 1}{i === sidMetadata.currentSubsong ? ' ●' : ''}
-              </option>
-            ))}
-          </select>
+          />
         )}
         <button
           onClick={() => setShowInfo(true)}
