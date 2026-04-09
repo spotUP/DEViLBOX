@@ -82,7 +82,6 @@ function companionRelativeName(mainFile: File, companion: File): string {
     // Companion: "Zoundmonitor/Samples/electom" → relative from main's dir = "Samples/electom"
     const mainDir = mainRel.substring(0, mainRel.lastIndexOf('/'));
     if (compRel.startsWith(mainDir + '/')) {
-      // Companion is under the same directory tree as main — use relative path from main's dir
       return compRel.substring(mainDir.length + 1);
     }
     // Companion is in a different subtree — find common ancestor
@@ -92,8 +91,12 @@ function companionRelativeName(mainFile: File, companion: File): string {
     while (common < mainParts.length && common < compParts.length && mainParts[common] === compParts[common]) {
       common++;
     }
-    // Return path from one level above main's dir (the common parent)
     return compParts.slice(common).join('/');
+  }
+  // Only companion has relative path (e.g. auto-prompted Samples/ folder for a single .sng)
+  // webkitRelativePath: "Samples/electom" → use it as-is
+  if (compRel && compRel.includes('/')) {
+    return compRel;
   }
   return companion.name;
 }
@@ -421,6 +424,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Ref for the hidden companion file input so we can trigger it programmatically
   const companionInputRef = useRef<HTMLInputElement | null>(null);
+  // Ref for the hidden samples folder input (ZoundMonitor Samples/ directory)
+  const samplesFolderInputRef = useRef<HTMLInputElement | null>(null);
   // Stash the main file while waiting for companion selection
   const pendingMainFileRef = useRef<File | null>(null);
 
@@ -439,6 +444,14 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       return;
     }
 
+    // ZoundMonitor .sng files need a Samples/ directory — auto-prompt for folder
+    const fmt = detectNativeFormat(mainFile.name.toLowerCase());
+    if (fmt?.key === 'zoundMonitor' && companions.length === 0 && samplesFolderInputRef.current) {
+      pendingMainFileRef.current = mainFile;
+      samplesFolderInputRef.current.click();
+      return;
+    }
+
     handleFileSelect(mainFile, companions);
   }, [handleFileSelect]);
 
@@ -449,6 +462,20 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     pendingMainFileRef.current = null;
     if (mainFile) {
       handleFileSelect(mainFile, file ? [file] : []);
+    }
+  }, [handleFileSelect]);
+
+  // Handler for Samples/ folder input (auto-prompted for ZoundMonitor .sng files)
+  const handleSamplesFolderInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    const mainFile = pendingMainFileRef.current;
+    pendingMainFileRef.current = null;
+    if (mainFile) {
+      // All files from the picked directory become companions.
+      // The webkitRelativePath on each file preserves subdirectory structure.
+      const companions = files.filter(f => !f.name.startsWith('.'));
+      handleFileSelect(mainFile, companions);
     }
   }, [handleFileSelect]);
 
@@ -485,6 +512,14 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         type="file"
         className="hidden"
         onChange={handleCompanionInput}
+      />
+      {/* Hidden directory input for Samples/ folder (ZoundMonitor auto-prompt) */}
+      <input
+        ref={samplesFolderInputRef}
+        type="file"
+        className="hidden"
+        {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+        onChange={handleSamplesFolderInput}
       />
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-full max-w-[90vw] md:max-w-[480px] max-h-[80vh] overflow-hidden">
         {/* Header */}
@@ -796,9 +831,19 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                           <span className="font-mono bg-dark-bg px-1 rounded">
                             {nativeFmt?.key === 'zoundMonitor' ? 'Samples/' : 'Instruments/'}
                           </span>
-                          {' '}folder next to this module. Drop the parent folder or use{' '}
-                          <span className="font-semibold">Pick Folder</span>
-                          {' '}below to load them.
+                          {' '}folder next to this module.
+                          <button
+                            type="button"
+                            className="ml-2 text-xs px-2 py-1 bg-amber-500/20 border border-amber-500/40 rounded hover:bg-amber-500/30 transition-colors cursor-pointer"
+                            onClick={() => {
+                              if (moduleInfo?.file && samplesFolderInputRef.current) {
+                                pendingMainFileRef.current = moduleInfo.file;
+                                samplesFolderInputRef.current.click();
+                              }
+                            }}
+                          >
+                            Select {nativeFmt?.key === 'zoundMonitor' ? 'Samples' : 'Instruments'} Folder
+                          </button>
                         </span>
                       );
                     })()}
