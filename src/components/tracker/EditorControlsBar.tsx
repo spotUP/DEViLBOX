@@ -439,18 +439,18 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
       {/* FPS / Quality Indicator - Compact */}
       <div
         className={`
-          flex-shrink-0 flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded
+          flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold font-mono rounded border
           ${quality === 'low'
-            ? 'bg-accent-error/20 text-accent-error'
+            ? 'bg-accent-error/20 text-accent-error border-accent-error/40'
             : quality === 'medium'
-            ? 'bg-orange-500/20 text-orange-400'
-            : 'bg-green-500/20 text-green-400'
+            ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+            : 'bg-green-500/20 text-green-400 border-green-500/40'
           }
         `}
         title={`Performance: ${quality.toUpperCase()} | Avg FPS: ${avgFps} | Current: ${fps.fps}`}
       >
-        <span className="font-bold">{avgFps}</span>
-        <span className="text-[10px] opacity-70">FPS</span>
+        <span>{avgFps}</span>
+        <span className="opacity-70">FPS</span>
         <div className={`w-1.5 h-1.5 rounded-full ${
           quality === 'low' ? 'bg-accent-error' :
           quality === 'medium' ? 'bg-orange-400' :

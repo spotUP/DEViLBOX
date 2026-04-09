@@ -37,7 +37,7 @@ export const GenreAnalysisBadge: React.FC = React.memo(() => {
   if (isCapturing) {
     return (
       <div
-        className="flex items-center gap-1.5 px-2 py-1 rounded bg-dark-bgSecondary text-text-secondary text-xs"
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-dark-bgSecondary text-text-secondary text-[10px] font-bold font-mono border border-dark-border"
         title={`Capturing audio... ${Math.round(progress)}%`}
       >
         <Disc size={12} className="animate-spin" />
@@ -55,11 +55,11 @@ export const GenreAnalysisBadge: React.FC = React.memo(() => {
   if (isAnalyzing) {
     return (
       <div
-        className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent-primary/20 text-accent-primary text-xs"
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-accent-primary/20 text-accent-primary text-[10px] font-bold font-mono border border-accent-primary/40"
         title="Analyzing genre..."
       >
         <Sparkles size={12} className="animate-pulse" />
-        <span className="font-mono text-[10px]">ANALYZING</span>
+        <span>ANALYZING</span>
       </div>
     );
   }
@@ -80,13 +80,13 @@ export const GenreAnalysisBadge: React.FC = React.memo(() => {
     
     return (
       <div
-        className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent-primary/10 text-accent-primary text-xs cursor-default"
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-accent-primary/20 text-accent-primary text-[10px] font-bold font-mono border border-accent-primary/40 cursor-default"
         title={`${genre.primary} › ${genre.subgenre || '?'}\nMood: ${genre.mood} (${genre.confidence > 0.7 ? 'High' : genre.confidence > 0.4 ? 'Med' : 'Low'} confidence)\nEnergy: ${energyPercent}% • Danceability: ${Math.round(genre.danceability * 100)}%\n${detailText}`}
       >
         <MoodIcon size={12} />
-        <span className="font-medium">{label}</span>
-        <span className="text-text-secondary">•</span>
-        <span className="text-text-secondary opacity-80">{genre.mood}</span>
+        <span>{label}</span>
+        <span className="opacity-50">•</span>
+        <span className="opacity-70">{genre.mood}</span>
         {/* Energy bar */}
         <div className="w-8 h-1 bg-dark-border rounded-full overflow-hidden ml-1">
           <div
