@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@utils/audio-context';
+import { getToneEngine } from '@/engine/ToneEngine';
 
 export interface V2MMetadata {
   lengthSeconds: number;
@@ -127,9 +128,19 @@ export class V2MPlayer {
         this.processNode!.port.addEventListener('message', initHandler);
       });
 
-      // Audio routing
+      // Audio routing — through ToneEngine master mixer for analyser visibility
       this.processNode.connect(this.gain);
-      this.gain.connect(this.context.destination);
+      try {
+        const engine = getToneEngine();
+        const masterInput = (engine.masterEffectsInput as any).input as AudioNode;
+        if (masterInput) {
+          this.gain.connect(masterInput);
+        } else {
+          this.gain.connect(this.context.destination);
+        }
+      } catch {
+        this.gain.connect(this.context.destination);
+      }
 
       this.initialized = true;
       this.fireEvent('onInitialized');
