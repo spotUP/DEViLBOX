@@ -164,6 +164,9 @@ export class AdPlugPlayer {
     const ok = await this.ensureInitialized();
     if (!ok || !this.processNode) return false;
 
+    // Restore gain (may have been zeroed by stop())
+    if (this.gain) this.gain.gain.value = 1;
+
     return new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => resolve(false), 10000);
 
@@ -190,6 +193,9 @@ export class AdPlugPlayer {
     this.playing = false;
     if (this.processNode) {
       this.processNode.port.postMessage({ type: 'stop' });
+    }
+    if (this.gain) {
+      this.gain.gain.value = 0;
     }
   }
 
