@@ -217,7 +217,8 @@ static float g_captureRefreshRate = 0.0f;
 static uint8_t g_oplRegs[2][256];  // [chip][register]
 static bool g_oplKeyOn[2][9];      // per-chip per-channel key-on state
 
-// Reconstruct instrument from shadow registers for a given channel
+// Reconstruct instrument from shadow registers for a given channel.
+// Returns FULL register data (including TL volume bits) for playback.
 static InstrumentFingerprint getChannelInstrument(int chip, int ch) {
     InstrumentFingerprint fp = {};
     if (ch < 0 || ch >= 9) return fp;
@@ -237,7 +238,21 @@ static InstrumentFingerprint getChannelInstrument(int chip, int ch) {
     return fp;
 }
 
-// Find or add instrument fingerprint, return index
+// Compare two instrument fingerprints ignoring volume-sensitive TL bits.
+// This prevents volume changes from creating duplicate instruments.
+static bool instrumentsMatch(const InstrumentFingerprint& a, const InstrumentFingerprint& b) {
+    for (int i = 0; i < 11; i++) {
+        if (i == 2 || i == 3) {
+            // KSL/TL register — compare only KSL (bits 6-7), ignore TL (bits 0-5)
+            if ((a.regs[i] & 0xC0) != (b.regs[i] & 0xC0)) return false;
+        } else {
+            if (a.regs[i] != b.regs[i]) return false;
+        }
+    }
+    return true;
+}
+
+// Find or add instrument fingerprint, return 1-based index (0 = no instrument)
 static uint8_t findOrAddInstrument(const InstrumentFingerprint& fp) {
     // Check if all regs are zero → skip
     bool allZero = true;
@@ -245,7 +260,7 @@ static uint8_t findOrAddInstrument(const InstrumentFingerprint& fp) {
     if (allZero) return 0;
 
     for (size_t i = 0; i < g_capturedInstruments.size(); i++) {
-        if (g_capturedInstruments[i] == fp) return (uint8_t)(i + 1); // 1-based
+        if (instrumentsMatch(g_capturedInstruments[i], fp)) return (uint8_t)(i + 1);
     }
     if (g_capturedInstruments.size() < 255) {
         g_capturedInstruments.push_back(fp);
@@ -1092,7 +1107,6 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
         uint32_t tickStart = targetRow * ticksPerRow;
         uint32_t tickEnd = tickStart + ticksPerRow;
 
-        // Find note-on events in this tick range for this channel
         // Binary search for approximate start position
         size_t lo = 0, hi = g_capturedNotes.size();
         while (lo < hi) {
@@ -1101,12 +1115,30 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
             else hi = mid;
         }
 
+        // First pass: look for note-on events
         for (size_t i = lo; i < g_capturedNotes.size(); i++) {
             auto& cn = g_capturedNotes[i];
             if (cn.tick >= tickEnd) break;
             if (cn.channel == channel && cn.isNoteOn) {
+                // Pack: note | instrument | Cxx volume command
+                // Volume cmd=15 (set volume), param = vol scaled 0-64
+                uint8_t volCmd = 15; // Cxx = set volume
+                uint8_t volParam = (uint8_t)std::min(63u, (uint32_t)cn.volume);
                 return ((uint32_t)cn.note) |
                        ((uint32_t)cn.instrument << 8) |
+                       ((uint32_t)volCmd << 16) |
+                       ((uint32_t)volParam << 24);
+            }
+        }
+
+        // Second pass: look for note-off events (no note-on found in this row)
+        for (size_t i = lo; i < g_capturedNotes.size(); i++) {
+            auto& cn = g_capturedNotes[i];
+            if (cn.tick >= tickEnd) break;
+            if (cn.channel == channel && !cn.isNoteOn) {
+                // Note off: note=127 in CmodPlayer convention (maps to XM 97)
+                return ((uint32_t)127) |
+                       ((uint32_t)0 << 8) |
                        ((uint32_t)0 << 16) |
                        ((uint32_t)0 << 24);
             }
