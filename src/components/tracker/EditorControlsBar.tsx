@@ -23,6 +23,7 @@ import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
 import { GenreAnalysisBadge } from './GenreAnalysisBadge';
+import { LayoutPresetsBar } from './LayoutPresetsBar';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
@@ -31,7 +32,6 @@ import {
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
-import { useEditorStore, MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 } from '@stores/useEditorStore';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 
 export interface EditorControlsBarProps {
@@ -81,11 +81,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
       closeDialogCommand();
     }
   }, [dialogOpen, closeDialogCommand]);
-
-  const pasteMode = useEditorStore((s) => s.pasteMode);
-  const setPasteMode = useEditorStore((s) => s.setPasteMode);
-  const pasteMask = useEditorStore((s) => s.pasteMask);
-  const toggleMaskBit = useEditorStore((s) => s.toggleMaskBit);
 
   // ── Grouped hardware presets ─────────────────────────────────────────────
   const groupedPresets = React.useMemo(() => getGroupedPresets(), []);
@@ -343,43 +338,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Separator */}
         <div className="w-px h-4 bg-border opacity-50 mx-1" />
 
-        {/* Paste Mode & Mask */}
-        <div className="flex items-center gap-1">
-          <DropdownButton
-            items={([
-              { id: 'overwrite', label: 'Overwrite', radio: true, checked: pasteMode === 'overwrite', onClick: () => setPasteMode('overwrite') },
-              { id: 'mix', label: 'Mix paste', radio: true, checked: pasteMode === 'mix', onClick: () => setPasteMode('mix') },
-              { id: 'flood', label: 'Flood fill', radio: true, checked: pasteMode === 'flood', onClick: () => setPasteMode('flood') },
-              { id: 'insert', label: 'Insert rows', radio: true, checked: pasteMode === 'insert', onClick: () => setPasteMode('insert') },
-            ] as MenuItemType[])}
-            className="h-6 px-2 bg-dark-bgSecondary text-text-secondary text-[10px] font-mono border border-dark-border rounded cursor-pointer hover:text-text-primary hover:border-accent-highlight/50 transition-colors"
-          >
-            {pasteMode === 'overwrite' ? 'Paste' : pasteMode === 'mix' ? 'Mix' : pasteMode === 'flood' ? 'Flood' : 'Insert'} ▾
-          </DropdownButton>
-          <div className="flex gap-px" title="Paste mask — toggle columns">
-            {([
-              ['N', MASK_NOTE],
-              ['I', MASK_INSTRUMENT],
-              ['V', MASK_VOLUME],
-              ['E', MASK_EFFECT],
-              ['E2', MASK_EFFECT2],
-            ] as const).map(([label, bit]) => (
-              <button
-                key={label}
-                className={`px-1 h-5 text-[10px] font-mono rounded transition-colors ${
-                  pasteMask & (bit as number)
-                    ? 'bg-accent-primary/30 text-accent-primary'
-                    : 'bg-dark-bgSecondary text-text-muted hover:text-text-secondary'
-                }`}
-                onClick={() => toggleMaskBit('paste', bit as number)}
-                title={`Toggle ${label} in paste`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Stepped/Smooth Scrolling Toggle */}
         <button
           onClick={c.handleToggleSmooth}
@@ -413,6 +371,9 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
         {/* Genre Analysis Badge */}
         <GenreAnalysisBadge />
+
+        {/* Layout Presets (1-4) */}
+        <LayoutPresetsBar />
 
         {/* Visual Background mode cycle (only when enabled) */}
         <VisualBgCycler />
