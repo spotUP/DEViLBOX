@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Activity, Filter, Zap } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
 
@@ -113,15 +114,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <Activity size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">OSCILLATOR 1</h3>
           </div>
-          <select
-            value={config.osc1.mode}
-            onChange={(e) => updateOsc1({ mode: parseInt(e.target.value) })}
+          <CustomSelect
+            value={String(config.osc1.mode)}
+            onChange={(v) => updateOsc1({ mode: parseInt(v) })}
             className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-          >
-            {OSC_MODES.map((mode, i) => (
-              <option key={mode} value={i}>{mode}</option>
-            ))}
-          </select>
+            options={OSC_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+          />
         </div>
         
         <div className="grid grid-cols-4 gap-3 items-center">
@@ -179,15 +177,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
                 className="w-3 h-3 rounded border-dark-borderLight bg-transparent"
               />
             </label>
-            <select
-              value={config.osc2.mode}
-              onChange={(e) => updateOsc2({ mode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(config.osc2.mode)}
+              onChange={(v) => updateOsc2({ mode: parseInt(v) })}
               className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-            >
-              {OSC23_MODES.map((mode, i) => (
-                <option key={mode} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={OSC23_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
         </div>
         
@@ -246,15 +241,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
                 className="w-3 h-3 rounded border-dark-borderLight bg-transparent"
               />
             </label>
-            <select
-              value={config.osc3.mode}
-              onChange={(e) => updateOsc3({ mode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(config.osc3.mode)}
+              onChange={(v) => updateOsc3({ mode: parseInt(v) })}
               className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-            >
-              {OSC23_MODES.map((mode, i) => (
-                <option key={mode} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={OSC23_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
         </div>
         
@@ -338,15 +330,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           );
         })()}
         <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
-          <select
-            value={config.filter1.mode}
-            onChange={(e) => updateFilter1({ mode: parseInt(e.target.value) })}
+          <CustomSelect
+            value={String(config.filter1.mode)}
+            onChange={(v) => updateFilter1({ mode: parseInt(v) })}
             className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-          >
-            {FILTER_MODES.map((mode, i) => (
-              <option key={mode} value={i}>{mode}</option>
-            ))}
-          </select>
+            options={FILTER_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+          />
         </div>
       </div>
 
@@ -388,15 +377,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           );
         })()}
         <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-dark-border/20">
-          <select
-            value={config.filter2.mode}
-            onChange={(e) => updateFilter2({ mode: parseInt(e.target.value) })}
+          <CustomSelect
+            value={String(config.filter2.mode)}
+            onChange={(v) => updateFilter2({ mode: parseInt(v) })}
             className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-          >
-            {FILTER_MODES.map((mode, i) => (
-              <option key={mode} value={i}>{mode}</option>
-            ))}
-          </select>
+            options={FILTER_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+          />
         </div>
       </div>
 
@@ -407,15 +393,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             <Zap size={16} className="text-amber-500" />
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">ROUTING</h3>
           </div>
-          <select
-            value={config.routing.mode}
-            onChange={(e) => updateRouting({ mode: parseInt(e.target.value) })}
+          <CustomSelect
+            value={String(config.routing.mode)}
+            onChange={(v) => updateRouting({ mode: parseInt(v) })}
             className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-          >
-            {ROUTING_MODES.map((mode, i) => (
-              <option key={mode} value={i}>{mode}</option>
-            ))}
-          </select>
+            options={ROUTING_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+          />
         </div>
         
         <div className="flex gap-3 items-center">
@@ -557,24 +540,18 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">LFO 2</h3>
             </div>
             <div className="flex items-center gap-3">
-              <select
-                value={lfo2.mode}
-                onChange={(e) => updateLFO2({ mode: parseInt(e.target.value) })}
+              <CustomSelect
+                value={String(lfo2.mode)}
+                onChange={(v) => updateLFO2({ mode: parseInt(v) })}
                 className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-              >
-                {LFO_MODES.map((mode, i) => (
-                  <option key={mode} value={i}>{mode}</option>
-                ))}
-              </select>
-              <select
-                value={lfo2.polarity}
-                onChange={(e) => updateLFO2({ polarity: parseInt(e.target.value) })}
+                options={LFO_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+              />
+              <CustomSelect
+                value={String(lfo2.polarity)}
+                onChange={(v) => updateLFO2({ polarity: parseInt(v) })}
                 className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-              >
-                {LFO_POLARITY.map((p, i) => (
-                  <option key={p} value={i}>{p}</option>
-                ))}
-              </select>
+                options={LFO_POLARITY.map((p, i) => ({ value: String(i), label: p }))}
+              />
             </div>
           </div>
 
@@ -644,15 +621,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               <Zap size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOICE DISTORTION</h3>
             </div>
-            <select
-              value={vDist.mode}
-              onChange={(e) => updateVoiceDist({ mode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(vDist.mode)}
+              onChange={(v) => updateVoiceDist({ mode: parseInt(v) })}
               className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-            >
-              {DIST_MODES.map((mode, i) => (
-                <option key={mode} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={DIST_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
           <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
@@ -689,15 +663,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               <Zap size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">CHANNEL DISTORTION</h3>
             </div>
-            <select
-              value={cDist.mode}
-              onChange={(e) => updateChanDist({ mode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(cDist.mode)}
+              onChange={(v) => updateChanDist({ mode: parseInt(v) })}
               className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-            >
-              {DIST_MODES.map((mode, i) => (
-                <option key={mode} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={DIST_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
           <div className="grid grid-cols-4 gap-3 items-center">
             <Knob
@@ -802,15 +773,12 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               <Zap size={16} className="text-amber-500" />
               <h3 className="font-bold text-amber-400 uppercase tracking-tight">COMPRESSOR</h3>
             </div>
-            <select
-              value={comp.mode}
-              onChange={(e) => updateCompressor({ mode: parseInt(e.target.value) })}
+            <CustomSelect
+              value={String(comp.mode)}
+              onChange={(v) => updateCompressor({ mode: parseInt(v) })}
               className="bg-dark-bgSecondary borderLight text-xs text-amber-400 rounded px-2 py-1"
-            >
-              {COMP_MODES.map((mode, i) => (
-                <option key={mode} value={i}>{mode}</option>
-              ))}
-            </select>
+              options={COMP_MODES.map((mode, i) => ({ value: String(i), label: mode }))}
+            />
           </div>
           <div className="flex items-center gap-3 mb-2">
             <label className="flex items-center gap-1 cursor-pointer">

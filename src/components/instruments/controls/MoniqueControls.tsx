@@ -7,6 +7,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import type { MoniqueConfig } from '@/engine/monique/MoniqueSynth';
 import { DEFAULT_MONIQUE } from '@/engine/monique/MoniqueSynth';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface MoniqueControlsProps {
   config: MoniqueConfig;
@@ -42,11 +43,12 @@ const OscPanel: React.FC<{
       <div className="flex gap-3 items-end">
         <div className="flex flex-col gap-1">
           <label className="text-text-muted text-[10px]">Wave</label>
-          <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-            value={Math.round((merged[waveKey] as number) ?? 0)}
-            onChange={(e) => update(waveKey, parseInt(e.target.value))}>
-            {WAVE_NAMES.map((name, i) => <option key={i} value={i}>{name}</option>)}
-          </select>
+          <CustomSelect
+            className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
+            value={String(Math.round((merged[waveKey] as number) ?? 0))}
+            onChange={(v) => update(waveKey, parseInt(v))}
+            options={WAVE_NAMES.map((name, i) => ({ value: String(i), label: name }))}
+          />
         </div>
         <Knob value={(merged[octKey] as number) ?? 0} min={-36} max={36}
           onChange={(v) => update(octKey, Math.round(v))} label="Oct" color="#22d3ee" />
@@ -70,13 +72,12 @@ const FilterPanel: React.FC<{
     <div className="p-2 rounded bg-[#1a1a2a]">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-text-muted font-semibold text-[11px]">FILTER {n}</span>
-        <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-          value={Math.round((merged[k('Type')] as number) ?? 1)}
-          onChange={(e) => update(k('Type'), parseInt(e.target.value))}>
-          {Object.entries(FILTER_TYPE_NAMES).map(([v, label]) => (
-            <option key={v} value={v}>{label}</option>
-          ))}
-        </select>
+        <CustomSelect
+          className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
+          value={String(Math.round((merged[k('Type')] as number) ?? 1))}
+          onChange={(v) => update(k('Type'), parseInt(v))}
+          options={Object.entries(FILTER_TYPE_NAMES).map(([v, label]) => ({ value: v, label }))}
+        />
       </div>
       <div className="flex gap-2 flex-wrap items-end">
         <Knob value={(merged[k('Cutoff')] as number) ?? 0.2} min={0} max={1}

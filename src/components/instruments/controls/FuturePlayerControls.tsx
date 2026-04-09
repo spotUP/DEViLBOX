@@ -8,6 +8,7 @@
  * ─── Live edit ────────────────────────────────────────────────────────────────
  *
  * Every parameter knob writes through to the running FuturePlayer WASM via
+
  * `FuturePlayerEngine.writeByte(detailPtr + offset, value)`. The C side
  * (`fp_wasm_write_byte`) patches the same module_copy buffer that fp_init
  * runs against, and update_audio() reads the new value on the next tick.
@@ -26,6 +27,7 @@ import { EnvelopeVisualization } from '@components/instruments/shared';
 import { FuturePlayerEngine } from '@/engine/futureplayer/FuturePlayerEngine';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { FP_DETAIL_OFFSET, FP_NEGATE_OFFSET } from '@/lib/futureplayer/detailOffsets';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
@@ -245,15 +247,16 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                   onChange={(v) => upd('pitchMod1Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
-                  <select
+                  <CustomSelect
                     className="bg-dark-bg border border-dark-border text-text-primary text-xs rounded px-1 py-0.5 focus:outline-none focus:border-accent-primary"
-                    value={config.pitchMod1Mode === 0 ? 0 : config.pitchMod1Mode === 1 ? 1 : 128}
-                    onChange={(e) => upd('pitchMod1Mode', Number(e.target.value))}
-                  >
-                    <option value={0}>Loop</option>
-                    <option value={1}>Continue</option>
-                    <option value={128}>One-shot</option>
-                  </select>
+                    value={String(config.pitchMod1Mode === 0 ? 0 : config.pitchMod1Mode === 1 ? 1 : 128)}
+                    onChange={(v) => upd('pitchMod1Mode', Number(v))}
+                    options={[
+                      { value: '0', label: 'Loop' },
+                      { value: '1', label: 'Continue' },
+                      { value: '128', label: 'One-shot' },
+                    ]}
+                  />
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Negate</div>
@@ -285,15 +288,16 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                   onChange={(v) => upd('pitchMod2Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
-                  <select
+                  <CustomSelect
                     className="bg-dark-bg border border-dark-border text-text-primary text-xs rounded px-1 py-0.5 focus:outline-none focus:border-accent-primary"
-                    value={config.pitchMod2Mode === 0 ? 0 : config.pitchMod2Mode === 1 ? 1 : 128}
-                    onChange={(e) => upd('pitchMod2Mode', Number(e.target.value))}
-                  >
-                    <option value={0}>Loop</option>
-                    <option value={1}>Continue</option>
-                    <option value={128}>One-shot</option>
-                  </select>
+                    value={String(config.pitchMod2Mode === 0 ? 0 : config.pitchMod2Mode === 1 ? 1 : 128)}
+                    onChange={(v) => upd('pitchMod2Mode', Number(v))}
+                    options={[
+                      { value: '0', label: 'Loop' },
+                      { value: '1', label: 'Continue' },
+                      { value: '128', label: 'One-shot' },
+                    ]}
+                  />
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Negate</div>
@@ -330,15 +334,16 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                   onChange={(v) => upd('sampleMod1Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
-                  <select
+                  <CustomSelect
                     className="bg-dark-bg border border-dark-border text-text-primary text-xs rounded px-1 py-0.5 focus:outline-none focus:border-accent-primary"
-                    value={config.sampleMod1Mode === 0 ? 0 : (config.sampleMod1Mode & 0x80) ? 128 : 1}
-                    onChange={(e) => upd('sampleMod1Mode', Number(e.target.value))}
-                  >
-                    <option value={0}>Loop</option>
-                    <option value={1}>Continue</option>
-                    <option value={128}>One-shot</option>
-                  </select>
+                    value={String(config.sampleMod1Mode === 0 ? 0 : (config.sampleMod1Mode & 0x80) ? 128 : 1)}
+                    onChange={(v) => upd('sampleMod1Mode', Number(v))}
+                    options={[
+                      { value: '0', label: 'Loop' },
+                      { value: '1', label: 'Continue' },
+                      { value: '128', label: 'One-shot' },
+                    ]}
+                  />
                 </div>
               </div>
             )}
@@ -364,15 +369,16 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                   onChange={(v) => upd('sampleMod2Shift', v)} color={knob} />
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Mode</div>
-                  <select
+                  <CustomSelect
                     className="bg-dark-bg border border-dark-border text-text-primary text-xs rounded px-1 py-0.5 focus:outline-none focus:border-accent-primary"
-                    value={config.sampleMod2Mode === 0 ? 0 : (config.sampleMod2Mode & 0x80) ? 128 : 1}
-                    onChange={(e) => upd('sampleMod2Mode', Number(e.target.value))}
-                  >
-                    <option value={0}>Loop</option>
-                    <option value={1}>Continue</option>
-                    <option value={128}>One-shot</option>
-                  </select>
+                    value={String(config.sampleMod2Mode === 0 ? 0 : (config.sampleMod2Mode & 0x80) ? 128 : 1)}
+                    onChange={(v) => upd('sampleMod2Mode', Number(v))}
+                    options={[
+                      { value: '0', label: 'Loop' },
+                      { value: '1', label: 'Continue' },
+                      { value: '128', label: 'One-shot' },
+                    ]}
+                  />
                 </div>
               </div>
             )}

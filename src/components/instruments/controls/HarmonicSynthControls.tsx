@@ -11,6 +11,7 @@ import type { HarmonicSynthConfig } from '@/types/instrument';
 import { DEFAULT_HARMONIC_SYNTH } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { FilterFrequencyResponse, EnvelopeVisualization, HarmonicBarsCanvas } from '@components/instruments/shared';
 
 interface HarmonicSynthControlsProps {
@@ -159,15 +160,16 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <span className="font-mono text-[10px] font-bold text-text-muted tracking-wider">FILTER</span>
-            <select
+            <CustomSelect
               value={config.filter.type}
-              onChange={(e) => updateFilter({ type: e.target.value as 'lowpass' | 'highpass' | 'bandpass' })}
+              onChange={(v) => updateFilter({ type: v as 'lowpass' | 'highpass' | 'bandpass' })}
+              options={[
+                { value: 'lowpass', label: 'LP' },
+                { value: 'highpass', label: 'HP' },
+                { value: 'bandpass', label: 'BP' },
+              ]}
               className="bg-transparent border rounded px-1.5 py-0.5 text-[9px] font-mono text-text-primary"
-            >
-              <option value="lowpass">LP</option>
-              <option value="highpass">HP</option>
-              <option value="bandpass">BP</option>
-            </select>
+            />
           </div>
           <div className="flex gap-4 justify-center">
             <Knob
@@ -227,15 +229,16 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
         <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
           <div className="flex items-center justify-between mb-2">
             <span className="font-mono text-[10px] font-bold text-text-muted tracking-wider">LFO</span>
-            <select
+            <CustomSelect
               value={config.lfo.target}
-              onChange={(e) => updateLFO({ target: e.target.value as 'pitch' | 'filter' | 'spectral' })}
+              onChange={(v) => updateLFO({ target: v as 'pitch' | 'filter' | 'spectral' })}
+              options={[
+                { value: 'pitch', label: 'Pitch' },
+                { value: 'filter', label: 'Filter' },
+                { value: 'spectral', label: 'Spectral' },
+              ]}
               className="bg-transparent border rounded px-1.5 py-0.5 text-[9px] font-mono text-text-primary"
-            >
-              <option value="pitch">Pitch</option>
-              <option value="filter">Filter</option>
-              <option value="spectral">Spectral</option>
-            </select>
+            />
           </div>
           <div className="flex gap-4 justify-center">
             <Knob

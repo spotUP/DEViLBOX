@@ -13,6 +13,7 @@ import type { InStereo2Config } from '@/types/instrument';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instruments/shared';
 
@@ -199,18 +200,13 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
       {/* Envelope Generator Section */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Envelope Generator (EG)" />
-        <select
-          value={config.egMode}
-          onChange={(e) => updateParam('egMode', parseInt(e.target.value))}
+        <CustomSelect
+          value={String(config.egMode)}
+          onChange={(v) => updateParam('egMode', parseInt(v))}
+          options={EG_MODES.map((m) => ({ value: String(m.value), label: m.name }))}
           className="w-full text-xs font-mono border rounded px-2 py-1.5 mb-3"
           style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
-        >
-          {EG_MODES.map((m) => (
-            <option key={m.value} value={m.value} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        />
 
         {config.egMode !== 0 && (
           <>

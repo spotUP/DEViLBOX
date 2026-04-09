@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { SynareConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { Drum, Activity, Waves, MoveDown, Speaker, Wind } from 'lucide-react';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { FilterFrequencyResponse } from '@components/instruments/shared';
@@ -362,15 +363,16 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           
           <div className="flex flex-col items-center gap-2">
             <span className="text-[10px] font-bold text-text-muted uppercase">Target</span>
-            <select
+            <CustomSelect
               value={config.lfo.target}
-              onChange={(e) => onChange({ lfo: { ...config.lfo, target: e.target.value as 'pitch' | 'filter' | 'both' } })}
+              onChange={(v) => onChange({ lfo: { ...config.lfo, target: v as 'pitch' | 'filter' | 'both' } })}
+              options={[
+                { value: 'pitch', label: 'Pitch' },
+                { value: 'filter', label: 'Filter' },
+                { value: 'both', label: 'Both' },
+              ]}
               className="bg-dark-bg borderLight text-xs text-text-primary rounded px-1 py-0.5"
-            >
-              <option value="pitch">Pitch</option>
-              <option value="filter">Filter</option>
-              <option value="both">Both</option>
-            </select>
+            />
           </div>
 
           {/* Momentary Throw Button */}

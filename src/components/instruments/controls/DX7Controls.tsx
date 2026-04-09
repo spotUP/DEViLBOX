@@ -7,6 +7,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { DX7Synth, type DX7PatchManifest } from '../../../engine/dx7/DX7Synth';
 import { getToneEngine } from '../../../engine/ToneEngine';
 
@@ -286,15 +287,12 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
           </div>
 
           {/* Bank Selector */}
-          <select
-            value={selectedBank}
-            onChange={(e) => selectPatch(Number(e.target.value), 0)}
+          <CustomSelect
+            value={String(selectedBank)}
+            onChange={(v) => selectPatch(Number(v), 0)}
+            options={bankNames.map(b => ({ value: String(b.index), label: b.label }))}
             className="w-full bg-dark-bgSecondary text-text-primary border border-ft2-border rounded px-2 py-1.5 text-[11px] mb-2 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-          >
-            {bankNames.map(b => (
-              <option key={b.index} value={b.index}>{b.label}</option>
-            ))}
-          </select>
+          />
 
           {/* Voice Grid (4×8) */}
           {currentBank && (
