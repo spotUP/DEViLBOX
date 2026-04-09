@@ -8,7 +8,7 @@
  * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -104,6 +104,25 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     return 'none';
   }, [editorMode, activeSystemPreset, sourceFormat]);
 
+  // Auto-size the select to fit the currently selected option text
+  const hwSelectRef = useRef<HTMLSelectElement>(null);
+  const autoSizeSelect = useCallback(() => {
+    const sel = hwSelectRef.current;
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+    // Measure text width using a temporary canvas
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return;
+    const style = getComputedStyle(sel);
+    ctx.font = `${style.fontSize} ${style.fontFamily}`;
+    const textW = ctx.measureText(opt.text).width;
+    // px padding (px-1.5 = 6px each side) + border (1px each) + dropdown arrow (~20px)
+    sel.style.width = `${Math.ceil(textW) + 34}px`;
+  }, []);
+
+  useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
+
   // Format info labels for tracker/platform formats
   const FORMAT_LABELS: Record<string, { name: string; platform: string }> = useMemo(() => ({
     // Amiga tracker formats
@@ -190,6 +209,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
+            ref={hwSelectRef}
             className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             onChange={(e) => {
               const v = e.target.value;
