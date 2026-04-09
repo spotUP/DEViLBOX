@@ -43,6 +43,11 @@ const _gainEngineCache = new Map<string, { Engine: GainEngine; maxCh: number }>(
 const _channelOnEngineCache = new Map<string, { Engine: ChannelOnEngine; maxCh: number }>();
 let _engineCacheWarmedUp = false;
 
+// Cached singleton refs populated during warm-up (avoids require() in runtime paths)
+let _trackerReplayerMod: { getTrackerReplayer(): any } | null = null;
+let _furnaceDispatchEngineRef: any = null;
+let _sunVoxEngineRef: any = null;
+
 // Engine definitions — resolved once at warm-up
 const BITMASK_ENGINES: [string, string, number?][] = [
   ['../engine/libopenmpt/LibopenmptEngine', 'LibopenmptEngine'],
@@ -82,7 +87,7 @@ const BITMASK_ENGINES: [string, string, number?][] = [
 void (async () => {
   const promises: Promise<void>[] = [];
 
-  // Bitmask engines
+  // Bitmask engines — also add to gain cache when they support setChannelGain
   for (const [path, name, chLimit] of BITMASK_ENGINES) {
     promises.push(
       import(/* @vite-ignore */ path)
@@ -90,13 +95,17 @@ void (async () => {
           const Engine = mod[name];
           if (Engine?.hasInstance) {
             _muteMaskEngineCache.set(name, { Engine, chLimit });
+            // Most bitmask engines also support setChannelGain
+            if (typeof Engine.getInstance === 'function') {
+              _gainEngineCache.set(name, { Engine: Engine as unknown as GainEngine, maxCh: chLimit ?? 32 });
+            }
           }
         })
         .catch((e) => console.warn(`[Mixer] Failed to warm up ${name}:`, e.message))
     );
   }
 
-  // Gain-based engines
+  // Gain-based engines (non-bitmask)
   promises.push(
     import('../engine/hively/HivelyEngine')
       .then(({ HivelyEngine }) => { _gainEngineCache.set('HivelyEngine', { Engine: HivelyEngine as unknown as GainEngine, maxCh: 16 }); })
@@ -115,6 +124,27 @@ void (async () => {
       .catch((e) => console.warn('[Mixer] Failed to warm up MusicLineEngine:', e.message))
   );
 
+  // TrackerReplayer — main mute mask + SID forwarder
+  promises.push(
+    import('../engine/TrackerReplayer')
+      .then((mod) => { _trackerReplayerMod = mod as any; })
+      .catch((e) => console.warn('[Mixer] Failed to warm up TrackerReplayer:', e.message))
+  );
+
+  // FurnaceDispatchEngine — per-channel mute
+  promises.push(
+    import('../engine/furnace-dispatch/FurnaceDispatchEngine')
+      .then((mod) => { _furnaceDispatchEngineRef = mod.FurnaceDispatchEngine; })
+      .catch((e) => console.warn('[Mixer] Failed to warm up FurnaceDispatchEngine:', e.message))
+  );
+
+  // SunVoxEngine — for VU polling
+  promises.push(
+    import('../engine/sunvox/SunVoxEngine')
+      .then((mod) => { _sunVoxEngineRef = mod.SunVoxEngine; })
+      .catch((e) => console.warn('[Mixer] Failed to warm up SunVoxEngine:', e.message))
+  );
+
   await Promise.allSettled(promises);
   _engineCacheWarmedUp = true;
 })();
@@ -127,10 +157,11 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 
   // Forward to TrackerReplayer (affects ToneEngine note triggering)
-  try {
-    const { getTrackerReplayer } = require('../engine/TrackerReplayer');
-    getTrackerReplayer().setChannelMuteMask(mask);
-  } catch { /* Replayer not initialized */ }
+  if (_trackerReplayerMod) {
+    try {
+      _trackerReplayerMod.getTrackerReplayer().setChannelMuteMask(mask);
+    } catch { /* Replayer not initialized */ }
+  }
 
   if (!_engineCacheWarmedUp) return; // Imports still warming up
 
@@ -175,13 +206,14 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 
   // C64 SID: instance-based (not singleton), access via replayer
-  try {
-    const { getTrackerReplayer } = require('../engine/TrackerReplayer');
-    const sidEngine = getTrackerReplayer().getC64SIDEngine();
-    if (sidEngine) {
-      sidEngine.setMuteMask(mask & 0x07); // 3 SID voices
-    }
-  } catch { /* replayer not initialized */ }
+  if (_trackerReplayerMod) {
+    try {
+      const sidEngine = _trackerReplayerMod.getTrackerReplayer().getC64SIDEngine();
+      if (sidEngine) {
+        sidEngine.setMuteMask(mask & 0x07); // 3 SID voices
+      }
+    } catch { /* replayer not initialized */ }
+  }
 }
 
 // ── SunVox mute bridge ─────────────────────────────────────────────────────
@@ -248,12 +280,10 @@ function pollSunVoxLevels(): void {
 
   _sunVoxVuInFlight = true;
 
-  // Use dynamic import pattern to avoid circular deps
+  // Use cached SunVox engine ref from warm-up
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { SunVoxEngine } = require('../engine/sunvox/SunVoxEngine');
-    if (!SunVoxEngine.hasInstance()) { _sunVoxVuInFlight = false; return; }
-    const engine = SunVoxEngine.getInstance();
+    if (!_sunVoxEngineRef || !_sunVoxEngineRef.hasInstance()) { _sunVoxVuInFlight = false; return; }
+    const engine = _sunVoxEngineRef.getInstance();
     engine.getModuleLevels(handle, moduleIds).then((levels: Float32Array) => {
       _sunVoxVuInFlight = false;
       if (!_sunVoxMuteBridge || levels.length === 0) return;
@@ -292,83 +322,21 @@ function hasActiveSunVoxSong(): boolean {
   return _sunVoxMuteBridge !== null && _sunVoxMuteBridge.getHandle() >= 0;
 }
 
-// Lazy references to WASM engines to avoid circular imports
-let _furnaceDispatchEngine: any = null;
+// Lazy reference to Furnace engine — uses cached ref from warm-up
 function getFurnaceDispatchEngine(): any {
-  if (!_furnaceDispatchEngine) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _furnaceDispatchEngine = require('../engine/furnace-dispatch/FurnaceDispatchEngine').FurnaceDispatchEngine;
-  }
-  return _furnaceDispatchEngine;
+  return _furnaceDispatchEngineRef;
 }
 
 /**
  * Get the active WASM engine instance that supports setChannelGain, if any.
- * Returns null if no gain-capable WASM engine is currently active.
+ * Iterates the warm-up cache — only one engine will have an active instance at a time.
  */
 export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
-  const fmt = useFormatStore.getState();
-  try {
-    if (fmt.editorMode === 'hively') {
-      const { HivelyEngine } = require('../engine/hively/HivelyEngine');
-      if (HivelyEngine.hasInstance()) return HivelyEngine.getInstance();
-    } else if (fmt.editorMode === 'klystrack') {
-      const { KlysEngine } = require('../engine/klystrack/KlysEngine');
-      if (KlysEngine.hasInstance()) return KlysEngine.getInstance();
-    } else if (fmt.editorMode === 'jamcracker') {
-      const { JamCrackerEngine } = require('../engine/jamcracker/JamCrackerEngine');
-      if (JamCrackerEngine.hasInstance()) return JamCrackerEngine.getInstance();
-    } else if (fmt.preTrackerFileData) {
-      const { PreTrackerEngine } = require('../engine/pretracker/PreTrackerEngine');
-      if (PreTrackerEngine.hasInstance()) return PreTrackerEngine.getInstance();
-    } else if (fmt.maFileData) {
-      const { MaEngine } = require('../engine/ma/MaEngine');
-      if (MaEngine.hasInstance()) return MaEngine.getInstance();
-    } else if (fmt.bdFileData) {
-      const { BdEngine } = require('../engine/bd/BdEngine');
-      if (BdEngine.hasInstance()) return BdEngine.getInstance();
-    } else if (fmt.sd2FileData) {
-      const { Sd2Engine } = require('../engine/sidmon2/Sd2Engine');
-      if (Sd2Engine.hasInstance()) return Sd2Engine.getInstance();
-    } else if (fmt.hippelFileData) {
-      const { HippelEngine } = require('../engine/hippel/HippelEngine');
-      if (HippelEngine.hasInstance()) return HippelEngine.getInstance();
-    } else if (fmt.eupFileData) {
-      const { EupminiEngine } = require('../engine/eupmini/EupminiEngine');
-      if (EupminiEngine.hasInstance()) return EupminiEngine.getInstance();
-    } else if (fmt.ixsFileData) {
-      const { IxalanceEngine } = require('../engine/ixalance/IxalanceEngine');
-      if (IxalanceEngine.hasInstance()) return IxalanceEngine.getInstance();
-    } else if (fmt.psycleFileData) {
-      const { CpsycleEngine } = require('../engine/cpsycle/CpsycleEngine');
-      if (CpsycleEngine.hasInstance()) return CpsycleEngine.getInstance();
-    } else if (fmt.sc68FileData) {
-      const { Sc68Engine } = require('../engine/sc68/Sc68Engine');
-      if (Sc68Engine.hasInstance()) return Sc68Engine.getInstance();
-    } else if (fmt.zxtuneFileData) {
-      const { ZxtuneEngine } = require('../engine/zxtune/ZxtuneEngine');
-      if (ZxtuneEngine.hasInstance()) return ZxtuneEngine.getInstance();
-    } else if (fmt.pumaTrackerFileData) {
-      const { PumaTrackerEngine } = require('../engine/pumatracker/PumaTrackerEngine');
-      if (PumaTrackerEngine.hasInstance()) return PumaTrackerEngine.getInstance();
-    } else if (fmt.steveTurnerFileData) {
-      const { SteveTurnerEngine } = require('../engine/steveturner/SteveTurnerEngine');
-      if (SteveTurnerEngine.hasInstance()) return SteveTurnerEngine.getInstance();
-    } else if (fmt.sidmon1WasmFileData) {
-      const { SidMon1ReplayerEngine } = require('../engine/sidmon1/SidMon1ReplayerEngine');
-      if (SidMon1ReplayerEngine.hasInstance()) return SidMon1ReplayerEngine.getInstance();
-    } else if (fmt.fredEditorWasmFileData) {
-      const { FredEditorReplayerEngine } = require('../engine/fred/FredEditorReplayerEngine');
-      if (FredEditorReplayerEngine.hasInstance()) return FredEditorReplayerEngine.getInstance();
-    } else if (fmt.artOfNoiseFileData) {
-      const { ArtOfNoiseEngine } = require('../engine/artofnoise/ArtOfNoiseEngine');
-      if (ArtOfNoiseEngine.hasInstance()) return ArtOfNoiseEngine.getInstance();
-    } else if (fmt.startrekkerAMFileData) {
-      const { StartrekkerAMEngine } = require('../engine/startrekker-am/StartrekkerAMEngine');
-      if (StartrekkerAMEngine.hasInstance()) return StartrekkerAMEngine.getInstance();
-    }
-  } catch {
-    // Engine not ready
+  if (!_engineCacheWarmedUp) return null;
+  for (const [, { Engine }] of _gainEngineCache) {
+    try {
+      if (Engine.hasInstance()) return Engine.getInstance() as any;
+    } catch { /* not ready */ }
   }
   return null;
 }
@@ -435,10 +403,12 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
   // Furnace uses mute API (binary on/off)
   if (fmt.editorMode === 'furnace') {
     try {
-      const engine = getFurnaceDispatchEngine().getInstance();
-      const c = channels[ch];
-      const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
-      engine.mute(ch, effectiveMute);
+      const eng = getFurnaceDispatchEngine();
+      if (eng) {
+        const c = channels[ch];
+        const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
+        eng.getInstance().mute(ch, effectiveMute);
+      }
     } catch (e: any) {
       console.warn('[Mixer] Furnace mute error:', e?.message);
     }
@@ -474,11 +444,14 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
   // Furnace uses mute API
   if (fmt.editorMode === 'furnace') {
     try {
-      const engine = getFurnaceDispatchEngine().getInstance();
-      channels.forEach((c, i) => {
-        const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
-        engine.mute(i, effectiveMute);
-      });
+      const eng = getFurnaceDispatchEngine();
+      if (eng) {
+        const engine = eng.getInstance();
+        channels.forEach((c, i) => {
+          const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
+          engine.mute(i, effectiveMute);
+        });
+      }
     } catch (e: any) {
       console.warn('[Mixer] Furnace mute-all error:', e?.message);
     }
