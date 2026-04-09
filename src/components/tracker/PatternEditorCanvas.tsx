@@ -559,6 +559,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const isScratchDragRef = useRef(false);
   const [, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
 
+  // Auto-scroll state for drag selection beyond visible edges
+  const lastDragClientRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const autoScrollRafRef = useRef<number | null>(null);
+
   // Document-level handlers for scratch drag (cursor can leave canvas bounds)
   // Use pointer events so touch drag works on iOS/mobile
   useEffect(() => {
@@ -715,11 +719,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setIsDragging(true);
   }, [isMobile, getCellFromCoords]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent | PointerEvent) => {
     // Scratch drag handled by document-level listener (supports dragging outside canvas)
     if (isScratchDragRef.current) return;
 
     if (!isDragging || isMobile) return;
+
+    // Store last mouse position for auto-scroll rAF loop
+    lastDragClientRef.current = { x: e.clientX, y: e.clientY };
 
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
@@ -727,13 +734,117 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     useCursorStore.getState().updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
   }, [isDragging, isMobile, getCellFromCoords]);
 
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRafRef.current !== null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+  }, []);
+
   const handleMouseUp = useCallback(() => {
     // Scratch drag ended by document-level listener
     if (isScratchDragRef.current) return;
     if (isDragging) {
+      stopAutoScroll();
       setIsDragging(false);
     }
-  }, [isDragging]);
+  }, [isDragging, stopAutoScroll]);
+
+  // Document-level pointer tracking during drag selection.
+  // Enables auto-scroll when the mouse moves beyond the top/bottom edge.
+  useEffect(() => {
+    if (!isDragging || isMobile) return;
+
+    const EDGE_ZONE = 40; // px from container edge to trigger auto-scroll
+    let lastScrollTime = 0;
+
+    const onDocMove = (e: PointerEvent) => {
+      if (isScratchDragRef.current) return;
+      lastDragClientRef.current = { x: e.clientX, y: e.clientY };
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const relativeY = e.clientY - rect.top;
+      const h = rect.height;
+
+      // Inside the safe zone — normal selection update, no auto-scroll needed
+      if (relativeY >= EDGE_ZONE && relativeY <= h - EDGE_ZONE) {
+        stopAutoScroll();
+        const cell = getCellFromCoords(e.clientX, e.clientY);
+        if (cell) {
+          useCursorStore.getState().updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
+        }
+        return;
+      }
+
+      // Near or beyond an edge — start auto-scroll if not already running
+      if (autoScrollRafRef.current === null) {
+        const scrollStep = () => {
+          if (!containerRef.current) return;
+          const now = performance.now();
+          // Throttle to ~20 rows/sec max for controllable scrolling
+          if (now - lastScrollTime < 50) {
+            autoScrollRafRef.current = requestAnimationFrame(scrollStep);
+            return;
+          }
+          lastScrollTime = now;
+
+          const r = containerRef.current.getBoundingClientRect();
+          const { x: mx, y: my } = lastDragClientRef.current;
+          const ry = my - r.top;
+          const cursor = cursorRef.current;
+
+          if (!pattern) { autoScrollRafRef.current = null; return; }
+
+          let targetRow = cursor.rowIndex;
+          if (ry < EDGE_ZONE) {
+            // Scroll up — speed increases with distance beyond edge
+            const intensity = Math.ceil((EDGE_ZONE - ry) / (EDGE_ZONE / 3));
+            targetRow = Math.max(0, cursor.rowIndex - intensity);
+          } else if (ry > r.height - EDGE_ZONE) {
+            // Scroll down
+            const intensity = Math.ceil((ry - (r.height - EDGE_ZONE)) / (EDGE_ZONE / 3));
+            targetRow = Math.min(pattern.length - 1, cursor.rowIndex + intensity);
+          } else {
+            // Mouse moved back to safe zone — stop
+            autoScrollRafRef.current = null;
+            return;
+          }
+
+          if (targetRow !== cursor.rowIndex) {
+            const cursorStore = useCursorStore.getState();
+            cursorStore.moveCursorToRow(targetRow);
+            // Extend selection to the edge row at the current horizontal position
+            const cell = getCellFromCoords(mx, my);
+            if (cell) {
+              cursorStore.updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
+            } else {
+              // Mouse is outside horizontal bounds — extend to the scrolled row keeping last channel
+              const sel = cursorStore.selection;
+              if (sel) cursorStore.updateSelection(sel.endChannel, targetRow);
+            }
+          }
+
+          autoScrollRafRef.current = requestAnimationFrame(scrollStep);
+        };
+        autoScrollRafRef.current = requestAnimationFrame(scrollStep);
+      }
+    };
+
+    const onDocUp = () => {
+      stopAutoScroll();
+      setIsDragging(false);
+    };
+
+    document.addEventListener('pointermove', onDocMove);
+    document.addEventListener('pointerup', onDocUp);
+    return () => {
+      stopAutoScroll();
+      document.removeEventListener('pointermove', onDocMove);
+      document.removeEventListener('pointerup', onDocUp);
+    };
+  }, [isDragging, isMobile, getCellFromCoords, stopAutoScroll, pattern]);
 
   const handleLongPress = useCallback((x: number, y: number) => {
     if (!isMobile) return;
@@ -3217,7 +3328,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onPointerDown={handleMouseDown as React.PointerEventHandler}
         onPointerMove={handleMouseMove as React.PointerEventHandler}
         onPointerUp={handleMouseUp as React.PointerEventHandler}
-        onPointerLeave={() => { if (!isScratchDragRef.current) handleMouseUp(); }}
+        onPointerLeave={() => { if (!isScratchDragRef.current && !isDragging) handleMouseUp(); }}
         onWheel={handleWheel}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
