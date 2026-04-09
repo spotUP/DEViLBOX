@@ -72,14 +72,21 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     }
 
     try {
+      // Helper: encode string to Uint8Array (AudioWorklet has no TextEncoder)
+      function strToBytes(str) {
+        const bytes = new Uint8Array(str.length);
+        for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xff;
+        return bytes;
+      }
+
       // Add companion files first (e.g. patch.003 for SCI)
       if (companions && companions.length > 0) {
         for (const comp of companions) {
           const cPtr = this.module._adplug_alloc(comp.data.length);
           this.module.HEAPU8.set(comp.data, cPtr);
-          const cnLen = (new TextEncoder().encode(comp.name)).length + 1;
-          const cnPtr = this.module._malloc(cnLen);
-          this.module.HEAPU8.set(new TextEncoder().encode(comp.name + '\0'), cnPtr);
+          const cnBytes = strToBytes(comp.name + '\0');
+          const cnPtr = this.module._malloc(cnBytes.length);
+          this.module.HEAPU8.set(cnBytes, cnPtr);
           this.module._adplug_add_companion(cPtr, comp.data.length, cnPtr);
           this.module._free(cnPtr);
           this.module._adplug_free(cPtr);
@@ -90,9 +97,8 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       this.module.HEAPU8.set(data, ptr);
 
       // Pass filename as C string
-      const fnLen = (new TextEncoder().encode(filename)).length + 1;
-      const fnPtr = this.module._malloc(fnLen);
-      const fnBytes = new TextEncoder().encode(filename + '\0');
+      const fnBytes = strToBytes(filename + '\0');
+      const fnPtr = this.module._malloc(fnBytes.length);
       this.module.HEAPU8.set(fnBytes, fnPtr);
 
       const result = this.module._adplug_load(ptr, data.length, fnPtr);
