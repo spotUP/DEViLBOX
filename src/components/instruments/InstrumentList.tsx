@@ -652,7 +652,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   <div className={`instrument-action-buttons flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
-                      className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-accent-highlight`}
+                      className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-accent-highlight'}`}
                       title="Pop out editor"
                     >
                       <ExternalLink size={10} />
@@ -668,14 +668,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       <>
                         <button
                           onClick={(e) => handleSaveAhi(e, instrument)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-yellow-400`}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-yellow-400'}`}
                           title="Save as .ahi instrument file"
                         >
                           <Download size={10} />
                         </button>
                         <button
                           onClick={(e) => handleLoadAhi(e, instrument.id)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-yellow-400`}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-yellow-400'}`}
                           title="Load .ahi instrument file"
                         >
                           <Upload size={10} />
@@ -686,14 +686,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                       <>
                         <button
                           onClick={(e) => handleSaveMli(e, instrument)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-orange-400`}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-orange-400'}`}
                           title="Save as .mli instrument file"
                         >
                           <Download size={10} />
                         </button>
                         <button
                           onClick={(e) => handleLoadMli(e, instrument.id)}
-                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-orange-400`}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-orange-400'}`}
                           title="Load .mli instrument file"
                         >
                           <Upload size={10} />
@@ -703,7 +703,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     {instruments.length > 1 && (
                       <button
                         onClick={(e) => handleDelete(e, instrument.id)}
-                        className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-red-400`}
+                        className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20 text-ft2-bg' : 'hover:bg-ft2-border text-red-400'}`}
                         title="Delete"
                       >
                         <Trash2 size={10} />
