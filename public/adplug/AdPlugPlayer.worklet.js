@@ -23,7 +23,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
         await this.initModule(msg.sampleRate, msg.wasmBinary, msg.jsCode);
         break;
       case 'load':
-        this.loadFile(msg.data, msg.filename);
+        this.loadFile(msg.data, msg.filename, msg.companions);
         break;
       case 'play':
         this.playing = true;
@@ -65,13 +65,27 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     }
   }
 
-  loadFile(data, filename) {
+  loadFile(data, filename, companions) {
     if (!this.initialized) {
       this.port.postMessage({ type: 'error', error: 'Not initialized' });
       return;
     }
 
     try {
+      // Add companion files first (e.g. patch.003 for SCI)
+      if (companions && companions.length > 0) {
+        for (const comp of companions) {
+          const cPtr = this.module._adplug_alloc(comp.data.length);
+          this.module.HEAPU8.set(comp.data, cPtr);
+          const cnLen = (new TextEncoder().encode(comp.name)).length + 1;
+          const cnPtr = this.module._malloc(cnLen);
+          this.module.HEAPU8.set(new TextEncoder().encode(comp.name + '\0'), cnPtr);
+          this.module._adplug_add_companion(cPtr, comp.data.length, cnPtr);
+          this.module._free(cnPtr);
+          this.module._adplug_free(cPtr);
+        }
+      }
+
       const ptr = this.module._adplug_alloc(data.length);
       this.module.HEAPU8.set(data, ptr);
 

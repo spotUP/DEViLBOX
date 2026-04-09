@@ -3,6 +3,7 @@
  *
  * Emscripten wrapper for the AdPlug C++ library.
  * Provides a C API for loading and rendering 50+ OPL/AdLib music formats.
+ * Embeds standard.bnk for ROL/SCI instrument bank support.
  */
 
 #include <emscripten.h>
@@ -10,6 +11,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
+#include <algorithm>
 
 #include "adplug.h"
 #include "emuopl.h"
@@ -18,19 +21,49 @@
 #include "players.h"
 #include "binstr.h"
 
+// Embedded standard.bnk for ROL/SCI support (generated from AdPlug test data)
+#include "standard_bnk.h"
+
+// Helper: case-insensitive ends-with check
+static bool iends_with(const std::string& str, const std::string& suffix) {
+    if (suffix.size() > str.size()) return false;
+    return std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(),
+        [](char a, char b) { return tolower(a) == tolower(b); });
+}
+
+// Companion files (e.g. patch.003 for SCI, .bnk for ROL)
+struct CompanionFile {
+    uint8_t* data;
+    uint64_t size;
+    std::string name;
+};
+static std::vector<CompanionFile> g_companions;
+
 // In-memory file provider for AdPlug
+// Serves the loaded music file, companion files, AND standard.bnk for ROL.
 class CProvider_Memory : public CFileProvider {
 public:
     CProvider_Memory(const uint8_t* data, uint64_t size, const std::string& filename)
         : m_data(data), m_size(size), m_filename(filename) {}
 
     binistream* open(std::string filename) const override {
+        // Serve the main music file
         if (filename == m_filename) {
-            binisstream* stream = new binisstream(const_cast<uint8_t*>(m_data), static_cast<unsigned long>(m_size));
-            stream->setFlag(binio::BigEndian, false);
-            stream->setFlag(binio::FloatIEEE);
-            return stream;
+            return makeStream(m_data, m_size);
         }
+
+        // Check companion files (e.g. patch.003 for SCI)
+        for (const auto& c : g_companions) {
+            if (iends_with(filename, c.name)) {
+                return makeStream(c.data, c.size);
+            }
+        }
+
+        // Serve standard.bnk for ROL files
+        if (iends_with(filename, "standard.bnk") || iends_with(filename, ".bnk")) {
+            return makeStream(standard_bnk_data, standard_bnk_size);
+        }
+
         return nullptr;
     }
 
@@ -39,6 +72,14 @@ public:
     }
 
 private:
+    static binisstream* makeStream(const uint8_t* data, uint64_t size) {
+        binisstream* stream = new binisstream(
+            const_cast<uint8_t*>(data), static_cast<unsigned long>(size));
+        stream->setFlag(binio::BigEndian, false);
+        stream->setFlag(binio::FloatIEEE);
+        return stream;
+    }
+
     const uint8_t* m_data;
     uint64_t m_size;
     std::string m_filename;
@@ -78,7 +119,23 @@ void adplug_shutdown() {
     if (g_player) { delete g_player; g_player = nullptr; }
     if (g_opl)    { delete g_opl;    g_opl = nullptr; }
     if (g_fileData) { free(g_fileData); g_fileData = nullptr; }
+    for (auto& c : g_companions) { free(c.data); }
+    g_companions.clear();
     g_initialized = false;
+}
+
+/**
+ * Add a companion file (e.g. patch.003 for SCI, custom .bnk for ROL).
+ * Call before adplug_load(). Companions are cleared on next adplug_load().
+ */
+EMSCRIPTEN_KEEPALIVE
+void adplug_add_companion(const uint8_t* data, uint32_t length, const char* name) {
+    CompanionFile c;
+    c.data = (uint8_t*)malloc(length);
+    memcpy(c.data, data, length);
+    c.size = length;
+    c.name = std::string(name);
+    g_companions.push_back(c);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -101,6 +158,10 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     // Use AdPlug factory to auto-detect format and create player
     CProvider_Memory provider(g_fileData, g_fileSize, std::string(filename));
     g_player = CAdPlug::factory(std::string(filename), g_opl, CAdPlug::players, provider);
+
+    // Clear companions after load attempt
+    for (auto& c : g_companions) { free(c.data); }
+    g_companions.clear();
 
     if (!g_player) {
         free(g_fileData);
