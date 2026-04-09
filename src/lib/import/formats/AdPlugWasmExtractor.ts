@@ -207,11 +207,11 @@ export async function extractAdPlugPatterns(
     if (numChannels > 18 || numRows > 256) return null;
 
     // ── Extract order list ──
-    // Stop at first out-of-range entry (some formats pad with 0xFF or numPatterns)
+    // Stop at first out-of-range or sentinel entry (0xFFFF = end, >= numPatterns = padding)
     const songPositions: number[] = [];
     for (let i = 0; i < numOrders; i++) {
       const entry = M._adplug_get_order_entry(i);
-      if (entry >= numPatterns) break;
+      if (entry === 0xFFFF || entry >= numPatterns) break;
       songPositions.push(entry);
     }
     if (songPositions.length === 0) return null;
