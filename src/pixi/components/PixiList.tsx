@@ -224,7 +224,6 @@ export const PixiList: React.FC<PixiListProps> = ({
             eventMode="static"
             cursor="pointer"
             hitArea={new Rectangle(0, 0, width - 10, itemHeight)}
-            onPointerUp={() => handleItemClick(item.id)}
             onClick={() => handleItemClick(item.id)}
             layout={{
               position: 'absolute',

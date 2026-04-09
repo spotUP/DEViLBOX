@@ -555,7 +555,6 @@ const RightSide: React.FC<RightSideProps> = ({
         <pixiContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={onToggleKnobBar}
           onClick={onToggleKnobBar}
           layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight }}
         >
@@ -580,7 +579,6 @@ const RightSide: React.FC<RightSideProps> = ({
       <pixiContainer
         eventMode="static"
         cursor="pointer"
-        onPointerUp={onShowTips}
         onClick={onShowTips}
         onPointerOver={() => setTipsHovered(true)}
         onPointerOut={() => setTipsHovered(false)}
@@ -734,7 +732,6 @@ const PixiBankTab: React.FC<BankTabProps> = ({ label, isActive, height, onPress 
     <pixiContainer
       eventMode="static"
       cursor="pointer"
-      onPointerUp={onPress}
       onClick={onPress}
       layout={{ width: W, height, justifyContent: 'center', alignItems: 'center' }}
     >

@@ -152,7 +152,6 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
             cursor={isGroup || opt.disabled ? 'default' : 'pointer'}
             onPointerOver={(e: { currentTarget: ContainerType }) => { if (!isGroup && !opt.disabled) e.currentTarget.tint = theme.accent.color; }}
             onPointerOut={(e: { currentTarget: ContainerType }) => { e.currentTarget.tint = 0xffffff; }}
-            onPointerUp={() => { if (!isGroup && !opt.disabled) { onSelect(opt.value); onClose(); } }}
             onClick={() => { if (!isGroup && !opt.disabled) { onSelect(opt.value); onClose(); } }}
             layout={{
               width: width - PANEL_PADDING * 2,
@@ -285,7 +284,6 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
       cursor={disabled ? 'default' : 'pointer'}
       onPointerOver={(e: { currentTarget: ContainerType }) => { e.currentTarget.tint = 0xdddddd; }}
       onPointerOut={(e: { currentTarget: ContainerType }) => { e.currentTarget.tint = 0xffffff; }}
-      onPointerUp={handleToggle}
       onClick={handleToggle}
       alpha={disabled ? 0.4 : 1}
       layout={{

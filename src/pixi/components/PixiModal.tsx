@@ -207,7 +207,6 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
           cursor="pointer"
           onPointerOver={() => setCloseHovered(true)}
           onPointerOut={() => setCloseHovered(false)}
-          onPointerUp={onClose}
           onClick={onClose}
           layout={{
             width: 28,

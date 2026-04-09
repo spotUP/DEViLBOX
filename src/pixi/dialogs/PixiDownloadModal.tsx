@@ -88,7 +88,6 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
           cursor="pointer"
           onPointerOver={() => setCloseHovered(true)}
           onPointerOut={() => setCloseHovered(false)}
-          onPointerUp={onClose}
           onClick={onClose}
           layout={{
             width: 28,
@@ -125,7 +124,6 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
                 cursor="pointer"
                 onPointerOver={() => setHoveredCard(p.name)}
                 onPointerOut={() => setHoveredCard(null)}
-                onPointerUp={handleDownload}
                 onClick={handleDownload}
                 layout={{
                   flexDirection: 'row',

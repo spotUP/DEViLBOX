@@ -96,7 +96,6 @@ const Section: React.FC<SectionProps> = ({ title, id: _id, expanded, onToggle, w
       <layoutContainer
         eventMode="static"
         cursor="pointer"
-        onPointerUp={onToggle}
         onClick={onToggle}
         layout={{
           width: width - 34,
