@@ -908,6 +908,31 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     // Wait for any deferred state updates (loadInstruments uses queueMicrotask)
     await new Promise<void>(resolve => queueMicrotask(resolve));
 
+    // Streaming WASM players (AdPlug, V2M) bypass the tracker store entirely —
+    // return metadata from the player instance, not stale tracker state.
+    const { isAdPlugWasmFormat } = await import('../../lib/file/UnifiedFileLoader');
+    if (isAdPlugWasmFormat(filename)) {
+      const { getAdPlugPlayer } = await import('../../lib/import/AdPlugPlayer');
+      const meta = getAdPlugPlayer().meta;
+      return {
+        ok: true,
+        format: meta?.formatType || 'AdPlug',
+        streaming: true,
+        title: meta?.title || filename,
+        subsongs: meta?.subsongs || 1,
+        instruments: meta?.instruments?.length || 0,
+        filename,
+      };
+    }
+    if (filename.endsWith('.v2m')) {
+      return {
+        ok: true,
+        format: 'V2M',
+        streaming: true,
+        filename,
+      };
+    }
+
     // Read back the result from stores
     const trackerState = useTrackerStore.getState();
     const instrumentState = useInstrumentStore.getState();
