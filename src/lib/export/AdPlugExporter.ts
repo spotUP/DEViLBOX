@@ -16,6 +16,7 @@
 import type { RegisterWrite } from './VGMExporter';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, FurnaceOperatorConfig, FurnaceConfig } from '@/types';
+import type { OPL3Config } from '@/types/instrument';
 
 void (undefined as unknown as RegisterWrite); // Satisfy import usage
 
@@ -41,10 +42,10 @@ export function canExportRAD(song: TrackerSong): boolean {
  * Determine if an instrument is OPL-based
  */
 function isOPLInstrument(inst: InstrumentConfig): boolean {
+  if (inst.synthType === 'OPL3' && inst.opl3) return true;
   if (OPL_SYNTH_TYPES.has(inst.synthType)) return true;
   if (inst.furnace) {
     if (OPL_CHIP_TYPES.has(inst.furnace.chipType)) return true;
-    // OPLL (chipType 11) is OPL-family
     if (inst.furnace.chipType === 11) return true;
   }
   return false;
@@ -126,6 +127,28 @@ function createDefaultOperator(): FurnaceOperatorConfig {
     mult: 1, tl: 63, ar: 15, dr: 0, d2r: 0, sl: 15, rr: 15, dt: 0,
     am: false, vib: false, sus: false, ksr: false, ksl: 0, ws: 0,
   };
+}
+
+/**
+ * Convert OPL3Config (from OPL3Synth instruments) → RAD 11-byte register format.
+ * Maps the named fields back to the standard 11-byte layout.
+ */
+function encodeOPL3Instrument(o: OPL3Config): Uint8Array {
+  const bytes = new Uint8Array(11);
+  bytes[0] = ((o.op1Tremolo ?? 0) & 1) << 7 | ((o.op1Vibrato ?? 0) & 1) << 6 |
+    ((o.op1SustainHold ?? 0) & 1) << 5 | ((o.op1KSR ?? 0) & 1) << 4 | ((o.op1Multi ?? 0) & 0x0F);
+  bytes[1] = ((o.op2Tremolo ?? 0) & 1) << 7 | ((o.op2Vibrato ?? 0) & 1) << 6 |
+    ((o.op2SustainHold ?? 0) & 1) << 5 | ((o.op2KSR ?? 0) & 1) << 4 | ((o.op2Multi ?? 0) & 0x0F);
+  bytes[2] = (((o.op1KSL ?? 0) & 0x03) << 6) | ((o.op1Level ?? 0) & 0x3F);
+  bytes[3] = (((o.op2KSL ?? 0) & 0x03) << 6) | ((o.op2Level ?? 0) & 0x3F);
+  bytes[4] = (((o.op1Attack ?? 0) & 0x0F) << 4) | ((o.op1Decay ?? 0) & 0x0F);
+  bytes[5] = (((o.op2Attack ?? 0) & 0x0F) << 4) | ((o.op2Decay ?? 0) & 0x0F);
+  bytes[6] = (((o.op1Sustain ?? 0) & 0x0F) << 4) | ((o.op1Release ?? 0) & 0x0F);
+  bytes[7] = (((o.op2Sustain ?? 0) & 0x0F) << 4) | ((o.op2Release ?? 0) & 0x0F);
+  bytes[8] = (o.op1Waveform ?? 0) & 0x07;
+  bytes[9] = (o.op2Waveform ?? 0) & 0x07;
+  bytes[10] = (((o.feedback ?? 0) & 0x07) << 1) | ((o.connection ?? 0) & 0x01);
+  return bytes;
 }
 
 /**
@@ -254,17 +277,25 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   // ── Identify OPL instruments and build mapping ────────────────────────
   // instrumentMap: XM instrument number (1-based) → RAD instrument number (1-based)
   const instrumentMap = new Map<number, number>();
-  const oplInstruments: Array<{ radIndex: number; config: FurnaceConfig }> = [];
+  const oplInstrumentBytes: Array<{ radIndex: number; bytes: Uint8Array }> = [];
   let radIndex = 1;
 
   for (let i = 0; i < song.instruments.length; i++) {
     const inst = song.instruments[i];
-    if (isOPLInstrument(inst) && inst.furnace) {
-      const xmIndex = inst.id || (i + 1); // 1-based
-      instrumentMap.set(xmIndex, radIndex);
-      oplInstruments.push({ radIndex, config: inst.furnace });
-      radIndex++;
+    if (!isOPLInstrument(inst)) continue;
+    const xmIndex = inst.id || (i + 1); // 1-based
+    instrumentMap.set(xmIndex, radIndex);
+
+    let bytes: Uint8Array;
+    if (inst.opl3) {
+      bytes = encodeOPL3Instrument(inst.opl3);
+    } else if (inst.furnace) {
+      bytes = encodeOPLInstrument(inst.furnace);
+    } else {
+      bytes = new Uint8Array(11); // empty patch
     }
+    oplInstrumentBytes.push({ radIndex, bytes });
+    radIndex++;
   }
 
   // ── Build binary sections ─────────────────────────────────────────────
@@ -287,10 +318,9 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   sections.push(speed);
 
   // 4. Instrument definitions: count + per-instrument data
-  sections.push(oplInstruments.length & 0xFF);
-  for (const { radIndex: idx, config } of oplInstruments) {
+  sections.push(oplInstrumentBytes.length & 0xFF);
+  for (const { radIndex: idx, bytes: instBytes } of oplInstrumentBytes) {
     sections.push(idx & 0xFF); // instrument number (1-based)
-    const instBytes = encodeOPLInstrument(config);
     for (let j = 0; j < instBytes.length; j++) sections.push(instBytes[j]);
   }
 
