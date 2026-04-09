@@ -13,6 +13,7 @@ import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
 import type { AutoTuneScale } from '@/engine/effects/AutoTuneEffect';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import { registerPTTHandlers, unregisterPTTHandlers } from '@/hooks/useGlobalPTT';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 const KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const SCALE_OPTIONS: AutoTuneScale[] = ['major', 'minor', 'chromatic', 'pentatonic', 'blues'];
@@ -157,8 +158,7 @@ export const DJVocoderControl: React.FC = () => {
     }
   }, [isActive, selectedDeviceId]);
 
-  const handleDeviceChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const deviceId = e.target.value;
+  const handleDeviceChange = useCallback(async (deviceId: string) => {
     setSelectedDeviceId(deviceId);
     // If already active, restart with new device
     if (engineRef.current?.isActive) {
@@ -224,8 +224,7 @@ export const DJVocoderControl: React.FC = () => {
     engineRef.current?.setWet(wet);
   }, []);
 
-  const handlePresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const name = e.target.value;
+  const handlePresetChange = useCallback((name: string) => {
     if (engineRef.current) {
       engineRef.current.loadPreset(name);
     } else {
@@ -255,14 +254,14 @@ export const DJVocoderControl: React.FC = () => {
     });
   }, [realTuneEnabled, tuneKey, tuneScale]);
 
-  const handleTuneKeyChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const k = parseInt(e.target.value, 10);
+  const handleTuneKeyChange = useCallback((v: string) => {
+    const k = parseInt(v, 10);
     setTuneKey(k);
     engineRef.current?.setAutoTuneKey(k);
   }, []);
 
-  const handleTuneScaleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const s = e.target.value as AutoTuneScale;
+  const handleTuneScaleChange = useCallback((v: string) => {
+    const s = v as AutoTuneScale;
     setTuneScale(s);
     engineRef.current?.setAutoTuneScale(s);
   }, []);
@@ -273,8 +272,8 @@ export const DJVocoderControl: React.FC = () => {
     engineRef.current?.applyFX(useVocoderStore.getState().fx);
   }, [fxEnabled]);
 
-  const handleFXPresetChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const preset = e.target.value as VocoderFXPreset;
+  const handleFXPresetChange = useCallback((v: string) => {
+    const preset = v as VocoderFXPreset;
     useVocoderStore.getState().loadFXPreset(preset);
     engineRef.current?.applyFX(useVocoderStore.getState().fx);
   }, []);
@@ -283,18 +282,16 @@ export const DJVocoderControl: React.FC = () => {
     <div className="flex items-center gap-1.5 flex-wrap">
       {/* Mic device selector (always visible so user can pick before activating) */}
       {devices.length > 1 && (
-        <select
+        <CustomSelect
           value={selectedDeviceId}
           onChange={handleDeviceChange}
-          className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary max-w-[140px] truncate"
+          options={devices.map(d => ({
+            value: d.deviceId,
+            label: d.label,
+          }))}
+          className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary max-w-[140px]"
           title="Select microphone input"
-        >
-          {devices.map(d => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+        />
       )}
 
       {/* Push-to-talk: always available — hold to speak, release to let echo ring out */}
@@ -371,26 +368,26 @@ export const DJVocoderControl: React.FC = () => {
         </label>
         {realTuneEnabled && (
           <>
-            <select
-              value={tuneKey}
+            <CustomSelect
+              value={String(tuneKey)}
               onChange={handleTuneKeyChange}
+              options={KEY_NAMES.map((name, i) => ({
+                value: String(i),
+                label: name,
+              }))}
               className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-pink-400"
               title="Autotune key"
-            >
-              {KEY_NAMES.map((name, i) => (
-                <option key={i} value={i}>{name}</option>
-              ))}
-            </select>
-            <select
+            />
+            <CustomSelect
               value={tuneScale}
               onChange={handleTuneScaleChange}
+              options={SCALE_OPTIONS.map((s) => ({
+                value: s,
+                label: s,
+              }))}
               className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-pink-400"
               title="Autotune scale"
-            >
-              {SCALE_OPTIONS.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            />
           </>
         )}
         <label className="flex items-center gap-0.5 cursor-pointer" title="Follow Melody — drive the vocoder carrier from the active deck's pattern data">
@@ -414,35 +411,35 @@ export const DJVocoderControl: React.FC = () => {
           <span className="text-[9px] text-text-muted">FX</span>
         </label>
         {fxEnabled && (
-          <select
+          <CustomSelect
             value={fxPreset}
             onChange={handleFXPresetChange}
+            options={Object.keys(VOCODER_FX_PRESETS).map(name => ({
+              value: name,
+              label: name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
+            }))}
             className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-cyan-400"
             title="Effect preset"
-          >
-            {Object.keys(VOCODER_FX_PRESETS).map(name => (
-              <option key={name} value={name}>
-                {name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')}
-              </option>
-            ))}
-          </select>
+          />
         )}
       </div>
 
       {/* Vocoder-specific controls — only when vocoder is active */}
       {isActive && (
         <>
-          <select
+          <CustomSelect
             value={presetName || ''}
             onChange={handlePresetChange}
+            options={[
+              ...(!presetName ? [{ value: '', label: 'Custom' }] : []),
+              ...VOCODER_PRESETS.map(p => ({
+                value: p.name,
+                label: p.name,
+              })),
+            ]}
             className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary"
             title="Vocoder voice preset"
-          >
-            {!presetName && <option value="">Custom</option>}
-            {VOCODER_PRESETS.map(p => (
-              <option key={p.name} value={p.name}>{p.name}</option>
-            ))}
-          </select>
+          />
           <input
             type="range" min="0.25" max="4.0" step="0.05"
             value={params.formantShift} onChange={handleFormantShift}

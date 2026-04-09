@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { Trash2, Shuffle, ChevronUp, ChevronDown, Cable, Wand2 } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { ScaleSelector } from './ScaleSelector';
 import { MIDILearnPanel } from './MIDILearnPanel';
 
@@ -78,19 +79,20 @@ export const GridControls: React.FC<GridControlsProps> = ({
       {/* Pattern Length */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-text-muted uppercase">Steps</span>
-        <select
-          value={maxSteps}
-          onChange={(e) => onMaxStepsChange(Number(e.target.value))}
-          className="px-2 py-1 text-sm bg-dark-bgTertiary border border-dark-border rounded text-text-primary"
-        >
-          <option value={4}>4</option>
-          <option value={8}>8</option>
-          <option value={12}>12</option>
-          <option value={16}>16</option>
-          <option value={24}>24</option>
-          <option value={32}>32</option>
-          <option value={64}>64</option>
-        </select>
+        <CustomSelect
+           value={String(maxSteps)}
+           onChange={(v) => onMaxStepsChange(Number(v))}
+           options={[
+             { value: '4', label: '4' },
+             { value: '8', label: '8' },
+             { value: '12', label: '12' },
+             { value: '16', label: '16' },
+             { value: '24', label: '24' },
+             { value: '32', label: '32' },
+             { value: '64', label: '64' },
+           ]}
+           className="px-2 py-1 text-sm bg-dark-bgTertiary border border-dark-border rounded text-text-primary"
+         />
         <button
           onClick={() => onResizeAllPatterns(maxSteps)}
           className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-dark-bgActive rounded transition-colors"

@@ -8,6 +8,7 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Headphones } from 'lucide-react';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useDJStore } from '@/stores/useDJStore';
 import { DJCueEngine } from '@/engine/dj/DJCueEngine';
 
@@ -68,8 +69,8 @@ export const MixerCueSection: React.FC = () => {
     useDJStore.getState().setCueMix(value);
   }, []);
 
-  const handleDeviceChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const deviceId = e.target.value || null;
+  const handleDeviceChange = useCallback((v: string) => {
+    const deviceId = v || null;
     setCueDevice(deviceId);
   }, [setCueDevice]);
 
@@ -148,17 +149,19 @@ export const MixerCueSection: React.FC = () => {
       {/* Headphone output device selector */}
       <div className="flex flex-col items-center w-full gap-0.5">
         <label className="text-[7px] font-mono text-text-muted uppercase tracking-wider">Phones</label>
-        <select
+        <CustomSelect
           value={cueDeviceId || ''}
           onChange={handleDeviceChange}
+          options={[
+            { value: '', label: 'System Default' },
+            ...devices.map(d => ({
+              value: d.deviceId,
+              label: d.label || 'Unknown Device',
+            })),
+          ]}
           className="w-full px-1 py-0.5 text-[8px] font-mono bg-dark-bgTertiary text-text-secondary border border-dark-borderLight rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
           title="Headphone output device — only affects cue/PFL monitoring, not main speakers"
-        >
-          <option value="">System Default</option>
-          {devices.map(d => (
-            <option key={d.deviceId} value={d.deviceId}>{d.label || 'Unknown Device'}</option>
-          ))}
-        </select>
+        />
         {!supportsMultiOutput && (
           <span className="text-[7px] text-accent-warning opacity-70" title="setSinkId not supported - requires Chrome/Edge or Y-splitter cable">
             ⚠ Y-splitter required
