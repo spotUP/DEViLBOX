@@ -207,24 +207,30 @@ export async function extractAdPlugPatterns(
     if (numChannels > 18 || numRows > 256) return null;
 
     // ── Extract order list ──
+    // Stop at first out-of-range entry (some formats pad with 0xFF or numPatterns)
     const songPositions: number[] = [];
     for (let i = 0; i < numOrders; i++) {
-      songPositions.push(M._adplug_get_order_entry(i));
+      const entry = M._adplug_get_order_entry(i);
+      if (entry >= numPatterns) break;
+      songPositions.push(entry);
     }
+    if (songPositions.length === 0) return null;
 
     // ── Extract instruments ──
+    // Extract all instruments but track which have non-zero register data
     const numInst = M._adplug_get_num_instruments();
     const instruments: InstrumentConfig[] = [];
     const regsPtr = M._malloc(11);
 
     for (let i = 0; i < Math.max(numInst, 1); i++) {
       const instName = numInst > 0 ? M.UTF8ToString(M._adplug_get_instrument_name(i)) : '';
-      const inst = makeOPLInstrument(i + 1, instName || `Inst ${i + 1}`);
+      const inst = makeOPLInstrument(i + 1, instName.trim() || `Inst ${i + 1}`);
 
       if (M._adplug_get_instrument_regs(i, regsPtr)) {
         const regs = new Uint8Array(11);
-        for (let j = 0; j < 11; j++) regs[j] = M.HEAPU8[regsPtr + j];
-        applyOPLRegisters(inst, regs);
+        let sum = 0;
+        for (let j = 0; j < 11; j++) { regs[j] = M.HEAPU8[regsPtr + j]; sum += regs[j]; }
+        if (sum > 0) applyOPLRegisters(inst, regs);
       }
       instruments.push(inst);
     }

@@ -941,6 +941,8 @@ export class ToneEngine {
       'DavidWhittakerSynth', 'SonicArrangerSynth',
       'InStereo2Synth', 'InStereo1Synth', 'StartrekkerAMSynth',
       'DeltaMusic1Synth', 'DeltaMusic2Synth',
+      // OPL3 has 18 internal voices — one WASM instance handles all channels
+      'OPL3',
     ]);
     const seenNativeTypes = new Set<string>();
     const dedupedOther = otherConfigs.filter((c) => {

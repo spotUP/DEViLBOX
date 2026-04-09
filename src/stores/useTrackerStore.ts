@@ -1718,7 +1718,7 @@ export const useTrackerStore = create<TrackerStore>()(
     },
 
     // Import/Export
-    loadPatterns: (patterns) =>
+    loadPatterns: (patterns) => {
       set((state) => {
         if (patterns.length > 0) {
           // Debug logging for pattern loading
@@ -1752,14 +1752,16 @@ export const useTrackerStore = create<TrackerStore>()(
             selection: null,
           });
           state.clipboard = null;
-
-          // Reset mixer mute/solo state for the new song
-          try {
-            const { useMixerStore } = require('./useMixerStore');
-            useMixerStore.getState().resetMuteState();
-          } catch { /* Mixer not ready */ }
         }
-      }),
+      });
+      // Reset mixer mute/solo AFTER set() completes to avoid nested setState
+      if (patterns.length > 0) {
+        try {
+          const { useMixerStore } = require('./useMixerStore');
+          useMixerStore.getState().resetMuteState();
+        } catch { /* Mixer not ready */ }
+      }
+    },
 
     setPatternOrder: (order) =>
       set((state) => {
