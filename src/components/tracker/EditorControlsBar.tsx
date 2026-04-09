@@ -123,8 +123,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     document.body.appendChild(span);
     const textW = span.offsetWidth;
     document.body.removeChild(span);
-    // text + left pad (6px) + right pad (6px) + border (2px) + arrow (~18px) + right space (8px)
-    sel.style.width = `${textW + 40}px`;
+    // text + left pad (6px) + right pad (6px) + border (2px) + arrow (~18px) + right space (16px)
+    sel.style.width = `${textW + 48}px`;
   }, []);
 
   useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
