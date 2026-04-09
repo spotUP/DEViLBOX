@@ -2,7 +2,7 @@
  * TrackScopesStrip — Renoise-style per-channel mini oscilloscopes.
  * Sits between the toolbar and pattern editor.
  * Aligns with actual pattern editor channel columns via shared channelLayout.
- * Waveform-only — shows oscilloscope data when available, flat line otherwise.
+ * Shows per-channel waveforms for WASM/Furnace, master waveform fallback for others.
  */
 
 import React, { useEffect, useRef, memo, useCallback } from 'react';
@@ -12,6 +12,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
+import { getToneEngine } from '@engine/ToneEngine';
 import { channelLayout } from './channelLayout';
 
 const STRIP_HEIGHT = 36;
@@ -31,10 +32,24 @@ export const TrackScopesStrip: React.FC = memo(() => {
   const numChRef = useRef(numChannels);
   const isPlayingRef = useRef(isPlaying);
   const oscActiveRef = useRef(oscActive);
+  const analysersEnabledRef = useRef(false);
 
   useEffect(() => { numChRef.current = numChannels; }, [numChannels]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { oscActiveRef.current = oscActive; }, [oscActive]);
+
+  // Enable master analyser for waveform fallback
+  useEffect(() => {
+    try {
+      getToneEngine().enableAnalysers();
+      analysersEnabledRef.current = true;
+    } catch { /* engine not ready yet */ }
+    return () => {
+      if (analysersEnabledRef.current) {
+        try { getToneEngine().disableAnalysers(); } catch { /* ok */ }
+      }
+    };
+  }, []);
 
   // Canvas resize
   useEffect(() => {
@@ -59,8 +74,9 @@ export const TrackScopesStrip: React.FC = memo(() => {
   const drawWaveform = useCallback((
     ctx: CanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
-    data: Int16Array,
+    data: Int16Array | Float32Array,
     color: string,
+    isFloat: boolean,
   ) => {
     const midY = y + h / 2;
     ctx.strokeStyle = color;
@@ -70,7 +86,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
     const step = data.length / w;
     for (let px = 0; px < w; px++) {
       const si = Math.floor(px * step);
-      const val = data[si] / 32768.0;
+      const val = isFloat ? (data[si] as number) : (data[si] as number) / 32768.0;
       const py = midY - val * (h / 2) * 0.85;
       if (px === 0) ctx.moveTo(x + px, py);
       else ctx.lineTo(x + px, py);
@@ -103,11 +119,11 @@ export const TrackScopesStrip: React.FC = memo(() => {
 
       const theme = useThemeStore.getState().getCurrentTheme().colors;
 
-      // Background — match pattern editor
       ctx.fillStyle = theme.bgSecondary;
       ctx.fillRect(0, 0, cw, ch);
 
       const nc = numChRef.current;
+      const playing = isPlayingRef.current;
       const useOsc = oscActiveRef.current;
 
       const layout = channelLayout;
@@ -118,6 +134,21 @@ export const TrackScopesStrip: React.FC = memo(() => {
       const mixState = useMixerStore.getState().channels;
       const trackerState = useTrackerStore.getState();
       const patternChannels = trackerState.patterns[trackerState.currentPatternIndex]?.channels;
+
+      // Fallback: master waveform from Tone.js analyser (for non-WASM formats)
+      let masterWaveform: Float32Array | null = null;
+      if (!useOsc && playing) {
+        try {
+          if (!analysersEnabledRef.current) {
+            getToneEngine().enableAnalysers();
+            analysersEnabledRef.current = true;
+          }
+          const raw = getToneEngine().analyser.getValue();
+          if (raw instanceof Float32Array) {
+            masterWaveform = raw;
+          }
+        } catch { /* engine not ready */ }
+      }
 
       for (let i = 0; i < nc; i++) {
         let x: number, w: number;
@@ -154,9 +185,18 @@ export const TrackScopesStrip: React.FC = memo(() => {
         ctx.lineTo(clipX + clipW, y + h / 2);
         ctx.stroke();
 
-        // Waveform
+        // Per-channel WASM oscilloscope waveform
         if (useOsc && oscSnapshot && oscSnapshot[i] && oscSnapshot[i]!.length > 0) {
-          drawWaveform(ctx, x, y, w, h, oscSnapshot[i]!, color);
+          drawWaveform(ctx, x, y, w, h, oscSnapshot[i]!, color, false);
+        }
+        // Fallback: slice of master waveform (each channel gets a different segment)
+        else if (masterWaveform && masterWaveform.length > 0) {
+          const segLen = Math.floor(masterWaveform.length / nc);
+          const start = i * segLen;
+          const segment = masterWaveform.subarray(start, start + segLen);
+          if (segment.length > 0) {
+            drawWaveform(ctx, clipX, y, clipW, h, segment, color, true);
+          }
         }
 
         // Channel label
