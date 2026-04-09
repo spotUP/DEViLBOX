@@ -44,6 +44,7 @@ struct OplVoice {
     uint8_t midiNote = 0;
     uint64_t age = 0;
     float pitchBend = 0.0f;
+    SbiPatch patch{};  // per-voice patch (set at note-on time)
 };
 
 // ── Engine ──────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ static void applyPatch(uint8_t ch) {
     channelToBank(ch, bank, chInBank);
     const uint8_t so = SLOT_OFFSET[chInBank];
     const uint8_t sc = so + 3;
-    const auto& p = g_opl->patch;
+    const auto& p = g_opl->voices[ch].patch;
 
     writeReg(bank | (0x20 + so), p.modTVSKSRMult);
     writeReg(bank | (0x20 + sc), p.carTVSKSRMult);
@@ -193,13 +194,12 @@ void oplNoteOn(uint8_t note, uint8_t velocity) {
     v.midiNote = note; v.age = g_opl->ageCounter;
     v.pitchBend = g_opl->globalPitchBend;
 
-    // Velocity → carrier TL attenuation
-    SbiPatch tmp = g_opl->patch;
+    // Copy current global patch to voice, apply velocity attenuation
+    v.patch = g_opl->patch;
     uint8_t velAtten = static_cast<uint8_t>((127 - velocity) * 32 / 127);
-    uint8_t carTL = static_cast<uint8_t>(std::min(63, (tmp.carKSLTL & 0x3F) + velAtten));
-    g_opl->patch.carKSLTL = static_cast<uint8_t>((tmp.carKSLTL & 0xC0) | carTL);
+    uint8_t carTL = static_cast<uint8_t>(std::min(63, (v.patch.carKSLTL & 0x3F) + velAtten));
+    v.patch.carKSLTL = static_cast<uint8_t>((v.patch.carKSLTL & 0xC0) | carTL);
     oplKeyOn(ch, note, g_opl->globalPitchBend);
-    g_opl->patch.carKSLTL = tmp.carKSLTL; // restore
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -267,9 +267,7 @@ int oplLoadSbi(const uint8_t* data, int size) {
     g_opl->patch.carWF         = r[9];
     g_opl->patch.fbAlg         = r[10];
 
-    // Re-apply to active voices
-    for (uint8_t ch = 0; ch < NUM_CHANNELS; ch++)
-        if (g_opl->voices[ch].active) applyPatch(ch);
+    // Only updates global patch — next noteOn will use it
     return 0;
 }
 
@@ -278,9 +276,8 @@ void oplSetPatchRegisters(uint8_t modTVSK, uint8_t carTVSK, uint8_t modKSL, uint
                           uint8_t modARDR, uint8_t carARDR, uint8_t modSLRR, uint8_t carSLRR,
                           uint8_t modWF, uint8_t carWF, uint8_t fbAlg) {
     if (!g_opl) return;
+    // Update global patch — will be applied to the NEXT noteOn voice only
     g_opl->patch = { modTVSK, carTVSK, modKSL, carKSL, modARDR, carARDR, modSLRR, carSLRR, modWF, carWF, fbAlg };
-    for (uint8_t ch = 0; ch < NUM_CHANNELS; ch++)
-        if (g_opl->voices[ch].active) applyPatch(ch);
 }
 
 EMSCRIPTEN_KEEPALIVE
