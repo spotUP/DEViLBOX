@@ -100,15 +100,15 @@ export async function withNativeThenUADE(
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;
           }
-          // Ensure at least a UADESynth instrument exists for audio playback.
-          // Native stub parsers may return 0 instruments — without at least one
-          // instrument the format store won't start the UADE engine.
+          // Ensure at least one UADEEditableSynth instrument exists so
+          // NativeEngineRouting can find it and connect the UADE audio graph.
+          // Native stub parsers may return 0 instruments or generic 'Synth' types.
           if (result.instruments.length === 0) {
             result.instruments = [{
               id: 0,
               name: 'UADE Audio',
               type: 'synth' as const,
-              synthType: 'UADESynth' as const,
+              synthType: 'UADEEditableSynth' as const,
               effects: [],
               volume: -6,
               pan: 0,
@@ -121,6 +121,13 @@ export async function withNativeThenUADE(
                 metadata: { player: 'Unknown', formatName: 'Unknown', minSubsong: 0, maxSubsong: 0 },
               },
             }];
+          } else if (!result.instruments.some(i => i.synthType === 'UADEEditableSynth')) {
+            // Native parser returned instruments but none are UADEEditableSynth.
+            // Tag the first one so the audio graph gets connected.
+            result.instruments[0] = {
+              ...result.instruments[0],
+              synthType: 'UADEEditableSynth' as const,
+            };
           }
           return injectUADEPlayback(result, ctx);
         }
