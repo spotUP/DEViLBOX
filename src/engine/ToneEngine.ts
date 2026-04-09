@@ -19,6 +19,7 @@ import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
 import { FurnaceDispatchSynth } from './furnace-dispatch/FurnaceDispatchSynth';
 import { FurnaceDispatchEngine } from './furnace-dispatch/FurnaceDispatchEngine';
 import { FurnaceSynth } from './FurnaceSynth';
+import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
@@ -1667,11 +1668,15 @@ export class ToneEngine {
     }
 
     // OPL3 singleton: one WASM instance handles all 18 voices via register addressing.
-    // Update the patch state and send a single setPatch before returning.
+    // Set the channel FIRST (for channel-addressed patch routing), then update the patch.
     if (config.synthType === 'OPL3') {
       for (const [existingKey, existingSynth] of this.instruments) {
         const storedType = this.instrumentSynthTypes.get(existingKey);
         if (storedType === 'OPL3' && existingSynth) {
+          // Set channel before patch so chSetPatch goes to the right voice
+          if (channelIndex !== undefined && existingSynth instanceof OPL3Synth) {
+            existingSynth.setChannel(channelIndex % 18);
+          }
           const opl = config.opl3;
           if (opl) {
             (existingSynth as any).applyPatch?.(opl);
@@ -3099,6 +3104,14 @@ export class ToneEngine {
       }
 
       // Some synths don't take a note parameter for release
+      if (config.synthType === 'OPL3') {
+        // OPL3: set channel before release for channel-addressed note-off
+        if (instrument instanceof OPL3Synth && channelIndex !== undefined) {
+          instrument.setChannel(channelIndex % 18);
+        }
+        (instrument as any).triggerRelease(undefined, safeTime);
+        return;
+      }
       if (
         config.synthType === 'NoiseSynth' ||
         config.synthType === 'MonoSynth' ||
@@ -3588,6 +3601,10 @@ export class ToneEngine {
             const maxCh = voiceNode.getNumChannels() || 3;
             const chipChannel = channelIndex % maxCh;
             voiceNode.setChannel(chipChannel);
+          }
+          // Set chip channel on OPL3Synth (for multi-timbral AdLib tracker playback)
+          if (voiceNode instanceof OPL3Synth && channelIndex !== undefined) {
+            voiceNode.setChannel(channelIndex % 18);
           }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {

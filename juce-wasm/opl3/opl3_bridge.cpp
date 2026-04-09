@@ -159,6 +159,7 @@ extern "C" {
 
 // Forward declarations
 EMSCRIPTEN_KEEPALIVE void oplNoteOff(uint8_t note);
+EMSCRIPTEN_KEEPALIVE void oplChannelNoteOff(uint8_t ch);
 
 EMSCRIPTEN_KEEPALIVE
 int oplInit(float sampleRate) {
@@ -212,6 +213,52 @@ void oplNoteOff(uint8_t note) {
             else { oplKeyOff(i); g_opl->voices[i].active = false; }
             break;
         }
+    }
+}
+
+// ── Channel-addressed API (for multi-timbral tracker playback) ─────────
+// Unlike the keyboard API (noteOn/noteOff) which uses voice allocation,
+// these functions address OPL channels directly: tracker channel N = OPL voice N.
+
+EMSCRIPTEN_KEEPALIVE
+void oplChannelSetPatch(uint8_t ch, uint8_t modTVSK, uint8_t carTVSK,
+                        uint8_t modKSL, uint8_t carKSL,
+                        uint8_t modARDR, uint8_t carARDR,
+                        uint8_t modSLRR, uint8_t carSLRR,
+                        uint8_t modWF, uint8_t carWF, uint8_t fbAlg) {
+    if (!g_opl || ch >= NUM_CHANNELS) return;
+    g_opl->voices[ch].patch = { modTVSK, carTVSK, modKSL, carKSL, modARDR, carARDR, modSLRR, carSLRR, modWF, carWF, fbAlg };
+}
+
+EMSCRIPTEN_KEEPALIVE
+void oplChannelNoteOn(uint8_t ch, uint8_t note, uint8_t velocity) {
+    if (!g_opl || !g_opl->initialized || ch >= NUM_CHANNELS) return;
+    if (velocity == 0) { oplChannelNoteOff(ch); return; }
+
+    // Key-off old note if voice was active
+    if (g_opl->voices[ch].active) oplKeyOff(ch);
+
+    auto& v = g_opl->voices[ch];
+    g_opl->ageCounter++;
+    v.active = true; v.held = true; v.sustained = false;
+    v.midiNote = note; v.age = g_opl->ageCounter;
+    v.pitchBend = g_opl->globalPitchBend;
+
+    // Apply velocity attenuation to carrier TL
+    uint8_t velAtten = static_cast<uint8_t>((127 - velocity) * 32 / 127);
+    uint8_t carTL = static_cast<uint8_t>(std::min(63, (v.patch.carKSLTL & 0x3F) + velAtten));
+    v.patch.carKSLTL = static_cast<uint8_t>((v.patch.carKSLTL & 0xC0) | carTL);
+
+    oplKeyOn(ch, note, g_opl->globalPitchBend);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void oplChannelNoteOff(uint8_t ch) {
+    if (!g_opl || ch >= NUM_CHANNELS) return;
+    if (g_opl->voices[ch].active) {
+        g_opl->voices[ch].held = false;
+        g_opl->voices[ch].active = false;
+        oplKeyOff(ch);
     }
 }
 

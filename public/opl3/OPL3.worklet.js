@@ -42,6 +42,19 @@ class OPL3Processor extends AudioWorkletProcessor {
           this.module._oplSetPatchRegisters(r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10]);
         }
         break;
+      // Channel-addressed API for multi-timbral tracker playback
+      case 'chSetPatch':
+        if (this.ready) {
+          const r = msg.regs;
+          this.module._oplChannelSetPatch(msg.ch, r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10]);
+        }
+        break;
+      case 'chNoteOn':
+        if (this.ready) this.module._oplChannelNoteOn(msg.ch, msg.note, msg.velocity);
+        break;
+      case 'chNoteOff':
+        if (this.ready) this.module._oplChannelNoteOff(msg.ch);
+        break;
       case 'destroy':
         if (this.ready) { this.module._oplDestroy(); this.ready = false; }
         break;
