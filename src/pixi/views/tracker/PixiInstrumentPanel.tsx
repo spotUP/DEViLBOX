@@ -20,6 +20,7 @@ import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiTheme } from '../../theme';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
+import { PixiContextMenu, type ContextMenuItem } from '../../input/PixiContextMenu';
 
 interface PixiInstrumentPanelProps {
   width: number;
@@ -308,6 +309,58 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     if (instruments.length > 1) deleteInstrument(id);
   }, [deleteInstrument, instruments.length]);
 
+  // ─── Context menu ───────────────────────────────────────────────────────────
+
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; instId: number } | null>(null);
+
+  const handleRightClick = useCallback((e: FederatedPointerEvent, id: number) => {
+    e.stopPropagation();
+    select(id);
+    setCtxMenu({ x: e.globalX, y: e.globalY, instId: id });
+  }, [select]);
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  const ctxMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!ctxMenu) return [];
+    const inst = instruments.find(i => i.id === ctxMenu.instId);
+    if (!inst) return [];
+    const canDel = instruments.length > 1;
+    const hasClipboard = !!localStorage.getItem('devilbox-instrument-clipboard');
+
+    return [
+      { label: 'Edit', action: () => { select(ctxMenu.instId); useUIStore.getState().openModal('instruments'); } },
+      { label: 'Rename', action: () => { setEditingId(ctxMenu.instId); setEditingName(inst.name); } },
+      { separator: true, label: '' },
+      { label: 'Duplicate', action: () => cloneInstrument(ctxMenu.instId) },
+      { label: 'Delete', action: () => { if (canDel) deleteInstrument(ctxMenu.instId); }, disabled: !canDel },
+      { separator: true, label: '' },
+      { label: 'Copy Settings', action: () => { localStorage.setItem('devilbox-instrument-clipboard', JSON.stringify(inst)); } },
+      { label: 'Paste Settings', action: () => {
+        const clip = localStorage.getItem('devilbox-instrument-clipboard');
+        if (clip) {
+          try {
+            const src = JSON.parse(clip);
+            const { id: _id, name: _name, ...settings } = src;
+            updateInstrument(ctxMenu.instId, settings);
+          } catch { /* ignore */ }
+        }
+      }, disabled: !hasClipboard },
+      { separator: true, label: '' },
+      { label: 'Reset to Default', action: () => {
+        updateInstrument(ctxMenu.instId, {
+          synthType: 'Synth',
+          oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
+          envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 },
+          filter: { type: 'lowpass', frequency: 2000, Q: 1, rolloff: -12 },
+          effects: [],
+          volume: -6,
+          pan: 0,
+        });
+      }},
+    ];
+  }, [ctxMenu, instruments, select, cloneInstrument, deleteInstrument, updateInstrument]);
+
   // ─── Scrollbar geometry ─────────────────────────────────────────────────────
 
   const trackHeight = listH - 4;
@@ -410,6 +463,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
               cursor="pointer"
               onPointerDown={() => handleItemPointerDown(inst.id)}
               onPointerUp={() => handleItemPointerUp(inst.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleRightClick(e, inst.id)}
               onPointerEnter={() => setHoveredId(inst.id)}
               onPointerLeave={() => { setHoveredId((prev) => (prev === inst.id ? null : prev)); stopPreview(); }}
               layout={{
@@ -577,6 +631,15 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
           layout={{ marginTop: 4 }}
         />
       </layoutContainer>
+
+      {/* ═══ Context Menu ═══ */}
+      <PixiContextMenu
+        items={ctxMenuItems}
+        x={ctxMenu?.x ?? 0}
+        y={ctxMenu?.y ?? 0}
+        isOpen={!!ctxMenu}
+        onClose={closeCtxMenu}
+      />
     </pixiContainer>
   );
 };
