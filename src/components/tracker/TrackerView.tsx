@@ -64,6 +64,7 @@ import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
 import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
+import { TrackScopesStrip } from './TrackScopesStrip';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -551,6 +552,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <div className="flex-shrink-0">
           <InstrumentKnobPanel />
         </div>
+      )}
+
+      {/* Track Scopes Strip — per-channel mini oscilloscopes (hidden in fullscreen) */}
+      {!editorFullscreen && viewMode === 'tracker' && (
+        <TrackScopesStrip />
       )}
 
       {/* Editor Controls Toolbar (hidden in fullscreen) */}
