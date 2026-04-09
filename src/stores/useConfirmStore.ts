@@ -1,5 +1,5 @@
 /**
- * useConfirmStore — Global confirmation dialog state.
+ * useConfirmStore — Global confirmation / alert dialog state.
  *
  * Allows any code (stores, hooks, components) to trigger a confirmation
  * dialog and await the result. The dialog renders at the App level.
@@ -11,6 +11,11 @@
  *     confirmLabel: 'Yes',
  *     danger: true,
  *   });
+ *
+ *   await showAlert({
+ *     title: 'Error',
+ *     message: 'File could not be loaded.',
+ *   });
  */
 
 import { create } from 'zustand';
@@ -20,6 +25,8 @@ interface ConfirmRequest {
   message: string;
   confirmLabel?: string;
   danger?: boolean;
+  /** When true, only show a single OK button (no Cancel). */
+  alertOnly?: boolean;
 }
 
 interface ConfirmState {
@@ -60,6 +67,25 @@ export function showConfirm(request: ConfirmRequest): Promise<boolean> {
       isOpen: true,
       request,
       resolve,
+    });
+  });
+}
+
+/**
+ * Show an alert dialog (single OK button) and await dismissal.
+ */
+export function showAlert(opts: { title: string; message: string }): Promise<void> {
+  return new Promise((resolve) => {
+    useConfirmStore.setState({
+      isOpen: true,
+      request: {
+        title: opts.title,
+        message: opts.message,
+        confirmLabel: 'OK',
+        alertOnly: true,
+        danger: false,
+      },
+      resolve: () => resolve(),
     });
   });
 }

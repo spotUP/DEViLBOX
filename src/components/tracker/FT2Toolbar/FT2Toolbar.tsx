@@ -178,10 +178,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     reset: s.reset,
   })));
 
-  const { isDirty, setMetadata, metadata } = useProjectStore(useShallow((s) => ({
+  const { isDirty, setMetadata, metadata, resetProject } = useProjectStore(useShallow((s) => ({
     isDirty: s.isDirty,
     setMetadata: s.setMetadata,
     metadata: s.metadata,
+    resetProject: s.resetProject,
   })));
   const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore(useShallow((s) => ({
     instruments: s.instruments,
@@ -1137,6 +1138,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 onClick={() => {
                   if (isPlaying) { stop(); engine.releaseAll(); }
                   resetInstruments();
+                  resetProject();
                   setShowClearModal(false);
                   notify.success('Instruments cleared');
                 }}
@@ -1149,6 +1151,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 onClick={() => {
                   if (isPlaying) { stop(); engine.releaseAll(); }
                   resetTracker();
+                  resetProject();
                   setShowClearModal(false);
                   notify.success('Song data cleared');
                 }}
@@ -1162,6 +1165,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                   if (isPlaying) { stop(); engine.releaseAll(); }
                   resetInstruments();
                   resetTracker();
+                  resetProject();
                   setShowClearModal(false);
                   notify.success('Project cleared');
                 }}
@@ -1176,6 +1180,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                   resetInstruments();
                   resetTracker();
                   resetTransport();
+                  resetProject();
                   void clearSavedProject();
                   setShowClearModal(false);
                   notify.success('Reset to defaults');
