@@ -2,7 +2,7 @@
  * NavBar - Top navigation bar with app title, tabs, and controls
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useThemeStore, themes } from '@stores';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
 import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings } from 'lucide-react';
@@ -17,6 +17,8 @@ import { isElectron } from '@utils/electron';
 import { useNavBar } from '@hooks/views/useNavBar';
 import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { useUIStore } from '@stores';
+import { useProjectStore } from '@stores/useProjectStore';
+import { useTabsStore } from '@stores/useTabsStore';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
@@ -87,6 +89,29 @@ const NavBarComponent: React.FC = () => {
     e.stopPropagation();
     n.closeTab(tabId);
   };
+
+  // ── Editable tab name ───────────────────────────────────────────────────
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  const commitTabRename = useCallback(() => {
+    if (editingTabId && editingName.trim()) {
+      useTabsStore.getState().updateTabName(editingTabId, editingName.trim());
+      // Also update the project metadata if this is the active tab
+      if (editingTabId === n.activeTabId) {
+        useProjectStore.getState().setMetadata({ name: editingName.trim() });
+      }
+    }
+    setEditingTabId(null);
+  }, [editingTabId, editingName, n.activeTabId]);
+
+  const startTabEdit = useCallback((tabId: string, currentName: string) => {
+    setEditingTabId(tabId);
+    setEditingName(currentName || 'Untitled');
+    // Focus the input on next render
+    requestAnimationFrame(() => editInputRef.current?.select());
+  }, []);
 
   return (
     <div className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
@@ -293,19 +318,38 @@ const NavBarComponent: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => n.setActiveTab(tab.id)}
+              onDoubleClick={() => startTabEdit(tab.id, tab.name)}
               className={`
                 group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium
-                transition-all duration-150 min-w-0 max-w-[200px]
+                transition-all duration-150 flex-shrink-0
                 ${n.activeTabId === tab.id
                   ? 'bg-dark-bg text-text-primary border-t border-x border-dark-border -mb-px'
                   : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary hover:bg-dark-bg/50'
                 }
               `}
             >
-              <span className="truncate">
-                {tab.name || 'Untitled'}
-                {tab.isDirty && <span className="text-accent-primary ml-1">*</span>}
-              </span>
+              {editingTabId === tab.id ? (
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={commitTabRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitTabRename();
+                    if (e.key === 'Escape') setEditingTabId(null);
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-dark-bgSecondary border border-accent-primary/50 rounded px-1 py-0 text-sm font-medium text-text-primary outline-none min-w-[80px]"
+                  autoFocus
+                />
+              ) : (
+                <span>
+                  {tab.name || 'Untitled'}
+                  {tab.isDirty && <span className="text-accent-primary ml-1">*</span>}
+                </span>
+              )}
               {n.tabs.length > 1 && (
                 <span
                   onClick={(e) => handleCloseTab(e, tab.id)}
