@@ -6,9 +6,7 @@ export const VISUALIZER_MODES = [
   'pattern',
   'circularSpectrum',
   'waveformTerrain',
-  'plasmaField',
   'starfield',
-  'particleBurst',
   // audioMotion modes
   'amLED',
   'amBars',
@@ -24,7 +22,6 @@ export const VISUALIZER_MODES = [
   'amDualOverlay',
   'amBark',
   'amMel',
-  'amOctave',
   'amNotes',
   'amMirrorReflex',
   'amRadialInvert',
@@ -42,7 +39,7 @@ export type WebGLVisualizerMode = Exclude<VisualizerMode,
   | 'amLED' | 'amBars' | 'amMirror' | 'amGraphLine'
   | 'amRadial' | 'amRadialGraph' | 'amStereo' | 'amLumi'
   | 'amAlpha' | 'amOutline' | 'amDualVert' | 'amDualOverlay'
-  | 'amBark' | 'amMel' | 'amOctave' | 'amNotes'
+  | 'amBark' | 'amMel' | 'amNotes'
   | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED'
   | 'amLinear' | 'amAWeighted' | 'amLumiMirror'
 >;
@@ -51,9 +48,7 @@ export const MODE_LABELS: Record<VisualizerMode, string> = {
   pattern: 'PATTERN',
   circularSpectrum: 'RADIAL',
   waveformTerrain: 'TERRAIN',
-  plasmaField: 'PLASMA',
   starfield: 'STARFIELD',
-  particleBurst: 'PARTICLES',
   amLED: 'LED BARS',
   amBars: 'SMOOTH BARS',
   amMirror: 'MIRROR BARS',
@@ -68,7 +63,6 @@ export const MODE_LABELS: Record<VisualizerMode, string> = {
   amDualOverlay: 'DUAL OVERLAY',
   amBark: 'BARK',
   amMel: 'MEL GRAPH',
-  amOctave: 'OCTAVE BANDS',
   amNotes: 'NOTE LABELS',
   amMirrorReflex: 'MIRROR REFLEX',
   amRadialInvert: 'RADIAL INVERT',
@@ -94,7 +88,6 @@ export const AM_PRESET_MAP: Partial<Record<VisualizerMode, string>> = {
   amDualOverlay: 'dualOverlay',
   amBark: 'barkSpectrum',
   amMel: 'melGraph',
-  amOctave: 'octaveBands',
   amNotes: 'noteLabels',
   amMirrorReflex: 'mirrorReflex',
   amRadialInvert: 'radialInvert',

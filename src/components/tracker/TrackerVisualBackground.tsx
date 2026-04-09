@@ -49,7 +49,6 @@ export const BG_MODES: BgMode[] = [
   { type: 'am', preset: 'dualOverlay',     label: 'DUAL OVERLAY' },
   { type: 'am', preset: 'barkSpectrum',    label: 'BARK' },
   { type: 'am', preset: 'melGraph',        label: 'MEL GRAPH' },
-  { type: 'am', preset: 'octaveBands',     label: 'OCTAVE BANDS' },
   { type: 'am', preset: 'noteLabels',      label: 'NOTE LABELS' },
   { type: 'am', preset: 'mirrorReflex',    label: 'MIRROR REFLEX' },
   { type: 'am', preset: 'linearBars',      label: 'LINEAR' },

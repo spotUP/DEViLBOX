@@ -34,7 +34,6 @@ import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { CustomBanner } from '@components/visualization/CustomBanner';
 import { CircularVU } from '@components/visualization/CircularVU';
 import { FrequencyBars } from '@components/visualization/FrequencyBars';
-import { ParticleField } from '@components/visualization/ParticleField';
 import { ChannelWaveforms } from '@components/visualization/ChannelWaveforms';
 import { ChannelActivityGrid } from '@components/visualization/ChannelActivityGrid';
 import { ChannelSpectrums } from '@components/visualization/ChannelSpectrums';
@@ -216,7 +215,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
-  type VizMode = 'waveform' | 'spectrum' | 'channels' | 'logo' | 'customBanner' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' | 'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amOctave' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
+  type VizMode = 'waveform' | 'spectrum' | 'channels' | 'logo' | 'customBanner' | 'circular' | 'bars' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' | 'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
   const [vizMode, setVizMode] = useState<VizMode>('logo');
 
   // Tap Tempo
@@ -789,7 +788,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
         <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ height: 68, alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
-          const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
+          const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
           const currentIndex = modes.indexOf(vizMode);
           const nextIndex = (currentIndex + 1) % modes.length;
           setVizMode(modes[nextIndex]);
@@ -830,7 +829,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               {vizMode === 'customBanner' && <CustomBanner height={100} onComplete={() => setVizMode('circular')} />}
               {vizMode === 'circular' && <CircularVU height={100} />}
               {vizMode === 'bars' && <FrequencyBars height={100} />}
-              {vizMode === 'particles' && <ParticleField height={100} />}
               {vizMode === 'chanWaves' && <ChannelWaveforms height={100} />}
               {vizMode === 'chanActivity' && <ChannelActivityGrid height={100} />}
               {vizMode === 'chanSpectrum' && <ChannelSpectrums height={100} />}
@@ -843,7 +841,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 <NibblesGame 
                   height={100} 
                   onExit={() => {
-                    const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
+                    const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
                     const currentIndex = modes.indexOf('chanNibbles');
                     const nextIndex = (currentIndex + 1) % modes.length;
                     setVizMode(modes[nextIndex]);
@@ -865,7 +863,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               {vizMode === 'amDualOverlay' && <AudioMotionVisualizer preset="dualOverlay" audioSource="master" height={100} />}
               {vizMode === 'amBark' && <AudioMotionVisualizer preset="barkSpectrum" audioSource="master" height={100} />}
               {vizMode === 'amMel' && <AudioMotionVisualizer preset="melGraph" audioSource="master" height={100} />}
-              {vizMode === 'amOctave' && <AudioMotionVisualizer preset="octaveBands" audioSource="master" height={100} />}
               {vizMode === 'amNotes' && <AudioMotionVisualizer preset="noteLabels" audioSource="master" height={100} />}
               {vizMode === 'amMirrorReflex' && <AudioMotionVisualizer preset="mirrorReflex" audioSource="master" height={100} />}
               {vizMode === 'amRadialInvert' && <AudioMotionVisualizer preset="radialInvert" audioSource="master" height={100} />}

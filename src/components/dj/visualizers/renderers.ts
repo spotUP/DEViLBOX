@@ -778,7 +778,5 @@ type RendererFn = (
 export const RENDERERS: Record<WebGLVisualizerMode, RendererFn> = {
   circularSpectrum: renderCircularSpectrum,
   waveformTerrain: renderWaveformTerrain,
-  plasmaField: renderPlasmaField,
   starfield: renderStarfield,
-  particleBurst: renderParticleBurst,
 };
