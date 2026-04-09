@@ -73,7 +73,7 @@ const MODAL_W = 480;
 const MODAL_H = 520;
 const CONTENT_W = MODAL_W - 34;
 const ROW_H = 18;
-const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus']);
+const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus', 'zoundMonitor']);
 
 /**
  * For two-file Amiga formats, derive the expected companion filename from the main file.
@@ -92,6 +92,30 @@ function getExpectedCompanion(filename: string): { expectedPrefix: string; descr
     return { expectedPrefix: 'smp.', description: 'MFP sample data (smp.*)' };
   }
   return null;
+}
+
+/**
+ * Compute the companion file name relative to the main file's directory.
+ * When files come from a directory picker (webkitRelativePath is set), we
+ * preserve subdirectory structure (e.g. "Samples/electom" for ZoundMonitor).
+ */
+function companionRelativeName(mainFile: File, companion: File): string {
+  const mainRel = (mainFile as any).webkitRelativePath as string | undefined;
+  const compRel = (companion as any).webkitRelativePath as string | undefined;
+  if (mainRel && compRel) {
+    const mainDir = mainRel.substring(0, mainRel.lastIndexOf('/'));
+    if (compRel.startsWith(mainDir + '/')) {
+      return compRel.substring(mainDir.length + 1);
+    }
+    const mainParts = mainDir.split('/');
+    const compParts = compRel.split('/');
+    let common = 0;
+    while (common < mainParts.length && common < compParts.length && mainParts[common] === compParts[common]) {
+      common++;
+    }
+    return compParts.slice(common).join('/');
+  }
+  return companion.name;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -138,6 +162,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
   const [sidHeader, setSidHeader] = useState<SIDHeaderInfo | null>(null);
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
+  const activeMainFileRef = useRef<File | null>(null);
 
   const uadeScanActiveRef = useRef(false);
   const companionFilesRef = useRef<File[]>(companionFiles ?? []);
@@ -172,6 +197,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
     const companions = overrideCompanions ?? companionFilesRef.current;
     setActiveCompanions(companions);
+    activeMainFileRef.current = file;
 
     const fname = file.name.toLowerCase();
     const nativeFmtForFile = detectNativeFormat(fname);
@@ -227,7 +253,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
         uadeScanActiveRef.current = true;
         for (const companion of companions) {
           const companionBuf = await companion.arrayBuffer();
-          await engine.addCompanionFile(companion.name, companionBuf);
+          const cfName = companionRelativeName(file, companion);
+          await engine.addCompanionFile(cfName, companionBuf);
         }
         engine.enableTickSnapshots(true);
         engine.resetTickSnapshots();
@@ -337,8 +364,10 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     let companionMap: Map<string, ArrayBuffer> | undefined;
     if (activeCompanions.length > 0) {
       companionMap = new Map();
+      const mainFile = activeMainFileRef.current ?? moduleInfo.file;
       for (const f of activeCompanions) {
-        companionMap.set(f.name, await f.arrayBuffer());
+        const cfName = companionRelativeName(mainFile, f);
+        companionMap.set(cfName, await f.arrayBuffer());
       }
     }
     // Block dialog until import completes so UADE engine is fully ready
