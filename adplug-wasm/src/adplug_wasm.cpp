@@ -314,14 +314,13 @@ public:
 
 static CmodPlayerAccessor* asModPlayer() {
     if (!g_player) return nullptr;
-    // Dynamic cast is not available (no RTTI in WASM build).
-    // Check if the player type string matches known CmodPlayer subclasses.
-    std::string type = g_player->gettype();
-    // All protrack-based formats identify with specific type strings.
-    // We check if getpatterns() returns >0 as a heuristic — CPlayer base returns 0,
-    // CmodPlayer overrides it to return nop.
     if (g_player->getpatterns() > 0 && g_player->getorders() > 0) {
-        return reinterpret_cast<CmodPlayerAccessor*>(g_player);
+        auto* mp = reinterpret_cast<CmodPlayerAccessor*>(g_player);
+        // Sanity: channels must be 1-18, rows must be 1-256
+        auto ch = mp->getNchans();
+        auto rows = mp->getNrows();
+        if (ch == 0 || ch > 18 || rows == 0 || rows > 256) return nullptr;
+        return mp;
     }
     return nullptr;
 }
@@ -396,6 +395,9 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
     if (row >= mp->getNrows()) return 0;
 
     unsigned short trackIdx = mp->trackord[pattern][channel];
+    // Safety: track index must be within allocated range (npats * nchans + 1)
+    unsigned long maxTracks = mp->getNpats() * mp->getNchans() + 1;
+    if (trackIdx >= maxTracks) return 0;
     if (!mp->tracks[trackIdx]) return 0;
 
     auto& t = mp->tracks[trackIdx][row];
