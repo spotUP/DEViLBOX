@@ -17,6 +17,7 @@ export const GlobalConfirmDialog: React.FC = () => {
       message={request?.message ?? ''}
       confirmLabel={request?.confirmLabel ?? 'Continue'}
       danger={request?.danger ?? false}
+      alertOnly={request?.alertOnly ?? false}
       onConfirm={_confirm}
       onClose={_cancel}
     />
