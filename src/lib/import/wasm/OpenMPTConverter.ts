@@ -34,19 +34,21 @@ function mapFormat(type: string): TrackerFormat {
  * Map OpenMPT note value (1-120) to DEViLBOX note value (1-96, 97=keyoff).
  *
  * OpenMPT adds an internal offset when loading each format:
- *   MOD: period table lookup adds +36 vs DEViLBOX's ProTracker convention
+ *   MOD: period table lookup adds +36 vs ProTracker convention (PT C-1 = OPM 49)
  *   XM:  note byte + 12 (OpenMPT C-5 = 61 vs FT2/DEViLBOX C-4 = 49)
  *   S3M/IT: packed octave formula adds +12
- * We subtract the offset to match each format's native note display.
+ * We subtract the format-specific offset so notes display as they do in
+ * the native tracker (e.g. PT Clone shows C-3, we show C-3).
  */
-function mapNote(openmptNote: number, _format: TrackerFormat): number {
+function mapNote(openmptNote: number, format: TrackerFormat): number {
   if (openmptNote === 0) return 0;         // Empty
   if (openmptNote === 255) return 97;      // Note Off → XM note-off
   if (openmptNote === 254) return 97;      // Note Cut → treat as note-off
   if (openmptNote === 253) return 97;      // Fade → treat as note-off
   if (openmptNote >= 1 && openmptNote <= 120) {
-    // Apply format-specific offset to match native tracker display conventions
-    const offset = 12;
+    // MOD: OpenMPT adds +36 offset (PT C-1 → OPM 49, PT C-3 → OPM 73)
+    // XM/S3M/IT: OpenMPT adds +12 offset (FT2 C-4 → OPM 61)
+    const offset = format === 'MOD' ? 36 : 12;
     const adjusted = openmptNote - offset;
     return Math.max(1, Math.min(adjusted, 96));
   }
@@ -381,8 +383,8 @@ export async function parseWithOpenMPT(
       initialSpeed: info.initialSpeed || 6,
       initialBPM: info.initialBPM || 125,
       linearPeriods: info.linearSlides,
-      // MOD period table adds +24 extra vs other formats; compensate in display only
-      noteDisplayOffset: format === 'MOD' ? -12 : 0,
+      // Note offset is now baked into mapNote() per format — no display offset needed
+      noteDisplayOffset: 0,
       // Store original file data for export fallback (return original binary)
       libopenmptFileData: buffer.slice(0),
     };
