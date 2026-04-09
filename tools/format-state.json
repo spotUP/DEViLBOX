@@ -3683,7 +3683,7 @@
     "pass": false,
     "auditStatus": "unknown",
     "divergeAt": 0.6366893424036281,
-    "notes": "file not found in demos"
+    "notes": "Test file removed from furnace demos upstream"
   },
   "fur-virtualboy-la_folia_ground_bass": {
     "envCorr": 0.9983739495015874,
@@ -4034,7 +4034,7 @@
     "pass": false,
     "auditStatus": "unknown",
     "divergeAt": 0.29174603174603175,
-    "notes": "fur file no longer exists in demos directory"
+    "notes": "Test file removed from furnace demos upstream"
   },
   "fur-x16-watching_paint_dry": {
     "envCorr": 0.9982,
@@ -4643,7 +4643,7 @@
   },
   "uade-dsm": {
     "auditStatus": "fail",
-    "notes": "Covered by pc-dsm (5/10 — format variant unsupported)"
+    "notes": "Covered by pc-dsm — DSM v1 (RIFF) vs v2 (DSMF) format variant detection issue"
   },
   "uade-dtm": {
     "auditStatus": "fixed",
@@ -5079,7 +5079,7 @@
   },
   "uade-fm-tracker": {
     "auditStatus": "fail",
-    "notes": "UADE ret=-1 (294b file, likely unsupported)"
+    "notes": "Eagleplayer limit — test file 294 bytes, too small for UADE (no Modland files exist)"
   },
   "uade-sound-master": {
     "auditStatus": "fixed",
@@ -5111,7 +5111,7 @@
   },
   "uade-quartet": {
     "auditStatus": "fail",
-    "notes": "UADE ret=-1 even with .set companion",
+    "notes": "Eagleplayer limit — UADE ret=-1 with .set companion; uses PCM playback not supported in WASM",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -7183,7 +7183,7 @@
   },
   "uade-maximum-effect": {
     "auditStatus": "fail",
-    "notes": "UADE ret=-1 even with SMP companion"
+    "notes": "Eagleplayer limit — UADE ret=-1 even with SMP companion; format rarely used"
   },
   "uade-synth-pack": {
     "auditStatus": "fixed",
@@ -7231,7 +7231,7 @@
   },
   "pc-dsm": {
     "auditStatus": "fail",
-    "notes": "5/10 — format variant unsupported by OpenMPT+UADE"
+    "notes": "5/10 — DSM v1 (RIFF DSMF) unsupported; v2 works. OpenMPT+UADE both fail on v1 variant"
   },
   "pc-gdm": {
     "auditStatus": "fixed",
@@ -7247,7 +7247,7 @@
   },
   "pc-j2b": {
     "auditStatus": "unknown",
-    "notes": "No Modland files available (Galaxy Sound System)"
+    "notes": "No test files — Galaxy Sound System format, no Modland/ModArchive files exist"
   },
   "pc-mdl": {
     "auditStatus": "fixed",
@@ -7283,7 +7283,7 @@
   },
   "pc-stx": {
     "auditStatus": "unknown",
-    "notes": "No Modland files available (Scream Tracker STMIK)"
+    "notes": "No test files — Scream Tracker STMIK format, no Modland/ModArchive files exist"
   },
   "pc-okt": {
     "auditStatus": "fixed",
