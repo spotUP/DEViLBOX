@@ -8244,5 +8244,93 @@
   "sc68": {
     "status": "silent",
     "notes": "Loads in sc68 mode (3ch) but SC68 WASM engine produces no audio output."
+  },
+  "adplug-rad": {
+    "status": "works",
+    "notes": "RAD v1/v2 — AdPlug WASM + native TS parser"
+  },
+  "adplug-a2m": {
+    "status": "works",
+    "notes": "AdLib Tracker 2 — AdPlug WASM"
+  },
+  "adplug-d00": {
+    "status": "works",
+    "notes": "EdLib packed — AdPlug WASM"
+  },
+  "adplug-hsc": {
+    "status": "works",
+    "notes": "HSC-Tracker — AdPlug WASM + native TS parser"
+  },
+  "adplug-cmf": {
+    "status": "works",
+    "notes": "Creative Music File — AdPlug WASM + native TS parser"
+  },
+  "adplug-imf": {
+    "status": "works",
+    "notes": "Apogee IMF — AdPlug WASM + native TS parser"
+  },
+  "adplug-dro": {
+    "status": "works",
+    "notes": "DOSBox Raw OPL — AdPlug WASM + native TS parser"
+  },
+  "adplug-lds": {
+    "status": "works",
+    "notes": "LOUDNESS Sound System — AdPlug WASM"
+  },
+  "adplug-mtk": {
+    "status": "works",
+    "notes": "MPU-401 Trakker — AdPlug WASM"
+  },
+  "adplug-dfm": {
+    "status": "works",
+    "notes": "Digital FM — AdPlug WASM"
+  },
+  "adplug-amd": {
+    "status": "works",
+    "notes": "AMUSIC Adlib Tracker — AdPlug WASM"
+  },
+  "adplug-sat": {
+    "status": "works",
+    "notes": "Surprise! AdLib Tracker — AdPlug WASM"
+  },
+  "adplug-mkj": {
+    "status": "works",
+    "notes": "MK-Jamz — AdPlug WASM"
+  },
+  "adplug-sa2": {
+    "status": "works",
+    "notes": "Surprise! AdLib Tracker 2.0 — AdPlug WASM"
+  },
+  "adplug-bam": {
+    "status": "works",
+    "notes": "Bob's AdLib Music — AdPlug WASM"
+  },
+  "adplug-raw": {
+    "status": "works",
+    "notes": "Raw AdLib Capture — AdPlug WASM"
+  },
+  "adplug-jbm": {
+    "status": "works",
+    "notes": "JBM Adlib Music — AdPlug WASM"
+  },
+  "adplug-xad": {
+    "status": "works",
+    "notes": "Exotic AdLib — AdPlug WASM"
+  },
+  "adplug-laa": {
+    "status": "works",
+    "notes": "LucasArts AdLib MIDI — AdPlug WASM"
+  },
+  "adplug-xms": {
+    "status": "works",
+    "notes": "AMUSIC XMS — AdPlug WASM"
+  },
+  "adplug-rol": {
+    "status": "partial",
+    "notes": "Visual Composer ROL — needs external .bnk bank file"
+  },
+  "adplug-sci": {
+    "status": "partial",
+    "notes": "Sierra SCI — needs external patch file"
   }
 }

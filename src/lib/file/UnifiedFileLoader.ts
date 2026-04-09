@@ -514,6 +514,11 @@ export async function loadFile(
       return await loadV2MFile(file);
     }
 
+    // === ADPLUG WASM STREAMING — OPL/AdLib formats not handled by TS parser ===
+    if (isAdPlugWasmFormat(filename)) {
+      return await loadAdPlugFile(file);
+    }
+
     // === SONG FORMATS (replace project) ===
     if (isSongFormat(filename)) {
       // TD-3 pattern files need replace/append choice from user
@@ -1478,6 +1483,43 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
     const errorMessage = error instanceof Error ? error.message : String(error);
     notify.error(`Failed to load V2M: ${errorMessage}`);
     return { success: false, error: `Failed to load V2M: ${errorMessage}` };
+  }
+}
+
+// ── AdPlug WASM streaming ─────────────────────────────────────────────────────
+
+/**
+ * All extensions handled by the AdPlug WASM engine.
+ * This covers 50+ OPL/AdLib music formats. The TS AdPlugParser handles a subset
+ * (RAD, HSC, DRO, IMF, CMF) with pattern editing — the WASM engine plays the rest
+ * as streaming audio via OPL emulation.
+ */
+const ADPLUG_WASM_EXTS = /\.(adl|adt|adtrack|agd|bmf|dfm|dmo|herad|hsp|hybrid|hyp|laa|mad|mdi|msc|mtk|mtr|pis|plx|psi|rat|rol|sat|sop|u6m|xms|xsm|a2m|amd|bam|cff|d00|dtm|got|jbm|ksm|lds|mkj|mus|raw|rix|sa2|sci|sng|xad|fmt)$/i;
+
+function isAdPlugWasmFormat(filename: string): boolean {
+  return ADPLUG_WASM_EXTS.test(filename);
+}
+
+async function loadAdPlugFile(file: File): Promise<FileLoadResult> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+    const player = getAdPlugPlayer();
+    const ok = await player.load(arrayBuffer, file.name);
+
+    if (!ok) {
+      return { success: false, error: `AdPlug could not load: ${file.name}` };
+    }
+
+    const meta = player.meta;
+    const title = meta?.title || file.name.replace(/\.[^.]+$/, '');
+    const type = meta?.formatType || 'OPL';
+    notify.success(`Playing ${type}: ${title}`);
+
+    return { success: true, message: `Playing ${type}: ${title}` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Failed to load AdPlug file: ${msg}` };
   }
 }
 
