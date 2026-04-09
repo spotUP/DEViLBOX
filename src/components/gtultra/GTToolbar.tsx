@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 import { getASIDDeviceManager } from '../../lib/sid/ASIDDeviceManager';
@@ -141,25 +142,25 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       {/* Song selector */}
       <label className="flex items-center gap-1 text-ft2-textDim" title="Song/subtune (0-31)">
         Song:
-        <select value={currentSong} onChange={(e) => setCurrentSong(Number(e.target.value))} className={SEL}>
-          {Array.from({ length: 32 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-        </select>
+        <CustomSelect value={String(currentSong)} onChange={(v) => setCurrentSong(Number(v))} className={SEL}
+          options={Array.from({ length: 32 }, (_, i) => ({ value: String(i), label: String(i) }))}
+        />
       </label>
 
       {/* Octave */}
       <label className="flex items-center gap-1 text-ft2-textDim" title="Octave (F9/F10)">
         Oct:
-        <select value={currentOctave} onChange={(e) => setCurrentOctave(Number(e.target.value))} className={SEL} style={{ width: 36 }}>
-          {Array.from({ length: 8 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-        </select>
+        <CustomSelect value={String(currentOctave)} onChange={(v) => setCurrentOctave(Number(v))} className={SEL}
+          options={Array.from({ length: 8 }, (_, i) => ({ value: String(i), label: String(i) }))}
+        />
       </label>
 
       {/* Edit step */}
       <label className="flex items-center gap-1 text-ft2-textDim" title="Edit step (rows to advance)">
         Stp:
-        <select value={editStep} onChange={(e) => setEditStep(Number(e.target.value))} className={SEL} style={{ width: 36 }}>
-          {Array.from({ length: 17 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-        </select>
+        <CustomSelect value={String(editStep)} onChange={(v) => setEditStep(Number(v))} className={SEL}
+          options={Array.from({ length: 17 }, (_, i) => ({ value: String(i), label: String(i) }))}
+        />
       </label>
 
       {/* Pattern length */}
@@ -177,10 +178,12 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       <span className="text-ft2-textDim">Tempo:<span className="text-ft2-text">{tempo}</span></span>
 
       {/* SID config */}
-      <select value={sidModel} onChange={(e) => setSidModel(Number(e.target.value) as GTSidModel)} className={SEL} title="SID chip model">
-        <option value={0}>6581</option>
-        <option value={1}>8580</option>
-      </select>
+      <CustomSelect value={String(sidModel)} onChange={(v) => setSidModel(Number(v) as GTSidModel)} className={SEL} title="SID chip model"
+        options={[
+          { value: '0', label: '6581' },
+          { value: '1', label: '8580' },
+        ]}
+      />
 
       <button
         onClick={() => setSidCount(sidCount === 1 ? 2 : 1)}

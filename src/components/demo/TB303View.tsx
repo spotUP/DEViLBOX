@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { Shuffle, Trash2, Wand2 } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
 import type { InstrumentConfig, DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
@@ -407,19 +408,16 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
           {/* Instrument Selector - Only show if multiple TB-303 instruments exist */}
           {tb303Instruments.length > 1 && (
             <div className="tb303-instrument-selector">
-              <label htmlFor="tb303-instrument-select">TB-303 Instrument:</label>
-              <select
-                id="tb303-instrument-select"
-                value={instrumentId}
-                onChange={(e) => handleInstrumentChange(Number(e.target.value))}
+              <label>TB-303 Instrument:</label>
+              <CustomSelect
+                value={String(instrumentId)}
+                onChange={(v) => handleInstrumentChange(Number(v))}
                 className="instrument-select"
-              >
-                {tb303Instruments.map((inst) => (
-                  <option key={inst.id} value={inst.id}>
-                    {inst.name} (ID: {inst.id})
-                  </option>
-                ))}
-              </select>
+                options={tb303Instruments.map((inst) => ({
+                  value: String(inst.id),
+                  label: `${inst.name} (ID: ${inst.id})`,
+                }))}
+              />
             </div>
           )}
 

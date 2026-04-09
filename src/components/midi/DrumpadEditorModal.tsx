@@ -7,6 +7,7 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import { X, Radio, Trash2, Zap, LayoutGrid, Disc, Piano, Play, Drum } from 'lucide-react';
 import { TR707DrumMap } from '../../engine/tr707/TR707Synth';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface DrumpadEditorModalProps {
   isOpen: boolean;
@@ -338,16 +339,16 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                       {drumMachines[0].name}
                     </button>
                   ) : (
-                    <select
-                      onChange={(e) => e.target.value && handleLoadDrumMachine(parseInt(e.target.value))}
+                    <CustomSelect
+                      onChange={(v) => v && handleLoadDrumMachine(parseInt(v))}
                       className="px-2 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors uppercase cursor-pointer"
-                      defaultValue=""
-                    >
-                      <option value="" disabled>Select Kit...</option>
-                      {drumMachines.map(dm => (
-                        <option key={dm.id} value={dm.id}>{dm.name}</option>
-                      ))}
-                    </select>
+                      value=""
+                      placeholder="Select Kit..."
+                      options={drumMachines.map(dm => ({
+                        value: String(dm.id),
+                        label: dm.name,
+                      }))}
+                    />
                   )}
                 </div>
               )}
@@ -478,18 +479,16 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-text-secondary">Target Instrument</label>
                   <div className="flex gap-2">
-                    <select
-                      value={currentPadMapping?.targetInstrumentId || ''}
-                      onChange={(e) => handleInstrumentChange(parseInt(e.target.value))}
+                    <CustomSelect
+                      value={String(currentPadMapping?.targetInstrumentId ?? '')}
+                      onChange={(v) => handleInstrumentChange(parseInt(v))}
                       className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-2 text-text-primary"
-                    >
-                      <option value="" disabled>Select Instrument...</option>
-                      {instruments.map(inst => (
-                        <option key={inst.id} value={inst.id}>
-                          {inst.id.toString(16).toUpperCase().padStart(2, '0')} - {inst.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select Instrument..."
+                      options={instruments.map(inst => ({
+                        value: String(inst.id),
+                        label: `${inst.id.toString(16).toUpperCase().padStart(2, '0')} - ${inst.name}`,
+                      }))}
+                    />
                     <button
                       onClick={() => currentPadMapping?.targetInstrumentId && previewInstrument(currentPadMapping.targetInstrumentId)}
                       disabled={!currentPadMapping?.targetInstrumentId}

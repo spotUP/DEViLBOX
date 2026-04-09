@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback } from 'react';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { EnvelopeVisualization } from '../instruments/shared';
 
@@ -94,17 +95,14 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
         <span style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', marginRight: 8, fontSize: 10 }}>INSTRUMENT</span>
-        <select
-          value={currentInstrument}
-          onChange={(e) => setCurrentInstrument(Number(e.target.value))}
-          style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', padding: '1px 4px', fontSize: 11, flex: 1 }}
-        >
-          {Array.from({ length: 64 }, (_, i) => (
-            <option key={i} value={i}>
-              {i.toString(16).toUpperCase().padStart(2, '0')} - {instrumentData[i]?.name || `Instr ${i}`}
-            </option>
-          ))}
-        </select>
+        <CustomSelect
+          value={String(currentInstrument)}
+          onChange={(v) => setCurrentInstrument(Number(v))}
+          options={Array.from({ length: 64 }, (_, i) => ({
+            value: String(i),
+            label: `${i.toString(16).toUpperCase().padStart(2, '0')} - ${instrumentData[i]?.name || `Instr ${i}`}`,
+          }))}
+        />
       </div>
 
       {/* Instrument name (read-only for now — WASM doesn't expose name setter easily) */}

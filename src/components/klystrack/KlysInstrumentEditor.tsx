@@ -33,6 +33,7 @@ import {
   type KlysParamKey,
 } from '@/engine/klystrack/klysParams';
 import type { KlysNativeInstrument } from '@/types/tracker';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface ParamRowProps {
   label: string;
@@ -256,13 +257,12 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
         <ParamRow label="Resonance" value={inst.resonance} max={3}    paramKey="resonance" onChange={handleParam} />
         <div className="flex items-center gap-2 h-6">
           <span className="w-24 text-[11px] text-text-secondary text-right">Type</span>
-          <select
-            value={inst.flttype}
-            onChange={e => handleParam('flttype', parseInt(e.target.value, 10))}
+          <CustomSelect
+            value={String(inst.flttype)}
+            onChange={(v) => handleParam('flttype', parseInt(v, 10))}
             className="flex-1 bg-dark-bgSecondary text-[11px] text-text-secondary border border-dark-border rounded-sm px-1"
-          >
-            {KLYS_FILTER_TYPES.map((n, i) => <option key={i} value={i}>{n}</option>)}
-          </select>
+            options={KLYS_FILTER_TYPES.map((n, i) => ({ value: String(i), label: n }))}
+          />
         </div>
       </Section>
 
@@ -273,25 +273,23 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
         <ParamRow label="Vib Delay"  value={inst.vibDelay}     max={255} paramKey="vibDelay" onChange={handleParam} />
         <div className="flex items-center gap-2 h-6">
           <span className="w-24 text-[11px] text-text-secondary text-right">Vib Shape</span>
-          <select
-            value={inst.vibShape}
-            onChange={e => handleParam('vibShape', parseInt(e.target.value, 10))}
+          <CustomSelect
+            value={String(inst.vibShape)}
+            onChange={(v) => handleParam('vibShape', parseInt(v, 10))}
             className="flex-1 bg-dark-bgSecondary text-[11px] text-text-secondary border border-dark-border rounded-sm px-1"
-          >
-            {KLYS_SHAPE_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
-          </select>
+            options={KLYS_SHAPE_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+          />
         </div>
         <ParamRow label="PWM Speed"  value={inst.pwmSpeed}     max={255} paramKey="pwmSpeed" onChange={handleParam} />
         <ParamRow label="PWM Depth"  value={inst.pwmDepth}     max={255} paramKey="pwmDepth" onChange={handleParam} />
         <div className="flex items-center gap-2 h-6">
           <span className="w-24 text-[11px] text-text-secondary text-right">PWM Shape</span>
-          <select
-            value={inst.pwmShape}
-            onChange={e => handleParam('pwmShape', parseInt(e.target.value, 10))}
+          <CustomSelect
+            value={String(inst.pwmShape)}
+            onChange={(v) => handleParam('pwmShape', parseInt(v, 10))}
             className="flex-1 bg-dark-bgSecondary text-[11px] text-text-secondary border border-dark-border rounded-sm px-1"
-          >
-            {KLYS_SHAPE_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
-          </select>
+            options={KLYS_SHAPE_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+          />
         </div>
       </Section>
 

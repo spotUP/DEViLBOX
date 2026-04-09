@@ -38,6 +38,7 @@ import {
   Settings,
   Monitor,
 } from 'lucide-react';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface MIDILearnModalProps {
   isOpen: boolean;
@@ -487,21 +488,19 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                     <h3 className="text-sm font-medium text-text-secondary mb-3">
                       Controller Profile
                     </h3>
-                    <select
+                    <CustomSelect
                       value={selectedProfile?.id || ''}
-                      onChange={(e) => {
-                        const profile = CONTROLLER_PROFILES.find((p) => p.id === e.target.value);
+                      onChange={(v) => {
+                        const profile = CONTROLLER_PROFILES.find((p) => p.id === v);
                         setSelectedProfile(profile || null);
                       }}
                       className="w-full bg-dark-bgSecondary border border-dark-border rounded px-3 py-2 text-text-primary"
-                    >
-                      <option value="">Select a profile...</option>
-                      {CONTROLLER_PROFILES.map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                          {profile.manufacturer} {profile.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select a profile..."
+                      options={CONTROLLER_PROFILES.map((profile) => ({
+                        value: profile.id,
+                        label: `${profile.manufacturer} ${profile.name}`,
+                      }))}
+                    />
                   </div>
 
                   {selectedProfile && (
@@ -796,21 +795,20 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                   Controlled Instrument
                 </h3>
                 <div className="bg-dark-bgSecondary rounded p-4">
-                  <select
-                    value={controlledInstrumentId ?? 'all'}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleInstrumentChange(value === 'all' ? null : parseInt(value));
+                  <CustomSelect
+                    value={String(controlledInstrumentId ?? 'all')}
+                    onChange={(v) => {
+                      handleInstrumentChange(v === 'all' ? null : parseInt(v));
                     }}
                     className="w-full bg-dark-bgTertiary border border-dark-border rounded px-3 py-2 text-text-primary mb-2"
-                  >
-                    <option value="all">All TB-303 Instruments</option>
-                    {instruments.map((inst) => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.id}. {inst.name} ({inst.synthType || 'Sampler'})
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: 'all', label: 'All TB-303 Instruments' },
+                      ...instruments.map((inst) => ({
+                        value: String(inst.id),
+                        label: `${inst.id}. ${inst.name} (${inst.synthType || 'Sampler'})`,
+                      })),
+                    ]}
+                  />
                   <p className="text-text-muted text-xs">
                     Choose which instrument responds to MIDI CC knobs.
                     "All TB-303" controls every TB-303 synth at once.
