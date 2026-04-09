@@ -14,8 +14,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useTrackerStore, useFormatStore, useUIStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { exportAsHively } from '@lib/export/HivelyExporter';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { HIVELY_COLUMNS, hivelyToFormatChannels } from './hivelyAdapter';
 import { HivelyPositionEditor, HIVELY_MATRIX_HEIGHT, HIVELY_MATRIX_COLLAPSED_HEIGHT } from './HivelyPositionEditor';
@@ -58,23 +56,6 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
     setEditPosition(pos);
     if (!isPlaying) setCurrentPosition(pos);
   }, [isPlaying, setCurrentPosition]);
-
-  const handleExport = useCallback((format: 'hvl' | 'ahx') => {
-    const song = getTrackerReplayer().getSong();
-    if (!song) return;
-    const result = exportAsHively(song, { format, nativeOverride: useFormatStore.getState().hivelyNative });
-    const url = URL.createObjectURL(result.data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = result.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    if (result.warnings.length > 0) {
-      console.warn('[HivelyExport]', result.warnings.join('; '));
-    }
-  }, []);
 
   if (!nativeData) {
     return (
@@ -120,18 +101,6 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
         <span style={{ fontWeight: 'bold', color: '#fde047', fontSize: '12px' }}>{formatLabel}</span>
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
-        {/* Export to the OTHER format (no point exporting AHX→AHX) */}
-        {formatLabel === 'AHX' ? (
-          <button
-            className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
-            onClick={() => handleExport('hvl')}
-          >Export HVL</button>
-        ) : (
-          <button
-            className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
-            onClick={() => handleExport('ahx')}
-          >Export AHX</button>
-        )}
       </div>
       )}
 
