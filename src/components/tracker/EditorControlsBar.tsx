@@ -117,8 +117,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     const style = getComputedStyle(sel);
     ctx.font = `${style.fontSize} ${style.fontFamily}`;
     const textW = ctx.measureText(opt.text).width;
-    // px padding (px-1.5 = 6px each side) + border (1px each) + dropdown arrow (~20px)
-    sel.style.width = `${Math.ceil(textW) + 34}px`;
+    // px padding (px-1.5 = 6px each side) + border (1px each) + dropdown arrow+gap (~26px)
+    sel.style.width = `${Math.ceil(textW) + 40}px`;
   }, []);
 
   useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
