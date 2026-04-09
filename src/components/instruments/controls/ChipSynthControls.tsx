@@ -8,6 +8,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameters';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
@@ -286,9 +287,10 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     if (param.type === 'select' && param.options) {
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <select
-            value={Math.round(Number(currentValue))}
-            onChange={(e) => onParamChange(paramKey, Number(e.target.value))}
+          <CustomSelect
+            value={String(Math.round(Number(currentValue)))}
+            onChange={(v) => onParamChange(paramKey, Number(v))}
+            options={param.options.map(opt => ({ value: String(opt.value), label: opt.label }))}
             style={{
               background: isCyanTheme ? '#041010' : '#1e293b',
               color: textColor,
@@ -297,11 +299,7 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
               fontSize: 11, cursor: 'pointer',
               minWidth: 80,
             }}
-          >
-            {param.options.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          />
           <span style={{ fontSize: 10, color: mutedColor }}>{param.label}</span>
         </div>
       );

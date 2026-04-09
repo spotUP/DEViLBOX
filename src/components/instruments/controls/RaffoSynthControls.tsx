@@ -6,6 +6,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { RaffoSynthConfig } from '@/engine/raffo/RaffoSynth';
 import { DEFAULT_RAFFO, RAFFO_PARAM_NAMES } from '@/engine/raffo/RaffoSynth';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface RaffoSynthControlsProps {
   config: Partial<RaffoSynthConfig>;
@@ -50,19 +51,21 @@ const OscGroup: React.FC<{
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-1">
           <label className="text-text-muted text-[10px]">Waveform</label>
-          <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-            value={Math.round(merged[waveKey] as number ?? 0)}
-            onChange={(e) => update(waveKey, parseInt(e.target.value))}>
-            {WAVEFORM_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
-          </select>
+          <CustomSelect
+            className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
+            value={String(Math.round(merged[waveKey] as number ?? 0))}
+            onChange={(v) => update(waveKey, parseInt(v))}
+            options={WAVEFORM_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-text-muted text-[10px]">Range</label>
-          <select className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-            value={Math.round(merged[rangeKey] as number ?? 2)}
-            onChange={(e) => update(rangeKey, parseInt(e.target.value))}>
-            {[1, 2, 3, 4, 5, 6].map(r => <option key={r} value={r}>{RANGE_NAMES[r]}</option>)}
-          </select>
+          <CustomSelect
+            className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
+            value={String(Math.round(merged[rangeKey] as number ?? 2))}
+            onChange={(v) => update(rangeKey, parseInt(v))}
+            options={[1, 2, 3, 4, 5, 6].map(r => ({ value: String(r), label: RANGE_NAMES[r] }))}
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-text-muted text-[10px]">Volume</label>

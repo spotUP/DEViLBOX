@@ -19,6 +19,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
@@ -159,17 +160,13 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Base Waveform" />
         <div className="flex items-center gap-3">
-          <select
-            value={config.waveNumber}
-            onChange={(e) => upd('waveNumber', parseInt(e.target.value))}
+          <CustomSelect
+            value={String(config.waveNumber)}
+            onChange={(v) => upd('waveNumber', parseInt(v))}
+            options={Array.from({ length: 47 }, (_, i) => ({ value: String(i), label: `${i}: ${waveLabel(i)}` }))}
             className="text-xs font-mono border rounded px-2 py-1.5"
-            style={{ background: '#100d00', borderColor: dim, color: accent }}>
-            {Array.from({ length: 47 }, (_, i) => (
-              <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-                {i}: {waveLabel(i)}
-              </option>
-            ))}
-          </select>
+            style={{ background: '#100d00', borderColor: dim, color: accent }}
+          />
           <span className="text-[10px] text-text-muted">Initial waveform (overridden by synth macro)</span>
         </div>
       </div>

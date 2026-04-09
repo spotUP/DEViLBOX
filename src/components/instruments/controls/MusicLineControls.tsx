@@ -42,6 +42,7 @@ import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { MusicLineArpeggioEditor } from '@/components/musicline/MusicLineArpeggioEditor';
 import { MusicLineWaveformVisualizer } from '@/components/musicline/MusicLineWaveformVisualizer';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -296,9 +297,10 @@ function CycleSelect({ value, options, label, color, onChange }: {
       }}>
         {label}
       </span>
-      <select
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+      <CustomSelect
+        value={String(value)}
+        onChange={(v) => onChange(Number(v))}
+        options={options.map((opt) => ({ value: String(opt.value), label: opt.label }))}
         style={{
           background: '#0e0e1c',
           border: `1px solid ${color}40`,
@@ -308,13 +310,8 @@ function CycleSelect({ value, options, label, color, onChange }: {
           fontFamily: 'monospace',
           padding: '3px 4px',
           cursor: 'pointer',
-          outline: 'none',
         }}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   cutoffToHz, filterResponseDb, formatCutoffHz,
   fmtInt, fmtWave, fmtCutoff, fmtTrack,
 } from '@engine/cmi/useCMIPanel';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // ── Colors ───────────────────────────────────────────────────────────────────
 
@@ -288,9 +289,11 @@ const CMIControls: React.FC<CMIControlsProps> = ({
               </button>
             ))}
           </div>
-          <select
-            onChange={(e) => cmi.loadPreset(parseInt(e.target.value))}
-            defaultValue=""
+          <CustomSelect
+            value=""
+            onChange={(v) => cmi.loadPreset(parseInt(v))}
+            placeholder="PRESET"
+            options={cmi.presets.map((p, i) => ({ value: String(i), label: p.name }))}
             className="text-[10px] font-mono px-2 py-1 rounded-sm"
             style={{
               backgroundColor: '#0a0a0a',
@@ -298,12 +301,7 @@ const CMIControls: React.FC<CMIControlsProps> = ({
               border: `1px solid ${CMI_GREEN_DIM}`,
               outline: 'none',
             }}
-          >
-            <option value="" disabled>PRESET</option>
-            {cmi.presets.map((p, i) => (
-              <option key={i} value={i}>{p.name}</option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* ════════════ Page 7: HARMONIC ════════════ */}
@@ -410,38 +408,30 @@ const CMIControls: React.FC<CMIControlsProps> = ({
                 </div>
                 <div className="flex gap-2" style={{ maxWidth: VIS_W }}>
                   {/* Category selector */}
-                  <select
-                    value={cmi.libraryCategoryIndex}
-                    onChange={(e) => { cmi.setLibraryCategoryIndex(Number(e.target.value)); }}
+                  <CustomSelect
+                    value={String(cmi.libraryCategoryIndex)}
+                    onChange={(v) => { cmi.setLibraryCategoryIndex(Number(v)); }}
+                    options={cmi.libraryCategories.map((cat, i) => ({ value: String(i), label: cat.toUpperCase() }))}
                     className="text-[10px] font-mono px-2 py-1 rounded-sm"
                     style={{
                       color: CMI_GREEN, backgroundColor: '#0a0a0a',
                       border: `1px solid ${CMI_GREEN_DIM}`, width: 140,
                       outline: 'none',
                     }}
-                  >
-                    {cmi.libraryCategories.map((cat, i) => (
-                      <option key={cat} value={i}>
-                        {cat.toUpperCase()} ({cmi.librarySamples.length === 0 && i === cmi.libraryCategoryIndex ? '...' : i === cmi.libraryCategoryIndex ? cmi.librarySamples.length : ''})
-                      </option>
-                    ))}
-                  </select>
+                  />
                   {/* Sample selector */}
-                  <select
-                    value={cmi.librarySampleIndex}
-                    onChange={(e) => cmi.loadLibrarySample(Number(e.target.value))}
+                  <CustomSelect
+                    value={String(cmi.librarySampleIndex)}
+                    onChange={(v) => cmi.loadLibrarySample(Number(v))}
+                    placeholder="— SELECT SAMPLE —"
+                    options={cmi.librarySamples.map((s, i) => ({ value: String(i), label: s.name }))}
                     className="text-[10px] font-mono px-2 py-1 rounded-sm flex-1"
                     style={{
                       color: CMI_GREEN, backgroundColor: '#0a0a0a',
                       border: `1px solid ${CMI_GREEN_DIM}`,
                       outline: 'none',
                     }}
-                  >
-                    <option value={-1}>— SELECT SAMPLE —</option>
-                    {cmi.librarySamples.map((s, i) => (
-                      <option key={s.file} value={i}>{s.name}</option>
-                    ))}
-                  </select>
+                  />
                   {/* Prev/Next + Preview buttons */}
                   <button onClick={cmi.prevLibrarySample} className="px-2 py-1 text-[10px] font-mono rounded-sm"
                     style={{ color: CMI_GREEN, border: `1px solid ${CMI_GREEN_DIM}`, background: 'transparent' }}>

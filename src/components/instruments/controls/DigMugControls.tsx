@@ -12,6 +12,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, WaveformThumbnail } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
@@ -164,17 +165,13 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
                 <div className="rounded overflow-hidden border" style={{ borderColor: dim }}>
                   <WaveformThumbnail type={waveDef.type} width={72} height={28} color={accent} style="line" />
                 </div>
-                <select
-                  value={waveIdx}
-                  onChange={(e) => updateWavetable(slot, parseInt(e.target.value))}
+                <CustomSelect
+                  value={String(waveIdx)}
+                  onChange={(v) => updateWavetable(slot, parseInt(v))}
+                  options={DM_WAVES.map((w, i) => ({ value: String(i), label: `${i}: ${w.name}` }))}
                   className="text-[9px] font-mono border rounded px-1 py-0.5"
-                  style={{ background: '#0a0f00', borderColor: dim, color: accent }}>
-                  {DM_WAVES.map((w, i) => (
-                    <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-                      {i}: {w.name}
-                    </option>
-                  ))}
-                </select>
+                  style={{ background: '#0a0f00', borderColor: dim, color: accent }}
+                />
               </div>
             );
           })}

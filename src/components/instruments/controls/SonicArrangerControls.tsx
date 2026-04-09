@@ -17,6 +17,7 @@ import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instrume
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 // SA instrument struct byte offsets (from SonicArrangerParser.ts file header).
 // All multi-byte fields are uint16 big-endian unless noted.
@@ -404,18 +405,13 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             label="Effect Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        <select
-          value={config.effect}
-          onChange={(e) => updateParam('effect', parseInt(e.target.value))}
+        <CustomSelect
+          value={String(config.effect)}
+          onChange={(v) => updateParam('effect', parseInt(v))}
+          options={EFFECT_MODES.map((m) => ({ value: String(m.value), label: `${m.value}: ${m.name}` }))}
           className="w-full text-xs font-mono border rounded px-2 py-1.5 mt-3"
           style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
-        >
-          {EFFECT_MODES.map((m) => (
-            <option key={m.value} value={m.value} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-              {m.value}: {m.name}
-            </option>
-          ))}
-        </select>
+        />
       </div>
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Waveform" />
@@ -424,18 +420,13 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           <div className="flex items-center gap-1">
             <label>Wave #</label>
             {numWaveforms > 0 ? (
-              <select
-                value={config.waveformNumber}
-                onChange={(e) => updateParam('waveformNumber', parseInt(e.target.value) || 0)}
+              <CustomSelect
+                value={String(config.waveformNumber)}
+                onChange={(v) => updateParam('waveformNumber', parseInt(v) || 0)}
+                options={Array.from({ length: numWaveforms }, (_, i) => ({ value: String(i), label: String(i) }))}
                 className="text-[10px] font-mono border rounded px-1 py-0.5"
                 style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
-              >
-                {Array.from({ length: numWaveforms }, (_, i) => (
-                  <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-                    {i}
-                  </option>
-                ))}
-              </select>
+              />
             ) : (
               <input
                 type="number"
@@ -488,18 +479,13 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <BarChart data={config.adsrTable} width={320} height={56} color={accent} />
         <div className="flex items-center gap-2 mt-2">
           <label className="text-[10px] text-text-muted">ADSR Table #</label>
-          <select
-            value={config.adsrNumber}
-            onChange={(e) => updateParam('adsrNumber', parseInt(e.target.value) || 0)}
+          <CustomSelect
+            value={String(config.adsrNumber)}
+            onChange={(v) => updateParam('adsrNumber', parseInt(v) || 0)}
+            options={Array.from({ length: numAdsrTables }, (_, i) => ({ value: String(i), label: String(i) }))}
             className="text-[10px] font-mono border rounded px-1 py-0.5"
             style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
-          >
-            {Array.from({ length: numAdsrTables }, (_, i) => (
-              <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-                {i}
-              </option>
-            ))}
-          </select>
+          />
           <span className="text-[9px] text-text-muted">({numAdsrTables} available)</span>
         </div>
         <div className="flex gap-3 flex-wrap mt-3">
@@ -540,18 +526,13 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
         <BarChart data={config.amfTable} width={320} height={56} color={accent} signed />
         <div className="flex items-center gap-2 mt-2">
           <label className="text-[10px] text-text-muted">AMF Table #</label>
-          <select
-            value={config.amfNumber}
-            onChange={(e) => updateParam('amfNumber', parseInt(e.target.value) || 0)}
+          <CustomSelect
+            value={String(config.amfNumber)}
+            onChange={(v) => updateParam('amfNumber', parseInt(v) || 0)}
+            options={Array.from({ length: numAmfTables }, (_, i) => ({ value: String(i), label: String(i) }))}
             className="text-[10px] font-mono border rounded px-1 py-0.5"
             style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
-          >
-            {Array.from({ length: numAmfTables }, (_, i) => (
-              <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
-                {i}
-              </option>
-            ))}
-          </select>
+          />
           <span className="text-[9px] text-text-muted">({numAmfTables} available)</span>
         </div>
         <div className="flex gap-3 mt-3">

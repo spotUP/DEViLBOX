@@ -6,6 +6,7 @@
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/pixi/views/instruments/synthPanelTypes';
 
 interface DOMSynthPanelProps {
@@ -245,15 +246,12 @@ const DOMSynthControl: React.FC<ControlProps> = ({ descriptor, value, onChange }
       return (
         <div className="flex flex-col gap-0.5">
           <div className="text-[7px] text-text-muted uppercase">{descriptor.label}</div>
-          <select
+          <CustomSelect
             value={strVal}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(v) => onChange(v)}
+            options={descriptor.options.map((opt) => ({ value: opt.value, label: opt.label }))}
             className="px-1.5 py-0.5 text-[10px] bg-dark-bgTertiary text-text-primary border border-dark-border rounded focus:border-accent-primary focus:outline-none"
-          >
-            {descriptor.options.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          />
         </div>
       );
     }

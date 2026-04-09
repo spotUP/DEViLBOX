@@ -8,6 +8,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { SelectControl } from '@components/instruments/shared';
+import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthV1Config } from '@/engine/synthv1/SynthV1Synth';
 import {
   DEFAULT_SYNTHV1,
@@ -110,13 +111,12 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             label="Detune" color="#eab308" />
           <div className="flex flex-col gap-1">
             <label className="text-text-muted text-[10px]">Octave</label>
-            <select
+            <CustomSelect
               className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-              value={Math.round(merged[dcoK('Octave', page)] as number)}
-              onChange={(e) => update(dcoK('Octave', page), parseInt(e.target.value))}
-            >
-              {OCTAVE_OPTIONS.map(o => <option key={o} value={o}>{o > 0 ? `+${o}` : o}</option>)}
-            </select>
+              value={String(Math.round(merged[dcoK('Octave', page)] as number))}
+              onChange={(v) => update(dcoK('Octave', page), parseInt(v))}
+              options={OCTAVE_OPTIONS.map(o => ({ value: String(o), label: o > 0 ? `+${o}` : String(o) }))}
+            />
           </div>
         </div>
         <div className="grid grid-cols-4 gap-3">
@@ -168,14 +168,15 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
           />
           <div className="flex flex-col gap-1">
             <label className="text-text-muted text-[10px]">Slope</label>
-            <select
+            <CustomSelect
               className="bg-dark-bgSecondary text-text-primary border border-dark-border rounded px-1 py-0.5 text-[10px]"
-              value={Math.round(merged[dcfK('Slope', page)] as number)}
-              onChange={(e) => update(dcfK('Slope', page), parseInt(e.target.value))}
-            >
-              <option value={0}>12 dB</option>
-              <option value={1}>24 dB</option>
-            </select>
+              value={String(Math.round(merged[dcfK('Slope', page)] as number))}
+              onChange={(v) => update(dcfK('Slope', page), parseInt(v))}
+              options={[
+                { value: '0', label: '12 dB' },
+                { value: '1', label: '24 dB' },
+              ]}
+            />
           </div>
         </div>
         <ADSRRow
