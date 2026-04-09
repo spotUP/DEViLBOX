@@ -109,16 +109,10 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const autoSizeSelect = useCallback(() => {
     const sel = hwSelectRef.current;
     if (!sel) return;
-    const opt = sel.options[sel.selectedIndex];
-    if (!opt) return;
-    // Measure text width using a temporary canvas
-    const ctx = document.createElement('canvas').getContext('2d');
-    if (!ctx) return;
-    const style = getComputedStyle(sel);
-    ctx.font = `${style.fontSize} ${style.fontFamily}`;
-    const textW = ctx.measureText(opt.text).width;
-    // pl-1.5 (6px) + pr-5 (20px) + border (2px) + dropdown arrow (~16px)
-    sel.style.width = `${Math.ceil(textW) + 44}px`;
+    // Let browser compute natural width for current selection, then add right margin
+    sel.style.width = 'auto';
+    const natural = sel.offsetWidth;
+    sel.style.width = `${natural + 8}px`; // 8px breathing room after the arrow
   }, []);
 
   useEffect(() => { autoSizeSelect(); }, [currentHardwareValue, autoSizeSelect]);
@@ -210,7 +204,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
             ref={hwSelectRef}
-            className="pl-1.5 pr-5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+            className="px-1.5 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             onChange={(e) => {
               const v = e.target.value;
               if (v.startsWith('format:') || v.startsWith('mode:')) return; // Info-only, not selectable
