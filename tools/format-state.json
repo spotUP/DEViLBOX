@@ -4942,8 +4942,8 @@
     "notes": "No test files available — routing verified in code"
   },
   "uade-zound-monitor": {
-    "auditStatus": "fail",
-    "notes": "ch=4 pat=20 inst=16 rms=0.0189 errors=2"
+    "auditStatus": "fixed",
+    "notes": "Samples/ subdir loading fixed — hittheroad rms=0.129, maddick rms=0.199"
   },
   "uade-dave-lowe": {
     "auditStatus": "fixed",
