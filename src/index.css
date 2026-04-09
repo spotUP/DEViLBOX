@@ -195,7 +195,8 @@
     border: none;
     background-color: var(--color-bg-tertiary);
     color: var(--color-text);
-    font-size: 0.875rem;
+    font-size: 0.625rem;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 500;
     cursor: pointer;
     transition: all 150ms ease-out;
@@ -215,7 +216,8 @@
     border: none;
     background-color: var(--color-accent);
     color: var(--color-text-inverse);
-    font-size: 0.875rem;
+    font-size: 0.625rem;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 600;
     cursor: pointer;
     transition: all 150ms ease-out;
@@ -228,7 +230,8 @@
   .btn-ghost {
     padding: 0.375rem 0.75rem;
     border-radius: 0.375rem;
-    font-size: 0.875rem;
+    font-size: 0.625rem;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 500;
     color: var(--color-text-secondary);
     cursor: pointer;
@@ -263,7 +266,8 @@
     border: none;
     background-color: #dc2626;
     color: white;
-    font-size: 0.875rem;
+    font-size: 0.625rem;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 600;
     cursor: pointer;
     transition: all 150ms ease-out;
@@ -276,17 +280,17 @@
   /* Button size modifiers */
   .btn-sm {
     padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    font-size: 0.625rem;
   }
 
   .btn-md {
     padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
+    font-size: 0.625rem;
   }
 
   .btn-lg {
     padding: 0.625rem 1.25rem;
-    font-size: 1rem;
+    font-size: 0.75rem;
   }
 
   /* Panel styles */
