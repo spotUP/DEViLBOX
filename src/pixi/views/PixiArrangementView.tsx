@@ -698,7 +698,8 @@ export const PixiArrangementView: React.FC = () => {
               if (!track) return;
               // Create a fresh empty pattern for this clip so each clip has independent data
               ts.addPattern();
-              const patternId = useTrackerStore.getState().patterns.at(-1)?.id;
+              const patterns = useTrackerStore.getState().patterns;
+              const patternId = patterns[patterns.length - 1]?.id;
               if (!patternId) return;
               arr.addClip({
                 patternId,
