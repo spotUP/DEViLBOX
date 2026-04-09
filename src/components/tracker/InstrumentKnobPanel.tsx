@@ -29,8 +29,6 @@ const MasterEffectsPanel = lazy(() =>
   import('@components/effects/MasterEffectsPanel').then((m) => ({ default: m.MasterEffectsPanel }))
 );
 
-type PanelTab = 'synth' | 'instFx' | 'masterFx';
-
 // Synth types that have the full JC303 hardware UI
 const TB303_TYPES: SynthType[] = ['TB303'];
 
@@ -39,15 +37,15 @@ const SC_TYPES: SynthType[] = ['SuperCollider'];
 
 // Height constants
 const COLLAPSED_HEIGHT = 40;
-const TAB_BAR_HEIGHT = 32;
+const SECTION_HEADER_HEIGHT = 24;
 const TB303_EXPANDED_HEIGHT = 512;
+const DEFAULT_EXPANDED_HEIGHT = 200;
 
-// For FX tabs and most synth types, return null to signal "auto height"
-// Only TB303 has a fixed hardware UI height
-function getExpandedHeight(synthType: SynthType | undefined, activeTab: PanelTab): number | null {
-  if (activeTab !== 'synth') return null;
+// For FX tabs and most synth types, return a fixed height
+// TB303 has its own large hardware UI height
+function getExpandedHeight(synthType: SynthType | undefined): number {
   if (synthType && TB303_TYPES.includes(synthType)) return TB303_EXPANDED_HEIGHT;
-  return null; // auto height — each control component knows its own size
+  return DEFAULT_EXPANDED_HEIGHT;
 }
 
 // ─── Generic Synth Knobs ─────────────────────────────────────────────────────
@@ -327,46 +325,28 @@ function getSynthColor(synthType: SynthType | undefined): string {
   }
 }
 
-// ─── Tab Bar ─────────────────────────────────────────────────────────────────
-const TabBar: React.FC<{
-  activeTab: PanelTab;
-  onTabChange: (tab: PanelTab) => void;
-  synthType: SynthType | undefined;
-  instrumentName: string;
-  fxCount: number;
-  rightContent?: React.ReactNode;
-}> = memo(({ activeTab, onTabChange, synthType, instrumentName, fxCount, rightContent }) => {
-  const tabs: { id: PanelTab; label: string; badge?: string }[] = [
-    { id: 'synth', label: synthType === 'TB303' ? 'TB-303' : (synthType || 'Synth') },
-    { id: 'instFx', label: 'Inst FX', badge: fxCount > 0 ? String(fxCount) : undefined },
-    { id: 'masterFx', label: 'Master FX' },
-  ];
-
-  return (
-    <div className="flex items-center gap-0.5 px-2 border-b border-dark-border" style={{ height: `${TAB_BAR_HEIGHT}px` }}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          className={`px-3 py-1 text-[11px] font-medium rounded-t transition-colors relative ${
-            activeTab === tab.id
-              ? 'text-text-primary bg-dark-bgTertiary border-b-2 border-accent-primary'
-              : 'text-text-muted hover:text-text-secondary hover:bg-dark-bgHover'
-          }`}
-          onClick={() => onTabChange(tab.id)}
-        >
-          {tab.label}
-          {tab.badge && (
-            <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded font-bold border bg-accent-highlight/20 text-accent-highlight border-accent-highlight/40">{tab.badge}</span>
-          )}
-        </button>
-      ))}
-      <div className="flex-1" />
-      {rightContent}
-      <span className="text-[10px] text-text-muted font-mono truncate max-w-[200px]">{instrumentName}</span>
-    </div>
-  );
-});
-TabBar.displayName = 'TabBar';
+// ─── Section Header ──────────────────────────────────────────────────────────
+const SectionHeader: React.FC<{
+  label: string;
+  badge?: string;
+  color?: string;
+  actions?: React.ReactNode;
+}> = memo(({ label, badge, color, actions }) => (
+  <div
+    className="flex items-center gap-1.5 px-2 border-b border-dark-border flex-shrink-0 select-none"
+    style={{ height: `${SECTION_HEADER_HEIGHT}px` }}
+  >
+    {color && (
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+    )}
+    <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}</span>
+    {badge && (
+      <span className="px-1 py-0 text-[9px] rounded font-bold bg-accent-highlight/20 text-accent-highlight">{badge}</span>
+    )}
+    {actions && <><div className="flex-1" />{actions}</>}
+  </div>
+));
+SectionHeader.displayName = 'SectionHeader';
 
 // ─── FX Loading Fallback ─────────────────────────────────────────────────────
 const FxLoadingFallback = () => (
@@ -397,7 +377,6 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   const contentRef = useRef<HTMLDivElement>(null);
   const instFxRef = useRef<InstrumentEffectsPanelHandle>(null);
   const masterFxRef = useRef<MasterEffectsPanelHandle>(null);
-  const [activeTab, setActiveTab] = useState<PanelTab>('synth');
 
   // Determine which instrument to show — follows the selected instrument
   const targetInstrument = useMemo(() => {
@@ -456,53 +435,44 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   }, [targetInstrument, updateInstrument]);
 
   // Right-side content for tab bar — action buttons for FX tabs
-  const tabRightContent = useMemo(() => {
-    if (activeTab === 'instFx') {
-      return (
-        <button
-          onClick={() => instFxRef.current?.toggleBrowser()}
-          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded
-                   bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
-        >
-          <Plus size={10} />
-          Add
-        </button>
-      );
-    }
-    if (activeTab === 'masterFx') {
-      return (
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => masterFxRef.current?.togglePresetMenu()}
-            className="px-2 py-0.5 text-[10px] font-medium rounded bg-dark-bgTertiary text-text-secondary
-                     hover:bg-dark-bgHover transition-colors border border-dark-borderLight"
-          >
-            Presets
-          </button>
-          <button
-            onClick={() => masterFxRef.current?.toggleAddMenu()}
-            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded
-                     bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
-          >
-            <Plus size={10} />
-            Add
-          </button>
-        </div>
-      );
-    }
-    return undefined;
-  }, [activeTab]);
+  const instFxActions = useMemo(() => (
+    <button
+      onClick={() => instFxRef.current?.toggleBrowser()}
+      className="flex items-center gap-1 px-1.5 py-0 text-[9px] font-bold uppercase rounded
+               bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
+    >
+      <Plus size={9} />
+      Add
+    </button>
+  ), []);
+
+  const masterFxActions = useMemo(() => (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => masterFxRef.current?.togglePresetMenu()}
+        className="px-1.5 py-0 text-[9px] font-medium rounded bg-dark-bgTertiary text-text-secondary
+                 hover:bg-dark-bgHover transition-colors border border-dark-borderLight"
+      >
+        Presets
+      </button>
+      <button
+        onClick={() => masterFxRef.current?.toggleAddMenu()}
+        className="flex items-center gap-1 px-1.5 py-0 text-[9px] font-bold uppercase rounded
+                 bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
+      >
+        <Plus size={9} />
+        Add
+      </button>
+    </div>
+  ), []);
 
   // Calculate popout dimensions based on content
   const getPopoutDimensions = useCallback(() => {
     if (isTB303) {
-      return { width: 1180, height: TB303_EXPANDED_HEIGHT + TAB_BAR_HEIGHT + 20 };
+      return { width: 1400, height: TB303_EXPANDED_HEIGHT + SECTION_HEADER_HEIGHT + 60 };
     }
-    if (activeTab === 'instFx' || activeTab === 'masterFx') {
-      return { width: 1000, height: 400 };
-    }
-    return { width: 800, height: 500 };
-  }, [isTB303, activeTab]);
+    return { width: 1200, height: 400 };
+  }, [isTB303]);
 
   // No instrument on this channel — render nothing
   if (!targetInstrument) {
@@ -524,7 +494,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     return null;
   }
 
-  const expandedHeight = getExpandedHeight(synthType, activeTab);
+  const expandedHeight = getExpandedHeight(synthType);
   const instNum = String(targetInstrument.id).padStart(2, '0');
   const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
   const fxCount = targetInstrument.effects?.length ?? 0;
@@ -541,48 +511,62 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
           width={popoutWidth}
           height={popoutHeight}
         >
-          <div style={{ background: 'var(--color-bg-tertiary)' }}>
-            <TabBar
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              synthType={synthType}
-              instrumentName={instrumentName}
-              fxCount={fxCount}
-              rightContent={tabRightContent}
-            />
-            <ScrollLockContainer>
-              {activeTab === 'synth' ? (
-                isTB303 && targetInstrument.tb303 ? (
-                  <JC303StyledKnobPanel
-                    key={targetInstrument.id}
-                    config={targetInstrument.tb303}
-                    onChange={handleTB303ConfigChange}
-                    onPresetLoad={handlePresetLoad}
-                    instrumentId={targetInstrument.id}
-                  />
-                ) : (
-                  <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
-                )
-              ) : activeTab === 'instFx' ? (
-                <Suspense fallback={<FxLoadingFallback />}>
-                  <div className="fx-horizontal-layout" style={{ height: '100%' }}>
-                    <InstrumentEffectsPanel
-                      ref={instFxRef}
-                      instrumentId={targetInstrument.id}
-                      instrumentName={instrumentName}
-                      effects={targetInstrument.effects || []}
-                      hideHeader
-                    />
-                  </div>
-                </Suspense>
-              ) : (
-                <Suspense fallback={<FxLoadingFallback />}>
-                  <div className="fx-horizontal-layout" style={{ height: '100%' }}>
-                    <MasterEffectsPanel ref={masterFxRef} hideHeader />
-                  </div>
-                </Suspense>
-              )}
-            </ScrollLockContainer>
+          <div style={{ background: 'var(--color-bg-tertiary)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Popout header */}
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-dark-border flex-shrink-0">
+              <span className="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                style={{ backgroundColor: getSynthColor(synthType), color: 'var(--color-text-inverse)' }}>
+                {synthType}
+              </span>
+              <span className="text-xs text-text-secondary truncate">{instrumentName}</span>
+            </div>
+            {/* Horizontal layout */}
+            <div className="flex-1 min-h-0 flex overflow-hidden">
+              <div className="flex-[2] min-w-0 flex flex-col overflow-hidden">
+                <SectionHeader label={synthType === 'TB303' ? 'TB-303' : (synthType || 'Synth')} color={getSynthColor(synthType)} />
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <ScrollLockContainer>
+                    {isTB303 && targetInstrument.tb303 ? (
+                      <JC303StyledKnobPanel
+                        key={targetInstrument.id}
+                        config={targetInstrument.tb303}
+                        onChange={handleTB303ConfigChange}
+                        onPresetLoad={handlePresetLoad}
+                        instrumentId={targetInstrument.id}
+                      />
+                    ) : (
+                      <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
+                    )}
+                  </ScrollLockContainer>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
+                <SectionHeader label="Inst FX" badge={fxCount > 0 ? String(fxCount) : undefined} actions={instFxActions} />
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <Suspense fallback={<FxLoadingFallback />}>
+                    <div className="fx-horizontal-layout p-2 h-full">
+                      <InstrumentEffectsPanel
+                        ref={instFxRef}
+                        instrumentId={targetInstrument.id}
+                        instrumentName={instrumentName}
+                        effects={targetInstrument.effects || []}
+                        hideHeader
+                      />
+                    </div>
+                  </Suspense>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
+                <SectionHeader label="Master FX" actions={masterFxActions} />
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <Suspense fallback={<FxLoadingFallback />}>
+                    <div className="fx-horizontal-layout p-2 h-full">
+                      <MasterEffectsPanel ref={masterFxRef} hideHeader />
+                    </div>
+                  </Suspense>
+                </div>
+              </div>
+            </div>
           </div>
         </PopOutWindow>
 
@@ -620,7 +604,6 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   }
 
   // ─── Inline panel with collapse/expand animation ───────────────────────────
-  const isAutoHeight = expandedHeight === null;
 
   return (
     <div
@@ -628,11 +611,11 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
       style={{
         position: 'relative',
         width: '100%',
-        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isAutoHeight ? 'auto' : `${expandedHeight}px`),
+        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : `${expandedHeight}px`,
         background: 'var(--color-bg-tertiary)',
         borderTop: '1px solid var(--color-border-light)',
         overflow: 'hidden',
-        transition: isAutoHeight ? undefined : 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       {/* Collapsed header — always visible */}
@@ -699,59 +682,58 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         pointerEvents: tb303Collapsed ? 'none' : 'auto',
         display: 'flex',
         flexDirection: 'column',
-        ...(isAutoHeight ? {} : { height: `${expandedHeight}px` }),
+        height: `${expandedHeight}px`,
       }}>
-        {/* Header bar with instrument info */}
-        <TabBar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          synthType={synthType}
-          instrumentName={instrumentName}
-          fxCount={fxCount}
-          rightContent={tabRightContent}
-        />
-
         {/* Horizontal layout — synth controls, inst FX, master FX side by side */}
         <div className="flex-1 min-h-0 flex overflow-hidden">
-          {/* Synth controls */}
-          <div className="flex-1 min-w-0 overflow-auto border-r border-dark-border">
-            {isTB303 && targetInstrument.tb303 ? (
-              <ScrollLockContainer className="w-full">
-                <JC303StyledKnobPanel
-                  key={targetInstrument.id}
-                  config={targetInstrument.tb303}
-                  onChange={handleTB303ConfigChange}
-                  onPresetLoad={handlePresetLoad}
-                  instrumentId={targetInstrument.id}
-                />
-              </ScrollLockContainer>
-            ) : (
-              <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
-            )}
+          {/* Synth controls — takes more space */}
+          <div className="flex-[2] min-w-0 flex flex-col overflow-hidden">
+            <SectionHeader label={synthType === 'TB303' ? 'TB-303' : (synthType || 'Synth')} color={getSynthColor(synthType)} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              {isTB303 && targetInstrument.tb303 ? (
+                <ScrollLockContainer className="w-full">
+                  <JC303StyledKnobPanel
+                    key={targetInstrument.id}
+                    config={targetInstrument.tb303}
+                    onChange={handleTB303ConfigChange}
+                    onPresetLoad={handlePresetLoad}
+                    instrumentId={targetInstrument.id}
+                  />
+                </ScrollLockContainer>
+              ) : (
+                <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
+              )}
+            </div>
           </div>
 
           {/* Instrument FX */}
-          <div className="flex-1 min-w-0 overflow-auto border-r border-dark-border">
-            <Suspense fallback={<FxLoadingFallback />}>
-              <div className="fx-horizontal-layout p-2 h-full">
-                <InstrumentEffectsPanel
-                  ref={instFxRef}
-                  instrumentId={targetInstrument.id}
-                  instrumentName={instrumentName}
-                  effects={targetInstrument.effects || []}
-                  hideHeader
-                />
-              </div>
-            </Suspense>
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
+            <SectionHeader label="Inst FX" badge={fxCount > 0 ? String(fxCount) : undefined} actions={instFxActions} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <Suspense fallback={<FxLoadingFallback />}>
+                <div className="fx-horizontal-layout p-2 h-full">
+                  <InstrumentEffectsPanel
+                    ref={instFxRef}
+                    instrumentId={targetInstrument.id}
+                    instrumentName={instrumentName}
+                    effects={targetInstrument.effects || []}
+                    hideHeader
+                  />
+                </div>
+              </Suspense>
+            </div>
           </div>
 
           {/* Master FX */}
-          <div className="flex-1 min-w-0 overflow-auto">
-            <Suspense fallback={<FxLoadingFallback />}>
-              <div className="fx-horizontal-layout p-2 h-full">
-                <MasterEffectsPanel ref={masterFxRef} hideHeader />
-              </div>
-            </Suspense>
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
+            <SectionHeader label="Master FX" actions={masterFxActions} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <Suspense fallback={<FxLoadingFallback />}>
+                <div className="fx-horizontal-layout p-2 h-full">
+                  <MasterEffectsPanel ref={masterFxRef} hideHeader />
+                </div>
+              </Suspense>
+            </div>
           </div>
         </div>
       </div>
