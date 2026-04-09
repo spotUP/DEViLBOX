@@ -290,6 +290,7 @@ interface DropdownButtonProps {
   items: MenuItemType[];
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   disabled?: boolean;
 }
 
@@ -297,6 +298,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
   items,
   children,
   className = '',
+  style,
   disabled = false,
 }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -328,6 +330,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
         onClick={handleClick}
         disabled={disabled}
         className={className}
+        style={style}
       >
         {children}
       </button>
