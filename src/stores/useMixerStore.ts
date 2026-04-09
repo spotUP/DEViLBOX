@@ -506,14 +506,13 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
 // useMixerStore is the single source of truth for mute/solo.
 // Pattern channel .muted/.solo are read-only mirrors used for rendering.
 function syncMuteToPatternChannels(): void {
-  try {
-    // Lazy import to avoid circular init — only reads/writes state
-    const { useTrackerStore } = require('./useTrackerStore');
+  // Use dynamic import to avoid circular dependency at module scope.
+  // Both useMixerStore and useTrackerStore import each other — direct import would deadlock.
+  import('./useTrackerStore').then(({ useTrackerStore }) => {
     const { channels } = useMixerStore.getState();
     const trackerState = useTrackerStore.getState();
     const numChannels = channels.length;
 
-    // Check if any pattern channel is out of sync
     const pattern = trackerState.patterns[trackerState.currentPatternIndex];
     if (!pattern) return;
 
@@ -527,7 +526,6 @@ function syncMuteToPatternChannels(): void {
     }
     if (!needsUpdate) return;
 
-    // Batch update all patterns
     useTrackerStore.setState((state: any) => {
       for (const pat of state.patterns) {
         for (let i = 0; i < Math.min(pat.channels.length, numChannels); i++) {
@@ -536,9 +534,9 @@ function syncMuteToPatternChannels(): void {
         }
       }
     });
-  } catch {
+  }).catch(() => {
     // TrackerStore not ready
-  }
+  });
 }
 
 export interface MixerChannelState {
