@@ -8251,11 +8251,13 @@
   },
   "adplug-a2m": {
     "status": "works",
-    "notes": "AdLib Tracker 2 — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-d00": {
     "status": "works",
-    "notes": "EdLib packed — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-hsc": {
     "status": "works",
@@ -8275,62 +8277,201 @@
   },
   "adplug-lds": {
     "status": "works",
-    "notes": "LOUDNESS Sound System — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-mtk": {
     "status": "works",
-    "notes": "MPU-401 Trakker — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-dfm": {
     "status": "works",
-    "notes": "Digital FM — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-amd": {
     "status": "works",
-    "notes": "AMUSIC Adlib Tracker — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-sat": {
     "status": "works",
-    "notes": "Surprise! AdLib Tracker — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-mkj": {
     "status": "works",
-    "notes": "MK-Jamz — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-sa2": {
     "status": "works",
-    "notes": "Surprise! AdLib Tracker 2.0 — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-bam": {
     "status": "works",
-    "notes": "Bob's AdLib Music — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-raw": {
     "status": "works",
-    "notes": "Raw AdLib Capture — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-jbm": {
     "status": "works",
-    "notes": "JBM Adlib Music — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-xad": {
     "status": "works",
-    "notes": "Exotic AdLib — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-laa": {
     "status": "works",
-    "notes": "LucasArts AdLib MIDI — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-xms": {
     "status": "works",
-    "notes": "AMUSIC XMS — AdPlug WASM"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-rol": {
     "status": "partial",
-    "notes": "Visual Composer ROL — needs external .bnk bank file"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
   },
   "adplug-sci": {
     "status": "partial",
-    "notes": "Sierra SCI — needs external patch file"
+    "notes": "Browser playback FAIL",
+    "auditStatus": "fail"
+  },
+  "adplug-ksm": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-adl": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-sng": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-adt": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - not a real extension (AdLib Tracker uses .sng)"
+  },
+  "adplug-adtrack": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - not a real extension (uses .sng)"
+  },
+  "adplug-bmf": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-herad": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - not a real extension (uses .hsq/.sqx/.sdb/.agd/.ha2)"
+  },
+  "adplug-hsp": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-hybrid": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+  },
+  "adplug-hyp": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+  },
+  "adplug-mdi": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-msc": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-psi": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+  },
+  "adplug-rat": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+  },
+  "adplug-sop": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-u6m": {
+    "auditStatus": "unknown",
+    "notes": "REMOVED - not a real extension (Ultima 6 uses .m)"
+  },
+  "adplug-got": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-rix": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-sdb": {
+    "auditStatus": "fixed",
+    "notes": "HERAD System SDB works (Dune music)"
+  },
+  "adplug-sqx": {
+    "auditStatus": "fixed",
+    "notes": "HERAD System SQX works (KGB music)"
+  },
+  "adplug-hsq": {
+    "auditStatus": "unknown",
+    "notes": "HERAD HSQ - no test files, same player as sdb/sqx"
+  },
+  "adplug-ha2": {
+    "auditStatus": "unknown",
+    "notes": "HERAD HA2 - no test files, same player as sdb/sqx"
+  },
+  "adplug-agd": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-cff": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-dmo": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-dtm": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-mad": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-mtr": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-pis": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-plx": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
+  },
+  "adplug-xsm": {
+    "auditStatus": "fail",
+    "notes": "Browser playback FAIL"
   }
 }
