@@ -637,56 +637,46 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   return (
     <div className="ft2-toolbar">
       <div className="flex flex-1 min-w-0 flex-wrap gap-y-1 items-start overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-hidden" style={{ flexBasis: '680px' }}>
+        <div className="min-w-0 flex-1 overflow-hidden">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
             </div>
             <div className="ft2-section ft2-col-2">
-              <FT2NumericInput
-                label="BPM"
-                value={bpm}
-                onChange={setBPM}
-                min={32}
-                max={255}
-                throttleMs={50}
-              />
+              <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
+            </div>
+            <div className="ft2-section ft2-col-3">
+              <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
             </div>
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
+            </div>
+            <div className="ft2-section ft2-col-3">
+              <FT2NumericInput
+                label="Length"
+                value={patternLength}
+                onChange={handleLengthChange}
+                min={1}
+                max={256}
+                presets={[
+                  { label: '16 rows', value: 16 },
+                  { label: '32 rows', value: 32 },
+                  { label: '48 rows', value: 48 },
+                  { label: '64 rows (default)', value: 64 },
+                  { label: '96 rows', value: 96 },
+                  { label: '128 rows', value: 128 },
+                  { label: '192 rows', value: 192 },
+                  { label: '256 rows (max)', value: 256 },
+                ]}
+              />
+            </div>
+            <div className="ft2-section ft2-col-3">
+              <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
             </div>
             <div className="ft2-section ft2-col-4">
               <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
             </div>
           </div>
-
-          <div className="ft2-toolbar-row">
-              <div className="ft2-section ft2-col-1">
-                <FT2NumericInput
-                  label="Length"
-                  value={patternLength}
-                  onChange={handleLengthChange}
-                  min={1}
-                  max={256}
-                  presets={[
-                    { label: '16 rows', value: 16 },
-                    { label: '32 rows', value: 32 },
-                    { label: '48 rows', value: 48 },
-                    { label: '64 rows (default)', value: 64 },
-                    { label: '96 rows', value: 96 },
-                    { label: '128 rows', value: 128 },
-                    { label: '192 rows', value: 192 },
-                    { label: '256 rows (max)', value: 256 },
-                  ]}
-                />
-              </div>
-              <div className="ft2-section ft2-col-2">
-                <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
-              </div>
-              <div className="ft2-section ft2-col-3">
-                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
-              </div>
-            </div>
         </div>
 
         {/* Playback buttons — separate block so they wrap below inputs on narrow windows */}
