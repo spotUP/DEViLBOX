@@ -96,8 +96,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // Derive the current dropdown value from loaded song state
   const currentHardwareValue = useMemo(() => {
-    // Furnace mode: show the active chip preset
-    if (editorMode === 'furnace' && activeSystemPreset) return activeSystemPreset;
+    // Hardware preset selected (Furnace chip or manual selection)
+    if (activeSystemPreset) return activeSystemPreset;
     // Non-furnace: derive a synthetic "format:" value from sourceFormat or editorMode
     if (sourceFormat) return `format:${sourceFormat}`;
     if (editorMode !== 'classic') return `mode:${editorMode}`;
