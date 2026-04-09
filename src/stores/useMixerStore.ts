@@ -147,6 +147,7 @@ void (async () => {
 
   await Promise.allSettled(promises);
   _engineCacheWarmedUp = true;
+  console.log(`[Mixer] Engine cache warmed up: ${_muteMaskEngineCache.size} bitmask, ${_gainEngineCache.size} gain, ${_channelOnEngineCache.size} channelOn, trackerReplayer=${!!_trackerReplayerMod}, furnace=${!!_furnaceDispatchEngineRef}`);
 })();
 
 function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
@@ -155,6 +156,8 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
     const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
     if (!effectiveMute) mask |= (1 << i);
   }
+
+  console.log(`[Mixer] forwardReplayerMuteMask: mask=0b${mask.toString(2)}, cacheWarmed=${_engineCacheWarmedUp}, trackerReplayer=${!!_trackerReplayerMod}, bitmaskEngines=${_muteMaskEngineCache.size}`);
 
   // Forward to TrackerReplayer (affects ToneEngine note triggering)
   if (_trackerReplayerMod) {
@@ -166,10 +169,11 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   if (!_engineCacheWarmedUp) return; // Imports still warming up
 
   // Bitmask engines (setMuteMask)
-  for (const [, { Engine, chLimit }] of _muteMaskEngineCache) {
+  for (const [name, { Engine, chLimit }] of _muteMaskEngineCache) {
     try {
       if (Engine.hasInstance()) {
         const m = chLimit ? mask & ((1 << chLimit) - 1) : mask;
+        console.log(`[Mixer] setMuteMask on ${name}: mask=0b${m.toString(2)}`);
         Engine.getInstance().setMuteMask(m);
       }
     } catch (e: any) {
@@ -650,6 +654,7 @@ export const useMixerStore = create<MixerStore>()(
     },
 
     setChannelMute(ch: number, muted: boolean): void {
+      console.log(`[Mixer] setChannelMute(${ch}, ${muted})`);
       set((state) => {
         state.channels[ch].muted = muted;
       });
