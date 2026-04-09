@@ -964,34 +964,59 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
     }
 
     // ── ChscPlayer ── patterns[pat][row*9+ch] has {note, effect}
+    // HSC format (from hsc.cpp):
+    //   note byte: bit 7 = "set instrument" flag, bits 0-6 = note (0=empty, 127=off)
+    //   If bit 7 set: effect byte = instrument number (0-127)
+    //   If bit 7 clear: effect byte high nibble = effect type, low nibble = param
+    //     Effects: 0x00=set panning, 0x10=global volume?, 0x50=set perc inst,
+    //              0x60=set volume, 0xA0=porta up, 0xB0=porta down, 0xC0=set inst vol
+    // At init, each channel i starts with instrument i.
     if (auto* hp = asHscPlayer()) {
         if (pattern >= 50 || row >= 64 || channel >= 9) return 0;
         auto& n = hp->patterns[pattern][row * 9 + channel];
         if (n.note == 0 && n.effect == 0) return 0;
 
-        // HSC note format: 0=empty, 1-12*8=notes (octave*12+note), 127=rest/off
-        uint8_t note = n.note;
+        uint8_t rawNote = n.note;
         uint8_t effect = n.effect;
         uint8_t cmd = 0, param = 0;
-
-        // Effects: 1=slide up, 2=slide down, 3=tone porta, 4=no effect (set instrument)
-        // High nibble of effect byte = instrument number (if bit 7 is 0)
         uint8_t instNum = 0;
-        if (note != 0 && note != 127) {
-            // Instrument is embedded in the channel state, not per-note in HSC
-            // The effect byte encodes: high nibble = instrument change or effect param
-            if (effect & 0x80) {
-                // Effect mode
-                cmd = (effect >> 4) & 0x07;
-                param = effect & 0x0F;
-            } else {
-                instNum = (effect >> 4) & 0x0F;
-                cmd = 0;
-                param = effect & 0x0F;
+
+        // Bit 7 of note = "set instrument" flag (hsc.cpp line 117)
+        // When set, the effect byte is the instrument number and no note is played.
+        bool setInst = (rawNote & 0x80) != 0;
+        uint8_t noteVal = rawNote & 0x7F; // 0=empty, 1-96=note, 127=off/pause
+
+        if (setInst) {
+            // Instrument change command: effect byte = instrument index (0-127)
+            // In HSC the player does `setinstr(chan, effect); continue;` — no note.
+            // We emit instrument number only (note stays 0).
+            instNum = effect + 1; // 1-based for XM
+            noteVal = 0; // no note plays on instrument-change rows
+        } else {
+            // HSC effects (hsc.cpp lines 126-168):
+            //   0x00=global, 0x10/0x20=manual slide up/down, 0x50=perc inst,
+            //   0x60=set feedback, 0xA0=set carrier vol, 0xB0=set mod vol,
+            //   0xC0=set inst vol, 0xD0=position jump, 0xF0=set speed
+            if (effect != 0) {
+                uint8_t effType = (effect >> 4) & 0x0F;
+                uint8_t effParam = effect & 0x0F;
+                switch (effType) {
+                    case 0x1: // slide up (manual)
+                        cmd = 1; param = effParam; break;
+                    case 0x2: // slide down (manual)
+                        cmd = 2; param = effParam; break;
+                    case 0xF: // set speed
+                        cmd = 0x0F; param = effParam; break;
+                    case 0xD: // position jump
+                        cmd = 0x0B; param = effParam; break;
+                    default:
+                        // Pass through other effects as-is (volume, feedback, etc.)
+                        cmd = effType; param = effParam; break;
+                }
             }
         }
 
-        return ((uint32_t)note) |
+        return ((uint32_t)noteVal) |
                ((uint32_t)instNum << 8) |
                ((uint32_t)cmd << 16) |
                ((uint32_t)param << 24);

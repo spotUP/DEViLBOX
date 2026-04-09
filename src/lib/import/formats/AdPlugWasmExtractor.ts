@@ -37,7 +37,7 @@ function makeOPLInstrument(id: number, name: string): InstrumentConfig {
   return {
     id, name, type: 'synth', synthType: 'OPL3',
     opl3: { ...DEFAULT_OPL3 },
-    effects: [], volume: 0, pan: 0,
+    effects: [], volume: 64, pan: 0,
   };
 }
 
@@ -333,11 +333,56 @@ export async function extractAdPlugPatterns(
     M._free(regsPtr);
 
     // ── Extract patterns ──
+    // Track the last active instrument per channel across the song (in playback order).
+    // Many AdLib formats (HSC, CmodPlayer) set the instrument once and it persists
+    // until changed. XM requires an explicit instrument on each note, so we fill
+    // it in from the tracked state.
     const patterns: Pattern[] = [];
     let totalNotes = 0;
+    const channelInst = new Uint8Array(numChannels);
+    // HSC initializes each channel with instrument=channel_index (hsc.cpp line 253)
+    const isHSC = type.toLowerCase().includes('hsc');
+    if (isHSC) {
+      for (let c = 0; c < numChannels; c++) {
+        channelInst[c] = Math.min(c + 1, instruments.length); // 1-based
+      }
+    }
 
+    // First pass: iterate patterns in song order to track instrument state,
+    // then store per-cell. We need this because pattern N might be played
+    // multiple times with different instrument state depending on song position.
+    // For simplicity, do a single sequential pass over song positions.
+    const patternInstruments = new Map<number, Uint8Array[]>(); // pattern → [row][channel] instrument
+
+    for (let sp = 0; sp < songPositions.length; sp++) {
+      const p = songPositions[sp];
+      if (p >= numPatterns) continue;
+
+      // Initialize per-row instrument tracking for this pattern visit
+      if (!patternInstruments.has(p)) {
+        patternInstruments.set(p, []);
+      }
+      const instRows = patternInstruments.get(p)!;
+
+      for (let r = 0; r < numRows; r++) {
+        if (!instRows[r]) instRows[r] = new Uint8Array(numChannels);
+        for (let c = 0; c < numChannels; c++) {
+          const packed = M._adplug_get_note(p, r, c);
+          if (packed === 0) continue;
+
+          const cmodInst = (packed >> 8) & 0xFF;
+          if (cmodInst > 0) {
+            channelInst[c] = cmodInst;
+          }
+          instRows[r][c] = channelInst[c];
+        }
+      }
+    }
+
+    // Second pass: build the actual Pattern objects
     for (let p = 0; p < numPatterns; p++) {
       const pat = emptyPattern(`p${p}`, `Pattern ${p}`, numChannels, numRows);
+      const instRows = patternInstruments.get(p);
 
       for (let r = 0; r < numRows; r++) {
         for (let c = 0; c < numChannels; c++) {
@@ -351,7 +396,13 @@ export async function extractAdPlugPatterns(
 
           const cell = pat.channels[c].rows[r];
           cell.note = cmodNoteToXM(cmodNote);
-          cell.instrument = cmodInst > 0 ? cmodInst : 0;
+
+          // Use explicit instrument if present, otherwise use tracked state
+          if (cmodInst > 0) {
+            cell.instrument = cmodInst;
+          } else if (instRows && instRows[r]) {
+            cell.instrument = instRows[r][c] || 0;
+          }
 
           if (cmodCmd > 0) {
             const [effTyp, eff] = cmodCmdToXM(cmodCmd, cmodParam);
