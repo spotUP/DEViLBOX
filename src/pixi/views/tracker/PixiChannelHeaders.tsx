@@ -92,7 +92,6 @@ const AddChannelBtn: React.FC<{
       eventMode="static"
       cursor="pointer"
       onClick={() => onPress()}
-      onPointerUp={() => onPress()}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       layout={{
