@@ -307,13 +307,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   React.useEffect(() => {
     if (!showFxPresetsMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (showFxPresetsMenu && fxPresetsMenuRef.current && !fxPresetsMenuRef.current.contains(e.target as Node)) {
         setShowFxPresetsMenu(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+    };
   }, [showFxPresetsMenu]);
 
   const handleSave = async () => {

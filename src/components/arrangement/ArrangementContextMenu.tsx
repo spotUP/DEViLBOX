@@ -10,6 +10,7 @@ import { useArrangementStore } from '@stores/useArrangementStore';
 import { useTrackerStore } from '@stores';
 import { usePianoRollStore } from '@/stores/usePianoRollStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 const CLIP_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -32,18 +33,15 @@ export const ArrangementContextMenu: React.FC = () => {
     setShowColorPicker(false);
   }, [menu]);
 
+  useClickOutside(menuRef, () => setMenu(null), { enabled: !!menu });
+
   useEffect(() => {
     if (!menu) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
-    };
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenu(null);
     };
-    document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('keydown', handleKey);
     return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('keydown', handleKey);
     };
   }, [menu, setMenu]);

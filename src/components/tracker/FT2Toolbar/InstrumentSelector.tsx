@@ -8,6 +8,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import * as LucideIcons from 'lucide-react';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 interface InstrumentSelectorProps {
   /** Show compact mode with just number */
@@ -41,18 +42,7 @@ export const InstrumentSelector: React.FC<InstrumentSelectorProps> = ({
   const currentInstrument = instruments.find((i) => i.id === currentInstrumentId);
 
   // Close dropdown when clicking outside
-  useEffect(() => {
-    if (!showDropdown) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDropdown]);
+  useClickOutside(dropdownRef, () => setShowDropdown(false), { enabled: showDropdown });
 
   // Navigate to next/prev instrument
   const navigateInstrument = useCallback((direction: 1 | -1) => {

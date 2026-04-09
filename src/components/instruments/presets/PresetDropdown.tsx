@@ -8,6 +8,7 @@ import { ChevronDown, Music, Tag } from 'lucide-react';
 import { FACTORY_PRESETS } from '@constants/factoryPresets';
 import type { SynthType, InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
 import { getSynthInfo } from '@constants/synthCategories';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 interface PresetDropdownProps {
   synthType: SynthType;
@@ -34,15 +35,7 @@ export const PresetDropdown: React.FC<PresetDropdownProps> = ({
   }, [synthType]);
 
   // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(dropdownRef, () => setIsOpen(false));
 
   // Scroll to selected preset when dropdown opens
   useEffect(() => {

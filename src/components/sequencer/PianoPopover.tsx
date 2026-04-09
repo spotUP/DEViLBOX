@@ -7,6 +7,7 @@ import * as Tone from 'tone';
 import type { TB303Step } from './TB303Sequencer';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useClickOutside } from '@hooks/useClickOutside';
 import './PianoPopover.css';
 
 interface PianoPopoverProps {
@@ -35,16 +36,7 @@ export const PianoPopover: React.FC<PianoPopoverProps> = ({
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+  useClickOutside(popoverRef, onClose);
 
   // Close on escape
   useEffect(() => {
