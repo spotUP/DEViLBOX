@@ -1,3 +1,5 @@
+// Polyfills for older browsers (must be first import)
+import './utils/polyfills'
 import { startConsoleCapture } from './bridge/consoleCapture'
 startConsoleCapture();
 

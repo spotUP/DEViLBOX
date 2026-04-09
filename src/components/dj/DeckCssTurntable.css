@@ -7,29 +7,45 @@
  */
 
 /* Outer wrapper — fills the parent and acts as a size container so we can use
-   cqw / cqh units for true "object-fit: contain" behaviour on the turntable div. */
+   cqw / cqh units for true "object-fit: contain" behaviour on the turntable div.
+   Fallback for browsers without container queries (Chrome <105): use vw/vh. */
 .turntable-css-container {
   width: 100%;
   height: 100%;
-  container-type: size;
   display: grid;
   place-items: center;
+}
+
+@supports (container-type: size) {
+  .turntable-css-container {
+    container-type: size;
+  }
 }
 
 /* The turntable itself: sized to the largest 1256×1010 rect that fits the
    container, exactly like object-fit: contain for a replaced element. */
 .turntable-css {
-  /* contain horizontally: full container width, derive height */
-  --w-from-cqw: 100cqw;
-  --h-from-cqw: calc(100cqw * 1010 / 1256);
-  /* contain vertically: full container height, derive width */
-  --w-from-cqh: calc(100cqh * 1256 / 1010);
-  --h-from-cqh: 100cqh;
-
-  width:  min(var(--w-from-cqw), var(--w-from-cqh));
-  height: min(var(--h-from-cqw), var(--h-from-cqh));
+  /* Fallback for browsers without cqw/cqh: use percentage of parent */
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1256 / 1010;
   max-width: 628px;
   max-height: calc(628px * 1010 / 1256);
+}
+
+@supports (width: 1cqw) {
+  .turntable-css {
+    /* contain horizontally: full container width, derive height */
+    --w-from-cqw: 100cqw;
+    --h-from-cqw: calc(100cqw * 1010 / 1256);
+    /* contain vertically: full container height, derive width */
+    --w-from-cqh: calc(100cqh * 1256 / 1010);
+    --h-from-cqh: 100cqh;
+
+    width:  min(var(--w-from-cqw), var(--w-from-cqh));
+    height: min(var(--h-from-cqw), var(--h-from-cqh));
+    aspect-ratio: auto;
+  }
 }
 
 .turntable-css img {

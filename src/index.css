@@ -2584,6 +2584,32 @@ html[data-theme="cyan-lineart"] #root > * {
 /* Responsive two-column control modules when instrument panel is wide (Studio canvas view).
    Header + viz stay full-width at top; only the scrollable control sections reflow.
    Editors add .synth-controls-flow to their scrollable section wrapper. */
+
+/* Fallback for browsers without @container queries (Chrome <105): use @media */
+@media (min-width: 900px) {
+  .synth-controls-flow {
+    display: block !important;
+    columns: 2;
+    column-gap: 12px;
+  }
+  .synth-controls-flow > * {
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+  .synth-editor-content {
+    columns: 2;
+    column-gap: 12px;
+  }
+  .synth-editor-content > * {
+    break-inside: avoid;
+  }
+  .synth-editor-content.synth-editor-content--no-columns {
+    columns: unset !important;
+    column-count: auto !important;
+  }
+}
+
+/* Override with container query for browsers that support it (more accurate) */
 @container (min-width: 700px) {
   .synth-controls-flow {
     display: block !important;   /* override flex-col to enable CSS columns */
