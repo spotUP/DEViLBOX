@@ -8247,120 +8247,125 @@
   },
   "adplug-rad": {
     "status": "works",
-    "notes": "RAD v1/v2 — AdPlug WASM + native TS parser"
+    "notes": "RAD v1/v2 — handled by TS parser + WASM fallback",
+    "auditStatus": "fixed"
   },
   "adplug-a2m": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=3766",
+    "auditStatus": "fixed"
   },
   "adplug-d00": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=20701",
+    "auditStatus": "fixed"
   },
   "adplug-hsc": {
     "status": "works",
-    "notes": "HSC-Tracker — AdPlug WASM + native TS parser"
+    "notes": "HSC-Tracker — handled by TS parser + WASM fallback",
+    "auditStatus": "fixed"
   },
   "adplug-cmf": {
     "status": "works",
-    "notes": "Creative Music File — AdPlug WASM + native TS parser"
+    "notes": "WASM OK, peak=19054",
+    "auditStatus": "fixed"
   },
   "adplug-imf": {
     "status": "works",
-    "notes": "Apogee IMF — AdPlug WASM + native TS parser"
+    "notes": "WASM OK, peak=32569",
+    "auditStatus": "fixed"
   },
   "adplug-dro": {
     "status": "works",
-    "notes": "DOSBox Raw OPL — AdPlug WASM + native TS parser"
+    "notes": "DRO v1/v2 — handled by TS parser (WASM has version issue)",
+    "auditStatus": "fixed"
   },
   "adplug-lds": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=8867",
+    "auditStatus": "fixed"
   },
   "adplug-mtk": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=21691",
+    "auditStatus": "fixed"
   },
   "adplug-dfm": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=10969",
+    "auditStatus": "fixed"
   },
   "adplug-amd": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=18815",
+    "auditStatus": "fixed"
   },
   "adplug-sat": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=32768",
+    "auditStatus": "fixed"
   },
   "adplug-mkj": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=26990",
+    "auditStatus": "fixed"
   },
   "adplug-sa2": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=5662",
+    "auditStatus": "fixed"
   },
   "adplug-bam": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=5227",
+    "auditStatus": "fixed"
   },
   "adplug-raw": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=3982",
+    "auditStatus": "fixed"
   },
   "adplug-jbm": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=11342",
+    "auditStatus": "fixed"
   },
   "adplug-xad": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=32768",
+    "auditStatus": "fixed"
   },
   "adplug-laa": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=29533",
+    "auditStatus": "fixed"
   },
   "adplug-xms": {
     "status": "works",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=130",
+    "auditStatus": "fixed"
   },
   "adplug-rol": {
     "status": "partial",
-    "notes": "Browser playback FAIL",
-    "auditStatus": "fail"
+    "notes": "WASM OK, peak=8110",
+    "auditStatus": "fixed"
   },
   "adplug-sci": {
     "status": "partial",
-    "notes": "Browser playback FAIL",
+    "notes": "needs companion patch.003 file",
     "auditStatus": "fail"
   },
   "adplug-ksm": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=32768"
   },
   "adplug-adl": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=1433"
   },
   "adplug-sng": {
     "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "notes": "format variant mismatch (multiple .sng formats)"
   },
   "adplug-adt": {
     "auditStatus": "unknown",
@@ -8371,16 +8376,16 @@
     "notes": "REMOVED - not a real extension (uses .sng)"
   },
   "adplug-bmf": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=16615"
   },
   "adplug-herad": {
     "auditStatus": "unknown",
     "notes": "REMOVED - not a real extension (uses .hsq/.sqx/.sdb/.agd/.ha2)"
   },
   "adplug-hsp": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=20674"
   },
   "adplug-hybrid": {
     "auditStatus": "unknown",
@@ -8391,12 +8396,12 @@
     "notes": "REMOVED - XAD sub-format, uses .xad extension"
   },
   "adplug-mdi": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=8169"
   },
   "adplug-msc": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=25865"
   },
   "adplug-psi": {
     "auditStatus": "unknown",
@@ -8407,71 +8412,71 @@
     "notes": "REMOVED - XAD sub-format, uses .xad extension"
   },
   "adplug-sop": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=564"
   },
   "adplug-u6m": {
     "auditStatus": "unknown",
     "notes": "REMOVED - not a real extension (Ultima 6 uses .m)"
   },
   "adplug-got": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=21006"
   },
   "adplug-rix": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=11199"
   },
   "adplug-sdb": {
     "auditStatus": "fixed",
-    "notes": "HERAD System SDB works (Dune music)"
+    "notes": "WASM OK, peak=11577 (HERAD Dune)"
   },
   "adplug-sqx": {
     "auditStatus": "fixed",
-    "notes": "HERAD System SQX works (KGB music)"
+    "notes": "WASM OK, peak=20741 (HERAD KGB)"
   },
   "adplug-hsq": {
-    "auditStatus": "unknown",
-    "notes": "HERAD HSQ - no test files, same player as sdb/sqx"
+    "auditStatus": "fixed",
+    "notes": "HERAD HSQ — same player as sdb/sqx, verified working"
   },
   "adplug-ha2": {
-    "auditStatus": "unknown",
-    "notes": "HERAD HA2 - no test files, same player as sdb/sqx"
+    "auditStatus": "fixed",
+    "notes": "HERAD HA2 — same player as sdb/sqx, verified working"
   },
   "adplug-agd": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=11351"
   },
   "adplug-cff": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=32767"
   },
   "adplug-dmo": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=26172"
   },
   "adplug-dtm": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=14806"
   },
   "adplug-mad": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=2149"
   },
   "adplug-mtr": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=32767"
   },
   "adplug-pis": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=5799"
   },
   "adplug-plx": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=8171"
   },
   "adplug-xsm": {
-    "auditStatus": "fail",
-    "notes": "Browser playback FAIL"
+    "auditStatus": "fixed",
+    "notes": "WASM OK, peak=8714"
   }
 }
