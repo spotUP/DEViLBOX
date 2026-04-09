@@ -1,0 +1,15 @@
+--- a/src/protrack.h
++++ b/src/protrack.h
+@@ -89,6 +89,12 @@
+ 
+   void dealloc();
+ 
++ public:
++  // Exposed for WASM extraction API
++  unsigned long getNrows() const { return nrows; }
++  unsigned long getNpats() const { return npats; }
++  unsigned long getNchans() const { return nchans; }
++
+  private:
+   static const unsigned short sa2_notetable[12];
+   static const unsigned char vibratotab[32];
