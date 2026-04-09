@@ -1852,8 +1852,8 @@
   font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 13px;
   position: relative;
-  /* Remove overflow-x: auto to prevent horizontal scrolling */
   width: 100%;
+  overflow-x: clip; /* Clip horizontal overflow without creating scroll container */
   overflow-y: visible; /* Allow dropdowns to escape */
 }
 
