@@ -250,6 +250,7 @@ interface SettingsStore {
   // Visual Settings
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
   trackerVisualMode: number; // Current visualizer mode index (0-5)
+  channelColorBlend: number; // Channel color background tint opacity (0-100, default 8)
   vjPatternOverlay: boolean; // Show pattern data overlay on VJ view
   vuMeterMode: 'trigger' | 'realtime'; // VU meter mode: trigger=note-on, realtime=continuous audio levels
   vuMeterStyle: 'segments' | 'fill'; // VU meter style: segments=LED bars, fill=solid background
@@ -294,6 +295,7 @@ interface SettingsStore {
   setMidiPolyphonic: (enabled: boolean) => void;
   setTrackerVisualBg: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
+  setChannelColorBlend: (blend: number) => void;
   setVjPatternOverlay: (enabled: boolean) => void;
   setVuMeterMode: (mode: 'trigger' | 'realtime') => void;
   setVuMeterStyle: (style: 'segments' | 'fill') => void;
@@ -483,6 +485,7 @@ export const useSettingsStore = create<SettingsStore>()(
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
+      channelColorBlend: 8,    // Default: 8% opacity for channel color tint
       vjPatternOverlay: true, // Default: on — pattern data visible in VJ view
       vuMeterMode: 'trigger' as const,  // Default: trigger-based VU (note-on)
       vuMeterStyle: 'segments' as const,  // Default: LED segment style
@@ -611,6 +614,11 @@ export const useSettingsStore = create<SettingsStore>()(
           state.trackerVisualMode = trackerVisualMode;
         }),
 
+      setChannelColorBlend: (channelColorBlend) =>
+        set((state) => {
+          state.channelColorBlend = Math.max(0, Math.min(100, channelColorBlend));
+        }),
+
       setVjPatternOverlay: (vjPatternOverlay) =>
         set((state) => {
           state.vjPatternOverlay = vjPatternOverlay;
@@ -733,6 +741,7 @@ export const useSettingsStore = create<SettingsStore>()(
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
+        channelColorBlend: state.channelColorBlend,
         vjPatternOverlay: state.vjPatternOverlay,
         vuMeterMode: state.vuMeterMode,
         vuMeterStyle: state.vuMeterStyle,
