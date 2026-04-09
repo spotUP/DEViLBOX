@@ -883,6 +883,11 @@ uint32_t adplug_get_speed() {
 }
 
 EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_is_cmod_player() {
+    return g_playerType == PT_CMOD ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_bpm_value() {
     if (auto* mp = asModPlayer()) return mp->bpm;
     if (auto* sp = asS3mPlayer()) return sp->tempo;
@@ -996,24 +1001,38 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
             noteVal = 0; // no note plays on instrument-change rows
         } else {
             // HSC effects (hsc.cpp lines 126-168):
-            //   0x00=global, 0x10/0x20=manual slide up/down, 0x50=perc inst,
-            //   0x60=set feedback, 0xA0=set carrier vol, 0xB0=set mod vol,
-            //   0xC0=set inst vol, 0xD0=position jump, 0xF0=set speed
+            //   0x10/0x20=manual slide up/down, 0x50=perc inst,
+            //   0x60=set feedback, 0xA0=carrier vol, 0xB0=mod vol,
+            //   0xC0=inst vol, 0xD0=position jump, 0xF0=set speed
+            //
+            // OPL-specific effects use range 0x30-0x3F so the TS replayer
+            // can forward them to the OPL3 synth (same pattern as Furnace chip effects).
+            //   0x30 = OPL set feedback       (param = feedback 0-7)
+            //   0x31 = OPL carrier volume     (param = volume 0-15, <<2 to get 0-63)
+            //   0x32 = OPL modulator volume   (param = volume 0-15, <<2 to get 0-63)
+            //   0x33 = OPL instrument volume  (param = volume 0-15, sets both ops)
             if (effect != 0) {
                 uint8_t effType = (effect >> 4) & 0x0F;
                 uint8_t effParam = effect & 0x0F;
                 switch (effType) {
-                    case 0x1: // slide up (manual)
+                    case 0x1: // slide up (manual) → XM porta up
                         cmd = 1; param = effParam; break;
-                    case 0x2: // slide down (manual)
+                    case 0x2: // slide down (manual) → XM porta down
                         cmd = 2; param = effParam; break;
-                    case 0xF: // set speed
-                        cmd = 0x0F; param = effParam; break;
-                    case 0xD: // position jump
+                    case 0x6: // set feedback → OPL effect 0x30
+                        cmd = 0x30; param = effParam; break;
+                    case 0xA: // carrier volume → OPL effect 0x31
+                        cmd = 0x31; param = effParam; break;
+                    case 0xB: // modulator volume → OPL effect 0x32
+                        cmd = 0x32; param = effParam; break;
+                    case 0xC: // instrument volume (both ops) → OPL effect 0x33
+                        cmd = 0x33; param = effParam; break;
+                    case 0xD: // position jump → XM Bxx
                         cmd = 0x0B; param = effParam; break;
+                    case 0xF: // set speed → XM Fxx
+                        cmd = 0x0F; param = effParam; break;
                     default:
-                        // Pass through other effects as-is (volume, feedback, etc.)
-                        cmd = effType; param = effParam; break;
+                        cmd = 0; param = 0; break;
                 }
             }
         }

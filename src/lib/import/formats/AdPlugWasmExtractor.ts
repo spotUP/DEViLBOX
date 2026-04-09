@@ -123,6 +123,7 @@ interface AdPlugWasmModule {
   _adplug_get_rows(): number;
   _adplug_get_channels(): number;
   _adplug_get_speed(): number;
+  _adplug_is_cmod_player(): number;
   _adplug_get_bpm_value(): number;
   _adplug_get_restart_pos(): number;
   _adplug_get_order_entry(idx: number): number;
@@ -233,6 +234,7 @@ export async function extractAdPlugPatterns(
     const title = M.UTF8ToString(M._adplug_get_title());
     const type = M.UTF8ToString(M._adplug_get_type());
     const playerRefresh = M._adplug_get_refresh_rate();
+    const isCmodFormat = M._adplug_is_cmod_player() !== 0;
     let usedCapture = false;
 
     console.log(`[AdPlug] WASM returned: type="${type}" pat=${numPatterns} ord=${numOrders} ch=${numChannels} rows=${numRows} speed=${rawSpeed} bpm=${rawBpm}`);
@@ -407,9 +409,17 @@ export async function extractAdPlugPatterns(
           }
 
           if (cmodCmd > 0) {
-            const [effTyp, eff] = cmodCmdToXM(cmodCmd, cmodParam);
-            cell.effTyp = effTyp;
-            cell.eff = eff;
+            // CmodPlayer formats use a custom command numbering (0-15) that needs
+            // mapping to XM effects. HSC, S3M, LDS and other formats already emit
+            // XM-compatible or OPL-native effect codes (0x30+) from C++.
+            if (isCmodFormat) {
+              const [effTyp, eff] = cmodCmdToXM(cmodCmd, cmodParam);
+              cell.effTyp = effTyp;
+              cell.eff = eff;
+            } else {
+              cell.effTyp = cmodCmd;
+              cell.eff = cmodParam;
+            }
           }
 
           if (cell.note > 0 && cell.note < 97) totalNotes++;

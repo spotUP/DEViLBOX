@@ -4599,6 +4599,39 @@ export class ToneEngine {
   }
 
   /**
+   * Apply an OPL-native effect (0x30-0x3F range) to an OPL3 instrument.
+   * These are AdLib/HSC effects that control OPL registers directly:
+   *   0x30 = set feedback (param 0-7)
+   *   0x31 = carrier volume (param 0-15, scaled to 0-63)
+   *   0x32 = modulator volume (param 0-15, scaled to 0-63)
+   *   0x33 = instrument volume (param 0-15, sets both operators)
+   */
+  public applyOPLEffect(instrumentId: number, effect: number, param: number, _channel: number = 0): boolean {
+    for (const [key, instrument] of this.instruments) {
+      if (this.instrumentIdFromKey(key) !== instrumentId) continue;
+      if (!(instrument instanceof OPL3Synth)) continue;
+
+      switch (effect) {
+        case 0x30: // set feedback
+          instrument.set('feedback', param & 0x7);
+          return true;
+        case 0x31: // carrier volume (param << 2 to get 0-63 range)
+          instrument.set('op2Level', (param & 0xF) << 2);
+          return true;
+        case 0x32: // modulator volume (param << 2 to get 0-63 range)
+          instrument.set('op1Level', (param & 0xF) << 2);
+          return true;
+        case 0x33: // instrument volume (both operators)
+          instrument.set('op1Level', (param & 0xF) << 2);
+          instrument.set('op2Level', (param & 0xF) << 2);
+          return true;
+      }
+      return false;
+    }
+    return false;
+  }
+
+  /**
    * Apply an extended effect (Exy format) to a Furnace instrument.
    * @param instrumentId The instrument ID
    * @param x Effect subtype (0x0-0xF)
