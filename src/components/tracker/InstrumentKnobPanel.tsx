@@ -557,9 +557,10 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         position: 'relative',
         width: '100%',
         height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? `${TB303_EXPANDED_HEIGHT}px` : 'auto'),
+        maxHeight: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? undefined : '50vh'),
         background: 'var(--color-bg-tertiary)',
         borderTop: '1px solid var(--color-border-light)',
-        overflow: 'hidden',
+        overflow: tb303Collapsed ? 'hidden' : (isTB303Height ? 'hidden' : 'auto'),
         transition: isTB303Height ? 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
       }}
     >
