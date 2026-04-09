@@ -25,26 +25,11 @@ import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
+import { Maximize2, Minimize2, MousePointerClick, ExternalLink, Gamepad2, X } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
-import { Oscilloscope } from '@components/visualization/Oscilloscope';
-import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
-import { CustomBanner } from '@components/visualization/CustomBanner';
-import { CircularVU } from '@components/visualization/CircularVU';
-import { FrequencyBars } from '@components/visualization/FrequencyBars';
-import { ChannelWaveforms } from '@components/visualization/ChannelWaveforms';
-import { ChannelActivityGrid } from '@components/visualization/ChannelActivityGrid';
-import { ChannelSpectrums } from '@components/visualization/ChannelSpectrums';
-import { ChannelCircularVU } from '@components/visualization/ChannelCircularVU';
-import { ChannelParticles } from '@components/visualization/ChannelParticles';
-import { ChannelRings } from '@components/visualization/ChannelRings';
-import { ChannelTunnel } from '@components/visualization/ChannelTunnel';
-import { ChannelRadar } from '@components/visualization/ChannelRadar';
 import { NibblesGame } from '@components/visualization/NibblesGame';
-import { SineScroller } from '@components/visualization/SineScroller';
-import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisualizer';
 import { JingleVisualizer } from '@components/visualization/JingleVisualizer';
 
 
@@ -216,8 +201,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
-  type VizMode = 'waveform' | 'spectrum' | 'channels' | 'logo' | 'customBanner' | 'circular' | 'bars' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' | 'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
-  const [vizMode, setVizMode] = useState<VizMode>('logo');
+  const [showNibbles, setShowNibbles] = useState(false);
 
   // Tap Tempo
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
@@ -267,13 +251,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
   const handleLogoAnimationComplete = useCallback(() => {
-    // Show custom banner after logo if one is set, otherwise cycle to next visualizer
-    const hasBanner = useSettingsStore.getState().customBannerImage;
-    if (hasBanner) {
-      setVizMode('customBanner');
-    } else {
-      setVizMode('circular');
-    }
+    // Logo animation stays visible — no mode cycling needed
   }, []);
 
   // Handle fullscreen changes from keyboard (F11) or other sources
@@ -787,13 +765,19 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               </Button>
         </div>
 
-        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ height: 68, alignItems: 'stretch', justifyContent: 'center' }}>
-        <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
-          const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
-          const currentIndex = modes.indexOf(vizMode);
-          const nextIndex = (currentIndex + 1) % modes.length;
-          setVizMode(modes[nextIndex]);
-        }}>
+        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 border-l border-dark-border group ml-auto hidden lg:flex" style={{ height: 68, alignItems: 'stretch', justifyContent: 'center' }}>
+        <div className="relative w-full h-full flex items-center justify-center">
+          {/* Nibbles button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNibbles(true);
+            }}
+            className="absolute top-1 left-1 p-0.5 rounded text-text-muted/0 group-hover:text-text-muted hover:!text-accent-highlight transition-all z-10"
+            title="Play Nibbles 🐍"
+          >
+            <Gamepad2 size={12} />
+          </button>
           {/* Pop out button */}
           <button
             onClick={(e) => {
@@ -815,63 +799,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             v{CURRENT_VERSION}
           </div>
 
-          {/* Jingle overlay — covers whatever viz is active during startup jingle */}
+          {/* Jingle overlay — covers logo during startup jingle */}
           {jingleActive && (
             <div className="absolute inset-0 z-20">
               <JingleVisualizer height={100} />
             </div>
           )}
 
+          {/* SVG logo animation */}
           {oscilloscopeVisible && (
-            <>
-              {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={100} mode={vizMode} />}
-              {vizMode === 'channels' && <ChannelLevelsCompact height={100} />}
-              {vizMode === 'logo' && <LogoAnimation height={100} onComplete={handleLogoAnimationComplete} />}
-              {vizMode === 'customBanner' && <CustomBanner height={100} onComplete={() => setVizMode('circular')} />}
-              {vizMode === 'circular' && <CircularVU height={100} />}
-              {vizMode === 'bars' && <FrequencyBars height={100} />}
-              {vizMode === 'chanWaves' && <ChannelWaveforms height={100} />}
-              {vizMode === 'chanActivity' && <ChannelActivityGrid height={100} />}
-              {vizMode === 'chanSpectrum' && <ChannelSpectrums height={100} />}
-              {vizMode === 'chanCircular' && <ChannelCircularVU height={100} />}
-              {vizMode === 'chanParticles' && <ChannelParticles height={100} />}
-              {vizMode === 'chanRings' && <ChannelRings height={100} />}
-              {vizMode === 'chanTunnel' && <ChannelTunnel height={100} />}
-              {vizMode === 'chanRadar' && <ChannelRadar height={100} />}
-              {vizMode === 'chanNibbles' && (
-                <NibblesGame 
-                  height={100} 
-                  onExit={() => {
-                    const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
-                    const currentIndex = modes.indexOf('chanNibbles');
-                    const nextIndex = (currentIndex + 1) % modes.length;
-                    setVizMode(modes[nextIndex]);
-                  }}
-                />
-              )}
-              {vizMode === 'sineScroll' && <SineScroller height={100} />}
-              {vizMode === 'amLED' && <AudioMotionVisualizer preset="ledBars" audioSource="master" height={100} />}
-              {vizMode === 'amBars' && <AudioMotionVisualizer preset="smoothBars" audioSource="master" height={100} />}
-              {vizMode === 'amMirror' && <AudioMotionVisualizer preset="mirrorBars" audioSource="master" height={100} />}
-              {vizMode === 'amRadial' && <AudioMotionVisualizer preset="radialSpectrum" audioSource="master" height={100} />}
-              {vizMode === 'amGraph' && <AudioMotionVisualizer preset="graphLine" audioSource="master" height={100} />}
-              {vizMode === 'amRadialGraph' && <AudioMotionVisualizer preset="radialGraph" audioSource="master" height={100} />}
-              {vizMode === 'amDualStereo' && <AudioMotionVisualizer preset="dualStereo" audioSource="master" height={100} />}
-              {vizMode === 'amLumi' && <AudioMotionVisualizer preset="lumiBars" audioSource="master" height={100} />}
-              {vizMode === 'amAlpha' && <AudioMotionVisualizer preset="alphaBars" audioSource="master" height={100} />}
-              {vizMode === 'amOutline' && <AudioMotionVisualizer preset="outlineBars" audioSource="master" height={100} />}
-              {vizMode === 'amDualV' && <AudioMotionVisualizer preset="dualVertical" audioSource="master" height={100} />}
-              {vizMode === 'amDualOverlay' && <AudioMotionVisualizer preset="dualOverlay" audioSource="master" height={100} />}
-              {vizMode === 'amBark' && <AudioMotionVisualizer preset="barkSpectrum" audioSource="master" height={100} />}
-              {vizMode === 'amMel' && <AudioMotionVisualizer preset="melGraph" audioSource="master" height={100} />}
-              {vizMode === 'amNotes' && <AudioMotionVisualizer preset="noteLabels" audioSource="master" height={100} />}
-              {vizMode === 'amMirrorReflex' && <AudioMotionVisualizer preset="mirrorReflex" audioSource="master" height={100} />}
-              {vizMode === 'amRadialInvert' && <AudioMotionVisualizer preset="radialInvert" audioSource="master" height={100} />}
-              {vizMode === 'amRadialLED' && <AudioMotionVisualizer preset="radialLED" audioSource="master" height={100} />}
-              {vizMode === 'amLinear' && <AudioMotionVisualizer preset="linearBars" audioSource="master" height={100} />}
-              {vizMode === 'amAWeight' && <AudioMotionVisualizer preset="aWeighted" audioSource="master" height={100} />}
-              {vizMode === 'amLumiMirror' && <AudioMotionVisualizer preset="lumiMirror" audioSource="master" height={100} />}
-            </>
+            <LogoAnimation height={100} onComplete={handleLogoAnimationComplete} />
           )}
         </div>
         </VisualizerFrame>
@@ -1196,6 +1133,21 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 Cancel
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nibbles Game Dialog */}
+      {showNibbles && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowNibbles(false)}>
+          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border bg-dark-bgSecondary">
+              <span className="text-sm font-bold text-text-primary">Nibbles</span>
+              <button onClick={() => setShowNibbles(false)} className="text-text-muted hover:text-text-primary transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <NibblesGame height={400} onExit={() => setShowNibbles(false)} />
           </div>
         </div>
       )}
