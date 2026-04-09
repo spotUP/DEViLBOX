@@ -47,6 +47,7 @@ import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
 import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRenderer';
+import { TrackerVisualBackground } from './TrackerVisualBackground';
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
@@ -3335,6 +3336,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onDrop={handleDrop}
         {...patternGestures}
       >
+        {/* Visual background — rendered inside the grid container so it doesn't bleed into channel headers */}
+        {trackerVisualBg && dimensions.width > 0 && dimensions.height > 0 && (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <TrackerVisualBackground width={dimensions.width} height={dimensions.height} />
+          </div>
+        )}
         {/* VU Meters overlay — hidden when explicitly disabled (e.g. perf list sub-editor) */}
         {!hideVUMeters && (
         <div

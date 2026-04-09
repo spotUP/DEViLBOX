@@ -2,9 +2,8 @@
  * TrackerView - Main tracker container with pattern editor and controls
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
-import { TrackerVisualBackground } from './TrackerVisualBackground';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
@@ -101,35 +100,16 @@ const MinimapWrapper: React.FC = () => {
   );
 };
 
-/** Wrapper: renders TrackerVisualBackground behind PatternEditorCanvas */
+/** Wrapper: renders PatternEditorCanvas (visual background now lives inside the grid) */
 const TrackerEditorWithBg: React.FC<{
   trackerVisualBg: boolean;
   onAcidGenerator: (channelIndex: number) => void;
   onRandomize: (channelIndex: number) => void;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
-}> = ({ trackerVisualBg, onAcidGenerator, onRandomize, onSwipeLeft, onSwipeRight }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setSize({ w: Math.round(width), h: Math.round(height) });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
+}> = ({ onAcidGenerator, onRandomize, onSwipeLeft, onSwipeRight }) => {
   return (
-    <div ref={containerRef} className="relative flex-1 min-h-0">
-      {trackerVisualBg && size.w > 0 && size.h > 0 && (
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <TrackerVisualBackground width={size.w} height={size.h} />
-        </div>
-      )}
+    <div className="relative flex-1 min-h-0">
       <PatternEditorCanvas
         onAcidGenerator={onAcidGenerator}
         onRandomize={onRandomize}
