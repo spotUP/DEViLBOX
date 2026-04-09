@@ -1,0 +1,22 @@
+--- a/src/lds.h
++++ b/src/lds.h
+@@ -41,7 +41,7 @@
+     static const unsigned short  maxsound, maxpos;
+ 
+ 
+-  private:
++  protected:
+     unsigned char    *music_data;
+     unsigned char    jumping, fadession, allvolume, haression,
+ 
+--- a/src/pis.h
++++ b/src/pis.h
+@@ -42,7 +42,7 @@
+     unsigned int getinstruments()
+     { return module.number_of_instruments; }
+ 
+-  private:
++  protected:
+     struct pis_module {
+       char            name[33];
+       unsigned char   number_of_positions;
