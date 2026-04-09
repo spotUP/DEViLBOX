@@ -5,6 +5,7 @@
  */
 
 import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 interface PresetOption {
   label: string;
@@ -60,16 +61,7 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
   }, []);
 
   // Close menu when clicking outside
-  useEffect(() => {
-    if (!showPresets) return;
-    const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowPresets(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showPresets]);
+  useClickOutside(containerRef, () => setShowPresets(false), { enabled: showPresets });
 
   // Handle right-click for presets menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {

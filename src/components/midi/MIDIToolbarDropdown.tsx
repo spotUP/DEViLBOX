@@ -2,13 +2,14 @@
  * MIDIToolbarDropdown - MIDI status indicator and settings dropdown for toolbar
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { MIDIDeviceSelector } from './MIDIDeviceSelector';
 import { MIDILearnModal } from './MIDILearnModal';
 import { PerformancePanel } from './PerformancePanel';
 import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone } from 'lucide-react';
 import { getBluetoothMIDIInfo } from '../../midi/BluetoothMIDIManager';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 interface MIDIToolbarDropdownProps {
   inline?: boolean; // If true, always shows expanded without button (for mobile menu)
@@ -58,19 +59,12 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
   };
 
   // Close dropdown when clicking outside
-  useEffect(() => {
-    if (!isOpen) return;
+  const handleCloseDropdown = useCallback(() => {
+    setIsOpen(false);
+    if (isLearning) cancelLearn();
+  }, [isLearning, cancelLearn]);
 
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-        if (isLearning) cancelLearn();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, isLearning, cancelLearn]);
+  useClickOutside(dropdownRef, handleCloseDropdown, { enabled: isOpen });
 
   // Activity flash effect
   const [showActivity, setShowActivity] = useState(false);

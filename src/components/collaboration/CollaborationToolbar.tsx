@@ -3,10 +3,11 @@
  * Displayed at the top of CollaborationSplitView.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { Minimize2, Copy, Check, Mic, MicOff, Video, VideoOff, Volume2, ChevronDown, X } from 'lucide-react';
 import type { ListenMode } from '@stores/useCollaborationStore';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 export const CollaborationToolbar: React.FC = () => {
   const { roomCode, micMuted, cameraMuted, listenMode, setViewMode, setListenMode, toggleMic, toggleCamera, disconnect } = useCollaborationStore();
@@ -23,15 +24,7 @@ export const CollaborationToolbar: React.FC = () => {
   };
 
   // Close menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowListenMenu(false);
-      }
-    };
-    if (showListenMenu) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showListenMenu]);
+  useClickOutside(menuRef, () => setShowListenMenu(false), { enabled: showListenMenu });
 
   const listenModeLabel: Record<ListenMode, string> = {
     shared: 'Shared',

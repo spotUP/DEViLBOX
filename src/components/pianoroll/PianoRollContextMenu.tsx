@@ -8,6 +8,7 @@ import {
   Copy, ClipboardPaste, Trash2, Scissors, Zap,
   ArrowRightLeft, Grid3X3, Layers, Gauge,
 } from 'lucide-react';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 // ============================================================================
 // Module-scope sub-components (extracted for react-hooks/static-components)
@@ -75,22 +76,17 @@ export const PianoRollContextMenu: React.FC<PianoRollContextMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close on click outside or escape
+  useClickOutside(menuRef, hideContextMenu, { enabled: contextMenu.visible });
+
   useEffect(() => {
     if (!contextMenu.visible) return;
 
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        hideContextMenu();
-      }
-    };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') hideContextMenu();
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [contextMenu.visible, hideContextMenu]);

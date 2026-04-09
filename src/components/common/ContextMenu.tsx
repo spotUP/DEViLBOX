@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, Check, Circle } from 'lucide-react';
+import { useClickOutside } from '@hooks/useClickOutside';
 
 export interface MenuDivider {
   type: 'divider';
@@ -88,28 +89,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [position]);
 
   // Close on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        // Check if click is inside a portal-rendered submenu (same component class)
-        // Submenus are rendered via createPortal at document.body level
-        const target = e.target as Element;
-        if (target.closest?.('[data-context-menu]')) return;
-        onClose();
-      }
-    };
+  useClickOutside(menuRef, onClose);
 
+  // Close on escape
+  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
       if (submenuTimerRef.current) clearTimeout(submenuTimerRef.current);
     };
