@@ -1494,7 +1494,7 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
  * (RAD, HSC, DRO, IMF, CMF) with pattern editing — the WASM engine plays the rest
  * as streaming audio via OPL emulation.
  */
-const ADPLUG_WASM_EXTS = /\.(adl|adt|adtrack|agd|bmf|dfm|dmo|herad|hsp|hybrid|hyp|laa|mad|mdi|msc|mtk|mtr|pis|plx|psi|rat|rol|sat|sop|u6m|xms|xsm|a2m|amd|bam|cff|d00|dtm|got|jbm|ksm|lds|mkj|mus|raw|rix|sa2|sci|sng|xad|fmt)$/i;
+const ADPLUG_WASM_EXTS = /\.(adl|adt|adtrack|agd|bmf|dfm|dmo|herad|hsp|hybrid|hyp|laa|mad|mdi|msc|mtk|mtr|pis|plx|psi|rat|rol|sat|sop|u6m|xms|xsm|a2m|amd|bam|cff|d00|dtm|got|jbm|ksm|lds|mkj|mus|raw|rix|sa2|sci|sng|xad)$/i;
 
 function isAdPlugWasmFormat(filename: string): boolean {
   return ADPLUG_WASM_EXTS.test(filename);
@@ -1505,7 +1505,18 @@ async function loadAdPlugFile(file: File): Promise<FileLoadResult> {
     const arrayBuffer = await file.arrayBuffer();
     const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
     const player = getAdPlugPlayer();
-    const ok = await player.load(arrayBuffer, file.name);
+
+    // Auto-discover companion files for SCI format
+    // SCI needs patch.003 from the same directory (first 3 chars of filename + "patch.003")
+    // TODO: When loaded via directory picker, resolve companion from sibling files
+    const companions: Array<{ name: string; data: Uint8Array }> = [];
+    if (file.name.toLowerCase().endsWith('.sci') && file.webkitRelativePath) {
+      const prefix = file.name.substring(0, 3);
+      const patchName = prefix + 'patch.003';
+      console.log(`[AdPlug] SCI file detected, companion needed: ${patchName}`);
+    }
+
+    const ok = await player.load(arrayBuffer, file.name, companions);
 
     if (!ok) {
       return { success: false, error: `AdPlug could not load: ${file.name}` };

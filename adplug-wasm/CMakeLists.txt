@@ -123,7 +123,7 @@ target_compile_definitions(AdPlugPlayer PRIVATE stricmp=strcasecmp)
 set(EMSCRIPTEN_FLAGS
     "-s MODULARIZE=1"
     "-s EXPORT_NAME='createAdPlugPlayer'"
-    "-s EXPORTED_FUNCTIONS=['_adplug_init','_adplug_shutdown','_adplug_load','_adplug_rewind','_adplug_render','_adplug_get_title','_adplug_get_type','_adplug_get_subsongs','_adplug_get_refresh','_adplug_get_num_instruments','_adplug_get_instrument_name','_adplug_alloc','_adplug_free','_malloc','_free']"
+    "-s EXPORTED_FUNCTIONS=['_adplug_init','_adplug_shutdown','_adplug_load','_adplug_add_companion','_adplug_rewind','_adplug_render','_adplug_get_title','_adplug_get_type','_adplug_get_subsongs','_adplug_get_refresh','_adplug_get_num_instruments','_adplug_get_instrument_name','_adplug_alloc','_adplug_free','_malloc','_free']"
     "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAP16','UTF8ToString']"
     "-s ALLOW_MEMORY_GROWTH=1"
     "-s INITIAL_MEMORY=16777216"
