@@ -11,6 +11,7 @@ import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 interface InterpolateDialogProps {
   isOpen: boolean;
@@ -98,15 +99,12 @@ export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, on
         {/* Column selector */}
         <div>
           <label className="block text-xs text-text-muted mb-1">Column</label>
-          <select
+          <CustomSelect
             value={column}
-            onChange={(e) => handleColumnChange(e.target.value as InterpolateColumn)}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-          >
-            {COLUMN_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+            onChange={(v) => handleColumnChange(v as InterpolateColumn)}
+            options={COLUMN_OPTIONS.map(opt => ({ value: opt.value, label: opt.label }))}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary"
+          />
         </div>
 
         {/* Start value */}

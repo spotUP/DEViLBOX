@@ -22,6 +22,7 @@ import {
 } from '@hooks/dialogs/useSettingsDialog';
 import { KeyBindingEditor } from '@components/dialogs/KeyBindingEditor';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
+import { CustomSelect } from '@components/common/CustomSelect';
 
 /** Normalize any CSS color to #RRGGBB for <input type="color"> */
 function normalizeToHex6(color: string | undefined): string {
@@ -102,17 +103,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-ft2-text text-xs font-mono">Theme:</label>
-                    <select
+                    <CustomSelect
                       value={s.currentThemeId}
-                      onChange={(e) => s.setTheme(e.target.value)}
-                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
-                    >
-                      {themes.map((theme) => (
-                        <option key={theme.id} value={theme.id} className="bg-ft2-bg text-ft2-text">
-                          {theme.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => s.setTheme(v)}
+                      options={themes.map((theme) => ({ value: theme.id, label: theme.name }))}
+                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1"
+                    />
                   </div>
 
                   {/* Custom Theme Editor */}
@@ -174,28 +170,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         <label className="text-ft2-text text-xs font-mono">UI Render Mode:</label>
                         <span className="text-[9px] text-ft2-textDim font-mono">Switch between DOM and WebGL rendering</span>
                       </div>
-                      <select
+                      <CustomSelect
                         value={s.renderMode}
-                        onChange={(e) => s.setRenderMode(e.target.value as 'dom' | 'webgl')}
-                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
-                      >
-                        <option value="dom">DOM (React)</option>
-                        <option value="webgl">WebGL (PixiJS)</option>
-                      </select>
+                        onChange={(v) => s.setRenderMode(v as 'dom' | 'webgl')}
+                        options={[
+                          { value: 'dom', label: 'DOM (React)' },
+                          { value: 'webgl', label: 'WebGL (PixiJS)' },
+                        ]}
+                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1"
+                      />
                     </div>
                   )}
 
                   {/* Number Format */}
                   <div className="flex items-center justify-between">
                     <label className="text-ft2-text text-xs font-mono">Number Format:</label>
-                    <select
+                    <CustomSelect
                       value={s.useHexNumbers ? 'hex' : 'dec'}
-                      onChange={(e) => s.setUseHexNumbers(e.target.value === 'hex')}
-                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
-                    >
-                      <option value="hex">Hexadecimal</option>
-                      <option value="dec">Decimal</option>
-                    </select>
+                      onChange={(v) => s.setUseHexNumbers(v === 'hex')}
+                      options={[
+                        { value: 'hex', label: 'Hexadecimal' },
+                        { value: 'dec', label: 'Decimal' },
+                      ]}
+                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1"
+                    />
                   </div>
 
                   {/* Blank Empty Cells */}
@@ -431,10 +429,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   {s.trackerVisualBg && (
                     <div className="flex items-center justify-between">
                       <label className="text-ft2-text text-xs font-mono">Mode:</label>
-                      <select value={s.trackerVisualMode} onChange={(e) => s.setTrackerVisualMode(Number(e.target.value))}
-                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight">
-                        {BG_MODES.map((bg, i) => <option key={i} value={i}>{getBgModeLabel(bg)}</option>)}
-                      </select>
+                      <CustomSelect value={String(s.trackerVisualMode)} onChange={(v) => s.setTrackerVisualMode(Number(v))}
+                        options={BG_MODES.map((bg, i) => ({ value: String(i), label: getBgModeLabel(bg) }))}
+                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1" />
                     </div>
                   )}
                 </div>
@@ -508,12 +505,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
                   <div className="flex items-center justify-between">
                     <label className="text-ft2-text text-xs font-mono">Edit Mode:</label>
-                    <select value={s.insertMode ? 'insert' : 'overwrite'}
-                      onChange={(e) => { const wantInsert = e.target.value === 'insert'; if (wantInsert !== s.insertMode) s.toggleInsertMode(); }}
-                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight">
-                      <option value="overwrite">Overwrite</option>
-                      <option value="insert">Insert (Shift Rows)</option>
-                    </select>
+                    <CustomSelect value={s.insertMode ? 'insert' : 'overwrite'}
+                      onChange={(v) => { const wantInsert = v === 'insert'; if (wantInsert !== s.insertMode) s.toggleInsertMode(); }}
+                      options={[
+                        { value: 'overwrite', label: 'Overwrite' },
+                        { value: 'insert', label: 'Insert (Shift Rows)' },
+                      ]}
+                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -528,14 +526,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <label className="text-ft2-text text-xs font-mono">Quantization:</label>
                     <div className="flex items-center gap-2">
                       <Toggle label="" value={s.recQuantEnabled} onChange={s.setRecQuantEnabled} size="sm" />
-                      <select value={s.recQuantRes} onChange={(e) => s.setRecQuantRes(Number(e.target.value))} disabled={!s.recQuantEnabled}
-                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight disabled:opacity-30">
-                        <option value={1}>1 row</option>
-                        <option value={2}>2 rows</option>
-                        <option value={4}>4 rows (1/4)</option>
-                        <option value={8}>8 rows (1/2)</option>
-                        <option value={16}>16 rows (1 beat)</option>
-                      </select>
+                      <CustomSelect value={String(s.recQuantRes)} onChange={(v) => s.setRecQuantRes(Number(v))} disabled={!s.recQuantEnabled}
+                        options={[
+                          { value: '1', label: '1 row' },
+                          { value: '2', label: '2 rows' },
+                          { value: '4', label: '4 rows (1/4)' },
+                          { value: '8', label: '8 rows (1/2)' },
+                          { value: '16', label: '16 rows (1 beat)' },
+                        ]}
+                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                     </div>
                   </div>
                 </div>
@@ -560,10 +559,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           className="p-1.5 bg-ft2-bg border border-ft2-border text-ft2-text hover:text-ft2-highlight hover:border-ft2-highlight transition-colors" title="View keybindings">
                           <Keyboard size={14} />
                         </button>
-                        <select value={s.activeScheme} onChange={(e) => s.setActiveScheme(e.target.value)}
-                          className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight">
-                          {KEYBOARD_SCHEMES.map((scheme) => <option key={scheme.id} value={scheme.id}>{scheme.name}</option>)}
-                        </select>
+                        <CustomSelect value={s.activeScheme} onChange={(v) => s.setActiveScheme(v)}
+                          options={KEYBOARD_SCHEMES.map((scheme) => ({ value: scheme.id, label: scheme.name }))}
+                          className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                       </div>
                     </div>
                     <span className="text-[9px] text-ft2-textDim font-mono">{KEYBOARD_SCHEMES.find(sc => sc.id === s.activeScheme)?.description}</span>
@@ -574,12 +572,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <label className="text-ft2-text text-xs font-mono">Platform:</label>
                       <span className="text-[9px] text-ft2-textDim font-mono">Override Cmd/Ctrl detection</span>
                     </div>
-                    <select value={s.platformOverride} onChange={(e) => s.setPlatformOverride(e.target.value as 'auto' | 'mac' | 'pc')}
-                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight">
-                      <option value="auto">Auto-detect</option>
-                      <option value="mac">Mac (Cmd)</option>
-                      <option value="pc">PC (Ctrl)</option>
-                    </select>
+                    <CustomSelect value={s.platformOverride} onChange={(v) => s.setPlatformOverride(v as 'auto' | 'mac' | 'pc')}
+                      options={[
+                        { value: 'auto', label: 'Auto-detect' },
+                        { value: 'mac', label: 'Mac (Cmd)' },
+                        { value: 'pc', label: 'PC (Ctrl)' },
+                      ]}
+                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                   </div>
                 </div>
 
@@ -711,13 +710,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <p className="text-ft2-textDim text-[9px] font-mono mb-2">Route to real MOS 6581/8580 chips via USB-SID-Pico.</p>
                 <div className="flex flex-col gap-1 mb-2">
                   <label className="text-ft2-text text-[9px] font-mono">Transport:</label>
-                  <select value={s.sidHardwareMode}
-                    onChange={(e) => { const mode = e.target.value as 'off' | 'asid' | 'webusb'; s.setSidHardwareMode(mode); s.setAsidEnabled(mode === 'asid'); }}
-                    className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight">
-                    <option value="off">Off — Software Only</option>
-                    <option value="webusb">WebUSB — Direct USB</option>
-                    <option value="asid">ASID — MIDI SysEx</option>
-                  </select>
+                  <CustomSelect value={s.sidHardwareMode}
+                    onChange={(v) => { const mode = v as 'off' | 'asid' | 'webusb'; s.setSidHardwareMode(mode); s.setAsidEnabled(mode === 'asid'); }}
+                    options={[
+                      { value: 'off', label: 'Off — Software Only' },
+                      { value: 'webusb', label: 'WebUSB — Direct USB' },
+                      { value: 'asid', label: 'ASID — MIDI SysEx' },
+                    ]}
+                    className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                 </div>
 
                 {s.sidHardwareMode === 'webusb' && s.webusbSupported && (
@@ -742,12 +742,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
                 {s.sidHardwareMode === 'asid' && s.asidSupported && (
                   <div className="pl-2 space-y-2 border-l border-ft2-border ml-1">
-                    <select value={s.asidDeviceId || ''} onChange={(e) => { s.setAsidDeviceId(e.target.value || null); getASIDDeviceManager().selectDevice(e.target.value || null); }}
-                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1">
-                      {s.asidDevices.length === 0 ? <option value="">No ASID devices</option> : (
-                        <><option value="">Select device...</option>{s.asidDevices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</>
-                      )}
-                    </select>
+                    <CustomSelect value={s.asidDeviceId || ''} onChange={(v) => { s.setAsidDeviceId(v || null); getASIDDeviceManager().selectDevice(v || null); }}
+                      options={s.asidDevices.length === 0
+                        ? [{ value: '', label: 'No ASID devices' }]
+                        : [{ value: '', label: 'Select device...' }, ...s.asidDevices.map((d) => ({ value: d.id, label: d.name }))]
+                      }
+                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                   </div>
                 )}
               </section>
