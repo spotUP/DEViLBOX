@@ -39,14 +39,6 @@ const SC_TYPES: SynthType[] = ['SuperCollider'];
 const COLLAPSED_HEIGHT = 40;
 const SECTION_HEADER_HEIGHT = 24;
 const TB303_EXPANDED_HEIGHT = 512;
-const DEFAULT_EXPANDED_HEIGHT = 200;
-
-// For FX tabs and most synth types, return a fixed height
-// TB303 has its own large hardware UI height
-function getExpandedHeight(synthType: SynthType | undefined): number {
-  if (synthType && TB303_TYPES.includes(synthType)) return TB303_EXPANDED_HEIGHT;
-  return DEFAULT_EXPANDED_HEIGHT;
-}
 
 // ─── Generic Synth Knobs ─────────────────────────────────────────────────────
 // Shows oscillator, envelope, filter knobs for Tone.js-based synths
@@ -447,7 +439,6 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     return null;
   }
 
-  const expandedHeight = getExpandedHeight(synthType);
   const instNum = String(targetInstrument.id).padStart(2, '0');
   const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
   const fxCount = targetInstrument.effects?.length ?? 0;
@@ -557,6 +548,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   }
 
   // ─── Inline panel with collapse/expand animation ───────────────────────────
+  const isTB303Height = isTB303;
 
   return (
     <div
@@ -564,11 +556,11 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
       style={{
         position: 'relative',
         width: '100%',
-        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : `${expandedHeight}px`,
+        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? `${TB303_EXPANDED_HEIGHT}px` : 'auto'),
         background: 'var(--color-bg-tertiary)',
         borderTop: '1px solid var(--color-border-light)',
         overflow: 'hidden',
-        transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: isTB303Height ? 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
       }}
     >
       {/* Collapsed header — always visible */}
@@ -635,14 +627,14 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         pointerEvents: tb303Collapsed ? 'none' : 'auto',
         display: 'flex',
         flexDirection: 'column',
-        height: `${expandedHeight}px`,
+        ...(isTB303Height ? { height: `${TB303_EXPANDED_HEIGHT}px` } : {}),
       }}>
         {/* Horizontal layout — synth controls, inst FX, master FX side by side */}
-        <div className="flex-1 min-h-0 flex overflow-hidden">
+        <div className="flex overflow-hidden">
           {/* Synth controls — takes more space */}
-          <div className="flex-[2] min-w-0 flex flex-col overflow-hidden">
+          <div className="flex-[2] min-w-0 flex flex-col">
             <SectionHeader label={synthType === 'TB303' ? 'TB-303' : (synthType || 'Synth')} color={getSynthColor(synthType)} />
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className={isTB303Height ? 'flex-1 min-h-0 overflow-auto' : ''}>
               {isTB303 && targetInstrument.tb303 ? (
                 <ScrollLockContainer className="w-full">
                   <JC303StyledKnobPanel
@@ -659,12 +651,12 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             </div>
           </div>
 
-          {/* Instrument FX */}
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
+          {/* Instrument FX — horizontal scroll for effect chain */}
+          <div className="flex-1 min-w-0 flex flex-col border-l border-dark-border">
             <SectionHeader label="Inst FX" badge={fxCount > 0 ? String(fxCount) : undefined} actions={instFxActions} />
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className="overflow-x-auto overflow-y-hidden">
               <Suspense fallback={<FxLoadingFallback />}>
-                <div className="fx-horizontal-layout p-2 h-full">
+                <div className="fx-horizontal-layout p-2">
                   <InstrumentEffectsPanel
                     ref={instFxRef}
                     instrumentId={targetInstrument.id}
@@ -677,12 +669,12 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             </div>
           </div>
 
-          {/* Master FX */}
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
+          {/* Master FX — horizontal scroll for effect chain */}
+          <div className="flex-1 min-w-0 flex flex-col border-l border-dark-border">
             <SectionHeader label="Master FX" actions={masterFxActions} />
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className="overflow-x-auto overflow-y-hidden">
               <Suspense fallback={<FxLoadingFallback />}>
-                <div className="fx-horizontal-layout p-2 h-full">
+                <div className="fx-horizontal-layout p-2">
                   <MasterEffectsPanel ref={masterFxRef} hideHeader />
                 </div>
               </Suspense>
