@@ -627,7 +627,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 )}
 
                 {/* Synth Type Badge */}
-                <span className={`text-[9px] px-1 rounded ${isSelected ? 'bg-ft2-bg/20 text-ft2-bg' : 'bg-ft2-header text-ft2-textDim'}`}>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${isSelected ? 'bg-ft2-bg/20 text-ft2-bg border-ft2-bg/40' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}>
                   {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
@@ -636,10 +636,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   const badge = getSynthBadge(instrument.synthType);
                   return (
                     <span
-                      className="text-[8px] px-1 rounded font-bold"
+                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
                       style={{
                         backgroundColor: isSelected ? 'rgba(0,0,0,0.2)' : `${badge.cssColor}20`,
                         color: isSelected ? 'var(--color-ft2-bg)' : badge.cssColor,
+                        borderColor: isSelected ? 'rgba(0,0,0,0.3)' : `${badge.cssColor}40`,
                       }}
                     >
                       {badge.label}
@@ -775,7 +776,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Synth type badge (non-compact only) */}
                 {!compact && (
-                  <span className="text-[10px] text-text-muted font-mono">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold font-mono border bg-dark-bgSecondary text-text-muted border-dark-border">
                     {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                   </span>
                 )}
@@ -785,10 +786,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   const badge = getSynthBadge(instrument.synthType);
                   return (
                     <span
-                      className="text-[9px] px-1 rounded font-bold"
+                      className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
                       style={{
                         backgroundColor: `${badge.cssColor}20`,
                         color: badge.cssColor,
+                        borderColor: `${badge.cssColor}40`,
                       }}
                     >
                       {badge.label}

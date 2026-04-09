@@ -356,7 +356,7 @@ const TabBar: React.FC<{
         >
           {tab.label}
           {tab.badge && (
-            <span className="ml-1 px-1 py-0 text-[9px] rounded bg-accent-highlight/20 text-accent-highlight">{tab.badge}</span>
+            <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded font-bold border bg-accent-highlight/20 text-accent-highlight border-accent-highlight/40">{tab.badge}</span>
           )}
         </button>
       ))}
