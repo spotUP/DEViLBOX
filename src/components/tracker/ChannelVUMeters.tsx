@@ -13,6 +13,7 @@ import { useTrackerStore, useSettingsStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useThemeStore } from '@stores/useThemeStore';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;
@@ -152,8 +153,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
       const vuStyle = useSettingsStore.getState().vuMeterStyle;
 
-      // Read theme accent color for fill style
-      const accentRaw = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-primary').trim() || '#22c55e';
+      // Read theme accent color from store (avoids expensive getComputedStyle per frame)
+      const accentRaw = useThemeStore.getState().getCurrentTheme().colors.accent || '#22c55e';
       const [ar, ag, ab] = parseColor(accentRaw);
 
       // Grow lastGens if needed

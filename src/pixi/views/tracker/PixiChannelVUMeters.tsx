@@ -15,6 +15,8 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTransportStore, useTrackerStore, useEditorStore, useSettingsStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useThemeStore } from '@stores/useThemeStore';
+import { cssColorToPixi } from '../../theme';
 import { VU_GREEN, VU_YELLOW, VU_RED } from '../../colors';
 
 // VU meter constants — must match DOM ChannelVUMeters.tsx for parity
@@ -36,7 +38,8 @@ const FILL_GREEN = { color: VU_GREEN, alpha: 0.9 };
 const FILL_YELLOW = { color: VU_YELLOW, alpha: 0.9 };
 const FILL_RED = { color: VU_RED, alpha: 0.9 };
 const FILL_CLEAR = { color: 0x000000, alpha: 0 };
-const FILL_SOLID = { color: VU_GREEN, alpha: 0.35 }; // Fill style background
+// Fill style uses theme accent (mutable — updated each frame from theme store)
+const FILL_ACCENT = { color: VU_GREEN, alpha: 0.35 };
 
 interface MeterState {
   level: number;
@@ -232,6 +235,11 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
       const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
       const vuStyle = useSettingsStore.getState().vuMeterStyle;
 
+      // Update fill accent color from theme
+      const themeColors = useThemeStore.getState().getCurrentTheme().colors;
+      const accentPixi = cssColorToPixi(themeColors.accent);
+      FILL_ACCENT.color = accentPixi.color;
+
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
         if (!meter) continue;
@@ -261,7 +269,7 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
               // Mirror: also fill downward from edit row
               g.rect(channelX, ery, channelW, fillHeight);
             }
-            g.fill(FILL_SOLID);
+            g.fill(FILL_ACCENT);
           }
         } else {
           // Segments style: LED-style bars
