@@ -133,6 +133,7 @@ interface AdPlugWasmModule {
   _adplug_get_num_instruments(): number;
   _adplug_get_instrument_name(index: number): number;
   _adplug_get_player_type(): number;
+  _adplug_get_refresh_rate(): number;
   _adplug_capture_song(): number;
   _adplug_capture_get_num_events(): number;
   _adplug_capture_get_num_instruments(): number;
@@ -226,11 +227,13 @@ export async function extractAdPlugPatterns(
     let numOrders = M._adplug_get_orders();
     let numChannels = M._adplug_get_channels();
     const numRows = M._adplug_get_rows();
-    const speed = M._adplug_get_speed();
-    const bpm = M._adplug_get_bpm_value();
+    let rawSpeed = M._adplug_get_speed();
+    let rawBpm = M._adplug_get_bpm_value();
     const restartPos = M._adplug_get_restart_pos();
     const title = M.UTF8ToString(M._adplug_get_title());
     const type = M.UTF8ToString(M._adplug_get_type());
+    const playerRefresh = M._adplug_get_refresh_rate();
+    let usedCapture = false;
 
     // If native extraction yields no patterns, try OPL capture
     if (numPatterns === 0 || numOrders === 0 || numChannels === 0) {
@@ -241,10 +244,70 @@ export async function extractAdPlugPatterns(
       numPatterns = M._adplug_get_patterns();
       numOrders = M._adplug_get_orders();
       numChannels = M._adplug_get_channels();
+      usedCapture = true;
 
       if (numPatterns === 0 || numOrders === 0 || numChannels === 0) return null;
     }
     if (numChannels > 24 || numRows > 256) return null;
+
+    // ── Compute BPM and speed from refresh rate ──
+    // The tracker equation: tickRate = BPM * 2 / 5, rowRate = tickRate / speed
+    // For OPL formats, the refresh rate IS the tick rate.
+    // For capture: each row = ticksPerRow OPL ticks.
+    // For native: use the player's speed, derive BPM from refresh.
+    let finalSpeed: number;
+    let finalBpm: number;
+
+    const refresh = usedCapture
+      ? M._adplug_capture_get_refresh_rate()
+      : playerRefresh;
+
+    if (usedCapture) {
+      // Capture quantized ticks to rows using ticksPerRow = round(refresh/50)
+      const ticksPerRow = Math.max(1, Math.round(refresh / 50));
+      const rowRate = refresh / ticksPerRow; // rows per second
+
+      // Choose speed to get BPM in comfortable range (80-200)
+      // BPM = rowRate * 5 * speed / 2 → speed = BPM * 2 / (5 * rowRate)
+      // Target BPM=125: speed = 125 * 2 / (5 * rowRate) = 50 / rowRate
+      if (rowRate < 20) {
+        // Very slow refresh — use speed to compensate
+        finalSpeed = Math.max(1, Math.min(31, Math.round(50 / rowRate)));
+        finalBpm = Math.round(rowRate * 5 * finalSpeed / 2);
+      } else if (rowRate > 200) {
+        // Very fast refresh (e.g. MDI at 840Hz) — increase speed to reduce row rate
+        finalSpeed = Math.max(1, Math.min(31, Math.round(rowRate / 50)));
+        finalBpm = Math.round(rowRate * 5 / (2 * finalSpeed));
+      } else {
+        finalSpeed = 1;
+        finalBpm = Math.round(rowRate * 5 / 2);
+      }
+    } else {
+      // Native format — use player speed if valid, compute BPM from refresh
+      finalSpeed = (rawSpeed > 0 && rawSpeed <= 31) ? rawSpeed : 6;
+      if (rawBpm > 0 && rawBpm <= 300) {
+        // Player reports a valid BPM — use it
+        finalBpm = rawBpm;
+      } else if (refresh > 0) {
+        // BPM = refresh * 5 / 2 (simplified from rowRate * speed * 5 / 2)
+        finalBpm = Math.round(refresh * 5 / 2);
+      } else {
+        finalBpm = 125;
+      }
+    }
+
+    // Clamp to tracker-friendly range, adjusting speed to compensate
+    if (finalBpm > 300) {
+      const factor = Math.ceil(finalBpm / 150);
+      finalSpeed = Math.min(31, finalSpeed * factor);
+      finalBpm = Math.round(finalBpm / factor);
+    }
+    if (finalBpm < 32) {
+      finalBpm = 125;
+      finalSpeed = 6;
+    }
+    finalBpm = Math.max(32, Math.min(300, finalBpm));
+    finalSpeed = Math.max(1, Math.min(31, finalSpeed));
 
     // ── Extract order list ──
     // Stop at first out-of-range or sentinel entry (0xFFFF = end, >= numPatterns = padding)
@@ -324,8 +387,8 @@ export async function extractAdPlugPatterns(
       songLength: songPositions.length,
       restartPosition: restartPos,
       numChannels,
-      initialSpeed: speed || 6,
-      initialBPM: bpm || 125,
+      initialSpeed: finalSpeed,
+      initialBPM: finalBpm,
     };
   } finally {
     M._adplug_shutdown();
