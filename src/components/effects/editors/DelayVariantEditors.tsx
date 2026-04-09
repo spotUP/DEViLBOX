@@ -34,17 +34,18 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#8b5cf6" title="Spacey Delayer" />
         <div className="flex justify-around items-end">
-          <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
-            <Knob
-              value={firstTap}
-              min={10}
-              max={2000}
-              onChange={(v) => onUpdateParameter('firstTap', v)}
-              label="First Tap"
-              color="#8b5cf6"
-              formatValue={(v) => `${Math.round(v)}ms`}
-            />
-          </div>
+          <Knob
+            value={firstTap}
+            min={10}
+            max={2000}
+            onChange={(v) => {
+              if (synced) onUpdateParameter('bpmSync', 0);
+              onUpdateParameter('firstTap', v);
+            }}
+            label="First Tap"
+            color="#8b5cf6"
+            formatValue={(v) => synced ? 'SYNC' : `${Math.round(v)}ms`}
+          />
           <Knob
             value={tapSize}
             min={10}
@@ -137,17 +138,18 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#dc2626" title="RE Tape Echo" />
         <div className="flex justify-around items-end">
-          <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
-            <Knob
-              value={repeatRate * 100}
-              min={0}
-              max={100}
-              onChange={(v) => onUpdateParameter('repeatRate', v / 100)}
-              label="Rate"
-              color="#dc2626"
-              formatValue={(v) => `${Math.round(v)}%`}
-            />
-          </div>
+          <Knob
+            value={repeatRate * 100}
+            min={0}
+            max={100}
+            onChange={(v) => {
+              if (synced) onUpdateParameter('bpmSync', 0);
+              onUpdateParameter('repeatRate', v / 100);
+            }}
+            label="Rate"
+            color="#dc2626"
+            formatValue={(v) => synced ? 'SYNC' : `${Math.round(v)}%`}
+          />
           <Knob
             value={intensity * 100}
             min={0}
