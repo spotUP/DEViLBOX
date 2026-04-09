@@ -787,7 +787,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             </div>
         </div>
 
-        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 overflow-hidden border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ alignItems: 'stretch', justifyContent: 'center' }}>
+        <VisualizerFrame variant="compact" className="min-w-0 max-w-[350px] flex-1 border-l border-dark-border cursor-pointer group ml-auto hidden lg:flex" style={{ alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
           const currentIndex = modes.indexOf(vizMode);
