@@ -212,9 +212,8 @@ class MPT extends AudioWorkletProcessor {
 			case 'setMuteMask':
 				// Set mute state for all channels via ext interactive interface
 				if (!this.modulePtr) break
-				if (this.muteFunc && this.extPtr && wasmTable) {
-					// Use the interactive interface's set_channel_mute_status function pointer
-					const fn = wasmTable.get(this.muteFunc)
+				if (this.muteFunc && this.extPtr && libopenmpt.wasmTable) {
+					const fn = libopenmpt.wasmTable.get(this.muteFunc)
 					for (let ch = 0; ch < Math.min(this.channels, 16); ch++) {
 						const muted = (v & (1 << ch)) === 0
 						try { fn(this.extPtr, ch, muted ? 1 : 0) } catch(e) { /* ignore */ }
@@ -272,7 +271,7 @@ class MPT extends AudioWorkletProcessor {
 			this.extPtr = libopenmpt._openmpt_module_ext_create_from_memory(ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0)
 			if (this.extPtr) {
 				this.modulePtr = libopenmpt._openmpt_module_ext_get_module(this.extPtr)
-				// Get interactive interface — struct of 18 function pointers (72 bytes in WASM32)
+				// Get interactive interface — struct of 16 function pointers (64 bytes in WASM32)
 				// set_channel_mute_status is at index 10 (offset 40)
 				if (libopenmpt._openmpt_module_ext_get_interface && libopenmpt.stackSave) {
 					const INTERACTIVE_STRUCT_SIZE = 64 // 16 function pointers × 4 bytes
@@ -340,13 +339,13 @@ class MPT extends AudioWorkletProcessor {
 			this.modulePtr = 0
 		}
 		this.muteFunc = 0
-		if (this.leftBufferPtr != 0) {
-			libopenmpt._free(this.leftBufferPtr)
-			this.leftBufferPtr = 0
+		if (this.leftPtr) {
+			libopenmpt._free(this.leftPtr)
+			this.leftPtr = 0
 		}
-		if (this.rightBufferPtr != 0) {
-			libopenmpt._free(this.rightBufferPtr)
-			this.rightBufferPtr = 0
+		if (this.rightPtr) {
+			libopenmpt._free(this.rightPtr)
+			this.rightPtr = 0
 		}
 		this.channels = 0
 		this.lastStateRow = -1
