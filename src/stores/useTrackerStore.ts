@@ -12,7 +12,6 @@ import type {
   ClipboardData,
 } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
-import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
@@ -25,174 +24,6 @@ import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
 import { useFormatStore } from './useFormatStore';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
-
-// ── WASM mute forwarding ─────────────────────────────────────────────────────
-// Forward mute/solo states to WASM engines.
-// ToneEngine path only handles DOM synths — WASM engines need direct mute/gain.
-// All lazy imports use cached dynamic import() (not require()) for Vite ESM compat.
-
-let _furnaceDispatchEngine: { getInstance(): { mute(ch: number, m: boolean): void } } | null = null;
-let _furnaceImportDone = false;
-
-let _uadeEngine: { hasInstance(): boolean; getInstance(): { setMuteMask(mask: number): void } } | null = null;
-let _uadeImportDone = false;
-
-let _getActiveGainEngine: (() => { setChannelGain(ch: number, gain: number): void } | null) | null = null;
-let _gainImportDone = false;
-
-// Eagerly warm up all lazy imports so first mute click works
-void (async () => {
-  try {
-    const [uadeMod, furnaceMod, mixerMod] = await Promise.all([
-      import('../engine/uade/UADEEngine'),
-      import('../engine/furnace-dispatch/FurnaceDispatchEngine'),
-      import('./useMixerStore'),
-    ]);
-    _uadeEngine = uadeMod.UADEEngine as unknown as typeof _uadeEngine;
-    _uadeImportDone = true;
-    _furnaceDispatchEngine = furnaceMod.FurnaceDispatchEngine as unknown as typeof _furnaceDispatchEngine;
-    _furnaceImportDone = true;
-    _getActiveGainEngine = mixerMod.getActiveGainEngine;
-    _gainImportDone = true;
-  } catch {
-    // Individual imports handled below
-  }
-})();
-
-function getGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
-  if (!_gainImportDone) return null;
-  return _getActiveGainEngine?.() ?? null;
-}
-
-/**
- * Apply mute/solo to SunVox modules by setting their Volume controller to min/restore.
- * Returns true if SunVox was active and handled (caller should skip other engines).
- */
-// Cached lazy imports for SunVox mute (avoid require() which doesn't work in Vite ESM)
-let _svMuteEngine: any = null;
-let _svMuteGetHandle: any = null;
-let _svMuteInstrStore: any = null;
-let _svMuteImportDone = false;
-
-async function _ensureSunVoxMuteImports(): Promise<boolean> {
-  if (_svMuteImportDone) return true;
-  try {
-    const [svMod, synthMod, instrMod] = await Promise.all([
-      import('../engine/sunvox/SunVoxEngine'),
-      import('../engine/sunvox-modular/SunVoxModularSynth'),
-      import('./useInstrumentStore'),
-    ]);
-    _svMuteEngine = svMod.SunVoxEngine;
-    _svMuteGetHandle = synthMod.getSharedSunVoxHandle;
-    _svMuteInstrStore = instrMod.useInstrumentStore;
-    _svMuteImportDone = true;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Eagerly warm up imports when module is loaded (so first mute click works)
-void _ensureSunVoxMuteImports();
-
-// Fire-and-forget: apply mute to SunVox modules
-function _applySunVoxMutes(channels: { muted: boolean; solo: boolean }[], anySolo: boolean): boolean {
-  if (!_svMuteImportDone) {
-    // Imports not ready yet — trigger and skip this call
-    void _ensureSunVoxMuteImports();
-    return false;
-  }
-
-  if (!_svMuteEngine.hasInstance()) return false;
-  const handle = _svMuteGetHandle();
-  if (handle < 0) return false;
-
-  const instruments = _svMuteInstrStore.getState().instruments;
-  const state = useTrackerStore.getState();
-  const pattern = state.patterns[state.currentPatternIndex];
-  if (!pattern) return false;
-
-  const hasSunVox = instruments.some(
-    (i: { synthType?: string; sunvox?: { isSong?: boolean } }) =>
-      i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true
-  );
-  if (!hasSunVox) return false;
-
-  const moduleUnmuted = new Map<number, boolean>();
-  for (let i = 0; i < pattern.channels.length; i++) {
-    const ch = channels[i];
-    if (!ch) continue;
-    const instrId = (pattern.channels[i] as { instrumentId?: number })?.instrumentId;
-    if (!instrId) continue;
-    const inst = instruments.find((ins: { id: number }) => ins.id === instrId);
-    if (!inst?.sunvox?.noteTargetModuleId) continue;
-    const modId = inst.sunvox.noteTargetModuleId as number;
-    const effectiveMute = anySolo ? !ch.solo : ch.muted;
-    if (!effectiveMute) moduleUnmuted.set(modId, true);
-    else if (!moduleUnmuted.has(modId)) moduleUnmuted.set(modId, false);
-  }
-
-  const engine = _svMuteEngine.getInstance();
-  for (const [modId, unmuted] of moduleUnmuted) {
-    if (unmuted) engine.unmuteModule(handle, modId);
-    else engine.muteModule(handle, modId);
-  }
-  return true;
-}
-
-function forwardWasmMuteStates(channels: { muted: boolean; solo: boolean }[]): void {
-  const editorMode = useFormatStore.getState().editorMode;
-  const anySolo = channels.some(ch => ch.solo);
-
-  // UADE: uses bitmask API — bit N=1 means Paula channel N is active (playing)
-  if (_uadeImportDone && _uadeEngine) {
-    try {
-      if (_uadeEngine.hasInstance()) {
-        const engine = _uadeEngine.getInstance();
-        let mask = 0;
-        channels.slice(0, 4).forEach((ch: { muted: boolean; solo: boolean }, i: number) => {
-          const effectiveMute = anySolo ? !ch.solo : ch.muted;
-          if (!effectiveMute) mask |= (1 << i);
-        });
-        engine.setMuteMask(mask);
-      }
-    } catch {
-      // UADE not loaded
-    }
-  }
-
-  // Furnace uses binary mute API
-  if (editorMode === 'furnace') {
-    if (_furnaceImportDone && _furnaceDispatchEngine) {
-      try {
-        const engine = _furnaceDispatchEngine.getInstance();
-        channels.forEach((ch, i) => {
-          const effectiveMute = anySolo ? !ch.solo : ch.muted;
-          engine.mute(i, effectiveMute);
-        });
-      } catch {
-        // Engine not ready
-      }
-    }
-    return;
-  }
-
-  // SunVox songs: mute/unmute at the module level inside WASM
-  if (_applySunVoxMutes(channels, anySolo)) return;
-
-  // Other WASM engines use gain API (0 = muted, 1 = unmuted)
-  try {
-    const gainEngine = getGainEngine();
-    if (gainEngine) {
-      channels.forEach((ch, i) => {
-        const effectiveMute = anySolo ? !ch.solo : ch.muted;
-        gainEngine.setChannelGain(i, effectiveMute ? 0 : 1);
-      });
-    }
-  } catch {
-    // Engine not ready
-  }
-}
 
 // ── Debounced WASM engine re-export on cell edit ────────────────────────────
 // For non-UADE WASM engines (MusicLine, PumaTracker), edits require
@@ -1614,63 +1445,39 @@ export const useTrackerStore = create<TrackerStore>()(
       }),
 
     toggleChannelMute: (channelIndex) => {
-      let isMuted = false;
-      set((state) => {
-        state.patterns.forEach((pattern) => {
-          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
-            pattern.channels[channelIndex].muted = !pattern.channels[channelIndex].muted;
-            isMuted = pattern.channels[channelIndex].muted;
-          }
-        });
-      });
-      // Update audio engine with new mute states
-      const state = get();
-      const pattern = state.patterns[state.currentPatternIndex];
-      if (pattern) {
-        const engine = getToneEngine();
-        engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
-        forwardWasmMuteStates(pattern.channels);
-      }
-      // Add status message
-      if (typeof window !== 'undefined') {
-        import('@stores/useUIStore').then(({ useUIStore }) => {
-          useUIStore.getState().setStatusMessage(isMuted ? 'MUTED' : 'UNMUTED');
-        });
+      // Delegate to useMixerStore — single source of truth for mute/solo.
+      // MixerStore handles: engine forwarding + syncing back to pattern channels.
+      try {
+        const { useMixerStore } = require('./useMixerStore');
+        const mixerState = useMixerStore.getState();
+        const currentlyMuted = mixerState.channels[channelIndex]?.muted ?? false;
+        mixerState.setChannelMute(channelIndex, !currentlyMuted);
+
+        if (typeof window !== 'undefined') {
+          import('@stores/useUIStore').then(({ useUIStore }) => {
+            useUIStore.getState().setStatusMessage(!currentlyMuted ? 'MUTED' : 'UNMUTED');
+          });
+        }
+      } catch {
+        // MixerStore not ready
       }
     },
 
     toggleChannelSolo: (channelIndex) => {
-      let isSolo = false;
-      set((state) => {
-        state.patterns.forEach((pattern) => {
-          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
-            const wasAlreadySolo = pattern.channels[channelIndex].solo;
-            // Clear all solos first (exclusive solo behavior)
-            pattern.channels.forEach((ch) => {
-              ch.solo = false;
-            });
-            // Toggle the clicked channel (if it was solo, it's now off; if it wasn't, it's now on)
-            if (!wasAlreadySolo) {
-              pattern.channels[channelIndex].solo = true;
-              isSolo = true;
-            }
-          }
-        });
-      });
-      // Update audio engine with new mute/solo states
-      const state = get();
-      const pattern = state.patterns[state.currentPatternIndex];
-      if (pattern) {
-        const engine = getToneEngine();
-        engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
-        // Forward to Furnace WASM dispatch if in Furnace mode
-        forwardWasmMuteStates(pattern.channels);
-      }
-      // Add status message
-      if (typeof window !== 'undefined') {
-        import('@stores/useUIStore').then(({ useUIStore }) => {
-          useUIStore.getState().setStatusMessage(isSolo ? 'SOLO ON' : 'SOLO OFF');
-        });
+      // Delegate to useMixerStore — single source of truth for mute/solo.
+      try {
+        const { useMixerStore } = require('./useMixerStore');
+        const mixerState = useMixerStore.getState();
+        const currentlySoloed = mixerState.channels[channelIndex]?.soloed ?? false;
+        mixerState.setChannelSolo(channelIndex, !currentlySoloed);
+
+        if (typeof window !== 'undefined') {
+          import('@stores/useUIStore').then(({ useUIStore }) => {
+            useUIStore.getState().setStatusMessage(!currentlySoloed ? 'SOLO ON' : 'SOLO OFF');
+          });
+        }
+      } catch {
+        // MixerStore not ready
       }
     },
 
@@ -1945,6 +1752,12 @@ export const useTrackerStore = create<TrackerStore>()(
             selection: null,
           });
           state.clipboard = null;
+
+          // Reset mixer mute/solo state for the new song
+          try {
+            const { useMixerStore } = require('./useMixerStore');
+            useMixerStore.getState().resetMuteState();
+          } catch { /* Mixer not ready */ }
         }
       }),
 

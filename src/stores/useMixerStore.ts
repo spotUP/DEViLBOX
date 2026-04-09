@@ -425,6 +425,45 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
   }
 }
 
+// ── Sync mute/solo state to pattern channels for visual rendering ──────────
+// useMixerStore is the single source of truth for mute/solo.
+// Pattern channel .muted/.solo are read-only mirrors used for rendering.
+function syncMuteToPatternChannels(): void {
+  try {
+    // Lazy import to avoid circular init — only reads/writes state
+    const { useTrackerStore } = require('./useTrackerStore');
+    const { channels } = useMixerStore.getState();
+    const trackerState = useTrackerStore.getState();
+    const numChannels = channels.length;
+
+    // Check if any pattern channel is out of sync
+    const pattern = trackerState.patterns[trackerState.currentPatternIndex];
+    if (!pattern) return;
+
+    let needsUpdate = false;
+    for (let i = 0; i < Math.min(pattern.channels.length, numChannels); i++) {
+      if (pattern.channels[i].muted !== channels[i].muted ||
+          pattern.channels[i].solo !== channels[i].soloed) {
+        needsUpdate = true;
+        break;
+      }
+    }
+    if (!needsUpdate) return;
+
+    // Batch update all patterns
+    useTrackerStore.setState((state: any) => {
+      for (const pat of state.patterns) {
+        for (let i = 0; i < Math.min(pat.channels.length, numChannels); i++) {
+          pat.channels[i].muted = channels[i].muted;
+          pat.channels[i].solo = channels[i].soloed;
+        }
+      }
+    });
+  } catch {
+    // TrackerStore not ready
+  }
+}
+
 export interface MixerChannelState {
   volume: number;   // 0–1, 1 = unity (0 dB)
   pan: number;      // -1..1
@@ -516,6 +555,9 @@ interface MixerStoreActions {
 
   // Effect presets
   loadChannelInsertPreset: (ch: number, effects: EffectConfig[]) => void;
+
+  // Reset mute/solo state (called on song load)
+  resetMuteState: () => void;
 }
 
 type MixerStore = MixerStoreState & MixerStoreActions;
@@ -564,18 +606,24 @@ export const useMixerStore = create<MixerStore>()(
         state.channels[ch].muted = muted;
       });
       applyToEngine(() => {
-        getToneEngine().setChannelMute(ch, muted);
+        const { channels: chans, isSoloing: soloing } = get();
+        const effectiveMute = soloing ? !chans[ch].soloed : muted;
+        getToneEngine().setChannelMute(ch, effectiveMute);
       });
       const { channels: chans, isSoloing: soloing } = get();
       forwardWasmChannelGain(ch, chans, soloing);
       forwardReplayerMuteMask(chans, soloing);
+      syncMuteToPatternChannels();
     },
 
     setChannelSolo(ch: number, soloed: boolean): void {
       set((state) => {
+        // Exclusive solo: clear all other solos first (tracker convention)
+        state.channels.forEach((c, i) => {
+          if (i !== ch) c.soloed = false;
+        });
         state.channels[ch].soloed = soloed;
-        const isSoloing = state.channels.some((c) => c.soloed);
-        state.isSoloing = isSoloing;
+        state.isSoloing = soloed; // Only one can be soloed
       });
 
       // Recompute effective mutes for all channels based on solo state
@@ -588,6 +636,28 @@ export const useMixerStore = create<MixerStore>()(
       });
       forwardAllWasmChannelGains(channels, isSoloing);
       forwardReplayerMuteMask(channels, isSoloing);
+      syncMuteToPatternChannels();
+    },
+
+    resetMuteState(): void {
+      set((state) => {
+        state.channels.forEach((c) => {
+          c.muted = false;
+          c.soloed = false;
+        });
+        state.isSoloing = false;
+      });
+      // Apply to all engines
+      applyToEngine(() => {
+        const { channels } = get();
+        channels.forEach((_, i) => {
+          getToneEngine().setChannelMute(i, false);
+        });
+      });
+      const { channels, isSoloing } = get();
+      forwardAllWasmChannelGains(channels, isSoloing);
+      forwardReplayerMuteMask(channels, isSoloing);
+      syncMuteToPatternChannels();
     },
 
     setChannelEffect(ch: number, slot: 0 | 1, type: string | null): void {
