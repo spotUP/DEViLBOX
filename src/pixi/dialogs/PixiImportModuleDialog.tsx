@@ -115,6 +115,10 @@ function companionRelativeName(mainFile: File, companion: File): string {
     }
     return compParts.slice(common).join('/');
   }
+  // Only companion has relative path (e.g. auto-prompted Samples/ folder)
+  if (compRel && compRel.includes('/')) {
+    return compRel;
+  }
   return companion.name;
 }
 
