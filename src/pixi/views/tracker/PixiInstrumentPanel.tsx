@@ -180,8 +180,12 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   }, [maxScroll]);
 
   const previewTimeoutRef = useRef<number | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+  const isPreviewingRef = useRef(false);
+  const previewInfoRef = useRef<{ instId: number; note: string; inst: any } | null>(null);
 
-  const previewInstrument = useCallback(async (id: number) => {
+  // Start previewing (called after hold delay)
+  const startPreview = useCallback(async (id: number) => {
     const inst = useInstrumentStore.getState().getInstrument(id);
     if (!inst) return;
     try {
@@ -203,27 +207,50 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       const previewNote = isModSample ? (inst.sample?.baseNote || 'C3') : (isBass ? 'C3' : 'C4');
 
       engine.triggerNoteAttack(inst.id, previewNote, Tone.now(), 0.8, inst);
-
-      const isSampler = ['Sampler', 'Sam', 'Player', 'DrumKit'].includes(inst.synthType ?? '');
-      previewTimeoutRef.current = window.setTimeout(() => {
-        engine.triggerNoteRelease(inst.id, previewNote, Tone.now(), inst);
-      }, isSampler ? 300 : 800);
-    } catch {
-      // Preview failure is non-fatal
-    }
+      isPreviewingRef.current = true;
+      previewInfoRef.current = { instId: inst.id, note: previewNote, inst };
+    } catch { /* non-fatal */ }
   }, []);
 
-  const handleItemClick = useCallback((id: number) => {
+  // Stop the current preview
+  const stopPreview = useCallback(() => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (!isPreviewingRef.current || !previewInfoRef.current) return;
+    const info = previewInfoRef.current;
+    isPreviewingRef.current = false;
+    previewInfoRef.current = null;
+    try {
+      const engine = getToneEngine();
+      engine.triggerNoteRelease(info.instId, info.note, Tone.now(), info.inst);
+    } catch { /* non-fatal */ }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    if (previewTimeoutRef.current) window.clearTimeout(previewTimeoutRef.current);
+  }, []);
+
+  const handleItemPointerDown = useCallback((id: number) => {
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = window.setTimeout(() => startPreview(id), 200);
+    document.addEventListener('pointerup', () => stopPreview(), { once: true });
+  }, [startPreview, stopPreview]);
+
+  const handleItemPointerUp = useCallback((id: number) => {
+    stopPreview();
     const now = Date.now();
     if (lastClickRef.current.id === id && now - lastClickRef.current.time < 300) {
       useUIStore.getState().openModal('instruments');
       lastClickRef.current = { id: -1, time: 0 };
     } else {
       select(id);
-      previewInstrument(id);
       lastClickRef.current = { id, time: now };
     }
-  }, [select, previewInstrument]);
+  }, [select, stopPreview]);
 
   // Double-click on instrument name to start inline rename
   const handleNameClick = useCallback((id: number, name: string) => {
@@ -381,9 +408,10 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
               key={inst.id}
               eventMode="static"
               cursor="pointer"
-              onPointerUp={() => handleItemClick(inst.id)}
+              onPointerDown={() => handleItemPointerDown(inst.id)}
+              onPointerUp={() => handleItemPointerUp(inst.id)}
               onPointerEnter={() => setHoveredId(inst.id)}
-              onPointerLeave={() => setHoveredId((prev) => (prev === inst.id ? null : prev))}
+              onPointerLeave={() => { setHoveredId((prev) => (prev === inst.id ? null : prev)); stopPreview(); }}
               layout={{
                 position: 'absolute',
                 left: 0,

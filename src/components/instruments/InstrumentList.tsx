@@ -123,6 +123,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<number | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+  const isPreviewingRef = useRef(false);
+  const previewInfoRef = useRef<{ instId: number; note: string; inst: InstrumentConfig; type?: 'gt' } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const [showLoadModal, setShowLoadModal] = useState(false);
@@ -144,87 +147,56 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     }
   }, [currentInstrumentId]);
 
-  // Preview an instrument by playing a short note
-  const previewInstrument = useCallback(async (inst: InstrumentConfig) => {
-    if (!showPreviewOnClick) return;
-
+  // Start previewing an instrument (called after hold delay)
+  const startPreview = useCallback(async (inst: InstrumentConfig) => {
     try {
-      // Start audio context if needed
       await Tone.start();
-
-      // Wait for context to start (give it up to 500ms)
-      // This handles the case where the global click handler in App.tsx
-      // is still processing the same user interaction
       let attempts = 0;
-      const maxAttempts = 10;
-      while (Tone.context.state !== 'running' && attempts < maxAttempts) {
+      while (Tone.context.state !== 'running' && attempts < 10) {
         await new Promise(resolve => setTimeout(resolve, 50));
         attempts++;
       }
+      if (Tone.context.state !== 'running') return;
 
-      // If still not running after retries, silently bail out
-      // (This is expected on first page load - user just needs to click again)
-      if (Tone.context.state !== 'running') {
-        return;
-      }
-
-      // Clear any existing preview timeout
-      if (previewTimeoutRef.current) {
-        window.clearTimeout(previewTimeoutRef.current);
-      }
+      if (previewTimeoutRef.current) window.clearTimeout(previewTimeoutRef.current);
 
       const engine = getToneEngine();
-
-      // Ensure WASM synths are initialized before triggering
       await engine.ensureInstrumentReady(inst);
 
-      // For sample instruments, always use the baseNote for natural-pitch preview.
-      // Check both metadata.modPlayback and top-level modPlayback (OpenMPT puts it at top level).
       const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback
         || (inst as any).modPlayback?.usePeriodPlayback;
       const isSampleInst = inst.type === 'sample' || inst.synthType === 'Sampler' || inst.synthType === 'Player';
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
       const rawPreviewNote = (isSampleInst && inst.sample?.baseNote)
-        ? inst.sample.baseNote                // Always use the sample's natural pitch
+        ? inst.sample.baseNote
         : isModSample
           ? (inst.sample?.baseNote || 'C3')
           : (isBass ? 'C3' : 'C4');
-      // Strip dash from tracker-style notes (C-4 → C4) for Tone.js
       const previewNote = rawPreviewNote.replace('-', '');
-
       const now = Tone.now();
 
-      // Check if ToneEngine can create a playable instrument for this synth type.
-      // WASM-only types return null; empty Samplers (no sample data) can't produce sound.
-      // In both cases, fall back to a temporary oscillator for preview.
       const toneInst = engine.getInstrument(inst.id, inst);
       const isEmptySampler = toneInst && inst.synthType === 'Sampler' && !inst.sample?.url && !inst.sample?.audioBuffer;
 
-      // GT Ultra SID: play through the WASM SID engine using playtestnote
-      // (works even when song is stopped — initializes instrument tables properly)
+      // GT Ultra SID: hold-to-preview via WASM SID engine
       if (inst.synthType === 'GTUltraSynth') {
         const { useGTUltraStore } = await import('@stores/useGTUltraStore');
         const gtEngine = useGTUltraStore.getState().engine;
         if (gtEngine) {
           const gtInstIdx = Math.max(1, Math.min(63, inst.id));
-          gtEngine.playTestNote(0, 0x60 + 3 * 12, gtInstIdx); // FIRSTNOTE(0x60) + octave 3 = C-3
-          previewTimeoutRef.current = window.setTimeout(() => {
-            gtEngine.releaseTestNote(0);
-          }, 500);
+          gtEngine.playTestNote(0, 0x60 + 3 * 12, gtInstIdx);
+          isPreviewingRef.current = true;
+          previewInfoRef.current = { instId: inst.id, note: previewNote, inst, type: 'gt' };
         }
         return;
       }
 
-      // UADE: skip preview (no way to trigger individual instruments)
       if (inst.synthType === 'UADESynth') return;
 
       if (!toneInst || isEmptySampler) {
-        // Fallback: play a short oscillator tone for WASM-only instruments
+        // Fallback oscillator — self-timed (400ms)
         const wfMap: Record<string, OscillatorType> = {
-          StartrekkerAMSynth: 'sine',
-          C64SID: 'square',
-          Sc68Synth: 'square',
-          Sampler: 'triangle',  // empty Sampler fallback
+          StartrekkerAMSynth: 'sine', C64SID: 'square', Sc68Synth: 'square', Sampler: 'triangle',
         };
         const wf = wfMap[inst.synthType ?? ''] ?? 'triangle';
         const osc = new Tone.Oscillator(Tone.Frequency(previewNote).toFrequency(), wf).toDestination();
@@ -239,28 +211,59 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         return;
       }
 
+      // Main path: trigger attack, hold until mouseUp releases
       engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
-
-      // Samples play through immediately — 300ms is plenty.
-      // Synth instruments need more time to let the envelope breathe.
-      const isSampler = ['Sampler', 'Sam', 'Player', 'DrumKit'].includes(inst.synthType ?? '');
-      const holdMs = isSampler ? 300 : 800;
-
-      previewTimeoutRef.current = window.setTimeout(() => {
-        engine.triggerNoteRelease(inst.id, previewNote, Tone.now(), inst);
-      }, holdMs);
+      isPreviewingRef.current = true;
+      previewInfoRef.current = { instId: inst.id, note: previewNote, inst };
     } catch (error) {
       console.warn('[InstrumentList] Preview failed:', error);
     }
-  }, [showPreviewOnClick]);
+  }, []);
 
-  const handleSelect = (id: number, inst: InstrumentConfig) => {
+  // Stop the current preview (called on mouseUp / mouseLeave)
+  const stopPreview = useCallback(() => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (!isPreviewingRef.current || !previewInfoRef.current) return;
+    const info = previewInfoRef.current;
+    isPreviewingRef.current = false;
+    previewInfoRef.current = null;
+    try {
+      if (info.type === 'gt') {
+        import('@stores/useGTUltraStore').then(({ useGTUltraStore }) => {
+          useGTUltraStore.getState().engine?.releaseTestNote(0);
+        });
+      } else {
+        const engine = getToneEngine();
+        engine.triggerNoteRelease(info.instId, info.note, Tone.now(), info.inst);
+      }
+    } catch { /* non-fatal */ }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    if (previewTimeoutRef.current) window.clearTimeout(previewTimeoutRef.current);
+  }, []);
+
+  const handleSelect = (id: number, _inst: InstrumentConfig) => {
     setCurrentInstrument(id);
     onInstrumentChange?.(id);
-    if (showPreviewOnClick) {
-      previewInstrument(inst);
-    }
   };
+
+  // Hold-to-preview: mouseDown starts a timer, mouseUp releases
+  const handlePreviewDown = useCallback((inst: InstrumentConfig) => {
+    if (!showPreviewOnClick) return;
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = window.setTimeout(() => startPreview(inst), 200);
+    document.addEventListener('mouseup', () => stopPreview(), { once: true });
+  }, [showPreviewOnClick, startPreview, stopPreview]);
+
+  const handlePreviewUp = useCallback(() => {
+    stopPreview();
+  }, [stopPreview]);
 
   const handleAdd = () => {
     setShowNewInstrumentBrowser(true);
@@ -580,6 +583,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 key={instrument.id}
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                onMouseDown={() => handlePreviewDown(instrument)}
+                onMouseUp={handlePreviewUp}
+                onMouseLeave={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
@@ -722,6 +728,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               <div
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                onMouseDown={() => handlePreviewDown(instrument)}
+                onMouseUp={handlePreviewUp}
+                onMouseLeave={handlePreviewUp}
                 draggable="true"
                 onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
