@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-09T09:27:41.553Z
+ * Generated: 2026-04-09T15:51:48.760Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4619';
-export const BUILD_NUMBER = '4619';
-export const BUILD_HASH = '904714419';
+export const BUILD_VERSION = '1.0.4676';
+export const BUILD_NUMBER = '4676';
+export const BUILD_HASH = '335a7f7ac';
 export const BUILD_DATE = '2026-04-09';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,26 +30,200 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4619',
+    version: '1.0.4676',
     date: '2026-04-09',
     changes: [
       {
         type: 'fix',
-        "description": "Fix ghosted rate knobs + robust mute forwarding for WASM engines"
+        "description": "Remove visual mode badge from pattern editor, fix bg bleeding into headers"
+      },
+      {
+        type: 'fix',
+        "description": "Fix instrument list action icon colors when selected"
       },
       {
         type: 'improvement',
-        "description": "Chore: update format tracker (revert stale retest entries)"
-      }
-    ]
-  },
-  {
-    version: '2026-04-08',
-    date: '2026-04-08',
-    changes: [
+        "description": "Chore: gitignore AdPlug extracted source directories"
+      },
+      {
+        type: 'feature',
+        "description": "Compile AdPlug C++ library to WASM for 50+ OPL/AdLib format support"
+      },
       {
         type: 'improvement',
-        "description": "Chore: update format audit state (packed formats + missing formats)"
+        "description": "Unify all toolbar button fonts to 10px mono"
+      },
+      {
+        type: 'fix',
+        "description": "Unify button font sizes — all variants use 10px mono font"
+      },
+      {
+        type: 'fix',
+        "description": "View selector in nav header uses default CustomSelect styling"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent text wrapping in dropdown buttons and menu items"
+      },
+      {
+        type: 'feature',
+        "description": "Format tracker auto-collapses finished categories with ✓ done badge"
+      },
+      {
+        type: 'fix',
+        "description": "FM Tracker (.fmt) always uses native parser — UADE can't play PC OPL formats"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate remaining selects to CustomSelect"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate instrument editor/shared selects to CustomSelect"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate instrument control selects to CustomSelect"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate dialog selects to CustomSelect"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate piano roll, grid, and DJ selects to CustomSelect"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate toolbar/nav/controls selects to CustomSelect"
+      },
+      {
+        type: 'feature',
+        "description": "Add CustomSelect component and extend DropdownButton with style prop"
+      },
+      {
+        type: 'fix',
+        "description": "Route 8 missing chip-dump formats to native parsers + fix VGZ gzip"
+      },
+      {
+        type: 'fix',
+        "description": "Dropdown menu uses text-xs font-mono to match toolbar buttons"
+      },
+      {
+        type: 'fix',
+        "description": "Dropdown menu items don't wrap text — use w-max + whitespace-nowrap"
+      },
+      {
+        type: 'improvement',
+        "description": "Hardware selector uses custom DropdownButton instead of native select"
+      },
+      {
+        type: 'fix',
+        "description": "More right space after dropdown arrow (40→48px total extra)"
+      },
+      {
+        type: 'fix',
+        "description": "Dropdown sizes to selected text only, not widest option"
+      },
+      {
+        type: 'fix',
+        "description": "Dropdown auto-size uses browser's natural width + 8px right breathing room"
+      },
+      {
+        type: 'fix',
+        "description": "Right padding after dropdown arrow on hardware selector"
+      },
+      {
+        type: 'fix',
+        "description": "Add right padding after dropdown arrow in hardware selector"
+      },
+      {
+        type: 'fix',
+        "description": "Hardware selector auto-sizes width to fit selected option text"
+      },
+      {
+        type: 'fix',
+        "description": "Recategorize 8 formats from chip-dump to pc-tracker"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove 34 fake *_test format files"
+      },
+      {
+        type: 'fix',
+        "description": "Hardware selector shows selected preset instead of reverting to SELECT HARDWARE"
+      },
+      {
+        type: 'feature',
+        "description": "Hardware selector shows current format — tracker name + platform"
+      },
+      {
+        type: 'feature',
+        "description": "Tabs show full song names and are editable via double-click"
+      },
+      {
+        type: 'feature',
+        "description": "Save master FX to playlists — auto-save and apply on Auto DJ start"
+      },
+      {
+        type: 'fix',
+        "description": "Clip toolbar horizontal overflow so buttons don't leak over pattern editor"
+      },
+      {
+        type: 'fix',
+        "description": "Visualizer gets explicit 68px height to break 100% chain"
+      },
+      {
+        type: 'fix',
+        "description": "Visualizer stretches to toolbar height instead of collapsing"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update format tracker notes for fail/unknown entries"
+      },
+      {
+        type: 'fix',
+        "description": "Playback buttons wrap below inputs on narrow windows"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update UADE.js glue from WASM rebuild"
+      },
+      {
+        type: 'fix',
+        "description": "FT2 toolbar responsive — sections wrap instead of overflowing"
+      },
+      {
+        type: 'fix',
+        "description": "Remove verbose UADE file-lookup logging from WASM"
+      },
+      {
+        type: 'fix',
+        "description": "FT2 toolbar visualizer clipped to black line"
+      },
+      {
+        type: 'feature',
+        "description": "Pattern editor drag-to-select auto-scrolls at edges"
+      },
+      {
+        type: 'feature',
+        "description": "Auto-prompt Samples/ folder for ZoundMonitor .sng imports"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing useClickOutside hook and structuredClone polyfill"
+      },
+      {
+        type: 'fix',
+        "description": "Preserve Samples/ subdirectory paths for companion files"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: update format tracker — Zound Monitor fixed"
+      },
+      {
+        type: 'fix',
+        "description": "IO808 noise buffer uses context sample rate + reliable trigger"
       },
       {
         type: 'improvement',
@@ -57,187 +231,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         type: 'fix',
-        "description": "Fix visualizer overlapping play buttons on narrow windows"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add packed format audit script (38 PTK-Prowiz formats)"
-      },
-      {
-        type: 'fix',
-        "description": "Auto-detect and inflate gzip-compressed module files"
-      },
-      {
-        type: 'fix',
-        "description": "Recognize UADE-only extensions in isSupportedFormat"
-      },
-      {
-        type: 'fix',
-        "description": "Fix VisualBgCycler hidden behind channel headers"
-      },
-      {
-        type: 'fix',
-        "description": "Add PTK-Prowiz packed format prefixes to UADE routing"
-      },
-      {
-        type: 'feature',
-        "description": "Add GL EQ editors with sliders + frequency response curves"
-      },
-      {
-        type: 'fix',
-        "description": "Add oscilloscope visualizers to all remaining editors + fix export warning freeze"
-      },
-      {
-        type: 'feature',
-        "description": "Replace EQ knobs with sliders + add frequency response curve visualization"
-      },
-      {
-        type: 'feature',
-        "description": "Add BPM sync for 10 effects + DJ FX pad system with 20 performance effects"
-      },
-      {
-        type: 'fix',
-        "description": "Fix sidechain effects routing, gate audio kill, compressor rewrite, GEQ31 layout"
-      },
-      {
-        type: 'fix',
-        "description": "Route Pumatracker to OpenMPT WASM (UADE can't play .puma)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix EQ parameter routing, oversample mapping, PhonoFilter 4-curve support"
-      },
-      {
-        type: 'fix',
-        "description": "PC tracker export + DMF routing + OpenMPT WASM fallback"
-      },
-      {
-        type: 'feature',
-        "description": "Add PC tracker format audit (23 formats, 12 PASS)"
-      },
-      {
-        type: 'fix',
-        "description": "Enable tick snapshots during short scan"
-      },
-      {
-        type: 'fix',
-        "description": "Fix short-scan: full WASM reinit after scan + tick snapshot passthrough"
-      },
-      {
-        type: 'feature',
-        "description": "Reapply \"Implement short-scan mode for compiled 68k replayers (Phase 1)\""
-      },
-      {
-        type: 'feature',
-        "description": "Revert \"Implement short-scan mode for compiled 68k replayers (Phase 1)\""
-      },
-      {
-        type: 'feature',
-        "description": "Implement short-scan mode for compiled 68k replayers (Phase 1)"
-      },
-      {
-        type: 'fix',
-        "description": "Remove extra vertical padding from FT2 toolbar button row"
-      },
-      {
-        type: 'fix',
-        "description": "Infinite render loop in sidechain editors (useShallow for array selectors)"
-      },
-      {
-        type: 'feature',
-        "description": "Add jpn/jp/jpnd (JasonPage) to SKIP_SCAN and FORCE_CLASSIC"
-      },
-      {
-        type: 'fix',
-        "description": "Use string size prop for Knob in EQ editors"
-      },
-      {
-        type: 'feature',
-        "description": "Add sjs (SoundPlayer) to SKIP_SCAN and FORCE_CLASSIC lists"
-      },
-      {
-        type: 'fix',
-        "description": "Register companion files in UADESynth.setInstrument() before load"
-      },
-      {
-        type: 'feature',
-        "description": "Add missing controls to 7 effect editors found by audit"
-      },
-      {
-        type: 'fix',
-        "description": "Add sb/ps/sng to FORCE_CLASSIC lists for defense-in-depth"
-      },
-      {
-        type: 'feature',
-        "description": "Add sidechain source channel selector to SidechainCompressor editor"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add crashing formats to audit skip list to prevent cascade failures"
-      },
-      {
-        type: 'fix',
-        "description": "Inject UADESynth stub instrument for injectUADE parsers with 0 instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Add sb/ps/sng to SKIP_SCAN lists to prevent browser crashes during scan"
-      },
-      {
-        type: 'feature',
-        "description": "Add waveform selectors, BPM sync, and mode controls to effect editors"
-      },
-      {
-        type: 'fix',
-        "description": "Fix audio measurement + audit resilience: all 132 effects pass audio"
-      },
-      {
-        type: 'feature',
-        "description": "Comprehensive two-file format companion detection"
-      },
-      {
-        type: 'fix',
-        "description": "Route SynthPack through withNativeThenUADE for companion file support"
-      },
-      {
-        type: 'fix',
-        "description": "Propagate UADE companion files through store for two-file format playback"
-      },
-      {
-        type: 'fix',
-        "description": "Fix connect-first pattern in all 67 WASM effects + update audit script"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: update UADE audit skip list with newly passing formats"
-      },
-      {
-        type: 'feature',
-        "description": "Add 66 custom hardware-style editors for Zynthian WASM effects + audit tool"
-      },
-      {
-        type: 'fix',
-        "description": "Export fallback for libopenmptFileData + Quartet two-file companion support"
-      },
-      {
-        type: 'fix',
-        "description": "Add libopenmptFileData to ALL native parsers for OpenMPT-supported formats"
-      },
-      {
-        type: 'feature',
-        "description": "Add 72 Zynthian-ported effects to UI dropdown"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent SpaceyDelayer/RETapeEcho + JCReverb replacement"
-      },
-      {
-        type: 'fix',
-        "description": "UADE two-file formats, crash-prone scan skips, Quartet 4v ext"
-      },
-      {
-        type: 'fix',
-        "description": "Suppress WAM plugin SortableJS clone errors in global handler"
+        "description": "Drum machine instrument creation + mixer panel + arrangement view"
       }
     ]
   }

@@ -28,21 +28,21 @@ import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisu
 
 type VizMode =
   // GPU-native modes
-  'jingle' | 'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner' |
+  'jingle' | 'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner' |
   // DOM-canvas modes (rendered via PixiDOMOverlay)
   'circular' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' |
   // AudioMotion modes (rendered via PixiDOMOverlay + AudioMotionVisualizer)
-  'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amOctave' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
+  'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
 
 const VIZ_MODES: VizMode[] = [
-  'waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels', 'particles',
+  'waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels',
   // Note: 'jingle' is not in the cycle — it is set programmatically when jingle plays
   'mirror', 'radial', 'energy', 'logo', 'banner',
   'circular', 'sineScroll', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular',
   'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar',
   'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo',
   'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel',
-  'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
+  'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
   'amLinear', 'amAWeight', 'amLumiMirror',
   'chanNibbles', // last slot — easter egg
 ];
@@ -51,7 +51,7 @@ const VIZ_MODE_LABELS: Record<VizMode, string> = {
   jingle: 'JINGLE',
   waveform: 'WAVE',      spectrum: 'SPECTRUM',  vectorscope: 'SCOPE',
   channels: 'CH-OSC',   stereo: 'STEREO',      freqbars: 'BARS',
-  levels: 'LEVELS',     particles: 'PARTICLES', mirror: 'MIRROR',
+  levels: 'LEVELS',     mirror: 'MIRROR',
   radial: 'RADIAL',     energy: 'ENERGY',       logo: 'LOGO',
   banner: 'BANNER',     circular: 'CIRCULAR',   sineScroll: 'SINE',
   chanWaves: 'CH-WAVE', chanActivity: 'CH-ACT', chanSpectrum: 'CH-SPEC',
@@ -61,7 +61,7 @@ const VIZ_MODE_LABELS: Record<VizMode, string> = {
   amRadial: 'AM-RADIAL', amGraph: 'AM-GRAPH',   amRadialGraph: 'AM-RGRAPH',
   amDualStereo: 'AM-DUAL', amLumi: 'AM-LUMI',   amAlpha: 'AM-ALPHA',
   amOutline: 'AM-OUT',  amDualV: 'AM-DUALV',    amDualOverlay: 'AM-OVL',
-  amBark: 'AM-BARK',    amMel: 'AM-MEL',         amOctave: 'AM-OCT',
+  amBark: 'AM-BARK',    amMel: 'AM-MEL',
   amNotes: 'AM-NOTES',  amMirrorReflex: 'AM-MRF', amRadialInvert: 'AM-RINV',
   amRadialLED: 'AM-RLED', amLinear: 'AM-LIN',   amAWeight: 'AM-AWT',
   amLumiMirror: 'AM-LMR',
@@ -73,7 +73,7 @@ const DOM_MODES = new Set<VizMode>([
   'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll',
   'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo',
   'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel',
-  'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
+  'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
   'amLinear', 'amAWeight', 'amLumiMirror',
 ]);
 
@@ -83,7 +83,7 @@ const AUDIOMOTION_PRESET_MAP: Partial<Record<VizMode, string>> = {
   amRadial: 'radialSpectrum', amGraph: 'graphLine',  amRadialGraph: 'radialGraph',
   amDualStereo: 'dualStereo', amLumi: 'lumiBars',    amAlpha: 'alphaBars',
   amOutline: 'outlineBars', amDualV: 'dualVertical', amDualOverlay: 'dualOverlay',
-  amBark: 'barkSpectrum',  amMel: 'melGraph',        amOctave: 'octaveBands',
+  amBark: 'barkSpectrum',  amMel: 'melGraph',
   amNotes: 'noteLabels',   amMirrorReflex: 'mirrorReflex', amRadialInvert: 'radialInvert',
   amRadialLED: 'radialLED', amLinear: 'linearBars',  amAWeight: 'aWeighted',
   amLumiMirror: 'lumiMirror',
@@ -146,7 +146,6 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
   const [mode, setMode] = useState<VizMode>('waveform');
   const graphicsRef = useRef<GraphicsType | null>(null);
   const peakHoldsRef = useRef(new Float32Array(64));
-  const particlesRef = useRef<ParticleState[]>([]);
   const jingleAnimRef = useRef<JingleAnimState>({ startTime: 0, lastBeatTime: 0, beatFlash: 0, beatCount: 0, typedChars: 0, glitchFrames: 0 });
   const isPlaying = useTransportStore(s => s.isPlaying);
   const jingleActive = useUIStore(s => s.jingleActive);
@@ -230,9 +229,6 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
             break;
           case 'levels':
             drawChannelLevels(g, engine.getWaveform(), width, height, theme);
-            break;
-          case 'particles':
-            drawParticles(g, engine.getWaveform(), width, height, theme, particlesRef.current);
             break;
           case 'mirror':
             drawMirrorWave(g, engine.getWaveform(), width, height, theme);
@@ -491,11 +487,6 @@ function drawVectorscope(g: GraphicsType, data: Float32Array, w: number, h: numb
 
 // ─── Extended visualizer modes ──────────────────────────────────────────────
 
-interface ParticleState {
-  x: number; y: number;
-  vx: number; vy: number;
-}
-
 function drawChannelOscilloscopes(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
   if (!data || data.length === 0) return;
   const channelCount = 4;
@@ -645,62 +636,6 @@ function drawChannelLevels(g: GraphicsType, data: Float32Array, w: number, h: nu
     const barW = level * drawW;
     g.rect(padX, y, barW, barH);
     g.fill({ color: bandColors[band], alpha: 0.7 });
-  }
-}
-
-function drawParticles(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme, particles: ParticleState[]) {
-  // Initialize particles on first call
-  if (particles.length === 0) {
-    for (let i = 0; i < 60; i++) {
-      particles.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-      });
-    }
-  }
-
-  // Audio energy from waveform
-  let energy = 0;
-  let peak = 0;
-  if (data && data.length > 0) {
-    for (let i = 0; i < Math.min(256, data.length); i++) {
-      const a = Math.abs(data[i] ?? 0);
-      energy += a;
-      if (a > peak) peak = a;
-    }
-    energy = energy / Math.min(256, data.length);
-  }
-
-  const cx = w / 2;
-  const cy = h / 2;
-  const force = energy * 12;
-
-  for (const p of particles) {
-    // Center attraction
-    const dx = cx - p.x;
-    const dy = cy - p.y;
-    const dist = Math.sqrt(dx * dx + dy * dy) + 1;
-    p.vx += (dx / dist) * 0.003 + (Math.random() - 0.5) * force;
-    p.vy += (dy / dist) * 0.003 + (Math.random() - 0.5) * force;
-
-    p.vx *= 0.96;
-    p.vy *= 0.96;
-    p.x += p.vx;
-    p.y += p.vy;
-
-    // Wrap
-    if (p.x < 0) p.x = w;
-    if (p.x > w) p.x = 0;
-    if (p.y < 0) p.y = h;
-    if (p.y > h) p.y = 0;
-
-    const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-    const alpha = 0.4 + Math.min(0.6, speed * 0.4);
-    const size = 1.5 + energy * 4 + speed * 0.3;
-    g.circle(p.x, p.y, size);
-    g.fill({ color: theme.accent.color, alpha });
   }
 }
 
