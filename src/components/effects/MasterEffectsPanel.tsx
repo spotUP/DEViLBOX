@@ -29,8 +29,22 @@ import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { VisualEffectEditorWrapper, ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 
-// Dynamics effects have no wet/dry mixing — default to 100 to avoid misleading UI
-const DYNAMICS_EFFECTS = new Set<string>(['Compressor', 'EQ3']);
+// Effects that should default to 100% wet (dynamics processors, EQ, filters).
+// At 50% wet, subtle dynamics effects are inaudible.
+const FULL_WET_EFFECTS = new Set<string>([
+  'Compressor', 'EQ3',
+  // All WASM dynamics
+  'Maximizer', 'Limiter', 'MonoComp', 'Expander', 'Clipper', 'NoiseGate',
+  'GOTTComp', 'MultibandComp', 'MultibandClipper', 'MultibandExpander',
+  'MultibandDynamics', 'MultibandGate', 'MultibandLimiter', 'X42Comp',
+  'AGC', 'Panda', 'BeatBreather', 'Ducka', 'TransientDesigner', 'DeEsser',
+  // Filters & EQ
+  'MoogFilter', 'AutoFilter', 'Filter',
+  'EQ5Band', 'EQ8Band', 'EQ12Band', 'ParametricEQ', 'GEQ31', 'DynamicEQ',
+  'PhonoFilter', 'Kuiza',
+  // Other effects that sound wrong at 50%
+  'AutoTune', 'Vocoder',
+]);
 
 interface SortableVisualEffectProps {
   effect: EffectConfig;
@@ -269,7 +283,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       }
     }
 
-    const defaultWet = DYNAMICS_EFFECTS.has(type) ? 100 : 50;
+    const defaultWet = FULL_WET_EFFECTS.has(type) ? 100 : 50;
 
     addMasterEffectConfig({
       category: availableEffect.category,

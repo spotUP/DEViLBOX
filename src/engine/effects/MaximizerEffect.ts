@@ -133,7 +133,7 @@ export class MaximizerEffect extends Tone.ToneAudioNode {
     }
   }
 
-  setCeiling(v: number): void { this._ceiling = Math.max(-6.0, Math.min(0.0, v)); this.sendParam('ceiling', this._ceiling); }
+  setCeiling(v: number): void { this._ceiling = Math.max(-24.0, Math.min(0.0, v)); this.sendParam('ceiling', this._ceiling); }
   setRelease(v: number): void { this._release = Math.max(1.0, Math.min(500.0, v)); this.sendParam('release', this._release); }
   setMix(v: number): void { this._mix = Math.max(0.0, Math.min(1.0, v)); this.sendParam('mix', this._mix); }
 
