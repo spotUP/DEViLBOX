@@ -26,8 +26,11 @@ export class AdPlugPlayer {
   public meta: AdPlugMetadata | null = null;
   public playing = false;
 
-  /** Position callback — called ~15fps from the worklet with (order, row). */
-  public onPosition: ((order: number, row: number) => void) | null = null;
+  /** Position callback — called ~47fps from the worklet with (order, row, audioTime, totalFrames). */
+  public onPosition: ((order: number, row: number, audioTime?: number, totalFrames?: number) => void) | null = null;
+
+  /** Per-channel level callback — called ~47fps with float array (0-1 per channel). */
+  public onChannelLevels: ((levels: Float32Array) => void) | null = null;
 
   /** Called when the song ends (all patterns played). */
   public onEnded: (() => void) | null = null;
@@ -151,7 +154,15 @@ export class AdPlugPlayer {
         console.log(`[AdPlugPlayer] Loaded: "${data.title}" (${data.formatType}), ${data.subsongs} subsong(s), ${data.instruments.length} instruments`);
         break;
       case 'position':
-        this.onPosition?.(data.order, data.row);
+        this.onPosition?.(data.order, data.row, data.audioTime, data.totalFrames);
+        if (data.channelLevels) {
+          this.onChannelLevels?.(data.channelLevels);
+        }
+        break;
+      case 'levels':
+        if (data.channelLevels) {
+          this.onChannelLevels?.(data.channelLevels);
+        }
         break;
       case 'ended':
         this.playing = false;
@@ -232,6 +243,17 @@ export class AdPlugPlayer {
 
   setVolume(vol: number) {
     if (this.gain) this.gain.gain.value = Math.max(0, Math.min(1, vol));
+  }
+
+  /**
+   * Set per-channel mute mask for live streaming playback.
+   * Bit N = 1 means channel N is ACTIVE; bit N = 0 = muted.
+   * Channels 0-8 = OPL chip 0. Default: 0x1FF (all 9 active).
+   */
+  setMuteMask(mask: number) {
+    if (this.processNode) {
+      this.processNode.port.postMessage({ type: 'setMuteMask', mask: mask >>> 0 });
+    }
   }
 
   destroy() {
