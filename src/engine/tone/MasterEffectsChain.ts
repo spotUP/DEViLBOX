@@ -141,9 +141,9 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     // Fallback: bypass effects entirely
     ctx.masterEffectsInput.connect(ctx.blepInput);
   }
-  // Debug: Success
-  // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
-  //   ctx.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
+  // Debug: log chain for diagnosing "effect does nothing" issues
+  console.log('[MasterEffectsChain] ⚡ Chain connected:', successConfigs.map(c => c.type).join(' → '),
+    '| nodes:', chainNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
 
   // Create pre/post AnalyserNode taps for each effect (side-branch, non-destructive)
   const rawCtx = Tone.getContext().rawContext as AudioContext;

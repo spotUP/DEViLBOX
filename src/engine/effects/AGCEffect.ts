@@ -61,36 +61,41 @@ export class AGCEffect extends Tone.ToneAudioNode {
   private async _initWorklet(): Promise<void> {
     try {
       const rawCtx = Tone.getContext().rawContext as AudioContext;
+      console.log('[AGC] ⚡ _initWorklet starting');
       await AGCEffect.ensureInitialized(rawCtx);
+      console.log('[AGC] ⚡ ensureInitialized done, wasmBinary:', !!AGCEffect.wasmBinary, 'jsCode:', !!AGCEffect.jsCode);
 
       this.workletNode = new AudioWorkletNode(rawCtx, 'agc-processor', {
         numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
       });
+      console.log('[AGC] ⚡ AudioWorkletNode created, sending init message');
 
       this.workletNode.port.onmessage = (e) => {
         if (e.data.type === 'ready') {
+          console.log('[AGC] ⚡ WASM ready! Connecting worklet to audio chain');
           this.isWasmReady = true;
           for (const p of this.pendingParams) {
             this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
           }
           this.pendingParams = [];
-          // Connect WASM first, then disconnect passthrough (avoids silent gap)
           try {
             const rawInput = getNativeAudioNode(this._input)!;
             const rawWet = getNativeAudioNode(this.wetGain)!;
+            console.log('[AGC] ⚡ rawInput:', !!rawInput, 'rawWet:', !!rawWet);
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            // Now safe to disconnect passthrough
             try { this._input.disconnect(this.wetGain); } catch { /* */ }
-            // Keepalive: ensure Chrome schedules the worklet
-            const rawCtx = Tone.getContext().rawContext as AudioContext;
-            const keepalive = rawCtx.createGain();
+            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;
             this.workletNode!.connect(keepalive);
-            keepalive.connect(rawCtx.destination);
+            keepalive.connect(rawCtx2.destination);
+            console.log('[AGC] ⚡ WASM swap complete — effect should be active!');
           } catch (swapErr) {
-            console.warn('[AGC] WASM swap failed, staying on passthrough:', swapErr);
+            console.error('[AGC] WASM swap failed, staying on passthrough:', swapErr);
           }
+        } else if (e.data.type === 'error') {
+          console.error('[AGC] WASM worklet error:', e.data.error);
         }
       };
 
