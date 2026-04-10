@@ -17,9 +17,6 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     this.lastReportedOrder = -1;
     this.lastReportedRow = -1;
     this.totalFramesRendered = 0;
-    this.startTime = -1; // set on first process() call
-    this.lastRowChangeFrame = 0; // frame count at last row change
-    this.measuredRowDuration = 0; // seconds between row changes
     this.sampleRate = 48000; // overridden in initModule
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
@@ -124,9 +121,6 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       if (result === 0) {
         this.playing = autoPlay;
         this.totalFramesRendered = 0;
-        this.startTime = -1;
-        this.lastRowChangeFrame = 0;
-        this.measuredRowDuration = 0;
         this.lastReportedOrder = -1;
         this.lastReportedRow = -1;
         this.positionReportCounter = 0;
@@ -189,20 +183,62 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       right[i] = heap16[baseIdx + i * 2 + 1] / 32768.0;
     }
 
-    // Report position ~47 times per second (48000/128 = 375 callbacks/sec, 375/8 ≈ 47)
+    // Track total frames for VU meter throttling
     this.totalFramesRendered += numFrames;
 
-    // Capture start time on first process() call for sample-accurate timing
-    if (this.startTime < 0) {
-      this.startTime = currentTime;
+    // Check position EVERY process() call (like libopenmpt) — reduces detection
+    // jitter from 21ms (8-tick window) to 2.67ms (single 128-frame quantum).
+    const order = this.module._adplug_get_position();
+    const row = this.module._adplug_get_row();
+
+    if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
+      this.lastReportedOrder = order;
+      this.lastReportedRow = row;
+
+      // Read per-channel note/inst/vol/effect state from WASM
+      let channelNotes = null;
+      try {
+        if (this.module._adplug_get_channel_state_ptr) {
+          const statePtr = this.module._adplug_get_channel_state_ptr();
+          const stride = this.module._adplug_get_channel_state_stride
+            ? this.module._adplug_get_channel_state_stride()
+            : 6;
+          const numCh = this.module._adplug_get_num_audio_channels
+            ? this.module._adplug_get_num_audio_channels()
+            : 9;
+          const heap = this.module.HEAPU8;
+          channelNotes = [];
+          for (let i = 0; i < numCh; i++) {
+            const base = statePtr + i * stride;
+            const note = heap[base];
+            const inst = heap[base + 1];
+            const vol = heap[base + 2];
+            const effTyp = heap[base + 3];
+            const eff = heap[base + 4];
+            const trigger = heap[base + 5];
+            if (note > 0 || trigger) {
+              channelNotes.push({ ch: i, note, inst, vol, effTyp, eff, trigger });
+            }
+          }
+          if (channelNotes.length === 0) channelNotes = null;
+        }
+      } catch (e) {
+        // Ignore — WASM memory may have grown/detached
+      }
+
+      this.port.postMessage({
+        type: 'position',
+        order,
+        row,
+        audioTime: currentTime,
+        totalFrames: this.totalFramesRendered,
+        channelNotes,
+      });
     }
 
+    // Throttle VU meters to ~47fps (every 8th call) — they don't need per-call updates
     if (++this.positionReportCounter >= 8) {
       this.positionReportCounter = 0;
-      const order = this.module._adplug_get_position();
-      const row = this.module._adplug_get_row();
-
-      // Read per-channel levels from WASM (18 floats)
       let channelLevels = null;
       try {
         if (this.module._adplug_get_channel_levels) {
@@ -211,7 +247,6 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
             const numCh = this.module._adplug_get_num_audio_channels
               ? this.module._adplug_get_num_audio_channels()
               : 9;
-            // Use DataView on WASM memory to read floats (HEAPF32 not on Module)
             const dv = new DataView(this.module.HEAPU8.buffer);
             channelLevels = new Float32Array(numCh);
             for (let i = 0; i < numCh; i++) {
@@ -222,73 +257,8 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       } catch (e) {
         // Ignore — WASM memory may have grown/detached
       }
-
-      if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
-        // Measure row duration from actual sample count delta
-        const frameDelta = this.totalFramesRendered - this.lastRowChangeFrame;
-        if (this.lastRowChangeFrame > 0 && frameDelta > 0) {
-          this.measuredRowDuration = frameDelta / this.sampleRate;
-        } else {
-          // First row change — estimate from refresh rate and speed
-          const refresh = this.module._adplug_get_refresh
-            ? this.module._adplug_get_refresh()
-            : 70.0;
-          const speed = this.module._adplug_get_speed
-            ? this.module._adplug_get_speed()
-            : 6;
-          this.measuredRowDuration = (refresh > 0 && speed > 0) ? speed / refresh : 0.085;
-        }
-        this.lastRowChangeFrame = this.totalFramesRendered;
-        this.lastReportedOrder = order;
-        this.lastReportedRow = row;
-
-        // Read per-channel note/inst/vol/effect state from WASM
-        let channelNotes = null;
-        try {
-          if (this.module._adplug_get_channel_state_ptr) {
-            const statePtr = this.module._adplug_get_channel_state_ptr();
-            const stride = this.module._adplug_get_channel_state_stride
-              ? this.module._adplug_get_channel_state_stride()
-              : 6;
-            const numCh = this.module._adplug_get_num_audio_channels
-              ? this.module._adplug_get_num_audio_channels()
-              : 9;
-            const heap = this.module.HEAPU8;
-            channelNotes = [];
-            for (let i = 0; i < numCh; i++) {
-              const base = statePtr + i * stride;
-              const note = heap[base];
-              const inst = heap[base + 1];
-              const vol = heap[base + 2];
-              const effTyp = heap[base + 3];
-              const eff = heap[base + 4];
-              const trigger = heap[base + 5];
-              if (note > 0 || trigger) {
-                channelNotes.push({ ch: i, note, inst, vol, effTyp, eff, trigger });
-              }
-            }
-            if (channelNotes.length === 0) channelNotes = null;
-          }
-        } catch (e) {
-          // Ignore — WASM memory may have grown/detached
-        }
-
-        this.port.postMessage({
-          type: 'position',
-          order,
-          row,
-          audioTime: currentTime,
-          totalFrames: this.totalFramesRendered,
-          rowDuration: this.measuredRowDuration,
-          channelLevels,
-          channelNotes,
-        });
-      } else if (channelLevels) {
-        // Even if position didn't change, send levels for VU meters
-        this.port.postMessage({
-          type: 'levels',
-          channelLevels,
-        });
+      if (channelLevels) {
+        this.port.postMessage({ type: 'levels', channelLevels });
       }
     }
 
