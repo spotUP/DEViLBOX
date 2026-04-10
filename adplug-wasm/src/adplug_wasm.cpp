@@ -466,8 +466,9 @@ public:
 };
 
 // Muting OPL wrapper — used during streaming playback.
-// Intercepts register writes and suppresses key-on + forces max attenuation
-// for muted channels. Also tracks shadow registers for level metering.
+// Intercepts register writes to:
+//   1. Track shadow registers for per-channel level metering
+//   2. Suppress key-on + force max attenuation for muted channels
 class CMutingOpl : public Copl {
 public:
     CEmuopl* realOpl;
@@ -478,53 +479,28 @@ public:
 
     void write(int reg, int val) override {
         int chip = currChip;
-        // Track shadow registers for all writes
-        if (chip >= 0 && chip <= 1)
+
+        // Track shadow registers for level metering
+        if (chip >= 0 && chip <= 1) {
             g_oplRegs[chip][reg & 0xFF] = (uint8_t)val;
-
-        // Track key-on state
-        if (reg >= 0xB0 && reg <= 0xB8) {
-            int ch = reg - 0xB0;
-            if (chip >= 0 && chip <= 1)
-                g_oplKeyOn[chip][ch] = (val & 0x20) != 0;
-        }
-
-        // Check if this register belongs to a muted channel
-        int ch = -1;
-        if (reg >= 0xA0 && reg <= 0xA8) ch = reg - 0xA0;       // freq LSB
-        else if (reg >= 0xB0 && reg <= 0xB8) ch = reg - 0xB0;   // freq MSB + key-on
-        else if (reg >= 0xC0 && reg <= 0xC8) ch = reg - 0xC0;   // feedback/connection
-        else {
-            // Operator registers: map offset to channel
-            int off = reg & 0x1F;
-            for (int c = 0; c < 9; c++) {
-                if (OPL_OP_OFFSETS[c][0] == off || OPL_OP_OFFSETS[c][1] == off) {
-                    int base = reg & 0xE0;
-                    if (base == 0x20 || base == 0x40 || base == 0x60 || base == 0x80 || base == 0xE0) {
-                        ch = c;
-                    }
-                    break;
-                }
+            // Track key-on state
+            if (reg >= 0xB0 && reg <= 0xB8) {
+                g_oplKeyOn[chip][reg - 0xB0] = (val & 0x20) != 0;
             }
         }
 
-        if (ch >= 0 && ch < 9) {
-            int globalCh = chip * 9 + ch;
-            if (!(g_channelMuteMask & (1u << globalCh))) {
-                // Channel is muted
-                if (reg >= 0xB0 && reg <= 0xB8) {
-                    // Strip key-on bit
-                    val &= ~0x20;
-                }
-                // For TL registers (0x40-0x55), force max attenuation
-                int base = reg & 0xE0;
-                int off = reg & 0x1F;
-                if (base == 0x40) {
-                    for (int c = 0; c < 9; c++) {
-                        if (OPL_OP_OFFSETS[c][0] == off || OPL_OP_OFFSETS[c][1] == off) {
-                            val = (val & 0xC0) | 0x3F; // keep KSL, max attenuation
-                            break;
-                        }
+        // Only do muting work if any channel is actually muted
+        if (g_channelMuteMask != 0x3FFFF) {
+            int ch = regToChannel(reg);
+            if (ch >= 0) {
+                int globalCh = chip * 9 + ch;
+                if (!(g_channelMuteMask & (1u << globalCh))) {
+                    // Channel is muted — strip key-on, force max attenuation
+                    if (reg >= 0xB0 && reg <= 0xB8) {
+                        val &= ~0x20;
+                    }
+                    if ((reg & 0xE0) == 0x40) {
+                        val = (val & 0xC0) | 0x3F;
                     }
                 }
             }
@@ -556,19 +532,33 @@ public:
             for (int ch = 0; ch < 9; ch++) {
                 int globalCh = chip * 9 + ch;
                 if (!g_oplKeyOn[chip][ch]) {
-                    // Decay towards zero
                     g_channelLevels[globalCh] *= 0.85f;
                     continue;
                 }
-                // Carrier total level: lower = louder. TL 0-63, 0=max volume
                 uint8_t carOff = OPL_OP_OFFSETS[ch][1];
                 uint8_t tl = g_oplRegs[chip][0x40 + carOff] & 0x3F;
                 float level = 1.0f - (tl / 63.0f);
-                // Smooth: take max of current and decayed previous
                 float prev = g_channelLevels[globalCh] * 0.85f;
                 g_channelLevels[globalCh] = level > prev ? level : prev;
             }
         }
+    }
+
+private:
+    // Map an OPL register to its channel (0-8), or -1 if not channel-specific
+    static int regToChannel(int reg) {
+        if (reg >= 0xA0 && reg <= 0xA8) return reg - 0xA0;
+        if (reg >= 0xB0 && reg <= 0xB8) return reg - 0xB0;
+        if (reg >= 0xC0 && reg <= 0xC8) return reg - 0xC0;
+        int off = reg & 0x1F;
+        int base = reg & 0xE0;
+        if (base == 0x20 || base == 0x40 || base == 0x60 || base == 0x80 || base == 0xE0) {
+            for (int c = 0; c < 9; c++) {
+                if (OPL_OP_OFFSETS[c][0] == off || OPL_OP_OFFSETS[c][1] == off)
+                    return c;
+            }
+        }
+        return -1;
     }
 };
 
