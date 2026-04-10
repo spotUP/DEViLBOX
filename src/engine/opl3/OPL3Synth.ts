@@ -106,7 +106,9 @@ export class OPL3Synth implements DevilboxSynth {
 
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
     if (!this._unmuted) {
-      this.output.gain.value = 1.0;
+      // OPL3 bridge scales output by 4.0/32768 (≈±4.0 peak), so we
+      // attenuate to avoid clipping into the [-1,1] audio range.
+      this.output.gain.value = 0.25;
       this._unmuted = true;
     }
     const midi = typeof note === 'string' ? noteToMidi(note) : note;

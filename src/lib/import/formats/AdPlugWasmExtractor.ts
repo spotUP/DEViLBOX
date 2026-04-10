@@ -140,6 +140,7 @@ interface AdPlugWasmModule {
   _adplug_capture_get_num_instruments(): number;
   _adplug_capture_get_total_ticks(): number;
   _adplug_capture_get_refresh_rate(): number;
+  _adplug_capture_get_ticks_per_row(): number;
   _malloc(size: number): number;
   _free(ptr: number): void;
   HEAPU8: Uint8Array;
@@ -267,12 +268,8 @@ export async function extractAdPlugPatterns(
       : playerRefresh;
 
     if (usedCapture) {
-      // Capture quantized ticks to rows using ticksPerRow = round(refresh/50).
-      // Each row represents ticksPerRow OPL ticks. The replayer must advance
-      // rows at exactly rawRowRate = refresh / ticksPerRow rows/sec.
-      // Tracker equation: rowRate = BPM * 2 / (5 * speed).
-      // With speed=1: BPM = rawRowRate * 5 / 2.
-      const ticksPerRow = Math.max(1, Math.round(refresh / 50));
+      // Use the WASM-computed ticksPerRow from actual note spacing analysis
+      const ticksPerRow = Math.max(1, M._adplug_capture_get_ticks_per_row());
       const rawRowRate = refresh / ticksPerRow;
       finalSpeed = 1;
       finalBpm = Math.round(rawRowRate * 5 / 2);
@@ -303,7 +300,8 @@ export async function extractAdPlugPatterns(
     finalBpm = Math.max(32, Math.min(300, finalBpm));
     finalSpeed = Math.max(1, Math.min(31, finalSpeed));
 
-    console.log(`[AdPlug] Timing: refresh=${refresh}Hz usedCapture=${usedCapture} → BPM=${finalBpm} speed=${finalSpeed} rowRate=${(finalBpm * 2 / (5 * finalSpeed)).toFixed(1)}/sec`);
+    const tprForLog = usedCapture ? M._adplug_capture_get_ticks_per_row() : 'N/A';
+    console.log(`[AdPlug] Timing: refresh=${refresh}Hz usedCapture=${usedCapture} ticksPerRow=${tprForLog} → BPM=${finalBpm} speed=${finalSpeed} rowRate=${(finalBpm * 2 / (5 * finalSpeed)).toFixed(1)}/sec`);
 
     // ── Extract order list ──
     // Stop at first out-of-range or sentinel entry (0xFFFF = end, >= numPatterns = padding)
