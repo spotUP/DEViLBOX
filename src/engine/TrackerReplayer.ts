@@ -1747,8 +1747,9 @@ export class TrackerReplayer {
         'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
         'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
         'TFMXSynth', 'FCSynth', 'C64SID',
-        // OPL3 AdLib formats — WASM AdPlug player handles all effects/audio
-        'OPL3',
+        // OPL3 is NOT in this list — replayer fires notes through OPL3Synth
+        // for editable playback. Streaming player is only used as fallback
+        // when pattern extraction fails.
         // WASM player-pool synths — each has a fixed-size pool, must dedup
         'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
         'FredSynth', 'FredEditorReplayerSynth', 'OctaMEDSynth',
@@ -1769,35 +1770,8 @@ export class TrackerReplayer {
         console.log('[HybridPlayback] Replaced instruments:', Array.from(this._replacedInstruments));
       }
 
-      // Detect all-OPL3 songs — start the AdPlug streaming player for audio
-      const allOPL3 = instruments.length > 0 && instruments.every(i => i.synthType === 'OPL3');
-      if (allOPL3) {
-        try {
-          const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
-          const adplug = getAdPlugPlayer();
-          // Rewind to start and begin playback
-          adplug.rewind();
-          adplug.play();
-          this.useAdPlugStreaming = true;
-          this._suppressNotes = true;
-
-          // Wire position reporting from AdPlug worklet → coordinator
-          const coordinator = this.coordinator;
-          adplug.onPosition = (order: number, row: number) => {
-            coordinator.dispatchEnginePosition(row, order);
-          };
-          adplug.onEnded = () => {
-            this.stop();
-          };
-          this._adplugPositionUnsub = () => {
-            adplug.onPosition = null;
-            adplug.onEnded = null;
-          };
-          coordinator.markDispatchActive();
-
-          _log('[TrackerReplayer] Using AdPlug streaming for OPL3 playback');
-        } catch { /* AdPlug not loaded */ }
-      }
+      // OPL3 instruments are played note-by-note through the OPL3Synth WASM,
+      // driven by the TS replayer like any other synth. No streaming player needed.
     }
 
     // Start automation capture → store sync (converts register writes to automation curves).
