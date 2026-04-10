@@ -13,7 +13,6 @@ const opl3Desc: SynthDescriptor = {
   loadMode: 'eager',
   sharedInstance: false,
   useSynthBus: true,
-  volumeOffsetDb: 6,
 
   create: () => new OPL3Synth(),
 

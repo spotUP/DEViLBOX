@@ -21,11 +21,12 @@ export class OPL3Synth implements DevilboxSynth {
   private _ready = false;
   private _pendingMessages: Array<Record<string, unknown>> = [];
   private _channelIndex = -1; // -1 = keyboard mode, 0+ = tracker channel
+  private _unmuted = false; // Start muted to prevent transient on preload
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
-    this.output.gain.value = 1.0;
+    this.output.gain.value = 0; // Muted until first note trigger
     this.initWorklet();
   }
 
@@ -97,6 +98,10 @@ export class OPL3Synth implements DevilboxSynth {
   }
 
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
+    if (!this._unmuted) {
+      this.output.gain.value = 1.0;
+      this._unmuted = true;
+    }
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     if (this._channelIndex >= 0) {
       this.send({ type: 'chNoteOn', ch: this._channelIndex, note: midi, velocity: Math.round(velocity * 127) });

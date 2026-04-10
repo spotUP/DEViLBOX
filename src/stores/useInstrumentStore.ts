@@ -1546,10 +1546,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
           state.instrumentLoadVersion = (state.instrumentLoadVersion ?? 0) + 1;
         });
 
-        // Preload instruments so WASM synths (TB303, Furnace, etc.) are initialized
+        // Preload instruments so WASM synths (TB303, Furnace, OPL3, etc.) are initialized
         // before playback starts. Without this, on-demand creation in getInstrument()
         // returns synths whose AudioWorklet hasn't loaded yet → silent notes.
-        // Skip for OPL3/AdLib songs where audio comes from the streaming player.
         if (!options?.skipPreload) {
           getToneEngine().preloadInstruments(migratedInstruments).catch(err => {
             console.warn('[InstrumentStore] Instrument preload failed:', err);
