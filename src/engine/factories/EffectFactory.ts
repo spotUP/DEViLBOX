@@ -146,7 +146,7 @@ switch (type) {
   case 'ToneArm':
     return { wow: 20, coil: 50, flutter: 15, riaa: 50, stylus: 30, hiss: 20, pops: 15, rpm: 33.333 };
   case 'ShimmerReverb':
-    return { decay: 70, shimmer: 50, pitch: 12, damping: 50, size: 70, predelay: 40, modRate: 30, modDepth: 20 };
+    return { decay: 50, shimmer: 30, pitch: 12, damping: 60, size: 60, predelay: 40, modRate: 30, modDepth: 20 };
   case 'GranularFreeze':
     return { freeze: 0, grainSize: 80, density: 12, scatter: 30, pitch: 0, spray: 20, shimmer: 0, stereoWidth: 70, feedback: 0, captureLen: 500, attack: 5, release: 40, thru: 0 };
   case 'TapeDegradation':

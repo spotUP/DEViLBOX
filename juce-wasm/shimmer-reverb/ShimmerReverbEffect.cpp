@@ -218,7 +218,7 @@ static const float PARAM_MAXS[PARAM_COUNT] = {
 };
 
 static const float PARAM_DEFAULTS[PARAM_COUNT] = {
-    0.7f, 0.5f, 12.0f, 0.5f, 0.7f, 0.04f, 0.3f, 0.2f, 0.5f
+    0.5f, 0.3f, 12.0f, 0.6f, 0.6f, 0.04f, 0.3f, 0.2f, 0.5f
 };
 
 // Base delay sizes at 48kHz (Dattorro-inspired prime-ish values)
@@ -310,13 +310,13 @@ public:
             float shiftedL = pitchL_.process(tankOutL);
             float shiftedR = pitchR_.process(tankOutR);
 
-            // Mix clean tank + shimmer for feedback
-            feedbackL_ = tankOutL * (1.0f - shimmer) + shiftedL * shimmer;
-            feedbackR_ = tankOutR * (1.0f - shimmer) + shiftedR * shimmer;
+            // Mix clean tank + shimmer for feedback, with soft clip to prevent runaway
+            feedbackL_ = tanhf(tankOutL * (1.0f - shimmer) + shiftedL * shimmer);
+            feedbackR_ = tanhf(tankOutR * (1.0f - shimmer) + shiftedR * shimmer);
 
-            // Output: wet L/R mixed with dry input
-            outputL[i] = inputL[i] * dry + tankOutL * mix;
-            outputR[i] = inputR[i] * dry + tankOutR * mix;
+            // Output: wet L/R mixed with dry input (soft clip wet signal)
+            outputL[i] = inputL[i] * dry + tanhf(tankOutL) * mix;
+            outputR[i] = inputR[i] * dry + tanhf(tankOutR) * mix;
         }
     }
 
