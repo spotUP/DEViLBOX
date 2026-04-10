@@ -59,14 +59,14 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
     super();
 
     this._options = {
-      decay: options.decay ?? 0.7,
-      shimmer: options.shimmer ?? 0.5,
+      decay: options.decay ?? 0.5,
+      shimmer: options.shimmer ?? 0.3,
       pitch: options.pitch ?? 12,
-      damping: options.damping ?? 0.5,
-      size: options.size ?? 0.8,
+      damping: options.damping ?? 0.6,
+      size: options.size ?? 0.6,
       predelay: options.predelay ?? 0.0,
       modRate: options.modRate ?? 0.3,
-      modDepth: options.modDepth ?? 0.3,
+      modDepth: options.modDepth ?? 0.2,
       wet: options.wet ?? 1.0,
     };
 
