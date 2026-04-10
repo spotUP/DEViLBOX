@@ -355,7 +355,7 @@ void oplProcess(float* outL, float* outR, int numSamples) {
 
     OPL3_GenerateStream(&g_opl->chip, g_opl->intBuf, static_cast<uint32_t>(numSamples));
 
-    constexpr float kScale = 4.0f / 32768.0f;
+    constexpr float kScale = 1.0f / 32768.0f; // normalize OPL int16 to [-1,1] float
     for (int i = 0; i < numSamples; i++) {
         outL[i] = static_cast<float>(g_opl->intBuf[i * 2 + 0]) * kScale;
         outR[i] = static_cast<float>(g_opl->intBuf[i * 2 + 1]) * kScale;
