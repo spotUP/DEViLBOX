@@ -1,13 +1,77 @@
+/**
+ * FX Audit Script — Tests every master effect for:
+ * 1. Audio passes through (not silent)
+ * 2. Knob changes actually affect audio (param responsiveness)
+ *
+ * Results pushed live to format-status tracker at localhost:4444
+ * Usage: npx tsx tools/fx-audit.ts [--only <effectType>]
+ */
 import WebSocket from 'ws';
+import http from 'http';
 import { randomUUID } from 'crypto';
 
 const WS_URL = 'ws://localhost:4003/mcp';
 
-function callBrowser(ws: WebSocket, method: string, params: Record<string, unknown> = {}): Promise<any> {
+// All effect types from unifiedEffects.ts
+const ALL_EFFECTS = [
+  'Compressor', 'EQ3', 'Distortion', 'BitCrusher', 'Chebyshev', 'TapeSaturation',
+  'Reverb', 'JCReverb', 'Delay', 'FeedbackDelay', 'PingPongDelay',
+  'Chorus', 'Phaser', 'Tremolo', 'Vibrato', 'AutoPanner',
+  'Filter', 'AutoFilter', 'AutoWah', 'StereoWidener', 'PitchShift', 'FrequencyShifter',
+  'BiPhase', 'DubFilter', 'MoogFilter', 'AmbientDelay', 'SidechainCompressor',
+  'SpaceEcho', 'SpaceyDelayer', 'RETapeEcho', 'MVerb', 'Leslie', 'SpringReverb',
+  'VinylNoise', 'ToneArm', 'Tumult', 'TapeSimulator', 'ShimmerReverb', 'GranularFreeze',
+  'TapeDegradation', 'Masha',
+  'Maximizer', 'Limiter', 'MonoComp', 'Expander', 'Clipper', 'NoiseGate',
+  'GOTTComp', 'MultibandComp', 'MultibandClipper', 'MultibandExpander',
+  'MultibandDynamics', 'MultibandGate', 'MultibandLimiter', 'X42Comp',
+  'AGC', 'Panda', 'BeatBreather', 'Ducka', 'TransientDesigner', 'DeEsser',
+  'Overdrive', 'Flanger', 'RingMod', 'DragonflyPlate', 'DragonflyHall', 'DragonflyRoom',
+  'JunoChorus', 'ParametricEQ', 'CabinetSim', 'TubeAmp', 'BassEnhancer',
+  'ReverseDelay', 'VintageDelay', 'ArtisticDelay', 'Della', 'SlapbackDelay', 'ZamDelay',
+  'AutoSat', 'DistortionShaper', 'Driva', 'Exciter', 'Satma', 'Saturator',
+  'DynamicsProc', 'DynamicEQ', 'EQ5Band', 'EQ8Band', 'EQ12Band', 'GEQ31',
+  'PhonoFilter', 'Kuiza', 'ZamEQ2',
+  'Bitta', 'Vinyl', 'Vocoder', 'AutoTune',
+  'CalfPhaser', 'Roomy', 'EarlyReflections', 'Pulsator', 'MultiChorus', 'MultiSpread',
+  'MultibandEnhancer', 'HaasEnhancer', 'BinauralPanner', 'Vihda',
+  'SidechainGate', 'SidechainLimiter',
+];
+
+// Knob test params: set min then max, check if audio level changes
+const KNOB_TESTS: Record<string, { key: string; min: number; max: number }[]> = {
+  Distortion:      [{ key: 'distortion', min: 0, max: 1 }],
+  Reverb:          [{ key: 'decay', min: 0.1, max: 8 }],
+  JCReverb:        [{ key: 'roomSize', min: 0, max: 0.99 }],
+  Delay:           [{ key: 'delayTime', min: 0.01, max: 1 }],
+  FeedbackDelay:   [{ key: 'delayTime', min: 0.01, max: 1 }],
+  Chorus:          [{ key: 'depth', min: 0, max: 1 }],
+  Phaser:          [{ key: 'frequency', min: 0.1, max: 15 }],
+  Filter:          [{ key: 'frequency', min: 100, max: 5000 }],
+  BitCrusher:      [{ key: 'bits', min: 1, max: 8 }],
+  Compressor:      [{ key: 'threshold', min: -60, max: 0 }],
+  SpringReverb:    [{ key: 'decay', min: 0, max: 1 }],
+  SpaceyDelayer:   [{ key: 'feedback', min: 0, max: 95 }],
+  RETapeEcho:      [{ key: 'intensity', min: 0, max: 1 }],
+  MVerb:           [{ key: 'size', min: 0, max: 1 }],
+  VinylNoise:      [{ key: 'hiss', min: 0, max: 100 }],
+  Tremolo:         [{ key: 'depth', min: 0, max: 1 }],
+  MoogFilter:      [{ key: 'cutoff', min: 100, max: 5000 }],
+  Flanger:         [{ key: 'depth', min: 0, max: 1 }],
+  Leslie:          [{ key: 'speed', min: 0, max: 1 }],
+  TapeSaturation:  [{ key: 'drive', min: 0, max: 100 }],
+  TapeSimulator:   [{ key: 'drive', min: 0, max: 1 }],
+  Overdrive:       [{ key: 'drive', min: 0, max: 1 }],
+  EQ3:             [{ key: 'low', min: -12, max: 12 }],
+  Limiter:         [{ key: 'threshold', min: -30, max: 0 }],
+};
+
+let ws: WebSocket;
+
+function mcpCall(method: string, params: Record<string, unknown> = {}): Promise<any> {
   return new Promise((resolve, reject) => {
     const id = randomUUID();
-    const timeout = setTimeout(() => reject(new Error(`Timeout: ${method}`)), 30000);
-    
+    const timeout = setTimeout(() => reject(new Error('timeout: ' + method)), 15000);
     const handler = (data: WebSocket.Data) => {
       try {
         const msg = JSON.parse(data.toString());
@@ -15,152 +79,154 @@ function callBrowser(ws: WebSocket, method: string, params: Record<string, unkno
           clearTimeout(timeout);
           ws.removeListener('message', handler);
           if (msg.type === 'error') reject(new Error(msg.error));
-          else resolve(msg.data);
+          else resolve(msg.result?.data ?? msg.data ?? msg.result ?? msg);
         }
-      } catch {}
+      } catch { /* ignore parse errors for other messages */ }
     };
     ws.on('message', handler);
     ws.send(JSON.stringify({ id, type: 'call', method, params }));
   });
 }
 
-async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+function pushTracker(key: string, data: Record<string, unknown>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ [key]: data });
+    const req = http.request({
+      hostname: 'localhost', port: 4444, path: '/push-updates', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, res => { let r = ''; res.on('data', c => r += c); res.on('end', () => resolve()); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function fxKey(type: string): string {
+  return 'fx-' + type.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function toDb(rms: number): number {
+  return rms > 0 ? 20 * Math.log10(rms) : -100;
+}
+
+async function measure(durationMs = 2000) {
+  const r = await mcpCall('get_audio_level', { durationMs });
+  return { rmsAvg: r?.rmsAvg ?? 0, peakMax: r?.peakMax ?? 0, silent: r?.silent ?? (r?.isSilent ?? true) };
+}
+
+async function ensurePlaying() {
+  const pb = await mcpCall('get_playback_state');
+  if (!pb?.isPlaying) { await mcpCall('play'); await sleep(500); }
+}
+
+async function removeAll() {
+  const state = await mcpCall('get_audio_state');
+  for (const fx of (state?.masterEffects ?? [])) {
+    await mcpCall('remove_master_effect', { effectId: fx.id });
+  }
+  await sleep(300);
+}
+
+async function auditOne(type: string, baseRms: number) {
+  const key = fxKey(type);
+  process.stdout.write('[' + type + '] ');
+
+  try {
+    await ensurePlaying();
+    await mcpCall('clear_console_errors');
+    await mcpCall('add_master_effect', { effectType: type });
+    await sleep(2500);
+
+    const state = await mcpCall('get_audio_state');
+    const fx = state?.masterEffects?.find((f: any) => f.type === type);
+    if (!fx) {
+      console.log('FAIL: not created');
+      await pushTracker(key, { auditStatus: 'fail', notes: 'Effect not created' });
+      return;
+    }
+
+    const lvl = await measure(2500);
+    const rmsDb = toDb(lvl.rmsAvg);
+    const diffDb = rmsDb - toDb(baseRms);
+    const isSilent = lvl.rmsAvg < 0.001 || diffDb < -20;
+
+    const errs = await mcpCall('get_console_errors');
+    const errCount = ((errs?.entries ?? []) as any[]).filter((e: any) => e.level === 'error').length;
+
+    // Knob test
+    let knobResult: string | null = null;
+    let knobsWork: boolean | null = null;
+    const tests = KNOB_TESTS[type];
+    if (tests && !isSilent) {
+      for (const t of tests) {
+        await mcpCall('update_master_effect', { effectId: fx.id, updates: { parameters: { ...fx.parameters, [t.key]: t.min } } });
+        await sleep(800);
+        const lo = await measure(1500);
+        await mcpCall('update_master_effect', { effectId: fx.id, updates: { parameters: { ...fx.parameters, [t.key]: t.max } } });
+        await sleep(800);
+        const hi = await measure(1500);
+        const d = Math.abs(toDb(hi.rmsAvg) - toDb(lo.rmsAvg));
+        knobResult = t.key + ':' + d.toFixed(1) + 'dB';
+        knobsWork = d > 0.5;
+      }
+    }
+
+    // Status
+    let status: string, notes: string;
+    if (isSilent) {
+      status = 'fail'; notes = 'SILENT rms=' + lvl.rmsAvg.toFixed(6) + ' diff=' + diffDb.toFixed(1) + 'dB';
+    } else if (knobsWork === false) {
+      status = 'fail'; notes = 'Audio OK, KNOBS DEAD [' + knobResult + '] diff=' + diffDb.toFixed(1) + 'dB';
+    } else if (knobsWork === true) {
+      status = 'fixed'; notes = 'OK [' + knobResult + '] diff=' + diffDb.toFixed(1) + 'dB';
+    } else {
+      status = lvl.rmsAvg > 0.005 ? 'fixed' : 'fail';
+      notes = (status === 'fixed' ? 'OK' : 'weak') + ' rms=' + lvl.rmsAvg.toFixed(4) + ' diff=' + diffDb.toFixed(1) + 'dB';
+    }
+    if (errCount > 0) notes += ' | ' + errCount + ' errors';
+
+    console.log((status === 'fixed' ? 'PASS' : 'FAIL') + ' ' + notes);
+    await pushTracker(key, { auditStatus: status, notes, rmsDb: Math.round(rmsDb * 10) / 10, diffDb: Math.round(diffDb * 10) / 10, knobsWork });
+
+  } catch (err: any) {
+    console.log('CRASH: ' + err.message);
+    await pushTracker(key, { auditStatus: 'fail', notes: 'CRASH: ' + err.message });
+  } finally {
+    await removeAll();
+    await sleep(300);
+  }
+}
 
 async function main() {
-  const ws = new WebSocket(WS_URL);
-  await new Promise<void>((resolve, reject) => {
-    ws.on('open', () => { console.log('Connected to relay'); resolve(); });
-    ws.on('error', reject);
-    setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-  });
-  
-  // Quick connectivity test
-  const info = await callBrowser(ws, 'get_song_info');
-  console.log('Song:', info.title || '(untitled)', '| BPM:', info.bpm, '| Channels:', info.channels);
+  const onlyIdx = process.argv.indexOf('--only');
+  const onlyType = onlyIdx >= 0 ? process.argv[onlyIdx + 1] : null;
+  const effects = onlyType ? ALL_EFFECTS.filter(e => e === onlyType) : ALL_EFFECTS;
 
-  // Get audio state and clear existing master effects
-  const state = await callBrowser(ws, 'get_audio_state');
-  if (state.masterEffects?.length > 0) {
-    for (const fx of state.masterEffects) {
-      await callBrowser(ws, 'remove_master_effect', { effectId: fx.id });
-    }
-    console.log('Cleared', state.masterEffects.length, 'existing master effects');
-  }
+  if (onlyType && effects.length === 0) { console.error('Unknown: ' + onlyType); process.exit(1); }
 
-  // Start playback and get baseline
-  await callBrowser(ws, 'play');
-  await sleep(1000);
-  
-  const baseline = await callBrowser(ws, 'get_audio_level', { durationMs: 2000 });
-  console.log(`\nBASELINE (no fx): RMS=${baseline.rmsAvg?.toFixed(4)} peak=${baseline.peakMax?.toFixed(4)} silent=${baseline.isSilent}`);
-  
-  if (baseline.isSilent) {
-    console.log('ERROR: No audio! Load a song and click in browser first.');
-    ws.close(); process.exit(1);
-  }
+  console.log('FX Audit: ' + effects.length + ' effects -> http://localhost:4444\n');
 
-  const baseRms = baseline.rmsAvg || 0.001;
+  ws = new WebSocket(WS_URL);
+  await new Promise<void>((resolve, reject) => { ws.on('open', resolve); ws.on('error', reject); });
 
-  // All effect types to test
-  const effectTypes = [
-    'Distortion', 'Reverb', 'Delay', 'Chorus', 'Phaser', 'Tremolo', 'Vibrato',
-    'AutoFilter', 'AutoPanner', 'AutoWah', 'BitCrusher', 'Chebyshev',
-    'Compressor', 'EQ3', 'FeedbackDelay', 'Filter', 'FrequencyShifter',
-    'JCReverb', 'PingPongDelay', 'PitchShift', 'StereoWidener',
-    'TapeSaturation', 'BiPhase', 'DubFilter', 'MoogFilter',
-    'SpaceEcho', 'SpaceyDelayer', 'RETapeEcho',
-    'MVerb', 'Leslie', 'SpringReverb', 'VinylNoise', 'ToneArm',
-    'ShimmerReverb', 'GranularFreeze', 'TapeDegradation', 'AmbientDelay',
-    'SidechainCompressor',
-  ];
+  await ensurePlaying();
+  const pb = await mcpCall('get_playback_state');
+  if (!pb?.isPlaying) { console.error('Nothing playing!'); ws.close(); process.exit(1); }
+  console.log('Playing at ' + pb.bpm + ' BPM');
 
-  const results: Array<{
-    type: string; initMs: number; rmsAvg: number; peakMax: number;
-    silent: boolean; levelDiffDb: number; error?: string;
-  }> = [];
+  await removeAll();
+  const base = await measure(3000);
+  console.log('Baseline: ' + toDb(base.rmsAvg).toFixed(1) + ' dBFS\n');
 
-  for (const fxType of effectTypes) {
-    process.stdout.write(`${fxType.padEnd(22)} `);
-    
-    try {
-      const t0 = Date.now();
-      const addResult = await callBrowser(ws, 'add_master_effect', { effectType: fxType });
-      const effectId = addResult?.effectId || addResult?.id;
-      
-      if (!effectId) {
-        console.log('SKIP (no id)');
-        results.push({ type: fxType, initMs: -1, rmsAvg: 0, peakMax: 0, silent: true, levelDiffDb: -999, error: 'no id' });
-        continue;
-      }
+  if (base.rmsAvg < 0.01) console.error('WARNING: Baseline very low!');
 
-      // Check for audio every 200ms for up to 5s
-      let initMs = 0;
-      let gotAudio = false;
-      for (let i = 0; i < 25; i++) {
-        await sleep(200);
-        const lvl = await callBrowser(ws, 'get_audio_level', { durationMs: 400 });
-        initMs = Date.now() - t0;
-        if (!lvl.isSilent) { gotAudio = true; break; }
-      }
+  await pushTracker('fx-baseline', { auditStatus: 'fixed', notes: 'Baseline: ' + toDb(base.rmsAvg).toFixed(1) + ' dBFS', rmsDb: Math.round(toDb(base.rmsAvg) * 10) / 10 });
 
-      // Stable measurement
-      await sleep(300);
-      const stable = await callBrowser(ws, 'get_audio_level', { durationMs: 2000 });
-      const rmsAvg = stable.rmsAvg || 0;
-      const peakMax = stable.peakMax || 0;
-      const isSilent = stable.isSilent;
-      const diffDb = rmsAvg > 0 ? 20 * Math.log10(rmsAvg / baseRms) : -999;
-      
-      results.push({ type: fxType, initMs, rmsAvg, peakMax, silent: isSilent, levelDiffDb: diffDb });
-      
-      const tag = isSilent ? 'SILENT!' : diffDb < -6 ? 'QUIET' : diffDb > 6 ? 'LOUD' : 'OK';
-      console.log(`${tag.padEnd(7)} init=${String(initMs).padStart(5)}ms  rms=${rmsAvg.toFixed(4)}  diff=${diffDb.toFixed(1)}dB`);
-      
-      // Remove effect
-      await callBrowser(ws, 'remove_master_effect', { effectId });
-      await sleep(300);
-      
-    } catch (err: any) {
-      console.log(`ERROR: ${err.message}`);
-      results.push({ type: fxType, initMs: -1, rmsAvg: 0, peakMax: 0, silent: true, levelDiffDb: -999, error: err.message });
-      // Cleanup
-      try {
-        const st = await callBrowser(ws, 'get_audio_state');
-        for (const fx of (st.masterEffects || [])) {
-          await callBrowser(ws, 'remove_master_effect', { effectId: fx.id });
-        }
-      } catch {}
-      await sleep(500);
-    }
-  }
+  for (const fx of effects) await auditOne(fx, base.rmsAvg);
 
-  // Summary
-  console.log('\n' + '='.repeat(85));
-  console.log('FX AUDIT SUMMARY');
-  console.log('='.repeat(85));
-  console.log(`${'Effect'.padEnd(22)} ${'Init'.padStart(6)} ${'RMS'.padStart(8)} ${'Peak'.padStart(8)} ${'dB diff'.padStart(8)} ${'Status'.padStart(8)}`);
-  console.log('-'.repeat(85));
-  
-  for (const r of results) {
-    const s = r.error ? 'ERROR' : r.silent ? 'SILENT' : r.levelDiffDb < -6 ? 'QUIET' : r.levelDiffDb > 6 ? 'LOUD' : 'OK';
-    console.log(`${r.type.padEnd(22)} ${String(r.initMs).padStart(6)} ${r.rmsAvg.toFixed(4).padStart(8)} ${r.peakMax.toFixed(4).padStart(8)} ${r.levelDiffDb.toFixed(1).padStart(8)} ${s.padStart(8)}`);
-  }
-  
-  console.log('-'.repeat(85));
-  console.log(`Baseline RMS: ${baseRms.toFixed(4)}`);
-  
-  const silent = results.filter(r => r.silent && !r.error);
-  const quiet = results.filter(r => !r.silent && r.levelDiffDb < -6);
-  const loud = results.filter(r => !r.silent && r.levelDiffDb > 6);
-  const slow = results.filter(r => r.initMs > 1000 && !r.error);
-  const errors = results.filter(r => r.error);
-  
-  if (silent.length) console.log(`\nSILENT (${silent.length}): ${silent.map(r => r.type).join(', ')}`);
-  if (quiet.length) console.log(`QUIET <-6dB (${quiet.length}): ${quiet.map(r => `${r.type}(${r.levelDiffDb.toFixed(1)})`).join(', ')}`);
-  if (loud.length) console.log(`LOUD >+6dB (${loud.length}): ${loud.map(r => `${r.type}(${r.levelDiffDb.toFixed(1)})`).join(', ')}`);
-  if (slow.length) console.log(`SLOW >1s (${slow.length}): ${slow.map(r => `${r.type}(${r.initMs}ms)`).join(', ')}`);
-  if (errors.length) console.log(`ERRORS (${errors.length}): ${errors.map(r => `${r.type}: ${r.error}`).join(', ')}`);
-  
+  console.log('\nDone.');
   ws.close();
 }
 

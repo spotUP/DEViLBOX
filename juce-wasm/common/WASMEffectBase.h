@@ -52,13 +52,13 @@ public:
     virtual float getParameterDefault(int paramId) const { return 0.0f; }
 
 #ifdef __EMSCRIPTEN__
-    // JS-callable wrapper for process (accepts uintptr_t pointers)
-    void processJS(uintptr_t inLPtr, uintptr_t inRPtr,
-                   uintptr_t outLPtr, uintptr_t outRPtr, int numSamples) {
-        float* inputL = reinterpret_cast<float*>(inLPtr);
-        float* inputR = reinterpret_cast<float*>(inRPtr);
-        float* outputL = reinterpret_cast<float*>(outLPtr);
-        float* outputR = reinterpret_cast<float*>(outRPtr);
+    // JS-callable wrapper for process (uses unsigned int for Embind compatibility)
+    void processJS(unsigned int inLPtr, unsigned int inRPtr,
+                   unsigned int outLPtr, unsigned int outRPtr, int numSamples) {
+        float* inputL = reinterpret_cast<float*>(static_cast<uintptr_t>(inLPtr));
+        float* inputR = reinterpret_cast<float*>(static_cast<uintptr_t>(inRPtr));
+        float* outputL = reinterpret_cast<float*>(static_cast<uintptr_t>(outLPtr));
+        float* outputR = reinterpret_cast<float*>(static_cast<uintptr_t>(outRPtr));
         process(inputL, inputR, outputL, outputR, numSamples);
     }
 
@@ -76,22 +76,32 @@ protected:
     }
 };
 
-// Macro to export an effect class with standard interface
+// Register the base class once per WASM module (each effect is its own module).
+// The base binding provides process(), isInitialized(), getSampleRate(), getParameterName().
+// Virtual methods (setParameter, getParameter, etc.) are dispatched via vtable so
+// calling them on a derived instance invokes the override.
+#define REGISTER_WASM_EFFECT_BASE() \
+    EMSCRIPTEN_BINDINGS(WASMEffectBase_bindings) { \
+        emscripten::class_<WASMEffectBase>("WASMEffectBase") \
+            .function("initialize", &WASMEffectBase::initialize) \
+            .function("isInitialized", &WASMEffectBase::isInitialized) \
+            .function("getSampleRate", &WASMEffectBase::getSampleRate) \
+            .function("setParameter", &WASMEffectBase::setParameter) \
+            .function("getParameter", &WASMEffectBase::getParameter) \
+            .function("getParameterCount", &WASMEffectBase::getParameterCount) \
+            .function("getParameterName", &WASMEffectBase::getParameterNameJS) \
+            .function("getParameterMin", &WASMEffectBase::getParameterMin) \
+            .function("getParameterMax", &WASMEffectBase::getParameterMax) \
+            .function("getParameterDefault", &WASMEffectBase::getParameterDefault) \
+            .function("process", &WASMEffectBase::processJS); \
+    }
+
+// Macro to export a derived effect class with base class relationship
 #define EXPORT_WASM_EFFECT(ClassName) \
+    REGISTER_WASM_EFFECT_BASE() \
     EMSCRIPTEN_BINDINGS(ClassName##_bindings) { \
-        emscripten::class_<ClassName>(#ClassName) \
-            .constructor<>() \
-            .function("initialize", &ClassName::initialize) \
-            .function("isInitialized", &ClassName::isInitialized) \
-            .function("getSampleRate", &ClassName::getSampleRate) \
-            .function("setParameter", &ClassName::setParameter) \
-            .function("getParameter", &ClassName::getParameter) \
-            .function("getParameterCount", &ClassName::getParameterCount) \
-            .function("getParameterName", &ClassName::getParameterNameJS) \
-            .function("getParameterMin", &ClassName::getParameterMin) \
-            .function("getParameterMax", &ClassName::getParameterMax) \
-            .function("getParameterDefault", &ClassName::getParameterDefault) \
-            .function("process", &ClassName::processJS); \
+        emscripten::class_<ClassName, emscripten::base<WASMEffectBase>>(#ClassName) \
+            .constructor<>(); \
     }
 
 } // namespace devilbox
