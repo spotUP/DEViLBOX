@@ -68,7 +68,9 @@ export class OverdriveEffect extends Tone.ToneAudioNode {
   private async _initWorklet(): Promise<void> {
     try {
       const rawCtx = Tone.getContext().rawContext as AudioContext;
+      console.log('[Overdrive] ⚡ _initWorklet starting');
       await OverdriveEffect.ensureInitialized(rawCtx);
+      console.log('[Overdrive] ⚡ ensureInitialized done');
 
       this.workletNode = new AudioWorkletNode(rawCtx, 'overdrive-processor', {
         numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
@@ -76,27 +78,26 @@ export class OverdriveEffect extends Tone.ToneAudioNode {
 
       this.workletNode.port.onmessage = (e) => {
         if (e.data.type === 'ready') {
+          console.log('[Overdrive] ⚡ WASM ready! Swapping');
           this.isWasmReady = true;
           for (const p of this.pendingParams) {
             this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
           }
           this.pendingParams = [];
-          // Connect WASM first, then disconnect passthrough (avoids silent gap)
           try {
             const rawInput = getNativeAudioNode(this.input)!;
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            // Now safe to disconnect passthrough
             try { this.input.disconnect(this.wetGain); } catch { /* */ }
-            // Keepalive: ensure Chrome schedules the worklet
-            const rawCtx = Tone.getContext().rawContext as AudioContext;
-            const keepalive = rawCtx.createGain();
+            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;
             this.workletNode!.connect(keepalive);
-            keepalive.connect(rawCtx.destination);
+            keepalive.connect(rawCtx2.destination);
+            console.log('[Overdrive] ⚡ WASM swap complete!');
           } catch (swapErr) {
-            console.warn('[Overdrive] WASM swap failed, staying on passthrough:', swapErr);
+            console.error('[Overdrive] WASM swap failed:', swapErr);
           }
         }
       };

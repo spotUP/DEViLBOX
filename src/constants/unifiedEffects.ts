@@ -487,12 +487,25 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
 export function getEffectsByGroup(): Record<string, AvailableEffect[]> {
   const grouped: Record<string, AvailableEffect[]> = {};
 
+  // Temporary: collect all WASM effects into a single test group
+  const wasmTestGroup: AvailableEffect[] = [];
+
   AVAILABLE_EFFECTS.forEach((effect) => {
     if (!grouped[effect.group]) {
       grouped[effect.group] = [];
     }
     grouped[effect.group].push(effect);
+
+    // Also add WASM effects to the test group
+    if (effect.category === 'wasm') {
+      wasmTestGroup.push(effect);
+    }
   });
+
+  // Add the test group (remove this when done testing)
+  if (wasmTestGroup.length > 0) {
+    grouped['★ Zynthian WASM'] = wasmTestGroup;
+  }
 
   return grouped;
 }

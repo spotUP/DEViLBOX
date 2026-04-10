@@ -26,12 +26,11 @@ export interface LeslieOptions {
 }
 
 /**
- * LeslieEffect - WASM-powered rotary speaker with JS fallback
+ * LeslieEffect - WASM-powered rotary speaker
  *
  * Built from scratch. Classic electromechanical Leslie simulation
  * with crossover, AM/doppler, and speed ramping.
  */
-/** Extract the underlying native AudioNode from a Tone.js wrapper */
 export class LeslieEffect extends Tone.ToneAudioNode {
   readonly name = 'Leslie';
 
@@ -44,10 +43,6 @@ export class LeslieEffect extends Tone.ToneAudioNode {
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ paramId: number; value: number }> = [];
-
-  private fallbackNode: ScriptProcessorNode | null = null;
-  private fallbackLeslie: LeslieFallback | null = null;
-  private usingFallback = false;
 
   private _options: Required<LeslieOptions>;
 
@@ -81,15 +76,14 @@ export class LeslieEffect extends Tone.ToneAudioNode {
     this.dryGain.connect(this.output);
     this.wetGain.connect(this.output);
 
-    this.initFallback();
-    this.initWasm();
+    this.input.connect(this.wetGain);
+    void this._initWorklet();
   }
 
   setSpeed(v: number) { this._options.speed = clamp01(v); this.sendParam(PARAM_SPEED, v); }
   setHornRate(v: number) {
     this._options.hornRate = Math.max(0.1, Math.min(10, v));
     this.sendParam(PARAM_HORN_RATE, v);
-    if (this.fallbackLeslie) this.fallbackLeslie.rate = this._options.hornRate;
   }
   setDrumRate(v: number) { this._options.drumRate = Math.max(0.1, Math.min(8, v)); this.sendParam(PARAM_DRUM_RATE, v); }
   setHornDepth(v: number) { this._options.hornDepth = clamp01(v); this.sendParam(PARAM_HORN_DEPTH, v); }
@@ -106,13 +100,13 @@ export class LeslieEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
-  private async initWasm() {
+  private async _initWorklet() {
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;
       await LeslieEffect.ensureInitialized(rawContext);
 
       if (!LeslieEffect.wasmBinary || !LeslieEffect.jsCode) {
-        console.warn('[Leslie] WASM not available, using JS fallback');
+        console.error('[Leslie] WASM not available, staying on passthrough');
         return;
       }
 
@@ -134,9 +128,23 @@ export class LeslieEffect extends Tone.ToneAudioNode {
             this.sendParam(paramId, value);
           }
           this.pendingParams = [];
-          this.swapToWasm();
+
+          try {
+            const rawInput = getNativeAudioNode(this.input)!;
+            const rawWet = getNativeAudioNode(this.wetGain)!;
+            rawInput.connect(this.workletNode!);
+            this.workletNode!.connect(rawWet);
+            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx2.createGain();
+            keepalive.gain.value = 0;
+            this.workletNode!.connect(keepalive);
+            keepalive.connect(rawCtx2.destination);
+          } catch (swapErr) {
+            console.error('[Leslie] WASM swap failed, staying on passthrough:', swapErr);
+          }
         } else if (event.data.type === 'error') {
-          console.warn('[Leslie] WASM worklet error:', event.data.error);
+          console.error('[Leslie] WASM worklet error:', event.data.error);
         }
       };
 
@@ -147,113 +155,34 @@ export class LeslieEffect extends Tone.ToneAudioNode {
       });
 
     } catch (err) {
-      console.warn('[Leslie] WASM init failed, using JS fallback:', err);
+      console.error('[Leslie] WASM init failed, staying on passthrough:', err);
     }
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      try { await context.audioWorklet.addModule(`${baseUrl}leslie/Leslie.worklet.js`); } catch { /* ignored */ }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        try {
-          const [wasmResponse, jsResponse] = await Promise.all([
-            fetch(`${baseUrl}leslie/Leslie.wasm`),
-            fetch(`${baseUrl}leslie/Leslie.js`),
-          ]);
-          if (wasmResponse.ok) this.wasmBinary = await wasmResponse.arrayBuffer();
-          if (jsResponse.ok) {
-            let code = await jsResponse.text();
-            code = code
-              .replace(/import\.meta\.url/g, "'.'")
-              .replace(/export\s+default\s+\w+;?\s*$/m, '')
-              .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-              .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-              .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
-              .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
-            // Inject shim for AudioWorklet scope (has globalThis but no `self`)
-            code = 'var self = globalThis;\n' + code;
-            this.jsCode = code;
-          }
-        } catch (fetchErr) {
-          console.warn('[Leslie] Failed to fetch WASM files:', fetchErr);
-        }
-      }
-      this.loadedContexts.add(context);
+  private static async ensureInitialized(ctx: AudioContext): Promise<void> {
+    if (this.loadedContexts.has(ctx)) return;
+    const existing = this.initPromises.get(ctx);
+    if (existing) return existing;
+    const p = (async () => {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      const [wasmResp, jsResp] = await Promise.all([
+        fetch(`${base}leslie/Leslie.wasm`), fetch(`${base}leslie/Leslie.js`),
+      ]);
+      this.wasmBinary = await wasmResp.arrayBuffer();
+      let js = await jsResp.text();
+      js = js.replace(/if\s*\(typeof exports\s*===\s*"object".*$/s, '');
+      this.jsCode = js;
+      await ctx.audioWorklet.addModule(`${base}leslie/Leslie.worklet.js`);
+      this.loadedContexts.add(ctx);
     })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private initFallback() {
-    try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-      this.fallbackNode = rawContext.createScriptProcessor(256, 2, 2);
-      this.fallbackLeslie = new LeslieFallback(rawContext.sampleRate);
-
-      this.fallbackNode.onaudioprocess = (e) => {
-        const inL = e.inputBuffer.getChannelData(0);
-        const inR = e.inputBuffer.getChannelData(1);
-        const outL = e.outputBuffer.getChannelData(0);
-        const outR = e.outputBuffer.getChannelData(1);
-        this.fallbackLeslie!.process(inL, inR, outL, outR);
-      };
-
-      const rawInput = getNativeAudioNode(this.input)!;
-      const rawWet = getNativeAudioNode(this.wetGain)!;
-      rawInput.connect(this.fallbackNode);
-      this.fallbackNode.connect(rawWet);
-      // wetGain → output already connected via Tone.js in constructor
-
-      // Keepalive: ensure ScriptProcessorNode is processed
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.fallbackNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-
-      this.usingFallback = true;
-    } catch (err) {
-      console.warn('[Leslie] Fallback init failed:', err);
-      this.input.connect(this.wetGain);
-    }
-  }
-
-  private swapToWasm() {
-    if (!this.workletNode) return;
-    try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-      // Connect WASM first, then disconnect fallback (avoids silent gap)
-      const rawInput = getNativeAudioNode(this.input)!;
-      const rawWet = getNativeAudioNode(this.wetGain)!;
-      rawInput.connect(this.workletNode);
-      this.workletNode.connect(rawWet);
-      // wetGain → output already connected via Tone.js in constructor
-      // Now safe to disconnect fallback
-      if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-        this.fallbackNode.onaudioprocess = null;
-        this.usingFallback = false;
-      }
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-    } catch (err) {
-      console.warn('[Leslie] WASM swap failed, staying on fallback:', err);
-    }
+    this.initPromises.set(ctx, p);
+    return p;
   }
 
   private sendParam(paramId: number, value: number) {
     if (this.workletNode && this.isWasmReady) {
       this.workletNode.port.postMessage({ type: 'parameter', paramId, value });
     } else {
-      // Queue param until WASM is ready; last write wins for each paramId
       this.pendingParams = this.pendingParams.filter(p => p.paramId !== paramId);
       this.pendingParams.push({ paramId, value });
     }
@@ -264,11 +193,6 @@ export class LeslieEffect extends Tone.ToneAudioNode {
       this.workletNode.port.postMessage({ type: 'dispose' });
       try { this.workletNode.disconnect(); } catch { /* ignored */ }
       this.workletNode = null;
-    }
-    if (this.fallbackNode) {
-      this.fallbackNode.onaudioprocess = null;
-      try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-      this.fallbackNode = null;
     }
     this.dryGain.dispose();
     this.wetGain.dispose();
@@ -281,31 +205,4 @@ export class LeslieEffect extends Tone.ToneAudioNode {
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
-}
-
-/**
- * Simple Leslie fallback: Tremolo + Chorus approximation
- */
-class LeslieFallback {
-  private phase = 0;
-  private _rate = 6.8;
-  private sampleRate: number;
-
-  constructor(sampleRate: number) {
-    this.sampleRate = sampleRate;
-  }
-
-  set rate(v: number) { this._rate = v; }
-
-  process(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array) {
-    const n = inL.length;
-    for (let i = 0; i < n; i++) {
-      const mod = Math.sin(this.phase * 2 * Math.PI);
-      const am = 0.7 + 0.3 * mod;
-      outL[i] = inL[i] * am;
-      outR[i] = inR[i] * (0.7 - 0.3 * mod);
-      this.phase += this._rate / this.sampleRate;
-      if (this.phase >= 1) this.phase -= 1;
-    }
-  }
 }
