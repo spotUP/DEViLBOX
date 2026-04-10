@@ -731,6 +731,26 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const [showReels, setShowReels] = useState(false);
   const [reelFrame, setReelFrame] = useState(0);
+  const [vuL, setVuL] = useState(0);
+  const [vuR, setVuR] = useState(0);
+
+  const { post } = useEffectAnalyser(effect.id, 'waveform');
+
+  // Drive VU meters from post-analyser waveform data
+  useEffect(() => {
+    if (!post || post.length === 0) return;
+    const half = post.length >> 1;
+    let sumL = 0, sumR = 0;
+    // Waveform data is interleaved or mono — compute RMS of first/second half as L/R proxy
+    for (let i = 0; i < half; i++) { sumL += post[i] * post[i]; }
+    for (let i = half; i < post.length; i++) { sumR += post[i] * post[i]; }
+    const rmsL = Math.sqrt(sumL / half);
+    const rmsR = Math.sqrt(sumR / (post.length - half));
+    // Map RMS (0..1) to VU frame (0..64) with a log-ish curve for realistic VU response
+    const toFrame = (rms: number) => Math.min(64, Math.round(Math.pow(Math.min(rms * 3, 1), 0.6) * 64));
+    setVuL(toFrame(rmsL));
+    setVuR(toFrame(rmsR));
+  }, [post]);
 
   const containerH = showReels ? 703 : 266;
   const yOff       = showReels ? 0 : -437;
@@ -875,7 +895,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
         style={{ left: 757, top: 521 + yOff }}
       />
 
-      {/* VU Meter L — decorative static frame 0 */}
+      {/* VU Meter L — driven by post-effect audio level */}
       <div
         style={{
           position: 'absolute',
@@ -885,13 +905,13 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           height: 108,
           backgroundImage: `url(${BASE}VUMeterL.png)`,
           backgroundSize: '108px auto',
-          backgroundPositionY: '0px',
+          backgroundPositionY: `${-(vuL * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
         }}
       />
 
-      {/* VU Meter R — decorative static frame 0 */}
+      {/* VU Meter R — driven by post-effect audio level */}
       <div
         style={{
           position: 'absolute',
@@ -901,7 +921,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           height: 108,
           backgroundImage: `url(${BASE}VUMeterR.png)`,
           backgroundSize: '110px auto',
-          backgroundPositionY: '0px',
+          backgroundPositionY: `${-(vuR * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
         }}
