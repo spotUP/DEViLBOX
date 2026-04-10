@@ -15,6 +15,16 @@ export interface AdPlugMetadata {
   instruments: string[];
 }
 
+export interface ChannelNoteEvent {
+  ch: number;
+  note: number;    // 0=off, 1-96=note
+  inst: number;    // 1-based instrument
+  vol: number;     // 0-63
+  effTyp: number;  // XM effect command
+  eff: number;     // XM effect parameter
+  trigger: number; // 1=new note this tick
+}
+
 export class AdPlugPlayer {
   private context: AudioContext | null = null;
   private gain: GainNode | null = null;
@@ -31,6 +41,9 @@ export class AdPlugPlayer {
 
   /** Per-channel level callback — called ~47fps with float array (0-1 per channel). */
   public onChannelLevels: ((levels: Float32Array) => void) | null = null;
+
+  /** Per-channel note state callback — called with position when channel notes change. */
+  public onChannelNotes: ((notes: ChannelNoteEvent[], order: number, row: number) => void) | null = null;
 
   /** Called when the song ends (all patterns played). */
   public onEnded: (() => void) | null = null;
@@ -157,6 +170,9 @@ export class AdPlugPlayer {
         this.onPosition?.(data.order, data.row, data.audioTime, data.totalFrames);
         if (data.channelLevels) {
           this.onChannelLevels?.(data.channelLevels);
+        }
+        if (data.channelNotes) {
+          this.onChannelNotes?.(data.channelNotes, data.order, data.row);
         }
         break;
       case 'levels':

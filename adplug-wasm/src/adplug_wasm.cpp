@@ -331,6 +331,20 @@ static uint32_t g_channelMuteMask = 0x3FFFF;  // all 18 active by default
 // Per-channel level output buffer (filled during render from shadow regs)
 static float g_channelLevels[18];
 
+// ── Real-time channel state (updated every tick during streaming render) ──
+// This gives the worklet accurate per-channel note/instrument/volume/effect
+// data that matches the actual OPL output, avoiding all extraction bugs.
+struct ChannelState {
+    uint8_t note;       // 0=off, 1-96=note (1-based like tracker)
+    uint8_t inst;       // 1-based instrument index, 0=none
+    uint8_t vol;        // 0-63 (from carrier TL, 0=silent 63=loud)
+    uint8_t effTyp;     // effect command type
+    uint8_t eff;        // effect parameter
+    uint8_t trigger;    // 1 if note just triggered this tick, 0 if sustained
+};
+static ChannelState g_channelState[18];
+static uint8_t g_prevKeyOn[2][9];  // previous tick's key-on state for edge detection
+
 // Reconstruct instrument from shadow registers for a given channel.
 // Returns FULL register data (including TL volume bits) for playback.
 static InstrumentFingerprint getChannelInstrument(int chip, int ch) {
@@ -562,6 +576,9 @@ private:
     }
 };
 
+// Forward declare — defined after accessor classes
+static void updateChannelState();
+
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
@@ -618,6 +635,9 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
 
     // Reset OPL emulator
     g_mutingOpl->init();
+    memset(g_channelState, 0, sizeof(g_channelState));
+    memset(g_prevKeyOn, 0, sizeof(g_prevKeyOn));
+    g_capturedInstruments.clear();
 
     // Use AdPlug factory to auto-detect format and create player
     // Pass the muting OPL wrapper so we can mute channels during streaming.
@@ -651,10 +671,10 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     // Detect player type for pattern extraction
     detectPlayerType();
 
-    // D00: pre-extract native pattern grid with full effect info
-    if (g_playerType == PT_D00) {
-        d00NativeExtract(asD00Player());
-    }
+    // D00 native extraction disabled — was producing empty grids for packed v4.
+    // OPL capture fallback handles D00 correctly when triggered by TypeScript.
+    // Live channel state enrichment (updateChannelState) provides D00-specific
+    // note/inst/effect data during streaming playback.
 
     return 0;
 }
@@ -666,6 +686,8 @@ void adplug_rewind(uint32_t subsong) {
         g_mutingOpl->init();
         g_sampleAccum = 0.0;
         g_renderTickCount = 0;
+        memset(g_channelState, 0, sizeof(g_channelState));
+        memset(g_prevKeyOn, 0, sizeof(g_prevKeyOn));
         float refresh = g_player->getrefresh();
         if (refresh <= 0.0f) refresh = 70.0f;
         g_samplesPerTick = (double)g_sampleRate / (double)refresh;
@@ -703,6 +725,9 @@ int adplug_render(int16_t* buffer, uint32_t maxFrames) {
 
             // Update per-channel levels from shadow registers
             if (g_mutingOpl) g_mutingOpl->updateChannelLevels();
+
+            // Update per-channel note/inst/vol/effect state
+            updateChannelState();
 
             float refresh = g_player->getrefresh();
             if (refresh > 0.0f)
@@ -807,6 +832,26 @@ void adplug_free(uint8_t* ptr) {
     free(ptr);
 }
 
+/**
+ * Get real-time channel state for a specific channel.
+ * Returns packed: note(8) | inst(8) | vol(8) | trigger(1)+effTyp(7) | eff(8)
+ * Called from worklet after each render to build live pattern grid.
+ * 40 bits packed into a uint64 returned as two uint32s via pointer.
+ * Simpler: return pointer to ChannelState array (6 bytes per channel).
+ */
+EMSCRIPTEN_KEEPALIVE
+uint8_t* adplug_get_channel_state_ptr() {
+    return (uint8_t*)g_channelState;
+}
+
+/**
+ * Get size of a single ChannelState struct (for JS offset calculation).
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_channel_state_stride() {
+    return sizeof(ChannelState);
+}
+
 } // extern "C"
 
 // ── Pattern/Instrument Extraction ──────────────────────────────────────────
@@ -839,6 +884,7 @@ public:
     using CmodPlayer::restartpos;
     using CmodPlayer::tempo;
     using CmodPlayer::bpm;
+    using CmodPlayer::channel;
 };
 
 class ChscPlayerAccessor : public ChscPlayer {
@@ -1349,6 +1395,87 @@ static void detectPlayerType() {
     // Fallback: if none of the above matched, use OPL capture
     // (covers ADL, BAM, GOT, KSM, LAA, MDI, MKJ, MSC, PLX, RAW, RIX, XAD, XSM)
     g_playerType = PT_OPL_CAPTURE;
+}
+
+// ── Real-time channel state (called every tick during streaming render) ──
+// Reads OPL shadow registers for note/volume, enriches from player internals.
+static void updateChannelState() {
+    for (int chip = 0; chip < 2; chip++) {
+        for (int ch = 0; ch < 9; ch++) {
+            int globalCh = chip * 9 + ch;
+            ChannelState& cs = g_channelState[globalCh];
+            bool keyOn = g_oplKeyOn[chip][ch];
+            bool wasOn = g_prevKeyOn[chip][ch] != 0;
+
+            if (keyOn) {
+                uint16_t fnum = g_oplRegs[chip][0xA0 + ch] |
+                               ((g_oplRegs[chip][0xB0 + ch] & 0x03) << 8);
+                uint8_t block = (g_oplRegs[chip][0xB0 + ch] >> 2) & 0x07;
+                cs.note = fnum_to_note(fnum, block);
+
+                uint8_t carrierTL = g_oplRegs[chip][0x40 + OPL_OP_OFFSETS[ch][1]] & 0x3F;
+                cs.vol = 63 - carrierTL;
+
+                // Trigger on key-on edge (was off, now on)
+                cs.trigger = (!wasOn) ? 1 : 0;
+
+                // Default instrument from OPL fingerprint (if no format-specific enrichment)
+                if (!wasOn) {
+                    InstrumentFingerprint fp = getChannelInstrument(chip, ch);
+                    cs.inst = findOrAddInstrument(fp);
+                }
+            } else {
+                if (wasOn) {
+                    cs.note = 0;
+                    cs.vol = 0;
+                    cs.trigger = 0;
+                    cs.effTyp = 0;
+                    cs.eff = 0;
+                }
+            }
+
+            g_prevKeyOn[chip][ch] = keyOn ? 1 : 0;
+        }
+    }
+
+    // Enrich D00 channels with player-internal state
+    if (g_playerType == PT_D00) {
+        auto* dp = asD00Player();
+        if (dp) {
+            for (int c = 0; c < 9; c++) {
+                ChannelState& cs = g_channelState[c];
+                if (cs.note > 0) {
+                    cs.inst = (uint8_t)(dp->channel[c].inst + 1);
+                    if (dp->channel[c].slideval != 0) {
+                        cs.effTyp = dp->channel[c].slideval > 0 ? 0x01 : 0x02;
+                        cs.eff = (uint8_t)abs(dp->channel[c].slideval);
+                    } else if (dp->channel[c].vibspeed != 0) {
+                        cs.effTyp = 0x04;
+                        cs.eff = (uint8_t)((dp->channel[c].vibspeed << 4) | dp->channel[c].vibdepth);
+                    } else {
+                        cs.effTyp = 0;
+                        cs.eff = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    // Enrich CmodPlayer channels with native note/inst/fx
+    if (g_playerType == PT_CMOD) {
+        auto* mp = asModPlayer();
+        if (mp && mp->channel) {
+            uint32_t nch = mp->getNchans();
+            for (uint32_t c = 0; c < nch && c < 18; c++) {
+                ChannelState& cs = g_channelState[c];
+                if (cs.note > 0 && cs.trigger) {
+                    cs.inst = mp->channel[c].inst + 1;
+                    cs.effTyp = mp->channel[c].fx;
+                    cs.eff = (mp->channel[c].info1 << 4) | mp->channel[c].info2;
+                }
+            }
+        }
+    }
 }
 
 extern "C" {
@@ -2054,6 +2181,12 @@ uint32_t adplug_capture_song() {
 
     delete capturePlayer;
     delete captureRealOpl;
+
+    // Sort captured notes by tick for correct binary search in adplug_get_note()
+    std::sort(g_capturedNotes.begin(), g_capturedNotes.end(),
+        [](const CapturedNote& a, const CapturedNote& b) {
+            return a.tick < b.tick;
+        });
 
     // Compute actual ticks-per-row from note spacing
     g_captureTicksPerRow = computeCaptureTicksPerRow();
