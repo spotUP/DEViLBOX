@@ -1128,7 +1128,7 @@ export class ToneEngine {
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'FredEditorReplayerSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
        'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
-       'KlysSynth', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth'].includes(c.synthType || '') ||
+       'KlysSynth', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'OPL3'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -1144,7 +1144,8 @@ export class ToneEngine {
         || c.synthType === 'HippelCoSoSynth' || c.synthType === 'RobHubbardSynth' || c.synthType === 'SteveTurnerSynth'
         || c.synthType === 'DavidWhittakerSynth' || c.synthType === 'SonicArrangerSynth'
         || c.synthType === 'InStereo2Synth' || c.synthType === 'InStereo1Synth' || c.synthType === 'StartrekkerAMSynth'
-        || c.synthType === 'DeltaMusic1Synth' || c.synthType === 'DeltaMusic2Synth') {
+        || c.synthType === 'DeltaMusic1Synth' || c.synthType === 'DeltaMusic2Synth'
+        || c.synthType === 'OPL3') {
         if (seenNativePlayers.has(c.synthType!)) return false;
         seenNativePlayers.add(c.synthType!);
       }
