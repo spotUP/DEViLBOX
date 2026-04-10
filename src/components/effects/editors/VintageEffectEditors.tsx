@@ -665,36 +665,38 @@ interface FilmstripKnobProps {
   style?: React.CSSProperties;
 }
 
-const FilmstripKnob: React.FC<FilmstripKnobProps> = ({
+const FilmstripKnob: React.FC<FilmstripKnobProps> = React.memo(({
   src, frameCount, frameW, frameH, value, onChange, defaultValue = 0.5, style,
 }) => {
   const frame = Math.round(value * (frameCount - 1));
   const bgY   = -(frame * frameH);
 
   const startRef = useRef<{ startY: number; startValue: number } | null>(null);
+  const onChangeRef = useRef(onChange);
+  const valueRef = useRef(value);
+  onChangeRef.current = onChange;
+  valueRef.current = value;
 
-  // Pointer events give us correct pointerId for setPointerCapture and work
-  // cross-browser (Firefox/Safari don't expose pointerId on MouseEvent).
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
-    startRef.current = { startY: e.clientY, startValue: value };
+    startRef.current = { startY: e.clientY, startValue: valueRef.current };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, [value]);
+  }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!startRef.current) return;
     const delta = startRef.current.startY - e.clientY;
     const newVal = Math.max(0, Math.min(1, startRef.current.startValue + delta / 150));
-    onChange(newVal);
-  }, [onChange]);
+    onChangeRef.current(newVal);
+  }, []);
 
   const onPointerUp = useCallback(() => {
     startRef.current = null;
   }, []);
 
   const onDblClick = useCallback(() => {
-    onChange(defaultValue);
-  }, [onChange, defaultValue]);
+    onChangeRef.current(defaultValue);
+  }, [defaultValue]);
 
   return (
     <div
@@ -716,7 +718,7 @@ const FilmstripKnob: React.FC<FilmstripKnobProps> = ({
       }}
     />
   );
-};
+});
 
 
 export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
@@ -731,19 +733,26 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   const { post } = useEffectAnalyser(effect.id, 'waveform');
 
   // Drive VU meters from post-analyser waveform data
+  const vuLRef = useRef(0);
+  const vuRRef = useRef(0);
   useEffect(() => {
     if (!post || post.length === 0) return;
     const half = post.length >> 1;
     let sumL = 0, sumR = 0;
-    // Waveform data is interleaved or mono — compute RMS of first/second half as L/R proxy
     for (let i = 0; i < half; i++) { sumL += post[i] * post[i]; }
     for (let i = half; i < post.length; i++) { sumR += post[i] * post[i]; }
     const rmsL = Math.sqrt(sumL / half);
     const rmsR = Math.sqrt(sumR / (post.length - half));
-    // Map RMS (0..1) to VU frame (0..64) with a log-ish curve for realistic VU response
     const toFrame = (rms: number) => Math.min(64, Math.round(Math.pow(Math.min(rms * 3, 1), 0.6) * 64));
-    setVuL(toFrame(rmsL));
-    setVuR(toFrame(rmsR));
+    const newL = toFrame(rmsL);
+    const newR = toFrame(rmsR);
+    // Only trigger re-render when VU frame actually changes
+    if (newL !== vuLRef.current || newR !== vuRRef.current) {
+      vuLRef.current = newL;
+      vuRRef.current = newR;
+      setVuL(newL);
+      setVuR(newR);
+    }
   }, [post]);
 
   const containerH = 703;
