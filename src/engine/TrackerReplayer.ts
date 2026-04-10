@@ -330,6 +330,10 @@ export interface TrackerSong {
   uadeEditableFileData?: ArrayBuffer;
   /** Original filename hint for UADE format detection */
   uadeEditableFileName?: string;
+  /** Raw file binary for AdPlug streaming playback (patterns displayed, AdPlug renders audio) */
+  adplugFileData?: ArrayBuffer;
+  /** Original filename for AdPlug format detection */
+  adplugFileName?: string;
   /** Companion files for two-file UADE formats (e.g. smp.*, .ins, .set) */
   uadeCompanionFiles?: Map<string, ArrayBuffer>;
   /** Raw Symphonie Pro (.symmod) binary for SymphonieEngine playback + export */
@@ -1747,9 +1751,9 @@ export class TrackerReplayer {
         'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth',
         'MusicLineSynth', 'JamCrackerSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
         'TFMXSynth', 'FCSynth', 'C64SID',
-        // OPL3 is NOT in this list — replayer fires notes through OPL3Synth
-        // for editable playback. Streaming player is only used as fallback
-        // when pattern extraction fails.
+        // OPL3: AdPlug streaming player handles audio when adplugFileData is present.
+        // The replayer displays patterns and follows position — same as UADE editable.
+        'OPL3',
         // WASM player-pool synths — each has a fixed-size pool, must dedup
         'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
         'FredSynth', 'FredEditorReplayerSynth', 'OctaMEDSynth',
@@ -1769,9 +1773,6 @@ export class TrackerReplayer {
       if (this._replacedInstruments.size > 0) {
         console.log('[HybridPlayback] Replaced instruments:', Array.from(this._replacedInstruments));
       }
-
-      // OPL3 instruments are played note-by-note through the OPL3Synth WASM,
-      // driven by the TS replayer like any other synth. No streaming player needed.
     }
 
     // Start automation capture → store sync (converts register writes to automation curves).
