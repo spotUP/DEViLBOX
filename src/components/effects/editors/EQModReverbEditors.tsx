@@ -950,12 +950,15 @@ export const MashaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
       <Section>
         <SectionHeader size="lg" color="#dc2626" title="Masha" />
         <div className="flex justify-center mb-4">
-          <button onClick={() => onUpdateParameter('active', active >= 0.5 ? 0 : 1)}
-            className={`px-6 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+          <button
+            onPointerDown={() => onUpdateParameter('active', 1)}
+            onPointerUp={() => onUpdateParameter('active', 0)}
+            onPointerLeave={() => { if (active >= 0.5) onUpdateParameter('active', 0); }}
+            className={`px-6 py-2 rounded-lg text-sm font-bold border-2 transition-all select-none ${
               active >= 0.5
                 ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-600/40 animate-pulse'
                 : 'bg-black/40 border-dark-border text-text-muted hover:border-red-700'
-            }`}>{active >= 0.5 ? 'ACTIVE' : 'BYPASS'}</button>
+            }`}>{active >= 0.5 ? 'ACTIVE' : 'HOLD'}</button>
         </div>
         <div className="flex justify-around items-end">
           <Knob value={getParam(effect, 'time', 100)} min={1} max={500}
