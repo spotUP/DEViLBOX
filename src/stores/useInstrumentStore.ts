@@ -131,7 +131,7 @@ interface InstrumentStore {
   saveAsPreset: (instrumentId: number, name: string, category: InstrumentPreset['category']) => void;
 
   // Import
-  loadInstruments: (instruments: InstrumentConfig[]) => void;
+  loadInstruments: (instruments: InstrumentConfig[], options?: { skipPreload?: boolean }) => void;
   loadFurnaceInstrument: (buffer: ArrayBuffer) => void;
   loadDefleMaskInstrument: (buffer: ArrayBuffer) => void;
   loadDefleMaskWavetable: (buffer: ArrayBuffer) => void;
@@ -1479,7 +1479,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       }),
 
     // Import instruments from song file
-    loadInstruments: (newInstruments) => {
+    loadInstruments: (newInstruments, options) => {
       // DIAGNOSTIC: trace who's calling loadInstruments (debug MIDI silence on loop)
       console.warn('[InstrumentStore] loadInstruments called with', newInstruments.length, 'instruments');
       console.trace('[InstrumentStore] loadInstruments caller');
@@ -1549,9 +1549,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // Preload instruments so WASM synths (TB303, Furnace, etc.) are initialized
         // before playback starts. Without this, on-demand creation in getInstrument()
         // returns synths whose AudioWorklet hasn't loaded yet → silent notes.
-        getToneEngine().preloadInstruments(migratedInstruments).catch(err => {
-          console.warn('[InstrumentStore] Instrument preload failed:', err);
-        });
+        // Skip for OPL3/AdLib songs where audio comes from the streaming player.
+        if (!options?.skipPreload) {
+          getToneEngine().preloadInstruments(migratedInstruments).catch(err => {
+            console.warn('[InstrumentStore] Instrument preload failed:', err);
+          });
+        }
       });
     },
 

@@ -1651,7 +1651,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
           } as typeof song.patterns[0]['importMetadata'];
         }
 
-        loadInstruments(song.instruments);
+        loadInstruments(song.instruments, { skipPreload: true });
         loadPatterns(song.patterns);
         setCurrentPattern(0);
         if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
@@ -1738,8 +1738,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
                 } as typeof song.patterns[0]['importMetadata'];
               }
 
-              loadInstruments(song.instruments);
-              loadPatterns(song.patterns);
+              loadInstruments(song.instruments, { skipPreload: true });              loadPatterns(song.patterns);
               setCurrentPattern(0);
               if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
               setOriginalModuleData(null);
