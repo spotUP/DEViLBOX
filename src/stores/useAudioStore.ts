@@ -10,6 +10,7 @@ import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
 
 interface AudioStore {
   // State
@@ -159,7 +160,7 @@ export const useAudioStore = create<AudioStore>()(
           category: 'tonejs',  // Master effects are Tone.js by default
           type: effectType,
           enabled: true,
-          wet: 100,
+          wet: getDefaultEffectWet(effectType),
           parameters: getDefaultEffectParameters(effectType),
         };
         state.masterEffects.push(newEffect);
