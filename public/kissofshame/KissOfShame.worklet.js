@@ -87,7 +87,37 @@ class KissOfShameProcessor extends AudioWorkletProcessor {
         config.wasmBinary = wasmBinary;
       }
 
-      this.module = await globalThis.createKissOfShameModule(config);
+      // Intercept WebAssembly.instantiate to capture WASM memory
+      // (Emscripten may not export HEAPF32 in minimal builds)
+      let capturedMemory = null;
+      const origInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = async function(...args) {
+        const result = await origInstantiate.apply(this, args);
+        const instance = result.instance || result;
+        if (instance.exports) {
+          for (const value of Object.values(instance.exports)) {
+            if (value instanceof WebAssembly.Memory) {
+              capturedMemory = value;
+              break;
+            }
+          }
+        }
+        return result;
+      };
+
+      let mod;
+      try {
+        mod = await globalThis.createKissOfShameModule(config);
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
+      }
+
+      // Store captured WASM memory on module for buffer views
+      if (capturedMemory && !mod.wasmMemory) {
+        mod.wasmMemory = capturedMemory;
+      }
+
+      this.module = mod;
 
       // Wrap exported functions
       this.wasm = {
@@ -146,15 +176,20 @@ class KissOfShameProcessor extends AudioWorkletProcessor {
   updateBufferViews() {
     if (!this.module || !this.inPtrL) return;
 
+    // Use HEAPF32 if available, otherwise fall back to captured wasmMemory
     const heapF32 = this.module.HEAPF32;
-    if (!heapF32) return;
+    const heapBuf = heapF32
+      ? heapF32.buffer
+      : (this.module.wasmMemory ? this.module.wasmMemory.buffer : null);
 
-    if (this.lastHeapBuffer !== heapF32.buffer) {
-      this.inBufL  = new Float32Array(heapF32.buffer, this.inPtrL,  this.bufferSize);
-      this.inBufR  = new Float32Array(heapF32.buffer, this.inPtrR,  this.bufferSize);
-      this.outBufL = new Float32Array(heapF32.buffer, this.outPtrL, this.bufferSize);
-      this.outBufR = new Float32Array(heapF32.buffer, this.outPtrR, this.bufferSize);
-      this.lastHeapBuffer = heapF32.buffer;
+    if (!heapBuf) return;
+
+    if (this.lastHeapBuffer !== heapBuf) {
+      this.inBufL  = new Float32Array(heapBuf, this.inPtrL,  this.bufferSize);
+      this.inBufR  = new Float32Array(heapBuf, this.inPtrR,  this.bufferSize);
+      this.outBufL = new Float32Array(heapBuf, this.outPtrL, this.bufferSize);
+      this.outBufR = new Float32Array(heapBuf, this.outPtrR, this.bufferSize);
+      this.lastHeapBuffer = heapBuf;
     }
   }
 
@@ -215,6 +250,9 @@ class KissOfShameProcessor extends AudioWorkletProcessor {
     this.updateBufferViews();
 
     if (!this.inBufL || !this.outBufL) {
+      // Passthrough if buffers not available (don't output silence)
+      outputL.set(inputL);
+      outputR.set(inputR);
       return true;
     }
 
