@@ -209,6 +209,38 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
         this.lastReportedOrder = order;
         this.lastReportedRow = row;
+
+        // Read per-channel note/inst/vol/effect state from WASM
+        let channelNotes = null;
+        try {
+          if (this.module._adplug_get_channel_state_ptr) {
+            const statePtr = this.module._adplug_get_channel_state_ptr();
+            const stride = this.module._adplug_get_channel_state_stride
+              ? this.module._adplug_get_channel_state_stride()
+              : 6;
+            const numCh = this.module._adplug_get_num_audio_channels
+              ? this.module._adplug_get_num_audio_channels()
+              : 9;
+            const heap = this.module.HEAPU8;
+            channelNotes = [];
+            for (let i = 0; i < numCh; i++) {
+              const base = statePtr + i * stride;
+              const note = heap[base];
+              const inst = heap[base + 1];
+              const vol = heap[base + 2];
+              const effTyp = heap[base + 3];
+              const eff = heap[base + 4];
+              const trigger = heap[base + 5];
+              if (note > 0 || trigger) {
+                channelNotes.push({ ch: i, note, inst, vol, effTyp, eff, trigger });
+              }
+            }
+            if (channelNotes.length === 0) channelNotes = null;
+          }
+        } catch (e) {
+          // Ignore — WASM memory may have grown/detached
+        }
+
         this.port.postMessage({
           type: 'position',
           order,
@@ -216,6 +248,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
           audioTime: currentTime,
           totalFrames: this.totalFramesRendered,
           channelLevels,
+          channelNotes,
         });
       } else if (channelLevels) {
         // Even if position didn't change, send levels for VU meters
