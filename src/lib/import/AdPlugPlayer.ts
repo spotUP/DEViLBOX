@@ -175,8 +175,10 @@ export class AdPlugPlayer {
     const ok = await this.ensureInitialized();
     if (!ok || !this.processNode) return false;
 
-    // Only restore gain if auto-playing; otherwise leave zeroed until explicit play()
-    if (autoPlay && this.gain) this.gain.gain.value = 1;
+    // Only restore gain if auto-playing; otherwise zero gain until explicit play()
+    if (this.gain) {
+      this.gain.gain.value = autoPlay ? 1 : 0;
+    }
 
     return new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => resolve(false), 10000);
