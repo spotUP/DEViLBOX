@@ -1919,12 +1919,27 @@ export class TrackerReplayer {
           this._activeWasmEngine = adplugPlayer;
 
           // Subscribe to position updates from the streaming player.
-          // Route through PlaybackCoordinator for DisplayStateRing queuing
-          // and latency compensation (just like UADE and libopenmpt do).
+          // Directly update the coordinator's position and queue with
+          // duration=0 (no smooth interpolation) — AdPlug's row rate
+          // may not match the computed BPM/speed duration.
           adplugPlayer.onPosition = (order: number, row: number, audioTime?: number) => {
             if (!this.playing || !this.song) return;
             if (order >= 0 && order < (this.song.songPositions?.length ?? 0)) {
-              this.coordinator.dispatchEnginePosition(row, order, audioTime, false);
+              this.coordinator.songPos = order;
+              this.coordinator.pattPos = row;
+              const patternNum = this.song.songPositions[order] ?? 0;
+              const ac = this.coordinator.context.audioContext;
+              let time: number;
+              if (audioTime != null && ac) {
+                const latency = ac.outputLatency ?? ac.baseLatency ?? 0;
+                time = audioTime + latency;
+              } else {
+                time = Tone.now();
+              }
+              this.coordinator.queueDisplayState(time, row, patternNum, order, 0, 0);
+              if (this.coordinator.onRowChange) {
+                this.coordinator.onRowChange(row, patternNum, order);
+              }
             }
           };
 
