@@ -26,6 +26,12 @@ export class AdPlugPlayer {
   public meta: AdPlugMetadata | null = null;
   public playing = false;
 
+  /** Position callback — called ~15fps from the worklet with (order, row). */
+  public onPosition: ((order: number, row: number) => void) | null = null;
+
+  /** Called when the song ends (all patterns played). */
+  public onEnded: (() => void) | null = null;
+
   constructor() {}
 
   private async ensureInitialized(): Promise<boolean> {
@@ -141,11 +147,15 @@ export class AdPlugPlayer {
           subsongs: data.subsongs,
           instruments: data.instruments,
         };
-        this.playing = true;
+        // Don't set this.playing here — it's set in load() based on autoPlay
         console.log(`[AdPlugPlayer] Loaded: "${data.title}" (${data.formatType}), ${data.subsongs} subsong(s), ${data.instruments.length} instruments`);
+        break;
+      case 'position':
+        this.onPosition?.(data.order, data.row);
         break;
       case 'ended':
         this.playing = false;
+        this.onEnded?.();
         break;
       case 'error':
         console.error('[AdPlugPlayer] Error:', data.error);
@@ -154,18 +164,19 @@ export class AdPlugPlayer {
   }
 
   /**
-   * Load and play a file from an ArrayBuffer.
+   * Load a file from an ArrayBuffer.
    * @param buffer Raw file data
    * @param filename Filename with extension (used for format detection)
    * @param companions Optional companion files (e.g. patch.003 for SCI)
+   * @param autoPlay If false, load but don't start playback (default: true)
    * @returns true if loaded successfully
    */
-  async load(buffer: ArrayBuffer, filename: string, companions?: Array<{ name: string; data: Uint8Array }>): Promise<boolean> {
+  async load(buffer: ArrayBuffer, filename: string, companions?: Array<{ name: string; data: Uint8Array }>, autoPlay = true): Promise<boolean> {
     const ok = await this.ensureInitialized();
     if (!ok || !this.processNode) return false;
 
-    // Restore gain (may have been zeroed by stop())
-    if (this.gain) this.gain.gain.value = 1;
+    // Only restore gain if auto-playing; otherwise leave zeroed until explicit play()
+    if (autoPlay && this.gain) this.gain.gain.value = 1;
 
     return new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => resolve(false), 10000);
@@ -174,6 +185,7 @@ export class AdPlugPlayer {
         if (msg.data.type === 'loaded') {
           clearTimeout(timeout);
           this.processNode!.port.removeEventListener('message', handler);
+          if (autoPlay) this.playing = true;
           resolve(true);
         } else if (msg.data.type === 'error') {
           clearTimeout(timeout);
@@ -185,8 +197,18 @@ export class AdPlugPlayer {
       this.processNode!.port.addEventListener('message', handler);
 
       const data = new Uint8Array(buffer);
-      this.processNode!.port.postMessage({ type: 'load', data, filename, companions: companions || [] });
+      this.processNode!.port.postMessage({ type: 'load', data, filename, companions: companions || [], autoPlay });
     });
+  }
+
+  play() {
+    this.playing = true;
+    if (this.processNode) {
+      this.processNode.port.postMessage({ type: 'play' });
+    }
+    if (this.gain) {
+      this.gain.gain.value = 1;
+    }
   }
 
   stop() {

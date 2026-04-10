@@ -13,6 +13,9 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.renderBuffer = null;
     this.renderBufferSize = 0;
+    this.positionReportCounter = 0;
+    this.lastReportedOrder = -1;
+    this.lastReportedRow = -1;
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
@@ -23,9 +26,10 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
         await this.initModule(msg.sampleRate, msg.wasmBinary, msg.jsCode);
         break;
       case 'load':
-        this.loadFile(msg.data, msg.filename, msg.companions);
+        this.loadFile(msg.data, msg.filename, msg.companions, msg.autoPlay !== false);
         break;
       case 'play':
+        if (this.gain !== undefined) this.gain = 1;
         this.playing = true;
         break;
       case 'stop':
@@ -65,7 +69,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     }
   }
 
-  loadFile(data, filename, companions) {
+  loadFile(data, filename, companions, autoPlay) {
     if (!this.initialized) {
       this.port.postMessage({ type: 'error', error: 'Not initialized' });
       return;
@@ -107,7 +111,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       this.module._adplug_free(ptr);
 
       if (result === 0) {
-        this.playing = true;
+        this.playing = autoPlay;
 
         // Read metadata
         const titlePtr = this.module._adplug_get_title();
@@ -160,6 +164,18 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < numFrames; i++) {
       left[i] = heap16[baseIdx + i * 2] / 32768.0;
       right[i] = heap16[baseIdx + i * 2 + 1] / 32768.0;
+    }
+
+    // Report position ~15 times per second (48000/128 = 375 callbacks/sec, 375/25 = 15)
+    if (++this.positionReportCounter >= 25) {
+      this.positionReportCounter = 0;
+      const order = this.module._adplug_get_position();
+      const row = this.module._adplug_get_row();
+      if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
+        this.lastReportedOrder = order;
+        this.lastReportedRow = row;
+        this.port.postMessage({ type: 'position', order, row });
+      }
     }
 
     if (result === 0) {

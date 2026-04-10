@@ -1600,6 +1600,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
 
     // Try WASM extraction first — for CmodPlayer-based formats this gives us
     // editable patterns + OPL3 instruments instead of stream-only audio
+    let extractionSucceeded = false;
     try {
       // Stop ALL audio immediately — streaming player, transport, and synth voices.
       // This must happen BEFORE extraction starts so the old song doesn't keep
@@ -1669,6 +1670,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
         // of unnecessary WASM synths. The streaming player below handles all audio.
 
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+        extractionSucceeded = true;
         // Don't return — fall through to start the streaming player for audio
       }
     } catch (err) {
@@ -1686,7 +1688,10 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
       data: new Uint8Array(c.data),
     }));
 
-    let ok = await player.load(arrayBuffer, file.name, streamCompanions);
+    // When extraction succeeded, load the streaming player without auto-play.
+    // The transport play/stop will control it. For pure streaming (no extraction),
+    // auto-play since there's no transport integration.
+    let ok = await player.load(arrayBuffer, file.name, streamCompanions, !extractionSucceeded);
 
     if (!ok) {
       // For companion-dependent formats, prompt user to select the companion file
@@ -1746,18 +1751,19 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
                 description: `Imported from ${file.name}`,
               });
               applyEditorMode({});
-              await engine.preloadInstruments(song.instruments);
+              // Don't preloadInstruments — streaming player handles audio
               notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-              return { success: true, message: `Imported editable: ${song.name}` };
+              extractionSucceeded = true;
+              // Don't return — fall through to streaming player retry below
             }
           } catch { /* extraction failed, try streaming */ }
 
-          // Retry streaming with companion
+          // Retry streaming with companion (load without auto-play if extraction succeeded)
           const retryCompanions = companions.map(c => ({
             name: c.name,
             data: new Uint8Array(c.data),
           }));
-          ok = await player.load(arrayBuffer, file.name, retryCompanions);
+          ok = await player.load(arrayBuffer, file.name, retryCompanions, !extractionSucceeded);
         }
       }
       if (!ok) {
@@ -1768,9 +1774,11 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
     const meta = player.meta;
     const title = meta?.title || file.name.replace(/\.[^.]+$/, '');
     const type = meta?.formatType || 'OPL';
-    notify.success(`Playing ${type}: ${title}`);
+    if (!extractionSucceeded) {
+      notify.success(`Playing ${type}: ${title}`);
+    }
 
-    return { success: true, message: `Playing ${type}: ${title}` };
+    return { success: true, message: extractionSucceeded ? `Imported editable + streaming: ${title}` : `Playing ${type}: ${title}` };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: `Failed to load AdPlug file: ${msg}` };

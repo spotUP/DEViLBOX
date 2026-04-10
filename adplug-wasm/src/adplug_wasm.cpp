@@ -904,6 +904,20 @@ uint32_t adplug_get_restart_pos() {
 
 // ── Order List ─────────────────────────────────────────────────────────────
 
+// ── Playback Position (for live position reporting) ───────────────────────
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_position() {
+    return g_player ? g_player->getorder() : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_row() {
+    return g_player ? g_player->getrow() : 0;
+}
+
+// ── Order List (continued) ────────────────────────────────────────────────
+
 EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_order_entry(uint32_t idx) {
     // CmodPlayer
