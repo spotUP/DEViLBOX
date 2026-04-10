@@ -259,7 +259,7 @@ public:
 
         const float mix = params_[PARAM_MIX];
         const float dry = 1.0f - mix;
-        const float decay = 0.5f + params_[PARAM_DECAY] * 0.495f; // map 0-1 -> 0.5-0.995
+        const float decay = 0.3f + params_[PARAM_DECAY] * 0.45f; // map 0-1 -> 0.3-0.75
         const float shimmer = params_[PARAM_SHIMMER];
         const float damping = params_[PARAM_DAMPING];
         const float modDepth = params_[PARAM_MOD_DEPTH] * 16.0f * srScale_;
@@ -311,8 +311,9 @@ public:
             float shiftedR = pitchR_.process(tankOutR);
 
             // Mix clean tank + shimmer for feedback, with soft clip to prevent runaway
-            feedbackL_ = tanhf(tankOutL * (1.0f - shimmer) + shiftedL * shimmer);
-            feedbackR_ = tanhf(tankOutR * (1.0f - shimmer) + shiftedR * shimmer);
+            float shimAmt = shimmer * 0.6f; // scale down shimmer to prevent instability
+            feedbackL_ = tanhf(tankOutL * (1.0f - shimAmt) + shiftedL * shimAmt);
+            feedbackR_ = tanhf(tankOutR * (1.0f - shimAmt) + shiftedR * shimAmt);
 
             // Output: wet L/R mixed with dry input (soft clip wet signal)
             outputL[i] = inputL[i] * dry + tanhf(tankOutL) * mix;

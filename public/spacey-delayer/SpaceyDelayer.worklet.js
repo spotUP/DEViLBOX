@@ -2,7 +2,71 @@
  * SpaceyDelayer AudioWorklet Processor
  * Multitap tape delay effect backed by WASM DSP engine.
  * Stereo in/out effect processing.
+ *
+ * Uses WebAssembly.instantiate interception to capture WASM memory
+ * (Emscripten 4.x no longer auto-exports HEAPF32).
  */
+
+// Polyfill URL for AudioWorklet scope
+if (typeof URL === 'undefined') {
+  globalThis.URL = class URL {
+    constructor(path, base) {
+      this.href = base ? (base + '/' + path) : path;
+      this.pathname = path;
+    }
+    toString() { return this.href; }
+  };
+}
+
+let sharedModule = null;
+let sharedModulePromise = null;
+
+async function getOrCreateModule(wasmBinary, jsCode) {
+  if (sharedModule) return sharedModule;
+  if (sharedModulePromise) return sharedModulePromise;
+
+  sharedModulePromise = (async () => {
+    const wrappedCode = jsCode + '\nreturn createSpaceyDelayer;';
+    const createModule = new Function(wrappedCode)();
+
+    if (typeof createModule !== 'function') {
+      sharedModulePromise = null;
+      throw new Error('Could not load SpaceyDelayer module factory');
+    }
+
+    let capturedMemory = null;
+    const origInstantiate = WebAssembly.instantiate;
+    WebAssembly.instantiate = async function(...args) {
+      const result = await origInstantiate.apply(this, args);
+      const instance = result.instance || result;
+      if (instance.exports) {
+        for (const value of Object.values(instance.exports)) {
+          if (value instanceof WebAssembly.Memory) {
+            capturedMemory = value;
+            break;
+          }
+        }
+      }
+      return result;
+    };
+
+    let Module;
+    try {
+      Module = await createModule({ wasmBinary });
+    } finally {
+      WebAssembly.instantiate = origInstantiate;
+    }
+
+    if (capturedMemory && !Module.wasmMemory) {
+      Module.wasmMemory = capturedMemory;
+    }
+
+    sharedModule = Module;
+    return Module;
+  })();
+
+  return sharedModulePromise;
+}
 
 class SpaceyDelayerProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -11,9 +75,8 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
     this.initialized = false;
     this.handle = 0;
     this.bufferSize = 128;
-    this.lastHeapBuffer = null;
+    this._wasmMemory = null;
 
-    // WASM memory pointers
     this.inPtrL = 0;
     this.inPtrR = 0;
     this.outPtrL = 0;
@@ -23,10 +86,7 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
     this.outBufL = null;
     this.outBufR = null;
 
-    // WASM function references
     this.wasm = null;
-
-    // Pending messages
     this.pendingMessages = [];
 
     this.port.onmessage = (event) => {
@@ -39,7 +99,6 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
       case 'init':
         await this.initModule(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
-
       case 'setParameter':
         if (!this.initialized || !this.handle) {
           this.pendingMessages.push(data);
@@ -47,7 +106,6 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
         }
         this.setParameter(data.param, data.value);
         break;
-
       case 'dispose':
         this.cleanup();
         break;
@@ -58,68 +116,52 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
     try {
       this.cleanup();
 
-      // Load JS module via Function constructor
-      if (jsCode && !globalThis.createSpaceyDelayer) {
-        if (typeof globalThis.URL === 'undefined') {
-          globalThis.URL = class URL {
-            constructor(path) { this.href = path; }
-          };
-        }
+      const Module = await getOrCreateModule(wasmBinary, jsCode);
+      this.module = Module;
 
-        const wrappedCode = jsCode + '\nreturn createSpaceyDelayer;';
-        const factory = new Function(wrappedCode);
-        const result = factory();
-
-        if (typeof result === 'function') {
-          globalThis.createSpaceyDelayer = result;
-        } else {
-          throw new Error('Failed to load JS module: got ' + typeof result);
-        }
-      }
-
-      if (typeof globalThis.createSpaceyDelayer !== 'function') {
-        throw new Error('createSpaceyDelayer factory not available');
-      }
-
-      const config = {};
-      if (wasmBinary) {
-        config.wasmBinary = wasmBinary;
-      }
-
-      this.module = await globalThis.createSpaceyDelayer(config);
-
-      // Wrap exported functions
       this.wasm = {
-        create: this.module._spacey_delayer_create,
-        destroy: this.module._spacey_delayer_destroy,
-        process: this.module._spacey_delayer_process,
-        setFirstTap: this.module._spacey_delayer_set_first_tap,
-        setTapSize: this.module._spacey_delayer_set_tap_size,
-        setFeedback: this.module._spacey_delayer_set_feedback,
-        setWetness: this.module._spacey_delayer_set_wetness,
-        setMultiTap: this.module._spacey_delayer_set_multi_tap,
-        setTapeFilter: this.module._spacey_delayer_set_tape_filter,
+        create: Module._spacey_delayer_create,
+        destroy: Module._spacey_delayer_destroy,
+        process: Module._spacey_delayer_process,
+        setFirstTap: Module._spacey_delayer_set_first_tap,
+        setTapSize: Module._spacey_delayer_set_tap_size,
+        setFeedback: Module._spacey_delayer_set_feedback,
+        setWetness: Module._spacey_delayer_set_wetness,
+        setMultiTap: Module._spacey_delayer_set_multi_tap,
+        setTapeFilter: Module._spacey_delayer_set_tape_filter,
       };
 
-      // Allocate I/O buffers in WASM memory (float = 4 bytes)
-      this.inPtrL = this.module._malloc(this.bufferSize * 4);
-      this.inPtrR = this.module._malloc(this.bufferSize * 4);
-      this.outPtrL = this.module._malloc(this.bufferSize * 4);
-      this.outPtrR = this.module._malloc(this.bufferSize * 4);
+      this.inPtrL = Module._malloc(this.bufferSize * 4);
+      this.inPtrR = Module._malloc(this.bufferSize * 4);
+      this.outPtrL = Module._malloc(this.bufferSize * 4);
+      this.outPtrR = Module._malloc(this.bufferSize * 4);
 
-      // Check for allocation failure
       if (!this.inPtrL || !this.inPtrR || !this.outPtrL || !this.outPtrR) {
         throw new Error('WASM malloc failed: out of memory');
       }
 
-      // Create delay instance
       this.handle = this.wasm.create(sr || sampleRate);
 
-      this.updateBufferViews();
+      // Get WASM memory buffer
+      const wasmMem = Module.wasmMemory;
+      const heapBuffer = Module.HEAPF32
+        ? Module.HEAPF32.buffer
+        : (wasmMem ? wasmMem.buffer : null);
+
+      if (!heapBuffer) {
+        throw new Error('Cannot access WASM memory buffer');
+      }
+
+      this._wasmMemory = wasmMem;
+
+      this.inBufL = new Float32Array(heapBuffer, this.inPtrL, this.bufferSize);
+      this.inBufR = new Float32Array(heapBuffer, this.inPtrR, this.bufferSize);
+      this.outBufL = new Float32Array(heapBuffer, this.outPtrL, this.bufferSize);
+      this.outBufR = new Float32Array(heapBuffer, this.outPtrR, this.bufferSize);
+
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
 
-      // Process pending messages
       const pending = this.pendingMessages;
       this.pendingMessages = [];
       for (const msg of pending) {
@@ -133,50 +175,22 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
 
   setParameter(param, value) {
     if (!this.handle || !this.wasm) return;
-
     switch (param) {
-      case 'firstTap':
-        this.wasm.setFirstTap(this.handle, value);
-        break;
-      case 'tapSize':
-        this.wasm.setTapSize(this.handle, value);
-        break;
-      case 'feedback':
-        this.wasm.setFeedback(this.handle, value);
-        break;
-      case 'wetness':
-        this.wasm.setWetness(this.handle, value);
-        break;
-      case 'multiTap':
-        this.wasm.setMultiTap(this.handle, value ? 1 : 0);
-        break;
-      case 'tapeFilter':
-        this.wasm.setTapeFilter(this.handle, value ? 1 : 0);
-        break;
-    }
-  }
-
-  updateBufferViews() {
-    if (!this.module || !this.inPtrL) return;
-
-    const heapF32 = this.module.HEAPF32;
-    if (!heapF32) return;
-
-    if (this.lastHeapBuffer !== heapF32.buffer) {
-      this.inBufL = new Float32Array(heapF32.buffer, this.inPtrL, this.bufferSize);
-      this.inBufR = new Float32Array(heapF32.buffer, this.inPtrR, this.bufferSize);
-      this.outBufL = new Float32Array(heapF32.buffer, this.outPtrL, this.bufferSize);
-      this.outBufR = new Float32Array(heapF32.buffer, this.outPtrR, this.bufferSize);
-      this.lastHeapBuffer = heapF32.buffer;
+      case 'firstTap':   this.wasm.setFirstTap(this.handle, value); break;
+      case 'tapSize':    this.wasm.setTapSize(this.handle, value); break;
+      case 'feedback':   this.wasm.setFeedback(this.handle, value); break;
+      case 'wetness':    this.wasm.setWetness(this.handle, value); break;
+      case 'multiTap':   this.wasm.setMultiTap(this.handle, value ? 1 : 0); break;
+      case 'tapeFilter': this.wasm.setTapeFilter(this.handle, value ? 1 : 0); break;
     }
   }
 
   cleanup() {
+    if (this.module && this.handle && this.wasm) {
+      this.wasm.destroy(this.handle);
+      this.handle = 0;
+    }
     if (this.module) {
-      if (this.handle && this.wasm) {
-        this.wasm.destroy(this.handle);
-        this.handle = 0;
-      }
       const free = this.module._free;
       if (free) {
         if (this.inPtrL) free(this.inPtrL);
@@ -185,32 +199,23 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
         if (this.outPtrR) free(this.outPtrR);
       }
     }
-
-    this.inPtrL = 0;
-    this.inPtrR = 0;
-    this.outPtrL = 0;
-    this.outPtrR = 0;
-    this.inBufL = null;
-    this.inBufR = null;
-    this.outBufL = null;
-    this.outBufR = null;
+    this.inPtrL = 0; this.inPtrR = 0;
+    this.outPtrL = 0; this.outPtrR = 0;
+    this.inBufL = null; this.inBufR = null;
+    this.outBufL = null; this.outBufR = null;
     this.wasm = null;
-    this.module = null;
     this.initialized = false;
-    this.lastHeapBuffer = null;
+    this._wasmMemory = null;
     this.handle = 0;
   }
 
-  process(inputs, outputs, parameters) {
+  process(inputs, outputs) {
     if (!this.initialized || !this.handle || !this.wasm) {
-      // Pass-through when not ready
       const input = inputs[0];
       const output = outputs[0];
       if (input && output) {
         for (let ch = 0; ch < output.length; ch++) {
-          if (input[ch]) {
-            output[ch].set(input[ch]);
-          }
+          if (input[ch]) output[ch].set(input[ch]);
         }
       }
       return true;
@@ -218,9 +223,7 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
 
     const input = inputs[0];
     const output = outputs[0];
-    if (!input || !output || input.length === 0 || output.length === 0) {
-      return true;
-    }
+    if (!input || !output || input.length === 0 || output.length === 0) return true;
 
     const inputL = input[0];
     const inputR = input[1] || input[0];
@@ -228,22 +231,22 @@ class SpaceyDelayerProcessor extends AudioWorkletProcessor {
     const outputR = output[1] || output[0];
     const numSamples = Math.min(inputL.length, this.bufferSize);
 
-    // Check for WASM memory growth
-    this.updateBufferViews();
-
-    if (!this.inBufL || !this.outBufL) {
-      return true;
+    if (this._wasmMemory && this.inBufL && this.inBufL.buffer !== this._wasmMemory.buffer) {
+      const buf = this._wasmMemory.buffer;
+      this.inBufL = new Float32Array(buf, this.inPtrL, this.bufferSize);
+      this.inBufR = new Float32Array(buf, this.inPtrR, this.bufferSize);
+      this.outBufL = new Float32Array(buf, this.outPtrL, this.bufferSize);
+      this.outBufR = new Float32Array(buf, this.outPtrR, this.bufferSize);
     }
 
-    // Copy input to WASM memory
+    if (!this.inBufL || !this.outBufL) return true;
+
     this.inBufL.set(inputL.subarray(0, numSamples));
     this.inBufR.set(inputR.subarray(0, numSamples));
 
-    // Process through WASM
     this.wasm.process(this.handle, this.inPtrL, this.inPtrR,
                       this.outPtrL, this.outPtrR, numSamples);
 
-    // Copy output from WASM memory
     outputL.set(this.outBufL.subarray(0, numSamples));
     outputR.set(this.outBufR.subarray(0, numSamples));
 
