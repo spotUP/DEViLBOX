@@ -101,9 +101,23 @@ public:
         std::memcpy(procBufL_, inputL, numSamples * sizeof(float));
         std::memcpy(procBufR_, inputR, numSamples * sizeof(float));
 
+        // Apply input drive
+        if (drive_ > 1.001f) {
+            for (int i = 0; i < numSamples; ++i) {
+                procBufL_[i] *= drive_;
+                procBufR_[i] *= drive_;
+            }
+        }
+
         // Process through current filter model
         filterL_->Process(procBufL_, numSamples);
         filterR_->Process(procBufR_, numSamples);
+
+        // Soft clip filter output to prevent distortion from resonance/drive
+        for (int i = 0; i < numSamples; ++i) {
+            procBufL_[i] = tanhf(procBufL_[i]);
+            procBufR_[i] = tanhf(procBufR_[i]);
+        }
 
         // Wet/dry mix
         if (wet_ >= 0.999f) {
