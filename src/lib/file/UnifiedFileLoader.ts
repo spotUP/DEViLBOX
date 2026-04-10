@@ -1650,7 +1650,9 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
           } as typeof song.patterns[0]['importMetadata'];
         }
 
-        loadInstruments(song.instruments);
+        // Skip preload — OPL3Synth is created on-demand by ensureWASMSynthsReady()
+        // in play(). Creating it here during drop causes an audio transient.
+        loadInstruments(song.instruments, { skipPreload: true });
         loadPatterns(song.patterns);
         setCurrentPattern(0);
         if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
@@ -1663,10 +1665,6 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
           description: `Imported from ${file.name}`,
         });
         applyEditorMode({});
-
-        // OPL3 audio comes from the OPL3Synth WASM, driven note-by-note by the
-        // TS replayer. Patterns are fully editable — edits heard in real-time.
-        // preloadInstruments creates ONE shared OPL3Synth (deduped in nativePlayerTypes).
 
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
         return { success: true, message: `Imported editable: ${song.name}` };
