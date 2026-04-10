@@ -99,6 +99,21 @@ export class MVerbEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'damping': this.setDamping(value); break;
+      case 'density': this.setDensity(value); break;
+      case 'bandwidth': this.setBandwidth(value); break;
+      case 'decay': this.setDecay(value); break;
+      case 'predelay': this.setPredelay(value); break;
+      case 'size': this.setSize(value); break;
+      case 'gain': this.setGain(value); break;
+      case 'mix': this.setMix(value); break;
+      case 'earlyMix': this.setEarlyMix(value); break;
+      case 'wet': this.wet = value; break;
+    }
+  }
+
   private async _initWorklet(): Promise<void> {
     try {
       const rawCtx = Tone.getContext().rawContext as AudioContext;

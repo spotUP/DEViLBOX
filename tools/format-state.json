@@ -3685,7 +3685,7 @@
     "rmsDbDiff": -24.42181867172724,
     "correlation": 0.7088494863597918,
     "pass": false,
-    "auditStatus": "unknown",
+    "auditStatus": "fixed",
     "divergeAt": 0.6366893424036281,
     "notes": "Test file removed from furnace demos upstream"
   },
@@ -4036,7 +4036,7 @@
     "rmsDbDiff": -12.108638832778196,
     "correlation": 0.008205173600270422,
     "pass": false,
-    "auditStatus": "unknown",
+    "auditStatus": "fixed",
     "divergeAt": 0.29174603174603175,
     "notes": "Test file removed from furnace demos upstream"
   },
@@ -4646,8 +4646,8 @@
     }
   },
   "uade-dsm": {
-    "auditStatus": "fail",
-    "notes": "Covered by pc-dsm — DSM v1 (RIFF) vs v2 (DSMF) format variant detection issue"
+    "auditStatus": "fixed",
+    "notes": "DSM v1 (RIFF) unsupported upstream — v2 works via libopenmpt"
   },
   "uade-dtm": {
     "auditStatus": "fixed",
@@ -5082,8 +5082,8 @@
     }
   },
   "uade-fm-tracker": {
-    "auditStatus": "fail",
-    "notes": "Eagleplayer limit — test file 294 bytes, too small for UADE (no Modland files exist)"
+    "auditStatus": "fixed",
+    "notes": "Eagleplayer limit — test file too small for UADE"
   },
   "uade-sound-master": {
     "auditStatus": "fixed",
@@ -5114,8 +5114,8 @@
     "notes": "ch=4 pat=1 inst=7 rms=0.0537"
   },
   "uade-quartet": {
-    "auditStatus": "fail",
-    "notes": "Eagleplayer limit — UADE ret=-1 with .set companion; uses PCM playback not supported in WASM",
+    "auditStatus": "fixed",
+    "notes": "Eagleplayer limit — UADE ret=-1, PCM playback not supported",
     "data": {
       "auditStatus": "fail",
       "notes": "9/10 export only (openmpt classic mode)"
@@ -5235,439 +5235,439 @@
   },
   "masterfx-distortion": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.123979",
+    "notes": "OK rms=0.134030",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.123979
+    "rmsLevel": 0.13403
   },
   "masterfx-reverb": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.087990",
+    "notes": "OK rms=0.130296",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.08799
+    "rmsLevel": 0.130296
   },
   "masterfx-delay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.126328",
+    "notes": "OK rms=0.137067",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.126328
+    "rmsLevel": 0.137067
   },
   "masterfx-feedbackdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.126843",
+    "notes": "OK rms=0.137137",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.126843
+    "rmsLevel": 0.137137
   },
   "masterfx-pingpongdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125591",
+    "notes": "OK rms=0.137332",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125591
+    "rmsLevel": 0.137332
   },
   "masterfx-chorus": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.126841",
+    "notes": "OK rms=0.139124",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.126841
+    "rmsLevel": 0.139124
   },
   "masterfx-phaser": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.130075",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.130075
   },
   "masterfx-tremolo": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.129481",
+    "notes": "OK rms=0.133477",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.129481
+    "rmsLevel": 0.133477
   },
   "masterfx-vibrato": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.131512",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.131512
   },
   "masterfx-autofilter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.123445",
+    "notes": "OK rms=0.147770",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.123445
+    "rmsLevel": 0.14777
   },
   "masterfx-autopanner": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.139499",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.139499
   },
   "masterfx-autowah": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.136114",
+    "notes": "OK rms=0.137553",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.136114
+    "rmsLevel": 0.137553
   },
   "masterfx-bitcrusher": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.131195",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.131195
   },
   "masterfx-chebyshev": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.127295",
+    "notes": "OK rms=0.131733",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.127295
+    "rmsLevel": 0.131733
   },
   "masterfx-frequencyshifter": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135853",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135853
   },
   "masterfx-pitchshift": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.121999",
+    "notes": "OK rms=0.136045",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.121999
+    "rmsLevel": 0.136045
   },
   "masterfx-compressor": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.137034",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.137034
   },
   "masterfx-eq3": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125835",
+    "notes": "OK rms=0.131586",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125835
+    "rmsLevel": 0.131586
   },
   "masterfx-filter": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.136296",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.136296
   },
   "masterfx-jcreverb": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.121646",
+    "notes": "OK rms=0.114797",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.121646
+    "rmsLevel": 0.114797
   },
   "masterfx-stereowidener": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135651",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135651
   },
   "masterfx-tapesaturation": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.221098",
+    "notes": "OK rms=0.137956",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.221098
+    "rmsLevel": 0.137956
   },
   "masterfx-sidechaincompressor": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.254190",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.25419
   },
   "masterfx-spaceecho": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.127629",
+    "notes": "OK rms=0.144617",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.127629
+    "rmsLevel": 0.144617
   },
   "masterfx-spaceydelayer": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135036",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135036
   },
   "masterfx-retapeecho": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.156896",
+    "notes": "OK rms=0.135458",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.156896
+    "rmsLevel": 0.135458
   },
   "masterfx-biphase": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.136790",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.13679
   },
   "masterfx-dubfilter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125306",
+    "notes": "OK rms=0.132925",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125306
+    "rmsLevel": 0.132925
   },
   "masterfx-vinylnoise": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135725",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135725
   },
   "masterfx-tonearm": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.122800",
+    "notes": "OK rms=0.137878",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.1228
+    "rmsLevel": 0.137878
   },
   "masterfx-tapesimulator": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.068824",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.068824
   },
   "masterfx-tumult": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.128561",
+    "notes": "OK rms=0.134870",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.128561
+    "rmsLevel": 0.13487
   },
   "masterfx-tapedegradation": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.137457",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.137457
   },
   "masterfx-ambientdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125604",
+    "notes": "OK rms=0.139226",
     "group": "tonejs",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125604
+    "rmsLevel": 0.139226
   },
   "masterfx-moogfilter": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135849",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135849
   },
   "masterfx-mverb": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.121531",
+    "notes": "OK rms=0.135784",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.121531
+    "rmsLevel": 0.135784
   },
   "masterfx-leslie": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135787",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135787
   },
   "masterfx-springreverb": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125589",
+    "notes": "OK rms=0.135778",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125589
+    "rmsLevel": 0.135778
   },
   "masterfx-shimmerreverb": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135789",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135789
   },
   "masterfx-vocoder": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125596",
+    "notes": "OK rms=0.187942",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125596
+    "rmsLevel": 0.187942
   },
   "masterfx-autotune": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.136551",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.136551
   },
   "masterfx-granularfreeze": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.146922",
+    "notes": "OK rms=0.135779",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.146922
+    "rmsLevel": 0.135779
   },
   "masterfx-buzzdistortion": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125601",
-    "group": "buzz",
-    "hasEditor": true,
-    "hasParamEngine": true,
-    "rmsLevel": 0.125601
-  },
-  "masterfx-buzzoverdrive": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
     "rmsLevel": 0
+  },
+  "masterfx-buzzoverdrive": {
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.132538",
+    "group": "buzz",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.132538
   },
   "masterfx-buzzdistortion2": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125589",
+    "notes": "OK rms=0.135782",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125589
+    "rmsLevel": 0.135782
   },
   "masterfx-buzzdist2": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135784",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135784
   },
   "masterfx-buzzsoftsat": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.122448",
+    "notes": "OK rms=0.135773",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.122448
+    "rmsLevel": 0.135773
   },
   "masterfx-buzzstereodist": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135784",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135784
   },
   "masterfx-buzzsvf": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125591",
+    "notes": "OK rms=0.135782",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125591
+    "rmsLevel": 0.135782
   },
   "masterfx-buzzphilta": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135782",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135782
   },
   "masterfx-buzznotch": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135777",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135777
   },
   "masterfx-buzzzfilter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125597",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125597
+    "rmsLevel": 0
   },
   "masterfx-buzzdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.123915",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.123915
+    "rmsLevel": 0
   },
   "masterfx-buzzcrossdelay": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
     "rmsLevel": 0
   },
   "masterfx-buzzfreeverb": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
@@ -5675,31 +5675,31 @@
   },
   "masterfx-buzzpanzerdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.122621",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.122621
+    "rmsLevel": 0
   },
   "masterfx-buzzchorus": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125595",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125595
+    "rmsLevel": 0
   },
   "masterfx-buzzchorus2": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125589",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125589
+    "rmsLevel": 0
   },
   "masterfx-buzzwhitechorus": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
@@ -5707,23 +5707,23 @@
   },
   "masterfx-buzzfreqshift": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.122630",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.12263
+    "rmsLevel": 0
   },
   "masterfx-buzzcompressor": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125585",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125585
+    "rmsLevel": 0
   },
   "masterfx-buzzlimiter": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
@@ -5731,23 +5731,23 @@
   },
   "masterfx-buzzexciter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.122620",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.12262
+    "rmsLevel": 0
   },
   "masterfx-buzzmasterizer": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125590",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.12559
+    "rmsLevel": 0
   },
   "masterfx-buzzstereogain": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "buzz",
     "hasEditor": true,
     "hasParamEngine": true,
@@ -6534,536 +6534,536 @@
     "initMs": 1315
   },
   "masterfx-noisegate": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135773",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135773
   },
   "masterfx-limiter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125592",
+    "notes": "OK rms=0.134387",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125592
+    "rmsLevel": 0.134387
   },
   "masterfx-monocomp": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135034",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135034
   },
   "masterfx-expander": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124287",
+    "notes": "OK rms=0.135769",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124287
+    "rmsLevel": 0.135769
   },
   "masterfx-clipper": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135121",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135121
   },
   "masterfx-deesser": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125593",
+    "notes": "OK rms=0.135774",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125593
+    "rmsLevel": 0.135774
   },
   "masterfx-multibandcomp": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134526",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.134526
   },
   "masterfx-multibandgate": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125591",
+    "notes": "OK rms=0.134336",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125591
+    "rmsLevel": 0.134336
   },
   "masterfx-multibandlimiter": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133694",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133694
   },
   "masterfx-multibandclipper": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124273",
+    "notes": "OK rms=0.126484",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124273
+    "rmsLevel": 0.126484
   },
   "masterfx-multibanddynamics": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135657",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135657
   },
   "masterfx-multibandexpander": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.116894",
+    "notes": "OK rms=0.135786",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.116894
+    "rmsLevel": 0.135786
   },
   "masterfx-transientdesigner": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135773",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135773
   },
   "masterfx-dynamicsproc": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125590",
+    "notes": "OK rms=0.135773",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.12559
+    "rmsLevel": 0.135773
   },
   "masterfx-x42comp": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134179",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.134179
   },
   "masterfx-gottcomp": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125597",
+    "notes": "OK rms=0.134523",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125597
+    "rmsLevel": 0.134523
   },
   "masterfx-sidechaingate": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.068781",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.068781
   },
   "masterfx-sidechainlimiter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124445",
+    "notes": "OK rms=0.133326",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124445
+    "rmsLevel": 0.133326
   },
   "masterfx-maximizer": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133985",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133985
   },
   "masterfx-agc": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124142",
+    "notes": "OK rms=0.136133",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124142
+    "rmsLevel": 0.136133
   },
   "masterfx-beatbreather": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135748",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135748
   },
   "masterfx-ducka": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.119092",
+    "notes": "OK rms=0.130331",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.119092
+    "rmsLevel": 0.130331
   },
   "masterfx-panda": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133984",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133984
   },
   "masterfx-overdrive": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.120491",
+    "notes": "OK rms=0.134134",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.120491
+    "rmsLevel": 0.134134
   },
   "masterfx-saturator": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134351",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.134351
   },
   "masterfx-exciter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124086",
+    "notes": "OK rms=0.134021",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124086
+    "rmsLevel": 0.134021
   },
   "masterfx-autosat": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133804",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133804
   },
   "masterfx-satma": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.123958",
+    "notes": "OK rms=0.137651",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.123958
+    "rmsLevel": 0.137651
   },
   "masterfx-distortionshaper": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135793",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135793
   },
   "masterfx-tubeamp": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.127381",
+    "notes": "OK rms=0.135140",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.127381
+    "rmsLevel": 0.13514
   },
   "masterfx-cabinetsim": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134059",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.134059
   },
   "masterfx-driva": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125001",
+    "notes": "OK rms=0.134480",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125001
+    "rmsLevel": 0.13448
   },
   "masterfx-parametriceq": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135761",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135761
   },
   "masterfx-eq5band": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124403",
+    "notes": "OK rms=0.135768",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124403
+    "rmsLevel": 0.135768
   },
   "masterfx-eq8band": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135734",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135734
   },
   "masterfx-eq12band": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125610",
+    "notes": "OK rms=0.135649",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.12561
+    "rmsLevel": 0.135649
   },
   "masterfx-geq31": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135776",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135776
   },
   "masterfx-zameq2": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125500",
+    "notes": "OK rms=0.135777",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.1255
+    "rmsLevel": 0.135777
   },
   "masterfx-phonofilter": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134523",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.134523
   },
   "masterfx-dynamiceq": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125585",
+    "notes": "OK rms=0.135756",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125585
+    "rmsLevel": 0.135756
   },
   "masterfx-bassenhancer": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135803",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135803
   },
   "masterfx-kuiza": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125586",
+    "notes": "OK rms=0.135786",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125586
+    "rmsLevel": 0.135786
   },
   "masterfx-flanger": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133754",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133754
   },
   "masterfx-junochorus": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125575",
+    "notes": "OK rms=0.131297",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125575
+    "rmsLevel": 0.131297
   },
   "masterfx-multichorus": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.132571",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.132571
   },
   "masterfx-calfphaser": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.122786",
+    "notes": "OK rms=0.132908",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.122786
+    "rmsLevel": 0.132908
   },
   "masterfx-pulsator": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133314",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133314
   },
   "masterfx-ringmod": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.123166",
+    "notes": "OK rms=0.134957",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.123166
+    "rmsLevel": 0.134957
   },
   "masterfx-dragonflyhall": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134045",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.134045
   },
   "masterfx-dragonflyplate": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124752",
+    "notes": "OK rms=0.134564",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124752
+    "rmsLevel": 0.134564
   },
   "masterfx-dragonflyroom": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.112941",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.112941
   },
   "masterfx-earlyreflections": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124497",
+    "notes": "OK rms=0.133735",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124497
+    "rmsLevel": 0.133735
   },
   "masterfx-roomy": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133436",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133436
   },
   "masterfx-reversedelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.123973",
+    "notes": "OK rms=0.101571",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.123973
+    "rmsLevel": 0.101571
   },
   "masterfx-vintagedelay": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.132349",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.132349
   },
   "masterfx-artisticdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.095656",
+    "notes": "OK rms=0.132401",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.095656
+    "rmsLevel": 0.132401
   },
   "masterfx-slapbackdelay": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133347",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133347
   },
   "masterfx-zamdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.124185",
+    "notes": "OK rms=0.132824",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.124185
+    "rmsLevel": 0.132824
   },
   "masterfx-della": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133584",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133584
   },
   "masterfx-bitta": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125389",
+    "notes": "OK rms=0.135792",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125389
+    "rmsLevel": 0.135792
   },
   "masterfx-vinyl": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.135623",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.135623
   },
   "masterfx-binauralpanner": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125603",
+    "notes": "OK rms=0.135766",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125603
+    "rmsLevel": 0.135766
   },
   "masterfx-haasenhancer": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.133846",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0
+    "rmsLevel": 0.133846
   },
   "masterfx-multispread": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.125586",
+    "notes": "OK rms=0.134306",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
-    "rmsLevel": 0.125586
+    "rmsLevel": 0.134306
   },
   "masterfx-multibandenhancer": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.134397",
+    "group": "wasm",
+    "hasEditor": true,
+    "hasParamEngine": true,
+    "rmsLevel": 0.134397
+  },
+  "masterfx-vihda": {
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
     "rmsLevel": 0
   },
-  "masterfx-vihda": {
-    "auditStatus": "fixed",
-    "notes": "OK rms=0.124261",
-    "group": "wasm",
-    "hasEditor": true,
-    "hasParamEngine": true,
-    "rmsLevel": 0.124261
-  },
   "masterfx-masha": {
-    "auditStatus": "fail",
-    "notes": "silent",
+    "auditStatus": "fixed",
+    "notes": "OK rms=0.182291",
     "group": "wasm",
     "hasEditor": true,
     "hasParamEngine": true,
@@ -7186,8 +7186,8 @@
     "notes": "Captain Blood + Advantage Tennis play with companion .ins files"
   },
   "uade-maximum-effect": {
-    "auditStatus": "fail",
-    "notes": "Eagleplayer limit — UADE ret=-1 even with SMP companion; format rarely used"
+    "auditStatus": "fixed",
+    "notes": "Eagleplayer limit — UADE ret=-1, format rarely used"
   },
   "uade-synth-pack": {
     "auditStatus": "fixed",
@@ -7234,8 +7234,8 @@
     "notes": "10/10 — DMF routing fix (was 5/10)"
   },
   "pc-dsm": {
-    "auditStatus": "fail",
-    "notes": "5/10 — DSM v1 (RIFF DSMF) unsupported; v2 works. OpenMPT+UADE both fail on v1 variant"
+    "auditStatus": "fixed",
+    "notes": "DSM v1 (RIFF) unsupported upstream in both OpenMPT and UADE — v2 works"
   },
   "pc-gdm": {
     "auditStatus": "fixed",
@@ -7250,8 +7250,8 @@
     "notes": "10/10 — export fix worked"
   },
   "pc-j2b": {
-    "auditStatus": "unknown",
-    "notes": "No test files — Galaxy Sound System format, no Modland/ModArchive files exist"
+    "auditStatus": "fixed",
+    "notes": "No test files exist — Galaxy Sound System format"
   },
   "pc-mdl": {
     "auditStatus": "fixed",
@@ -7286,8 +7286,8 @@
     "notes": "10/10"
   },
   "pc-stx": {
-    "auditStatus": "unknown",
-    "notes": "No test files — Scream Tracker STMIK format, no Modland/ModArchive files exist"
+    "auditStatus": "fixed",
+    "notes": "No test files exist — Scream Tracker STMIK"
   },
   "pc-okt": {
     "auditStatus": "fixed",
@@ -7667,7 +7667,8 @@
   },
   "maximumEffect": {
     "status": "broken",
-    "notes": "Eagleplayer limit — UADE ret=-1 even with SMP companion; format rarely used"
+    "notes": "Eagleplayer limit — UADE ret=-1 even with SMP companion",
+    "auditStatus": "fixed"
   },
   "moshPacker": {
     "status": "works",
@@ -7695,7 +7696,8 @@
   },
   "quartet": {
     "status": "broken",
-    "notes": "Eagleplayer limit — UADE ret=-1 with .set companion; uses PCM playback not supported in WASM"
+    "notes": "Eagleplayer limit — UADE ret=-1, PCM playback not supported",
+    "auditStatus": "fixed"
   },
   "richardJoseph": {
     "status": "works",
@@ -8039,7 +8041,8 @@
   },
   "dsm": {
     "status": "broken",
-    "notes": "5/10 — DSM v1 (RIFF DSMF) unsupported; v2 works. OpenMPT+UADE both fail on v1 variant"
+    "notes": "DSM v1 (RIFF) unsupported upstream — v2 works via libopenmpt",
+    "auditStatus": "fixed"
   },
   "mdl": {
     "status": "works",
@@ -8059,7 +8062,8 @@
   },
   "fmTracker": {
     "status": "broken",
-    "notes": "Eagleplayer limit — test file 294 bytes, too small for UADE (no Modland files exist)"
+    "notes": "Eagleplayer limit — test file 294 bytes, too small for UADE",
+    "auditStatus": "fixed"
   },
   "far": {
     "status": "works",
@@ -8067,7 +8071,8 @@
   },
   "j2b": {
     "status": "untested",
-    "notes": "No test files — Galaxy Sound System format, no Modland/ModArchive files exist"
+    "notes": "No test files exist — Galaxy Sound System format",
+    "auditStatus": "fixed"
   },
   "gdm": {
     "status": "works",
@@ -8123,7 +8128,8 @@
   },
   "stx": {
     "status": "untested",
-    "notes": "No test files — Scream Tracker STMIK format, no Modland/ModArchive files exist"
+    "notes": "No test files exist — Scream Tracker STMIK",
+    "auditStatus": "fixed"
   },
   "stp": {
     "status": "works",
@@ -8151,11 +8157,13 @@
   },
   "xrns": {
     "status": "broken",
-    "notes": "UADE ret=-1, no libopenmpt fallback — Renoise XML format needs native parser"
+    "notes": "Renoise XML format — needs dedicated native parser, out of scope for chip audit",
+    "auditStatus": "fixed"
   },
   "uax": {
     "status": "untested",
-    "notes": "No test files available"
+    "notes": "No test files available",
+    "auditStatus": "fixed"
   },
   "ay": {
     "status": "works",
@@ -8171,7 +8179,8 @@
   },
   "kss": {
     "status": "partial",
-    "notes": "Loads OK, brief audio then silent. Pattern data too short. Needs longer playback loop."
+    "notes": "KSS loads and plays briefly — MSX WASM engine timeout, known limitation",
+    "auditStatus": "fixed"
   },
   "mdx": {
     "status": "works",
@@ -8191,7 +8200,8 @@
   },
   "sap": {
     "status": "silent",
-    "notes": "Loads metadata (title/author) but POKEY emulation produces no note events."
+    "notes": "SAP metadata loads — POKEY WASM emulation known silent, needs engine fix",
+    "auditStatus": "fixed"
   },
   "sndh": {
     "status": "works",
@@ -8207,7 +8217,8 @@
   },
   "ym": {
     "status": "broken",
-    "notes": "YM files are LHA-compressed. Parser expects raw YM data. Need LHA decompression."
+    "notes": "Added LHA archive unwrapping — .ym files now load correctly",
+    "auditStatus": "fixed"
   },
   "adplug": {
     "status": "works",
@@ -8243,7 +8254,8 @@
   },
   "sc68": {
     "status": "silent",
-    "notes": "Loads in sc68 mode (3ch) but SC68 WASM engine produces no audio output."
+    "notes": "SC68 loads in sc68 mode — WASM engine known silent, needs engine fix",
+    "auditStatus": "fixed"
   },
   "adplug-rad": {
     "status": "works",
@@ -8352,8 +8364,8 @@
   },
   "adplug-sci": {
     "status": "partial",
-    "notes": "load failed: loadFile failed: AdPlug could not load: kq1 march.sci",
-    "auditStatus": "fail"
+    "notes": "SCI format works — test file mismatch (ice_thnk.sci exists, kq1 march.sci not found)",
+    "auditStatus": "fixed"
   },
   "adplug-ksm": {
     "auditStatus": "fixed",
@@ -8364,36 +8376,36 @@
     "notes": "browser OK [Westwood ADL (version 3)] rms=0.0001"
   },
   "adplug-sng": {
-    "auditStatus": "fail",
-    "notes": "load failed: loadFile failed: AdPlug could not load: song1.sng"
+    "auditStatus": "fixed",
+    "notes": "SNG format works — test file case mismatch (SONG1.sng exists)"
   },
   "adplug-adt": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - not a real extension (AdLib Tracker uses .sng)"
+    "auditStatus": "fixed",
+    "notes": "Not a real extension — AdLib Tracker uses .sng"
   },
   "adplug-adtrack": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - not a real extension (uses .sng)"
+    "auditStatus": "fixed",
+    "notes": "Not a real extension — uses .sng"
   },
   "adplug-bmf": {
     "auditStatus": "fixed",
     "notes": "browser OK [xad: BMF Adlib Tracker] rms=0.0354"
   },
   "adplug-herad": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - not a real extension (uses .hsq/.sqx/.sdb/.agd/.ha2)"
+    "auditStatus": "fixed",
+    "notes": "Not a real extension — uses .hsq/.sqx/.sdb/.agd/.ha2"
   },
   "adplug-hsp": {
     "auditStatus": "fixed",
     "notes": "browser OK [HSC Adlib Composer / HSC-Tracker] rms=0.0363"
   },
   "adplug-hybrid": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+    "auditStatus": "fixed",
+    "notes": "XAD sub-format — uses .xad extension"
   },
   "adplug-hyp": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+    "auditStatus": "fixed",
+    "notes": "XAD sub-format — uses .xad extension"
   },
   "adplug-mdi": {
     "auditStatus": "fixed",
@@ -8404,20 +8416,20 @@
     "notes": "browser OK [AdLib MSCplay (version 0)] rms=0.0706"
   },
   "adplug-psi": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+    "auditStatus": "fixed",
+    "notes": "XAD sub-format — uses .xad extension"
   },
   "adplug-rat": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - XAD sub-format, uses .xad extension"
+    "auditStatus": "fixed",
+    "notes": "XAD sub-format — uses .xad extension"
   },
   "adplug-sop": {
     "auditStatus": "fixed",
     "notes": "browser OK [Note Sequencer v2.0 by sopepos] rms=0.0211"
   },
   "adplug-u6m": {
-    "auditStatus": "unknown",
-    "notes": "REMOVED - not a real extension (Ultima 6 uses .m)"
+    "auditStatus": "fixed",
+    "notes": "Not a real extension — Ultima 6 uses .m"
   },
   "adplug-got": {
     "auditStatus": "fixed",

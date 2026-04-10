@@ -55,9 +55,9 @@ function applyOPLRegisters(inst: InstrumentConfig, regs: Uint8Array): void {
   o.op2KSR = (regs[1] >> 4) & 1;
   o.op2Multi = regs[1] & 0x0F;
   o.op1KSL = (regs[2] >> 6) & 0x03;
-  o.op1Level = regs[2] & 0x3F;
+  o.op1Level = 63 - (regs[2] & 0x3F); // OPL TL is inverted: 0=loud, 63=quiet → convert to 63=loud
   o.op2KSL = (regs[3] >> 6) & 0x03;
-  o.op2Level = regs[3] & 0x3F;
+  o.op2Level = 63 - (regs[3] & 0x3F);
   o.op1Attack = (regs[4] >> 4) & 0x0F;
   o.op1Decay = regs[4] & 0x0F;
   o.op2Attack = (regs[5] >> 4) & 0x0F;

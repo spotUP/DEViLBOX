@@ -1065,12 +1065,12 @@ const wasmEffects: EffectDescriptor[] = [
         time: Number(p.time) ?? 100,
         volume: Number(p.volume) ?? 1,
         passthrough: Number(p.passthrough) ?? 0,
-        active: Number(p.active) ?? 1,
+        active: Number(p.active) ?? 0,
         mix: Number(p.mix) ?? 1,
         wet: c.wet / 100,
       });
     },
-    getDefaultParameters: () => ({ time: 100, volume: 1, passthrough: 0, active: 1, mix: 1 }),
+    getDefaultParameters: () => ({ time: 100, volume: 1, passthrough: 0, active: 0, mix: 1 }),
   },
   {
     id: 'Vinyl', name: 'Vinyl Simulator', category: 'wasm', group: 'Lo-Fi',
