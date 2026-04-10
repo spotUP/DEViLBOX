@@ -1777,6 +1777,7 @@ export class TrackerReplayer {
           const adplug = getAdPlugPlayer();
           // Rewind to start and begin playback
           adplug.rewind();
+          adplug.play();
           this.useAdPlugStreaming = true;
           this._suppressNotes = true;
 
