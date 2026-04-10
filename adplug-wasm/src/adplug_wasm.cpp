@@ -1242,8 +1242,8 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
             if (cn.tick >= tickEnd) break;
             if (cn.channel == channel && cn.isNoteOn) {
                 // Pack: note | instrument | Cxx volume command
-                // Volume cmd=15 (set volume), param = vol scaled 0-64
-                uint8_t volCmd = 15; // Cxx = set volume
+                // XM effect 0x0C (12) = Set Volume (Cxx)
+                uint8_t volCmd = 12; // XM Cxx = set volume (NOT 15 which is Fxx=speed!)
                 uint8_t volParam = (uint8_t)std::min(63u, (uint32_t)cn.volume);
 
                 // For D00: remap captured instrument index to native instrument index
