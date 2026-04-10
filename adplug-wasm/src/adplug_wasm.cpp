@@ -212,11 +212,69 @@ static std::vector<CapturedNote> g_capturedNotes;
 static std::vector<InstrumentFingerprint> g_capturedInstruments;
 static uint32_t g_captureTotalTicks = 0;
 static float g_captureRefreshRate = 0.0f;
+static uint32_t g_captureTicksPerRow = 0; // computed from actual note spacing
 
 // D00 captured→native instrument mapping.
 // g_d00InstMap[capturedIdx] = native 1-based instrument index (0 = no match).
 // Built after capture by comparing captured fingerprints to native D00 instruments.
 static std::vector<uint8_t> g_d00InstMap;
+
+// Compute the actual ticks-per-row from captured note timestamps.
+// Measures tick deltas between consecutive note-ons per channel, finds the GCD.
+static uint32_t computeCaptureTicksPerRow() {
+    if (g_capturedNotes.size() < 2) return 6; // fallback
+
+    // Track last note-on tick per channel (up to 18 OPL channels)
+    uint32_t lastTick[18];
+    bool hasTick[18];
+    memset(hasTick, 0, sizeof(hasTick));
+
+    // Collect tick deltas in a histogram (buckets for deltas 1-499)
+    uint32_t deltaCount[500];
+    memset(deltaCount, 0, sizeof(deltaCount));
+    uint32_t totalDeltas = 0;
+
+    for (auto& cn : g_capturedNotes) {
+        if (!cn.isNoteOn || cn.channel >= 18) continue;
+        if (hasTick[cn.channel]) {
+            uint32_t delta = cn.tick - lastTick[cn.channel];
+            if (delta > 0 && delta < 500) {
+                deltaCount[delta]++;
+                totalDeltas++;
+            }
+        }
+        lastTick[cn.channel] = cn.tick;
+        hasTick[cn.channel] = true;
+    }
+
+    if (totalDeltas == 0) return 6; // fallback
+
+    // Find the GCD of all deltas that appear at least twice
+    uint32_t gcd = 0;
+    for (uint32_t d = 1; d < 500; d++) {
+        if (deltaCount[d] < 2) continue;
+        if (gcd == 0) {
+            gcd = d;
+        } else {
+            uint32_t a = gcd, b = d;
+            while (b) { uint32_t t = b; b = a % b; a = t; }
+            gcd = a;
+        }
+    }
+
+    // If no deltas appeared twice, use the most common delta
+    if (gcd == 0) {
+        uint32_t bestCount = 0;
+        for (uint32_t d = 1; d < 500; d++) {
+            if (deltaCount[d] > bestCount) {
+                bestCount = deltaCount[d];
+                gcd = d;
+            }
+        }
+    }
+
+    return gcd > 0 ? gcd : 6;
+}
 
 // OPL shadow registers for capture
 static uint8_t g_oplRegs[2][256];  // [chip][register]
@@ -888,9 +946,7 @@ uint32_t adplug_get_patterns() {
     if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_SOP ||
         g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
         if (g_captureTotalTicks == 0) return 0;
-        // 64 rows per pattern, ticks_per_row from refresh rate
-        float refresh = g_captureRefreshRate > 0 ? g_captureRefreshRate : 70.0f;
-        uint32_t ticksPerRow = std::max(1u, (uint32_t)(refresh / 50.0f + 0.5f));
+        uint32_t ticksPerRow = g_captureTicksPerRow > 0 ? g_captureTicksPerRow : 6;
         uint32_t totalRows = g_captureTotalTicks / ticksPerRow;
         return totalRows > 0 ? (totalRows + 63) / 64 : 0;
     }
@@ -1222,8 +1278,7 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
         g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
         if (g_capturedNotes.empty() || g_captureTotalTicks == 0) return 0;
 
-        float refresh = g_captureRefreshRate > 0 ? g_captureRefreshRate : 70.0f;
-        uint32_t ticksPerRow = std::max(1u, (uint32_t)(refresh / 50.0f + 0.5f));
+        uint32_t ticksPerRow = g_captureTicksPerRow > 0 ? g_captureTicksPerRow : 6;
         uint32_t targetRow = pattern * 64 + row;
         uint32_t tickStart = targetRow * ticksPerRow;
         uint32_t tickEnd = tickStart + ticksPerRow;
@@ -1484,6 +1539,7 @@ uint32_t adplug_capture_song() {
     g_capturedInstruments.clear();
     g_d00InstMap.clear();
     g_captureTotalTicks = 0;
+    g_captureTicksPerRow = 0;
     memset(g_oplRegs, 0, sizeof(g_oplRegs));
     memset(g_oplKeyOn, 0, sizeof(g_oplKeyOn));
 
@@ -1527,6 +1583,9 @@ uint32_t adplug_capture_song() {
 
     delete capturePlayer;
     delete captureRealOpl;
+
+    // Compute actual ticks-per-row from note spacing
+    g_captureTicksPerRow = computeCaptureTicksPerRow();
 
     // ── Build D00 captured→native instrument mapping ──
     // For D00, map each captured instrument fingerprint to the closest
@@ -1588,6 +1647,12 @@ uint32_t adplug_capture_get_total_ticks() {
 EMSCRIPTEN_KEEPALIVE
 float adplug_capture_get_refresh_rate() {
     return g_captureRefreshRate;
+}
+
+/** Get computed ticks-per-row from captured note spacing */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_capture_get_ticks_per_row() {
+    return g_captureTicksPerRow;
 }
 
 /** Get player refresh rate (ticks per second) for any loaded format */
