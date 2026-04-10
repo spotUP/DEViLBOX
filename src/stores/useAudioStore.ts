@@ -159,7 +159,7 @@ export const useAudioStore = create<AudioStore>()(
           category: 'tonejs',  // Master effects are Tone.js by default
           type: effectType,
           enabled: true,
-          wet: 50,
+          wet: 100,
           parameters: getDefaultEffectParameters(effectType),
         };
         state.masterEffects.push(newEffect);
