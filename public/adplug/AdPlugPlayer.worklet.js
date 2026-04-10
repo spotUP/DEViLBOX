@@ -26,7 +26,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
         await this.initModule(msg.sampleRate, msg.wasmBinary, msg.jsCode);
         break;
       case 'load':
-        this.loadFile(msg.data, msg.filename, msg.companions, msg.autoPlay !== false);
+        this.loadFile(msg.data, msg.filename, msg.companions, msg.autoPlay !== false, msg.ticksPerRow);
         break;
       case 'play':
         if (this.gain !== undefined) this.gain = 1;
@@ -69,7 +69,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     }
   }
 
-  loadFile(data, filename, companions, autoPlay) {
+  loadFile(data, filename, companions, autoPlay, ticksPerRow) {
     if (!this.initialized) {
       this.port.postMessage({ type: 'error', error: 'Not initialized' });
       return;
@@ -112,6 +112,11 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
 
       if (result === 0) {
         this.playing = autoPlay;
+
+        // Set ticks-per-row for tick-based position tracking (capture formats)
+        if (ticksPerRow && ticksPerRow > 0 && this.module._adplug_set_ticks_per_row) {
+          this.module._adplug_set_ticks_per_row(ticksPerRow);
+        }
 
         // Read metadata
         const titlePtr = this.module._adplug_get_title();
