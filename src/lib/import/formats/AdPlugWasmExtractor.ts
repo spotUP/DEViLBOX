@@ -267,17 +267,14 @@ export async function extractAdPlugPatterns(
       : playerRefresh;
 
     if (usedCapture) {
-      // Capture quantized ticks to rows using ticksPerRow = round(refresh/50)
+      // Capture quantized ticks to rows using ticksPerRow = round(refresh/50).
+      // Each row represents ticksPerRow OPL ticks. The replayer must advance
+      // rows at exactly rawRowRate = refresh / ticksPerRow rows/sec.
+      // Tracker equation: rowRate = BPM * 2 / (5 * speed).
+      // With speed=1: BPM = rawRowRate * 5 / 2.
       const ticksPerRow = Math.max(1, Math.round(refresh / 50));
-      const rawRowRate = refresh / ticksPerRow; // rows per second
-
-      // Target a comfortable visual row rate (~8-12 rows/sec like a normal tracker).
-      // Use speed to slow down the visual cursor to match the audio duration.
-      const targetRowRate = 10;
-      finalSpeed = Math.max(1, Math.min(31, Math.round(rawRowRate / targetRowRate)));
-      finalBpm = Math.round(rawRowRate * 5 * finalSpeed / (2 * finalSpeed));
-      // Simplifies to: finalBpm = round(rawRowRate * 5 / 2) — speed cancels out.
-      // But the visual rowRate = BPM * 2 / (5 * speed) = rawRowRate / speed ≈ targetRowRate.
+      const rawRowRate = refresh / ticksPerRow;
+      finalSpeed = 1;
       finalBpm = Math.round(rawRowRate * 5 / 2);
     } else {
       // Native format — use player speed if valid, compute BPM from refresh
@@ -305,6 +302,8 @@ export async function extractAdPlugPatterns(
     }
     finalBpm = Math.max(32, Math.min(300, finalBpm));
     finalSpeed = Math.max(1, Math.min(31, finalSpeed));
+
+    console.log(`[AdPlug] Timing: refresh=${refresh}Hz usedCapture=${usedCapture} → BPM=${finalBpm} speed=${finalSpeed} rowRate=${(finalBpm * 2 / (5 * finalSpeed)).toFixed(1)}/sec`);
 
     // ── Extract order list ──
     // Stop at first out-of-range or sentinel entry (0xFFFF = end, >= numPatterns = padding)
