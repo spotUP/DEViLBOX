@@ -970,22 +970,6 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
         title={printThrough ? 'Print Through: On' : 'Print Through: Off'}
       />
 
-      {/* Environments label — static display (no audio effect in WASM build) */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 388,
-          top: 654 + yOff,
-          width: 183,
-          height: 32,
-          backgroundImage: `url(${BASE}Environments.png)`,
-          backgroundSize: '183px auto',
-          backgroundPositionY: '-32px',
-          backgroundRepeat: 'no-repeat',
-          pointerEvents: 'none',
-        }}
-      />
-
     </div>
     </div>
   );
