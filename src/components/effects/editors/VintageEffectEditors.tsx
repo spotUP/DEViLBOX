@@ -729,7 +729,6 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
-  const [showReels, setShowReels] = useState(false);
   const [reelFrame, setReelFrame] = useState(0);
   const [vuL, setVuL] = useState(0);
   const [vuR, setVuR] = useState(0);
@@ -752,15 +751,14 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
     setVuR(toFrame(rmsR));
   }, [post]);
 
-  const containerH = showReels ? 703 : 266;
-  const yOff       = showReels ? 0 : -437;
+  const containerH = 703;
+  const yOff = 0;
 
   // Animate reels at ~20fps
   useEffect(() => {
-    if (!showReels) return;
     const id = setInterval(() => setReelFrame(f => (f + 1) % 31), 50);
     return () => clearInterval(id);
-  }, [showReels]);
+  }, []);
 
   const drive     = getParam(effect, 'drive',     30) / 100;
   const character = getParam(effect, 'character', 40) / 100;
@@ -787,37 +785,29 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           transform: 'scale(0.625)',
           transformOrigin: 'top left',
         }}
-      onDoubleClick={(e) => {
-        // Only toggle if double-click is on the background, not a knob
-        if ((e.target as HTMLElement).tagName === 'DIV' && !(e.target as HTMLElement).dataset.knob) {
-          setShowReels(r => !r);
-        }
-      }}
-    >
-      {/* Background face */}
+      >
+      {/* Background face with reels */}
       <img
-        src={BASE + (showReels ? 'FaceWithReels.png' : 'Face.png')}
+        src={BASE + 'FaceWithReels.png'}
         style={{ position: 'absolute', top: 0, left: 0, width: 960, height: containerH, pointerEvents: 'none' }}
         alt=""
       />
 
-      {/* Spinning reels (only in full mode) */}
-      {showReels && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: 960,
-            height: 322,
-            backgroundImage: `url(${BASE}Wheels.png)`,
-            backgroundSize: '960px auto',
-            backgroundPositionY: `${reelBgY}px`,
-            backgroundRepeat: 'no-repeat',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
+      {/* Spinning reels */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: 960,
+          height: 322,
+          backgroundImage: `url(${BASE}Wheels.png)`,
+          backgroundSize: '960px auto',
+          backgroundPositionY: `${reelBgY}px`,
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+        }}
+      />
 
       {/* Input (drive) knob */}
       <FilmstripKnob
@@ -908,6 +898,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           backgroundPositionY: `${-(vuL * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
+          filter: 'sepia(1) saturate(3) hue-rotate(-10deg) brightness(0.7)',
         }}
       />
 
@@ -924,6 +915,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           backgroundPositionY: `${-(vuR * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
+          filter: 'sepia(1) saturate(3) hue-rotate(-10deg) brightness(0.7)',
         }}
       />
 
