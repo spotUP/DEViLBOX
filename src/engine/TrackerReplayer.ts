@@ -1128,9 +1128,11 @@ export class TrackerReplayer {
    */
   setChannelMuteMask(mask: number): void {
     this.channelMuteMask = mask;
-    // Forward to LibopenmptEngine if it's the active audio renderer.
-    // When libopenmptFileData is set, WASM renders all audio — this mask
-    // must reach the worklet via setMuteMask for actual channel muting.
+    // Forward to the active WASM engine for actual channel muting.
+    if (this._activeWasmEngine) {
+      this._activeWasmEngine.setMuteMask(mask);
+    }
+    // Also forward to LibopenmptEngine if it's the active audio renderer.
     import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
       if (LibopenmptEngine.hasInstance()) {
         LibopenmptEngine.getInstance().setMuteMask(mask);
@@ -1913,14 +1915,25 @@ export class TrackerReplayer {
           this.useAdPlugStreaming = true;
           this._suppressNotes = true;
 
-          // Subscribe to position updates from the streaming player
-          adplugPlayer.onPosition = (order: number, row: number) => {
+          // Register AdPlug as the active WASM engine for mute/solo support.
+          this._activeWasmEngine = adplugPlayer;
+
+          // Subscribe to position updates from the streaming player.
+          // Route through PlaybackCoordinator for DisplayStateRing queuing
+          // and latency compensation (just like UADE and libopenmpt do).
+          adplugPlayer.onPosition = (order: number, row: number, audioTime?: number) => {
             if (!this.playing || !this.song) return;
-            // Sync replayer position to streaming player's position
             if (order >= 0 && order < (this.song.songPositions?.length ?? 0)) {
-              this.songPos = order;
-              this.pattPos = row;
+              this.coordinator.dispatchEnginePosition(row, order, audioTime, false);
             }
+          };
+
+          // Subscribe to per-channel levels for VU meters
+          adplugPlayer.onChannelLevels = (levels: Float32Array) => {
+            const engine = getToneEngine();
+            const arr: number[] = [];
+            for (let i = 0; i < levels.length; i++) arr.push(levels[i]);
+            engine.updateRealtimeChannelLevels(arr);
           };
 
           _log('[TrackerReplayer] Using AdPlug streaming for audio, suppressNotes = true');
@@ -2035,6 +2048,7 @@ export class TrackerReplayer {
         import('@/lib/import/AdPlugPlayer').then(({ getAdPlugPlayer }) => {
           const p = getAdPlugPlayer();
           p.onPosition = null;
+          p.onChannelLevels = null;
           p.stop();
         });
       } catch { /* ignored */ }

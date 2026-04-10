@@ -103,6 +103,8 @@ private:
 
 // Global state
 static CEmuopl* g_opl = nullptr;
+class CMutingOpl;
+static CMutingOpl* g_mutingOpl = nullptr;  // wraps g_opl for mute/level support
 static CPlayer* g_player = nullptr;
 static uint32_t g_sampleRate = 48000;
 static bool g_initialized = false;
@@ -126,6 +128,8 @@ enum PlayerType {
 };
 static PlayerType g_playerType = PT_UNKNOWN;
 static void detectPlayerType();
+class Cd00PlayerAccessor;
+static Cd00PlayerAccessor* asD00Player();
 
 // Include player headers early for use in both extern "C" blocks
 #include "protrack.h"
@@ -152,6 +156,45 @@ static CpisPlayerAccessor* asPisPlayer() {
     if (g_playerType != PT_PIS) return nullptr;
     return reinterpret_cast<CpisPlayerAccessor*>(g_player);
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// D00 Native Pattern Extraction
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Walks D00 order lists and sequence data to build a time-aligned pattern grid
+// with full effect information preserved. Unlike OPL capture, this reads the
+// actual D00 format data structures so effects like vibrato, slide, SpFX,
+// LevelPuls, set-instrument, set-volume are all captured.
+
+// D00 note table (same as in d00.cpp)
+static const uint16_t d00_notetable[12] = {340,363,385,408,432,458,485,514,544,577,611,647};
+
+// Local LE16 reader for D00 extraction (defined before accessor classes)
+static inline uint16_t d00ReadLE16(const uint16_t* val) {
+    const uint8_t* b = (const uint8_t*)val;
+    return (uint16_t)((b[1] << 8) + b[0]);
+}
+
+struct D00Cell {
+    uint8_t note;       // 0=empty, 1-96=note, 127=note-off
+    uint8_t inst;       // 0=none, 1-based instrument
+    uint8_t effTyp;     // XM-compatible effect type
+    uint8_t eff;        // XM-compatible effect parameter
+};
+
+// Max grid size for D00 extraction
+#define D00_MAX_ROWS    16384
+#define D00_MAX_CHANNELS 9
+
+// Storage for pre-extracted D00 pattern grid
+static std::vector<D00Cell> g_d00Grid;   // [row * 9 + channel]
+static uint32_t g_d00GridRows = 0;
+static uint32_t g_d00GridChannels = 9;
+static bool g_d00NativeExtracted = false;
+
+// Pre-extract D00 patterns by simulating the sequencer (no OPL, just data walking)
+static void d00NativeExtract(Cd00PlayerAccessor* dp);
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // OPL Register Capture — generic extraction for ALL formats
@@ -280,6 +323,13 @@ static uint32_t computeCaptureTicksPerRow() {
 // OPL shadow registers for capture
 static uint8_t g_oplRegs[2][256];  // [chip][register]
 static bool g_oplKeyOn[2][9];      // per-chip per-channel key-on state
+
+// Per-channel mute mask: bit N = 1 means channel N is ACTIVE, 0 = muted.
+// Supports up to 18 channels (2 OPL chips × 9 channels).
+static uint32_t g_channelMuteMask = 0x3FFFF;  // all 18 active by default
+
+// Per-channel level output buffer (filled during render from shadow regs)
+static float g_channelLevels[18];
 
 // Reconstruct instrument from shadow registers for a given channel.
 // Returns FULL register data (including TL volume bits) for playback.
@@ -415,6 +465,113 @@ public:
     }
 };
 
+// Muting OPL wrapper — used during streaming playback.
+// Intercepts register writes and suppresses key-on + forces max attenuation
+// for muted channels. Also tracks shadow registers for level metering.
+class CMutingOpl : public Copl {
+public:
+    CEmuopl* realOpl;
+
+    CMutingOpl(CEmuopl* real) : realOpl(real) {
+        currType = real->gettype();
+    }
+
+    void write(int reg, int val) override {
+        int chip = currChip;
+        // Track shadow registers for all writes
+        if (chip >= 0 && chip <= 1)
+            g_oplRegs[chip][reg & 0xFF] = (uint8_t)val;
+
+        // Track key-on state
+        if (reg >= 0xB0 && reg <= 0xB8) {
+            int ch = reg - 0xB0;
+            if (chip >= 0 && chip <= 1)
+                g_oplKeyOn[chip][ch] = (val & 0x20) != 0;
+        }
+
+        // Check if this register belongs to a muted channel
+        int ch = -1;
+        if (reg >= 0xA0 && reg <= 0xA8) ch = reg - 0xA0;       // freq LSB
+        else if (reg >= 0xB0 && reg <= 0xB8) ch = reg - 0xB0;   // freq MSB + key-on
+        else if (reg >= 0xC0 && reg <= 0xC8) ch = reg - 0xC0;   // feedback/connection
+        else {
+            // Operator registers: map offset to channel
+            int off = reg & 0x1F;
+            for (int c = 0; c < 9; c++) {
+                if (OPL_OP_OFFSETS[c][0] == off || OPL_OP_OFFSETS[c][1] == off) {
+                    int base = reg & 0xE0;
+                    if (base == 0x20 || base == 0x40 || base == 0x60 || base == 0x80 || base == 0xE0) {
+                        ch = c;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (ch >= 0 && ch < 9) {
+            int globalCh = chip * 9 + ch;
+            if (!(g_channelMuteMask & (1u << globalCh))) {
+                // Channel is muted
+                if (reg >= 0xB0 && reg <= 0xB8) {
+                    // Strip key-on bit
+                    val &= ~0x20;
+                }
+                // For TL registers (0x40-0x55), force max attenuation
+                int base = reg & 0xE0;
+                int off = reg & 0x1F;
+                if (base == 0x40) {
+                    for (int c = 0; c < 9; c++) {
+                        if (OPL_OP_OFFSETS[c][0] == off || OPL_OP_OFFSETS[c][1] == off) {
+                            val = (val & 0xC0) | 0x3F; // keep KSL, max attenuation
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        realOpl->setchip(chip);
+        realOpl->write(reg, val);
+    }
+
+    void setchip(int n) override {
+        Copl::setchip(n);
+        realOpl->setchip(n);
+    }
+
+    void init() override {
+        realOpl->init();
+        memset(g_oplRegs, 0, sizeof(g_oplRegs));
+        memset(g_oplKeyOn, 0, sizeof(g_oplKeyOn));
+        memset(g_channelLevels, 0, sizeof(g_channelLevels));
+    }
+
+    void update(short* buf, int samples) override {
+        realOpl->update(buf, samples);
+    }
+
+    // Compute per-channel levels from shadow registers
+    void updateChannelLevels() {
+        for (int chip = 0; chip < 2; chip++) {
+            for (int ch = 0; ch < 9; ch++) {
+                int globalCh = chip * 9 + ch;
+                if (!g_oplKeyOn[chip][ch]) {
+                    // Decay towards zero
+                    g_channelLevels[globalCh] *= 0.85f;
+                    continue;
+                }
+                // Carrier total level: lower = louder. TL 0-63, 0=max volume
+                uint8_t carOff = OPL_OP_OFFSETS[ch][1];
+                uint8_t tl = g_oplRegs[chip][0x40 + carOff] & 0x3F;
+                float level = 1.0f - (tl / 63.0f);
+                // Smooth: take max of current and decayed previous
+                float prev = g_channelLevels[globalCh] * 0.85f;
+                g_channelLevels[globalCh] = level > prev ? level : prev;
+            }
+        }
+    }
+};
+
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
@@ -424,6 +581,8 @@ int adplug_init(uint32_t sampleRate) {
     g_sampleRate = sampleRate;
     // 16-bit stereo OPL emulator
     g_opl = new CEmuopl(static_cast<int>(sampleRate), true, true);
+    g_mutingOpl = new CMutingOpl(g_opl);
+    g_channelMuteMask = 0x3FFFF; // all active
     g_initialized = true;
     return 0;
 }
@@ -431,6 +590,7 @@ int adplug_init(uint32_t sampleRate) {
 EMSCRIPTEN_KEEPALIVE
 void adplug_shutdown() {
     if (g_player) { delete g_player; g_player = nullptr; }
+    if (g_mutingOpl) { delete g_mutingOpl; g_mutingOpl = nullptr; }
     if (g_opl)    { delete g_opl;    g_opl = nullptr; }
     if (g_fileData) { free(g_fileData); g_fileData = nullptr; }
     for (auto& c : g_companions) { free(c.data); }
@@ -454,7 +614,7 @@ void adplug_add_companion(const uint8_t* data, uint32_t length, const char* name
 
 EMSCRIPTEN_KEEPALIVE
 int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
-    if (!g_initialized || !g_opl) return -1;
+    if (!g_initialized || !g_opl || !g_mutingOpl) return -1;
 
     // Clean up previous
     if (g_player) { delete g_player; g_player = nullptr; }
@@ -467,13 +627,12 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     g_fileSize = length;
 
     // Reset OPL emulator
-    g_opl->init();
+    g_mutingOpl->init();
 
     // Use AdPlug factory to auto-detect format and create player
-    // NOTE: companions are NOT cleared here — they stay available for capture.
-    // They are cleared at the START of the next adplug_load() call.
+    // Pass the muting OPL wrapper so we can mute channels during streaming.
     CProvider_Memory provider(g_fileData, g_fileSize, std::string(filename));
-    g_player = CAdPlug::factory(std::string(filename), g_opl, CAdPlug::players, provider);
+    g_player = CAdPlug::factory(std::string(filename), g_mutingOpl, CAdPlug::players, provider);
 
     if (!g_player) {
         free(g_fileData);
@@ -502,6 +661,11 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     // Detect player type for pattern extraction
     detectPlayerType();
 
+    // D00: pre-extract native pattern grid with full effect info
+    if (g_playerType == PT_D00) {
+        d00NativeExtract(asD00Player());
+    }
+
     return 0;
 }
 
@@ -509,7 +673,7 @@ EMSCRIPTEN_KEEPALIVE
 void adplug_rewind(uint32_t subsong) {
     if (g_player) {
         g_player->rewind(static_cast<int>(subsong));
-        g_opl->init();
+        g_mutingOpl->init();
         g_sampleAccum = 0.0;
         g_renderTickCount = 0;
         float refresh = g_player->getrefresh();
@@ -547,6 +711,9 @@ int adplug_render(int16_t* buffer, uint32_t maxFrames) {
             g_renderTickCount++;
             g_sampleAccum -= g_samplesPerTick;
 
+            // Update per-channel levels from shadow registers
+            if (g_mutingOpl) g_mutingOpl->updateChannelLevels();
+
             float refresh = g_player->getrefresh();
             if (refresh > 0.0f)
                 g_samplesPerTick = (double)g_sampleRate / (double)refresh;
@@ -575,6 +742,53 @@ float adplug_get_refresh() {
 EMSCRIPTEN_KEEPALIVE
 void adplug_set_ticks_per_row(uint32_t tpr) {
     g_captureTicksPerRow = tpr;
+}
+
+/**
+ * Set per-channel mute mask for live streaming playback.
+ * Bit N = 1 means channel N is ACTIVE (playing); bit N = 0 = muted.
+ * Channels 0-8 = OPL chip 0, channels 9-17 = OPL chip 1.
+ * Default: 0x3FFFF (all 18 active).
+ */
+EMSCRIPTEN_KEEPALIVE
+void adplug_set_mute_mask(uint32_t mask) {
+    g_channelMuteMask = mask;
+    // When a channel is newly muted, immediately silence it in the OPL
+    if (g_opl) {
+        for (int chip = 0; chip < 2; chip++) {
+            for (int ch = 0; ch < 9; ch++) {
+                int globalCh = chip * 9 + ch;
+                if (!(mask & (1u << globalCh)) && g_oplKeyOn[chip][ch]) {
+                    // Force key-off + max attenuation
+                    g_opl->setchip(chip);
+                    uint8_t bval = g_oplRegs[chip][0xB0 + ch] & ~0x20;
+                    g_opl->write(0xB0 + ch, bval);
+                    // Max attenuation on carrier
+                    uint8_t carOff = OPL_OP_OFFSETS[ch][1];
+                    g_opl->write(0x40 + carOff, (g_oplRegs[chip][0x40 + carOff] & 0xC0) | 0x3F);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Get pointer to per-channel level array (18 floats, 0.0-1.0).
+ * Updated every tick during adplug_render().
+ */
+EMSCRIPTEN_KEEPALIVE
+float* adplug_get_channel_levels() {
+    return g_channelLevels;
+}
+
+/**
+ * Get the number of active audio channels for the current format.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_num_audio_channels() {
+    if (!g_player) return 0;
+    // Most OPL2 formats use 9 channels
+    return 9;
 }
 
 // adplug_get_num_instruments is defined in the second extern "C" block
@@ -773,6 +987,230 @@ static Cd00PlayerAccessor* asD00Player() {
     return reinterpret_cast<Cd00PlayerAccessor*>(g_player);
 }
 
+// ── D00 Native Pattern Extraction Implementation ──────────────────────────
+static void d00NativeExtract(Cd00PlayerAccessor* dp) {
+    g_d00NativeExtracted = false;
+    g_d00GridRows = 0;
+    g_d00Grid.clear();
+
+    if (!dp || !dp->filedata) return;
+
+    uint16_t tpoinOff;
+    uint8_t globalSpeed;
+    if (dp->version > 1) {
+        tpoinOff = d00ReadLE16(&dp->header->tpoin);
+        globalSpeed = dp->header->speed;
+    } else {
+        tpoinOff = d00ReadLE16(&dp->header1->tpoin);
+        globalSpeed = dp->header1->speed;
+    }
+    if (globalSpeed == 0) globalSpeed = 6;
+
+    struct Stpoin {
+        uint16_t ptr[9];
+        uint8_t volume[9];
+        uint8_t dummy[5];
+    };
+
+    if (tpoinOff + sizeof(Stpoin) > dp->filesize) return;
+    Stpoin tpoin;
+    memcpy(&tpoin, dp->filedata + tpoinOff, sizeof(Stpoin));
+
+    struct ChanSim {
+        const uint16_t* order;
+        uint32_t ordpos;
+        uint16_t speed;
+        int16_t transpose;
+        uint16_t inst;
+        uint8_t vol;
+        bool ended;
+        uint16_t rhcnt;
+        uint16_t del;
+        uint32_t pattpos;
+        const uint16_t* patt;
+        bool pattValid;
+    };
+    ChanSim ch[9];
+    memset(ch, 0, sizeof(ch));
+
+    for (int c = 0; c < 9; c++) {
+        uint16_t ptr = d00ReadLE16(&tpoin.ptr[c]);
+        if (ptr && ptr + 4 <= dp->filesize) {
+            ch[c].speed = d00ReadLE16((const uint16_t*)(dp->filedata + ptr));
+            ch[c].order = (const uint16_t*)(dp->filedata + ptr + 2);
+            ch[c].vol = tpoin.volume[c];
+            ch[c].inst = c;
+        } else {
+            ch[c].ended = true;
+        }
+        ch[c].pattValid = false;
+    }
+
+    g_d00Grid.resize(D00_MAX_ROWS * D00_MAX_CHANNELS);
+    memset(g_d00Grid.data(), 0, g_d00Grid.size() * sizeof(D00Cell));
+
+    auto safeRead16 = [&](const uint16_t* ptr) -> uint16_t {
+        const char* p = (const char*)ptr;
+        if (p < dp->filedata || p + 2 > dp->filedata + dp->filesize) return 0xFFFF;
+        return d00ReadLE16(ptr);
+    };
+
+    uint32_t totalRows = 0;
+
+    for (uint32_t row = 0; row < D00_MAX_ROWS; row++) {
+        bool allEnded = true;
+
+        for (int c = 0; c < 9; c++) {
+            if (ch[c].ended) continue;
+            allEnded = false;
+
+            if (ch[c].del > 0) {
+                ch[c].del--;
+                continue;
+            }
+
+            if (ch[c].rhcnt > 0) {
+                ch[c].rhcnt--;
+                ch[c].del = ch[c].speed > 0 ? ch[c].speed - 1 : 0;
+                continue;
+            }
+
+            bool needOrder = !ch[c].pattValid;
+
+            if (needOrder) {
+d00_readorder:
+                uint16_t ord = safeRead16(&ch[c].order[ch[c].ordpos]);
+                if (ord == 0xFFFE) {
+                    ch[c].ended = true;
+                    continue;
+                }
+                if (ord == 0xFFFF) {
+                    uint16_t target = safeRead16(&ch[c].order[ch[c].ordpos + 1]);
+                    if (target == ch[c].ordpos || target > 4096) {
+                        ch[c].ended = true;
+                        continue;
+                    }
+                    ch[c].ordpos = target;
+                    goto d00_readorder;
+                }
+                if (ord >= 0x9000) {
+                    ch[c].speed = ord & 0xFF;
+                    ch[c].ordpos++;
+                    goto d00_readorder;
+                }
+                if (ord >= 0x8000) {
+                    int16_t trans = ord & 0xFF;
+                    if (ord & 0x100) trans = -trans;
+                    ch[c].transpose = trans;
+                    ch[c].ordpos++;
+                    ord = safeRead16(&ch[c].order[ch[c].ordpos]);
+                }
+
+                if (!dp->seqptr) { ch[c].ended = true; continue; }
+                uint16_t seqOff = safeRead16(&dp->seqptr[ord]);
+                if (seqOff == 0xFFFF || seqOff + 2 > dp->filesize) {
+                    ch[c].ended = true;
+                    continue;
+                }
+                ch[c].patt = (const uint16_t*)(dp->filedata + seqOff);
+                ch[c].pattpos = 0;
+                ch[c].pattValid = true;
+            }
+
+d00_readseq:
+            {
+                uint16_t pattword = safeRead16(&ch[c].patt[ch[c].pattpos]);
+                if (pattword == 0xFFFF) {
+                    ch[c].pattpos = 0;
+                    ch[c].ordpos++;
+                    ch[c].pattValid = false;
+                    goto d00_readorder;
+                }
+
+                uint8_t cnt = (pattword >> 8) & 0xFF;
+                uint8_t note = pattword & 0xFF;
+                uint8_t fx = (pattword >> 12) & 0x0F;
+                uint16_t fxop = pattword & 0x0FFF;
+                ch[c].pattpos++;
+
+                D00Cell& cell = g_d00Grid[row * D00_MAX_CHANNELS + c];
+
+                bool isNoteEvent = (dp->version > 0) ? (cnt < 0x40) : (!fx);
+
+                if (isNoteEvent) {
+                    if (note == 0 || note == 0x80) {
+                        cell.note = 97; // XM note-off
+                        if (dp->version > 0) ch[c].rhcnt = cnt;
+                    } else if (note == 0x7E) {
+                        if (dp->version > 0) ch[c].rhcnt = cnt;
+                    } else {
+                        uint8_t playNote = note;
+                        if (dp->version > 0) {
+                            if (note > 0x80) playNote = note - 0x80;
+                            else playNote = note + ch[c].transpose;
+                        } else {
+                            if (cnt < 2) playNote = note + ch[c].transpose;
+                        }
+                        if (playNote > 0 && playNote < 127) {
+                            cell.note = playNote;
+                            cell.inst = (ch[c].inst & 0xFF) + 1;
+                        }
+                        if (dp->version > 0) {
+                            uint8_t dur = cnt;
+                            if (cnt >= 0x20) dur = cnt - 0x20;
+                            ch[c].rhcnt = dur;
+                        }
+                    }
+                } else {
+                    uint8_t effType = 0, effParam = 0;
+                    switch (fx) {
+                        case 6:
+                            cell.note = 97;
+                            ch[c].rhcnt = fxop & 0xFF;
+                            ch[c].del = ch[c].speed > 0 ? ch[c].speed - 1 : 0;
+                            continue;
+                        case 7:
+                            effType = 0x04;
+                            effParam = ((fxop >> 8) & 0x0F) << 4 | (fxop & 0x0F);
+                            break;
+                        case 8:
+                            break;
+                        case 9:
+                            effType = 0x0C;
+                            effParam = 63 - (fxop & 63);
+                            break;
+                        case 0xB:
+                            break;
+                        case 0xC:
+                            ch[c].inst = fxop & 0xFF;
+                            break;
+                        case 0xD:
+                            effType = 0x01;
+                            effParam = fxop & 0xFF;
+                            break;
+                        case 0xE:
+                            effType = 0x02;
+                            effParam = fxop & 0xFF;
+                            break;
+                    }
+                    cell.effTyp = effType;
+                    cell.eff = effParam;
+                    goto d00_readseq;
+                }
+
+                ch[c].del = ch[c].speed > 0 ? ch[c].speed - 1 : 0;
+            }
+        }
+
+        if (allEnded) break;
+        totalRows = row + 1;
+    }
+
+    g_d00GridRows = totalRows;
+    g_d00Grid.resize(totalRows * D00_MAX_CHANNELS);
+    g_d00NativeExtracted = true;
+}
+
 // Read little-endian uint16_t (matches d00.cpp's LE_WORD)
 static inline uint16_t readLE16(const uint16_t* val) {
     const uint8_t* b = (const uint8_t*)val;
@@ -951,8 +1389,18 @@ uint32_t adplug_get_patterns() {
         return maxLen > 0 ? (maxLen + 63) / 64 : 0;
     }
     // SOP/HERAD/JBM/ROL: OPL capture provides pattern count
-    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_SOP ||
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_SOP ||
         g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
+        if (g_captureTotalTicks == 0) return 0;
+        uint32_t ticksPerRow = g_captureTicksPerRow > 0 ? g_captureTicksPerRow : 6;
+        uint32_t totalRows = g_captureTotalTicks / ticksPerRow;
+        return totalRows > 0 ? (totalRows + 63) / 64 : 0;
+    }
+    // D00: use native extraction grid if available, else fall back to OPL capture
+    if (g_playerType == PT_D00) {
+        if (g_d00NativeExtracted && g_d00GridRows > 0) {
+            return (g_d00GridRows + 63) / 64;
+        }
         if (g_captureTotalTicks == 0) return 0;
         uint32_t ticksPerRow = g_captureTicksPerRow > 0 ? g_captureTicksPerRow : 6;
         uint32_t totalRows = g_captureTotalTicks / ticksPerRow;
@@ -991,6 +1439,8 @@ uint32_t adplug_get_channels() {
     if (auto* hp = asHeradPlayer()) return (uint32_t)hp->nTracks;
     if (auto* sp = asSopPlayer()) return (uint32_t)sp->nTracks;
     if (g_playerType == PT_JBM) return 9;  // JBM uses up to 11 but OPL2 has 9 melody
+    // D00 native extraction: always 9 channels
+    if (g_playerType == PT_D00 && g_d00NativeExtracted) return 9;
     // OPL capture: count channels that have notes
     if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_ROL) {
         uint8_t maxCh = 0;
@@ -1290,6 +1740,18 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
                ((uint32_t)inst << 8) |
                ((uint32_t)cmd << 16) |
                ((uint32_t)param << 24);
+    }
+
+    // ── D00 Native Extraction (preserves all effects) ──
+    if (g_playerType == PT_D00 && g_d00NativeExtracted) {
+        uint32_t absRow = pattern * 64 + row;
+        if (absRow >= g_d00GridRows || channel >= D00_MAX_CHANNELS) return 0;
+        const D00Cell& cell = g_d00Grid[absRow * D00_MAX_CHANNELS + channel];
+        if (cell.note == 0 && cell.inst == 0 && cell.effTyp == 0 && cell.eff == 0) return 0;
+        return ((uint32_t)cell.note) |
+               ((uint32_t)cell.inst << 8) |
+               ((uint32_t)cell.effTyp << 16) |
+               ((uint32_t)cell.eff << 24);
     }
 
     // ── OPL Capture (SOP, HERAD, JBM, ROL, D00, and all stream formats) ──
