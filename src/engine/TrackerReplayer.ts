@@ -1384,9 +1384,9 @@ export class TrackerReplayer {
     }
 
     // FT2 XM period system: use for XM/IT/S3M files, not for MOD/HVL/AHX
-    // XM, IT, and S3M all use note numbers (1-96/120) instead of Amiga periods
-    this.useXMPeriods = song.format === 'XM' || song.format === 'IT' || song.format === 'S3M';
-    this.linearPeriods = song.linearPeriods ?? (song.format === 'XM'); // Default XM to linear
+    // XM, IT, S3M and AdPlug all use note numbers (1-96/120) instead of Amiga periods
+    this.useXMPeriods = song.format === 'XM' || song.format === 'IT' || song.format === 'S3M' || song.format === 'AdPlug';
+    this.linearPeriods = song.linearPeriods ?? (song.format === 'XM' || song.format === 'AdPlug');
 
     // Set initial playback state
     this.songPos = 0;

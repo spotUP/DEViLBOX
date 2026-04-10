@@ -27,7 +27,14 @@ export class OPL3Synth implements DevilboxSynth {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
     this.output.gain.value = 0; // Muted until first note trigger
-    this.initWorklet();
+    this._initPromise = this.initWorklet();
+  }
+
+  private _initPromise: Promise<void>;
+
+  /** Wait until the AudioWorklet + WASM are loaded and ready */
+  async ensureInitialized(): Promise<void> {
+    await this._initPromise;
   }
 
   private async initWorklet() {
