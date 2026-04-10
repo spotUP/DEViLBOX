@@ -566,6 +566,11 @@ export class TrackerReplayer {
   // and TrackerReplayer only forwards position updates to the UI.
   private useLibopenmptPlayback = false;
 
+  // AdPlug streaming player: when active, audio comes from AdPlug WASM worklet.
+  // Set when an OPL3-only song has extracted patterns + streaming player loaded.
+  private useAdPlugStreaming = false;
+  private _adplugPositionUnsub: (() => void) | null = null;
+
   // Per-deck channel mute mask (DJ mode only)
   // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
   // Kept separate from ToneEngine's global mute states so each deck is independent.
@@ -1763,6 +1768,35 @@ export class TrackerReplayer {
       if (this._replacedInstruments.size > 0) {
         console.log('[HybridPlayback] Replaced instruments:', Array.from(this._replacedInstruments));
       }
+
+      // Detect all-OPL3 songs — start the AdPlug streaming player for audio
+      const allOPL3 = instruments.length > 0 && instruments.every(i => i.synthType === 'OPL3');
+      if (allOPL3) {
+        try {
+          const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+          const adplug = getAdPlugPlayer();
+          // Rewind to start and begin playback
+          adplug.rewind();
+          this.useAdPlugStreaming = true;
+          this._suppressNotes = true;
+
+          // Wire position reporting from AdPlug worklet → coordinator
+          const coordinator = this.coordinator;
+          adplug.onPosition = (order: number, row: number) => {
+            coordinator.dispatchEnginePosition(row, order);
+          };
+          adplug.onEnded = () => {
+            this.stop();
+          };
+          this._adplugPositionUnsub = () => {
+            adplug.onPosition = null;
+            adplug.onEnded = null;
+          };
+          coordinator.markDispatchActive();
+
+          _log('[TrackerReplayer] Using AdPlug streaming for OPL3 playback');
+        } catch { /* AdPlug not loaded */ }
+      }
     }
 
     // Start automation capture → store sync (converts register writes to automation curves).
@@ -1966,6 +2000,20 @@ export class TrackerReplayer {
             engine.onEnded = null;
             engine.stop();
           }
+        });
+      } catch { /* ignored */ }
+    }
+
+    // Stop AdPlug streaming player if active
+    if (this.useAdPlugStreaming) {
+      this.useAdPlugStreaming = false;
+      if (this._adplugPositionUnsub) {
+        this._adplugPositionUnsub();
+        this._adplugPositionUnsub = null;
+      }
+      try {
+        import('@/lib/import/AdPlugPlayer').then(({ getAdPlugPlayer }) => {
+          getAdPlugPlayer().stop();
         });
       } catch { /* ignored */ }
     }
