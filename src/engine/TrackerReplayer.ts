@@ -1919,27 +1919,17 @@ export class TrackerReplayer {
           // Register AdPlug as the active WASM engine for mute/solo support.
           this._activeWasmEngine = adplugPlayer;
 
+          // Mark dispatch active so the TS scheduler is skipped
+          this.coordinator.markDispatchActive();
+
           // Subscribe to position updates from the streaming player.
-          // Use the worklet's measured rowDuration for correct display ring timing.
-          adplugPlayer.onPosition = (order: number, row: number, audioTime?: number, _totalFrames?: number, rowDuration?: number) => {
+          // Use dispatchEnginePosition() — same path as libopenmpt/Furnace —
+          // which computes stable, theoretical row duration from BPM/speed
+          // and handles latency compensation, hybrid notes, VU, automation.
+          adplugPlayer.onPosition = (order: number, row: number, audioTime?: number) => {
             if (!this.playing || !this.song) return;
             if (order >= 0 && order < (this.song.songPositions?.length ?? 0)) {
-              this.coordinator.songPos = order;
-              this.coordinator.pattPos = row;
-              const patternNum = this.song.songPositions[order] ?? 0;
-              const ac = this.coordinator.context.audioContext;
-              let time: number;
-              if (audioTime != null && ac) {
-                const latency = ac.outputLatency ?? ac.baseLatency ?? 0;
-                time = audioTime + latency;
-              } else {
-                time = Tone.now();
-              }
-              const dur = rowDuration ?? 0;
-              this.coordinator.queueDisplayState(time, row, patternNum, order, 0, dur);
-              if (this.coordinator.onRowChange) {
-                this.coordinator.onRowChange(row, patternNum, order);
-              }
+              this.coordinator.dispatchEnginePosition(row, order, audioTime, false);
             }
           };
 
