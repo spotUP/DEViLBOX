@@ -16,6 +16,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     this.positionReportCounter = 0;
     this.lastReportedOrder = -1;
     this.lastReportedRow = -1;
+    this.totalFramesRendered = 0;
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
@@ -39,6 +40,11 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
         if (this.module) {
           this.module._adplug_rewind(msg.subsong || 0);
           this.playing = true;
+        }
+        break;
+      case 'setMuteMask':
+        if (this.module && this.module._adplug_set_mute_mask) {
+          this.module._adplug_set_mute_mask(msg.mask >>> 0);
         }
         break;
     }
@@ -112,6 +118,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
 
       if (result === 0) {
         this.playing = autoPlay;
+        this.totalFramesRendered = 0;
 
         // Set ticks-per-row for tick-based position tracking (capture formats)
         if (ticksPerRow && ticksPerRow > 0 && this.module._adplug_set_ticks_per_row) {
@@ -171,15 +178,46 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       right[i] = heap16[baseIdx + i * 2 + 1] / 32768.0;
     }
 
-    // Report position ~15 times per second (48000/128 = 375 callbacks/sec, 375/25 = 15)
-    if (++this.positionReportCounter >= 25) {
+    // Report position ~47 times per second (48000/128 = 375 callbacks/sec, 375/8 ≈ 47)
+    this.totalFramesRendered += numFrames;
+    if (++this.positionReportCounter >= 8) {
       this.positionReportCounter = 0;
       const order = this.module._adplug_get_position();
       const row = this.module._adplug_get_row();
+
+      // Read per-channel levels from WASM (18 floats)
+      let channelLevels = null;
+      if (this.module._adplug_get_channel_levels) {
+        const ptr = this.module._adplug_get_channel_levels();
+        if (ptr) {
+          const numCh = this.module._adplug_get_num_audio_channels
+            ? this.module._adplug_get_num_audio_channels()
+            : 9;
+          channelLevels = new Float32Array(numCh);
+          const floatIdx = ptr >> 2; // byte offset to float32 index
+          for (let i = 0; i < numCh; i++) {
+            channelLevels[i] = this.module.HEAPF32[floatIdx + i];
+          }
+        }
+      }
+
       if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
         this.lastReportedOrder = order;
         this.lastReportedRow = row;
-        this.port.postMessage({ type: 'position', order, row });
+        this.port.postMessage({
+          type: 'position',
+          order,
+          row,
+          audioTime: currentTime,
+          totalFrames: this.totalFramesRendered,
+          channelLevels,
+        });
+      } else if (channelLevels) {
+        // Even if position didn't change, send levels for VU meters
+        this.port.postMessage({
+          type: 'levels',
+          channelLevels,
+        });
       }
     }
 
