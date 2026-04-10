@@ -268,11 +268,13 @@ export async function extractAdPlugPatterns(
       : playerRefresh;
 
     if (usedCapture) {
-      // Use the WASM-computed ticksPerRow from actual note spacing analysis
+      // Use the WASM-computed ticksPerRow from actual note spacing analysis.
+      // speed = ticksPerRow, BPM = refresh * 5/2 gives natural tracker values:
+      //   70Hz, tpr=6 → BPM=175, speed=6, rowRate=11.67/sec
+      //   50Hz, tpr=5 → BPM=125, speed=5, rowRate=10.0/sec
       const ticksPerRow = Math.max(1, M._adplug_capture_get_ticks_per_row());
-      const rawRowRate = refresh / ticksPerRow;
-      finalSpeed = 1;
-      finalBpm = Math.round(rawRowRate * 5 / 2);
+      finalSpeed = Math.min(31, ticksPerRow);
+      finalBpm = Math.round(refresh * 5 / 2);
     } else {
       // Native format — use player speed if valid, compute BPM from refresh
       finalSpeed = (rawSpeed > 0 && rawSpeed <= 31) ? rawSpeed : 6;
