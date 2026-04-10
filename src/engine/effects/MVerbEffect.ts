@@ -26,12 +26,11 @@ export interface MVerbOptions {
 }
 
 /**
- * MVerbEffect - WASM-powered plate reverb with JS Schroeder fallback
+ * MVerbEffect - WASM-powered plate reverb via AudioWorklet.
  *
  * Wraps Martin Eastwood's MVerb (GPL v3) via AudioWorklet+WASM.
- * Falls back to a simple Schroeder reverb if WASM fails to load.
+ * Uses passthrough until WASM is ready, then swaps in the worklet.
  */
-/** Extract the underlying native AudioNode from a Tone.js wrapper */
 export class MVerbEffect extends Tone.ToneAudioNode {
   readonly name = 'MVerb';
 
@@ -44,10 +43,6 @@ export class MVerbEffect extends Tone.ToneAudioNode {
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ paramId: number; value: number }> = [];
-
-  private fallbackNode: ScriptProcessorNode | null = null;
-  private fallbackReverb: SchroederFallback | null = null;
-  private usingFallback = false;
 
   private _options: Required<MVerbOptions>;
 
@@ -82,8 +77,9 @@ export class MVerbEffect extends Tone.ToneAudioNode {
     this.dryGain.connect(this.output);
     this.wetGain.connect(this.output);
 
-    this.initFallback();
-    this.initWasm();
+    this.input.connect(this.wetGain);
+
+    void this._initWorklet();
   }
 
   setDamping(v: number) { this._options.damping = clamp01(v); this.sendParam(PARAM_DAMPING, v); }
@@ -103,22 +99,25 @@ export class MVerbEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
-  private async initWasm() {
+  private async _initWorklet(): Promise<void> {
     try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-      await MVerbEffect.ensureInitialized(rawContext);
+      const rawCtx = Tone.getContext().rawContext as AudioContext;
+      console.log('[MVerb] ⚡ _initWorklet starting (refactored v2)');
+      await MVerbEffect.ensureInitialized(rawCtx);
+      console.log('[MVerb] ⚡ ensureInitialized done, wasmBinary:', !!MVerbEffect.wasmBinary, 'jsCode:', !!MVerbEffect.jsCode);
 
       if (!MVerbEffect.wasmBinary || !MVerbEffect.jsCode) {
-        console.warn('[MVerb] WASM not available, using JS fallback');
+        console.error('[MVerb] WASM not available, staying on passthrough');
         return;
       }
 
-      this.workletNode = new AudioWorkletNode(rawContext, 'mverb-processor');
+      this.workletNode = new AudioWorkletNode(rawCtx, 'mverb-processor');
+      console.log('[MVerb] ⚡ AudioWorkletNode created, sending init message');
 
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
+          console.log('[MVerb] ⚡ WASM ready! Connecting worklet to audio chain');
           this.isWasmReady = true;
-          // Send initial params from _options (always up-to-date via setters)
           this.sendParam(PARAM_DAMPING, this._options.damping);
           this.sendParam(PARAM_DENSITY, this._options.density);
           this.sendParam(PARAM_BANDWIDTH, this._options.bandwidth);
@@ -126,16 +125,30 @@ export class MVerbEffect extends Tone.ToneAudioNode {
           this.sendParam(PARAM_PREDELAY, this._options.predelay);
           this.sendParam(PARAM_SIZE, this._options.size);
           this.sendParam(PARAM_GAIN, this._options.gain);
-          this.sendParam(PARAM_MIX, 1.0); // WASM always 100% wet
+          this.sendParam(PARAM_MIX, 1.0);
           this.sendParam(PARAM_EARLYMIX, this._options.earlyMix);
-          // Flush any params queued before WASM was ready (overrides _options with latest user values)
           for (const { paramId, value } of this.pendingParams) {
             this.sendParam(paramId, value);
           }
           this.pendingParams = [];
-          this.swapToWasm();
+          try {
+            const rawInput = getNativeAudioNode(this.input)!;
+            const rawWet = getNativeAudioNode(this.wetGain)!;
+            console.log('[MVerb] ⚡ rawInput:', !!rawInput, 'rawWet:', !!rawWet);
+            rawInput.connect(this.workletNode!);
+            this.workletNode!.connect(rawWet);
+            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx2.createGain();
+            keepalive.gain.value = 0;
+            this.workletNode!.connect(keepalive);
+            keepalive.connect(rawCtx2.destination);
+            console.log('[MVerb] ⚡ WASM swap complete — effect should be active!');
+          } catch (swapErr) {
+            console.error('[MVerb] WASM swap failed, staying on passthrough:', swapErr);
+          }
         } else if (event.data.type === 'error') {
-          console.warn('[MVerb] WASM worklet error:', event.data.error);
+          console.error('[MVerb] WASM worklet error:', event.data.error);
         }
       };
 
@@ -146,131 +159,28 @@ export class MVerbEffect extends Tone.ToneAudioNode {
       });
 
     } catch (err) {
-      console.warn('[MVerb] WASM init failed, using JS fallback:', err);
+      console.error('[MVerb] Worklet init failed, staying on passthrough:', err);
     }
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}mverb/MVerb.worklet.js`);
-      } catch {
-        // May already be registered
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        try {
-          const [wasmResponse, jsResponse] = await Promise.all([
-            fetch(`${baseUrl}mverb/MVerb.wasm`),
-            fetch(`${baseUrl}mverb/MVerb.js`),
-          ]);
-
-          if (wasmResponse.ok) {
-            this.wasmBinary = await wasmResponse.arrayBuffer();
-          }
-          if (jsResponse.ok) {
-            let code = await jsResponse.text();
-            code = code
-              .replace(/import\.meta\.url/g, "'.'")
-              .replace(/export\s+default\s+\w+;?\s*$/m, '')
-              .replace(
-                /if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g,
-                ''
-              )
-              .replace(
-                /var\s+wasmBinary;/,
-                'var wasmBinary = Module["wasmBinary"];'
-              )
-              .replace(
-                /(wasmMemory=wasmExports\["\w+"\])/,
-                '$1;Module["wasmMemory"]=wasmMemory'
-              );
-            // Inject shim for AudioWorklet scope (has globalThis but no `self`)
-            code = 'var self = globalThis;\n' + code;
-            this.jsCode = code;
-          }
-        } catch (fetchErr) {
-          console.warn('[MVerb] Failed to fetch WASM files:', fetchErr);
-        }
-      }
-
-      this.loadedContexts.add(context);
+  private static async ensureInitialized(ctx: AudioContext): Promise<void> {
+    if (this.loadedContexts.has(ctx)) return;
+    const existing = this.initPromises.get(ctx);
+    if (existing) return existing;
+    const p = (async () => {
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+      const [wasmResp, jsResp] = await Promise.all([
+        fetch(`${base}mverb/MVerb.wasm`), fetch(`${base}mverb/MVerb.js`),
+      ]);
+      this.wasmBinary = await wasmResp.arrayBuffer();
+      let js = await jsResp.text();
+      js = js.replace(/if\s*\(typeof exports\s*===\s*"object".*$/s, '');
+      this.jsCode = js;
+      await ctx.audioWorklet.addModule(`${base}mverb/MVerb.worklet.js`);
+      this.loadedContexts.add(ctx);
     })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private initFallback() {
-    try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-      this.fallbackNode = rawContext.createScriptProcessor(256, 2, 2);
-      this.fallbackReverb = new SchroederFallback(rawContext.sampleRate);
-
-      this.fallbackNode.onaudioprocess = (e) => {
-        const inL = e.inputBuffer.getChannelData(0);
-        const inR = e.inputBuffer.getChannelData(1);
-        const outL = e.outputBuffer.getChannelData(0);
-        const outR = e.outputBuffer.getChannelData(1);
-        this.fallbackReverb!.process(inL, inR, outL, outR);
-      };
-
-      const rawInput = getNativeAudioNode(this.input)!;
-      const rawWet = getNativeAudioNode(this.wetGain)!;
-
-      rawInput.connect(this.fallbackNode);
-      this.fallbackNode.connect(rawWet);
-      // wetGain → output already connected via Tone.js in constructor
-
-      // Keepalive: ensure ScriptProcessorNode is processed
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.fallbackNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-
-      this.usingFallback = true;
-    } catch (err) {
-      console.warn('[MVerb] Fallback init failed:', err);
-      this.input.connect(this.wetGain);
-    }
-  }
-
-  private swapToWasm() {
-    if (!this.workletNode) return;
-
-    try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-
-      // Connect WASM first, then disconnect fallback (avoids silent gap)
-      const rawInput = getNativeAudioNode(this.input)!;
-      const rawWet = getNativeAudioNode(this.wetGain)!;
-
-      rawInput.connect(this.workletNode);
-      this.workletNode.connect(rawWet);
-      // wetGain → output already connected via Tone.js in constructor
-
-      // Now safe to disconnect fallback
-      if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-        this.fallbackNode.onaudioprocess = null;
-        this.usingFallback = false;
-      }
-
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-
-    } catch (err) {
-      console.warn('[MVerb] WASM swap failed, staying on fallback:', err);
-    }
+    this.initPromises.set(ctx, p);
+    return p;
   }
 
   private sendParam(paramId: number, value: number) {
@@ -285,14 +195,9 @@ export class MVerbEffect extends Tone.ToneAudioNode {
 
   dispose(): this {
     if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
-      try { this.workletNode.disconnect(); } catch { /* ignored */ }
+      try { this.workletNode.port.postMessage({ type: 'dispose' }); } catch { /* */ }
+      try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
-    }
-    if (this.fallbackNode) {
-      this.fallbackNode.onaudioprocess = null;
-      try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-      this.fallbackNode = null;
     }
     this.dryGain.dispose();
     this.wetGain.dispose();
@@ -305,80 +210,4 @@ export class MVerbEffect extends Tone.ToneAudioNode {
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
-}
-
-/**
- * Simple Schroeder reverb fallback (4 parallel comb filters + 2 allpass in series)
- */
-class SchroederFallback {
-  private combs: CombFilter[];
-  private allpasses: AllpassFilter[];
-
-  constructor(sampleRate: number) {
-    const sr = sampleRate / 44100;
-    this.combs = [
-      new CombFilter(Math.round(1116 * sr), 0.84),
-      new CombFilter(Math.round(1188 * sr), 0.84),
-      new CombFilter(Math.round(1277 * sr), 0.84),
-      new CombFilter(Math.round(1356 * sr), 0.84),
-    ];
-    this.allpasses = [
-      new AllpassFilter(Math.round(556 * sr), 0.5),
-      new AllpassFilter(Math.round(441 * sr), 0.5),
-    ];
-  }
-
-  process(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array) {
-    const n = inL.length;
-    for (let i = 0; i < n; i++) {
-      const mono = (inL[i] + inR[i]) * 0.5;
-      let sum = 0;
-      for (const comb of this.combs) {
-        sum += comb.process(mono);
-      }
-      sum *= 0.25;
-      for (const ap of this.allpasses) {
-        sum = ap.process(sum);
-      }
-      outL[i] = sum;
-      outR[i] = sum;
-    }
-  }
-}
-
-class CombFilter {
-  private buffer: Float32Array;
-  private index = 0;
-  private feedback: number;
-
-  constructor(size: number, feedback: number) {
-    this.buffer = new Float32Array(size);
-    this.feedback = feedback;
-  }
-
-  process(input: number): number {
-    const out = this.buffer[this.index];
-    this.buffer[this.index] = input + out * this.feedback;
-    this.index = (this.index + 1) % this.buffer.length;
-    return out;
-  }
-}
-
-class AllpassFilter {
-  private buffer: Float32Array;
-  private index = 0;
-  private feedback: number;
-
-  constructor(size: number, feedback: number) {
-    this.buffer = new Float32Array(size);
-    this.feedback = feedback;
-  }
-
-  process(input: number): number {
-    const buffered = this.buffer[this.index];
-    const out = -input + buffered;
-    this.buffer[this.index] = input + buffered * this.feedback;
-    this.index = (this.index + 1) % this.buffer.length;
-    return out;
-  }
 }
