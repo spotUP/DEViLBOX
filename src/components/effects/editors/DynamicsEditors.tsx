@@ -822,7 +822,7 @@ export const MaximizerEditor: React.FC<VisualEffectEditorProps> = ({ effect, onU
       <Section>
         <SectionHeader size="lg" color="#b91c1c" title="Maximizer" />
         <div className="flex justify-around items-end">
-          <Knob value={ceiling} min={-6} max={0} onChange={(v) => onUpdateParameter('ceiling', v)}
+          <Knob value={ceiling} min={-24} max={0} onChange={(v) => onUpdateParameter('ceiling', v)}
             label="Ceiling" color="#b91c1c" formatValue={(v) => `${v.toFixed(1)} dB`} />
           <Knob value={release} min={5} max={500} onChange={(v) => onUpdateParameter('release', v)}
             label="Release" color="#dc2626" formatValue={(v) => `${Math.round(v)} ms`} />

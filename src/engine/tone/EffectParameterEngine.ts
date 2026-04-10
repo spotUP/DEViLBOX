@@ -462,7 +462,7 @@ export function applyEffectParametersDiff(
         if ('attack' in changed) node.setAttack(Number(changed.attack));
         if ('hold' in changed) node.setHold(Number(changed.hold));
         if ('release' in changed) node.setRelease(Number(changed.release));
-        if ('range' in changed) node.setRange(Number(changed.range) / 100);
+        if ('range' in changed) node.setRange(Number(changed.range));
         if ('hpf' in changed) node.setHpf(Number(changed.hpf));
       }
       break;
