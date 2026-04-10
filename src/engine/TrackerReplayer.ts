@@ -334,6 +334,8 @@ export interface TrackerSong {
   adplugFileData?: ArrayBuffer;
   /** Original filename for AdPlug format detection */
   adplugFileName?: string;
+  /** Ticks per row for AdPlug position tracking (capture formats) */
+  adplugTicksPerRow?: number;
   /** Companion files for two-file UADE formats (e.g. smp.*, .ins, .set) */
   uadeCompanionFiles?: Map<string, ArrayBuffer>;
   /** Raw Symphonie Pro (.symmod) binary for SymphonieEngine playback + export */
@@ -1890,6 +1892,47 @@ export class TrackerReplayer {
       }
     }
 
+    // ── AdPlug streaming: use AdPlug WASM for audio, replayer for display ────
+    // Same approach as UADE editable: AdPlug renders perfect audio via OPL
+    // emulation, the replayer ticks forward for pattern cursor display.
+    if (this.song.adplugFileData && !this.useWasmSequencer && !this.useLibopenmptPlayback) {
+      try {
+        const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
+        if (gen !== this._playGeneration) return;
+        const adplugPlayer = getAdPlugPlayer();
+        const ok = await adplugPlayer.load(
+          this.song.adplugFileData,
+          this.song.adplugFileName || 'song.d00',
+          undefined,
+          true,
+          this.song.adplugTicksPerRow,
+        );
+        if (gen !== this._playGeneration) return;
+
+        if (ok) {
+          this.useAdPlugStreaming = true;
+          this._suppressNotes = true;
+
+          // Subscribe to position updates from the streaming player
+          adplugPlayer.onPosition = (order: number, row: number) => {
+            if (!this.playing || !this.song) return;
+            // Sync replayer position to streaming player's position
+            if (order >= 0 && order < (this.song.songPositions?.length ?? 0)) {
+              this.songPos = order;
+              this.pattPos = row;
+            }
+          };
+
+          _log('[TrackerReplayer] Using AdPlug streaming for audio, suppressNotes = true');
+        } else {
+          _warn('[TrackerReplayer] AdPlug streaming failed to load');
+        }
+      } catch (err) {
+        _warn('[TrackerReplayer] AdPlug streaming failed:', err);
+        this.useAdPlugStreaming = false;
+      }
+    }
+
     // Eagerly initialize the scratch buffer so it starts capturing audio from
     // the moment playback begins. Without this, the first scratch attempt would
     // lazily init the buffer and immediately freeze it — resulting in silence
@@ -1983,13 +2026,16 @@ export class TrackerReplayer {
     // Stop AdPlug streaming player if active
     if (this.useAdPlugStreaming) {
       this.useAdPlugStreaming = false;
+      this._suppressNotes = false;
       if (this._adplugPositionUnsub) {
         this._adplugPositionUnsub();
         this._adplugPositionUnsub = null;
       }
       try {
         import('@/lib/import/AdPlugPlayer').then(({ getAdPlugPlayer }) => {
-          getAdPlugPlayer().stop();
+          const p = getAdPlugPlayer();
+          p.onPosition = null;
+          p.stop();
         });
       } catch { /* ignored */ }
     }

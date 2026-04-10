@@ -169,9 +169,10 @@ export class AdPlugPlayer {
    * @param filename Filename with extension (used for format detection)
    * @param companions Optional companion files (e.g. patch.003 for SCI)
    * @param autoPlay If false, load but don't start playback (default: true)
+   * @param ticksPerRow Optional ticks-per-row for tick-based position tracking (capture formats)
    * @returns true if loaded successfully
    */
-  async load(buffer: ArrayBuffer, filename: string, companions?: Array<{ name: string; data: Uint8Array }>, autoPlay = true): Promise<boolean> {
+  async load(buffer: ArrayBuffer, filename: string, companions?: Array<{ name: string; data: Uint8Array }>, autoPlay = true, ticksPerRow?: number): Promise<boolean> {
     const ok = await this.ensureInitialized();
     if (!ok || !this.processNode) return false;
 
@@ -199,7 +200,7 @@ export class AdPlugPlayer {
       this.processNode!.port.addEventListener('message', handler);
 
       const data = new Uint8Array(buffer);
-      this.processNode!.port.postMessage({ type: 'load', data, filename, companions: companions || [], autoPlay });
+      this.processNode!.port.postMessage({ type: 'load', data, filename, companions: companions || [], autoPlay, ticksPerRow: ticksPerRow || 0 });
     });
   }
 

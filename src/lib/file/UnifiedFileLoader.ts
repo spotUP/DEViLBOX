@@ -1667,6 +1667,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
         applyEditorMode({
           adplugFileData: song.adplugFileData,
           adplugFileName: song.adplugFileName,
+          adplugTicksPerRow: (song as any).adplugTicksPerRow,
         });
 
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
@@ -1750,6 +1751,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
               applyEditorMode({
                 adplugFileData: song.adplugFileData,
                 adplugFileName: song.adplugFileName,
+                adplugTicksPerRow: (song as any).adplugTicksPerRow,
               });
               notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
               return { success: true, message: `Imported editable: ${song.name}` };
