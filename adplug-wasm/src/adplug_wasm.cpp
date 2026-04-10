@@ -213,6 +213,7 @@ static std::vector<InstrumentFingerprint> g_capturedInstruments;
 static uint32_t g_captureTotalTicks = 0;
 static float g_captureRefreshRate = 0.0f;
 static uint32_t g_captureTicksPerRow = 0; // computed from actual note spacing
+static uint32_t g_renderTickCount = 0;   // ticks rendered since last rewind (for position tracking)
 
 // D00 captured→native instrument mapping.
 // g_d00InstMap[capturedIdx] = native 1-based instrument index (0 = no match).
@@ -510,6 +511,7 @@ void adplug_rewind(uint32_t subsong) {
         g_player->rewind(static_cast<int>(subsong));
         g_opl->init();
         g_sampleAccum = 0.0;
+        g_renderTickCount = 0;
         float refresh = g_player->getrefresh();
         if (refresh <= 0.0f) refresh = 70.0f;
         g_samplesPerTick = (double)g_sampleRate / (double)refresh;
@@ -542,6 +544,7 @@ int adplug_render(int16_t* buffer, uint32_t maxFrames) {
 
         if (g_sampleAccum >= g_samplesPerTick) {
             finished = !g_player->update();
+            g_renderTickCount++;
             g_sampleAccum -= g_samplesPerTick;
 
             float refresh = g_player->getrefresh();
@@ -567,6 +570,11 @@ uint32_t adplug_get_subsongs() {
 EMSCRIPTEN_KEEPALIVE
 float adplug_get_refresh() {
     return g_player ? g_player->getrefresh() : 0.0f;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void adplug_set_ticks_per_row(uint32_t tpr) {
+    g_captureTicksPerRow = tpr;
 }
 
 // adplug_get_num_instruments is defined in the second extern "C" block
@@ -1025,11 +1033,22 @@ uint32_t adplug_get_restart_pos() {
 
 EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_position() {
+    // For capture-based formats (D00, SOP, HERAD, etc.), the player's getorder()
+    // returns 0 because these formats don't track position internally.
+    // Use tick-based computation from the render tick counter instead.
+    if (g_captureTicksPerRow > 0 && g_renderTickCount > 0) {
+        uint32_t globalRow = g_renderTickCount / g_captureTicksPerRow;
+        return globalRow / 64; // 64 rows per pattern
+    }
     return g_player ? g_player->getorder() : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_row() {
+    if (g_captureTicksPerRow > 0 && g_renderTickCount > 0) {
+        uint32_t globalRow = g_renderTickCount / g_captureTicksPerRow;
+        return globalRow % 64;
+    }
     return g_player ? g_player->getrow() : 0;
 }
 

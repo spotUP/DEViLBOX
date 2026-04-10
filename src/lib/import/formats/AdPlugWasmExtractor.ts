@@ -446,6 +446,7 @@ export async function extractAdPlugPatterns(
       initialBPM: finalBpm,
       adplugFileData: buffer.slice(0),
       adplugFileName: filename,
+      adplugTicksPerRow: usedCapture ? Math.max(1, M._adplug_capture_get_ticks_per_row()) : undefined,
     };
   } finally {
     M._adplug_shutdown();
