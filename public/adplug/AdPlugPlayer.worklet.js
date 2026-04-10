@@ -193,10 +193,12 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
           const numCh = this.module._adplug_get_num_audio_channels
             ? this.module._adplug_get_num_audio_channels()
             : 9;
+          // Create Float32Array view from WASM memory (HEAPF32 not on Module)
+          const f32 = new Float32Array(this.module.HEAPU8.buffer);
+          const floatIdx = ptr >> 2;
           channelLevels = new Float32Array(numCh);
-          const floatIdx = ptr >> 2; // byte offset to float32 index
           for (let i = 0; i < numCh; i++) {
-            channelLevels[i] = this.module.HEAPF32[floatIdx + i];
+            channelLevels[i] = f32[floatIdx + i];
           }
         }
       }
