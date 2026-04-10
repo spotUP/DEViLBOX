@@ -150,19 +150,29 @@ interface AdPlugWasmModule {
 let wasmModule: AdPlugWasmModule | null = null;
 let wasmLoading: Promise<AdPlugWasmModule> | null = null;
 
+/** Force reload the WASM module on next extract (e.g. after WASM rebuild) */
+export function invalidateAdPlugModule() {
+  if (wasmModule) {
+    try { wasmModule._adplug_shutdown(); } catch { /* ignore */ }
+  }
+  wasmModule = null;
+  wasmLoading = null;
+}
+
 async function getModule(): Promise<AdPlugWasmModule> {
   if (wasmModule) return wasmModule;
   if (wasmLoading) return wasmLoading;
 
   wasmLoading = (async () => {
     // Load via script tag (browser) — the worklet already uses this pattern
-    const response = await fetch('/adplug/AdPlugPlayer.js');
+    const cb = `?v=${Date.now()}`;
+    const response = await fetch(`/adplug/AdPlugPlayer.js${cb}`);
     const jsText = await response.text();
     // eslint-disable-next-line no-new-func
     const factory = new Function(jsText + '; return createAdPlugPlayer;')() as
       (opts?: Record<string, unknown>) => Promise<AdPlugWasmModule>;
     const m = await factory({
-      locateFile: (f: string) => `/adplug/${f}`,
+      locateFile: (f: string) => `/adplug/${f}${cb}`,
     });
     m._adplug_init(48000);
     wasmModule = m;
@@ -242,7 +252,9 @@ export async function extractAdPlugPatterns(
 
     // If native extraction yields no patterns, try OPL capture
     if (numPatterns === 0 || numOrders === 0 || numChannels === 0) {
+      console.log(`[AdPlug] No native patterns — running OPL capture scan...`);
       const capturedEvents = M._adplug_capture_song();
+      console.log(`[AdPlug] OPL capture: ${capturedEvents} events`);
       if (!capturedEvents || capturedEvents === 0) return null;
 
       // Re-query structural data (now populated from capture)
@@ -251,7 +263,34 @@ export async function extractAdPlugPatterns(
       numChannels = M._adplug_get_channels();
       usedCapture = true;
 
+      console.log(`[AdPlug] After capture: pat=${numPatterns} ord=${numOrders} ch=${numChannels}`);
       if (numPatterns === 0 || numOrders === 0 || numChannels === 0) return null;
+    }
+
+    // Safety: if native extraction returned patterns but they're mostly empty,
+    // force OPL capture. This catches buggy native extractors (e.g. D00 packed v4)
+    // where patterns exist but cells are empty.
+    if (!usedCapture && numPatterns > 0 && numChannels > 0) {
+      let sampleNotes = 0;
+      const checkPats = Math.min(numPatterns, 3);
+      for (let p = 0; p < checkPats; p++)
+        for (let r = 0; r < numRows; r++)
+          for (let c = 0; c < numChannels; c++) {
+            const pk = M._adplug_get_note(p, r, c);
+            if (pk && (pk & 0xFF) > 0 && (pk & 0xFF) < 127) sampleNotes++;
+          }
+      const expectedMin = checkPats * numRows * 0.02; // at least 2% density
+      if (sampleNotes < expectedMin && sampleNotes < 5) {
+        console.log(`[AdPlug] Native extraction nearly empty (${sampleNotes} notes in ${checkPats} patterns) — forcing OPL capture`);
+        const capturedEvents = M._adplug_capture_song();
+        if (capturedEvents > 0) {
+          numPatterns = M._adplug_get_patterns();
+          numOrders = M._adplug_get_orders();
+          numChannels = M._adplug_get_channels();
+          usedCapture = true;
+          console.log(`[AdPlug] Capture fallback: ${capturedEvents} events → pat=${numPatterns} ord=${numOrders} ch=${numChannels}`);
+        }
+      }
     }
     if (numChannels > 24 || numRows > 256) return null;
 
@@ -427,6 +466,8 @@ export async function extractAdPlugPatterns(
 
       patterns.push(pat);
     }
+
+    console.log(`[AdPlug] Extraction complete: ${totalNotes} notes in ${patterns.length} patterns, ${numChannels} channels, ${songPositions.length} orders`);
 
     // If we got no actual notes, this format isn't useful for editing
     if (totalNotes === 0) return null;
