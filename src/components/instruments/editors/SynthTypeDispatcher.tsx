@@ -27,6 +27,7 @@ import {
   DEFAULT_PINK_TROMBONE,
   DEFAULT_DECTALK,
   DEFAULT_GRANULAR,
+  DEFAULT_OPL3,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { Knob } from '@components/controls/Knob';
@@ -158,6 +159,7 @@ const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m =
 const WobbleBassControls = lazy(() => import('../controls/WobbleBassControls').then(m => ({ default: m.WobbleBassControls })));
 const StartrekkerAMControls = lazy(() => import('../controls/StartrekkerAMControls').then(m => ({ default: m.StartrekkerAMControls })));
 const FuturePlayerControls = lazy(() => import('../controls/FuturePlayerControls').then(m => ({ default: m.FuturePlayerControls })));
+const OPL3Controls = lazy(() => import('../controls/OPL3Controls').then(m => ({ default: m.OPL3Controls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -178,7 +180,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -1344,6 +1346,26 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={symphonieConfig}
             onChange={handleSymphonieChange}
           />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // OPL3 / ADLIB INSTRUMENT VIEWER
+  // ============================================================================
+  if (editorMode === 'opl3') {
+    const opl3Config = deepMerge(DEFAULT_OPL3, instrument.opl3 || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0e00] to-[#0a0500]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <OPL3Controls config={opl3Config} />
         </Suspense>
       </div>
     );
