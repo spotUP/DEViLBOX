@@ -9,6 +9,7 @@ import { EffectOscilloscope, WaveshaperCurve } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
 import { isEffectBpmSynced } from '@engine/bpmSync';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useAudioStore } from '@stores/useAudioStore';
 import { SectionHeader, getParam, renderBpmSync, type VisualEffectEditorProps } from './shared';
 
 // ============================================================================
@@ -766,7 +767,14 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   const shame     = getParam(effect, 'shame',     20) / 100;
   const hiss      = getParam(effect, 'hiss',      20) / 100;
   const speed     = getParam(effect, 'speed',      0);
+  const printThrough = getParam(effect, 'printThrough', 0) === 1;
   const wet       = effect.wet / 100;
+
+  const bypassed = !effect.enabled;
+  const updateMasterEffect = useAudioStore(s => s.updateMasterEffect);
+  const toggleBypass = useCallback(() => {
+    updateMasterEffect(effect.id, { enabled: !effect.enabled });
+  }, [effect.id, effect.enabled, updateMasterEffect]);
 
   const BASE = '/kissofshame/ui/';
 
@@ -934,6 +942,42 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           backgroundRepeat: 'no-repeat',
           cursor: 'pointer',
         }}
+      />
+
+      {/* Bypass button — toggles effect enabled/disabled */}
+      <div
+        onClick={toggleBypass}
+        style={{
+          position: 'absolute',
+          left: 202,
+          top: 469 + yOff,
+          width: 34,
+          height: 34,
+          backgroundImage: `url(${BASE}Bypass.png)`,
+          backgroundSize: '34px auto',
+          backgroundPositionY: bypassed ? `${-34 * 2}px` : '0px',
+          backgroundRepeat: 'no-repeat',
+          cursor: 'pointer',
+        }}
+        title={bypassed ? 'Activate' : 'Bypass'}
+      />
+
+      {/* Print Through button — toggles tape print-through effect */}
+      <div
+        onClick={() => onUpdateParameter('printThrough', printThrough ? 0 : 1)}
+        style={{
+          position: 'absolute',
+          left: 698,
+          top: 609 + yOff,
+          width: 47,
+          height: 41,
+          backgroundImage: `url(${BASE}PrintThrough.png)`,
+          backgroundSize: '47px auto',
+          backgroundPositionY: printThrough ? '-41px' : '0px',
+          backgroundRepeat: 'no-repeat',
+          cursor: 'pointer',
+        }}
+        title={printThrough ? 'Print Through: On' : 'Print Through: Off'}
       />
 
       {/* Environments — preset picker */}
