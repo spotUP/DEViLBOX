@@ -17,6 +17,10 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
     this.lastReportedOrder = -1;
     this.lastReportedRow = -1;
     this.totalFramesRendered = 0;
+    this.startTime = -1; // set on first process() call
+    this.lastRowChangeFrame = 0; // frame count at last row change
+    this.measuredRowDuration = 0; // seconds between row changes
+    this.sampleRate = 48000; // overridden in initModule
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
@@ -63,6 +67,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       const result = this.module._adplug_init(sampleRate);
       if (result === 0) {
         this.initialized = true;
+        this.sampleRate = sampleRate;
         // Pre-allocate render buffer: 128 stereo S16 samples = 512 bytes
         this.renderBufferSize = 128;
         this.renderBuffer = this.module._malloc(this.renderBufferSize * 2 * 2);
@@ -119,6 +124,12 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       if (result === 0) {
         this.playing = autoPlay;
         this.totalFramesRendered = 0;
+        this.startTime = -1;
+        this.lastRowChangeFrame = 0;
+        this.measuredRowDuration = 0;
+        this.lastReportedOrder = -1;
+        this.lastReportedRow = -1;
+        this.positionReportCounter = 0;
 
         // Set ticks-per-row for tick-based position tracking (capture formats)
         if (ticksPerRow && ticksPerRow > 0 && this.module._adplug_set_ticks_per_row) {
@@ -180,6 +191,12 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
 
     // Report position ~47 times per second (48000/128 = 375 callbacks/sec, 375/8 ≈ 47)
     this.totalFramesRendered += numFrames;
+
+    // Capture start time on first process() call for sample-accurate timing
+    if (this.startTime < 0) {
+      this.startTime = currentTime;
+    }
+
     if (++this.positionReportCounter >= 8) {
       this.positionReportCounter = 0;
       const order = this.module._adplug_get_position();
@@ -207,6 +224,21 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
       }
 
       if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
+        // Measure row duration from actual sample count delta
+        const frameDelta = this.totalFramesRendered - this.lastRowChangeFrame;
+        if (this.lastRowChangeFrame > 0 && frameDelta > 0) {
+          this.measuredRowDuration = frameDelta / this.sampleRate;
+        } else {
+          // First row change — estimate from refresh rate and speed
+          const refresh = this.module._adplug_get_refresh
+            ? this.module._adplug_get_refresh()
+            : 70.0;
+          const speed = this.module._adplug_get_speed
+            ? this.module._adplug_get_speed()
+            : 6;
+          this.measuredRowDuration = (refresh > 0 && speed > 0) ? speed / refresh : 0.085;
+        }
+        this.lastRowChangeFrame = this.totalFramesRendered;
         this.lastReportedOrder = order;
         this.lastReportedRow = row;
 
@@ -247,6 +279,7 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
           row,
           audioTime: currentTime,
           totalFrames: this.totalFramesRendered,
+          rowDuration: this.measuredRowDuration,
           channelLevels,
           channelNotes,
         });

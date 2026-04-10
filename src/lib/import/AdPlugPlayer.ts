@@ -36,8 +36,8 @@ export class AdPlugPlayer {
   public meta: AdPlugMetadata | null = null;
   public playing = false;
 
-  /** Position callback — called ~47fps from the worklet with (order, row, audioTime, totalFrames). */
-  public onPosition: ((order: number, row: number, audioTime?: number, totalFrames?: number) => void) | null = null;
+  /** Position callback — called ~47fps from the worklet with (order, row, audioTime, totalFrames, rowDuration). */
+  public onPosition: ((order: number, row: number, audioTime?: number, totalFrames?: number, rowDuration?: number) => void) | null = null;
 
   /** Per-channel level callback — called ~47fps with float array (0-1 per channel). */
   public onChannelLevels: ((levels: Float32Array) => void) | null = null;
@@ -167,7 +167,7 @@ export class AdPlugPlayer {
         console.log(`[AdPlugPlayer] Loaded: "${data.title}" (${data.formatType}), ${data.subsongs} subsong(s), ${data.instruments.length} instruments`);
         break;
       case 'position':
-        this.onPosition?.(data.order, data.row, data.audioTime, data.totalFrames);
+        this.onPosition?.(data.order, data.row, data.audioTime, data.totalFrames, data.rowDuration);
         if (data.channelLevels) {
           this.onChannelLevels?.(data.channelLevels);
         }

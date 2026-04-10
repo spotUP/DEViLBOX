@@ -1920,10 +1920,8 @@ export class TrackerReplayer {
           this._activeWasmEngine = adplugPlayer;
 
           // Subscribe to position updates from the streaming player.
-          // Directly update the coordinator's position and queue with
-          // duration=0 (no smooth interpolation) — AdPlug's row rate
-          // may not match the computed BPM/speed duration.
-          adplugPlayer.onPosition = (order: number, row: number, audioTime?: number) => {
+          // Use the worklet's measured rowDuration for correct display ring timing.
+          adplugPlayer.onPosition = (order: number, row: number, audioTime?: number, _totalFrames?: number, rowDuration?: number) => {
             if (!this.playing || !this.song) return;
             if (order >= 0 && order < (this.song.songPositions?.length ?? 0)) {
               this.coordinator.songPos = order;
@@ -1937,7 +1935,8 @@ export class TrackerReplayer {
               } else {
                 time = Tone.now();
               }
-              this.coordinator.queueDisplayState(time, row, patternNum, order, 0, 0);
+              const dur = rowDuration ?? 0;
+              this.coordinator.queueDisplayState(time, row, patternNum, order, 0, dur);
               if (this.coordinator.onRowChange) {
                 this.coordinator.onRowChange(row, patternNum, order);
               }
@@ -1978,6 +1977,13 @@ export class TrackerReplayer {
                 }
               }
             }
+          };
+
+          // Wire onEnded so we stop when the song finishes — prevents
+          // the pattern from continuing to scroll after playback ends.
+          adplugPlayer.onEnded = () => {
+            _log('[TrackerReplayer] AdPlug song ended');
+            this.stop();
           };
 
           _log('[TrackerReplayer] Using AdPlug streaming for audio, suppressNotes = true');
@@ -2094,6 +2100,7 @@ export class TrackerReplayer {
           p.onPosition = null;
           p.onChannelLevels = null;
           p.onChannelNotes = null;
+          p.onEnded = null;
           p.stop();
         });
       } catch { /* ignored */ }
