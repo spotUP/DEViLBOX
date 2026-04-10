@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-09T22:10:33.797Z
+ * Generated: 2026-04-10T20:03:57.687Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4735';
-export const BUILD_NUMBER = '4735';
-export const BUILD_HASH = 'bddc389c5';
-export const BUILD_DATE = '2026-04-09';
+export const BUILD_VERSION = '1.0.4781';
+export const BUILD_NUMBER = '4781';
+export const BUILD_HASH = 'affb944e7';
+export const BUILD_DATE = '2026-04-10';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,189 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4735',
+    version: '1.0.4781',
     date: '2026-04-10',
     changes: [
+      {
+        type: 'fix',
+        "description": "KissOfShame UI: always show reels, red VU meters, fix cutoff"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPL3 distortion properly: normalize in WASM bridge, not gain node"
+      },
+      {
+        type: 'improvement',
+        "description": "Animate KissOfShame VU meters from post-effect audio level"
+      },
+      {
+        type: 'fix',
+        "description": "Fix capture BPM: use speed=ticksPerRow, BPM=refresh*5/2"
+      },
+      {
+        type: 'fix',
+        "description": "Fix TapeSimulator killing all audio — missing WASM memory capture in worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPL capture ticksPerRow + distortion: measure actual note spacing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPL capture volume: was sending Fxx (speed) instead of Cxx (volume)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPL capture BPM: remove 5-7x tempo slowdown"
+      },
+      {
+        type: 'fix',
+        "description": "Fix WASM effects appearing unresponsive: wet defaults, NoiseGate bug, Maximizer range"
+      },
+      {
+        type: 'improvement',
+        "description": "D00/EdLib: native instrument extraction in WASM bridge"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPL3 note-on-drop: skip preload, create synth on play"
+      },
+      {
+        type: 'fix',
+        "description": "Add setParam to all WASM effects, fix updateEffectParameters routing"
+      },
+      {
+        type: 'feature',
+        "description": "Remove JS fallbacks from 5 handcrafted WASM effects, add diagnostics"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPL3 editable playback silence — three root causes"
+      },
+      {
+        type: 'fix',
+        "description": "OPL3 transient on drop and volume miscalculation"
+      },
+      {
+        type: 'feature',
+        "description": "Make AdLib/OPL formats fully editable via OPL3Synth"
+      },
+      {
+        type: 'feature',
+        "description": "Add LHA archive unwrapping for YM files"
+      },
+      {
+        type: 'fix',
+        "description": "Restore AdPlug gain on play after autoPlay=false load"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent instrument trigger on AdLib file drop"
+      },
+      {
+        type: 'feature',
+        "description": "Add OPL3 instrument editor for AdLib formats"
+      },
+      {
+        type: 'fix',
+        "description": "Proper AdPlug transport wiring — no auto-play, position sync, single audio source"
+      },
+      {
+        type: 'fix',
+        "description": "Remove non-functional Layout 1-4 preset buttons from toolbar"
+      },
+      {
+        type: 'fix',
+        "description": "Start WASM streaming player after AdLib extraction for audio"
+      },
+      {
+        type: 'feature',
+        "description": "Tabbed FX panes — show one effect at a time with tabs when multiple"
+      },
+      {
+        type: 'feature',
+        "description": "Pure WASM streaming for AdLib + OPL effect display"
+      },
+      {
+        type: 'fix',
+        "description": "Cap instrument panel height with scrollbar for tall content"
+      },
+      {
+        type: 'feature',
+        "description": "OPL native effect routing for AdLib formats (HSC/D00/LDS)"
+      },
+      {
+        type: 'fix',
+        "description": "Make SAMPLE button match other instrument list buttons"
+      },
+      {
+        type: 'fix',
+        "description": "Correct HSC/D00/LDS playback speed — derive BPM from refresh rate"
+      },
+      {
+        type: 'fix',
+        "description": "Auto-size instrument panel, effects side by side with horizontal scroll"
+      },
+      {
+        type: 'improvement',
+        "description": "Restyle synth panels to match FX pedal aesthetic"
+      },
+      {
+        type: 'fix',
+        "description": "Route HSC/RAD/CMF/DRO/IMF to WASM extractor instead of TS parser"
+      },
+      {
+        type: 'improvement',
+        "description": "Redo instrument panel: proper horizontal 3-pane layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Horizontal layout for synth + inst FX + master FX panels"
+      },
+      {
+        type: 'improvement',
+        "description": "Double per-channel visualizer height (36px → 72px)"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove border-right from FT2 toolbar sections"
+      },
+      {
+        type: 'feature',
+        "description": "Remove viz area, add About dialog with logo + sine scroller"
+      },
+      {
+        type: 'fix',
+        "description": "HSC instrument tracking + correct note/effect parsing"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove tap tempo, Ins, Del buttons from FT2 toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "Strip toolbar viz to logo-only + add Nibbles dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Track scopes always stretch to full width"
+      },
+      {
+        type: 'fix',
+        "description": "Remove redundant export buttons from pattern editor headers"
+      },
+      {
+        type: 'fix',
+        "description": "Track scopes react to MOD/XM/IT playback via master waveform"
+      },
+      {
+        type: 'fix',
+        "description": "Simplify track scopes to waveform-only oscilloscopes"
+      },
+      {
+        type: 'fix',
+        "description": "OPL3 multi-timbral channel routing + scratch mode grace period"
+      },
       {
         type: 'fix',
         "description": "Instrument list context menu + double-click + scope channel colors"
@@ -54,190 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Flanger/doubling on WASM-backed formats + worklet memory leak"
-      },
-      {
-        type: 'feature',
-        "description": "Stop AdPlug streaming player when loading new song"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AdLib capture: note-offs, volume, instrument fingerprinting"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AdLib capture visual tempo — use speed to target ~10 rows/sec"
-      },
-      {
-        type: 'fix',
-        "description": "Fix clear not resetting song name + show dialog on load failure"
-      },
-      {
-        type: 'fix',
-        "description": "Enable mute/solo for MOD/XM/IT/S3M (libopenmpt ext API)"
-      },
-      {
-        type: 'fix',
-        "description": "Wire companion files through drag-drop for AdLib SNG/SCI formats"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing AdLib extension aliases (edl, dtl, as3m, adlib, wlf)"
-      },
-      {
-        type: 'improvement',
-        "description": "Centralize UADE scan lists into shared module (Phase 1)"
-      },
-      {
-        type: 'feature',
-        "description": "Add RAW exporter and integrate AdLib export (RAD/IMF/RAW)"
-      },
-      {
-        type: 'fix',
-        "description": "OPL3 allNotesOff now forces instant silence"
-      },
-      {
-        type: 'fix',
-        "description": "OPL3 per-voice patches — multi-instrument songs no longer corrupt"
-      },
-      {
-        type: 'feature',
-        "description": "Add right-click context menu to Pixi instrument panel"
-      },
-      {
-        type: 'fix',
-        "description": "AdLib BPM/speed computation and DMO instrument extraction"
-      },
-      {
-        type: 'improvement',
-        "description": "VU fill meters use theme accent color instead of hardcoded green"
-      },
-      {
-        type: 'improvement',
-        "description": "Hold-to-preview instruments: click selects, hold plays until release"
-      },
-      {
-        type: 'fix',
-        "description": "All 36 AdLib formats now editable (ADL subsong iter, SCI/SNG companions)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 43 double-fire bugs across all Pixi components"
-      },
-      {
-        type: 'feature',
-        "description": "OPL register capture — 33/36 AdLib formats now editable"
-      },
-      {
-        type: 'fix',
-        "description": "Fix ProTracker mod mute + solo gain cache bug"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AddChannelBtn double-fire, remove diagnostic logs"
-      },
-      {
-        type: 'fix',
-        "description": "Fix double-fire: HoverableHeaderBtn called onPress twice per click"
-      },
-      {
-        type: 'feature',
-        "description": "Add diagnostic logging to mute forwarding chain"
-      },
-      {
-        type: 'feature',
-        "description": "Multi-player AdLib WASM extraction — 15 formats now editable"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace ALL require() with cached dynamic imports in useMixerStore"
-      },
-      {
-        type: 'fix',
-        "description": "Fix require() → ESM import for mute/solo in browser"
-      },
-      {
-        type: 'fix',
-        "description": "OPL3Synth singleton — share one WASM instance across all AdLib instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Fix nested setState: move resetMuteState outside immer set()"
-      },
-      {
-        type: 'fix',
-        "description": "Add sanity checks to prevent WASM crashes on HSP/MTK formats"
-      },
-      {
-        type: 'feature',
-        "description": "Add master bus limiter + enable auto-gain by default"
-      },
-      {
-        type: 'improvement',
-        "description": "Bulletproof engine mute forwarding: cached refs + error logging"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify mute/solo: single source of truth in useMixerStore"
-      },
-      {
-        type: 'feature',
-        "description": "Add IMF (id Music Format) exporter for OPL songs"
-      },
-      {
-        type: 'fix',
-        "description": "Update RAD exporter to support OPL3Synth instruments"
-      },
-      {
-        type: 'feature',
-        "description": "Add WASM pattern/instrument extraction for AdPlug CmodPlayer formats"
-      },
-      {
-        type: 'improvement',
-        "description": "Consolidate bottom bars: move paste mode/mask to PatternBottomBar"
-      },
-      {
-        type: 'feature',
-        "description": "Make AdLib/OPL formats editable with OPL3Synth"
-      },
-      {
-        type: 'feature',
-        "description": "Add GUI layout presets (1-4 slots)"
-      },
-      {
-        type: 'feature',
-        "description": "Add Renoise-style bottom control bar for pattern editor"
-      },
-      {
-        type: 'feature',
-        "description": "Add channel color blend slider in settings"
-      },
-      {
-        type: 'feature',
-        "description": "Add shift-click multi-select to pattern order sidebar"
-      },
-      {
-        type: 'fix',
-        "description": "Return streaming player metadata for AdPlug/V2M load_file"
-      },
-      {
-        type: 'feature',
-        "description": "Add Renoise-style track scopes strip"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update format-state with verified AdPlug WASM results"
-      },
-      {
-        type: 'fix',
-        "description": "Route AdPlug and V2M audio through ToneEngine master mixer"
-      },
-      {
-        type: 'feature',
-        "description": "Make pattern order sidebar fully interactive"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update format-state.json with AdPlug audit entries"
       }
     ]
   }

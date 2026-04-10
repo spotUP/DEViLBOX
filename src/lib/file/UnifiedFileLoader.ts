@@ -1664,7 +1664,10 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
           author: '',
           description: `Imported from ${file.name}`,
         });
-        applyEditorMode({});
+        applyEditorMode({
+          adplugFileData: song.adplugFileData,
+          adplugFileName: song.adplugFileName,
+        });
 
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
         return { success: true, message: `Imported editable: ${song.name}` };
@@ -1744,7 +1747,10 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
                 author: '',
                 description: `Imported from ${file.name}`,
               });
-              applyEditorMode({});
+              applyEditorMode({
+                adplugFileData: song.adplugFileData,
+                adplugFileName: song.adplugFileName,
+              });
               notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
               return { success: true, message: `Imported editable: ${song.name}` };
             }

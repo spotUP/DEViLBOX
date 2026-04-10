@@ -29,7 +29,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, uadePatternLayout, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, uadePatternLayout, adplugFileData, adplugFileName, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -61,6 +61,8 @@ export const usePatternPlayback = () => {
     symphonieFileData: s.symphonieFileData,
     uadeEditableFileData: s.uadeEditableFileData,
     uadePatternLayout: s.uadePatternLayout,
+    adplugFileData: s.adplugFileData,
+    adplugFileName: s.adplugFileName,
     tfmxFileData: s.tfmxFileData,
     tfmxSmplData: s.tfmxSmplData,
     libopenmptFileData: s.libopenmptFileData,
@@ -538,6 +540,8 @@ export const usePatternPlayback = () => {
           symphonieFileData: symphonieFileData ?? undefined,
           uadeEditableFileData: uadeEditableFileData ?? undefined,
           uadePatternLayout: uadePatternLayout ?? undefined,
+          adplugFileData: adplugFileData ?? undefined,
+          adplugFileName: adplugFileName ?? undefined,
           tfmxFileData: tfmxFileData ?? undefined,
           tfmxSmplData: tfmxSmplData ?? undefined,
           libopenmptFileData: libopenmptFileData ?? undefined,
