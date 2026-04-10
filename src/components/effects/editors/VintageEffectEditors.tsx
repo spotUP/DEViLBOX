@@ -718,9 +718,6 @@ const FilmstripKnob: React.FC<FilmstripKnobProps> = ({
   );
 };
 
-// 6 environments matching the original KissOfShame plugin (EShameEnvironments enum)
-// The Environments.png filmstrip has 6 frames of 183x32
-const KOS_ENVIRONMENT_COUNT = 6;
 
 export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
@@ -764,7 +761,6 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   const shame     = getParam(effect, 'shame',     20) / 100;
   const hiss      = getParam(effect, 'hiss',      20) / 100;
   const speed     = getParam(effect, 'speed',      0);
-  const environment = getParam(effect, 'environment', 1);
   const printThrough = getParam(effect, 'printThrough', 0) === 1;
   const wet       = effect.wet / 100;
 
@@ -978,23 +974,6 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
         title={printThrough ? 'Print Through: On' : 'Print Through: Off'}
       />
 
-      {/* Environments — click to cycle through 6 environments (filmstrip) */}
-      <div
-        onClick={() => onUpdateParameter('environment', (environment + 1) % KOS_ENVIRONMENT_COUNT)}
-        style={{
-          position: 'absolute',
-          left: 388,
-          top: 654 + yOff,
-          width: 183,
-          height: 32,
-          backgroundImage: `url(${BASE}Environments.png)`,
-          backgroundSize: '183px auto',
-          backgroundPositionY: `${-(environment * 32)}px`,
-          backgroundRepeat: 'no-repeat',
-          cursor: 'pointer',
-        }}
-        title="Click to cycle environment"
-      />
     </div>
     </div>
   );
