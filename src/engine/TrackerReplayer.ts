@@ -28,6 +28,7 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
@@ -1951,6 +1952,34 @@ export class TrackerReplayer {
             engine.updateRealtimeChannelLevels(arr);
           };
 
+          // Subscribe to live channel notes — fill pattern grid during playback.
+          // This enriches the statically-extracted pattern data with real-time
+          // note/instrument/effect data from the player's internal state.
+          adplugPlayer.onChannelNotes = (notes, order, row) => {
+            if (!this.playing || !this.song) return;
+            const store = useTrackerStore.getState();
+            const patIdx = this.song.songPositions?.[order];
+            if (patIdx == null || patIdx < 0 || patIdx >= store.patterns.length) return;
+            const pattern = store.patterns[patIdx];
+            if (!pattern || row < 0 || row >= pattern.length) return;
+
+            for (const n of notes) {
+              if (n.trigger && n.note > 0 && n.ch < pattern.channels.length) {
+                const existing = pattern.channels[n.ch].rows[row];
+                // Only write if the cell is currently empty
+                if (!existing || (existing.note === 0 && existing.instrument === 0)) {
+                  setCellInPattern(pattern, n.ch, row, {
+                    note: n.note as any,
+                    instrument: n.inst as any,
+                    volume: n.vol > 0 ? (0x10 + Math.min(n.vol, 63)) as any : 0 as any,
+                    effTyp: n.effTyp as any,
+                    eff: n.eff as any,
+                  });
+                }
+              }
+            }
+          };
+
           _log('[TrackerReplayer] Using AdPlug streaming for audio, suppressNotes = true');
         } else {
           _warn('[TrackerReplayer] AdPlug streaming failed to load');
@@ -2064,6 +2093,7 @@ export class TrackerReplayer {
           const p = getAdPlugPlayer();
           p.onPosition = null;
           p.onChannelLevels = null;
+          p.onChannelNotes = null;
           p.stop();
         });
       } catch { /* ignored */ }
