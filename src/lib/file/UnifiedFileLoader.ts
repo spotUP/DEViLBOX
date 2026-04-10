@@ -1599,8 +1599,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
     }
 
     // Try WASM extraction first — for CmodPlayer-based formats this gives us
-    // editable patterns + OPL3 instruments instead of stream-only audio
-    let extractionSucceeded = false;
+    // editable patterns + OPL3 instruments playable through OPL3Synth
     try {
       // Stop ALL audio immediately — streaming player, transport, and synth voices.
       // This must happen BEFORE extraction starts so the old song doesn't keep
@@ -1651,7 +1650,7 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
           } as typeof song.patterns[0]['importMetadata'];
         }
 
-        loadInstruments(song.instruments, { skipPreload: true });
+        loadInstruments(song.instruments);
         loadPatterns(song.patterns);
         setCurrentPattern(0);
         if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
@@ -1665,20 +1664,19 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
         });
         applyEditorMode({});
 
-        // OPL3 audio comes from the WASM streaming player, not from individual
-        // OPL3 synth instances. Skip preloadInstruments — it would create hundreds
-        // of unnecessary WASM synths. The streaming player below handles all audio.
+        // OPL3 audio comes from the OPL3Synth WASM, driven note-by-note by the
+        // TS replayer. Patterns are fully editable — edits heard in real-time.
+        // preloadInstruments creates ONE shared OPL3Synth (deduped in nativePlayerTypes).
 
         notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-        extractionSucceeded = true;
-        // Don't return — fall through to start the streaming player for audio
+        return { success: true, message: `Imported editable: ${song.name}` };
       }
     } catch (err) {
       console.warn('[AdPlug] WASM extraction failed, falling back to streaming:', err);
     }
 
-    // Start WASM streaming player for audio (always — even after successful extraction,
-    // since the pattern data is for display/editing only; audio comes from WASM player)
+    // Extraction failed or format not supported — fall back to streaming player.
+    // Streaming audio is opaque (read-only patterns, if any).
     const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
     const player = getAdPlugPlayer();
 
@@ -1688,10 +1686,8 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
       data: new Uint8Array(c.data),
     }));
 
-    // When extraction succeeded, load the streaming player without auto-play.
-    // The transport play/stop will control it. For pure streaming (no extraction),
-    // auto-play since there's no transport integration.
-    let ok = await player.load(arrayBuffer, file.name, streamCompanions, !extractionSucceeded);
+    // Streaming player: auto-play since there's no pattern extraction
+    let ok = await player.load(arrayBuffer, file.name, streamCompanions, true);
 
     if (!ok) {
       // For companion-dependent formats, prompt user to select the companion file
@@ -1738,7 +1734,8 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
                 } as typeof song.patterns[0]['importMetadata'];
               }
 
-              loadInstruments(song.instruments, { skipPreload: true });              loadPatterns(song.patterns);
+              loadInstruments(song.instruments);
+              loadPatterns(song.patterns);
               setCurrentPattern(0);
               if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
               setOriginalModuleData(null);
@@ -1750,19 +1747,17 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
                 description: `Imported from ${file.name}`,
               });
               applyEditorMode({});
-              // Don't preloadInstruments — streaming player handles audio
               notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-              extractionSucceeded = true;
-              // Don't return — fall through to streaming player retry below
+              return { success: true, message: `Imported editable: ${song.name}` };
             }
           } catch { /* extraction failed, try streaming */ }
 
-          // Retry streaming with companion (load without auto-play if extraction succeeded)
+          // Extraction failed with companion — retry streaming
           const retryCompanions = companions.map(c => ({
             name: c.name,
             data: new Uint8Array(c.data),
           }));
-          ok = await player.load(arrayBuffer, file.name, retryCompanions, !extractionSucceeded);
+          ok = await player.load(arrayBuffer, file.name, retryCompanions, true);
         }
       }
       if (!ok) {
@@ -1773,11 +1768,9 @@ async function loadAdPlugFile(file: File, companionFiles?: Map<string, ArrayBuff
     const meta = player.meta;
     const title = meta?.title || file.name.replace(/\.[^.]+$/, '');
     const type = meta?.formatType || 'OPL';
-    if (!extractionSucceeded) {
-      notify.success(`Playing ${type}: ${title}`);
-    }
+    notify.success(`Playing ${type}: ${title}`);
 
-    return { success: true, message: extractionSucceeded ? `Imported editable + streaming: ${title}` : `Playing ${type}: ${title}` };
+    return { success: true, message: `Playing ${type}: ${title}` };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: `Failed to load AdPlug file: ${msg}` };
