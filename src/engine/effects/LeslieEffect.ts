@@ -100,6 +100,21 @@ export class LeslieEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'speed': this.setSpeed(value); break;
+      case 'hornRate': this.setHornRate(value); break;
+      case 'drumRate': this.setDrumRate(value); break;
+      case 'hornDepth': this.setHornDepth(value); break;
+      case 'drumDepth': this.setDrumDepth(value); break;
+      case 'doppler': this.setDoppler(value); break;
+      case 'mix': this.setMix(value); break;
+      case 'width': this.setWidth(value); break;
+      case 'acceleration': this.setAcceleration(value); break;
+      case 'wet': this.wet = value; break;
+    }
+  }
+
   private async _initWorklet() {
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;

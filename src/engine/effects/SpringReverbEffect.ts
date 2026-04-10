@@ -87,6 +87,18 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'decay': this.setDecay(value); break;
+      case 'damping': this.setDamping(value); break;
+      case 'tension': this.setTension(value); break;
+      case 'mix': this.setSpringMix(value); break;
+      case 'drip': this.setDrip(value); break;
+      case 'diffusion': this.setDiffusion(value); break;
+      case 'wet': this.wet = value; break;
+    }
+  }
+
   private async _initWorklet(): Promise<void> {
     try {
       const rawCtx = Tone.getContext().rawContext as AudioContext;

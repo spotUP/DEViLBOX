@@ -206,6 +206,18 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
     this.wetGain.gain.value = this._options.wet;
   }
 
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'drive': this.setDrive(value); break;
+      case 'character': this.setCharacter(value); break;
+      case 'bias': this.setBias(value); break;
+      case 'shame': this.setShame(value); break;
+      case 'hiss': this.setHiss(value); break;
+      case 'speed': this.setSpeed(value); break;
+      case 'wet': this.wet = value; break;
+    }
+  }
+
   dispose(): this {
     this._disposed = true;
     if (this.workletNode) {

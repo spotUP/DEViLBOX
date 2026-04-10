@@ -1577,7 +1577,7 @@ export const DEFAULT_OPL3: OPL3Config = {
   op1Level: 32, op1Multi: 1, op1Waveform: 0,
   op1Tremolo: 0, op1Vibrato: 0, op1SustainHold: 0, op1KSR: 0, op1KSL: 0,
   op2Attack: 1, op2Decay: 4, op2Sustain: 2, op2Release: 5,
-  op2Level: 0, op2Multi: 1, op2Waveform: 0,
+  op2Level: 63, op2Multi: 1, op2Waveform: 0,
   op2Tremolo: 0, op2Vibrato: 0, op2SustainHold: 0, op2KSR: 0, op2KSL: 0,
   feedback: 0, connection: 0,
 };

@@ -142,8 +142,17 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     this._options.wet = Math.max(0, Math.min(1, value));
     this.wetGain.gain.value = this._options.wet;
     this.dryGain.gain.value = 1 - this._options.wet;
-    // Dry/wet mixing is handled entirely by the TS gain nodes.
-    // WASM always runs at 100% wet to avoid double-mixing.
+  }
+
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'cutoff': this.setCutoff(value); break;
+      case 'resonance': this.setResonance(value); break;
+      case 'drive': this.setDrive(value); break;
+      case 'model': this.setModel(value as any); break;
+      case 'filterMode': this.setFilterMode(value as any); break;
+      case 'wet': this.wet = value; break;
+    }
   }
 
   // --- WASM initialization ---
