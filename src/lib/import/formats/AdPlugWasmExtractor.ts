@@ -444,6 +444,8 @@ export async function extractAdPlugPatterns(
       numChannels,
       initialSpeed: finalSpeed,
       initialBPM: finalBpm,
+      adplugFileData: buffer.slice(0),
+      adplugFileName: filename,
     };
   } finally {
     M._adplug_shutdown();

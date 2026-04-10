@@ -718,12 +718,9 @@ const FilmstripKnob: React.FC<FilmstripKnobProps> = ({
   );
 };
 
-const KOS_PRESETS = [
-  { label: 'New Tape', drive: 20, character: 30, bias: 25, shame: 10, hiss: 15 },
-  { label: 'Studio',   drive: 40, character: 45, bias: 45, shame: 25, hiss: 30 },
-  { label: 'Home Deck',drive: 60, character: 60, bias: 60, shame: 55, hiss: 50 },
-  { label: 'Worn',     drive: 80, character: 70, bias: 80, shame: 80, hiss: 75 },
-];
+// 6 environments matching the original KissOfShame plugin (EShameEnvironments enum)
+// The Environments.png filmstrip has 6 frames of 183x32
+const KOS_ENVIRONMENT_COUNT = 6;
 
 export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
@@ -767,6 +764,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   const shame     = getParam(effect, 'shame',     20) / 100;
   const hiss      = getParam(effect, 'hiss',      20) / 100;
   const speed     = getParam(effect, 'speed',      0);
+  const environment = getParam(effect, 'environment', 1);
   const printThrough = getParam(effect, 'printThrough', 0) === 1;
   const wet       = effect.wet / 100;
 
@@ -906,7 +904,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           backgroundPositionY: `${-(vuL * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
-          filter: 'sepia(1) saturate(3) hue-rotate(-10deg) brightness(0.7)',
+          filter: 'brightness(1.4) contrast(1.2) sepia(0.6) saturate(2.5) hue-rotate(-15deg)',
         }}
       />
 
@@ -923,7 +921,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           backgroundPositionY: `${-(vuR * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
-          filter: 'sepia(1) saturate(3) hue-rotate(-10deg) brightness(0.7)',
+          filter: 'brightness(1.4) contrast(1.2) sepia(0.6) saturate(2.5) hue-rotate(-15deg)',
         }}
       />
 
@@ -980,48 +978,23 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
         title={printThrough ? 'Print Through: On' : 'Print Through: Off'}
       />
 
-      {/* Environments — preset picker */}
+      {/* Environments — click to cycle through 6 environments (filmstrip) */}
       <div
+        onClick={() => onUpdateParameter('environment', (environment + 1) % KOS_ENVIRONMENT_COUNT)}
         style={{
           position: 'absolute',
           left: 388,
           top: 654 + yOff,
           width: 183,
-          height: 192,
-          overflow: 'hidden',
+          height: 32,
+          backgroundImage: `url(${BASE}Environments.png)`,
+          backgroundSize: '183px auto',
+          backgroundPositionY: `${-(environment * 32)}px`,
+          backgroundRepeat: 'no-repeat',
+          cursor: 'pointer',
         }}
-      >
-        {/* Background Environments filmstrip image */}
-        <img
-          src={BASE + 'Environments.png'}
-          style={{ position: 'absolute', top: 0, left: 0, width: 183, height: 192, pointerEvents: 'none' }}
-          alt=""
-        />
-        {/* 4 preset buttons overlaid, stacked vertically */}
-        {KOS_PRESETS.map((preset, i) => (
-          <button
-            key={preset.label}
-            onClick={() => {
-              onUpdateParameter('drive',     preset.drive);
-              onUpdateParameter('character', preset.character);
-              onUpdateParameter('bias',      preset.bias);
-              onUpdateParameter('shame',     preset.shame);
-              onUpdateParameter('hiss',      preset.hiss);
-            }}
-            style={{
-              position: 'absolute',
-              top: i * 48,
-              left: 0,
-              width: 183,
-              height: 48,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-            title={preset.label}
-          />
-        ))}
-      </div>
+        title="Click to cycle environment"
+      />
     </div>
     </div>
   );
