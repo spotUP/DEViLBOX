@@ -201,6 +201,73 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
   return new Uint8Array(out);
 }
 
+// ── LHA Archive Unwrapper ─────────────────────────────────────────────────────
+// Standard .ym files are distributed as LHA archives (-lh5- method) containing
+// a single YM file. This extracts the first file from an LHA archive.
+
+function isLHAArchive(buf: Uint8Array): boolean {
+  if (buf.length < 22) return false;
+  // LHA header: byte[2] = '-', byte[3..5] = 'lhX' or 'lzX', byte[6] = '-'
+  return buf[2] === 0x2D /* '-' */ &&
+    (buf[3] === 0x6C /* 'l' */ && buf[4] === 0x68 /* 'h' */) &&
+    buf[6] === 0x2D /* '-' */;
+}
+
+function extractFromLHA(buf: Uint8Array): Uint8Array {
+  // LHA level-0/1/2 header parsing — extract first file
+  const headerSize = buf[0];
+  const level = buf.length > 20 ? buf[20] : 0;
+
+  let compressedSize: number;
+  let method: string;
+  let dataStart: number;
+
+  if (level === 0 || level === 1) {
+    // Level 0/1: header_size(1) checksum(1) method(5) compressed(4) original(4) ...
+    method = String.fromCharCode(buf[2], buf[3], buf[4], buf[5], buf[6]);
+    compressedSize = buf[7] | (buf[8] << 8) | (buf[9] << 16) | (buf[10] << 24);
+    // originalSize at buf[11..14] — not needed for extraction
+
+    if (level === 0) {
+      // Level 0: data starts after header (headerSize + 2 bytes)
+      dataStart = headerSize + 2;
+    } else {
+      // Level 1: header + extended headers
+      dataStart = headerSize + 2;
+      // Parse extended headers
+      let pos = headerSize + 2;
+      while (pos + 2 < buf.length) {
+        const extSize = buf[pos] | (buf[pos + 1] << 8);
+        if (extSize === 0) { pos += 2; break; }
+        pos += extSize;
+      }
+      dataStart = pos;
+    }
+  } else if (level === 2) {
+    // Level 2: total_size(2) method(5) compressed(4) original(4) ...
+    method = String.fromCharCode(buf[2], buf[3], buf[4], buf[5], buf[6]);
+    compressedSize = buf[7] | (buf[8] << 8) | (buf[9] << 16) | (buf[10] << 24);
+    // originalSize at buf[11..14] — not needed for extraction
+    const totalHeaderSize = buf[0] | (buf[1] << 8);
+    dataStart = totalHeaderSize;
+  } else {
+    throw new Error('Unsupported LHA header level: ' + level);
+  }
+
+  if (dataStart >= buf.length) throw new Error('LHA data offset beyond file');
+
+  const compressed = buf.subarray(dataStart, dataStart + compressedSize);
+
+  if (method === '-lh0-' || method === '-lz4-') {
+    // Stored (uncompressed)
+    return compressed;
+  } else if (method === '-lh5-' || method === '-lh6-' || method === '-lh7-') {
+    return decodeLZH5(compressed);
+  } else {
+    throw new Error('Unsupported LHA method: ' + method);
+  }
+}
+
 // ── YM Header ─────────────────────────────────────────────────────────────────
 
 interface YMHeader {
@@ -330,12 +397,27 @@ export function isYMFormat(buffer: ArrayBuffer): boolean {
   const b = new Uint8Array(buffer);
   if (b.length < 4) return false;
   const magic = String.fromCharCode(b[0], b[1], b[2], b[3]);
-  return ['YM2!', 'YM3!', 'YM3b', 'YM4!', 'YM5!', 'YM6!'].includes(magic);
+  if (['YM2!', 'YM3!', 'YM3b', 'YM4!', 'YM5!', 'YM6!'].includes(magic)) return true;
+  // Check if it's an LHA archive (standard .ym distribution format)
+  return isLHAArchive(b);
 }
 
 export async function parseYMFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   let buf = new Uint8Array(buffer);
-  if (!isYMFormat(buf.buffer)) throw new Error('Not a valid YM file');
+
+  // Unwrap LHA archive if needed (standard .ym distribution wraps in LHA)
+  if (isLHAArchive(buf)) {
+    try {
+      buf = new Uint8Array(extractFromLHA(buf));
+    } catch (e) {
+      throw new Error('Failed to extract YM file from LHA archive: ' + (e instanceof Error ? e.message : e));
+    }
+  }
+
+  const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (!['YM2!', 'YM3!', 'YM3b', 'YM4!', 'YM5!', 'YM6!'].includes(magic)) {
+    throw new Error('Not a valid YM file (magic: ' + magic + ')');
+  }
 
   const hdr = parseYMHeader(buf);
 
