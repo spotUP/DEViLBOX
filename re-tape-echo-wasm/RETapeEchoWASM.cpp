@@ -345,6 +345,8 @@ struct RETapeEchoInstance {
 
     updateMode();
     smoothedDelay = calcBaseDelaySamples();
+    // Initialize filter state to target so echoes start immediately
+    paramSmooth.z1 = smoothedDelay;
   }
 
   void updateMode() {

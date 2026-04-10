@@ -25,6 +25,49 @@ import { WAMEffectNode } from '../wam/WAMEffectNode';
 import { WAM_EFFECT_URLS } from '@/constants/wamPlugins';
 import { EffectRegistry } from '../registry/EffectRegistry';
 
+/** Default wet % per effect type. Delays/echoes need lower wet to preserve dry signal. */
+export function getDefaultEffectWet(type: string): number {
+  switch (type) {
+    // Delays & echoes: wet-only output, so keep dry signal dominant
+    case 'Delay':
+    case 'FeedbackDelay':
+    case 'PingPongDelay':
+    case 'SpaceEcho':
+    case 'SpaceyDelayer':
+    case 'RETapeEcho':
+    case 'AmbientDelay':
+      return 35;
+
+    // Reverbs: moderate wet
+    case 'Reverb':
+    case 'Freeverb':
+    case 'JCReverb':
+    case 'MVerb':
+    case 'SpringReverb':
+    case 'ShimmerReverb':
+      return 50;
+
+    // Modulation: moderate wet
+    case 'Chorus':
+    case 'Phaser':
+    case 'Tremolo':
+    case 'Vibrato':
+    case 'AutoWah':
+    case 'AutoFilter':
+    case 'AutoPanner':
+    case 'BiPhase':
+      return 50;
+
+    // Granular/special: moderate wet
+    case 'GranularFreeze':
+      return 50;
+
+    // Everything else (distortion, compression, EQ, filters, tape effects): full wet
+    default:
+      return 100;
+  }
+}
+
 export function getDefaultEffectParameters(type: string): Record<string, number | string> {
 // Try registry first
 const desc = EffectRegistry.get(type);
