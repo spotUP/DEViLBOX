@@ -727,33 +727,20 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const [reelFrame, setReelFrame] = useState(0);
-  const [vuL, setVuL] = useState(0);
-  const [vuR, setVuR] = useState(0);
 
   const { post } = useEffectAnalyser(effect.id, 'waveform');
 
-  // Drive VU meters from post-analyser waveform data
-  const vuLRef = useRef(0);
-  const vuRRef = useRef(0);
-  useEffect(() => {
-    if (!post || post.length === 0) return;
+  // Compute VU meter frames directly during render (post data updates in-place)
+  const toVuFrame = (rms: number) => Math.min(64, Math.round(Math.pow(Math.min(rms * 3, 1), 0.6) * 64));
+  let vuLFrame = 0, vuRFrame = 0;
+  if (post && post.length > 0) {
     const half = post.length >> 1;
     let sumL = 0, sumR = 0;
     for (let i = 0; i < half; i++) { sumL += post[i] * post[i]; }
     for (let i = half; i < post.length; i++) { sumR += post[i] * post[i]; }
-    const rmsL = Math.sqrt(sumL / half);
-    const rmsR = Math.sqrt(sumR / (post.length - half));
-    const toFrame = (rms: number) => Math.min(64, Math.round(Math.pow(Math.min(rms * 3, 1), 0.6) * 64));
-    const newL = toFrame(rmsL);
-    const newR = toFrame(rmsR);
-    // Only trigger re-render when VU frame actually changes
-    if (newL !== vuLRef.current || newR !== vuRRef.current) {
-      vuLRef.current = newL;
-      vuRRef.current = newR;
-      setVuL(newL);
-      setVuR(newR);
-    }
-  }, [post]);
+    vuLFrame = toVuFrame(Math.sqrt(sumL / half));
+    vuRFrame = toVuFrame(Math.sqrt(sumR / (post.length - half)));
+  }
 
   const containerH = 703;
   const yOff = 0;
@@ -906,7 +893,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           height: 108,
           backgroundImage: `url(${BASE}VUMeterL.png)`,
           backgroundSize: '108px auto',
-          backgroundPositionY: `${-(vuL * 108)}px`,
+          backgroundPositionY: `${-(vuLFrame * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
           filter: 'brightness(1.4) contrast(1.2) sepia(0.6) saturate(2.5) hue-rotate(-15deg)',
@@ -923,7 +910,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           height: 108,
           backgroundImage: `url(${BASE}VUMeterR.png)`,
           backgroundSize: '110px auto',
-          backgroundPositionY: `${-(vuR * 108)}px`,
+          backgroundPositionY: `${-(vuRFrame * 108)}px`,
           backgroundRepeat: 'no-repeat',
           pointerEvents: 'none',
           filter: 'brightness(1.4) contrast(1.2) sepia(0.6) saturate(2.5) hue-rotate(-15deg)',
@@ -981,6 +968,22 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
           cursor: 'pointer',
         }}
         title={printThrough ? 'Print Through: On' : 'Print Through: Off'}
+      />
+
+      {/* Environments label — static display (no audio effect in WASM build) */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 388,
+          top: 654 + yOff,
+          width: 183,
+          height: 32,
+          backgroundImage: `url(${BASE}Environments.png)`,
+          backgroundSize: '183px auto',
+          backgroundPositionY: '-32px',
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+        }}
       />
 
     </div>
