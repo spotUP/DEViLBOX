@@ -187,20 +187,23 @@ class AdPlugPlayerProcessor extends AudioWorkletProcessor {
 
       // Read per-channel levels from WASM (18 floats)
       let channelLevels = null;
-      if (this.module._adplug_get_channel_levels) {
-        const ptr = this.module._adplug_get_channel_levels();
-        if (ptr) {
-          const numCh = this.module._adplug_get_num_audio_channels
-            ? this.module._adplug_get_num_audio_channels()
-            : 9;
-          // Create Float32Array view from WASM memory (HEAPF32 not on Module)
-          const f32 = new Float32Array(this.module.HEAPU8.buffer);
-          const floatIdx = ptr >> 2;
-          channelLevels = new Float32Array(numCh);
-          for (let i = 0; i < numCh; i++) {
-            channelLevels[i] = f32[floatIdx + i];
+      try {
+        if (this.module._adplug_get_channel_levels) {
+          const ptr = this.module._adplug_get_channel_levels();
+          if (ptr) {
+            const numCh = this.module._adplug_get_num_audio_channels
+              ? this.module._adplug_get_num_audio_channels()
+              : 9;
+            // Use DataView on WASM memory to read floats (HEAPF32 not on Module)
+            const dv = new DataView(this.module.HEAPU8.buffer);
+            channelLevels = new Float32Array(numCh);
+            for (let i = 0; i < numCh; i++) {
+              channelLevels[i] = dv.getFloat32(ptr + i * 4, true);
+            }
           }
         }
+      } catch (e) {
+        // Ignore — WASM memory may have grown/detached
       }
 
       if (order !== this.lastReportedOrder || row !== this.lastReportedRow) {
