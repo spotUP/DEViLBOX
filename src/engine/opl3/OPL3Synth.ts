@@ -106,6 +106,8 @@ export class OPL3Synth implements DevilboxSynth {
 
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
     if (!this._unmuted) {
+      console.warn('[OPL3] First triggerAttack — unmuting. note:', note, 'vel:', velocity);
+      console.trace('[OPL3] triggerAttack caller');
       this.output.gain.value = 1.0;
       this._unmuted = true;
     }

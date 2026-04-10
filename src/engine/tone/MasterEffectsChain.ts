@@ -239,8 +239,11 @@ export function updateEffectParameters(ctx: MasterEffectsContext, newEffects: Ef
 
     // Update parameters on the existing node
     Object.entries(newConfig.parameters || {}).forEach(([key, value]) => {
-      if (key in existing.node) {
-        const nodeAny = existing.node as any;
+      const nodeAny = existing.node as any;
+      // Prefer setParam() dispatch method (WASM effects use this)
+      if (typeof nodeAny.setParam === 'function') {
+        nodeAny.setParam(key, value as number);
+      } else if (key in existing.node) {
         // Handle Tone.js Signal/Param types
         if (nodeAny[key]?.value !== undefined) {
           nodeAny[key].value = value;

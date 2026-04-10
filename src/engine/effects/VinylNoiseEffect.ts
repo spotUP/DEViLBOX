@@ -192,7 +192,25 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
   set wet(value: number) {
     this._wet = clamp01(value);
     this.wetGain.gain.value = this._wet;
-    // dryGain stays at 1.0 always — dry signal is never attenuated
+  }
+
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'hiss': this.setHiss(value); break;
+      case 'dust': this.setDust(value); break;
+      case 'age': this.setAge(value); break;
+      case 'speed': this.setSpeed(value); break;
+      case 'riaa': this.setRiaa(value); break;
+      case 'stylusResonance': this.setStylusResonance(value); break;
+      case 'wornStylus': this.setWornStylus(value); break;
+      case 'pinch': this.setPinch(value); break;
+      case 'innerGroove': this.setInnerGroove(value); break;
+      case 'ghostEcho': this.setGhostEcho(value); break;
+      case 'dropout': this.setDropout(value); break;
+      case 'warp': this.setWarp(value); break;
+      case 'eccentricity': this.setEccentricity(value); break;
+      case 'wet': this.wet = value; break;
+    }
   }
 
   dispose(): this {
