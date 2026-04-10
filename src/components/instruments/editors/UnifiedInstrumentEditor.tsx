@@ -128,6 +128,11 @@ function isSonicArrangerType(synthType: SynthType): boolean {
   return synthType === 'SonicArrangerSynth';
 }
 
+/** Check if synth type is OPL3/AdLib */
+function isOPL3Type(synthType: SynthType): boolean {
+  return synthType === 'OPL3';
+}
+
 /** Check if synth type is InStereo! 2.0 or 1.0 */
 function isInStereo2Type(synthType: SynthType): boolean {
   return synthType === 'InStereo2Synth' || synthType === 'InStereo1Synth';
@@ -191,6 +196,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'Surge') return 'surge';
   if (synthType === 'SuperCollider') return 'supercollider';
   if (synthType === 'MusicLineSynth') return 'musicline';
+  if (isOPL3Type(synthType)) return 'opl3';
   if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') return 'xrns-synth';
   if (synthType === 'SunVoxSynth') return 'sunvox-synth';
   if (synthType === 'StartrekkerAMSynth') return 'startrekker-am';
