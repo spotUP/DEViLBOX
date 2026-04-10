@@ -213,6 +213,11 @@ static std::vector<InstrumentFingerprint> g_capturedInstruments;
 static uint32_t g_captureTotalTicks = 0;
 static float g_captureRefreshRate = 0.0f;
 
+// D00 captured→native instrument mapping.
+// g_d00InstMap[capturedIdx] = native 1-based instrument index (0 = no match).
+// Built after capture by comparing captured fingerprints to native D00 instruments.
+static std::vector<uint8_t> g_d00InstMap;
+
 // OPL shadow registers for capture
 static uint8_t g_oplRegs[2][256];  // [chip][register]
 static bool g_oplKeyOn[2][9];      // per-chip per-channel key-on state
@@ -695,6 +700,62 @@ static CsopPlayerAccessor* asSopPlayer() {
 static CjbmPlayerAccessor* asJbmPlayer() {
     if (!g_player || g_playerType != PT_JBM) return nullptr;
     return reinterpret_cast<CjbmPlayerAccessor*>(g_player);
+}
+
+static Cd00PlayerAccessor* asD00Player() {
+    if (!g_player || g_playerType != PT_D00) return nullptr;
+    return reinterpret_cast<Cd00PlayerAccessor*>(g_player);
+}
+
+// Read little-endian uint16_t (matches d00.cpp's LE_WORD)
+static inline uint16_t readLE16(const uint16_t* val) {
+    const uint8_t* b = (const uint8_t*)val;
+    return (uint16_t)((b[1] << 8) + b[0]);
+}
+
+// Compute number of instruments in a D00 file.
+// The instrument table starts at instptr and ends at the next section boundary.
+static uint32_t d00InstrumentCount() {
+    auto* dp = asD00Player();
+    if (!dp || !dp->inst) return 0;
+
+    uint16_t instOff;
+    if (dp->version > 1) {
+        instOff = readLE16(&dp->header->instptr);
+    } else {
+        instOff = readLE16(&dp->header1->instptr);
+    }
+
+    // Collect all section offsets that come AFTER the instrument table
+    // to find the nearest boundary
+    uint32_t boundary = (uint32_t)dp->filesize;  // worst case: end of file
+    uint16_t offsets[8];
+    int nOffsets = 0;
+
+    if (dp->version > 1) {
+        offsets[nOffsets++] = readLE16(&dp->header->seqptr);
+        offsets[nOffsets++] = readLE16(&dp->header->tpoin);
+        offsets[nOffsets++] = readLE16(&dp->header->infoptr);
+        if (dp->version == 2 || dp->version == 4)
+            offsets[nOffsets++] = readLE16(&dp->header->spfxptr);
+    } else {
+        offsets[nOffsets++] = readLE16(&dp->header1->seqptr);
+        offsets[nOffsets++] = readLE16(&dp->header1->tpoin);
+        offsets[nOffsets++] = readLE16(&dp->header1->infoptr);
+        if (dp->version == 1)
+            offsets[nOffsets++] = readLE16(&dp->header1->lpulptr);
+    }
+
+    for (int i = 0; i < nOffsets; i++) {
+        uint32_t off = (uint32_t)offsets[i];
+        if (off > instOff && off < boundary)
+            boundary = off;
+    }
+
+    uint32_t instRegionSize = boundary - instOff;
+    uint32_t count = instRegionSize / 16;  // sizeof(Sinsts) = 16 with packing
+    if (count > 4096) count = 4096;  // sanity cap
+    return count;
 }
 
 // Detect player type after loading by checking the type string
@@ -1184,8 +1245,16 @@ uint32_t adplug_get_note(uint32_t pattern, uint32_t row, uint32_t channel) {
                 // Volume cmd=15 (set volume), param = vol scaled 0-64
                 uint8_t volCmd = 15; // Cxx = set volume
                 uint8_t volParam = (uint8_t)std::min(63u, (uint32_t)cn.volume);
+
+                // For D00: remap captured instrument index to native instrument index
+                uint8_t instIdx = cn.instrument;
+                if (g_playerType == PT_D00 && instIdx > 0 &&
+                    (instIdx - 1) < g_d00InstMap.size() && g_d00InstMap[instIdx - 1] > 0) {
+                    instIdx = g_d00InstMap[instIdx - 1];
+                }
+
                 return ((uint32_t)cn.note) |
-                       ((uint32_t)cn.instrument << 8) |
+                       ((uint32_t)instIdx << 8) |
                        ((uint32_t)volCmd << 16) |
                        ((uint32_t)volParam << 24);
             }
@@ -1299,6 +1368,38 @@ int adplug_get_instrument_regs(uint32_t index, uint8_t* outRegs) {
         return 1;
     }
 
+    // ── Cd00Player ── D00/EdLib instruments: data[11] in D00-specific byte order
+    // D00 data[] layout differs from standard OPL register order — remap here.
+    // Mapping derived from Cd00Player::setinst() in d00.cpp:
+    //   data[0]  → reg 0x60+carOff  (car AR/DR)
+    //   data[1]  → reg 0x80+carOff  (car SL/RR)
+    //   data[2]  → reg 0x40+carOff  (car KSL/TL, used in setvolume)
+    //   data[3]  → reg 0x20+carOff  (car AM/VIB/EG/KSR/MULT)
+    //   data[4]  → reg 0xE0+carOff  (car waveform)
+    //   data[5]  → reg 0x60+modOff  (mod AR/DR)
+    //   data[6]  → reg 0x80+modOff  (mod SL/RR)
+    //   data[7]  → reg 0x40+modOff  (mod KSL/TL, used in setvolume)
+    //   data[8]  → reg 0x20+modOff  (mod AM/VIB/EG/KSR/MULT)
+    //   data[9]  → reg 0xE0+modOff  (mod waveform)
+    //   data[10] → reg 0xC0+ch      (feedback/connection)
+    if (auto* dp = asD00Player()) {
+        uint32_t numInst = d00InstrumentCount();
+        if (!dp->inst || index >= numInst) return 0;
+        auto& d = dp->inst[index].data;
+        outRegs[0]  = d[8];   // mod AM/VIB/EG/KSR/MULT
+        outRegs[1]  = d[3];   // car AM/VIB/EG/KSR/MULT
+        outRegs[2]  = d[7];   // mod KSL/TL
+        outRegs[3]  = d[2];   // car KSL/TL
+        outRegs[4]  = d[5];   // mod AR/DR
+        outRegs[5]  = d[0];   // car AR/DR
+        outRegs[6]  = d[6];   // mod SL/RR
+        outRegs[7]  = d[1];   // car SL/RR
+        outRegs[8]  = d[9];   // mod waveform
+        outRegs[9]  = d[4];   // car waveform
+        outRegs[10] = d[10];  // feedback/connection
+        return 1;
+    }
+
     // ── BMF ── instruments[32] with 13 bytes of OPL data
     if (auto* bp = asBmfPlayer()) {
         if (index >= 32) return 0;
@@ -1338,7 +1439,7 @@ int adplug_get_instrument_regs(uint32_t index, uint8_t* outRegs) {
     }
 
     // ── OPL Capture ── instruments from captured fingerprints
-    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_SOP ||
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_SOP ||
         g_playerType == PT_HERAD || g_playerType == PT_JBM || g_playerType == PT_ROL) {
         // index is 0-based, but captured instruments use 1-based indexing
         if (index >= g_capturedInstruments.size()) return 0;
@@ -1359,9 +1460,10 @@ uint32_t adplug_get_num_instruments() {
         return pp ? (uint32_t)pp->module.number_of_instruments : 0;
     }
     if (g_playerType == PT_BMF) return 32;
+    if (g_playerType == PT_D00) return d00InstrumentCount();
     if (auto* hp = asHeradPlayer()) return hp->nInsts;
     if (auto* sp = asSopPlayer()) return sp->nInsts;
-    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_D00 || g_playerType == PT_JBM || g_playerType == PT_ROL)
+    if (g_playerType == PT_OPL_CAPTURE || g_playerType == PT_JBM || g_playerType == PT_ROL)
         return (uint32_t)g_capturedInstruments.size();
     return g_player ? (uint32_t)g_player->getinstruments() : 0;
 }
@@ -1380,6 +1482,7 @@ uint32_t adplug_capture_song() {
     // Clear previous capture
     g_capturedNotes.clear();
     g_capturedInstruments.clear();
+    g_d00InstMap.clear();
     g_captureTotalTicks = 0;
     memset(g_oplRegs, 0, sizeof(g_oplRegs));
     memset(g_oplKeyOn, 0, sizeof(g_oplKeyOn));
@@ -1424,6 +1527,41 @@ uint32_t adplug_capture_song() {
 
     delete capturePlayer;
     delete captureRealOpl;
+
+    // ── Build D00 captured→native instrument mapping ──
+    // For D00, map each captured instrument fingerprint to the closest
+    // native D00 instrument by comparing registers (ignoring TL volume bits).
+    g_d00InstMap.clear();
+    if (g_playerType == PT_D00) {
+        auto* dp = asD00Player();
+        uint32_t numNative = d00InstrumentCount();
+        if (dp && dp->inst && numNative > 0) {
+            for (size_t ci = 0; ci < g_capturedInstruments.size(); ci++) {
+                // Convert each native D00 instrument to standard format and compare
+                uint8_t bestMatch = 0; // 0 = no match
+                for (uint32_t ni = 0; ni < numNative; ni++) {
+                    auto& d = dp->inst[ni].data;
+                    InstrumentFingerprint nativeFp = {};
+                    nativeFp.regs[0]  = d[8];   // mod AM/VIB/EG/KSR/MULT
+                    nativeFp.regs[1]  = d[3];   // car AM/VIB/EG/KSR/MULT
+                    nativeFp.regs[2]  = d[7];   // mod KSL/TL
+                    nativeFp.regs[3]  = d[2];   // car KSL/TL
+                    nativeFp.regs[4]  = d[5];   // mod AR/DR
+                    nativeFp.regs[5]  = d[0];   // car AR/DR
+                    nativeFp.regs[6]  = d[6];   // mod SL/RR
+                    nativeFp.regs[7]  = d[1];   // car SL/RR
+                    nativeFp.regs[8]  = d[9];   // mod waveform
+                    nativeFp.regs[9]  = d[4];   // car waveform
+                    nativeFp.regs[10] = d[10];  // feedback/connection
+                    if (instrumentsMatch(g_capturedInstruments[ci], nativeFp)) {
+                        bestMatch = (uint8_t)(ni + 1); // 1-based
+                        break;
+                    }
+                }
+                g_d00InstMap.push_back(bestMatch);
+            }
+        }
+    }
 
     return (uint32_t)g_capturedNotes.size();
 }
