@@ -13,12 +13,16 @@ import type {
 } from '@typedefs';
 import { EMPTY_CELL } from '@typedefs';
 
-// Re-export mask constants so the store doesn't need two imports for paste logic
-export const MASK_NOTE = 1 << 0;
-export const MASK_INSTRUMENT = 1 << 1;
-export const MASK_VOLUME = 1 << 2;
-export const MASK_EFFECT = 1 << 3;
-export const MASK_EFFECT2 = 1 << 4;
+// Mask constants come from the shared leaf module. Re-exported so the store
+// doesn't need two imports for paste logic.
+import {
+  MASK_NOTE,
+  MASK_INSTRUMENT,
+  MASK_VOLUME,
+  MASK_EFFECT,
+  MASK_EFFECT2,
+} from '../editorMasks';
+export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2 };
 
 const hasMaskBit = (mask: number, bit: number): boolean => (mask & bit) !== 0;
 
