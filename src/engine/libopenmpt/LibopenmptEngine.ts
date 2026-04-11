@@ -201,6 +201,14 @@ export class LibopenmptEngine {
       case 'isolationReady':
         console.log(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} ready`);
         break;
+      case 'isolationError':
+        console.warn(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} failed: ${msg.data.error}`);
+        // Clean up the slot mask so main module doesn't mute this channel
+        if (msg.data.slotIndex >= 0 && msg.data.slotIndex < LibopenmptEngine.MAX_ISOLATION_SLOTS) {
+          this._isolationSlotMasks[msg.data.slotIndex] = null;
+          this._updateMainMuteMask();
+        }
+        break;
     }
   }
 
