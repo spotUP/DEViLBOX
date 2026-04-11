@@ -17,6 +17,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PixiKnob, PixiLabel, PixiButton } from '../../components';
+import { PixiNumericInput } from '../../components/PixiNumericInput';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SoundMonConfig } from '@/types/instrument/exotic';
@@ -455,22 +456,47 @@ export const PixiSoundMonPanel: React.FC<Props> = ({ instrument, onUpdate }) => 
             />
           )}
 
-          {/* PCM loop points (read-only display) */}
-          {sm.type === 'pcm' && (
-            <>
-              <SectionHeading text="LOOP POINTS" />
-              <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
-                <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <PixiLabel text="Start" size="xs" color="textMuted" />
-                  <PixiLabel text={String(sm.loopStart ?? 0)} size="xs" color="text" />
+          {/* PCM loop points — editable */}
+          {sm.type === 'pcm' && (() => {
+            const pcmLen = sm.pcmData?.length ?? 0;
+            const loopStart = sm.loopStart ?? 0;
+            const maxLoopLen = Math.max(0, pcmLen - loopStart);
+            return (
+              <>
+                <SectionHeading text="LOOP POINTS" />
+                <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
+                  <layoutContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                    <PixiLabel text="Start" size="xs" color="textMuted" />
+                    <PixiNumericInput
+                      value={loopStart}
+                      min={0}
+                      max={Math.max(0, pcmLen - 1)}
+                      onChange={(v) => {
+                        const clamped = Math.max(0, Math.min(pcmLen, Math.round(v)));
+                        upd('loopStart', clamped);
+                        // Clamp length so start+length stays within pcmLen
+                        const curLen = smRef.current.loopLength ?? 0;
+                        if (clamped + curLen > pcmLen) {
+                          upd('loopLength', Math.max(0, pcmLen - clamped));
+                        }
+                      }}
+                      width={80}
+                    />
+                  </layoutContainer>
+                  <layoutContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                    <PixiLabel text="Length" size="xs" color="textMuted" />
+                    <PixiNumericInput
+                      value={sm.loopLength ?? 0}
+                      min={0}
+                      max={maxLoopLen}
+                      onChange={(v) => upd('loopLength', Math.max(0, Math.min(maxLoopLen, Math.round(v))))}
+                      width={80}
+                    />
+                  </layoutContainer>
                 </layoutContainer>
-                <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <PixiLabel text="Length" size="xs" color="textMuted" />
-                  <PixiLabel text={String(sm.loopLength ?? 0)} size="xs" color="text" />
-                </layoutContainer>
-              </layoutContainer>
-            </>
-          )}
+              </>
+            );
+          })()}
 
           {/* Tuning & Volume */}
           <SectionHeading text="TUNING & VOLUME" />
