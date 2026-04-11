@@ -527,9 +527,10 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     Bitta: <Disc size={18} className="text-text-primary" />,
   };
 
-  const enc = ENCLOSURE_COLORS[effect.type] || DEFAULT_ENCLOSURE;
-  const icon = iconMap[effect.type] || <Music size={18} className="text-text-primary" />;
-  const isWAM = effect.type.startsWith('WAM');
+  const effectType = effect.type ?? '';
+  const enc = ENCLOSURE_COLORS[effectType] || DEFAULT_ENCLOSURE;
+  const icon = iconMap[effectType] || <Music size={18} className="text-text-primary" />;
+  const isWAM = effectType.startsWith('WAM');
 
   // WAM effects render only their native GUI — skip the pedal enclosure wrapper
   if (isWAM) {

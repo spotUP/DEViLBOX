@@ -349,7 +349,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // Inject chip-required macros that the platform needs to produce sound.
     // Some platforms (e.g., Lynx) need a duty macro to oscillate — without it,
     // the LFSR feedback register stays 0 and no waveform is generated.
-    const enriched = this.injectChipRequiredMacros(config as unknown as FurnaceConfig);
+    // Spread-copy first: the config may be a frozen immer proxy from the store,
+    // and we need to mutate chipType/ops/algorithm below for platform correction.
+    const enriched = { ...this.injectChipRequiredMacros(config as unknown as FurnaceConfig) };
 
     // Correct chipType to match the platform's FM family.
     // A generic config (e.g. DEFAULT_FURNACE chipType=1/OPN2) uploaded to an OPL chip
