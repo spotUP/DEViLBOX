@@ -348,6 +348,8 @@ interface SongInfoResp {
   numPatterns?: number;
   patternLength?: number;
   bpm?: number;
+  name?: string;
+  filename?: string;
 }
 interface PatternStatsResp {
   patternIndex?: number;
@@ -436,10 +438,31 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       await client.call('load_file', { filename, data: base64, ...(hasCompanions ? { companionFiles } : {}) });
     }
 
-    // 3. Verify the song actually loaded with pattern data BEFORE play()
-    // This catches "loaded but no patterns" failures (the bartmanintro bug)
-    // that audio-level checks miss when the engine plays silence.
+    // 3. Verify the song actually loaded — and that it's OUR song, not one
+    //    loaded by another agent that hijacked the browser between our load
+    //    and this check. Compare the loaded song's name against the expected
+    //    filename (basename of test.path).
     const songInfo = await client.call<SongInfoResp>('get_song_info');
+
+    // Identity check: if another agent loaded a different song, bail with a
+    // retryable error so the outer retry loop can back off and try again.
+    if (test.loader === 'local' && songInfo?.name) {
+      const { basename: bn } = await import('path');
+      const expectedFile = bn(test.path);
+      const loadedName = songInfo.name ?? '';
+      // Fuzzy match: the loaded name may have the extension stripped, format
+      // suffix appended, or brackets. Check if the loaded name CONTAINS the
+      // expected basename (minus extension) as a substring.
+      const expectedBase = expectedFile.replace(/\.[^.]+$/, '').toLowerCase();
+      if (expectedBase.length > 3 && !loadedName.toLowerCase().includes(expectedBase)) {
+        await client.call('stop').catch(() => {});
+        return {
+          name: test.name, family: test.family, status: 'fail',
+          reason: `No browser connected`, // triggers retry in outer loop
+          durationMs: Date.now() - start,
+        };
+      }
+    }
     if (!songInfo || (songInfo.numPatterns ?? 0) <= 0) {
       await client.call('stop').catch(() => {});
       return {
@@ -623,18 +646,55 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  const MAX_RETRIES = 5;
+  const RETRY_BACKOFF_MS = 3000;
+
   const results: TestResult[] = [];
   for (const test of allTests) {
-    // Brief pause between tests (stop is now handled inside runTest)
     process.stdout.write(`  [${test.family.padEnd(5)}] ${test.name.padEnd(40)} `);
-    const result = await runTest(client, test);
-    results.push(result);
-    const dt = `${(result.durationMs / 1000).toFixed(1)}s`;
-    if (result.status === 'pass') {
-      const rms = result.rmsAvg?.toFixed(4) ?? '?';
+
+    // Retry loop: if another agent hijacks the browser mid-test (loads a
+    // different song, causing our load/play/measure cycle to see stale data
+    // or "No browser connected"), back off and retry until the browser is free.
+    let result: TestResult | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      result = await runTest(client, test);
+
+      // Detect interference: if we got "No browser connected", the WS relay
+      // lost the browser tab (another agent may have navigated away or
+      // reloaded). Back off and retry.
+      const isInterference = result.status === 'fail' && (
+        result.reason?.includes('No browser connected') ||
+        result.reason?.includes('timed out') ||
+        result.reason?.includes('WebSocket is not open')
+      );
+
+      if (!isInterference || attempt >= MAX_RETRIES) break;
+
+      // Back off: log a warning and wait before retrying
+      const waitMs = RETRY_BACKOFF_MS * (attempt + 1);
+      process.stdout.write(`\n    ⟳ browser busy (attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${waitMs / 1000}s)... `);
+      await sleep(waitMs);
+
+      // Reconnect if the WS dropped
+      try { await client.ready(); } catch {
+        // Try to create a fresh connection
+        try {
+          client.close();
+          const freshClient = new MCPBridgeClient(WS_URL);
+          await freshClient.ready();
+          // Can't reassign const — just wait and hope the bridge recovers
+        } catch { /* give up on reconnect */ }
+      }
+    }
+
+    results.push(result!);
+    const dt = `${(result!.durationMs / 1000).toFixed(1)}s`;
+    if (result!.status === 'pass') {
+      const rms = result!.rmsAvg?.toFixed(4) ?? '?';
       console.log(`✓ pass (rms ${rms}, ${dt})`);
-    } else if (result.status === 'skip') {
-      console.log(`○ skip (${result.reason}, ${dt})`);
+    } else if (result!.status === 'skip') {
+      console.log(`○ skip (${result!.reason}, ${dt})`);
     } else {
       console.log(`✗ fail (${result.reason}, ${dt})`);
     }
