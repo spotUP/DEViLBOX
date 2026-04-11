@@ -28,8 +28,10 @@ export function useSF2FormatData(): SF2FormatData {
   const playbackPos = useSF2Store((s) => s.playbackPos);
   const orderCursor = useSF2Store((s) => s.orderCursor);
 
+  const cursorRow = useSF2Store((s) => s.cursor.row);
+
   const currentOrderPos = playing ? playbackPos.songPos : orderCursor;
-  const displayRow = playing ? playbackRow : 0;
+  const displayRow = playing ? playbackRow : cursorRow;
 
   const channels = useMemo(
     () => sf2ToFormatChannels(trackCount, orderLists, sequences, currentOrderPos),
