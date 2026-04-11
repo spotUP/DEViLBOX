@@ -655,15 +655,15 @@ export class SF2Engine {
     };
     this.captureRAFId = requestAnimationFrame(captureTick);
 
-    // Position polling: high-frequency interval (4ms ≈ 250Hz) for precise
-    // row-change detection. rAF (60Hz) gives ±8ms jitter which causes
-    // visibly uneven stepped scrolling. 4ms gives ±2ms — imperceptible.
+    // Position detection: hook into ScriptProcessorNode's onaudioprocess callback.
+    // The C64 emulator advances inside onaudioprocess, so reading RAM right after
+    // gives the freshest position — no polling jitter from setInterval.
     let lastSeqRow = -1;
     let lastOrderIdx = -1;
     let lastDuration = -1;
     const PAL_TICK_MS = 20; // PAL frame: 50Hz = 20ms per tick
 
-    const pollPosition = () => {
+    const checkPosition = () => {
       if (!this.capturing || !setRow || !this.driverCommonData) return;
 
       const seqRow = this.readRAM(this.driverCommonData.sequenceIndexAddress) ?? 0;
@@ -687,7 +687,11 @@ export class SF2Engine {
         sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
       }
     };
-    this.positionPollId = window.setInterval(pollPosition, 4);
+
+    // Try to hook into the audio processing callback for jitter-free position
+    this.sidEngine.setAfterProcessCallback(checkPosition);
+    // Fallback: also poll at 4ms in case the hook isn't available (e.g. jsSID)
+    this.positionPollId = window.setInterval(checkPosition, 4);
   }
 
   /** Stop capturing */
@@ -701,6 +705,7 @@ export class SF2Engine {
       clearInterval(this.positionPollId);
       this.positionPollId = 0;
     }
+    this.sidEngine.removeAfterProcessCallback();
     // Clear playback state
     import('@/engine/FormatPlaybackState').then(mod => {
       mod.setFormatPlaybackPlaying(false);
