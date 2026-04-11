@@ -207,4 +207,4 @@ class V2SynthProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('v2-synth-processor', V2SynthProcessor);
+try { registerProcessor('v2-synth-processor', V2SynthProcessor); } catch { /* already registered — harmless on hot reload */ }
