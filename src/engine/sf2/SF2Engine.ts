@@ -81,12 +81,13 @@ export class SF2FlightRecorder {
 export function packSequence(events: SF2SeqEvent[]): Uint8Array {
   const bytes: number[] = [];
   let i = 0;
+  let lastDuration = -1;
 
   while (i < events.length) {
     const ev = events[i];
 
-    // Skip duration fill rows (instrument=0x80 or command=0x80)
-    if (ev.instrument === 0x80 || ev.command === 0x80) {
+    // Skip orphan duration fill rows (shouldn't normally occur but be safe)
+    if (ev.instrument === 0x80 && ev.command === 0x80 && (ev.note === 0 || ev.note === 0x7E)) {
       i++;
       continue;
     }
@@ -94,11 +95,9 @@ export function packSequence(events: SF2SeqEvent[]): Uint8Array {
     // Count hold/rest rows following this event to determine duration
     let duration = 0;
     let j = i + 1;
-    while (j < events.length) {
+    while (j < events.length && duration < 15) {
       const next = events[j];
-      // Duration fill rows have instrument=0x80 and command=0x80
       if (next.instrument !== 0x80 || next.command !== 0x80) break;
-      // Rest rows have note=0, tie rows have note=0x7E
       if (ev.note !== 0x00) {
         if (next.note !== 0x7E) break;
       } else {
@@ -107,7 +106,6 @@ export function packSequence(events: SF2SeqEvent[]): Uint8Array {
       duration++;
       j++;
     }
-    duration = Math.min(duration, 15); // 4 bits max
 
     const isTie = ev.instrument === 0x90;
 
@@ -116,14 +114,16 @@ export function packSequence(events: SF2SeqEvent[]): Uint8Array {
       bytes.push(0xC0 + (ev.command - 1));
     }
 
-    // Instrument byte (1-based → 0xA0 + (inst-1))
+    // Instrument byte (1-based → 0xA0 + (inst-1)), skip ties
     if (ev.instrument > 0 && ev.instrument < 0x80) {
       bytes.push(0xA0 + (ev.instrument - 1));
     }
 
-    // Duration byte (if > 0), with tie flag in bit 4
-    if (duration > 0 || isTie) {
+    // Duration byte — only emit when duration changes OR tie flag set
+    // (matches original Pack() optimization: `if (lastDuration != duration || bTieNote)`)
+    if (lastDuration !== duration || isTie) {
       bytes.push(0x80 | duration | (isTie ? 0x10 : 0x00));
+      lastDuration = duration;
     }
 
     // Note byte (always present)
@@ -142,15 +142,25 @@ export function packSequence(events: SF2SeqEvent[]): Uint8Array {
 
 /**
  * Pack an SF2 order list into the compact C64 format.
- * Format: [transpose>=0x80]? <seqIdx>  ... terminated by 0xFE (no loop) or 0xFF <loopIdx> (loop)
+ * Format: [transpose>=0x80]? <seqIdx>  ... terminated by 0xFE (no loop) or 0xFF <packedLoopOffset>
+ *
+ * Key detail from original: loop byte is the PACKED DATA OFFSET, not the entry index.
+ * Also, transpose is always emitted at the loop target entry (even if unchanged).
  */
 export function packOrderList(ol: { entries: SF2OrderEntry[]; loopIndex: number; hasLoop: boolean }): Uint8Array {
   const bytes: number[] = [];
   let prevTranspose = 0;
+  let packedLoopOffset = 0;
 
-  for (const entry of ol.entries) {
-    // Emit transpose byte only when it changes
-    if (entry.transpose >= 0x80 && entry.transpose !== prevTranspose) {
+  for (let i = 0; i < ol.entries.length; i++) {
+    const entry = ol.entries[i];
+
+    // At loop target, always emit transpose (and record offset)
+    if (ol.hasLoop && i === ol.loopIndex) {
+      packedLoopOffset = bytes.length;
+      bytes.push(entry.transpose);
+      prevTranspose = entry.transpose;
+    } else if (entry.transpose >= 0x80 && entry.transpose !== prevTranspose) {
       bytes.push(entry.transpose);
       prevTranspose = entry.transpose;
     }
@@ -159,7 +169,7 @@ export function packOrderList(ol: { entries: SF2OrderEntry[]; loopIndex: number;
 
   if (ol.hasLoop) {
     bytes.push(0xFF);
-    bytes.push(ol.loopIndex & 0xFF);
+    bytes.push(packedLoopOffset & 0xFF);
   } else {
     bytes.push(0xFE);
   }

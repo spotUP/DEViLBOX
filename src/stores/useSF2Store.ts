@@ -169,6 +169,10 @@ export interface SF2StoreState {
   // Channel mute state
   channelMutes: boolean[];
 
+  // Block selection (mark)
+  markStart: number | null;  // null = no mark active
+  markEnd: number | null;
+
   // ── Actions ────────────────────────────────────────────────────────────
 
   /** Load parsed SF2 data into the store */
@@ -198,12 +202,18 @@ export interface SF2StoreState {
   setSequenceCell: (seqIdx: number, row: number, field: keyof SF2SeqEvent, value: number) => void;
   insertRow: (seqIdx: number, row: number) => void;
   deleteRow: (seqIdx: number, row: number) => void;
+  eraseEvent: (seqIdx: number, row: number) => void;
+  eraseEventLine: (seqIdx: number, row: number) => void;
 
   // Block operations
   copyBlock: (seqIdx: number, fromRow: number, toRow: number) => void;
   cutBlock: (seqIdx: number, fromRow: number, toRow: number) => void;
   pasteBlock: (seqIdx: number, atRow: number) => void;
   transposeBlock: (seqIdx: number, fromRow: number, toRow: number, semitones: number) => void;
+
+  // Mark block
+  setMark: (start: number | null, end: number | null) => void;
+  clearMark: () => void;
 
   // Instrument editing
   setInstrumentByte: (instIdx: number, byteOffset: number, value: number) => void;
@@ -286,6 +296,8 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   undoStack: [],
   redoStack: [],
   channelMutes: [],
+  markStart: null,
+  markEnd: null,
 
   // ── Load ───────────────────────────────────────────────────────────────
 
@@ -311,6 +323,8 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     undoStack: [],
     redoStack: [],
     channelMutes: new Array(data.musicData.trackCount).fill(false),
+    markStart: null,
+    markEnd: null,
   }),
 
   reset: () => set({
@@ -336,6 +350,8 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     undoStack: [],
     redoStack: [],
     channelMutes: [],
+    markStart: null,
+    markEnd: null,
   }),
 
   // ── Cursor ─────────────────────────────────────────────────────────────
@@ -437,6 +453,37 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     };
   }),
 
+  eraseEvent: (seqIdx, row) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq || row >= seq.length) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq = [...seq];
+    newSeq[row] = { note: 0, instrument: 0x80, command: 0x80 };
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  eraseEventLine: (seqIdx, row) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq || row >= seq.length) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq = [...seq];
+    // Erase all fields on this row across all columns
+    newSeq[row] = { note: 0, instrument: 0x80, command: 0x80 };
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
   // ── Block operations (clipboard, transpose) ────────────────────────────
 
   copyBlock: (seqIdx, fromRow, toRow) => set((s) => {
@@ -516,6 +563,11 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
       redoStack: [],
     };
   }),
+
+  // ── Mark block ─────────────────────────────────────────────────────────
+
+  setMark: (start, end) => set({ markStart: start, markEnd: end }),
+  clearMark: () => set({ markStart: null, markEnd: null }),
 
   // ── Instrument editing ─────────────────────────────────────────────────
 
