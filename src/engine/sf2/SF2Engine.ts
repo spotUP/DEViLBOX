@@ -187,6 +187,7 @@ export class SF2Engine {
 
   // rAF-based flight recorder capture
   private captureRAFId = 0;
+  private positionPollId = 0;
   private capturing = false;
 
   constructor(sidData: Uint8Array) {
@@ -503,6 +504,7 @@ export class SF2Engine {
     // Import FormatPlaybackState for pattern follow
     let setRow: ((row: number) => void) | null = null;
     let setPlaying: ((playing: boolean) => void) | null = null;
+    let setRowDuration: ((ms: number) => void) | null = null;
     let sf2StoreReady = false;
     let sf2SetPlaying: ((p: boolean) => void) | null = null;
     let sf2UpdatePos: ((pos: { row: number; songPos: number }) => void) | null = null;
@@ -510,6 +512,7 @@ export class SF2Engine {
     import('@/engine/FormatPlaybackState').then(mod => {
       setRow = mod.setFormatPlaybackRow;
       setPlaying = mod.setFormatPlaybackPlaying;
+      setRowDuration = mod.setFormatPlaybackRowDuration;
       setPlaying!(true);
     });
     import('@stores/useSF2Store').then(mod => {
@@ -520,33 +523,47 @@ export class SF2Engine {
       sf2SetPlaying!(true);
     });
 
-    let lastSeqRow = -1;
-    let lastOrderIdx = -1;
-
-    const tick = () => {
+    // Flight recorder: capture SID registers at display rate (rAF)
+    const captureTick = () => {
       if (!this.capturing) return;
       this.flightRecorder.capture(this.sidEngine);
+      this.captureRAFId = requestAnimationFrame(captureTick);
+    };
+    this.captureRAFId = requestAnimationFrame(captureTick);
 
-      // Read playback position from C64 driver memory
-      if (setRow && this.driverCommonData) {
-        const seqRow = this.readRAM(this.driverCommonData.sequenceIndexAddress) ?? 0;
-        const orderIdx = this.readRAM(this.driverCommonData.orderListIndexAddress) ?? 0;
-        const rowChanged = seqRow !== lastSeqRow;
-        const orderChanged = orderIdx !== lastOrderIdx;
+    // Position polling: high-frequency interval (4ms ≈ 250Hz) for precise
+    // row-change detection. rAF (60Hz) gives ±8ms jitter which causes
+    // visibly uneven stepped scrolling. 4ms gives ±2ms — imperceptible.
+    let lastSeqRow = -1;
+    let lastOrderIdx = -1;
+    let lastDuration = -1;
+    const PAL_TICK_MS = 20; // PAL frame: 50Hz = 20ms per tick
 
-        if (rowChanged) {
-          lastSeqRow = seqRow;
-          setRow(seqRow);
-        }
-        if (sf2StoreReady && (rowChanged || orderChanged)) {
-          lastOrderIdx = orderIdx;
-          sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
-        }
+    const pollPosition = () => {
+      if (!this.capturing || !setRow || !this.driverCommonData) return;
+
+      const seqRow = this.readRAM(this.driverCommonData.sequenceIndexAddress) ?? 0;
+      const orderIdx = this.readRAM(this.driverCommonData.orderListIndexAddress) ?? 0;
+      const rowChanged = seqRow !== lastSeqRow;
+      const orderChanged = orderIdx !== lastOrderIdx;
+
+      // Read current event duration (ticks per row) from driver
+      const eventDuration = this.readRAM(this.driverCommonData.currentSeqEventDurationAddress) ?? 0;
+      if (setRowDuration && eventDuration > 0 && eventDuration !== lastDuration) {
+        lastDuration = eventDuration;
+        setRowDuration(eventDuration * PAL_TICK_MS);
       }
 
-      this.captureRAFId = requestAnimationFrame(tick);
+      if (rowChanged) {
+        lastSeqRow = seqRow;
+        setRow(seqRow);
+      }
+      if (sf2StoreReady && (rowChanged || orderChanged)) {
+        lastOrderIdx = orderIdx;
+        sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
+      }
     };
-    this.captureRAFId = requestAnimationFrame(tick);
+    this.positionPollId = window.setInterval(pollPosition, 4);
   }
 
   /** Stop capturing */
@@ -555,6 +572,10 @@ export class SF2Engine {
     if (this.captureRAFId) {
       cancelAnimationFrame(this.captureRAFId);
       this.captureRAFId = 0;
+    }
+    if (this.positionPollId) {
+      clearInterval(this.positionPollId);
+      this.positionPollId = 0;
     }
     // Clear playback state
     import('@/engine/FormatPlaybackState').then(mod => {
