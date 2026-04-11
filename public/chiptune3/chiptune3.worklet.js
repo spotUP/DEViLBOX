@@ -71,6 +71,7 @@ class MPT extends AudioWorkletProcessor {
 		// Pre-allocated transfer buffers for isolation audio (avoid GC in process())
 		this.isoTransferLeft = new Array(MAX_ISOLATION_SLOTS).fill(null)
 		this.isoTransferRight = new Array(MAX_ISOLATION_SLOTS).fill(null)
+		this._diagCounter = 0
 	}
 
 	process(inputList, outputList, parameters) {
@@ -183,6 +184,29 @@ class MPT extends AudioWorkletProcessor {
 				this.isoTransferRight[s].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
 				port.postMessage({ left: this.isoTransferLeft[s], right: this.isoTransferRight[s] })
 			}
+		}
+
+		// Periodic diagnostic logging (every ~2 seconds at 48kHz/128 = 375 renders/sec)
+		if (this.isolatedBits && ++this._diagCounter >= 750) {
+			this._diagCounter = 0
+			const numSlots = this.isolationSlots.filter(Boolean).length
+			const numPorts = this.isolationPorts.filter(Boolean).length
+			const effMainMask = this.userMuteMask & ~this.isolatedBits
+			// Compute RMS of main output to verify it's not silent
+			let mainRms = 0
+			for (let i = 0; i < left.length; i++) mainRms += left[i] * left[i]
+			mainRms = Math.sqrt(mainRms / left.length)
+			this.port.postMessage({
+				cmd: 'isolationDiag',
+				isolatedBits: this.isolatedBits,
+				userMuteMask: this.userMuteMask,
+				effectiveMainMask: effMainMask,
+				channels: this.channels,
+				activeSlots: numSlots,
+				activePorts: numPorts,
+				slotMasks: this.isolationSlots.map(s => s ? s.channelMask : null),
+				mainRms: mainRms.toFixed(6),
+			})
 		}
 
 		return true // def. needed for Chrome
