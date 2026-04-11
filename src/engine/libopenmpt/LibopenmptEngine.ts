@@ -287,32 +287,13 @@ export class LibopenmptEngine {
   }
 
   /**
-   * After a new song starts, recreate isolation slots if the mixer store has per-channel effects.
+   * After a new song starts, recreate isolation slots if any per-channel effects exist
+   * (either mixer insert effects or master effects with selectedChannels).
    */
   private _rebuildIsolationAfterPlay(): void {
     try {
-      // Dynamic import to avoid circular dependency
-      void import('../../stores/useMixerStore').then(({ useMixerStore }) => {
-        const state = useMixerStore.getState();
-        const hasEffects = state.channels.some(ch => ch.insertEffects.some(e => e.enabled));
-        if (hasEffects) {
-          console.log('[LibopenmptEngine] Rebuilding per-channel effects after song start');
-          // Trigger the same rebuild the mixer store uses
-          void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
-            void import('../ToneEngine').then(({ getToneEngine }) => {
-              const masterEffectsInput = getToneEngine().masterEffectsInput;
-              const mgr = getChannelRoutedEffectsManager(masterEffectsInput);
-              const channelEffects = new Map<number, import('@typedefs/instrument').EffectConfig[]>();
-              for (let ch = 0; ch < state.channels.length; ch++) {
-                const effects = state.channels[ch].insertEffects;
-                if (effects.length > 0) {
-                  channelEffects.set(ch, effects.map(e => ({ ...e, parameters: { ...e.parameters } })));
-                }
-              }
-              void mgr.rebuild(channelEffects);
-            });
-          });
-        }
+      void import('../../stores/useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+        scheduleWasmEffectRebuild();
       });
     } catch (e) {
       console.warn('[LibopenmptEngine] Failed to rebuild isolation after play:', e);
