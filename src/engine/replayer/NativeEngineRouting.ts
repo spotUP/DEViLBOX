@@ -693,19 +693,24 @@ export async function startNativeEngines(
   // --- C64 SID (instance-based, not singleton - special case) ---
   if (song.c64SidFileData && song.format === 'SID') {
     suppressNotes = true;
+    // Check if SF2 store has loaded data (set by applyEditorMode → useSF2Store.loadSF2Data)
+    const { useSF2Store } = await import('@stores/useSF2Store');
+    const sf2State = useSF2Store.getState();
+    const hasSF2Data = sf2State.rawFileData !== null && sf2State.descriptor !== null;
+    console.log('[NativeEngineRouting] C64 SID path activated — hasSF2Data:', hasSF2Data, 'dataLen:', song.c64SidFileData.length);
     try {
       const audioContext = Tone.getContext().rawContext as AudioContext;
       const synthBusNode = getNativeAudioNode(toneEngine.synthBus as any);
 
       // SF2 files: use SF2Engine for live editing support
-      if (song.sf2StoreData) {
+      if (hasSF2Data && sf2State.descriptor && sf2State.driverCommon && sf2State.musicData) {
         const engine = new SF2Engine(song.c64SidFileData);
         engine.setDriverInfo({
-          descriptor: song.sf2StoreData.descriptor,
-          driverCommon: song.sf2StoreData.driverCommon,
-          musicData: song.sf2StoreData.musicData,
-          tableDefs: song.sf2StoreData.tableDefs,
-          loadAddress: song.sf2StoreData.loadAddress,
+          descriptor: sf2State.descriptor,
+          driverCommon: sf2State.driverCommon,
+          musicData: sf2State.musicData,
+          tableDefs: sf2State.tableDefs,
+          loadAddress: sf2State.loadAddress,
         });
         await engine.init(audioContext, synthBusNode ?? undefined);
         sf2Engine = engine;
