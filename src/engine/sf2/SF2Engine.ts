@@ -655,18 +655,23 @@ export class SF2Engine {
     };
     this.captureRAFId = requestAnimationFrame(captureTick);
 
-    // Position polling — simple setInterval reading sequenceIndex from C64 RAM.
+    // Position detection — hook into onaudioprocess (audio-clock driven).
     //
-    // The original SF2 editor checks tempoCounter==0 after each C64 frame (50Hz).
-    // We can't hook per-frame, so we poll sequenceIndex which reflects the result.
-    // The explicit rowDuration from currentSeqEventDuration tells the display
-    // layer exactly how long each row lasts for consistent visual timing.
+    // GT Ultra has perfect scroll because position comes from AudioWorklet
+    // process() — fired by the audio clock, zero JS timer jitter. SF2 uses
+    // ScriptProcessorNode instead of AudioWorklet, but onaudioprocess is
+    // equally audio-clock-driven. We wrap it to read position immediately
+    // after each buffer fill, just like GT Ultra's worklet posts position
+    // after each process() call.
+    //
+    // This is called from startCapture() which runs AFTER await play(),
+    // so _producerNode is guaranteed to exist.
     let lastSeqRow = -1;
     let lastOrderIdx = -1;
     let lastDuration = -1;
     const PAL_TICK_MS = 20; // PAL frame: 50Hz = 20ms per tick
 
-    this.positionPollId = window.setInterval(() => {
+    const checkPosition = () => {
       if (!this.capturing || !setRow || !this.driverCommonData) return;
 
       const dc = this.driverCommonData;
@@ -692,7 +697,10 @@ export class SF2Engine {
         sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
       }
       lastOrderIdx = orderIdx;
-    }, 8); // ~125Hz — fast enough to catch every row change, low enough to not waste CPU
+    };
+
+    // Hook onaudioprocess — fires at audio clock rate (~43Hz with 1024 buffer)
+    this.sidEngine.setAfterProcessCallback(checkPosition);
   }
 
   /** Stop capturing */
@@ -706,6 +714,7 @@ export class SF2Engine {
       clearInterval(this.positionPollId);
       this.positionPollId = 0;
     }
+    this.sidEngine.removeAfterProcessCallback();
     // Clear playback state
     import('@/engine/FormatPlaybackState').then(mod => {
       mod.setFormatPlaybackPlaying(false);

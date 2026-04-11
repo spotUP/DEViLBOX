@@ -501,6 +501,8 @@ export class ScriptNodePlayerEngine {
         original(e);
         cb();
       };
+    } else {
+      console.warn('[ScriptNodePlayerEngine] setAfterProcessCallback: _producerNode not available, position updates will not work');
     }
   }
 
