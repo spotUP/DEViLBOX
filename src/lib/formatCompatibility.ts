@@ -209,6 +209,21 @@ export type ViolationType =
 
 const _confirmedViolations = new Set<ViolationType>();
 
+/** When > 0, all format violation checks are suppressed (returns true immediately).
+ *  Use suppressFormatChecks() / restoreFormatChecks() around file-loading paths. */
+let _suppressDepth = 0;
+
+/** Suppress format violation dialogs (e.g. during file import).
+ *  Must be paired with restoreFormatChecks(). Supports nesting. */
+export function suppressFormatChecks(): void {
+  _suppressDepth++;
+}
+
+/** Restore format violation dialogs after a suppress call. */
+export function restoreFormatChecks(): void {
+  if (_suppressDepth > 0) _suppressDepth--;
+}
+
 /** Reset all violation confirmations (call on song load) */
 export function resetFormatViolations(): void {
   _confirmedViolations.clear();
@@ -267,6 +282,7 @@ export async function checkFormatViolation(
   type: ViolationType,
   message: string,
 ): Promise<boolean> {
+  if (_suppressDepth > 0) return true; // suppressed during file import
   if (_confirmedViolations.has(type)) return true;
 
   const limits = getActiveFormatLimits();
@@ -287,6 +303,7 @@ export async function checkFormatViolation(
  * Used for quick pre-checks before async dialog. Returns null if no violation.
  */
 export function wouldViolateFormat(type: ViolationType): string | null {
+  if (_suppressDepth > 0) return null;
   if (_confirmedViolations.has(type)) return null;
   const limits = getActiveFormatLimits();
   return limits?.name ?? null;
