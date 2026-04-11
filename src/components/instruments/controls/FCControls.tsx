@@ -21,7 +21,7 @@ import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
+import { EnvelopeVisualization, SectionLabel, SampleBrowserPane } from '@components/instruments/shared';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import {
   FC_SYNTH_MACRO_COLUMNS,
@@ -589,39 +589,34 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
           {activeTab === 'rawvol'   && renderRawVol()}
         </div>
         {showSamplePane && (
-          <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
-            <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
-              SAMPLES ({sampleRows.length})
-            </div>
-            {sampleRows.length === 0 && (
-              <div className="p-2 text-[10px] text-text-muted italic">
-                No Future Composer instruments loaded.
-              </div>
-            )}
-            {sampleRows.map((s) => (
-              <div
-                key={s.id}
-                className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
-                  s.isCurrent ? 'bg-accent-primary/10' : ''
-                }`}
-                title={`Instrument #${s.id}: ${s.instrName}`}
-              >
-                <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
-                  {String(s.id).padStart(2, '0')}. {s.instrName}
-                </div>
-                <div className="text-text-muted mt-0.5">
-                  wave #{s.waveNumber}
-                  {s.waveSize > 0 && <span className="ml-1">· {s.waveSize}B</span>}
-                </div>
-                <div className="mt-0.5 text-[9px]">
-                  <span className={s.waveNumber < 10 ? 'text-accent-secondary' : 'text-accent-highlight'}>
-                    {s.waveNumber < 10 ? 'PCM SLOT' : 'SYNTH WAVE'}
-                  </span>
-                  {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
-                </div>
-              </div>
-            ))}
-          </div>
+          <SampleBrowserPane
+            entries={sampleRows.map((s) => ({
+              id: s.id,
+              name: `${String(s.id).padStart(2, '0')}. ${s.instrName}`,
+              isCurrent: s.isCurrent,
+            }))}
+            emptyMessage="No Future Composer instruments loaded."
+            renderEntry={(entry) => {
+              const s = sampleRows.find((r) => r.id === entry.id)!;
+              return (
+                <>
+                  <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
+                    {String(s.id).padStart(2, '0')}. {s.instrName}
+                  </div>
+                  <div className="text-text-muted mt-0.5">
+                    wave #{s.waveNumber}
+                    {s.waveSize > 0 && <span className="ml-1">· {s.waveSize}B</span>}
+                  </div>
+                  <div className="mt-0.5 text-[9px]">
+                    <span className={s.waveNumber < 10 ? 'text-accent-secondary' : 'text-accent-highlight'}>
+                      {s.waveNumber < 10 ? 'PCM SLOT' : 'SYNTH WAVE'}
+                    </span>
+                    {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
+                  </div>
+                </>
+              );
+            }}
+          />
         )}
       </div>
       {uadeChipRam && (
