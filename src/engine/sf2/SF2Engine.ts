@@ -715,7 +715,6 @@ export class SF2Engine {
         console.warn('[SF2] onaudioprocess callback NOT firing — falling back to setInterval');
         this.positionPollId = window.setInterval(checkPosition, 16);
       } else {
-        console.log('[SF2] onaudioprocess callback is firing ✓');
         // Re-install without monitor wrapper
         this.sidEngine.setAfterProcessCallback(checkPosition);
       }
