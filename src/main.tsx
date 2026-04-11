@@ -39,6 +39,14 @@ installIOSAudioUnlock();
 // Always initialized so the AI panel's MCP tools work in any browser
 import('./bridge/MCPBridge').then(({ initMCPBridge }) => initMCPBridge());
 
+// Soak test: opt-in via ?soak=supreme URL param. Runs end-to-end auto-DJ through
+// the Supreme Synthetics playlist and dumps a timing/heap/error report on finish.
+if (new URLSearchParams(window.location.search).has('soak')) {
+  import('./soak/soakTest').then(({ runSupremeSynthSoak }) => {
+    void runSupremeSynthSoak();
+  });
+}
+
 // Global error handlers for uncaught errors
 window.addEventListener('error', (event) => {
   // Suppress Tone.js PolySynth disposal errors - these happen when scheduled events
