@@ -185,10 +185,10 @@ export const PixiSymphoniePanel: React.FC<Props> = ({ instrument, onUpdate }) =>
 
           <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 8 }}>
             <PixiToggle
+              label="New Loop System"
               value={sym.newLoopSystem}
               onChange={(v) => upd('newLoopSystem', v)}
             />
-            <PixiLabel text="New Loop System" size="xs" color="text" />
           </layoutContainer>
 
           <layoutContainer layout={{ paddingTop: 4 }}>
@@ -217,10 +217,10 @@ export const PixiSymphoniePanel: React.FC<Props> = ({ instrument, onUpdate }) =>
           <SectionHeading text="DSP PROCESSING" />
           <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 4 }}>
             <PixiToggle
+              label="Bypass DSP (no echo/delay)"
               value={sym.noDsp}
               onChange={(v) => upd('noDsp', v)}
             />
-            <PixiLabel text="Bypass DSP (no echo/delay)" size="xs" color="text" />
           </layoutContainer>
 
           <layoutContainer layout={{ paddingTop: 4 }}>
