@@ -178,6 +178,43 @@ export function useSF2LiveSync(): void {
       },
     );
   }, []);
+
+  // Subscribe to channel mute changes → push to SID engine
+  useEffect(() => {
+    return useSF2Store.subscribe(
+      (state, prevState) => {
+        if (!engine.current) return;
+        if (state.channelMutes === prevState.channelMutes) return;
+        let mask = 0;
+        for (let i = 0; i < state.channelMutes.length; i++) {
+          if (state.channelMutes[i]) mask |= (1 << i);
+        }
+        engine.current.setMuteMask(mask);
+      },
+    );
+  }, []);
+
+  // Subscribe to c64Memory changes (table edits) → push to C64 memory
+  useEffect(() => {
+    return useSF2Store.subscribe(
+      (state, prevState) => {
+        if (!engine.current?.canEdit) return;
+        if (state.c64Memory === prevState.c64Memory) return;
+        // Find changed table bytes and write them. Tables are the primary
+        // consumer of c64Memory edits, so scan table address ranges.
+        for (const td of state.tableDefs) {
+          for (let c = 0; c < td.columnCount; c++) {
+            for (let r = 0; r < td.rowCount; r++) {
+              const addr = td.address + c * td.rowCount + r;
+              if (addr < state.c64Memory.length && state.c64Memory[addr] !== prevState.c64Memory[addr]) {
+                engine.current.writeTableByte(td.id, r, c, state.c64Memory[addr]);
+              }
+            }
+          }
+        }
+      },
+    );
+  }, []);
 }
 
 /**
