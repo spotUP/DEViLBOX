@@ -203,7 +203,23 @@ export const useAudioStore = create<AudioStore>()(
           // masterEffectsKey useEffect in usePatternPlayback / DJView. Calling
           // updateMasterEffectParams here would fail because disabled effects don't
           // have Tone nodes. Skip the per-param update path for enable/disable toggles.
-          if ('enabled' in updates) return;
+          if ('enabled' in updates) {
+            // If this is a channel-targeted effect, also trigger WASM isolation rebuild
+            if (Array.isArray(effect.selectedChannels) && effect.selectedChannels.length > 0) {
+              import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+                scheduleWasmEffectRebuild();
+              }).catch(() => {});
+            }
+            return;
+          }
+
+          // When selectedChannels changes, trigger WASM isolation rebuild
+          // (the masterEffectsKey useEffect handles the master chain rebuild)
+          if ('selectedChannels' in updates) {
+            import('./useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+              scheduleWasmEffectRebuild();
+            }).catch(() => {});
+          }
 
           // Extract plain object from Immer draft before passing to ToneEngine
           const effectCopy = current(effect) as EffectConfig;
