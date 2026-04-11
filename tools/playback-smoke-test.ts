@@ -1,22 +1,65 @@
 #!/usr/bin/env npx tsx
 /**
- * Playback Smoke Test — regression harness for the TrackerReplayer refactor.
+ * Playback Smoke Test — THE format regression harness for DEViLBOX.
  *
- * Loads a battery of representative songs across all major format families,
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  THIS IS THE CANONICAL FORMAT AUDIT SCRIPT. DO NOT CREATE A NEW ONE.
+ *  If it needs fixing, fix THIS file. If it needs new features, add them
+ *  HERE. Future agents: read this header before writing any new test script.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Loads representative songs across all format families DEViLBOX supports,
  * plays each for a few seconds, and asserts:
  *   - No console errors during load/playback
  *   - Audio level is non-silent (RMS > threshold)
  *   - Song info reports the expected format
  *
- * Run BEFORE and AFTER each refactor phase to verify nothing regressed.
+ * === PREREQUISITES ===
+ *   1. Dev server running: `npm run dev` (starts Vite:5173 + Express:3001 + WS:4003)
+ *   2. DEViLBOX open in browser at http://localhost:5173
+ *   3. AudioContext unlocked (click anywhere in the browser window)
+ *   4. Format tracker running (optional): `npx tsx tools/format-server.ts &`
  *
- * Usage:
- *   1. Start the dev server: `npm run dev` (from project root)
- *   2. Open DEViLBOX in a browser, click anywhere to unlock the AudioContext
- *   3. Run: `npx tsx tools/playback-smoke-test.ts`
+ * === USAGE ===
+ *   npx tsx tools/playback-smoke-test.ts                   # all tests (hardcoded + local)
+ *   npx tsx tools/playback-smoke-test.ts --local-only      # only local Reference Music (164 formats)
+ *   npx tsx tools/playback-smoke-test.ts --hardcoded-only  # only hardcoded Modland/HVSC tests
+ *   npx tsx tools/playback-smoke-test.ts --push-results    # push pass/fail to localhost:4444 tracker
+ *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only
  *
- * The script connects to the MCP WebSocket relay (ws://localhost:4003/mcp),
- * drives the running browser via bridge calls, and reports a pass/fail summary.
+ * === HOW IT WORKS ===
+ *   1. Connects to the MCP WebSocket relay at ws://localhost:4003/mcp
+ *   2. For each test case:
+ *      a. Stops any current playback
+ *      b. Clears console errors
+ *      c. Reads the file from disk, base64-encodes it, sends to browser via WS bridge
+ *         (the bridge expects {filename, data}, NOT {path} — the MCP HTTP server
+ *         handles path→base64 conversion but the WS bridge is direct-to-browser)
+ *      d. Companion files (TFMX smpl.*, MIDI smpl.*, etc.) are auto-discovered
+ *      e. Verifies song loaded (patterns > 0, channels > 0)
+ *      f. Calls play(), waits for audio, measures RMS level
+ *      g. Checks console for critical errors
+ *      h. Stops playback, reports pass/fail
+ *   3. Prints summary with pass/fail counts + failure details
+ *
+ * === LOCAL TEST DISCOVERY ===
+ *   The --local-only flag auto-discovers ~164 format test cases from the
+ *   local Reference Music collection at /Users/spot/Code/Reference Music/.
+ *   Each format directory contains artist subdirectories with real module files.
+ *   The script picks the first valid music file from each format directory.
+ *
+ * === ENVIRONMENT VARIABLES ===
+ *   MCP_BRIDGE_URL     WebSocket URL (default ws://localhost:4003/mcp)
+ *   DEVILBOX_API        Express API URL (default http://localhost:3001)
+ *   REFERENCE_MUSIC     Local test music path (default /Users/spot/Code/Reference Music)
+ *
+ * === OTHER AUDIT SCRIPTS IN THIS REPO ===
+ *   tools/pc-tracker-audit.ts    — deep 10-point audit for 23 OpenMPT PC formats
+ *   tools/soak-test.ts           — 2+ hour endurance test for pre-gig stability
+ *   tools/furnace-audit/         — lock-step command comparison for Furnace chips
+ *   tools/fx-audit.ts            — effects chain regression test
+ *   tools/uade-audit.ts          — UADE-specific format coverage
+ *   DO NOT duplicate their functionality here — this script is for BROAD coverage.
  */
 
 import { WebSocket } from 'ws';
@@ -76,10 +119,20 @@ async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
     let testFile: string | null = null;
     let testName: string | null = null;
 
+    // File extensions to skip — these are metadata/docs, not music
+    const SKIP_EXT = new Set(['.txt', '.md', '.nfo', '.info', '.readme', '.diz', '.doc',
+      '.jpg', '.png', '.gif', '.bmp', '.pdf', '.html', '.htm', '.css', '.js',
+      '.ki', '.ins', '.pat', '.cfg', '.ini', '.json', '.xml', '.yaml', '.yml']);
+    const isMusic = (f: string) => {
+      if (f.startsWith('.')) return false;
+      const ext = f.lastIndexOf('.') > 0 ? f.slice(f.lastIndexOf('.')).toLowerCase() : '';
+      return !SKIP_EXT.has(ext);
+    };
+
     // Try top-level files first
     try {
       const topFiles = readdirSync(fullDir).filter(f => {
-        try { return statSync(join(fullDir, f)).isFile() && !f.startsWith('.') && !f.endsWith('.txt') && !f.endsWith('.md') && !f.endsWith('.nfo'); } catch { return false; }
+        try { return statSync(join(fullDir, f)).isFile() && isMusic(f); } catch { return false; }
       }).sort();
       if (topFiles.length > 0) {
         testFile = join(fullDir, topFiles[0]);
@@ -95,7 +148,7 @@ async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
         }).sort();
         for (const sub of subDirs) {
           const subFiles = readdirSync(join(fullDir, sub)).filter(f => {
-            try { return statSync(join(fullDir, sub, f)).isFile() && !f.startsWith('.') && !f.endsWith('.txt') && !f.endsWith('.md') && !f.endsWith('.nfo'); } catch { return false; }
+            try { return statSync(join(fullDir, sub, f)).isFile() && isMusic(f); } catch { return false; }
           }).sort();
           if (subFiles.length > 0) {
             testFile = join(fullDir, sub, subFiles[0]);
@@ -309,8 +362,14 @@ interface PatternStatsResp {
 async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestResult> {
   const start = Date.now();
   try {
-    // 1. Clean slate — clear console and remove any master effects that could
-    //    trigger format-compatibility dialogs during native-format loads.
+    // 1. STOP previous playback — critical to prevent the previous song's audio
+    //    from bleeding into this test's RMS measurement. Without this, formats
+    //    that fail to load appear to "pass" because the previous song is still
+    //    playing and producing audio.
+    try { await client.call('stop'); } catch { /* may not be playing */ }
+    await sleep(500); // let the engine fully quiesce
+
+    // 2. Clean slate — clear console and remove any master effects
     await client.call('clear_console_errors');
     try {
       const audioState = await client.call<{ masterEffects?: { id: string }[] }>('get_audio_state');
@@ -321,7 +380,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       }
     } catch { /* audio state read may fail on first call */ }
 
-    // 2. Load — download via Express API, then send to browser via load_file
+    // 3. Load — download via Express API, then send to browser via load_file
     if (test.loader === 'modland' || test.loader === 'hvsc') {
       const { filename, base64 } = await downloadFile(test.loader, test.path);
 
@@ -443,11 +502,18 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     // 6. Let it play
     await sleep(PLAY_DURATION_MS);
 
-    // 7. Measure
-    const level = await client.call<{ rmsAvg: number; rmsMax: number; isSilent: boolean }>(
-      'get_audio_level',
-      { durationMs: 1000 },
-    );
+    // 7. Measure — retry up to 3 times with increasing wait. Some WASM engines
+    //    (UADE, TFMX, SID) take a moment to start producing audio after play().
+    let level = { rmsAvg: 0, rmsMax: 0, isSilent: true };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      level = await client.call<{ rmsAvg: number; rmsMax: number; isSilent: boolean }>(
+        'get_audio_level',
+        { durationMs: 1500 },
+      );
+      if ((level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4) break;
+      // Still silent — wait a bit and retry
+      if (attempt < 2) await sleep(1000);
+    }
 
     // 8. Check console errors
     const errs = await client.call<{ entries: Array<{ level: string; message: string }> }>('get_console_errors');
@@ -546,8 +612,7 @@ async function main(): Promise<void> {
 
   const results: TestResult[] = [];
   for (const test of allTests) {
-    // Brief pause between tests to let AudioContext and WASM settle
-    if (results.length > 0) await sleep(2000);
+    // Brief pause between tests (stop is now handled inside runTest)
     process.stdout.write(`  [${test.family.padEnd(5)}] ${test.name.padEnd(40)} `);
     const result = await runTest(client, test);
     results.push(result);
