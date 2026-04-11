@@ -58,6 +58,7 @@ import type {
 } from '@/types/tfmxNative';
 import { TFMXEngine } from '@/engine/tfmx/TFMXEngine';
 import { useTrackerStore } from '@stores';
+import { SampleBrowserPane } from '@components/instruments/shared';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -812,45 +813,31 @@ export const TFMXMacroEditor: React.FC<Props> = ({ height = 360, initialMacroInd
 
       {/* Sample browser pane (4th column, toggle via SMP button) */}
       {showSamplePane && (
-        <div style={{
-          width: '220px', borderLeft: '1px solid var(--color-border)',
-          overflowY: 'auto', backgroundColor: 'var(--color-bg-tertiary)',
-          flexShrink: 0,
-        }}>
-          <div style={{
-            padding: '4px 8px', fontWeight: 'bold', color: '#88c0c0',
-            borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0,
-            backgroundColor: 'var(--color-bg-tertiary)',
-          }}>
-            SAMPLES ({sampleRefs.length})
-          </div>
-          {sampleRefs.length === 0 && (
-            <div style={{ padding: '8px', fontSize: '10px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-              No SetBegin/SetLen pairs found in any macro.
-            </div>
-          )}
-          {sampleRefs.map((s, i) => (
-            <div
-              key={i}
-              style={{
-                padding: '4px 8px', borderBottom: '1px solid var(--color-border)',
-                fontSize: '10px',
-              }}
-              title={`Used by macros: ${s.macros.map(m => hex2(m)).join(', ')}`}
-            >
-              <div style={{ color: '#e0e0e0', fontFamily: 'inherit' }}>
-                ${hex8(s.addr)}
-              </div>
-              <div style={{ color: 'var(--color-text-muted)', marginTop: '1px' }}>
-                {s.lenWords * 2} bytes ({s.lenWords}w)
-              </div>
-              <div style={{ color: '#88c0c0', marginTop: '2px', fontSize: '9px' }}>
-                {s.macros.length} macro{s.macros.length === 1 ? '' : 's'}: {s.macros.slice(0, 6).map(m => hex2(m)).join(' ')}
-                {s.macros.length > 6 && '…'}
-              </div>
-            </div>
-          ))}
-        </div>
+        <SampleBrowserPane
+          entries={sampleRefs.map((s, i) => ({
+            id: i,
+            name: `$${hex8(s.addr)}`,
+            sizeBytes: s.lenWords * 2,
+          }))}
+          emptyMessage="No SetBegin/SetLen pairs found in any macro."
+          renderEntry={(entry) => {
+            const s = sampleRefs[entry.id as number];
+            return (
+              <>
+                <div className="text-text-primary font-mono">
+                  ${hex8(s.addr)}
+                </div>
+                <div className="text-text-muted mt-0.5">
+                  {s.lenWords * 2} bytes ({s.lenWords}w)
+                </div>
+                <div className="mt-0.5 text-[9px] text-accent-primary">
+                  {s.macros.length} macro{s.macros.length === 1 ? '' : 's'}: {s.macros.slice(0, 6).map(m => hex2(m)).join(' ')}
+                  {s.macros.length > 6 && '\u2026'}
+                </div>
+              </>
+            );
+          }}
+        />
       )}
     </div>
   );

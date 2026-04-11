@@ -28,3 +28,5 @@ export { SegmentButton } from './SegmentButton';
 export { NumBox } from './NumBox';
 export { SelectControl } from './SelectControl';
 export { DrawbarSlider } from './DrawbarSlider';
+export { SampleBrowserPane } from './SampleBrowserPane';
+export type { SampleBrowserEntry, SampleBrowserPaneProps } from './SampleBrowserPane';

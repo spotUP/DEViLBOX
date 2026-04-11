@@ -13,7 +13,7 @@ import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/compo
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instruments/shared';
+import { SectionLabel, WaveformLineCanvas, BarChart, SampleBrowserPane } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -733,42 +733,37 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           {activeTab === 'modulation' && renderModulation()}
         </div>
         {showSamplePane && (
-          <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
-            <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
-              WAVEFORMS ({(config.allWaveforms ?? []).length})
-            </div>
-            {(config.allWaveforms ?? []).length === 0 && (
-              <div className="p-2 text-[10px] text-text-muted italic">
-                No waveform bank on this instrument.
-              </div>
-            )}
-            {(config.allWaveforms ?? []).map((wf, i) => {
-              const isCurrent = i === config.waveformNumber;
+          <SampleBrowserPane
+            headerLabel="WAVEFORMS"
+            entries={(config.allWaveforms ?? []).map((wf, i) => ({
+              id: i,
+              name: `${String(i).padStart(2, '0')}. wave${i}`,
+              sizeBytes: wf.length,
+              isCurrent: i === config.waveformNumber,
+            }))}
+            onEntryClick={(entry) => updateParam('waveformNumber', entry.id as number)}
+            emptyMessage="No waveform bank on this instrument."
+            renderEntry={(entry) => {
+              const wf = (config.allWaveforms ?? [])[entry.id as number];
+              const isCurrent = (entry.id as number) === config.waveformNumber;
               return (
-                <div
-                  key={i}
-                  onClick={() => updateParam('waveformNumber', i)}
-                  className={`px-2 py-1.5 border-b border-dark-border text-[10px] cursor-pointer hover:bg-accent-primary/20 transition-colors ${
-                    isCurrent ? 'bg-accent-primary/10' : ''
-                  }`}
-                  title={`Click to select waveform #${i} — ${wf.length} bytes`}
-                >
+                <>
                   <div className={`font-mono ${isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
-                    {String(i).padStart(2, '0')}. wave{i}
+                    {String(entry.id).padStart(2, '0')}. wave{entry.id}
                   </div>
                   <div className="text-text-muted mt-0.5">
-                    {wf.length} bytes
+                    {wf?.length ?? 0} bytes
                   </div>
                   <div className="mt-0.5 font-mono text-accent-highlight text-[10px] leading-none tracking-tight">
-                    {miniWave(wf)}
+                    {wf ? miniWave(wf) : ''}
                   </div>
                   {isCurrent && (
                     <div className="mt-0.5 text-[9px] text-accent-primary">(this instrument)</div>
                   )}
-                </div>
+                </>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
     </div>
