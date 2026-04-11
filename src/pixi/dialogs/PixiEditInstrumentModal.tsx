@@ -1768,7 +1768,7 @@ const NATIVE_WASM_SYNTH_TYPES = new Set([
   'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
   // Autonomous replayer engines (no synth param UI)
-  'KlysSynth', 'Sc68Synth', 'GTUltraSynth', 'FredEditorReplayerSynth', 'ChiptuneModule',
+  'KlysSynth', 'Sc68Synth', 'GTUltraSynth', 'SF2Synth', 'FredEditorReplayerSynth', 'ChiptuneModule',
 ]);
 
 // Whole-song engine types — always show NativeInstrumentPanel even if sample data present
@@ -1780,7 +1780,7 @@ const SONG_ENGINE_SYNTH_TYPES = new Set([
   'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
   'FuturePlayerSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
   'HivelySynth', 'SunVoxSynth',
-  'KlysSynth', 'Sc68Synth', 'GTUltraSynth', 'FredEditorReplayerSynth', 'ChiptuneModule',
+  'KlysSynth', 'Sc68Synth', 'GTUltraSynth', 'SF2Synth', 'FredEditorReplayerSynth', 'ChiptuneModule',
 ]);
 
 function isNativeWASMSynth(synthType?: string): boolean {

@@ -125,7 +125,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const previewTimeoutRef = useRef<number | null>(null);
   const holdTimerRef = useRef<number | null>(null);
   const isPreviewingRef = useRef(false);
-  const previewInfoRef = useRef<{ instId: number; note: string; inst: InstrumentConfig; type?: 'gt' } | null>(null);
+  const previewInfoRef = useRef<{ instId: number; note: string; inst: InstrumentConfig; type?: 'gt' | 'sf2' } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const [showLoadModal, setShowLoadModal] = useState(false);
@@ -193,6 +193,22 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
       if (inst.synthType === 'UADESynth') return;
 
+      // SF2: hold-to-preview via SF2Engine's memory-mapped note trigger
+      if (inst.synthType === 'SF2Synth') {
+        const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+        const sf2Engine = getTrackerReplayer()?.getSF2Engine?.();
+        if (sf2Engine?.canEdit) {
+          const sf2InstIdx = Math.max(0, inst.id - 1); // 0-based for driver
+          // Extract octave from previewNote (e.g. "C4" → 4)
+          const octave = parseInt(previewNote.slice(-1), 10) || 4;
+          const sf2Note = 0x30 + (octave - 4) * 12;
+          sf2Engine.playTestNote(0, sf2Note, sf2InstIdx);
+          isPreviewingRef.current = true;
+          previewInfoRef.current = { instId: inst.id, note: previewNote, inst, type: 'sf2' };
+        }
+        return;
+      }
+
       if (!toneInst || isEmptySampler) {
         // Fallback oscillator — self-timed (400ms)
         const wfMap: Record<string, OscillatorType> = {
@@ -234,6 +250,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       if (info.type === 'gt') {
         import('@stores/useGTUltraStore').then(({ useGTUltraStore }) => {
           useGTUltraStore.getState().engine?.releaseTestNote(0);
+        });
+      } else if (info.type === 'sf2') {
+        import('@/engine/TrackerReplayer').then(({ getTrackerReplayer }) => {
+          getTrackerReplayer()?.getSF2Engine?.()?.releaseTestNote(0);
         });
       } else {
         const engine = getToneEngine();
