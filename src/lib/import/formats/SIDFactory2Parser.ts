@@ -278,7 +278,7 @@ export async function parseSIDFactory2File(
   // ── Parse order lists (packed format) ─────────────────────────────────
   // Each track's order list is at the address pointed to by the pointer tables
   interface OrderEntry { transpose: number; seqIdx: number }
-  const orderLists: { entries: OrderEntry[]; loopIndex: number }[] = [];
+  const orderLists: { entries: OrderEntry[]; loopIndex: number; hasLoop: boolean }[] = [];
 
   for (let t = 0; t < numChannels; t++) {
     const olAddrLo = mem[musicData.orderListPtrsLo + t];
@@ -287,31 +287,28 @@ export async function parseSIDFactory2File(
 
     const entries: OrderEntry[] = [];
     let loopIndex = 0;
+    let hasLoop = false;
     let currentTranspose = 0;
     let a = olAddr;
 
     while (a < 0x10000) {
       const val = mem[a++];
       if (val === 0xFE) {
-        // End without loop
         break;
       }
       if (val === 0xFF) {
-        // End with loop — next byte is packed loop offset
-        // We just mark loop at entry 0 for simplicity
+        hasLoop = true;
         loopIndex = 0;
         break;
       }
       if (val >= 0x80) {
-        // Transposition value
         currentTranspose = val;
       } else {
-        // Sequence index
         entries.push({ transpose: currentTranspose, seqIdx: val });
       }
     }
 
-    orderLists.push({ entries, loopIndex });
+    orderLists.push({ entries, loopIndex, hasLoop });
   }
 
   // ── Parse sequences ──────────────────────────────────────────────────
@@ -517,6 +514,30 @@ export async function parseSIDFactory2File(
 
   console.log(`[SF2] Parsed: "${title}" driver=${driverName} v${descriptor.versionMajor}.${String(descriptor.versionMinor).padStart(2, '0')} tracks=${numChannels} seqs=${usedSeqs.size} patterns=${patterns.length}`);
 
+  // ── Build SF2 store data for the format editor ────────────────────────
+  // Collect all sequences into a Map<seqIdx, SeqEvent[]>
+  const sequenceMap = new Map<number, { note: number; instrument: number; command: number }[]>();
+  for (const seqIdx of usedSeqs) {
+    sequenceMap.set(seqIdx, readSequence(seqIdx));
+  }
+
+  // Build instrument data from driver tables
+  const instrTableDef = tableDefs.find(t => t.type === 0x80);
+  const sf2Instruments: { rawBytes: Uint8Array; name: string }[] = [];
+  if (instrTableDef) {
+    for (let i = 0; i < instrTableDef.rowCount && i < 64; i++) {
+      const addr = instrTableDef.address + i * instrTableDef.columnCount;
+      const rawBytes = new Uint8Array(instrTableDef.columnCount);
+      for (let b = 0; b < instrTableDef.columnCount; b++) {
+        rawBytes[b] = mem[addr + b];
+      }
+      sf2Instruments.push({
+        rawBytes,
+        name: i < instrumentDescriptions.length ? instrumentDescriptions[i] : `Inst ${i + 1}`,
+      });
+    }
+  }
+
   return {
     name: title,
     format: 'SID' as TrackerFormat,
@@ -529,5 +550,19 @@ export async function parseSIDFactory2File(
     initialSpeed: speed,
     initialBPM: bpm,
     c64SidFileData: sidFile,
+    sf2StoreData: {
+      rawFileData: raw,
+      loadAddress: loadAddr,
+      descriptor,
+      driverCommon,
+      musicData,
+      tableDefs,
+      instrumentDescriptions,
+      c64Memory: mem,
+      sequences: sequenceMap,
+      orderLists,
+      instruments: sf2Instruments,
+      songName: title,
+    },
   };
 }

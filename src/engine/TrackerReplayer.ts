@@ -389,6 +389,9 @@ export interface TrackerSong {
   channelSpeeds?: number[];
   // Per-channel groove speed (alternates with channelSpeeds each row; 0 = no groove)
   channelGrooves?: number[];
+
+  /** SID Factory II store data — populated by SIDFactory2Parser, consumed by useSF2Store */
+  sf2StoreData?: import('@/stores/useSF2Store').SF2LoadPayload;
 }
 
 // ============================================================================
