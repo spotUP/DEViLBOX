@@ -4863,57 +4863,33 @@ export class ToneEngine {
     const wantsChannelRouting = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
     const wantsGlobal = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
 
-    // Attempt per-channel isolation via secondary libopenmpt worklets
+    // Attempt per-channel isolation via secondary libopenmpt worklets.
+    // If isolation fails for ANY reason, the effect falls back to the global chain.
     let routedIds: string[] = [];
-    let isolatedChannelsMask = 0;
 
     if (wantsChannelRouting.length > 0) {
-      // Get module buffer from active LibopenmptEngine (if currently playing)
-      let moduleBuffer: ArrayBuffer | null = null;
-      let audioContext: AudioContext | null = null;
-      let currentPosition: { order: number; row: number } | null = null;
-
       try {
         const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
         if (LibopenmptEngine.hasInstance()) {
           const engine = LibopenmptEngine.getInstance();
-          // Only use isolation if libopenmpt is actively playing
-          if (engine.isPlaying() && engine.getModuleBuffer()) {
-            moduleBuffer = engine.getModuleBuffer();
-            audioContext = engine.getAudioContext();
-            currentPosition = engine.getCurrentPosition();
-          }
-        }
-      } catch { /* LibopenmptEngine not available */ }
+          const moduleBuffer = engine.getModuleBuffer();
+          const audioContext = engine.getAudioContext();
 
-      if (moduleBuffer && audioContext) {
-        if (!this._channelRoutedEffects) {
-          const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
-          this._channelRoutedEffects = new ChannelRoutedEffectsManager(this.masterInput);
-        }
+          if (engine.isPlaying() && moduleBuffer && audioContext) {
+            if (!this._channelRoutedEffects) {
+              const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
+              this._channelRoutedEffects = new ChannelRoutedEffectsManager(this.masterInput);
+            }
 
-        const result = await this._channelRoutedEffects.rebuild(
-          wantsChannelRouting,
-          moduleBuffer,
-          audioContext,
-          currentPosition,
-        );
-        routedIds = result.routedIds;
-        isolatedChannelsMask = result.isolatedChannelsMask;
+            const result = await this._channelRoutedEffects.rebuild(
+              wantsChannelRouting, moduleBuffer, audioContext,
+              engine.getCurrentPosition(),
+            );
+            routedIds = result.routedIds;
 
-        // Update main LibopenmptEngine mute mask to exclude isolated channels.
-        // The isolated channels are now played by their own worklet instances.
-        if (isolatedChannelsMask !== 0) {
-          try {
-            const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
-            if (LibopenmptEngine.hasInstance()) {
-              const engine = LibopenmptEngine.getInstance();
-              // Preserve user mute mask (from mixer), add isolation mask
-              const allActive = 0xFFFFFFFF;
-              engine.setMuteMask(allActive & ~isolatedChannelsMask);
-              console.log(`[ToneEngine] Main engine mute mask updated: isolated channels ${isolatedChannelsMask.toString(2)}`);
-
-              // Subscribe to transport events to keep isolation nodes in sync
+            // Mute isolated channels in the main engine + subscribe to transport
+            if (result.isolatedChannelsMask !== 0) {
+              engine.setMuteMask(0xFFFFFFFF & ~result.isolatedChannelsMask);
               const mgr = this._channelRoutedEffects!;
               engine.onTransportEvent = (event: string, order?: number, row?: number) => {
                 switch (event) {
@@ -4923,36 +4899,43 @@ export class ToneEngine {
                   case 'stop': mgr.teardown(); break;
                 }
               };
+              console.log(`[ToneEngine] Channel isolation active: mask=0x${result.isolatedChannelsMask.toString(16)}, routed: ${routedIds.join(',')}`);
             }
-          } catch { /* */ }
+          }
         }
-      } else {
-        // No libopenmpt module loaded — tear down old isolation nodes
-        if (this._channelRoutedEffects) {
-          this._channelRoutedEffects.teardown();
-        }
+      } catch (e) {
+        console.warn('[ToneEngine] Channel isolation failed, using global chain:', e);
+        routedIds = [];
+      }
+
+      // Clean up isolation if nothing was routed
+      if (routedIds.length === 0 && this._channelRoutedEffects) {
+        this._channelRoutedEffects.teardown();
+        this._restoreMainEngineMuteMask();
       }
     } else if (this._channelRoutedEffects) {
       this._channelRoutedEffects.teardown();
-      // Restore full mute mask and clear transport subscription on main engine
       this._restoreMainEngineMuteMask();
     }
 
     // Abort if superseded by a newer rebuild
     if (myVersion !== this._channelRoutedRebuildVersion) return;
 
-    // Effects that wanted channel routing but couldn't connect fall back to global
+    // Effects that wanted channel routing but couldn't be isolated → global chain
     const fallbackToGlobal = wantsChannelRouting.filter(e => !routedIds.includes(e.id));
+    if (fallbackToGlobal.length > 0) {
+      console.log(`[ToneEngine] Fallback to global: ${fallbackToGlobal.map(e => e.type).join(', ')}`);
+    }
     const globalEffects = [...wantsGlobal, ...fallbackToGlobal];
 
-    // Build global master chain with all remaining effects
+    // Build global master chain
     await _rebuildMasterEffects(this._masterFxCtx, globalEffects);
 
     // Abort if superseded during global rebuild
     if (myVersion !== this._channelRoutedRebuildVersion) return;
 
-    // Register channel-routed effect nodes in masterEffectConfigs for parameter updates
-    if (this._channelRoutedEffects) {
+    // Register channel-routed effect nodes for parameter updates
+    if (this._channelRoutedEffects && routedIds.length > 0) {
       const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
       for (const [id, entry] of routedConfigs) {
         this.masterEffectConfigs.set(id, entry);
