@@ -937,6 +937,14 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
   // Key Handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Enter starts/restarts the game from the menu
+      if (e.key === 'Enter' && !isPlayingRef.current) {
+        e.preventDefault();
+        playStartSound();
+        resetGame();
+        setIsPlaying(true);
+        return;
+      }
       if (!isPlayingRef.current) return;
 
       if (twoKeyMode) {
