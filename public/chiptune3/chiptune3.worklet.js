@@ -77,10 +77,10 @@ class MPT extends AudioWorkletProcessor {
 	process(inputList, outputList, parameters) {
 		if (!this.modulePtr || !this.leftPtr || !this.rightPtr || this.paused) return true	//silence
 
-		// Re-apply main mute mask every render to guard against loop/seek resets
+		// Re-apply main mute + volume every render to guard against loop/seek resets
 		if (this.isolatedBits && this.muteFunc) {
 			const effectiveMainMask = this.userMuteMask & ~this.isolatedBits
-			this.applyMuteMask_(this.extPtr, this.muteFunc, effectiveMainMask)
+			this.applyChannelIsolation_(this.extPtr, this.muteFunc, this.volumeFunc, effectiveMainMask)
 		}
 
 		const left = outputList[0][0]
@@ -166,9 +166,9 @@ class MPT extends AudioWorkletProcessor {
 			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr || !port) {
 				continue
 			}
-			// Re-apply mute mask EVERY render to guard against loop/seek resets
+			// Re-apply mute + volume EVERY render to guard against loop/seek resets
 			const effectiveSlotMask = slot.channelMask & this.userMuteMask
-			this.applyMuteMask_(slot.extPtr, slot.muteFunc, effectiveSlotMask)
+			this.applyChannelIsolation_(slot.extPtr, slot.muteFunc, slot.volumeFunc, effectiveSlotMask)
 
 			const bufLen = left.length // same size as main output
 			const frames = libopenmpt._openmpt_module_read_float_stereo(
@@ -406,12 +406,13 @@ class MPT extends AudioWorkletProcessor {
 		// _openmpt_module_ext_get_module extracts the regular module ptr.
 		this.extPtr = 0
 		this.muteFunc = 0
+		this.volumeFunc = 0
 		if (libopenmpt._openmpt_module_ext_create_from_memory) {
 			this.extPtr = libopenmpt._openmpt_module_ext_create_from_memory(ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0)
 			if (this.extPtr) {
 				this.modulePtr = libopenmpt._openmpt_module_ext_get_module(this.extPtr)
 				// Get interactive interface — struct of 16 function pointers (64 bytes in WASM32)
-				// set_channel_mute_status is at index 10 (offset 40)
+				// set_channel_volume at index 8 (offset 32), set_channel_mute_status at index 10 (offset 40)
 				if (libopenmpt._openmpt_module_ext_get_interface && libopenmpt.stackSave) {
 					const INTERACTIVE_STRUCT_SIZE = 64 // 16 function pointers × 4 bytes
 					const ifacePtr = libopenmpt._malloc(INTERACTIVE_STRUCT_SIZE)
@@ -426,10 +427,11 @@ class MPT extends AudioWorkletProcessor {
 						)
 						libopenmpt.stackRestore(stack)
 						if (ok) {
-							// Read set_channel_mute_status function pointer (index 10, offset 40)
-							this.muteFunc = libopenmpt.HEAPU32
-								? libopenmpt.HEAPU32[(ifacePtr + 40) >> 2]
-								: new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + 40, true)
+							const read32 = libopenmpt.HEAPU32
+								? (off) => libopenmpt.HEAPU32[(ifacePtr + off) >> 2]
+								: (off) => new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + off, true)
+							this.volumeFunc = read32(32) // set_channel_volume (i32,i32,f64)->i32
+							this.muteFunc = read32(40)    // set_channel_mute_status (i32,i32,i32)->i32
 						}
 						libopenmpt._free(ifacePtr)
 					}
@@ -621,6 +623,26 @@ class MPT extends AudioWorkletProcessor {
 	}
 
 	/**
+	 * Belt-and-suspenders channel isolation: set BOTH mute status AND channel volume.
+	 * Mute alone can be reset by libopenmpt on loop/seek; volume provides a second layer.
+	 * Used for isolation modules; main module uses applyMuteMask_ only (volume stays at 1).
+	 */
+	applyChannelIsolation_(extPtr, muteFunc, volumeFunc, mask) {
+		if (!muteFunc || !extPtr || !libopenmpt.wasmTable) return false
+		const muteFn = libopenmpt.wasmTable.get(muteFunc)
+		if (!muteFn) return false
+		const volFn = volumeFunc ? libopenmpt.wasmTable.get(volumeFunc) : null
+		for (let ch = 0; ch < Math.min(this.channels, 32); ch++) {
+			const active = (mask & (1 << ch)) !== 0
+			try {
+				muteFn(extPtr, ch, active ? 0 : 1)
+				if (volFn) volFn(extPtr, ch, active ? 1.0 : 0.0)
+			} catch(e) { return false }
+		}
+		return true
+	}
+
+	/**
 	 * Recompute and apply the combined mute mask for the main module.
 	 * Effective mask = userMuteMask & ~isolatedBits — a channel is audible
 	 * in main output ONLY if the user hasn't muted it AND it's not isolated.
@@ -628,7 +650,21 @@ class MPT extends AudioWorkletProcessor {
 	recomputeMainMask_() {
 		if (!this.extPtr || !this.muteFunc) return
 		const effectiveMask = this.userMuteMask & ~this.isolatedBits
-		this.applyMuteMask_(this.extPtr, this.muteFunc, effectiveMask)
+		if (this.isolatedBits) {
+			// While isolation is active, use both mute + volume for reliability
+			this.applyChannelIsolation_(this.extPtr, this.muteFunc, this.volumeFunc, effectiveMask)
+		} else {
+			// No isolation active — only use mute, restore all volumes to 1.0
+			this.applyMuteMask_(this.extPtr, this.muteFunc, effectiveMask)
+			if (this.volumeFunc && libopenmpt.wasmTable) {
+				const volFn = libopenmpt.wasmTable.get(this.volumeFunc)
+				if (volFn) {
+					for (let ch = 0; ch < Math.min(this.channels, 32); ch++) {
+						try { volFn(this.extPtr, ch, 1.0) } catch { /* */ }
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -640,7 +676,7 @@ class MPT extends AudioWorkletProcessor {
 			const slot = this.isolationSlots[s]
 			if (!slot) continue
 			const effectiveSlotMask = slot.channelMask & this.userMuteMask
-			this.applyMuteMask_(slot.extPtr, slot.muteFunc, effectiveSlotMask)
+			this.applyChannelIsolation_(slot.extPtr, slot.muteFunc, slot.volumeFunc, effectiveSlotMask)
 		}
 	}
 
@@ -680,8 +716,9 @@ class MPT extends AudioWorkletProcessor {
 			return
 		}
 
-		// Extract mute function pointer from interactive interface
+		// Extract mute + volume function pointers from interactive interface
 		let muteFunc = 0
+		let volumeFunc = 0
 		if (libopenmpt._openmpt_module_ext_get_interface && libopenmpt.stackSave) {
 			const INTERACTIVE_STRUCT_SIZE = 64
 			const ifacePtr = libopenmpt._malloc(INTERACTIVE_STRUCT_SIZE)
@@ -695,9 +732,11 @@ class MPT extends AudioWorkletProcessor {
 				)
 				libopenmpt.stackRestore(stack)
 				if (ok) {
-					muteFunc = libopenmpt.HEAPU32
-						? libopenmpt.HEAPU32[(ifacePtr + 40) >> 2]
-						: new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + 40, true)
+					const read32 = libopenmpt.HEAPU32
+						? (off) => libopenmpt.HEAPU32[(ifacePtr + off) >> 2]
+						: (off) => new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + off, true)
+					volumeFunc = read32(32) // set_channel_volume (i32,i32,f64)->i32
+					muteFunc = read32(40)   // set_channel_mute_status (i32,i32,i32)->i32
 				}
 				libopenmpt._free(ifacePtr)
 			}
@@ -739,15 +778,17 @@ class MPT extends AudioWorkletProcessor {
 			modulePtr,
 			extPtr,
 			muteFunc,
+			volumeFunc,
 			leftPtr,
 			rightPtr,
 			channelMask,
 			paused: this.paused,
 		}
 
-		// Apply mute mask — only the target channels are audible, also respecting user mutes
+		// Apply mute AND volume — belt-and-suspenders for reliable channel isolation.
+		// Mute alone can be reset by libopenmpt loop/seek; volume provides a backup.
 		const effectiveSlotMask = channelMask & this.userMuteMask
-		const maskOk = this.applyMuteMask_(extPtr, muteFunc, effectiveSlotMask)
+		const maskOk = this.applyChannelIsolation_(extPtr, muteFunc, volumeFunc, effectiveSlotMask)
 		if (!maskOk) {
 			// Muting failed — abort to prevent all channels going through effects
 			libopenmpt._openmpt_module_ext_destroy(extPtr)
@@ -760,10 +801,11 @@ class MPT extends AudioWorkletProcessor {
 		this.isolationSlots[slotIndex] = slot
 		this.port.postMessage({
 			cmd: 'isolationReady', slotIndex,
-			channelMask, muteFunc,
+			channelMask, muteFunc, volumeFunc,
 			effectiveSlotMask: effectiveSlotMask,
 			userMuteMask: this.userMuteMask,
 			isolatedBits: this.isolatedBits,
+			channels: this.channels,
 		})
 	}
 
@@ -795,7 +837,7 @@ class MPT extends AudioWorkletProcessor {
 		if (!slot) return
 		slot.channelMask = channelMask
 		const effectiveSlotMask = channelMask & this.userMuteMask
-		this.applyMuteMask_(slot.extPtr, slot.muteFunc, effectiveSlotMask)
+		this.applyChannelIsolation_(slot.extPtr, slot.muteFunc, slot.volumeFunc, effectiveSlotMask)
 	}
 
 	/**
