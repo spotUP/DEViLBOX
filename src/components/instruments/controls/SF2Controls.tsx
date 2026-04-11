@@ -11,7 +11,7 @@
  * common byte positions with their SID meaning where possible.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import type { SF2Config } from '@/types/instrument/exotic';
 import { useSF2Store, type SF2TableDef } from '@/stores/useSF2Store';
 import { EnvelopeVisualization, SectionLabel } from '@components/instruments/shared';
@@ -24,7 +24,6 @@ interface Props {
   instrumentId: number;
 }
 
-type SF2Tab = 'instrument' | 'tables' | 'monitor';
 
 // ── SID Constants ──
 
@@ -61,7 +60,6 @@ function getActiveWaveforms(ctrl: number): string {
 // ── Component ──
 
 export const SF2Controls: React.FC<Props> = ({ config, onChange }) => {
-  const [tab, setTab] = useState<SF2Tab>('instrument');
   const descriptor = useSF2Store((s) => s.descriptor);
   const instruments = useSF2Store((s) => s.instruments);
   const tableDefs = useSF2Store((s) => s.tableDefs);
@@ -96,7 +94,6 @@ export const SF2Controls: React.FC<Props> = ({ config, onChange }) => {
   // ── Live SID registers ──
   const [sidRegs, setSidRegs] = useState<number[]>(new Array(25).fill(0));
   useEffect(() => {
-    if (tab !== 'monitor') return;
     const iv = setInterval(() => {
       const mem = useSF2Store.getState().c64Memory;
       if (mem.length >= 0xD419) {
@@ -106,16 +103,10 @@ export const SF2Controls: React.FC<Props> = ({ config, onChange }) => {
       }
     }, 50);
     return () => clearInterval(iv);
-  }, [tab]);
-
-  const tabs: { id: SF2Tab; label: string }[] = [
-    { id: 'instrument', label: 'Instrument' },
-    { id: 'tables', label: 'Tables' },
-    { id: 'monitor', label: 'SID Monitor' },
-  ];
+  }, []);
 
   return (
-    <div className="flex flex-col gap-2 p-3 text-xs font-mono h-full overflow-hidden">
+    <div className="flex flex-col gap-2 p-3 text-xs font-mono h-full overflow-y-auto">
       {/* Header */}
       <div className="flex items-center gap-3 flex-shrink-0">
         <span className="text-accent-primary font-bold text-sm">SF2</span>
@@ -130,40 +121,23 @@ export const SF2Controls: React.FC<Props> = ({ config, onChange }) => {
         />
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 flex-shrink-0 border-b border-dark-border pb-1">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-3 py-1 text-[11px] rounded-t border border-b-0 transition-colors ${
-              tab === t.id
-                ? 'bg-dark-bgSecondary text-accent-primary border-dark-border font-bold'
-                : 'bg-transparent text-text-muted border-transparent hover:text-text-secondary'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* All sections shown at once — Instrument, Tables, SID Monitor */}
+      <InstrumentTab
+        rawBytes={rawBytes}
+        colCount={colCount}
+        instrTableDef={instrTableDef}
+        onByteChange={handleByteChange}
+      />
 
-      {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === 'instrument' && (
-          <InstrumentTab
-            rawBytes={rawBytes}
-            colCount={colCount}
-            instrTableDef={instrTableDef}
-            onByteChange={handleByteChange}
-          />
-        )}
-        {tab === 'tables' && (
+      {tableDefs.length > 0 && (
+        <>
+          <div className="border-t border-dark-border" />
           <TablesTab tableDefs={tableDefs} c64Memory={c64Memory} />
-        )}
-        {tab === 'monitor' && (
-          <SIDMonitorTab regs={sidRegs} />
-        )}
-      </div>
+        </>
+      )}
+
+      <div className="border-t border-dark-border" />
+      <SIDMonitorTab regs={sidRegs} />
     </div>
   );
 };
