@@ -839,4 +839,4 @@ class MPT extends AudioWorkletProcessor {
 
 }
 
-registerProcessor('libopenmpt-processor', MPT)
+try { registerProcessor('libopenmpt-processor', MPT) } catch { /* already registered */ }
