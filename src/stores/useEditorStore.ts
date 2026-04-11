@@ -12,14 +12,18 @@ import { DEFAULT_COLUMN_VISIBILITY } from '@typedefs';
 import { MAX_CHANNELS } from '../constants/trackerConstants';
 import { useCursorStore } from './useCursorStore';
 import { getBehaviorForScheme, DEFAULT_BEHAVIOR, type EditorBehavior } from '../engine/keyboard/EditorBehavior';
-
-// FT2-style bitwise mask system for copy/paste/transpose operations
-const MASK_NOTE = 1 << 0;      // 0b00001
-const MASK_INSTRUMENT = 1 << 1; // 0b00010
-const MASK_VOLUME = 1 << 2;     // 0b00100
-const MASK_EFFECT = 1 << 3;     // 0b01000
-const MASK_EFFECT2 = 1 << 4;    // 0b10000
-const MASK_ALL = 0b11111;       // All columns
+// FT2-style copy/paste/transpose bitmasks. Live in a leaf module so
+// useTrackerStore can re-export them without dragging the whole editor
+// store into its init-time namespace — that cycle was hitting a TDZ in
+// production when Rollup entered the group through a sibling module.
+import {
+  MASK_NOTE,
+  MASK_INSTRUMENT,
+  MASK_VOLUME,
+  MASK_EFFECT,
+  MASK_EFFECT2,
+  MASK_ALL,
+} from './editorMasks';
 
 const _toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
 

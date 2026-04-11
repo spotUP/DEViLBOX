@@ -1939,6 +1939,11 @@ export const useTrackerStore = create<TrackerStore>()(
   }))
 );
 
-// Export mask constants for use in other modules (re-export from useEditorStore for backward compat)
-export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL } from './useEditorStore';
+// Export mask constants for use in other modules. Re-export from the leaf
+// editorMasks module — NOT from useEditorStore — to avoid a circular-import
+// TDZ. The store group cycle (useTrackerStore → useEditorStore → useCursorStore
+// → useTrackerStore) would freeze this namespace object before useEditorStore
+// had evaluated its const declarations, throwing "Cannot access before
+// initialization" on the minified mask symbols at app load.
+export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL } from './editorMasks';
 export type { MacroSlot };
