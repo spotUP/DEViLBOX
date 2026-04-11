@@ -215,6 +215,13 @@ export interface SF2StoreState {
   setMark: (start: number | null, end: number | null) => void;
   clearMark: () => void;
 
+  // Sequence management
+  duplicateSequence: (track: number, orderPos: number) => void;
+  splitSequenceAtRow: (track: number, orderPos: number, atRow: number) => void;
+  insertFirstFreeSequence: (track: number, orderPos: number) => void;
+  setOrderLoopPoint: (track: number, loopIndex: number) => void;
+  setAllOrderLoopPoints: (loopIndex: number) => void;
+
   // Instrument editing
   setInstrumentByte: (instIdx: number, byteOffset: number, value: number) => void;
 
@@ -568,6 +575,124 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
 
   setMark: (start, end) => set({ markStart: start, markEnd: end }),
   clearMark: () => set({ markStart: null, markEnd: null }),
+
+  // ── Sequence management ────────────────────────────────────────────────
+
+  duplicateSequence: (track, orderPos) => set((s) => {
+    const ol = s.orderLists[track];
+    if (!ol || orderPos >= ol.entries.length) return {};
+    const srcSeqIdx = ol.entries[orderPos].seqIdx;
+    const srcSeq = s.sequences.get(srcSeqIdx);
+    if (!srcSeq) return {};
+
+    // Find first unused sequence index
+    const maxSeq = s.musicData?.sequenceCount ?? 128;
+    let freeIdx = -1;
+    for (let i = 0; i < maxSeq; i++) {
+      if (!s.sequences.has(i) || (s.sequences.get(i)?.length === 0)) {
+        freeIdx = i;
+        break;
+      }
+    }
+    if (freeIdx === -1) return {};
+
+    // Clone sequence data
+    const seqs = new Map(s.sequences);
+    seqs.set(freeIdx, srcSeq.map(e => ({ ...e })));
+
+    // Replace current order entry with new sequence
+    const lists = [...s.orderLists];
+    const olCopy = { ...lists[track], entries: [...lists[track].entries] };
+    olCopy.entries[orderPos] = { ...olCopy.entries[orderPos], seqIdx: freeIdx };
+    lists[track] = olCopy;
+
+    return { sequences: seqs, orderLists: lists, redoStack: [] };
+  }),
+
+  splitSequenceAtRow: (track, orderPos, atRow) => set((s) => {
+    const ol = s.orderLists[track];
+    if (!ol || orderPos >= ol.entries.length) return {};
+    const srcSeqIdx = ol.entries[orderPos].seqIdx;
+    const srcSeq = s.sequences.get(srcSeqIdx);
+    if (!srcSeq || atRow <= 0 || atRow >= srcSeq.length) return {};
+
+    // Find first unused sequence index
+    const maxSeq = s.musicData?.sequenceCount ?? 128;
+    let freeIdx = -1;
+    for (let i = 0; i < maxSeq; i++) {
+      if (!s.sequences.has(i) || (s.sequences.get(i)?.length === 0)) {
+        freeIdx = i;
+        break;
+      }
+    }
+    if (freeIdx === -1) return {};
+
+    // Split: original keeps rows 0..atRow-1, new gets atRow..end
+    const seqs = new Map(s.sequences);
+    seqs.set(srcSeqIdx, srcSeq.slice(0, atRow).map(e => ({ ...e })));
+    seqs.set(freeIdx, srcSeq.slice(atRow).map(e => ({ ...e })));
+
+    // Insert new order entry after current position
+    const lists = [...s.orderLists];
+    const olCopy = { ...lists[track], entries: [...lists[track].entries] };
+    const newEntry = { transpose: olCopy.entries[orderPos].transpose, seqIdx: freeIdx };
+    olCopy.entries.splice(orderPos + 1, 0, newEntry);
+    lists[track] = olCopy;
+
+    return { sequences: seqs, orderLists: lists, redoStack: [] };
+  }),
+
+  insertFirstFreeSequence: (track, orderPos) => set((s) => {
+    const ol = s.orderLists[track];
+    if (!ol) return {};
+
+    // Find first unused sequence index
+    const maxSeq = s.musicData?.sequenceCount ?? 128;
+    let freeIdx = -1;
+    for (let i = 0; i < maxSeq; i++) {
+      if (!s.sequences.has(i) || (s.sequences.get(i)?.length === 0)) {
+        freeIdx = i;
+        break;
+      }
+    }
+    if (freeIdx === -1) return {};
+
+    // Create empty sequence (default 32 rows)
+    const seqs = new Map(s.sequences);
+    const emptySeq: SF2SeqEvent[] = [];
+    for (let r = 0; r < 32; r++) {
+      emptySeq.push({ note: 0, instrument: 0x80, command: 0x80 });
+    }
+    seqs.set(freeIdx, emptySeq);
+
+    // Insert order entry at current position
+    const lists = [...s.orderLists];
+    const olCopy = { ...lists[track], entries: [...lists[track].entries] };
+    const newEntry = { transpose: 0x80, seqIdx: freeIdx };
+    olCopy.entries.splice(orderPos, 0, newEntry);
+    lists[track] = olCopy;
+
+    return { sequences: seqs, orderLists: lists, redoStack: [] };
+  }),
+
+  setOrderLoopPoint: (track, loopIndex) => set((s) => {
+    const lists = [...s.orderLists];
+    if (track >= lists.length) return {};
+    const ol = { ...lists[track] };
+    ol.loopIndex = Math.max(0, Math.min(ol.entries.length - 1, loopIndex));
+    ol.hasLoop = true;
+    lists[track] = ol;
+    return { orderLists: lists };
+  }),
+
+  setAllOrderLoopPoints: (loopIndex) => set((s) => {
+    const lists = s.orderLists.map(ol => ({
+      ...ol,
+      loopIndex: Math.max(0, Math.min(ol.entries.length - 1, loopIndex)),
+      hasLoop: true,
+    }));
+    return { orderLists: lists };
+  }),
 
   // ── Instrument editing ─────────────────────────────────────────────────
 

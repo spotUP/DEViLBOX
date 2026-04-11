@@ -133,7 +133,53 @@ export function useSF2KeyboardHandler(active: boolean) {
     // ── Set command from cursor: Ctrl+O ──
     if (mod && e.key === 'o') {
       e.preventDefault();
-      // Just pick up the command value — store for paste reference
+      return;
+    }
+
+    // ── Sequence management ──
+    // Ctrl+D = Duplicate & replace sequence
+    if (mod && e.key === 'd' && !e.shiftKey) {
+      e.preventDefault();
+      state.duplicateSequence(cursor.channel, state.orderCursor);
+      return;
+    }
+    // Ctrl+B = Split sequence at cursor
+    if (mod && e.key === 'b') {
+      e.preventDefault();
+      state.splitSequenceAtRow(cursor.channel, state.orderCursor, cursor.row);
+      return;
+    }
+    // Ctrl+F = Insert first free sequence
+    if (mod && e.key === 'f' && !e.shiftKey) {
+      e.preventDefault();
+      state.insertFirstFreeSequence(cursor.channel, state.orderCursor);
+      return;
+    }
+    // Ctrl+L = Set order loop point (all tracks)
+    if (mod && e.key === 'l' && !e.shiftKey) {
+      e.preventDefault();
+      state.setAllOrderLoopPoints(state.orderCursor);
+      return;
+    }
+    // Ctrl+Shift+L = Set order loop point (current track only)
+    if (mod && e.key === 'l' && e.shiftKey) {
+      e.preventDefault();
+      state.setOrderLoopPoint(cursor.channel, state.orderCursor);
+      return;
+    }
+    // Ctrl+S = Quick save (export)
+    if (mod && e.key === 's') {
+      e.preventDefault();
+      const data = state.exportSF2File();
+      if (data) {
+        const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (state.songName || 'untitled') + '.sf2';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
       return;
     }
 
@@ -353,6 +399,14 @@ export function useSF2KeyboardHandler(active: boolean) {
       if (h !== null) {
         e.preventDefault();
         if (seqIdx === null) return;
+
+        // Validate: instrument first digit must be 0-1 (max 0x1F=31)
+        // Command first digit must be 0-3 (max 0x3F=63)
+        if (cursor.digit === 0) {
+          if (cursor.column === 0 && h > 1) return; // instrument: reject >1
+          if (cursor.column === 1 && h > 3) return; // command: reject >3
+        }
+
         const field: keyof SF2SeqEvent = cursor.column === 0 ? 'instrument' : 'command';
         const current = seq && cursor.row < seq.length ? seq[cursor.row][field] : 0;
 
