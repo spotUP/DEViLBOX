@@ -20,7 +20,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
+import { SectionLabel, SequenceEditor, SampleBrowserPane } from '@components/instruments/shared';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
@@ -456,35 +456,33 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
           {activeTab === 'sequences' && renderSequences()}
         </div>
         {showSamplePane && (
-          <div className="w-[240px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
-            <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0 z-10">
-              SAMPLES ({sampleRows.length})
-            </div>
-            {sampleRows.length === 0 && (
-              <div className="p-2 text-[10px] text-text-muted italic">
-                No sample bank — this song carries no COSO sample headers.
-              </div>
-            )}
-            {sampleRows.map((s) => (
-              <div
-                key={s.index}
-                className="px-2 py-1.5 border-b border-dark-border text-[10px]"
-                title={`Sample #${s.index} · pointer 0x${s.pointer.toString(16)}`}
-              >
-                <div className="font-mono truncate text-text-primary">
-                  {String(s.index).padStart(2, '0')}. sample
-                </div>
-                <div className="text-text-muted mt-0.5">
-                  {s.length} bytes
-                  {s.hasLoop && <span className="ml-1 text-accent-success">·loop</span>}
-                </div>
-                <div className="mt-0.5 text-[9px] text-text-muted font-mono">
-                  ptr 0x{s.pointer.toString(16)}
-                  {s.hasLoop && ` · rep ${s.repeatLength}`}
-                </div>
-              </div>
-            ))}
-          </div>
+          <SampleBrowserPane
+            width={240}
+            entries={sampleRows.map((s) => ({
+              id: s.index,
+              name: `${String(s.index).padStart(2, '0')}. sample`,
+              sizeBytes: s.length,
+            }))}
+            emptyMessage="No sample bank — this song carries no COSO sample headers."
+            renderEntry={(entry) => {
+              const s = sampleRows.find((r) => r.index === entry.id)!;
+              return (
+                <>
+                  <div className="font-mono truncate text-text-primary">
+                    {String(s.index).padStart(2, '0')}. sample
+                  </div>
+                  <div className="text-text-muted mt-0.5">
+                    {s.length} bytes
+                    {s.hasLoop && <span className="ml-1 text-accent-success">·loop</span>}
+                  </div>
+                  <div className="mt-0.5 text-[9px] text-text-muted font-mono">
+                    ptr 0x{s.pointer.toString(16)}
+                    {s.hasLoop && ` · rep ${s.repeatLength}`}
+                  </div>
+                </>
+              );
+            }}
+          />
         )}
       </div>
     </div>
