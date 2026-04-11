@@ -115,6 +115,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
 export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
+  onUpdateParameters,
   onUpdateWet,
 }) => {
   const mode = getParam(effect, 'mode', 3);
@@ -133,17 +134,13 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
   const modeLabels = ['Head 1', 'Head 2', 'Both', 'H1+FB', 'H2+FB', 'Both+FB'];
 
   const applyPreset = (preset: RETapeEchoPreset) => {
-    const p = preset.params;
-    onUpdateParameter('mode', p.mode);
-    onUpdateParameter('repeatRate', p.repeatRate);
-    onUpdateParameter('intensity', p.intensity);
-    onUpdateParameter('echoVolume', p.echoVolume);
-    onUpdateParameter('wow', p.wow);
-    onUpdateParameter('flutter', p.flutter);
-    onUpdateParameter('dirt', p.dirt);
-    onUpdateParameter('inputBleed', p.inputBleed);
-    onUpdateParameter('loopAmount', p.loopAmount);
-    onUpdateParameter('playheadFilter', p.playheadFilter);
+    if (onUpdateParameters) {
+      onUpdateParameters(preset.params as Record<string, number>);
+    } else {
+      Object.entries(preset.params).forEach(([key, value]) => {
+        onUpdateParameter(key, value);
+      });
+    }
   };
 
   return (

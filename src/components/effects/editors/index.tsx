@@ -21,6 +21,7 @@ import {
 
 // Re-export shared types
 export type { VisualEffectEditorProps } from './shared';
+import type { VisualEffectEditorProps } from './shared';
 
 // Import all editors
 import { DistortionEditor, ReverbEditor, DelayEditor, ChorusEditor, PhaserEditor, TremoloEditor, VibratoEditor } from './BasicEffectEditors';
@@ -74,12 +75,6 @@ export { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 // ============================================================================
 // EFFECT EDITOR FACTORY
 // ============================================================================
-
-interface VisualEffectEditorProps {
-  effect: EffectConfig;
-  onUpdateParameter: (key: string, value: number | string) => void;
-  onUpdateWet: (wet: number) => void;
-}
 
 const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   Distortion: DistortionEditor,
@@ -251,6 +246,7 @@ export function getVisualEffectEditor(effectType: string): React.FC<VisualEffect
 interface VisualEffectEditorWrapperProps {
   effect: EffectConfig;
   onUpdateParameter: (key: string, value: number | string) => void;
+  onUpdateParameters?: (params: Record<string, number | string>) => void;
   onUpdateWet: (wet: number) => void;
   onClose?: () => void;
 }
@@ -407,6 +403,7 @@ const EffectEditorDispatch: React.FC<VisualEffectEditorProps & { effectType: str
 export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps> = ({
   effect,
   onUpdateParameter,
+  onUpdateParameters,
   onUpdateWet,
   onClose,
 }) => {
@@ -542,6 +539,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
           effectType={effect.type}
           effect={effect}
           onUpdateParameter={onUpdateParameter}
+          onUpdateParameters={onUpdateParameters}
           onUpdateWet={onUpdateWet}
         />
       </div>
@@ -616,6 +614,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
           effectType={effect.type}
           effect={effect}
           onUpdateParameter={onUpdateParameter}
+          onUpdateParameters={onUpdateParameters}
           onUpdateWet={onUpdateWet}
         />
       </div>
