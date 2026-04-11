@@ -589,15 +589,28 @@ const REFERENCE_MUSIC_DIR = process.env.REFERENCE_MUSIC ?? '/Users/spot/Code/Ref
 async function main(): Promise<void> {
   // Auto-discover tests from the local Reference Music collection
   const localTests = await discoverLocalTests(REFERENCE_MUSIC_DIR);
-  // CLI: --local-only skips the hardcoded Modland/HVSC tests, --hardcoded-only skips local
+
+  // CLI flags
   const args = process.argv.slice(2);
   const localOnly = args.includes('--local-only');
   const hardcodedOnly = args.includes('--hardcoded-only');
-  const allTests = hardcodedOnly ? TESTS : localOnly ? localTests : [...TESTS, ...localTests];
+  const pushResults = args.includes('--push-results');
+  const onlyArg = args.find(a => a.startsWith('--only=') || a.startsWith('--only '));
+  const onlyFamilies = onlyArg
+    ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf('--only') + 1])
+      ?.split(',').map(s => s.trim().toUpperCase())
+    : null;
+
+  let allTests = hardcodedOnly ? TESTS : localOnly ? localTests : [...TESTS, ...localTests];
+  if (onlyFamilies) {
+    allTests = allTests.filter(t => onlyFamilies.some(f => t.family.toUpperCase().includes(f)));
+  }
 
   console.log('▶ DEViLBOX playback smoke test');
   console.log(`  Bridge: ${WS_URL}`);
   console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded + ${localTests.length} local)`);
+  if (onlyFamilies) console.log(`  Filter: ${onlyFamilies.join(', ')}`);
+  if (pushResults) console.log(`  Push:   results → http://localhost:4444`);
   console.log('');
 
   const client = new MCPBridgeClient(WS_URL);
@@ -643,6 +656,36 @@ async function main(): Promise<void> {
       console.log(`    ✗ [${r.family}] ${r.name} — ${r.reason}`);
     }
   }
+
+  // Push results to format status tracker at localhost:4444
+  if (pushResults) {
+    console.log('');
+    console.log('── Pushing results to localhost:4444 ──');
+    const updates: Record<string, { auditStatus: string; notes: string }> = {};
+    for (const r of results) {
+      // Derive a tracker key from the family name (lowercase, spaces→hyphens)
+      const key = r.family.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+      updates[key] = {
+        auditStatus: r.status === 'pass' ? 'fixed' : 'fail',
+        notes: r.status === 'pass'
+          ? `smoke-test PASS — rms=${(r.rmsAvg ?? 0).toFixed(4)} (${new Date().toISOString().slice(0, 10)})`
+          : `smoke-test FAIL — ${r.reason ?? 'unknown'} (${new Date().toISOString().slice(0, 10)})`,
+      };
+    }
+    try {
+      const resp = await fetch('http://localhost:4444/push-updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const body = await resp.json();
+      console.log(`  Pushed ${Object.keys(updates).length} entries: ${JSON.stringify(body)}`);
+    } catch (err) {
+      console.error(`  Failed to push: ${err instanceof Error ? err.message : err}`);
+      console.error('  Is the format tracker running? `npx tsx tools/format-server.ts &`');
+    }
+  }
+
   process.exit(failed > 0 ? 1 : 0);
 }
 
