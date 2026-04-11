@@ -97,14 +97,14 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
     </layoutContainer>
   );
 
-  const ReadOnlyField: React.FC<{ label: string; value: string; highlight?: boolean }> = ({ label, value, highlight }) => (
-    <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 48 }}>
-      <PixiLabel text={label} size="xs" color="textMuted" />
-      {highlight ? (
-        <PixiLabel text={value} size="xs" color="custom" customColor={theme.error.color} />
-      ) : (
-        <PixiLabel text={value} size="xs" color="text" />
-      )}
+  const NegateToggle: React.FC<{ value: boolean; onToggle: () => void }> = ({ value, onToggle }) => (
+    <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 56 }}>
+      <PixiLabel text="Negate" size="xs" color="textMuted" />
+      <PixiButton
+        label={value ? 'Yes' : 'No'}
+        variant={value ? 'danger' : 'primary'}
+        onClick={onToggle}
+      />
     </layoutContainer>
   );
 
@@ -299,7 +299,10 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
                 defaultValue={0}
               />
               <ModeSelect value={pitchModModeValue(fp.pitchMod1Mode)} onChange={(v) => upd('pitchMod1Mode', v)} />
-              <ReadOnlyField label="Negate" value={fp.pitchMod1Negate ? 'Yes' : 'No'} highlight={fp.pitchMod1Negate} />
+              <NegateToggle
+                value={fp.pitchMod1Negate}
+                onToggle={() => upd('pitchMod1Negate', !fpRef.current.pitchMod1Negate)}
+              />
             </layoutContainer>
           )}
 
@@ -333,7 +336,10 @@ export const PixiFuturePlayerPanel: React.FC<Props> = ({ instrument, onUpdate })
                 defaultValue={0}
               />
               <ModeSelect value={pitchModModeValue(fp.pitchMod2Mode)} onChange={(v) => upd('pitchMod2Mode', v)} />
-              <ReadOnlyField label="Negate" value={fp.pitchMod2Negate ? 'Yes' : 'No'} highlight={fp.pitchMod2Negate} />
+              <NegateToggle
+                value={fp.pitchMod2Negate}
+                onToggle={() => upd('pitchMod2Negate', !fpRef.current.pitchMod2Negate)}
+              />
             </layoutContainer>
           )}
         </layoutContainer>

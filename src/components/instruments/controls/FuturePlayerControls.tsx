@@ -260,9 +260,16 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Negate</div>
-                  <div className={`text-xs ${config.pitchMod1Negate ? 'text-red-300' : 'text-text-muted'}`}>
+                  <button
+                    onClick={() => upd('pitchMod1Negate', !config.pitchMod1Negate)}
+                    className={`px-2 py-1 text-xs rounded ${
+                      config.pitchMod1Negate
+                        ? 'bg-red-900/40 text-red-300'
+                        : (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
+                    }`}
+                  >
                     {config.pitchMod1Negate ? 'Yes' : 'No'}
-                  </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -301,9 +308,16 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                 </div>
                 <div className="flex flex-col items-center">
                   <div className="text-[9px] text-text-muted mb-1">Negate</div>
-                  <div className={`text-xs ${config.pitchMod2Negate ? 'text-red-300' : 'text-text-muted'}`}>
+                  <button
+                    onClick={() => upd('pitchMod2Negate', !config.pitchMod2Negate)}
+                    className={`px-2 py-1 text-xs rounded ${
+                      config.pitchMod2Negate
+                        ? 'bg-red-900/40 text-red-300'
+                        : (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
+                    }`}
+                  >
                     {config.pitchMod2Negate ? 'Yes' : 'No'}
-                  </div>
+                  </button>
                 </div>
               </div>
             )}
