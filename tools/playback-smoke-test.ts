@@ -9,10 +9,14 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Loads representative songs across all format families DEViLBOX supports,
- * plays each for a few seconds, and asserts:
- *   - No console errors during load/playback
- *   - Audio level is non-silent (RMS > threshold)
- *   - Song info reports the expected format
+ * plays each for a few seconds, and runs a multi-tier verification:
+ *   Tier 1: Audio — non-silent (RMS > threshold), no console errors
+ *   Tier 2: Instruments — correct synthType, named instruments exist
+ *   Tier 3: Export round-trip — native export + reimport for PC formats
+ *   Tier 4: Special formats — MIDI, V2M, and other edge-case formats
+ *   Tier 5: Parameters — synth config fields are populated (coverage %)
+ *   Tier 6: Regressions — specific fixed bugs that must not regress
+ *   Tier 7: Lock-step — Furnace command comparison (--lockstep flag)
  *
  * === PREREQUISITES ===
  *   1. Dev server running: `npm run dev` (starts Vite:5173 + Express:3001 + WS:4003)
@@ -30,6 +34,7 @@
  *   npx tsx tools/playback-smoke-test.ts --skip-furnace    # all EXCEPT furnace demos
  *   npx tsx tools/playback-smoke-test.ts --push-results    # push pass/fail to localhost:4444 tracker
  *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only (substring match)
+ *   npx tsx tools/playback-smoke-test.ts --lockstep        # enable Furnace lock-step command comparison (slow)
  *
  * === HOW IT WORKS ===
  *   1. Connects to the MCP WebSocket relay at ws://localhost:4003/mcp
@@ -285,10 +290,10 @@ function buildEffectTests(): TestCase[] {
 
 const TESTS: TestCase[] = [
   // ── PC tracker formats (libopenmpt/OpenMPT WASM path) ──
-  { name: 'Captain - Space Debris',           family: 'MOD',      loader: 'modland', path: 'pub/modules/Protracker/Captain/space debris.mod', expectedEditorMode: 'classic' },
-  { name: 'Skaven - Bookworm',                family: 'IT',       loader: 'modland', path: 'pub/modules/Impulsetracker/Skaven/bookworm.it', expectedEditorMode: 'classic' },
-  { name: 'Skaven - Catch That Goblin',       family: 'S3M',      loader: 'modland', path: 'pub/modules/Screamtracker 3/Skaven/catch that goblin!!.s3m', expectedEditorMode: 'classic' },
-  { name: 'XM - Believe',                     family: 'XM',       loader: 'modland', path: 'pub/modules/Fasttracker 2/Skaven/believe.xm', expectedEditorMode: 'classic' },
+  { name: 'Captain - Space Debris',           family: 'MOD',      loader: 'modland', path: 'pub/modules/Protracker/Captain/space debris.mod', expectedEditorMode: 'classic', expectedSynthTypes: ['Sampler'], supportsExport: true },
+  { name: 'Skaven - Bookworm',                family: 'IT',       loader: 'modland', path: 'pub/modules/Impulsetracker/Skaven/bookworm.it', expectedEditorMode: 'classic', expectedSynthTypes: ['Sampler'], supportsExport: true },
+  { name: 'Skaven - Catch That Goblin',       family: 'S3M',      loader: 'modland', path: 'pub/modules/Screamtracker 3/Skaven/catch that goblin!!.s3m', expectedEditorMode: 'classic', expectedSynthTypes: ['Sampler'], supportsExport: true },
+  { name: 'XM - Believe',                     family: 'XM',       loader: 'modland', path: 'pub/modules/Fasttracker 2/Skaven/believe.xm', expectedEditorMode: 'classic', expectedSynthTypes: ['Sampler'], supportsExport: true },
   { name: 'Multitracker - cthulhu',           family: 'MTM',      loader: 'modland', path: 'pub/modules/Multitracker/Starscream/cthulhu.mtm' },
   { name: 'Composer 669 - test',              family: '669',      loader: 'modland', path: 'pub/modules/Composer 669/- unknown/brain.669' },
   { name: 'Ultratracker - test',              family: 'ULT',      loader: 'modland', path: 'pub/modules/Ultratracker/Emax/nightfly.ult' },
@@ -497,6 +502,8 @@ interface TestResult {
   rmsMax?: number;
   errorCount?: number;
   reason?: string;
+  /** Per-tier verification data (populated by expanded runTest) */
+  verification?: TestVerification;
   durationMs: number;
 }
 
@@ -791,6 +798,151 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       editorModeOk = songInfo.editorMode === test.expectedEditorMode;
     }
 
+    // ── Tier 2: Instrument validation ─────────────────────────────────────
+    const verification: TestVerification = {
+      audioPass: false, rmsAvg: level.rmsAvg ?? 0,
+      instrumentCount: 0, instrumentPass: false,
+      exportTested: false, exportPass: false,
+      paramTested: false, paramPass: false,
+      lockstepTested: false, lockstepPass: false,
+    };
+
+    const audibleByOurThreshold = (level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS
+      || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4;
+    verification.audioPass = audibleByOurThreshold || !!test.allowSilent;
+
+    try {
+      const insts = await client.call<any>('get_instruments_list');
+      const instList: any[] = Array.isArray(insts) ? insts : (insts?.instruments ?? []);
+      verification.instrumentCount = instList.length;
+
+      if (instList.length === 0 && !test.engineDriven) {
+        verification.instrumentPass = false;
+        verification.instrumentIssue = 'no instruments (non-engine format)';
+      } else if (instList.length === 0 && test.engineDriven) {
+        // Engine-driven formats (SID, SCUMM, etc.) may not expose instruments
+        verification.instrumentPass = true;
+      } else {
+        const synthTypes = [...new Set(instList.map((i: any) => i.synthType).filter(Boolean))];
+        let instOk = true;
+
+        // Check synthType correctness if expected types are specified
+        if (test.expectedSynthTypes && test.expectedSynthTypes.length > 0) {
+          const unexpected = synthTypes.filter((t: string) => !test.expectedSynthTypes!.includes(t));
+          if (unexpected.length > 0) {
+            instOk = false;
+            verification.instrumentIssue = `wrong synthTypes: got [${synthTypes.join(',')}] expected [${test.expectedSynthTypes.join(',')}]`;
+          }
+        }
+
+        // Check that at least some instruments have names
+        const namedInsts = instList.filter((i: any) => i.name && i.name.trim() !== '');
+        if (namedInsts.length === 0 && instList.length > 3) {
+          // Only flag as issue if there are many unnamed instruments (1-3 is OK for small songs)
+          verification.instrumentIssue = (verification.instrumentIssue ? verification.instrumentIssue + '; ' : '') + 'all instruments unnamed';
+        }
+
+        verification.instrumentPass = instOk;
+      }
+    } catch {
+      verification.instrumentPass = false;
+      verification.instrumentIssue = 'get_instruments_list failed';
+    }
+
+    // ── Tier 3: Native export round-trip (PC tracker formats only) ────────
+    if (test.supportsExport && songInfo.editorMode === 'classic') {
+      verification.exportTested = true;
+      try {
+        const exp = await client.call<any>('export_native');
+        if (exp?.error) {
+          verification.exportPass = false;
+          verification.exportIssue = `export error: ${String(exp.error).slice(0, 80)}`;
+        } else {
+          const exportSize = exp?.sizeBytes ?? 0;
+          const exportData = exp?.data ?? null;
+          const exportFilename = exp?.filename ?? '';
+          if (exportSize === 0) {
+            verification.exportPass = false;
+            verification.exportIssue = 'export returned 0 bytes';
+          } else if (exportData) {
+            // Round-trip: reimport the exported file
+            try {
+              await client.call('load_file', { filename: exportFilename, data: exportData });
+              const reimportInfo = await client.call<SongInfoResp>('get_song_info');
+              const reimportPat = reimportInfo?.numPatterns ?? 0;
+              const reimportCh = reimportInfo?.numChannels ?? 0;
+              const reimportInsts = await client.call<any>('get_instruments_list');
+              const reimportInstList = Array.isArray(reimportInsts) ? reimportInsts : (reimportInsts?.instruments ?? []);
+
+              const issues: string[] = [];
+              if (reimportCh !== (songInfo.numChannels ?? 0)) {
+                issues.push(`ch ${songInfo.numChannels}→${reimportCh}`);
+              }
+              if (reimportPat === 0) issues.push('lost all patterns');
+              if (reimportInstList.length === 0 && verification.instrumentCount > 0) {
+                issues.push('lost all instruments');
+              }
+              verification.exportPass = issues.length === 0;
+              if (issues.length > 0) verification.exportIssue = `round-trip: ${issues.join(', ')}`;
+            } catch (e: unknown) {
+              verification.exportPass = false;
+              verification.exportIssue = `reimport failed: ${e instanceof Error ? e.message.slice(0, 60) : e}`;
+            }
+          } else {
+            verification.exportPass = true; // export worked, no data blob to reimport
+          }
+        }
+      } catch (e: unknown) {
+        verification.exportPass = false;
+        verification.exportIssue = `export crash: ${e instanceof Error ? e.message.slice(0, 60) : e}`;
+      }
+    }
+
+    // ── Tier 5: Synth parameter completeness ──────────────────────────────
+    if (verification.instrumentCount > 0) {
+      verification.paramTested = true;
+      try {
+        const insts = await client.call<any>('get_instruments_list');
+        const instList: any[] = Array.isArray(insts) ? insts : (insts?.instruments ?? []);
+        let totalFields = 0;
+        let filledFields = 0;
+
+        // Check up to 3 instruments for parameter completeness
+        const toCheck = instList.slice(0, 3);
+        for (const inst of toCheck) {
+          try {
+            const full = await client.call<any>('get_instrument', { instrumentId: inst.id ?? inst.index });
+            if (!full) continue;
+            const synthType = full.synthType ?? inst.synthType;
+            const configKey = SYNTH_CONFIG_FIELDS[synthType];
+            if (configKey && full[configKey]) {
+              const config = full[configKey];
+              const keys = Object.keys(config);
+              totalFields += keys.length;
+              filledFields += keys.filter((k: string) => config[k] !== null && config[k] !== undefined).length;
+            } else if (full.config && typeof full.config === 'object') {
+              const keys = Object.keys(full.config);
+              totalFields += keys.length;
+              filledFields += keys.filter((k: string) => full.config[k] !== null && full.config[k] !== undefined).length;
+            }
+          } catch { /* individual instrument fetch may fail */ }
+        }
+
+        if (totalFields > 0) {
+          verification.paramCoverage = Math.round((filledFields / totalFields) * 100);
+          verification.paramPass = verification.paramCoverage >= 50;
+          if (!verification.paramPass) {
+            verification.paramIssue = `${verification.paramCoverage}% coverage (${filledFields}/${totalFields} fields)`;
+          }
+        } else {
+          verification.paramPass = true; // no fields to check
+        }
+      } catch {
+        verification.paramPass = false;
+        verification.paramIssue = 'parameter check failed';
+      }
+    }
+
     // 10. Stop
     await client.call('stop');
 
@@ -798,13 +950,11 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
 
     // 11. Verdict — STRICT: trust rmsAvg/rmsMax directly, don't rely on the
     // tool's isSilent flag (which has historically been too lenient).
-    const audibleByOurThreshold = (level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS
-      || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4;
     if (!audibleByOurThreshold && !test.allowSilent) {
       return {
         name: test.name, family: test.family, status: 'fail',
         rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
-        errorCount: critical.length,
+        errorCount: critical.length, verification,
         reason: `silent (rmsAvg=${level.rmsAvg.toFixed(6)}, rmsMax=${level.rmsMax.toFixed(6)}, threshold=${SILENCE_THRESHOLD_RMS})`,
         durationMs,
       };
@@ -813,7 +963,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       return {
         name: test.name, family: test.family, status: 'fail',
         rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
-        errorCount: critical.length,
+        errorCount: critical.length, verification,
         reason: `${critical.length} console error(s): ${critical[0].message.slice(0, 80)}`,
         durationMs,
       };
@@ -822,7 +972,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       return {
         name: test.name, family: test.family, status: 'fail',
         rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
-        errorCount: critical.length,
+        errorCount: critical.length, verification,
         reason: `editorMode mismatch (expected ${test.expectedEditorMode}, got ${songInfo.editorMode})`,
         durationMs,
       };
@@ -830,7 +980,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     return {
       name: test.name, family: test.family, status: 'pass',
       rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
-      errorCount: critical.length,
+      errorCount: critical.length, verification,
       durationMs,
     };
   } catch (err) {
@@ -848,6 +998,31 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
 const REFERENCE_MUSIC_DIR = process.env.REFERENCE_MUSIC ?? '/Users/spot/Code/Reference Music';
 const FURNACE_DEMOS_DIR = process.env.FURNACE_DEMOS ?? '/Users/spot/Code/DEViLBOX/third-party/furnace-master/demos';
 
+/**
+ * Tier 7: Lock-step Furnace command comparison.
+ * Spawns compare-cmds.ts as a child process for a .fur file.
+ * Returns true if commands match (exit 0), false otherwise.
+ */
+async function runLockstepComparison(furPath: string): Promise<{ pass: boolean; detail: string }> {
+  const { execSync } = await import('child_process');
+  try {
+    const output = execSync(
+      `npx tsx --tsconfig tsconfig.app.json tools/furnace-audit/compare-cmds.ts --song "${furPath}" 2>/dev/null`,
+      { maxBuffer: 100 * 1024 * 1024, timeout: 120000 },
+    ).toString();
+    // Check for "0 differences found" in output
+    if (output.includes('0 differences found')) {
+      return { pass: true, detail: 'commands match' };
+    }
+    const diffMatch = output.match(/(\d+) differences found/);
+    const diffs = diffMatch ? diffMatch[1] : '?';
+    return { pass: false, detail: `${diffs} command differences` };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message.slice(0, 80) : String(e);
+    return { pass: false, detail: `lockstep error: ${msg}` };
+  }
+}
+
 async function main(): Promise<void> {
   // Auto-discover all test sources
   const localTests = await discoverLocalTests(REFERENCE_MUSIC_DIR);
@@ -863,6 +1038,7 @@ async function main(): Promise<void> {
   const pushResults = args.includes('--push-results');
   const skipFx = args.includes('--skip-fx');
   const skipFurnace = args.includes('--skip-furnace');
+  const lockstep = args.includes('--lockstep');
   const onlyArg = args.find(a => a.startsWith('--only=') || a.startsWith('--only '));
   const onlyFamilies = onlyArg
     ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf('--only') + 1])
@@ -886,18 +1062,24 @@ async function main(): Promise<void> {
     allTests = allTests.filter(t => onlyFamilies.some(f => t.family.toUpperCase().includes(f)));
   }
 
-  console.log('▶ DEViLBOX playback smoke test');
+  // Always include regression tests (tier 6) unless a specific --*-only flag was used
+  if (!hardcodedOnly && !localOnly && !furnaceOnly && !fxOnly) {
+    allTests.push(...REGRESSIONS);
+  }
+
+  console.log('▶ DEViLBOX release-readiness test suite');
   console.log(`  Bridge: ${WS_URL}`);
-  console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded, ${localTests.length} local, ${furnaceTests.length} furnace, ${effectTests.length} fx)`);
+  console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded, ${localTests.length} local, ${furnaceTests.length} furnace, ${effectTests.length} fx, ${REGRESSIONS.length} regressions)`);
   if (onlyFamilies) console.log(`  Filter: ${onlyFamilies.join(', ')}`);
-  if (pushResults) console.log(`  Push:   results → http://localhost:4444`);
+  if (lockstep) console.log(`  Lock-step: enabled (Furnace command comparison)`);
+  if (pushResults) console.log(`  Push:   results -> http://localhost:4444`);
   console.log('');
 
   const client = new MCPBridgeClient(WS_URL);
   try {
     await client.ready();
   } catch (err) {
-    console.error(`✗ Failed to connect to MCP bridge at ${WS_URL}`);
+    console.error(`x Failed to connect to MCP bridge at ${WS_URL}`);
     console.error('  Make sure the dev server is running (npm run dev) and DEViLBOX is open in a browser.');
     console.error(`  Error: ${err instanceof Error ? err.message : err}`);
     process.exit(2);
@@ -930,7 +1112,7 @@ async function main(): Promise<void> {
 
       // Back off: log a warning and wait before retrying
       const waitMs = RETRY_BACKOFF_MS * (attempt + 1);
-      process.stdout.write(`\n    ⟳ browser busy (attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${waitMs / 1000}s)... `);
+      process.stdout.write(`\n    -> browser busy (attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${waitMs / 1000}s)... `);
       await sleep(waitMs);
 
       // Reconnect if the WS dropped
@@ -945,48 +1127,171 @@ async function main(): Promise<void> {
       }
     }
 
+    // Tier 7: Lock-step comparison for Furnace tests (behind --lockstep flag)
+    if (lockstep && test.loader === 'fur' && result && result.verification) {
+      process.stdout.write(' [lockstep] ');
+      const ls = await runLockstepComparison(test.path);
+      result.verification.lockstepTested = true;
+      result.verification.lockstepPass = ls.pass;
+      if (!ls.pass) result.verification.lockstepIssue = ls.detail;
+    }
+
     results.push(result!);
     const dt = `${(result!.durationMs / 1000).toFixed(1)}s`;
     if (result!.status === 'pass') {
       const rms = result!.rmsAvg?.toFixed(4) ?? '?';
-      console.log(`✓ pass (rms ${rms}, ${dt})`);
+      const v = result!.verification;
+      const extras: string[] = [];
+      if (v?.instrumentCount) extras.push(`inst=${v.instrumentCount}`);
+      if (v?.exportTested) extras.push(v.exportPass ? 'export=ok' : 'export=FAIL');
+      if (v?.paramCoverage !== undefined) extras.push(`params=${v.paramCoverage}%`);
+      if (v?.lockstepTested) extras.push(v.lockstepPass ? 'lockstep=ok' : 'lockstep=FAIL');
+      const extraStr = extras.length > 0 ? ` [${extras.join(', ')}]` : '';
+      console.log(`+ pass (rms ${rms}, ${dt})${extraStr}`);
     } else if (result!.status === 'skip') {
-      console.log(`○ skip (${result!.reason}, ${dt})`);
+      console.log(`o skip (${result!.reason}, ${dt})`);
     } else {
-      console.log(`✗ fail (${result.reason}, ${dt})`);
+      console.log(`x fail (${result!.reason}, ${dt})`);
     }
   }
 
   client.close();
 
-  // Summary
-  const passed = results.filter((r) => r.status === 'pass').length;
-  const failed = results.filter((r) => r.status === 'fail').length;
-  const skipped = results.filter((r) => r.status === 'skip').length;
+  // ── Expanded summary with per-tier pass rates ─────────────────────────────
+  const passed = results.filter(r => r.status === 'pass').length;
+  const failed = results.filter(r => r.status === 'fail').length;
+  const skipped = results.filter(r => r.status === 'skip').length;
+
+  // Tier breakdowns (only count tests that have verification data)
+  const withV = results.filter(r => r.verification);
+  const audioPass = withV.filter(r => r.verification!.audioPass).length;
+  const audioTotal = withV.length;
+
+  const instTested = withV.filter(r => r.verification!.instrumentCount > 0 || !r.verification!.instrumentPass);
+  const instPass = withV.filter(r => r.verification!.instrumentPass).length;
+  const instNoInst = withV.filter(r => r.verification!.instrumentCount === 0 && r.verification!.instrumentPass).length;
+
+  const exportTested = withV.filter(r => r.verification!.exportTested);
+  const exportPass = exportTested.filter(r => r.verification!.exportPass).length;
+
+  const paramTested = withV.filter(r => r.verification!.paramTested);
+  const paramPass = paramTested.filter(r => r.verification!.paramPass).length;
+
+  const regressionResults = results.filter(r => allTests.find(t => t.name === r.name)?.isRegression);
+  const regressionPass = regressionResults.filter(r => r.status === 'pass').length;
+
+  const fxResults = results.filter(r => allTests.find(t => t.name === r.name)?.loader === 'fx');
+  const fxPass = fxResults.filter(r => r.status === 'pass').length;
+
+  const furnaceResults = results.filter(r => allTests.find(t => t.name === r.name)?.loader === 'fur');
+  const furnacePass = furnaceResults.filter(r => r.status === 'pass').length;
+
+  const lockstepResults = withV.filter(r => r.verification!.lockstepTested);
+  const lockstepPass = lockstepResults.filter(r => r.verification!.lockstepPass).length;
+
+  // Calculate total pass points across all tiers
+  let totalChecks = 0;
+  let totalPass = 0;
+
+  totalChecks += audioTotal;       totalPass += audioPass;
+  totalChecks += withV.length;     totalPass += instPass;
+  if (exportTested.length > 0) { totalChecks += exportTested.length; totalPass += exportPass; }
+  if (paramTested.length > 0) { totalChecks += paramTested.length; totalPass += paramPass; }
+  if (regressionResults.length > 0) { totalChecks += regressionResults.length; totalPass += regressionPass; }
+  if (fxResults.length > 0) { totalChecks += fxResults.length; totalPass += fxPass; }
+  if (furnaceResults.length > 0) { totalChecks += furnaceResults.length; totalPass += furnacePass; }
+  if (lockstepResults.length > 0) { totalChecks += lockstepResults.length; totalPass += lockstepPass; }
+
+  const totalPct = totalChecks > 0 ? ((totalPass / totalChecks) * 100).toFixed(1) : '0.0';
+
   console.log('');
-  console.log('── Summary ─────────────────');
-  console.log(`  ${passed} passed, ${failed} failed, ${skipped} skipped`);
+  console.log('== Summary ========================');
+  console.log(`  Audio:        ${audioPass}/${audioTotal} pass`);
+  console.log(`  Instruments:  ${instPass}/${withV.length} pass${instNoInst > 0 ? `  (${instNoInst} engine-driven, no instruments expected)` : ''}`);
+  if (exportTested.length > 0) {
+    console.log(`  Export:       ${exportPass}/${exportTested.length} pass    (PC formats only)`);
+  }
+  if (paramTested.length > 0) {
+    console.log(`  Parameters:   ${paramPass}/${paramTested.length} pass`);
+  }
+  if (regressionResults.length > 0) {
+    console.log(`  Regressions:  ${regressionPass}/${regressionResults.length} pass`);
+  }
+  if (fxResults.length > 0) {
+    console.log(`  Effects:      ${fxPass}/${fxResults.length} pass`);
+  }
+  if (furnaceResults.length > 0) {
+    console.log(`  Furnace:      ${furnacePass}/${furnaceResults.length} pass`);
+  }
+  if (lockstepResults.length > 0) {
+    console.log(`  Lock-step:    ${lockstepPass}/${lockstepResults.length} pass`);
+  }
+  console.log(`  TOTAL:        ${totalPass}/${totalChecks} pass (${totalPct}%)`);
+
   if (failed > 0) {
     console.log('');
     console.log('  Failures:');
-    for (const r of results.filter((r) => r.status === 'fail')) {
-      console.log(`    ✗ [${r.family}] ${r.name} — ${r.reason}`);
+    for (const r of results.filter(r => r.status === 'fail')) {
+      console.log(`    x [${r.family}] ${r.name} -- ${r.reason}`);
+      // Show tier-specific failures from verification
+      const v = r.verification;
+      if (v) {
+        if (v.instrumentIssue) console.log(`      inst: ${v.instrumentIssue}`);
+        if (v.exportIssue) console.log(`      export: ${v.exportIssue}`);
+        if (v.paramIssue) console.log(`      params: ${v.paramIssue}`);
+        if (v.lockstepIssue) console.log(`      lockstep: ${v.lockstepIssue}`);
+      }
+    }
+    // Also show tier failures for passing tests (these are soft failures)
+    const passWithTierIssues = results.filter(r =>
+      r.status === 'pass' && r.verification && (
+        !r.verification.instrumentPass ||
+        (r.verification.exportTested && !r.verification.exportPass) ||
+        (r.verification.paramTested && !r.verification.paramPass) ||
+        (r.verification.lockstepTested && !r.verification.lockstepPass)
+      ),
+    );
+    if (passWithTierIssues.length > 0) {
+      console.log('');
+      console.log('  Tier issues (audio passes, but other checks failed):');
+      for (const r of passWithTierIssues) {
+        const v = r.verification!;
+        const issues: string[] = [];
+        if (!v.instrumentPass && v.instrumentIssue) issues.push(`inst: ${v.instrumentIssue}`);
+        if (v.exportTested && !v.exportPass && v.exportIssue) issues.push(`export: ${v.exportIssue}`);
+        if (v.paramTested && !v.paramPass && v.paramIssue) issues.push(`params: ${v.paramIssue}`);
+        if (v.lockstepTested && !v.lockstepPass && v.lockstepIssue) issues.push(`lockstep: ${v.lockstepIssue}`);
+        console.log(`    ~ [${r.family}] ${r.name} -- ${issues.join('; ')}`);
+      }
     }
   }
 
   // Push results to format status tracker at localhost:4444
   if (pushResults) {
     console.log('');
-    console.log('── Pushing results to localhost:4444 ──');
-    const updates: Record<string, { auditStatus: string; notes: string }> = {};
+    console.log('== Pushing results to localhost:4444 ==');
+    const updates: Record<string, Record<string, unknown>> = {};
     for (const r of results) {
-      // Derive a tracker key from the family name (lowercase, spaces→hyphens)
+      // Derive a tracker key from the family name (lowercase, spaces->hyphens)
       const key = r.family.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+      const v = r.verification;
+      const date = new Date().toISOString().slice(0, 10);
+      const tierSummary: string[] = [];
+      if (v) {
+        tierSummary.push(`audio=${v.audioPass ? 'ok' : 'FAIL'}`);
+        tierSummary.push(`inst=${v.instrumentCount}/${v.instrumentPass ? 'ok' : 'FAIL'}`);
+        if (v.exportTested) tierSummary.push(`export=${v.exportPass ? 'ok' : 'FAIL'}`);
+        if (v.paramCoverage !== undefined) tierSummary.push(`params=${v.paramCoverage}%`);
+        if (v.lockstepTested) tierSummary.push(`lockstep=${v.lockstepPass ? 'ok' : 'FAIL'}`);
+      }
       updates[key] = {
         auditStatus: r.status === 'pass' ? 'fixed' : 'fail',
         notes: r.status === 'pass'
-          ? `smoke-test PASS — rms=${(r.rmsAvg ?? 0).toFixed(4)} (${new Date().toISOString().slice(0, 10)})`
-          : `smoke-test FAIL — ${r.reason ?? 'unknown'} (${new Date().toISOString().slice(0, 10)})`,
+          ? `smoke-test PASS -- rms=${(r.rmsAvg ?? 0).toFixed(4)} [${tierSummary.join(', ')}] (${date})`
+          : `smoke-test FAIL -- ${r.reason ?? 'unknown'} [${tierSummary.join(', ')}] (${date})`,
+        rmsAvg: r.rmsAvg ?? 0,
+        instrumentCount: v?.instrumentCount ?? 0,
+        paramCoverage: v?.paramCoverage,
       };
     }
     try {
