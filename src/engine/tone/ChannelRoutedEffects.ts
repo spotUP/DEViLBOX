@@ -9,13 +9,41 @@
  *   non-selected channels → masterInput (unchanged)
  *   masterInput → [global master effects] → output
  *
- * This gives proper serial/inline processing per-channel.
+ * Uses native Web Audio API disconnect(destination) for surgical routing,
+ * bypassing Tone.js wrappers which may not support targeted disconnection.
  */
 
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
 import type { ChannelOutput } from './ChannelRouting';
+
+/** Get the underlying AudioNode from a Tone node by traversing the output chain */
+function getNativeOutput(toneNode: Tone.ToneAudioNode): AudioNode | null {
+  let current: any = toneNode;
+  // Traverse: ToneAudioNode.output → .output → ... until we find a native AudioNode
+  for (let i = 0; i < 5; i++) {
+    if (!current) return null;
+    // If this is already a native AudioNode, return it
+    if (current instanceof AudioNode) return current;
+    // Tone.Gain wraps a native GainNode as _gainNode
+    if (current._gainNode instanceof AudioNode) return current._gainNode;
+    // Traverse to .output
+    current = current.output;
+  }
+  return null;
+}
+
+function getNativeInput(toneNode: Tone.ToneAudioNode): AudioNode | null {
+  let current: any = toneNode;
+  for (let i = 0; i < 5; i++) {
+    if (!current) return null;
+    if (current instanceof AudioNode) return current;
+    if (current._gainNode instanceof AudioNode) return current._gainNode;
+    current = current.input;
+  }
+  return null;
+}
 
 interface RoutedEffect {
   config: EffectConfig;
@@ -46,6 +74,7 @@ export class ChannelRoutedEffectsManager {
     this.teardown();
 
     const handledIds: string[] = [];
+    const masterInputNative = getNativeInput(this.masterInput);
 
     for (const config of configs) {
       if (!config.enabled || !config.selectedChannels?.length) continue;
@@ -65,19 +94,31 @@ export class ChannelRoutedEffectsManager {
       subMix.connect(node);
       node.connect(this.masterInput);
 
-      // Reroute selected channels: disconnect from masterInput, connect to subMix
+      // Reroute selected channels using native Web Audio API for surgical disconnect
       for (const ch of config.selectedChannels) {
         const output = this.getChannelOutput(ch);
         if (!output) continue;
 
+        const channelNativeOut = getNativeOutput(output.channel);
+        const subMixNativeIn = getNativeInput(subMix);
+
+        if (!channelNativeOut || !masterInputNative || !subMixNativeIn) {
+          console.warn(`[ChannelRoutedEffects] Could not get native nodes for ch${ch}`,
+            { channelNativeOut: !!channelNativeOut, masterInputNative: !!masterInputNative, subMixNativeIn: !!subMixNativeIn });
+          continue;
+        }
+
         try {
           // Add the new route first (avoids brief dropout)
-          output.channel.connect(subMix);
-          // Then remove the direct route
-          output.channel.disconnect(this.masterInput);
+          channelNativeOut.connect(subMixNativeIn);
+          // Then surgically disconnect ONLY the masterInput connection
+          channelNativeOut.disconnect(masterInputNative);
           rerouted.push(ch);
+          console.log(`[ChannelRoutedEffects] ✓ ch${ch}: native disconnect+connect OK`);
         } catch (e) {
           console.warn(`[ChannelRoutedEffects] Failed to reroute ch${ch}:`, e);
+          // If disconnect failed, undo the connect to avoid signal doubling
+          try { channelNativeOut.disconnect(subMixNativeIn); } catch { /* */ }
         }
       }
 
@@ -96,16 +137,25 @@ export class ChannelRoutedEffectsManager {
    * Tear down all channel-routed effects and restore direct connections.
    */
   teardown(): void {
+    const masterInputNative = getNativeInput(this.masterInput);
+
     for (const effect of this.effects) {
-      // Restore direct channel → masterInput connections
+      // Restore direct channel → masterInput connections using native API
       for (const ch of effect.rerouted) {
         const output = this.getChannelOutput(ch);
         if (!output) continue;
+
+        const channelNativeOut = getNativeOutput(output.channel);
+        const subMixNativeIn = getNativeInput(effect.subMix);
+
+        if (!channelNativeOut || !masterInputNative) continue;
+
         try {
           // Disconnect from sub-mix first, then restore direct path
-          // (brief dropout is preferable to signal doubling)
-          output.channel.disconnect(effect.subMix);
-          output.channel.connect(this.masterInput);
+          if (subMixNativeIn) {
+            channelNativeOut.disconnect(subMixNativeIn);
+          }
+          channelNativeOut.connect(masterInputNative);
         } catch {
           // Connection may have already been changed
         }
