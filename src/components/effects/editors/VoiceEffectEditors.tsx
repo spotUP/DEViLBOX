@@ -40,6 +40,7 @@ function getStringParam(effect: { parameters: Record<string, number | string> },
 export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
+  onUpdateParameters,
   onUpdateWet,
 }) => {
   const presetName = getStringParam(effect, 'preset', '');
@@ -57,13 +58,20 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
     const preset = VOCODER_EFFECT_PRESETS.find((p) => p.name === name);
     if (!preset) return;
     const p = preset.params;
-    onUpdateParameter('preset', name);
-    onUpdateParameter('bands', p.bands);
-    onUpdateParameter('filtersPerBand', p.filtersPerBand);
-    onUpdateParameter('carrierType', CARRIER_NAME_TO_INT[p.carrierType]);
-    onUpdateParameter('carrierFreq', p.carrierFreq);
-    onUpdateParameter('formantShift', p.formantShift);
-    onUpdateParameter('reactionTime', Math.round(p.reactionTime * 1000));
+    const allParams: Record<string, number | string> = {
+      preset: name,
+      bands: p.bands,
+      filtersPerBand: p.filtersPerBand,
+      carrierType: CARRIER_NAME_TO_INT[p.carrierType],
+      carrierFreq: p.carrierFreq,
+      formantShift: p.formantShift,
+      reactionTime: Math.round(p.reactionTime * 1000),
+    };
+    if (onUpdateParameters) {
+      onUpdateParameters(allParams);
+    } else {
+      Object.entries(allParams).forEach(([key, value]) => onUpdateParameter(key, value));
+    }
   };
 
   /** Tweaking any individual param clears the preset name (custom). */
