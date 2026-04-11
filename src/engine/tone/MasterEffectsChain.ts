@@ -58,8 +58,23 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Filter to only enabled effects
   const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
-  if (enabledEffects.length === 0) {
-    // No effects - direct connection to BLEP input (which routes to masterChannel)
+  // Separate global effects (all channels) from channel-targeted effects
+  const globalEffects = enabledEffects.filter(
+    fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0
+  );
+  const hasChannelTargeted = enabledEffects.some(
+    fx => Array.isArray(fx.selectedChannels) && fx.selectedChannels.length > 0
+  );
+
+  // Channel-targeted effects are handled by the WASM isolation system
+  if (hasChannelTargeted) {
+    import('../../stores/useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
+      scheduleWasmEffectRebuild();
+    }).catch(() => { /* mixer store not available */ });
+  }
+
+  if (globalEffects.length === 0) {
+    // No global effects - direct connection to BLEP input
     ctx.masterEffectsInput.connect(ctx.blepInput);
     return;
   }
@@ -78,7 +93,7 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Create effect nodes individually — skip any that fail (e.g. worklet on suspended context)
   const successNodes: Tone.ToneAudioNode[] = [];
   const successConfigs: EffectConfig[] = [];
-  for (const config of enabledEffects) {
+  for (const config of globalEffects) {
     try {
       const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
       // Check again after each async operation
