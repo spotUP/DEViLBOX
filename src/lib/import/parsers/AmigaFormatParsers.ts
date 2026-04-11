@@ -510,6 +510,17 @@ export async function tryRouteFormat(
   { const chipResult = await tryChipDumpParse(buffer, filename, originalFileName);
     if (chipResult) return chipResult; }
 
+  // ── SID Factory II (.sf2) ─────────────────────────────────────────────────
+  // .sf2 is ambiguous: SID Factory II (C64 PRG + 0x1337 magic) vs SoundFont (RIFF)
+  if (matchesExt(filename, ['sf2'])) {
+    const { isSIDFactory2File, parseSIDFactory2File } = await import('@lib/import/formats/SIDFactory2Parser');
+    if (isSIDFactory2File(buffer)) {
+      return parseSIDFactory2File(buffer, originalFileName);
+    }
+    // Not SID Factory II — could be a SoundFont file, which we don't support as a tracker format
+    throw new Error(`${originalFileName}: SoundFont (.sf2) files are not supported as tracker formats`);
+  }
+
   // ── SidMon 1.0 (.sid1) ───────────────────────────────────────────────────
   // .sid1 files may be SidMon 1.0 or Commodore 64 SID — try magic detection first.
   if (matchesExt(filename, ['sid1'])) {
