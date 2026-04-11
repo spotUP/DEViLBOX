@@ -28,6 +28,9 @@ const state: FormatPlaybackSnapshot = {
 
 let lastRow = -1;
 let lastRowTime = 0;
+// When > 0, an engine has set the duration explicitly (e.g. from driver speed)
+// and the rolling average is suppressed.
+let explicitDuration = 0;
 
 /**
  * Called by format engines (e.g. GT Ultra onPosition callback) whenever
@@ -37,11 +40,14 @@ let lastRowTime = 0;
 export function setFormatPlaybackRow(row: number): void {
   if (row !== lastRow) {
     const now = performance.now();
-    if (lastRow >= 0 && lastRowTime > 0) {
+    // Only estimate rowDuration from timing if no explicit duration is set
+    if (explicitDuration <= 0 && lastRow >= 0 && lastRowTime > 0) {
       const dt = now - lastRowTime;
-      // Rolling average: blend new measurement with existing estimate
+      // Rolling average: blend new measurement with existing estimate.
+      // High smoothing factor (0.85) dampens jitter from rAF polling —
+      // engines that poll memory (SF2) have ±16ms noise per sample.
       if (dt > 5 && dt < 2000) {
-        state.rowDuration = state.rowDuration * 0.6 + dt * 0.4;
+        state.rowDuration = state.rowDuration * 0.85 + dt * 0.15;
       }
     }
     lastRow = row;
@@ -51,11 +57,24 @@ export function setFormatPlaybackRow(row: number): void {
   }
 }
 
+/**
+ * Set an explicit row duration in ms (overrides the rolling average).
+ * Use when the engine knows the exact speed (e.g. SF2 driver speed * 20ms).
+ * Pass 0 to revert to measurement-based estimation.
+ */
+export function setFormatPlaybackRowDuration(ms: number): void {
+  explicitDuration = ms;
+  if (ms > 0) {
+    state.rowDuration = ms;
+  }
+}
+
 export function setFormatPlaybackPlaying(playing: boolean): void {
   state.isPlaying = playing;
   if (!playing) {
     lastRow = -1;
     lastRowTime = 0;
+    explicitDuration = 0;
   }
 }
 
@@ -71,4 +90,5 @@ export function resetFormatPlaybackState(): void {
   state.rowDuration = 120;
   lastRow = -1;
   lastRowTime = 0;
+  explicitDuration = 0;
 }
