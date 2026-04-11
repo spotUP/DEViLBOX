@@ -4859,50 +4859,20 @@ export class ToneEngine {
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
     const myVersion = ++this._channelRoutedRebuildVersion;
 
-    // Split effects into those requesting channel routing vs global
-    const wantsChannelRouting = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
-    const wantsGlobal = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
-
-    // Attempt to build channel-routed effects (parallel sends)
-    let actuallyRoutedIds: string[] = [];
-    if (wantsChannelRouting.length > 0) {
-      if (!this._channelRoutedEffects) {
-        const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
-        this._channelRoutedEffects = new ChannelRoutedEffectsManager(
-          this.masterInput,
-          (idx) => this.channelOutputs.get(idx) ?? null,
-        );
-      }
-      actuallyRoutedIds = await this._channelRoutedEffects.rebuild(wantsChannelRouting);
-    } else if (this._channelRoutedEffects) {
+    // Channel routing via parallel sends is not yet supported for WASM engines
+    // (LibopenmptEngine, FurnaceDispatch, SunVox, etc.) because their audio bypasses
+    // channelOutputs entirely. The selectedChannels preference is stored in the config
+    // for future use, but ALL effects go through the global chain for now.
+    // Tear down any stale channel-routed sends
+    if (this._channelRoutedEffects) {
       this._channelRoutedEffects.teardown();
     }
 
     // Abort if superseded by a newer rebuild
     if (myVersion !== this._channelRoutedRebuildVersion) return;
 
-    // Effects that WANTED channel routing but couldn't connect fall back to global chain
-    const fallbackToGlobal = wantsChannelRouting.filter(e => !actuallyRoutedIds.includes(e.id));
-    if (fallbackToGlobal.length > 0) {
-      console.log(`[ToneEngine] Channel routing unavailable for: ${fallbackToGlobal.map(e => e.type).join(', ')} — using global chain`);
-    }
-    const globalEffects = [...wantsGlobal, ...fallbackToGlobal];
-
-    // Build global master chain (post-mix) with all global effects
-    // NOTE: _rebuildMasterEffects clears masterEffectConfigs, so register
-    // channel-routed configs AFTER the global rebuild.
-    await _rebuildMasterEffects(this._masterFxCtx, globalEffects);
-
-    // Abort if superseded during global rebuild
-    if (myVersion !== this._channelRoutedRebuildVersion) return;
-
-    // Register channel-routed effect nodes in masterEffectConfigs for parameter updates
-    if (this._channelRoutedEffects) {
-      const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
-      for (const [id, entry] of routedConfigs) {
-        this.masterEffectConfigs.set(id, entry);
-      }
-    }
+    // Build global master chain with ALL effects (ignore selectedChannels for routing)
+    await _rebuildMasterEffects(this._masterFxCtx, effects);
   }
 
   public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {
