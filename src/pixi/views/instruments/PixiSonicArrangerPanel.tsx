@@ -17,8 +17,8 @@
  * writeBipolarBar helpers in src/lib/pixi/barChartDraw.ts.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
-import { PixiKnob, PixiLabel, PixiSelect, PixiNumericInput } from '../../components';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { PixiKnob, PixiLabel, PixiSelect, PixiNumericInput, PixiButton } from '../../components';
 import type { SelectOption } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { usePixiTheme } from '../../theme';
@@ -26,6 +26,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SonicArrangerConfig } from '@/types/instrument';
 import type { Graphics, FederatedPointerEvent, Container } from 'pixi.js';
 import { writeBipolarBar, writeUnipolarBar } from '@/lib/pixi/barChartDraw';
+import { SonicArrangerSynth } from '@/engine/sonic-arranger/SonicArrangerSynth';
 
 const KNOB_SIZE = 'sm' as const;
 
@@ -79,6 +80,31 @@ function arg3Label(effect: number): string {
 export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
   const theme = usePixiTheme();
   const sa = instrument.sonicArranger!;
+
+  // ── Preview synth ──────────────────────────────────────────────────────────
+  const [previewNote, setPreviewNote] = useState(48);
+  const previewSynthRef = useRef<SonicArrangerSynth | null>(null);
+
+  useEffect(() => {
+    return () => {
+      previewSynthRef.current?.dispose();
+      previewSynthRef.current = null;
+    };
+  }, []);
+
+  const handlePreview = useCallback(async () => {
+    const cfg = instrument.sonicArranger;
+    if (!cfg) return;
+    let synth = previewSynthRef.current;
+    if (!synth) {
+      synth = new SonicArrangerSynth();
+      previewSynthRef.current = synth;
+      synth.output.connect(synth.output.context.destination);
+    }
+    await synth.setInstrument(cfg);
+    synth.triggerAttack(previewNote);
+    setTimeout(() => synth!.triggerRelease(), 800);
+  }, [instrument.sonicArranger, previewNote]);
 
   // Per-song counts exposed by SonicArrangerParser via chipRam.sections.
   // Fall back to 16 when not available (project snapshots).
@@ -341,6 +367,21 @@ export const PixiSonicArrangerPanel: React.FC<Props> = ({ instrument, onUpdate }
           width={180}
           height={20}
           fontSize={11}
+        />
+        <layoutContainer layout={{ flexGrow: 1 }} />
+        <PixiNumericInput
+          value={previewNote}
+          min={0}
+          max={95}
+          onChange={setPreviewNote}
+          width={40}
+        />
+        <PixiButton
+          label="Preview"
+          icon="play"
+          size="sm"
+          variant="ghost"
+          onClick={() => void handlePreview()}
         />
       </layoutContainer>
 
