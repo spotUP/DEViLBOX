@@ -4853,7 +4853,11 @@ export class ToneEngine {
     return ctx;
   }
 
+  private _channelRoutedRebuildVersion = 0;
+
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
+    const myVersion = ++this._channelRoutedRebuildVersion;
+
     // Split effects into channel-routed (pre-mix) vs global (post-mix)
     const channelRouted = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
     const global = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
@@ -4868,15 +4872,23 @@ export class ToneEngine {
     }
     await this._channelRoutedEffects.rebuild(channelRouted);
 
+    // Abort if superseded by a newer rebuild
+    if (myVersion !== this._channelRoutedRebuildVersion) return;
+
     // Build global master chain (post-mix) with remaining effects
     // NOTE: _rebuildMasterEffects clears masterEffectConfigs, so register
     // channel-routed configs AFTER the global rebuild.
     await _rebuildMasterEffects(this._masterFxCtx, global);
 
+    // Abort if superseded during global rebuild
+    if (myVersion !== this._channelRoutedRebuildVersion) return;
+
     // Register channel-routed effect nodes in masterEffectConfigs for parameter updates
-    const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
-    for (const [id, entry] of routedConfigs) {
-      this.masterEffectConfigs.set(id, entry);
+    if (this._channelRoutedEffects) {
+      const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
+      for (const [id, entry] of routedConfigs) {
+        this.masterEffectConfigs.set(id, entry);
+      }
     }
   }
 
