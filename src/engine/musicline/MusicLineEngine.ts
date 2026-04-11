@@ -66,7 +66,13 @@ export class MusicLineEngine {
   }
 
   static getInstance(): MusicLineEngine {
-    if (!MusicLineEngine.instance || MusicLineEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!MusicLineEngine.instance || MusicLineEngine.instance._disposed ||
+        MusicLineEngine.instance.audioContext !== currentCtx) {
+      // Dispose stale instance if context changed (HMR or rapid reload)
+      if (MusicLineEngine.instance && !MusicLineEngine.instance._disposed) {
+        MusicLineEngine.instance.dispose();
+      }
       MusicLineEngine.instance = new MusicLineEngine();
     }
     return MusicLineEngine.instance;
