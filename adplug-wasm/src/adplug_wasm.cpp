@@ -671,10 +671,21 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     // Detect player type for pattern extraction
     detectPlayerType();
 
-    // D00 native extraction disabled — was producing empty grids for packed v4.
-    // OPL capture fallback handles D00 correctly when triggered by TypeScript.
-    // Live channel state enrichment (updateChannelState) provides D00-specific
-    // note/inst/effect data during streaming playback.
+    // D00 native extraction — walk order lists + sequences to build pattern grid.
+    // Falls back to OPL capture (triggered by TypeScript) if extraction produces
+    // too few rows (e.g., some packed v4 files with unusual sequence layouts).
+    if (g_playerType == PT_D00) {
+        auto* dp = asD00Player();
+        if (dp) {
+            d00NativeExtract(dp);
+            if (g_d00NativeExtracted && g_d00GridRows < 4) {
+                // Suspiciously few rows — disable native and let OPL capture handle it
+                g_d00NativeExtracted = false;
+                g_d00GridRows = 0;
+                g_d00Grid.clear();
+            }
+        }
+    }
 
     return 0;
 }
