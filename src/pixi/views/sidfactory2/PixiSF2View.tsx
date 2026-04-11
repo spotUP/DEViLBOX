@@ -55,7 +55,7 @@ export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
     if (!ol) continue;
     const entries = ol.entries.map((e, i) => {
       const seqStr = e.seqIdx.toString(16).toUpperCase().padStart(2, '0');
-      const tOff = e.transpose - 0x80;
+      const tOff = e.transpose - 0xA0;
       const tStr = tOff !== 0 ? (tOff > 0 ? `+${tOff}` : `${tOff}`) : '';
       const loopMark = ol.hasLoop && i === ol.loopIndex ? '*' : '';
       const prefix = tStr ? `${tStr}:` : '';

@@ -134,9 +134,9 @@ export function sf2ToFormatChannels(
       },
     ];
 
-    const transStr = entry ? ` T${(((entry.transpose & 0x7F) - 0x20) | 0).toString(16).toUpperCase()}` : '';
+    const transLabel = transpose !== 0 ? ` T${transpose > 0 ? '+' : ''}${transpose}` : '';
     result.push({
-      label: `CH${t + 1} S${String(seqIdx).padStart(2, '0')}${transStr}`,
+      label: `CH${t + 1} S${String(seqIdx).padStart(2, '0')}${transLabel}`,
       patternLength: maxRows,
       rows,
       isPatternChannel: true,
