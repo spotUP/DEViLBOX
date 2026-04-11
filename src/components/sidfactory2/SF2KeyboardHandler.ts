@@ -271,6 +271,36 @@ export function useSF2KeyboardHandler(active: boolean) {
       return;
     }
 
+    // ── Ctrl+Shift+Down = Toggle gate until next event ──
+    if (mod && e.shiftKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (seqIdx !== null && seq) {
+        // Fill gate-on (0x7E) from cursor down until next note event
+        for (let r = cursor.row; r <= maxRow; r++) {
+          const ev = seq[r];
+          if (r > cursor.row && ev.note > 0 && ev.note !== 0x7E) break;
+          if (ev.note === 0) {
+            state.setSequenceCell(seqIdx, r, 'note', 0x7E);
+          }
+        }
+      }
+      return;
+    }
+    // ── Ctrl+Shift+Up = Toggle gate since previous event ──
+    if (mod && e.shiftKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (seqIdx !== null && seq) {
+        for (let r = cursor.row; r >= 0; r--) {
+          const ev = seq[r];
+          if (r < cursor.row && ev.note > 0 && ev.note !== 0x7E) break;
+          if (ev.note === 0) {
+            state.setSequenceCell(seqIdx, r, 'note', 0x7E);
+          }
+        }
+      }
+      return;
+    }
+
     // ── Space = Erase event under cursor ──
     if (e.key === ' ' && !mod && !e.shiftKey) {
       e.preventDefault();
