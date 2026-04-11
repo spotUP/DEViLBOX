@@ -468,6 +468,13 @@ Without this, the pattern display keeps scrolling after the audio stops.
 | `_suppressNotes` not set | Double audio (ToneEngine + WASM) | Set `this._suppressNotes = true` |
 | WASM singleton cached across HMR | Old code persists after rebuild | Add cache-busting `?v=Date.now()` to WASM fetch |
 | Pattern extraction returns empty cells | Notes missing from display | Add density check fallback + live enrichment |
+| rAF-only position polling | Uneven stepped scroll speed | Use `setInterval(4ms)` for ±2ms accuracy |
+| `displayRow` returns 0 when stopped | Arrow keys don't scroll pattern | Return `cursorRow` when not playing |
+| Arrow keys in keyboard handler | Conflicts with canvas hold-to-scroll | Let canvas handle all navigation |
+| Extension conflict (e.g., .sng) | Wrong format loaded | Magic byte check BEFORE extension routing |
+| `formatIsPlaying={true}` on order matrix | Matrix scrolls with pattern rows | Pass `formatIsPlaying={false}` for order matrices |
+| Singleton FormatPlaybackState not reset | Stale row persists after stop | Call `setFormatPlaybackPlaying(false)` on stop |
+| Store cursor not synced from canvas | Note entry at wrong position | Use `onFormatCursorChange` callback |
 
 ---
 
@@ -580,3 +587,581 @@ sidFile.set(rawPRG, 124);       // Full PRG including 2-byte load address
   other C64 trackers.
 - **Duration expansion is critical** — Without expanding duration bytes into hold rows,
   patterns look compressed and don't align with the actual playback timing.
+
+---
+
+## Model E: Format-Specific View with Custom Engine
+
+### When to Use
+
+When a format has its own dedicated engine (WASM or otherwise), its own Zustand store,
+and needs a custom UI layout that differs from the standard tracker view. The format
+bypasses `TrackerReplayer` entirely and manages its own playback, position tracking,
+and pattern data.
+
+**Examples:** GT Ultra, SID Factory II, JamCracker, Hively
+
+### How It Works
+
+```
+File → TS Parser extracts data → Format-specific Zustand store
+     → Custom engine handles audio (WASM worklet or C64 emulation)
+     → Engine reports position → FormatPlaybackState singleton
+     → Format view renders PatternEditorCanvas in "format mode"
+     → Format adapter hook converts store → FormatChannel[]
+```
+
+### Architecture
+
+```
+┌─ Format Engine ──────────────┐
+│  Audio playback               │──→ FormatPlaybackState singleton
+│  Position reporting           │       (row, rowDuration, rowChangeTime)
+│  RAM/memory access            │
+└──────────────────────────────┘
+         ↕ store updates
+┌─ Format Zustand Store ───────┐
+│  Pattern data, order lists    │
+│  Playback position            │
+│  Cursor position              │
+│  Instruments, tables          │
+└──────────────────────────────┘
+         ↕ React hooks
+┌─ Format View ────────────────┐
+│  Toolbar (transport, info)    │
+│  Order matrix (optional)      │
+│  PatternEditorCanvas          │←── formatColumns, formatChannels,
+│    (format mode)              │    formatCurrentRow, formatIsPlaying
+│  Instrument editor (optional) │
+└──────────────────────────────┘
+```
+
+### Key Difference from Models A–D
+
+Models A–D all flow through `TrackerReplayer` and `PlaybackCoordinator` for position sync.
+Model E bypasses both — the engine writes directly to `FormatPlaybackState`, and the
+canvas reads it via its RAF loop. No `dispatchEnginePosition()`, no `DisplayStateRing`.
+
+### Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/stores/useMyFormatStore.ts` | Zustand store for format state |
+| `src/engine/myformat/MyFormatEngine.ts` | Engine wrapper (audio + memory access) |
+| `src/components/myformat/MyFormatView.tsx` | Format-specific view layout |
+| `src/components/myformat/useMyFormatFormatData.ts` | Store → FormatChannel[] adapter |
+| `src/components/myformat/MyFormatKeyboardHandler.ts` | QWERTY piano + format-specific keys |
+| `src/components/myformat/myformatAdapter.ts` | Column definitions + data conversion |
+
+### Reference Implementations
+
+- **GT Ultra** — Full-featured: WASM engine, order matrix, DAW mode, ASID bridge
+- **SID Factory II** — C64 emulation: PSID wrapping, driver memory polling, live editing
+- **JamCracker** — Simple: WASM engine, read/write patterns, export
+- **Hively** — Minimal: uses standard tracker stores, custom position editor
+
+---
+
+## FormatPlaybackState — The Scroll Mechanism
+
+All Model E engines use `FormatPlaybackState` to communicate playback position to
+the pattern editor canvas. It's a lightweight singleton — zero React overhead, zero
+allocation per frame.
+
+### API
+
+```typescript
+import {
+  setFormatPlaybackRow,
+  setFormatPlaybackPlaying,
+  setFormatPlaybackRowDuration,
+  getFormatPlaybackState,
+  resetFormatPlaybackState,
+} from '@engine/FormatPlaybackState';
+
+// Engine calls these:
+setFormatPlaybackPlaying(true);
+setFormatPlaybackRow(row);                 // Called on every row change
+setFormatPlaybackRowDuration(120);         // Optional: exact ms per row
+
+// Canvas reads this every rAF frame:
+const state = getFormatPlaybackState();
+// state.row, state.isPlaying, state.rowChangeTime, state.rowDuration
+```
+
+### Row Duration: Measurement vs Explicit
+
+By default, `rowDuration` is estimated from a rolling average of measured intervals
+between row changes. This works well for engines with precise callbacks (GT Ultra),
+but produces jitter for engines that poll position via rAF (±16ms noise).
+
+**Use `setFormatPlaybackRowDuration(ms)` when:**
+- Your engine knows the exact speed (e.g., C64 driver speed × 20ms PAL tick)
+- You're polling position and the rolling average produces visible jitter
+- The format has variable speed and you read the current speed from engine memory
+
+When an explicit duration is set, the rolling average is suppressed. Call with `0`
+to revert to measurement-based estimation.
+
+### Position Reporting Strategies
+
+| Strategy | Accuracy | Used By | When |
+|----------|----------|---------|------|
+| Worklet callback | ±2.7ms | GT Ultra, JamCracker | Engine's worklet posts on row change |
+| `setInterval(4ms)` | ±2ms | SF2 | Polling C64 RAM, no worklet callback |
+| rAF polling (60Hz) | ±8ms | ❌ Avoid | Visible jitter in stepped scroll |
+
+**Rule:** Never poll position with rAF alone. Use either worklet callbacks (preferred)
+or a high-frequency interval (4ms). The SF2 engine splits its capture loop:
+- rAF (60Hz) for flight recorder / SID register sampling (visual rate)
+- `setInterval(4ms)` for position polling (sub-frame accuracy)
+
+### Canvas Integration
+
+The `PatternEditorCanvas` reads `getFormatPlaybackState()` every frame in both
+the WebGL worker overlay and Canvas2D fallback RAF loops:
+
+```typescript
+// Worker overlay path (macOS):
+const fps = getFormatPlaybackState();
+const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
+let newRow = formatCurrentRowRef.current;  // From React prop
+// Smooth offset calculated from fps.rowDuration + fps.rowChangeTime
+
+// Canvas2D path (iOS/fallback):
+const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
+playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
+```
+
+**Important:** The `formatIsPlaying` prop controls whether the canvas uses
+FormatPlaybackState for scrolling. Order matrices pass `formatIsPlaying={false}`
+to prevent scrolling with the pattern — they track song position via their own
+`formatCurrentRow` prop instead.
+
+---
+
+## Format-Specific Views
+
+### Layout Pattern
+
+All format views follow the same structure:
+
+```tsx
+<div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+  {/* Toolbar — 36px, format info + transport */}
+  <div style={{ height: 36, flexShrink: 0 }}>
+    <MyFormatToolbar />
+  </div>
+
+  {/* Order matrix — collapsible, optional */}
+  <div style={{ height: matrixH, flexShrink: 0 }}>
+    <MyOrderMatrix collapsed={collapsed} onToggleCollapse={toggle} />
+  </div>
+
+  {/* Pattern editor — flex: 1 fills remaining space */}
+  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+    <PatternEditorCanvas
+      formatColumns={FORMAT_COLUMNS}
+      formatChannels={channels}
+      formatCurrentRow={currentRow}
+      formatIsPlaying={isPlaying}
+      onFormatCellChange={handleCellChange}
+      onFormatCursorChange={handleCursorChange}  // Optional: sync canvas cursor → store
+    />
+  </div>
+</div>
+```
+
+### Format Adapter Hook Pattern
+
+Every format needs a hook that converts its store data to `FormatChannel[]`:
+
+```typescript
+export function useMyFormatFormatData() {
+  const playing = useMyFormatStore(s => s.playing);
+  const playbackRow = useMyFormatStore(s => s.playbackPos.row);
+  const cursorRow = useMyFormatStore(s => s.cursor.row);
+  const playbackPos = useMyFormatStore(s => s.playbackPos);
+  const orderCursor = useMyFormatStore(s => s.orderCursor);
+
+  // Switch between playback position and cursor position
+  const currentOrderPos = playing ? playbackPos.songPos : orderCursor;
+  const displayRow = playing ? playbackRow : cursorRow;
+
+  const channels = useMemo(() =>
+    convertToFormatChannels(storeData, currentOrderPos),
+    [storeData, currentOrderPos],
+  );
+
+  const handleCellChange = useCallback((chIdx, rowIdx, colKey, value) => {
+    // Write to engine/store
+    engine.setCell(chIdx, rowIdx, colKey, value);
+    store.refresh();
+  }, [currentOrderPos]);
+
+  return { channels, currentRow: displayRow, isPlaying: playing, handleCellChange };
+}
+```
+
+**Critical:** `displayRow` must return `cursorRow` when stopped, not `0`. Without
+this, arrow key navigation doesn't scroll the pattern.
+
+### FormatChannel / ColumnDef Types
+
+Define your format's columns in an adapter file:
+
+```typescript
+import type { ColumnDef, FormatChannel, FormatCell } from '@/components/shared/format-editor-types';
+
+export const MY_FORMAT_COLUMNS: ColumnDef[] = [
+  { key: 'note',       label: 'Not', type: 'note', width: 3, emptyValue: 0 },
+  { key: 'instrument', label: 'Ins', type: 'hex',  width: 2, emptyValue: 0xFF,
+    color: '#80c0ff' },
+  { key: 'command',    label: 'Cmd', type: 'hex',  width: 2, emptyValue: 0,
+    color: '#ffe080' },
+  { key: 'data',       label: 'Dat', type: 'hex',  width: 2, emptyValue: 0,
+    color: '#ffe080' },
+];
+```
+
+Column types: `note` (C-4 style), `hex` (2-digit hex), `ctrl` (special formatting).
+`emptyValue` determines what renders as "··" (dots) vs a real value.
+
+### Keyboard Handler Pattern
+
+Format-specific keyboard handlers handle note entry, hex editing, and format-specific
+shortcuts. Navigation (arrows, PgUp/PgDn, Home/End) is handled by the canvas itself.
+
+```typescript
+export function useMyFormatKeyboardHandler(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is in an input field
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // QWERTY piano entry
+      const pianoOffset = PIANO_MAP[e.key.toLowerCase()];
+      if (pianoOffset !== undefined && !e.ctrlKey && !e.metaKey) {
+        const note = pianoOffset + octave * 12;
+        store.setNote(cursor.row, cursor.channel, note);
+        e.preventDefault();
+        return;
+      }
+
+      // Hex entry for instrument/command columns
+      const hexVal = parseHex(e.key);
+      if (hexVal !== null && cursor.columnType !== 'note') {
+        // ... handle hex digit entry
+      }
+
+      // Format-specific shortcuts
+      if (e.key === ' ') { togglePlayback(); e.preventDefault(); }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [active]);
+}
+```
+
+**Rule:** Do NOT handle arrow keys, PgUp/PgDn, Home/End in the keyboard handler.
+The `PatternEditorCanvas` handles all navigation with smooth hold-to-scroll in its
+internal RAF loop. Duplicating navigation in the keyboard handler causes conflicts.
+
+Use `onFormatCursorChange` callback to sync the canvas cursor back to the format store:
+
+```tsx
+<PatternEditorCanvas
+  onFormatCursorChange={(row, channel) => {
+    store.setCursor({ row, channel });
+  }}
+/>
+```
+
+---
+
+## Order Matrix / Trackstep Editor
+
+### Using PatternEditorCanvas as an Order Matrix
+
+The same `PatternEditorCanvas` can render order matrices by passing order data as
+`formatChannels` with one row per order entry:
+
+```tsx
+<PatternEditorCanvas
+  formatColumns={ORDER_COLUMNS}
+  formatChannels={orderChannels}
+  formatCurrentRow={songPos}
+  formatIsPlaying={false}         // ← Order matrix does NOT scroll with playback
+  onFormatCellChange={handleOrderChange}
+  hideVUMeters={true}
+  hideAutomationLanes={true}
+/>
+```
+
+**Key:** `formatIsPlaying={false}` prevents the order matrix from using
+`FormatPlaybackState` for scrolling. Instead, it centers on `formatCurrentRow`
+(the song position from the Zustand store). The store updates when the engine
+reports a new order position, which triggers a React re-render and prop change.
+
+### Using SongOrderMatrix (Shared Component)
+
+For simpler order editors, use the shared `SongOrderMatrix` component:
+
+```tsx
+import { SongOrderMatrix } from '@/components/shared/SongOrderMatrix';
+
+<SongOrderMatrix
+  label="POSITIONS"
+  width={width}
+  height={height}
+  formatColumns={positionColumns}
+  formatChannels={positionChannels}
+  currentRow={currentPosition}
+  onCellChange={handleCellChange}
+  collapsed={collapsed}
+  onToggleCollapse={toggle}
+/>
+```
+
+This wraps `PatternEditorCanvas` with a collapsible container, label bar, and
+keyboard shortcuts for block selection (Ctrl+C/X/V/A).
+
+### Special Order Values
+
+Order matrices often have special command values (repeat, transpose, end marker).
+Use column `formatter` functions to decode them:
+
+```typescript
+const ORDER_COLUMN: ColumnDef = {
+  key: 'order',
+  label: 'Ord',
+  type: 'hex',
+  width: 2,
+  emptyValue: -1,
+  formatter: (val: number) => {
+    if (val === 0xFF) return { text: 'EN', color: '#ff6060' };  // End marker
+    if (val >= 0xD0 && val <= 0xDF) return { text: `R${val - 0xD0}`, color: '#60ff60' };
+    return null;  // Use default hex rendering
+  },
+};
+```
+
+---
+
+## Extension Conflict Resolution
+
+Multiple formats sometimes share the same file extension (e.g., `.sng` is used by
+both GoatTracker and AdPlug/EdPlayer/SNGPlay). The resolution pattern:
+
+### Magic Byte Check Before Fallback
+
+In `src/lib/file/UnifiedFileLoader.ts`, check magic bytes BEFORE the generic
+extension-based routing:
+
+```typescript
+// In loadFile():
+
+// 1. Check magic bytes for formats that share extensions
+if (filename.endsWith('.sng')) {
+  const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
+  const buf = await file.arrayBuffer();
+  if (isGoatTrackerSong(buf)) {
+    return await loadSongFile(file, options, buf);  // → GoatTracker
+  }
+  // Not GoatTracker → fall through to AdPlug
+}
+
+// 2. Generic extension-based routing
+if (isAdPlugWasmFormat(filename)) {
+  return await loadAdPlugFile(file, options.companionFiles);
+}
+```
+
+### SoundFont vs SID Factory II (.sf2)
+
+Another example: `.sf2` is shared by SoundFont 2 (RIFF container) and SID Factory II
+(C64 PRG with 0x1337 magic). The parser checks RIFF header first:
+
+```typescript
+if (isRIFFHeader(data))  → route to SoundFont loader
+if (magic === 0x1337)    → route to SID Factory II parser
+```
+
+### Rules for Extension Conflicts
+
+1. **Magic byte checks MUST come before extension-based routing** in `loadFile()`
+2. **Lazy-load detection functions** — `await import()` avoids circular deps
+3. **Read file bytes only when needed** — `file.arrayBuffer()` is async; don't read
+   eagerly for every file
+4. **Document the conflict** — add a comment explaining which formats share the extension
+
+### Known Extension Conflicts
+
+| Extension | Formats | Resolution |
+|-----------|---------|------------|
+| `.sng` | GoatTracker, AdPlug (EdPlayer/SNGPlay) | Magic bytes: `GTS!`/`GTS2-5` = GoatTracker |
+| `.sf2` | SoundFont 2, SID Factory II | RIFF header = SoundFont, 0x1337 = SF2 |
+| `.mod` | ProTracker, SoundTracker, NoiseTracker | M.K. / FLT4 / etc. magic at offset 1080 |
+
+---
+
+## Engine Position Reporting Patterns
+
+### Pattern 1: Worklet Callback (Best — GT Ultra, JamCracker)
+
+The engine's AudioWorklet fires a callback at the exact moment a row changes.
+Zero jitter, precise timing.
+
+```typescript
+// In engine init:
+engine.onPosition = (pos: { row: number; pos: number }) => {
+  setFormatPlaybackRow(pos.row);
+  store.updatePlaybackPos({ row: pos.row, songPos: pos.pos });
+};
+```
+
+**Deduplication pattern** (closured state):
+```typescript
+onPosition: (() => {
+  let lastRow = -1;
+  let lastPos = -1;
+  return (pos) => {
+    setFormatPlaybackRow(pos.row);  // Always (lightweight singleton)
+    if (pos.row !== lastRow || pos.pos !== lastPos) {
+      lastRow = pos.row;
+      lastPos = pos.pos;
+      store.updatePlaybackPos({ row: pos.row, songPos: pos.pos });  // Only on change
+    }
+  };
+})(),
+```
+
+### Pattern 2: High-Frequency Polling (SF2 — C64 RAM reads)
+
+When the engine doesn't expose a position callback (e.g., C64 emulation via
+ScriptProcessor), poll at high frequency with `setInterval`:
+
+```typescript
+// Start two parallel loops:
+
+// 1. rAF (60Hz) — visual-rate sampling (oscilloscope, SID registers)
+const captureTick = () => {
+  flightRecorder.capture(sidEngine);
+  captureRAFId = requestAnimationFrame(captureTick);
+};
+captureRAFId = requestAnimationFrame(captureTick);
+
+// 2. setInterval (4ms ≈ 250Hz) — precise position polling
+const pollPosition = () => {
+  const seqRow = readRAM(driverCommon.sequenceIndexAddress) ?? 0;
+  const orderIdx = readRAM(driverCommon.orderListIndexAddress) ?? 0;
+
+  // Read speed from driver memory for exact row duration
+  const eventDuration = readRAM(driverCommon.currentSeqEventDurationAddress) ?? 0;
+  if (eventDuration > 0) {
+    setFormatPlaybackRowDuration(eventDuration * 20);  // PAL: 20ms per tick
+  }
+
+  if (seqRow !== lastSeqRow) {
+    lastSeqRow = seqRow;
+    setFormatPlaybackRow(seqRow);
+  }
+};
+positionPollId = window.setInterval(pollPosition, 4);
+```
+
+**Why 4ms?** rAF (60Hz) gives ±8ms detection jitter. In stepped scroll mode
+(no interpolation), this causes visible speed variation — some rows display
+for 7 frames, others for 8. `setInterval(4ms)` reduces jitter to ±2ms,
+which is imperceptible.
+
+### Pattern 3: Transport Store (Hively — Standard Tracker Path)
+
+Some format views don't use `FormatPlaybackState` at all. They read from the
+standard `useTransportStore` which is updated by `TrackerReplayer`:
+
+```typescript
+const isPlaying = useTransportStore(s => s.isPlaying);
+const currentRow = useTransportStore(s => s.currentRow);
+```
+
+This works when the format's engine is wired through `NativeEngineRouting.ts`
+and the standard replayer position sync path.
+
+---
+
+## Updated Checklist (Full Format with Custom View)
+
+### Core Integration
+- [ ] **FormatRegistry entry** — key, label, extensions, family, parser ref
+- [ ] **Parser** — returns valid `TrackerSong` with patterns, instruments, positions
+- [ ] **BPM/speed** — row timing matches actual format playback rate
+- [ ] **Extension conflict** — magic byte check if extension is shared
+- [ ] **Type check** — `npm run type-check` passes
+
+### Engine
+- [ ] **Engine class** — init, play, stop, pause, resume
+- [ ] **Position reporting** — worklet callback OR high-frequency polling
+- [ ] **FormatPlaybackState** — `setFormatPlaybackRow()` + `setFormatPlaybackPlaying()`
+- [ ] **Row duration** — `setFormatPlaybackRowDuration()` if polling (not callback)
+- [ ] **Mute/solo** — `setMuteMask(mask)` or per-channel mute API
+- [ ] **Cleanup on stop** — cancel rAF, clear intervals, reset FormatPlaybackState
+
+### Store
+- [ ] **Zustand store** — pattern data, playback position, cursor, instruments
+- [ ] **Position update action** — `updatePlaybackPos({ row, songPos })`
+- [ ] **Cursor action** — `setCursor({ row, channel })`
+- [ ] **Cell edit actions** — write note/instrument/command/data per cell
+
+### View
+- [ ] **Format view component** — toolbar + optional order matrix + PatternEditorCanvas
+- [ ] **Format adapter hook** — `useMyFormatFormatData()` returning FormatChannel[]
+- [ ] **Column definitions** — note, instrument, command columns with formatters
+- [ ] **Cell change handler** — maps column keys to store/engine writes
+- [ ] **displayRow** — returns `cursorRow` when stopped, `playbackRow` when playing
+- [ ] **Cursor sync** — `onFormatCursorChange` callback bridges canvas → store
+
+### Keyboard
+- [ ] **Keyboard handler hook** — QWERTY piano entry + hex editing
+- [ ] **No arrow key handling** — canvas handles all navigation
+- [ ] **Format shortcuts** — space (transport), octave switch, order navigation
+
+### Order Matrix (optional)
+- [ ] **Order matrix component** — `PatternEditorCanvas` with `formatIsPlaying={false}`
+- [ ] **Song position tracking** — reads `songPos` from store
+- [ ] **Special value formatting** — end markers, repeat commands, transpose values
+
+---
+
+## Updated File Map
+
+| Purpose | Path |
+|---------|------|
+| Format registry | `src/lib/import/FormatRegistry.ts` |
+| File loader (extension routing) | `src/lib/file/UnifiedFileLoader.ts` |
+| Import dispatcher | `src/lib/import/parseModuleToSong.ts` |
+| TrackerSong interface | `src/engine/TrackerReplayer.ts` |
+| PlaybackCoordinator | `src/engine/PlaybackCoordinator.ts` |
+| **Format playback singleton** | **`src/engine/FormatPlaybackState.ts`** |
+| **Format editor types** | **`src/components/shared/format-editor-types.ts`** |
+| **Shared order matrix** | **`src/components/shared/SongOrderMatrix.tsx`** |
+| Pattern editor canvas | `src/components/tracker/PatternEditorCanvas.tsx` |
+| WASM position store | `src/stores/useWasmPositionStore.ts` |
+| Native engine routing | `src/engine/replayer/NativeEngineRouting.ts` |
+
+### Reference Implementations by Model
+
+| Model | Format | Key Files |
+|-------|--------|-----------|
+| A (Pure TS) | MOD/XM/IT | `src/lib/import/formats/XMParser.ts` |
+| B (WASM Streaming) | AdPlug | `src/lib/import/AdPlugPlayer.ts`, `public/adplug/` |
+| C (Native Engine) | libopenmpt | `src/engine/libopenmpt/LibopenmptEngine.ts` |
+| D (UADE Hybrid) | Future Composer | `src/lib/import/formats/FutureComposerParser.ts` |
+| **E (Custom View)** | **GT Ultra** | **`src/engine/gtultra/`, `src/components/gtultra/`, `src/stores/useGTUltraStore.ts`** |
+| **E (Custom View)** | **SID Factory II** | **`src/engine/sf2/`, `src/components/sidfactory2/`, `src/stores/useSF2Store.ts`** |
+| **E (Custom View)** | **JamCracker** | **`src/engine/jamcracker/`, `src/components/jamcracker/`, `src/hooks/useJamCrackerData.ts`** |
+| **E (Custom View)** | **Hively/AHX** | **`src/components/hively/`, `src/stores/useHivelyStore.ts`** |
