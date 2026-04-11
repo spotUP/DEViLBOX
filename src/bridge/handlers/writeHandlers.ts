@@ -872,10 +872,15 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm)$/i;
       const canUseLibopenmpt = useLib && libopenmptExts.test(filename);
 
-      if (canUseLibopenmpt || (format?.nativeOnly && !format?.nativeParser)) {
-        // Use the standard import pipeline for libopenmpt formats AND nativeOnly
-        // formats without dedicated parsers (XRNS, Furnace, etc.) that have their
-        // own handling in loadModuleFile and must NOT fall through to UADE.
+      // Formats that loadModuleFile handles via its own native parser (useNativeParser):
+      // .fur, .dmf, .xrns — plus .xm/.mod which are covered by canUseLibopenmpt above.
+      // Other nativeOnly formats (Organya, PxTone, Eupmini, etc.) do NOT have parsers
+      // in loadModuleFile — they are routed via AmigaFormatParsers in parseModuleToSong.
+      const moduleLoaderNativeExts = /\.(fur|dmf|xrns)$/i;
+      const needsModuleLoader = canUseLibopenmpt || moduleLoaderNativeExts.test(filename);
+      if (needsModuleLoader) {
+        // Use the standard import pipeline for libopenmpt formats AND formats
+        // with native parsers in ModuleLoader (Furnace, DefleMask, XRNS).
         const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
         const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
         const moduleInfo = await loadModuleFile(file);
