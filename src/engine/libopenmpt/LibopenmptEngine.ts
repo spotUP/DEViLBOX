@@ -437,21 +437,22 @@ export class LibopenmptEngine {
 
     await this.loadTune(tuneData);
 
-    // Route output exactly once per engine instance. The destination is
-    // typically the stereo separation chain's input node; pass null to
-    // route directly to context.destination.
-    if (!this._routed) {
-      const target = opts.destination ?? this.output.context.destination;
+    // Route output to the destination node (typically the stereo separation
+    // chain's input). Reconnect every time — the TrackerReplayer may have been
+    // recreated by HMR with a new separationNode, but this engine singleton
+    // persists. Disconnecting first is safe even if nothing was connected.
+    if (opts.destination) {
+      try { this.output.disconnect(); } catch { /* nothing was connected */ }
       try {
-        this.output.connect(target);
-        this._routed = true;
+        this.output.connect(opts.destination);
       } catch (err) {
         console.warn('[LibopenmptEngine] startWithCoordinator: routing failed, falling back to context.destination:', err);
-        try {
-          this.output.connect(this.output.context.destination);
-          this._routed = true;
-        } catch { /* truly broken — return failure */ }
+        try { this.output.connect(this.output.context.destination); } catch { /* truly broken */ }
       }
+    } else if (!this._routed) {
+      // No destination provided (DJ deck or first-ever call) — route to context.destination once
+      try { this.output.connect(this.output.context.destination); } catch { /* ignored */ }
+      this._routed = true;
     }
 
     // Apply current stereo separation setting from the settings store.
