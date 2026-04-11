@@ -1299,7 +1299,7 @@ function App() {
 
         {/* Global Status Bar (includes MIDI Knob Bar) — hidden in VJ view */}
         {activeView !== 'vj' && (
-          <StatusBar onShowTips={() => openModal('tips', { initialTab: 'tips' })} />
+          <StatusBar />
         )}
       </div>
 
@@ -1345,6 +1345,9 @@ function App() {
                 if (result.success === 'pending-import') {
                   // Auto-import without showing dialog — use parseModuleToSong
                   // which correctly routes UADE/TFMX formats with companion files
+                  const { suppressFormatChecks: sfc, restoreFormatChecks: rfc } = await import('@/lib/formatCompatibility');
+                  sfc();
+                  try {
                   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
                   const song = await parseModuleToSong(file, 0, undefined, undefined, companionFiles);
                   const { useTrackerStore: ts } = await import('./stores/useTrackerStore');
@@ -1365,6 +1368,7 @@ function App() {
                   trs.getState().setBPM(song.initialBPM ?? 125);
                   ps.getState().setMetadata({ name: song.name });
                   fs.getState().applyEditorMode(song);
+                  } finally { rfc(); }
                 } else if (result.success === true) {
                   notify.success(result.message);
                 } else if (result.success === false) {
