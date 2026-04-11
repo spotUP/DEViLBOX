@@ -214,6 +214,7 @@ const VINYL_CONDITION_PRESETS = [
 export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
+  onUpdateParameters,
   onUpdateWet,
 }) => {
   // Notify the worklet that the editor is open so it produces audio for preview
@@ -283,18 +284,25 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
             <button
               key={p.label}
               onClick={() => {
-                onUpdateParameter('hiss',            p.hiss);
-                onUpdateParameter('dust',            p.dust);
-                onUpdateParameter('age',             p.age);
-                onUpdateParameter('riaa',            p.riaa);
-                onUpdateParameter('stylusResonance', p.stylusResonance);
-                onUpdateParameter('wornStylus',      p.wornStylus);
-                onUpdateParameter('pinch',           p.pinch);
-                onUpdateParameter('innerGroove',     p.innerGroove);
-                onUpdateParameter('ghostEcho',       p.ghostEcho);
-                onUpdateParameter('dropout',         p.dropout);
-                onUpdateParameter('warp',            p.warp);
-                onUpdateParameter('eccentricity',    p.eccentricity);
+                const allParams: Record<string, number> = {
+                  hiss: p.hiss,
+                  dust: p.dust,
+                  age: p.age,
+                  riaa: p.riaa,
+                  stylusResonance: p.stylusResonance,
+                  wornStylus: p.wornStylus,
+                  pinch: p.pinch,
+                  innerGroove: p.innerGroove,
+                  ghostEcho: p.ghostEcho,
+                  dropout: p.dropout,
+                  warp: p.warp,
+                  eccentricity: p.eccentricity,
+                };
+                if (onUpdateParameters) {
+                  onUpdateParameters(allParams);
+                } else {
+                  Object.entries(allParams).forEach(([key, value]) => onUpdateParameter(key, value));
+                }
               }}
               className={[
                 'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all',
