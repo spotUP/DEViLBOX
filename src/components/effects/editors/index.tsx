@@ -27,6 +27,7 @@ import type { VisualEffectEditorProps } from './shared';
 import { DistortionEditor, ReverbEditor, DelayEditor, ChorusEditor, PhaserEditor, TremoloEditor, VibratoEditor } from './BasicEffectEditors';
 import { AutoFilterEditor, CompressorEditor, EQ3Editor, FilterEditor, DubFilterEditor, SidechainCompressorEditor, MoogFilterEditor } from './FilterEffectEditors';
 import { BiPhaseEditor, TapeSaturationEditor, VinylNoiseEditor, MVerbEditor, LeslieEditor, SpringReverbEditor, KissOfShameEditor } from './VintageEffectEditors';
+import { AelapseEditor } from './AelapseEditor';
 import { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, TumultEditor } from './DelayVariantEditors';
 import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
@@ -115,6 +116,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   MVerb: MVerbEditor,
   Leslie: LeslieEditor,
   SpringReverb: SpringReverbEditor,
+  Aelapse: AelapseEditor,
   TapeDegradation: TapeDegradationEditor,
   AmbientDelay: AmbientDelayEditor,
   ShimmerReverb: ShimmerReverbEditor,
