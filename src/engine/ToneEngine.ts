@@ -469,12 +469,20 @@ export class ToneEngine {
       const destCtx = nativeDestination.context;
 
       if (sourceCtx !== destCtx) {
-        console.error('[ToneEngine] AudioContext mismatch! Cannot connect nodes from different contexts.',
-          'Source context:', sourceCtx,
-          'Dest context:', destCtx,
-          'Are they same instance?', sourceCtx === destCtx);
-        // Try to reconnect via master output as workaround
-        return;
+        console.warn('[ToneEngine] AudioContext mismatch — bridging via MediaStream.',
+          'Source:', sourceCtx.state, 'Dest:', destCtx.state);
+        // Create a cross-context bridge: source → MediaStreamDestination → MediaStreamSource → dest
+        try {
+          const msDest = (sourceCtx as AudioContext).createMediaStreamDestination();
+          synthOutput.connect(msDest);
+          const msSource = (destCtx as AudioContext).createMediaStreamSource(msDest.stream);
+          msSource.connect(nativeDestination);
+          console.log('[ToneEngine] connectNativeSynth: cross-context bridge established');
+          return;
+        } catch (bridgeErr) {
+          console.error('[ToneEngine] Cross-context bridge failed:', bridgeErr);
+          return;
+        }
       }
 
       try {
