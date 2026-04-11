@@ -26,12 +26,13 @@ export function useGTUltraFormatData(): GTUltraFormatData {
   // NOT from useTransportStore (which tracks the standard tracker engine).
   const gtPlaying = useGTUltraStore((s) => s.playing);
   const playbackRow = useGTUltraStore((s) => s.playbackPos.row);
+  const cursorRow = useGTUltraStore((s) => s.cursor.row);
   const orderData = useGTUltraStore((s) => s.orderData);
   const patternData = useGTUltraStore((s) => s.patternData);
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
   const currentOrderPos = gtPlaying ? playbackPos.songPos : orderCursor;
-  const displayRow = gtPlaying ? playbackRow : 0;
+  const displayRow = gtPlaying ? playbackRow : cursorRow;
 
   const channels = useMemo(
     () => gtUltraToFormatChannels(channelCount, orderData, patternData, currentOrderPos),
