@@ -223,6 +223,17 @@ export class LibopenmptEngine {
       case 'diagIsolation':
         console.log('[LibopenmptEngine] Isolation diagnostics:', msg.data);
         break;
+      case 'isolationDiag':
+        console.log('[LibopenmptEngine] 🔍 Periodic isolation state:', {
+          isolatedBits: '0x' + (msg.data.isolatedBits ?? 0).toString(16),
+          userMuteMask: '0x' + (msg.data.userMuteMask ?? 0).toString(16),
+          effectiveMainMask: '0x' + (msg.data.effectiveMainMask ?? 0).toString(16),
+          channels: msg.data.channels,
+          activeSlots: msg.data.activeSlots,
+          activePorts: msg.data.activePorts,
+          slotMasks: msg.data.slotMasks,
+        });
+        break;
     }
   }
 

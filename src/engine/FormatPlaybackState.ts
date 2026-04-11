@@ -1,21 +1,22 @@
 /**
  * FormatPlaybackState — Lightweight singleton for format-engine playback position.
  *
- * Format engines (GT Ultra, etc.) that bypass the standard TrackerReplayer
+ * Format engines (GT Ultra, SF2, etc.) that bypass the standard TrackerReplayer
  * write their playback row here. The PatternEditorCanvas RAF loop reads it
  * every frame for smooth scrolling — no React props in the hot path.
  *
- * Constant-rate scrolling: instead of recording the wall-clock time when a
- * poll detects a row change (which has jitter), we PREDICT the transition time
- * as `lastChangeTime + rowDuration`. This gives perfectly even timestamps and
- * constant-rate visual scrolling. Hard-resets only happen on seek, pattern
- * boundary, or speed change.
+ * Constant-rate scrolling via free-running clock:
+ * A clock anchored at the first row change advances at exactly rowDuration ms
+ * per row. The canvas calls getClockPosition(now) every frame for perfectly
+ * constant-rate visual scrolling. Engine polls cross-check and re-anchor on
+ * pattern boundaries, seeks, or speed changes.
  */
 
 export interface FormatPlaybackSnapshot {
+  /** Latest polled row (from engine) */
   row: number;
   isPlaying: boolean;
-  /** Predicted timestamp of the most recent row transition */
+  /** Timestamp of last polled row change (for backward compat) */
   rowChangeTime: number;
   /** Milliseconds per row (from explicit duration or rolling average) */
   rowDuration: number;
@@ -25,72 +26,93 @@ const state: FormatPlaybackSnapshot = {
   row: 0,
   isPlaying: false,
   rowChangeTime: 0,
-  rowDuration: 120, // sensible default (~speed 6 at 50 Hz PAL)
+  rowDuration: 120,
 };
 
 let lastRow = -1;
-// When > 0, an engine has set the duration explicitly (e.g. from driver speed)
-// and the rolling average is suppressed.
 let explicitDuration = 0;
-// Duration of the row that just completed — saved before rowDuration is updated
-// for the new row, so predictions use the correct elapsed time.
-let completedRowDuration = 0;
+
+// Free-running clock for constant-rate display
+let clockAnchorTime = 0;
+let clockAnchorRow = 0;
+let clockDuration = 120;  // ms per row for the clock
+
+/**
+ * Get clock-predicted position at the given time. Returns { row, progress }
+ * where row is the integer row number and progress is 0.0-1.0 sub-row.
+ * Advances at a perfectly constant rate of one row per clockDuration ms.
+ */
+export function getClockPosition(now: number): { row: number; progress: number } {
+  if (!state.isPlaying || clockAnchorTime <= 0 || clockDuration <= 0) {
+    return { row: state.row, progress: 0 };
+  }
+  const elapsed = now - clockAnchorTime;
+  if (elapsed < 0) return { row: clockAnchorRow, progress: 0 };
+  const totalRows = elapsed / clockDuration;
+  return {
+    row: clockAnchorRow + Math.floor(totalRows),
+    progress: totalRows - Math.floor(totalRows),
+  };
+}
 
 /**
  * Called by format engines whenever the playback row changes.
- *
- * Instead of recording performance.now() (which has poll jitter), we predict
- * the transition time as `lastChangeTime + completedRowDuration`. This yields
- * perfectly even timestamps → constant-rate scrolling. We hard-reset only when
- * the prediction is unreasonable (seek, pattern boundary, speed change).
+ * Anchors the clock on first call; re-anchors on pattern boundaries or seeks.
  */
 export function setFormatPlaybackRow(row: number): void {
-  if (row !== lastRow) {
-    const now = performance.now();
+  if (row === lastRow) return;
+  const now = performance.now();
 
-    // Predict when this transition actually happened
-    const dur = completedRowDuration > 0 ? completedRowDuration : state.rowDuration;
-    if (state.rowChangeTime > 0 && dur > 0) {
-      const predicted = state.rowChangeTime + dur;
-      // Accept prediction if it's in the past and within one row-duration of now.
-      // Otherwise hard-reset (seek, pattern boundary, or major desync).
-      if (predicted <= now + 2 && (now - predicted) < dur) {
-        state.rowChangeTime = predicted;
-      } else {
-        state.rowChangeTime = now;
-      }
-
-      // Rolling-average duration for engines that don't set explicit duration
-      // (e.g. GT Ultra). Uses the predicted-corrected timestamp for accuracy.
-      if (explicitDuration <= 0) {
-        const dt = now - (state.rowChangeTime - dur); // time since previous predicted transition
-        if (dt > 5 && dt < 2000) {
-          state.rowDuration = state.rowDuration * 0.85 + dt * 0.15;
-        }
-      }
-    } else {
-      // First row change — no history to predict from
-      state.rowChangeTime = now;
+  if (clockAnchorTime <= 0) {
+    // First row — start the clock
+    clockAnchorTime = now;
+    clockAnchorRow = row;
+  } else {
+    const { row: clockRow } = getClockPosition(now);
+    // Re-anchor on pattern boundary (row wrapped backwards) or major drift (>1 row)
+    if (row < lastRow || Math.abs(row - clockRow) > 1) {
+      clockAnchorTime = now;
+      clockAnchorRow = row;
     }
-
-    // Save current rowDuration as "completed" for the next prediction.
-    // This is the duration of the row that is NOW starting — when it ends,
-    // we'll use this value to predict when the next transition happened.
-    completedRowDuration = state.rowDuration;
-
-    lastRow = row;
-    state.row = row;
+    // Small drift (±1 row): clock self-corrects, don't re-anchor
   }
+
+  // Rolling-average duration for engines without explicit duration (GT Ultra)
+  if (explicitDuration <= 0 && state.rowChangeTime > 0) {
+    const dt = now - state.rowChangeTime;
+    if (dt > 5 && dt < 2000) {
+      state.rowDuration = state.rowDuration * 0.85 + dt * 0.15;
+      // Also update clock duration to track actual speed
+      if (clockDuration !== state.rowDuration) {
+        clockDuration = state.rowDuration;
+      }
+    }
+  }
+
+  lastRow = row;
+  state.row = row;
+  state.rowChangeTime = now;
 }
 
 /**
  * Set an explicit row duration in ms (overrides the rolling average).
- * Use when the engine knows the exact speed (e.g. SF2 driver speed * 20ms).
- * Pass 0 to revert to measurement-based estimation.
+ * Re-anchors the clock at the current position so the new speed takes effect
+ * immediately without a visual jump.
  */
 export function setFormatPlaybackRowDuration(ms: number): void {
   explicitDuration = ms;
-  if (ms > 0) {
+  if (ms > 0 && ms !== clockDuration) {
+    // Speed changed — re-anchor clock at current position
+    const now = performance.now();
+    if (clockAnchorTime > 0) {
+      const { row: clockRow, progress } = getClockPosition(now);
+      clockAnchorRow = clockRow;
+      // Anchor slightly in the past to preserve current sub-row progress
+      clockAnchorTime = now - progress * ms;
+    }
+    clockDuration = ms;
+    state.rowDuration = ms;
+  } else if (ms > 0) {
     state.rowDuration = ms;
   }
 }
@@ -100,7 +122,8 @@ export function setFormatPlaybackPlaying(playing: boolean): void {
   if (!playing) {
     lastRow = -1;
     explicitDuration = 0;
-    completedRowDuration = 0;
+    clockAnchorTime = 0;
+    clockAnchorRow = 0;
   }
 }
 
@@ -116,5 +139,7 @@ export function resetFormatPlaybackState(): void {
   state.rowDuration = 120;
   lastRow = -1;
   explicitDuration = 0;
-  completedRowDuration = 0;
+  clockAnchorTime = 0;
+  clockAnchorRow = 0;
+  clockDuration = 120;
 }
