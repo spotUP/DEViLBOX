@@ -1095,7 +1095,7 @@ async function main(): Promise<void> {
   if (pushResults) console.log(`  Push:   results -> http://localhost:4444`);
   console.log('');
 
-  const client = new MCPBridgeClient(WS_URL);
+  let client = new MCPBridgeClient(WS_URL);
   try {
     await client.ready();
   } catch (err) {
@@ -1119,31 +1119,31 @@ async function main(): Promise<void> {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       result = await runTest(client, test);
 
-      // Detect interference: if we got "No browser connected", the WS relay
-      // lost the browser tab (another agent may have navigated away or
-      // reloaded). Back off and retry.
-      const isInterference = result.status === 'fail' && (
+      // Detect transient failures: browser tab crashed/reloaded, WS relay
+      // lost connection, another agent interfered, etc.
+      const isTransient = result.status === 'fail' && (
         result.reason?.includes('No browser connected') ||
+        result.reason?.includes('Browser disconnected') ||
+        result.reason?.includes('Connection closed') ||
+        result.reason?.includes('Bridge not connected') ||
         result.reason?.includes('timed out') ||
         result.reason?.includes('WebSocket is not open')
       );
 
-      if (!isInterference || attempt >= MAX_RETRIES) break;
+      if (!isTransient || attempt >= MAX_RETRIES) break;
 
       // Back off: log a warning and wait before retrying
       const waitMs = RETRY_BACKOFF_MS * (attempt + 1);
-      process.stdout.write(`\n    -> browser busy (attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${waitMs / 1000}s)... `);
+      process.stdout.write(`\n    -> browser disconnected (attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${waitMs / 1000}s)... `);
       await sleep(waitMs);
 
-      // Reconnect if the WS dropped
-      try { await client.ready(); } catch {
-        // Try to create a fresh connection
-        try {
-          client.close();
-          const freshClient = new MCPBridgeClient(WS_URL);
-          await freshClient.ready();
-          // Can't reassign const — just wait and hope the bridge recovers
-        } catch { /* give up on reconnect */ }
+      // Reconnect the WS client
+      try {
+        client.close();
+        client = new MCPBridgeClient(WS_URL);
+        await client.ready();
+      } catch {
+        // Connection failed — will retry on next attempt
       }
     }
 

@@ -18,6 +18,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getToneEngine } from '../../engine/ToneEngine';
+import { suppressFormatChecks, restoreFormatChecks } from '../../lib/formatCompatibility';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
@@ -183,7 +184,12 @@ export function removeFromOrder(params: Record<string, unknown>): Record<string,
 // ─── Transport ─────────────────────────────────────────────────────────────────
 
 export function setBpm(params: Record<string, unknown>): Record<string, unknown> {
-  useTransportStore.getState().setBPM(params.bpm as number);
+  suppressFormatChecks();
+  try {
+    useTransportStore.getState().setBPM(params.bpm as number);
+  } finally {
+    restoreFormatChecks();
+  }
   return { ok: true };
 }
 
@@ -856,10 +862,12 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       throw new Error(loadResult.error || `Failed to load ${filename}`);
     }
     if (loadResult.success === 'pending-confirmation') {
-      throw new Error(`${filename} requires user confirmation before loading`);
+      throw new Error(`${filename} requires user confirmation before loading (format dialog suppressed)`);
     }
     // For tracker modules that need the import dialog, bypass it and import directly.
     if (loadResult.success === 'pending-import') {
+      suppressFormatChecks();
+      try {
       const useLib = params.useLibopenmpt === true;
       const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm)$/i;
       const canUseLibopenmpt = useLib && libopenmptExts.test(filename);
@@ -930,6 +938,9 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
         trs.getState().setBPM(song.initialBPM ?? 125);
         ps.getState().setMetadata({ name: song.name });
         fs.getState().applyEditorMode(song);
+      }
+      } finally {
+        restoreFormatChecks();
       }
       loadResult = { success: true, message: 'imported' };
     }

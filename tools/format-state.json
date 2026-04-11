@@ -4568,7 +4568,10 @@
   },
   "midi": {
     "status": "works",
-    "notes": ""
+    "notes": "smoke-test PASS -- rms=0.0939 [audio=ok, inst=5/ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.093923,
+    "instrumentCount": 5
   },
   "titanicsPacker": {
     "status": "works",
@@ -5814,57 +5817,69 @@
   },
   "fx-reverb": {
     "auditStatus": "fixed",
-    "notes": "OK [decay:1.3dB] diff=-3.0dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -23.6,
     "diffDb": -3,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119227,
+    "instrumentCount": 0
   },
   "fx-delay": {
-    "auditStatus": "fail",
-    "notes": "Audio OK, KNOBS DEAD [delayTime:0.3dB] diff=-1.2dB",
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
     "rmsDb": -21.8,
     "diffDb": -1.2,
     "initMs": null,
     "knobsWork": false,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119061,
+    "instrumentCount": 0
   },
   "fx-chorus": {
     "auditStatus": "fixed",
-    "notes": "OK [depth:0.9dB] diff=4.1dB",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
     "rmsDb": -16.4,
     "diffDb": 4.1,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119126,
+    "instrumentCount": 0
   },
   "fx-phaser": {
-    "auditStatus": "fail",
-    "notes": "Audio OK, KNOBS DEAD [frequency:0.0dB] diff=-0.1dB",
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
     "rmsDb": -20.6,
     "diffDb": -0.1,
     "initMs": null,
     "knobsWork": false,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.11935,
+    "instrumentCount": 0
   },
   "fx-tremolo": {
     "auditStatus": "fixed",
-    "notes": "OK [depth:2.9dB] diff=-0.0dB",
+    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
     "rmsDb": -20.6,
     "diffDb": 0,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119539,
+    "instrumentCount": 0
   },
   "fx-vibrato": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0790 diff=-1.5dB",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
     "rmsDb": -22.1,
     "diffDb": -1.5,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119144,
+    "instrumentCount": 0
   },
   "fx-autofilter": {
     "auditStatus": "fixed",
@@ -5886,12 +5901,14 @@
   },
   "fx-autowah": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0892 diff=-0.5dB",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
     "rmsDb": -21,
     "diffDb": -0.5,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119085,
+    "instrumentCount": 0
   },
   "fx-bitcrusher": {
     "auditStatus": "fixed",
@@ -5922,12 +5939,14 @@
   },
   "fx-eq3": {
     "auditStatus": "fixed",
-    "notes": "OK [low:1.1dB] diff=-0.7dB",
+    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
     "rmsDb": -21.2,
     "diffDb": -0.7,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119538,
+    "instrumentCount": 0
   },
   "fx-feedbackdelay": {
     "auditStatus": "fixed",
@@ -5940,12 +5959,14 @@
   },
   "fx-filter": {
     "auditStatus": "fixed",
-    "notes": "OK [frequency:1.1dB] diff=-1.0dB",
+    "notes": "smoke-test PASS -- rms=0.1199 [] (2026-04-11)",
     "rmsDb": -21.5,
     "diffDb": -1,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119851,
+    "instrumentCount": 0
   },
   "fx-frequencyshifter": {
     "auditStatus": "fixed",
@@ -5958,12 +5979,14 @@
   },
   "fx-jcreverb": {
     "auditStatus": "fixed",
-    "notes": "OK [roomSize:2.1dB] diff=2.5dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -18,
     "diffDb": 2.5,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119241,
+    "instrumentCount": 0
   },
   "fx-pingpongdelay": {
     "auditStatus": "fixed",
@@ -6003,12 +6026,14 @@
   },
   "fx-biphase": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1069 diff=1.1dB",
+    "notes": "smoke-test PASS -- rms=0.1202 [] (2026-04-11)",
     "rmsDb": -19.4,
     "diffDb": 1.1,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.120234,
+    "instrumentCount": 0
   },
   "fx-dubfilter": {
     "auditStatus": "fixed",
@@ -6065,22 +6090,26 @@
     "failHistory": null
   },
   "fx-mverb": {
-    "auditStatus": "fail",
-    "notes": "SILENT rms=0.000000 diff=-79.5dB",
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
     "rmsDb": -100,
     "diffDb": -79.5,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119398,
+    "instrumentCount": 0
   },
   "fx-leslie": {
-    "auditStatus": "fail",
-    "notes": "CRASH: Browser disconnected",
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1202 [] (2026-04-11)",
     "rmsDb": -16.9,
     "diffDb": -0.1,
     "initMs": null,
     "knobsWork": false,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.120166,
+    "instrumentCount": 0
   },
   "fx-springreverb": {
     "auditStatus": "fixed",
@@ -6102,12 +6131,14 @@
   },
   "fx-tonearm": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1387 diff=-0.4dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -17.2,
     "diffDb": -0.4,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119196,
+    "instrumentCount": 0
   },
   "fx-shimmerreverb": {
     "auditStatus": "fixed",
@@ -6156,21 +6187,25 @@
   },
   "fx-limiter": {
     "auditStatus": "fixed",
-    "notes": "OK [threshold:17.1dB] diff=2.3dB",
+    "notes": "smoke-test PASS -- rms=0.1214 [] (2026-04-11)",
     "rmsDb": -14.5,
     "diffDb": 2.3,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.121384,
+    "instrumentCount": 0
   },
   "fx-flanger": {
     "auditStatus": "fixed",
-    "notes": "OK [depth:0.7dB] diff=-3.0dB",
+    "notes": "smoke-test PASS -- rms=0.1189 [] (2026-04-11)",
     "rmsDb": -19.8,
     "diffDb": -3,
     "initMs": null,
     "knobsWork": true,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118901,
+    "instrumentCount": 0
   },
   "fx-overdrive": {
     "auditStatus": "fixed",
@@ -6183,12 +6218,14 @@
   },
   "fx-ringmod": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0674 diff=-6.7dB",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
     "rmsDb": -23.4,
     "diffDb": -6.7,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119303,
+    "instrumentCount": 0
   },
   "fx-dragonflyplate": {
     "auditStatus": "fixed",
@@ -6246,21 +6283,25 @@
   },
   "fx-tubeamp": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1156 diff=-2.0dB",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
     "rmsDb": -18.7,
     "diffDb": -2,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119142,
+    "instrumentCount": 0
   },
   "fx-deesser": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1204 diff=-1.6dB",
+    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
     "rmsDb": -18.4,
     "diffDb": -1.6,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119515,
+    "instrumentCount": 0
   },
   "fx-multibandcomp": {
     "auditStatus": "fixed",
@@ -6291,12 +6332,14 @@
   },
   "fx-expander": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1155 diff=-2.0dB",
+    "notes": "smoke-test PASS -- rms=0.1196 [] (2026-04-11)",
     "rmsDb": -18.7,
     "diffDb": -2,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119648,
+    "instrumentCount": 0
   },
   "fx-reversedelay": {
     "auditStatus": "fixed",
@@ -6336,12 +6379,14 @@
   },
   "fx-zamdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0912 diff=-4.0dB",
+    "notes": "smoke-test PASS -- rms=0.1197 [] (2026-04-11)",
     "rmsDb": -20.8,
     "diffDb": -4,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119658,
+    "instrumentCount": 0
   },
   "fx-saturator": {
     "auditStatus": "fixed",
@@ -6354,30 +6399,36 @@
   },
   "fx-exciter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1794 diff=1.8dB",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
     "rmsDb": -14.9,
     "diffDb": 1.8,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118838,
+    "instrumentCount": 0
   },
   "fx-autosat": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1838 diff=2.1dB",
+    "notes": "smoke-test PASS -- rms=0.1197 [] (2026-04-11)",
     "rmsDb": -14.7,
     "diffDb": 2.1,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119669,
+    "instrumentCount": 0
   },
   "fx-satma": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1403 diff=-0.3dB",
+    "notes": "smoke-test PASS -- rms=0.1199 [] (2026-04-11)",
     "rmsDb": -17.1,
     "diffDb": -0.3,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119888,
+    "instrumentCount": 0
   },
   "fx-distortionshaper": {
     "auditStatus": "fixed",
@@ -6390,12 +6441,14 @@
   },
   "fx-monocomp": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0998 diff=-3.3dB",
+    "notes": "smoke-test PASS -- rms=0.1203 [] (2026-04-11)",
     "rmsDb": -20,
     "diffDb": -3.3,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.120329,
+    "instrumentCount": 0
   },
   "fx-sidechaingate": {
     "auditStatus": "fail",
@@ -6435,12 +6488,14 @@
   },
   "fx-clipper": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1132 diff=-2.2dB",
+    "notes": "smoke-test PASS -- rms=0.1187 [] (2026-04-11)",
     "rmsDb": -18.9,
     "diffDb": -2.2,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118735,
+    "instrumentCount": 0
   },
   "fx-dynamicsproc": {
     "auditStatus": "fixed",
@@ -6453,21 +6508,25 @@
   },
   "fx-x42comp": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0666 diff=-6.8dB",
+    "notes": "smoke-test PASS -- rms=0.1200 [] (2026-04-11)",
     "rmsDb": -23.5,
     "diffDb": -6.8,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119961,
+    "instrumentCount": 0
   },
   "fx-ducka": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0795 diff=-5.2dB",
+    "notes": "smoke-test PASS -- rms=0.1196 [] (2026-04-11)",
     "rmsDb": -22,
     "diffDb": -5.2,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119575,
+    "instrumentCount": 0
   },
   "fx-beatbreather": {
     "auditStatus": "fixed",
@@ -6507,12 +6566,14 @@
   },
   "fx-gottcomp": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1263 diff=-1.2dB",
+    "notes": "smoke-test PASS -- rms=0.1198 [] (2026-04-11)",
     "rmsDb": -18,
     "diffDb": -1.2,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.11976,
+    "instrumentCount": 0
   },
   "fx-maximizer": {
     "auditStatus": "fixed",
@@ -6525,66 +6586,80 @@
   },
   "fx-agc": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1509 diff=0.3dB",
+    "notes": "smoke-test PASS -- rms=0.1201 [] (2026-04-11)",
     "rmsDb": -16.4,
     "diffDb": 0.3,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.120134,
+    "instrumentCount": 0
   },
   "fx-panda": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0878 diff=-4.4dB",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
     "rmsDb": -21.1,
     "diffDb": -4.4,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119332,
+    "instrumentCount": 0
   },
   "fx-eq5band": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1598 diff=0.8dB",
+    "notes": "smoke-test PASS -- rms=0.1187 [] (2026-04-11)",
     "rmsDb": -15.9,
     "diffDb": 0.8,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118718,
+    "instrumentCount": 0
   },
   "fx-eq8band": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1192 diff=-1.7dB",
+    "notes": "smoke-test PASS -- rms=0.1185 [] (2026-04-11)",
     "rmsDb": -18.5,
     "diffDb": -1.7,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118509,
+    "instrumentCount": 0
   },
   "fx-eq12band": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1194 diff=-1.7dB",
+    "notes": "smoke-test PASS -- rms=0.1199 [] (2026-04-11)",
     "rmsDb": -18.5,
     "diffDb": -1.7,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119946,
+    "instrumentCount": 0
   },
   "fx-geq31": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1233 diff=-1.4dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -18.2,
     "diffDb": -1.4,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119214,
+    "instrumentCount": 0
   },
   "fx-zameq2": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1462 diff=0.1dB",
+    "notes": "smoke-test PASS -- rms=0.1201 [] (2026-04-11)",
     "rmsDb": -16.7,
     "diffDb": 0.1,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.120124,
+    "instrumentCount": 0
   },
   "fx-phonofilter": {
     "auditStatus": "fixed",
@@ -6606,12 +6681,14 @@
   },
   "fx-kuiza": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1234 diff=-1.4dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -18.2,
     "diffDb": -1.4,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119235,
+    "instrumentCount": 0
   },
   "fx-haasenhancer": {
     "auditStatus": "fixed",
@@ -6651,12 +6728,14 @@
   },
   "fx-vihda": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1327 diff=-0.8dB",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
     "rmsDb": -17.5,
     "diffDb": -0.8,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119131,
+    "instrumentCount": 0
   },
   "fx-earlyreflections": {
     "auditStatus": "fixed",
@@ -6669,30 +6748,36 @@
   },
   "fx-pulsator": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1022 diff=-3.1dB",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
     "rmsDb": -19.8,
     "diffDb": -3.1,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118994,
+    "instrumentCount": 0
   },
   "fx-masha": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1609 diff=0.9dB",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
     "rmsDb": -15.9,
     "diffDb": 0.9,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119022,
+    "instrumentCount": 0
   },
   "fx-vinyl": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1610 diff=0.9dB",
+    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
     "rmsDb": -15.9,
     "diffDb": 0.9,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119475,
+    "instrumentCount": 0
   },
   "fx-multichorus": {
     "auditStatus": "fixed",
@@ -6714,39 +6799,47 @@
   },
   "fx-della": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0440 diff=-10.4dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -27.1,
     "diffDb": -10.4,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119213,
+    "instrumentCount": 0
   },
   "fx-driva": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1887 diff=2.3dB",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
     "rmsDb": -14.5,
     "diffDb": 2.3,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119378,
+    "instrumentCount": 0
   },
   "fx-roomy": {
-    "auditStatus": "fail",
-    "notes": "SILENT rms=0.000000 diff=0.0dB",
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -100,
     "diffDb": 0,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119183,
+    "instrumentCount": 0
   },
   "fx-bitta": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1548 diff=0.6dB",
+    "notes": "smoke-test PASS -- rms=0.1189 [] (2026-04-11)",
     "rmsDb": -16.2,
     "diffDb": 0.6,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.118856,
+    "instrumentCount": 0
   },
   "masterfx-noisegate": {
     "auditStatus": "fixed",
@@ -7295,30 +7388,36 @@
   },
   "fx-tumult": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1567 diff=0.7dB",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
     "rmsDb": -16.1,
     "diffDb": 0.7,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119212,
+    "instrumentCount": 0
   },
   "fx-vocoder": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.3487 diff=7.6dB",
+    "notes": "smoke-test PASS -- rms=0.1198 [] (2026-04-11)",
     "rmsDb": -9.2,
     "diffDb": 7.6,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119826,
+    "instrumentCount": 0
   },
   "fx-autotune": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1735 diff=1.6dB",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
     "rmsDb": -15.2,
     "diffDb": 1.6,
     "initMs": null,
     "knobsWork": null,
-    "failHistory": null
+    "failHistory": null,
+    "rmsAvg": 0.119392,
+    "instrumentCount": 0
   },
   "fx-buzzdistortion": {
     "auditStatus": "unknown",
@@ -7865,23 +7964,31 @@
   },
   "mod": {
     "auditStatus": "fixed",
-    "notes": "8/8 smoke + 10/10 pc-audit — OpenMPT routed post-refactor",
-    "status": "works"
+    "notes": "smoke-test PASS -- rms=0.0479 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "status": "works",
+    "rmsAvg": 0.047922,
+    "instrumentCount": 31
   },
   "s3m": {
     "auditStatus": "fixed",
-    "notes": "10/10 pc-audit — OpenMPT routed",
-    "status": "works"
+    "notes": "smoke-test PASS -- rms=0.0040 [audio=ok, inst=99/ok, export=ok] (2026-04-11)",
+    "status": "works",
+    "rmsAvg": 0.004004,
+    "instrumentCount": 99
   },
   "it": {
     "auditStatus": "fixed",
-    "notes": "10/10 pc-audit — OpenMPT routed",
-    "status": "works"
+    "notes": "smoke-test PASS -- rms=0.0148 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "status": "works",
+    "rmsAvg": 0.014763,
+    "instrumentCount": 31
   },
   "xm": {
     "auditStatus": "fixed",
-    "notes": "10/10 pc-audit — OpenMPT routed",
-    "status": "works"
+    "notes": "smoke-test PASS -- rms=0.0262 [audio=ok, inst=53/ok, export=ok] (2026-04-11)",
+    "status": "works",
+    "rmsAvg": 0.026154,
+    "instrumentCount": 53
   },
   "activisionPro": {
     "status": "works",
@@ -7937,7 +8044,10 @@
   },
   "desire": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0010 [audio=ok, inst=8/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.001048,
+    "instrumentCount": 8
   },
   "digitalSoundStudio": {
     "status": "works",
@@ -7969,7 +8079,10 @@
   },
   "infogrames": {
     "status": "works",
-    "notes": "Captain Blood + Advantage Tennis play with companion .ins files"
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: advantage tennis-bruits.dum (ret=-1) [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fail",
+    "rmsAvg": 0.000223,
+    "instrumentCount": 1
   },
   "inStereo1": {
     "status": "works",
@@ -7981,8 +8094,10 @@
   },
   "jamcracker": {
     "status": "works",
-    "notes": "smoke pass — JamCrackerEngine",
-    "auditStatus": "fixed"
+    "notes": "smoke-test PASS -- rms=0.1453 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.145293,
+    "instrumentCount": 6
   },
   "jankoMrsicFlogel": {
     "status": "works",
@@ -8084,7 +8199,10 @@
   },
   "soundfx": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0916 [audio=ok, inst=15/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.091628,
+    "instrumentCount": 15
   },
   "soundmon": {
     "status": "works",
@@ -8104,7 +8222,10 @@
   },
   "synthesis": {
     "status": "works",
-    "notes": "ch=4 pat=412 rms=0.0603"
+    "notes": "smoke-test PASS -- rms=0.0601 [audio=ok, inst=1/ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.060131,
+    "instrumentCount": 1
   },
   "tcbTracker": {
     "status": "works",
@@ -8112,8 +8233,10 @@
   },
   "tfmx": {
     "status": "works",
-    "notes": "smoke pass — TFMXEngine",
-    "auditStatus": "fixed"
+    "notes": "smoke-test PASS -- rms=0.0005 [audio=ok, inst=128/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.000535,
+    "instrumentCount": 128
   },
   "thomasHermann": {
     "status": "works",
@@ -8154,8 +8277,10 @@
   },
   "hvl": {
     "status": "works",
-    "notes": "smoke pass — HivelyEngine (not OpenMPT)",
-    "auditStatus": "fixed"
+    "notes": "smoke-test PASS -- rms=0.1200 [audio=ok, inst=36/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.12,
+    "instrumentCount": 36
   },
   "imagesMusicSystem": {
     "status": "works",
@@ -8183,7 +8308,10 @@
   },
   "okt": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0003 [audio=ok, inst=36/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.000327,
+    "instrumentCount": 36
   },
   "peterVerswyvelenPacker": {
     "status": "works",
@@ -8223,7 +8351,10 @@
   },
   "actionamics": {
     "status": "works",
-    "notes": "UADE engine (verified working) - no individual test file"
+    "notes": "smoke-test PASS -- rms=0.0001 [audio=ok, inst=39/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.000093,
+    "instrumentCount": 39
   },
   "ams": {
     "status": "works",
@@ -8243,7 +8374,10 @@
   },
   "medley": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fail",
+    "rmsAvg": 0.071923,
+    "instrumentCount": 1
   },
   "midiLoriciel": {
     "status": "works",
@@ -8367,7 +8501,10 @@
   },
   "sawteeth": {
     "status": "works",
-    "notes": "UADE engine (verified working) - no individual test file"
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: okolaNUKE.st (ret=-1) [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fail",
+    "rmsAvg": 0.000865,
+    "instrumentCount": 6
   },
   "specialFX": {
     "status": "works",
@@ -8383,7 +8520,10 @@
   },
   "amf": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0702 [audio=ok, inst=5/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.07021,
+    "instrumentCount": 5
   },
   "cdfm67": {
     "status": "works",
@@ -8400,7 +8540,10 @@
   },
   "mdl": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0673 [audio=ok, inst=22/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.067321,
+    "instrumentCount": 22
   },
   "dtm": {
     "status": "works",
@@ -8408,7 +8551,10 @@
   },
   "plm": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.1117 [audio=ok, inst=34/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.111747,
+    "instrumentCount": 34
   },
   "easyTrax": {
     "status": "works",
@@ -8430,7 +8576,10 @@
   },
   "gdm": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.1005 [audio=ok, inst=18/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.100491,
+    "instrumentCount": 18
   },
   "itp": {
     "status": "works",
@@ -8446,7 +8595,10 @@
   },
   "mo3": {
     "status": "works",
-    "notes": "10/10 — export fix worked"
+    "notes": "smoke-test PASS -- rms=0.0485 [audio=ok, inst=11/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.04851,
+    "instrumentCount": 11
   },
   "madTracker2": {
     "status": "works",
@@ -8466,15 +8618,24 @@
   },
   "psm": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0561 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.056116,
+    "instrumentCount": 31
   },
   "ptm": {
     "status": "works",
-    "notes": "10/10 (dialog blocked retest)"
+    "notes": "smoke-test PASS -- rms=0.0505 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.05046,
+    "instrumentCount": 6
   },
   "rtm": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0476 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.047582,
+    "instrumentCount": 31
   },
   "stm": {
     "status": "works",
@@ -8499,7 +8660,10 @@
   },
   "ult": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke-test PASS -- rms=0.0430 [audio=ok, inst=26/ok, export=ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.042997,
+    "instrumentCount": 26
   },
   "xmf": {
     "status": "works",
@@ -8588,7 +8752,10 @@
   },
   "organya": {
     "status": "works",
-    "notes": "Cave Story engine — Organya WASM (Organya.wasm)"
+    "notes": "smoke-test FAIL -- 1 console error(s): [LibopenmptEngine] Worklet error: dur [audio=ok, inst=0/ok] (2026-04-11)",
+    "auditStatus": "fail",
+    "rmsAvg": 0.073618,
+    "instrumentCount": 0
   },
   "cpsycle": {
     "status": "works",
@@ -8600,7 +8767,10 @@
   },
   "v2m": {
     "status": "works",
-    "notes": "Farbrausch V2 synth — V2MPlayer WASM (V2MPlayer.wasm)"
+    "notes": "smoke-test PASS -- rms=0.0276 [audio=ok, inst=11/ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.027592,
+    "instrumentCount": 11
   },
   "zxtune": {
     "status": "works",
@@ -8608,8 +8778,10 @@
   },
   "sc68": {
     "status": "silent",
-    "notes": "SC68 loads in sc68 mode — WASM engine known silent, needs engine fix",
-    "auditStatus": "fixed"
+    "notes": "smoke-test PASS -- rms=0.2828 [audio=ok, inst=1/ok] (2026-04-11)",
+    "auditStatus": "fixed",
+    "rmsAvg": 0.282815,
+    "instrumentCount": 1
   },
   "adplug-rad": {
     "status": "works",
@@ -8844,5 +9016,1355 @@
   "adplug-xsm": {
     "auditStatus": "fixed",
     "notes": "browser OK [eXtra Simple Music] rms=0.0442"
+  },
+  "activision-p": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=10/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 10
+  },
+  "anders-oland": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=8/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 8
+  },
+  "art-of-noise": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=7/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 7
+  },
+  "audio-sculpt": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 11
+  },
+  "bp-soundmon": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1391 [audio=ok, inst=15/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.139052,
+    "instrumentCount": 15
+  },
+  "beathoven-sy": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0739 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.073919,
+    "instrumentCount": 4
+  },
+  "composer-667": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "composer-670": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: amnesia1.c67 (ret=-1) [audio=ok, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0.000092,
+    "instrumentCount": 0
+  },
+  "core-design": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=8/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 8
+  },
+  "custommade": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=9/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 9
+  },
+  "darius-zende": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 11
+  },
+  "david-whitta": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.6691 [audio=ok, inst=1/ok] (2026-04-11)",
+    "rmsAvg": 0.669057,
+    "instrumentCount": 1
+  },
+  "delitracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0011 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.001092,
+    "instrumentCount": 4
+  },
+  "delta-music": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.3690 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.368991,
+    "instrumentCount": 6
+  },
+  "digital-mugi": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1007 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.100743,
+    "instrumentCount": 6
+  },
+  "digital-soni": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.2161 [audio=ok, inst=19/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.216145,
+    "instrumentCount": 19
+  },
+  "digital-soun": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0951 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.095092,
+    "instrumentCount": 31
+  },
+  "digital-symp": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0663 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.066308,
+    "instrumentCount": 31
+  },
+  "digital-trac": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0214 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.021387,
+    "instrumentCount": 31
+  },
+  "disorder-tra": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1116 [audio=ok, inst=34/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.111564,
+    "instrumentCount": 34
+  },
+  "earache": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0336 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.033558,
+    "instrumentCount": 4
+  },
+  "fm-tracker": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "face-the-mus": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0440 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.044029,
+    "instrumentCount": 6
+  },
+  "farandole-co": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0582 [audio=ok, inst=15/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.058171,
+    "instrumentCount": 15
+  },
+  "fashion-trac": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=128/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.070372,
+    "instrumentCount": 128
+  },
+  "follin-playe": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0653 [audio=ok, inst=5/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.065274,
+    "instrumentCount": 5
+  },
+  "forgotten-wo": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0002 [audio=ok, inst=2/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.00019,
+    "instrumentCount": 2
+  },
+  "fred-gray": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.3521 [audio=ok, inst=2/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.352052,
+    "instrumentCount": 2
+  },
+  "fredmon": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1904 [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.190427,
+    "instrumentCount": 20
+  },
+  "future-compo": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0008 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000768,
+    "instrumentCount": 1
+  },
+  "future-playe": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0473 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.047334,
+    "instrumentCount": 1
+  },
+  "game-music-c": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0612 [audio=ok, inst=15/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.06123,
+    "instrumentCount": 15
+  },
+  "general-digi": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0388 [audio=ok, inst=27/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.038785,
+    "instrumentCount": 27
+  },
+  "gluemon": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1587 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.158689,
+    "instrumentCount": 1
+  },
+  "goat-tracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0006 [audio=ok, inst=63/ok] (2026-04-11)",
+    "rmsAvg": 0.000644,
+    "instrumentCount": 63
+  },
+  "graoumf-trac": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0891 [audio=ok, inst=33/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.089098,
+    "instrumentCount": 33
+  },
+  "hippel": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0889 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.088905,
+    "instrumentCount": 1
+  },
+  "hippel-7v": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0006 [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000641,
+    "instrumentCount": 20
+  },
+  "hippel-coso": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=32/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 32
+  },
+  "hippel-st": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 1
+  },
+  "hippel-st-co": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0748 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.074774,
+    "instrumentCount": 1
+  },
+  "his-masters": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0319 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.03194,
+    "instrumentCount": 31
+  },
+  "hively-track": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1043 [audio=ok, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.104304,
+    "instrumentCount": 11
+  },
+  "hivelytracke": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1054 [audio=ok, inst=36/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.105351,
+    "instrumentCount": 36
+  },
+  "howie-davies": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1549 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.154924,
+    "instrumentCount": 4
+  },
+  "iff-smus": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: 633 SQUADRON.smus (ret=-1) [audio=ok, inst=5/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.00126,
+    "instrumentCount": 5
+  },
+  "images-music": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1224 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.122367,
+    "instrumentCount": 31
+  },
+  "impulse-trac": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0160 [audio=ok, inst=50/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.015966,
+    "instrumentCount": 50
+  },
+  "instereo": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0922 [audio=ok, inst=12/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.09223,
+    "instrumentCount": 12
+  },
+  "instereo-2": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0718 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.071825,
+    "instrumentCount": 1
+  },
+  "janko-mrsic": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.211576,
+    "instrumentCount": 1
+  },
+  "jason-brooke": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0908 [audio=ok, inst=5/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.090804,
+    "instrumentCount": 5
+  },
+  "jason-page": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0388 [audio=ok, inst=18/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.038821,
+    "instrumentCount": 18
+  },
+  "jason-page-o": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1377 [audio=ok, inst=32/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.13768,
+    "instrumentCount": 32
+  },
+  "jeroen-tel": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0989 [audio=ok, inst=2/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.098874,
+    "instrumentCount": 2
+  },
+  "jesper-olsen": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: georgglaxo ingame.jo (ret=-1) [audio=ok, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0.00034,
+    "instrumentCount": 0
+  },
+  "klystrack": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=64/ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 64
+  },
+  "leggless-mus": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1461 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.14613,
+    "instrumentCount": 1
+  },
+  "midi-loricie": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0873 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.087321,
+    "instrumentCount": 1
+  },
+  "mad-tracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0251 [audio=ok, inst=23/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.025108,
+    "instrumentCount": 23
+  },
+  "maniacs-of-n": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 4
+  },
+  "mark-cooksey": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0872 [audio=ok, inst=64/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.087186,
+    "instrumentCount": 64
+  },
+  "mark-ii": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1836 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.1836,
+    "instrumentCount": 4
+  },
+  "maxtrax": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: mxtx.contraptionzack-agro (ret=-1) [audio=ok, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0.000413,
+    "instrumentCount": 0
+  },
+  "multi-tracke": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0523 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.052321,
+    "instrumentCount": 31
+  },
+  "multimedia-s": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.2027 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.202708,
+    "instrumentCount": 1
+  },
+  "music-assemb": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1381 [audio=ok, inst=30/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.138098,
+    "instrumentCount": 30
+  },
+  "musicmaker-v": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1934 [audio=ok, inst=10/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.193362,
+    "instrumentCount": 10
+  },
+  "musicline-ed": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1312 [audio=ok, inst=8/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.131158,
+    "instrumentCount": 8
+  },
+  "octamed-mmd0": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1879 [audio=ok, inst=3/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.187927,
+    "instrumentCount": 3
+  },
+  "octamed-mmd1": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1882 [audio=ok, inst=12/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.188206,
+    "instrumentCount": 12
+  },
+  "octamed-mmd3": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: bounty hunter - outro (remixed).mmd3 (ret=-1) [audio=ok, inst=12/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.200287,
+    "instrumentCount": 12
+  },
+  "octamed-mmdc": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.106675,
+    "instrumentCount": 1
+  },
+  "octalyser": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0781 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.078116,
+    "instrumentCount": 31
+  },
+  "oktalyzer": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0805 [audio=ok, inst=36/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.080481,
+    "instrumentCount": 36
+  },
+  "paul-shields": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0583 [audio=ok, inst=15/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.058305,
+    "instrumentCount": 15
+  },
+  "paul-summers": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0305 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.030522,
+    "instrumentCount": 6
+  },
+  "piston-colla": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [LibopenmptEngine] Worklet error: dur [audio=ok, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0.075499,
+    "instrumentCount": 0
+  },
+  "pollytracker": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- call('load_file') timed out after 60000ms [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "pretracker": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Browser disconnected [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "professional": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1319 [audio=ok, inst=8/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.131865,
+    "instrumentCount": 8
+  },
+  "protracker-i": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0231 [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.02312,
+    "instrumentCount": 20
+  },
+  "pumatracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0511 [audio=ok, inst=12/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.051077,
+    "instrumentCount": 12
+  },
+  "quadra-compo": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1256 [audio=ok, inst=9/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.125614,
+    "instrumentCount": 9
+  },
+  "quartet-psg": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0830 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.082984,
+    "instrumentCount": 1
+  },
+  "real-tracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0475 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.047495,
+    "instrumentCount": 31
+  },
+  "richard-jose": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: aquatic games.sng (ret=-1) [audio=ok, inst=63/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000608,
+    "instrumentCount": 63
+  },
+  "riff-raff": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.192746,
+    "instrumentCount": 4
+  },
+  "rob-hubbard": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0002 [audio=ok, inst=5/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000172,
+    "instrumentCount": 5
+  },
+  "ron-klaren": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 11
+  },
+  "scream-track": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0103 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.010322,
+    "instrumentCount": 31
+  },
+  "sean-connoll": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.14429,
+    "instrumentCount": 4
+  },
+  "sean-conran": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0349 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.034931,
+    "instrumentCount": 13
+  },
+  "sid-factory": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0490 [audio=ok, inst=32/ok] (2026-04-11)",
+    "rmsAvg": 0.049014,
+    "instrumentCount": 32
+  },
+  "sidmon-1": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0885 [audio=ok, inst=23/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.088504,
+    "instrumentCount": 23
+  },
+  "sidmon-2": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1386 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.138557,
+    "instrumentCount": 1
+  },
+  "silmarils": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0744 [audio=ok, inst=39/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.074405,
+    "instrumentCount": 39
+  },
+  "sonic-arrang": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=10/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 10
+  },
+  "sonix": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 11
+  },
+  "sound-master": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [LibopenmptEngine] Worklet error: dur [audio=ok, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.01207,
+    "instrumentCount": 11
+  },
+  "soundcontrol": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0453 [audio=ok, inst=15/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.045279,
+    "instrumentCount": 15
+  },
+  "soundfactory": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0899 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.089853,
+    "instrumentCount": 4
+  },
+  "special-fx": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0902 [audio=ok, inst=16/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.090166,
+    "instrumentCount": 16
+  },
+  "speedy-a1-sy": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0360 [audio=ok, inst=3/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.036,
+    "instrumentCount": 3
+  },
+  "speedy-syste": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0819 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.081894,
+    "instrumentCount": 31
+  },
+  "startrekker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0157 [audio=ok, inst=10/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.015703,
+    "instrumentCount": 10
+  },
+  "steve-barret": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 2 console error(s): [UADEEngine] UADE could not play: amnesia1.c67 (ret=-1) [audio=ok, inst=0/ok] (2026-04-11)",
+    "rmsAvg": 0.000461,
+    "instrumentCount": 0
+  },
+  "stonetracker": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=8/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 8
+  },
+  "studio-pixel": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0014 [audio=ok, inst=9/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.001359,
+    "instrumentCount": 9
+  },
+  "suntronic": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0007 [audio=ok, inst=11/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000735,
+    "instrumentCount": 11
+  },
+  "sunvox": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0146 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.014648,
+    "instrumentCount": 6
+  },
+  "symphonie": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1168 [audio=ok, inst=9/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.116826,
+    "instrumentCount": 9
+  },
+  "synth-dream": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [UADEEngine] Failed to reload song for playback [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.222959,
+    "instrumentCount": 1
+  },
+  "tcb-tracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.2766 [audio=ok, inst=4/ok] (2026-04-11)",
+    "rmsAvg": 0.276564,
+    "instrumentCount": 4
+  },
+  "tfm-music-ma": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0151 [audio=ok, inst=4/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.015127,
+    "instrumentCount": 4
+  },
+  "tss": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- 1 console error(s): [LibopenmptEngine] Worklet error: dur [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.258534,
+    "instrumentCount": 20
+  },
+  "the-musical": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.2043 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.204267,
+    "instrumentCount": 6
+  },
+  "tomy-tracker": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=8/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 8
+  },
+  "ultra-tracke": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0220 [audio=ok, inst=16/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.021969,
+    "instrumentCount": 16
+  },
+  "v2": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0220 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.021964,
+    "instrumentCount": 31
+  },
+  "velvet-studi": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0162 [audio=ok, inst=22/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.01619,
+    "instrumentCount": 22
+  },
+  "wally-beben": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=27/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 27
+  },
+  "zoundmonitor": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- silent (rmsAvg=0.000000, rmsMax=0.000000, threshold=0.001) [audio=FAIL, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 6
+  },
+  "fur-a2600": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-amiga": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-arcade": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-ay8910": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-ay8930": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-c64": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-esfm": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-gameboy": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-genesis": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-lynx": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-misc": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-msx": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-multichi": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-nes": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-opl": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-opm": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-opz": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-pc98": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-pce": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-sn7": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-snes": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-specs2": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-vic20": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-virtualb": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-wondersw": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-x16": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-x68000": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fur-ymz280b": {
+    "auditStatus": "fail",
+    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "rmsAvg": 0,
+    "instrumentCount": 0
+  },
+  "fx-compress": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1177 [] (2026-04-11)",
+    "rmsAvg": 0.117729,
+    "instrumentCount": 0
+  },
+  "fx-distorti": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
+    "rmsAvg": 0.118822,
+    "instrumentCount": 0
+  },
+  "fx-bitcrush": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119394,
+    "instrumentCount": 0
+  },
+  "fx-chebyshe": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
+    "rmsAvg": 0.118824,
+    "instrumentCount": 0
+  },
+  "fx-tapesatu": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1186 [] (2026-04-11)",
+    "rmsAvg": 0.118588,
+    "instrumentCount": 0
+  },
+  "fx-feedback": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119388,
+    "instrumentCount": 0
+  },
+  "fx-pingpong": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1189 [] (2026-04-11)",
+    "rmsAvg": 0.118947,
+    "instrumentCount": 0
+  },
+  "fx-autopann": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
+    "rmsAvg": 0.119006,
+    "instrumentCount": 0
+  },
+  "fx-autofilt": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
+    "rmsAvg": 0.119314,
+    "instrumentCount": 0
+  },
+  "fx-stereowi": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
+    "rmsAvg": 0.11946,
+    "instrumentCount": 0
+  },
+  "fx-pitchshi": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
+    "rmsAvg": 0.119291,
+    "instrumentCount": 0
+  },
+  "fx-frequenc": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
+    "rmsAvg": 0.118992,
+    "instrumentCount": 0
+  },
+  "fx-dubfilte": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1196 [] (2026-04-11)",
+    "rmsAvg": 0.119613,
+    "instrumentCount": 0
+  },
+  "fx-moogfilt": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119429,
+    "instrumentCount": 0
+  },
+  "fx-ambientd": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119418,
+    "instrumentCount": 0
+  },
+  "fx-sidechai": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "rmsAvg": 0.119141,
+    "instrumentCount": 0
+  },
+  "fx-spaceech": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1184 [] (2026-04-11)",
+    "rmsAvg": 0.118427,
+    "instrumentCount": 0
+  },
+  "fx-spaceyde": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
+    "rmsAvg": 0.118979,
+    "instrumentCount": 0
+  },
+  "fx-retapeec": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
+    "rmsAvg": 0.119173,
+    "instrumentCount": 0
+  },
+  "fx-springre": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1196 [] (2026-04-11)",
+    "rmsAvg": 0.119575,
+    "instrumentCount": 0
+  },
+  "fx-vinylnoi": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1185 [] (2026-04-11)",
+    "rmsAvg": 0.118532,
+    "instrumentCount": 0
+  },
+  "fx-tapesimu": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
+    "rmsAvg": 0.118754,
+    "instrumentCount": 0
+  },
+  "fx-shimmerr": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
+    "rmsAvg": 0.119219,
+    "instrumentCount": 0
+  },
+  "fx-granular": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1198 [] (2026-04-11)",
+    "rmsAvg": 0.119819,
+    "instrumentCount": 0
+  },
+  "fx-tapedegr": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
+    "rmsAvg": 0.118843,
+    "instrumentCount": 0
+  },
+  "fx-maximize": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119402,
+    "instrumentCount": 0
+  },
+  "fx-noisegat": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1185 [] (2026-04-11)",
+    "rmsAvg": 0.118509,
+    "instrumentCount": 0
+  },
+  "fx-multiban": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "rmsAvg": 0.11906,
+    "instrumentCount": 0
+  },
+  "fx-beatbrea": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
+    "rmsAvg": 0.118782,
+    "instrumentCount": 0
+  },
+  "fx-transien": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "rmsAvg": 0.119144,
+    "instrumentCount": 0
+  },
+  "fx-overdriv": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
+    "rmsAvg": 0.118963,
+    "instrumentCount": 0
+  },
+  "fx-dragonfl": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1190 [] (2026-04-11)",
+    "rmsAvg": 0.118954,
+    "instrumentCount": 0
+  },
+  "fx-junochor": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.11937,
+    "instrumentCount": 0
+  },
+  "fx-parametr": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1197 [] (2026-04-11)",
+    "rmsAvg": 0.119659,
+    "instrumentCount": 0
+  },
+  "fx-cabinets": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1206 [] (2026-04-11)",
+    "rmsAvg": 0.120604,
+    "instrumentCount": 0
+  },
+  "fx-bassenha": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1189 [] (2026-04-11)",
+    "rmsAvg": 0.118853,
+    "instrumentCount": 0
+  },
+  "fx-reversed": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1197 [] (2026-04-11)",
+    "rmsAvg": 0.119739,
+    "instrumentCount": 0
+  },
+  "fx-vintaged": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "rmsAvg": 0.119122,
+    "instrumentCount": 0
+  },
+  "fx-artistic": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
+    "rmsAvg": 0.119335,
+    "instrumentCount": 0
+  },
+  "fx-slapback": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1186 [] (2026-04-11)",
+    "rmsAvg": 0.11861,
+    "instrumentCount": 0
+  },
+  "fx-saturato": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1188 [] (2026-04-11)",
+    "rmsAvg": 0.118767,
+    "instrumentCount": 0
+  },
+  "fx-dynamics": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
+    "rmsAvg": 0.119337,
+    "instrumentCount": 0
+  },
+  "fx-dynamice": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119449,
+    "instrumentCount": 0
+  },
+  "fx-phonofil": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
+    "rmsAvg": 0.119313,
+    "instrumentCount": 0
+  },
+  "fx-calfphas": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
+    "rmsAvg": 0.119457,
+    "instrumentCount": 0
+  },
+  "fx-earlyref": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1189 [] (2026-04-11)",
+    "rmsAvg": 0.118854,
+    "instrumentCount": 0
+  },
+  "fx-multicho": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1199 [] (2026-04-11)",
+    "rmsAvg": 0.119905,
+    "instrumentCount": 0
+  },
+  "fx-multispr": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "rmsAvg": 0.119135,
+    "instrumentCount": 0
+  },
+  "fx-haasenha": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1203 [] (2026-04-11)",
+    "rmsAvg": 0.120304,
+    "instrumentCount": 0
+  },
+  "fx-binaural": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "rmsAvg": 0.119374,
+    "instrumentCount": 0
+  },
+  "reg": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.1221 [audio=ok, inst=128/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.122135,
+    "instrumentCount": 128
+  },
+  "mptm": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0745 [audio=ok, inst=17/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.074495,
+    "instrumentCount": 17
+  },
+  "dbm": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0199 [audio=ok, inst=22/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.019901,
+    "instrumentCount": 22
+  },
+  "gt2": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0691 [audio=ok, inst=20/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.069075,
+    "instrumentCount": 20
+  },
+  "mt2": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0035 [audio=ok, inst=49/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.003521,
+    "instrumentCount": 49
+  },
+  "dsym": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0795 [audio=ok, inst=63/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.079457,
+    "instrumentCount": 63
+  },
+  "puma": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0649 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.064886,
+    "instrumentCount": 6
+  },
+  "fc14": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.2316 [audio=ok, inst=10/FAIL, export=ok] (2026-04-11)",
+    "rmsAvg": 0.231623,
+    "instrumentCount": 10
+  },
+  "jam": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0591 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.059149,
+    "instrumentCount": 13
+  },
+  "sid": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0473 [audio=ok, inst=3/ok] (2026-04-11)",
+    "rmsAvg": 0.047289,
+    "instrumentCount": 3
+  },
+  "ahx": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0358 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.035775,
+    "instrumentCount": 13
+  },
+  "ay-amadeus": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0364 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.03635,
+    "instrumentCount": 13
+  },
+  "ay-emul": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0368 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.036786,
+    "instrumentCount": 13
+  },
+  "ay-strc": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0375 [audio=ok, inst=13/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.037469,
+    "instrumentCount": 13
+  },
+  "ashley-hogg": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0003 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000266,
+    "instrumentCount": 1
+  },
+  "ben-daglish": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0345 [audio=ok, inst=3/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.03455,
+    "instrumentCount": 3
+  },
+  "chiptracker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0675 [audio=ok, inst=31/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.067505,
+    "instrumentCount": 31
+  },
+  "composer-669": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0139 [audio=ok, inst=10/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.013921,
+    "instrumentCount": 10
+  },
+  "dave-lowe": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.2377 [audio=ok, inst=6/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.237703,
+    "instrumentCount": 6
+  },
+  "dave-lowe-ne": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0007 [audio=ok, inst=9/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.000673,
+    "instrumentCount": 9
+  },
+  "david-hanney": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0448 [audio=ok, inst=1/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.044781,
+    "instrumentCount": 1
+  },
+  "deflemask": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.3750 [audio=ok, inst=4/ok] (2026-04-11)",
+    "rmsAvg": 0.375014,
+    "instrumentCount": 4
+  },
+  "digi-trakker": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0255 [audio=ok, inst=16/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.025505,
+    "instrumentCount": 16
+  },
+  "digibooster": {
+    "auditStatus": "fixed",
+    "notes": "smoke-test PASS -- rms=0.0195 [audio=ok, inst=22/ok, export=ok] (2026-04-11)",
+    "rmsAvg": 0.019534,
+    "instrumentCount": 22
   }
 }
