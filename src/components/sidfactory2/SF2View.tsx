@@ -42,6 +42,11 @@ export const SF2View: React.FC = () => {
   const orderCursor = useSF2Store((s) => s.orderCursor);
   const loaded = useSF2Store((s) => s.loaded);
   const sequences = useSF2Store((s) => s.sequences);
+  const playMarkers = useSF2Store((s) => s.playMarkers);
+  const selectedMarker = useSF2Store((s) => s.selectedMarker);
+  const sidModel = useSF2Store((s) => s.sidModel);
+  const sidRegion = useSF2Store((s) => s.sidRegion);
+  const notationMode = useSF2Store((s) => s.notationMode);
 
   useSF2KeyboardHandler(loaded);
   useSF2LiveSync();
@@ -79,6 +84,31 @@ export const SF2View: React.FC = () => {
         <span className="text-dark-border">│</span>
         <span className="text-text-muted text-[10px]">{trackCount}ch</span>
         <span className="text-text-muted text-[10px]">{seqCount} seq</span>
+        <span className="text-dark-border">│</span>
+        <span className="text-text-muted text-[10px]">{sidModel}</span>
+        <span className="text-text-muted text-[10px]">{sidRegion}</span>
+        <span className="text-text-muted text-[10px]">{notationMode === 'sharp' ? '♯' : '♭'}</span>
+        <span className="text-dark-border">│</span>
+        {/* Play marker slots */}
+        <div className="flex gap-px">
+          {playMarkers.map((m, i) => (
+            <span
+              key={i}
+              className={`w-4 text-center text-[9px] rounded cursor-pointer ${
+                i === selectedMarker
+                  ? m.isSet ? 'bg-accent-success/30 text-accent-success font-bold' : 'bg-accent-primary/20 text-accent-primary'
+                  : m.isSet ? 'text-accent-success/60' : 'text-text-muted/30'
+              }`}
+              title={m.isSet ? `Marker ${i + 1}: pos ${m.orderPos}:${m.eventPos}` : `Marker ${i + 1}: empty`}
+              onClick={() => {
+                useSF2Store.getState().selectMarker(i);
+                if (m.isSet) useSF2Store.getState().gotoPlayMarker();
+              }}
+            >
+              {i + 1}
+            </span>
+          ))}
+        </div>
         <span className="text-dark-border">│</span>
         <button
           className="px-2 py-0.5 text-[10px] bg-dark-bgSecondary hover:bg-dark-bgTertiary text-text-secondary rounded border border-dark-border disabled:opacity-30"

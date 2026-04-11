@@ -60,7 +60,17 @@
  *
  * Display:
  *   Ctrl+U      = Toggle hex uppercase/lowercase
+ *   Ctrl+N      = Toggle notation mode (Sharp/Flat)
  *   Ctrl+S      = Quick save (export download)
+ *
+ * Play markers:
+ *   Alt+1-8     = Select play marker slot
+ *   Ctrl+M      = Set marker at current position
+ *   Ctrl+G      = Go to selected marker
+ *
+ * Hardware:
+ *   F9          = Toggle SID model (6581/8580)
+ *   Shift+F9    = Toggle region (PAL/NTSC)
  *
  * Note input applies transposition offset (transpose - 0xA0) so stored
  * values are absolute. Display shows transposed notes.
@@ -137,10 +147,52 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (e.key === 'F4' && !e.shiftKey && !mod) { e.preventDefault(); state.setCurrentOctave(currentOctave + 1); return; }
 
     // ── Channel mute: Ctrl+1/2/3 ──
-    if (mod && (e.key === '1' || e.key === '2' || e.key === '3')) {
+    if (mod && !e.altKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
       e.preventDefault();
       const ch = parseInt(e.key) - 1;
       if (ch < state.trackCount) state.toggleChannelMute(ch);
+      return;
+    }
+
+    // ── Play markers: Alt+1-8 to select slot ──
+    if (e.altKey && !mod && !e.shiftKey && e.key >= '1' && e.key <= '8') {
+      e.preventDefault();
+      state.selectMarker(parseInt(e.key) - 1);
+      return;
+    }
+
+    // ── Set marker: Ctrl+M ──
+    if (mod && e.key === 'm' && !e.shiftKey) {
+      e.preventDefault();
+      state.setPlayMarker();
+      return;
+    }
+
+    // ── Goto marker: Ctrl+G ──
+    if (mod && e.key === 'g' && !e.shiftKey) {
+      e.preventDefault();
+      state.gotoPlayMarker();
+      return;
+    }
+
+    // ── Toggle notation mode: Ctrl+N ──
+    if (mod && e.key === 'n' && !e.shiftKey) {
+      e.preventDefault();
+      state.toggleNotationMode();
+      return;
+    }
+
+    // ── SID model toggle: F9 (no mod) ──
+    if (e.key === 'F9' && !mod && !e.shiftKey) {
+      e.preventDefault();
+      state.toggleSIDModel();
+      return;
+    }
+
+    // ── Region toggle: Shift+F9 ──
+    if (e.key === 'F9' && e.shiftKey && !mod) {
+      e.preventDefault();
+      state.toggleRegion();
       return;
     }
 

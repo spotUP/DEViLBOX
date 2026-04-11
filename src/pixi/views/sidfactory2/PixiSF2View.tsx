@@ -34,6 +34,10 @@ export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
   const orderLists = useSF2Store((s) => s.orderLists);
   const orderCursor = useSF2Store((s) => s.orderCursor);
   const loaded = useSF2Store((s) => s.loaded);
+  const sidModel = useSF2Store((s) => s.sidModel);
+  const sidRegion = useSF2Store((s) => s.sidRegion);
+  const playMarkers = useSF2Store((s) => s.playMarkers);
+  const selectedMarker = useSF2Store((s) => s.selectedMarker);
 
   const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
 
@@ -41,11 +45,18 @@ export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
     ? `${descriptor.driverName} v${descriptor.versionMajor}.${String(descriptor.versionMinor).padStart(2, '0')}`
     : '';
 
+  // Play marker summary
+  const markerStr = playMarkers.map((m, i) =>
+    i === selectedMarker ? (m.isSet ? `[${i + 1}]` : `(${i + 1})`) : (m.isSet ? `${i + 1}` : '·')
+  ).join('');
+
   const toolbarInfo = [
     songName || 'Untitled',
     driverVersion,
     `Tracks: ${trackCount}`,
+    `${sidModel} ${sidRegion}`,
     `Pos: ${orderCursor + 1}/${maxOlLen}`,
+    `M:${markerStr}`,
   ].filter(Boolean).join('  |  ');
 
   // Order list overview text with transpose + loop indicators
