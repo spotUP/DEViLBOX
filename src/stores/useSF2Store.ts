@@ -159,6 +159,16 @@ export interface SF2StoreState {
   // Order list cursor
   orderCursor: number;
 
+  // Clipboard
+  clipboard: SF2SeqEvent[] | null;
+
+  // Undo/redo
+  undoStack: SF2UndoEntry[];
+  redoStack: SF2UndoEntry[];
+
+  // Channel mute state
+  channelMutes: boolean[];
+
   // ── Actions ────────────────────────────────────────────────────────────
 
   /** Load parsed SF2 data into the store */
@@ -181,12 +191,34 @@ export interface SF2StoreState {
   // Order list
   setOrderCursor: (idx: number) => void;
   setOrderEntry: (track: number, pos: number, entry: Partial<SF2OrderEntry>) => void;
+  insertOrderEntry: (track: number, pos: number) => void;
+  deleteOrderEntry: (track: number, pos: number) => void;
 
   // Sequence editing
   setSequenceCell: (seqIdx: number, row: number, field: keyof SF2SeqEvent, value: number) => void;
+  insertRow: (seqIdx: number, row: number) => void;
+  deleteRow: (seqIdx: number, row: number) => void;
+
+  // Block operations
+  copyBlock: (seqIdx: number, fromRow: number, toRow: number) => void;
+  cutBlock: (seqIdx: number, fromRow: number, toRow: number) => void;
+  pasteBlock: (seqIdx: number, atRow: number) => void;
+  transposeBlock: (seqIdx: number, fromRow: number, toRow: number, semitones: number) => void;
 
   // Instrument editing
   setInstrumentByte: (instIdx: number, byteOffset: number, value: number) => void;
+
+  // Table editing
+  setTableByte: (tableDef: SF2TableDef, row: number, col: number, value: number) => void;
+
+  // Channel mute
+  toggleChannelMute: (channel: number) => void;
+  soloChannel: (channel: number) => void;
+  unmuteAll: () => void;
+
+  // Undo/redo
+  undo: () => void;
+  redo: () => void;
 
   // Export
   exportSF2File: () => Uint8Array | null;
@@ -206,6 +238,20 @@ export interface SF2LoadPayload {
   instruments: SF2InstrumentData[];
   songName: string;
 }
+
+// ── Undo/redo entry ──────────────────────────────────────────────────────
+
+interface SF2UndoEntry {
+  type: 'sequence' | 'orderList' | 'instrument' | 'table';
+  /** Sequence index or track index */
+  key: number;
+  /** Snapshot of the data before the edit */
+  before: SF2SeqEvent[] | SF2OrderList | Uint8Array;
+}
+
+const MAX_UNDO = 100;
+
+const EMPTY_EVENT: SF2SeqEvent = { note: 0, instrument: 0x80, command: 0x80 };
 
 // ── Initial state ────────────────────────────────────────────────────────
 
@@ -236,6 +282,10 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   followPlay: true,
   playbackPos: { row: 0, songPos: 0 },
   orderCursor: 0,
+  clipboard: null,
+  undoStack: [],
+  redoStack: [],
+  channelMutes: [],
 
   // ── Load ───────────────────────────────────────────────────────────────
 
@@ -257,6 +307,10 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     cursor: { ...INITIAL_CURSOR },
     playbackPos: { row: 0, songPos: 0 },
     orderCursor: 0,
+    clipboard: null,
+    undoStack: [],
+    redoStack: [],
+    channelMutes: new Array(data.musicData.trackCount).fill(false),
   }),
 
   reset: () => set({
@@ -278,6 +332,10 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     playbackPos: { row: 0, songPos: 0 },
     orderCursor: 0,
     playing: false,
+    clipboard: null,
+    undoStack: [],
+    redoStack: [],
+    channelMutes: [],
   }),
 
   // ── Cursor ─────────────────────────────────────────────────────────────
@@ -307,7 +365,28 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
       ol.entries[pos] = { ...ol.entries[pos], ...entry };
     }
     lists[track] = ol;
-    return { orderLists: lists };
+    return { orderLists: lists, redoStack: [] };
+  }),
+
+  insertOrderEntry: (track, pos) => set((s) => {
+    const lists = [...s.orderLists];
+    if (track >= lists.length) return {};
+    const ol = { ...lists[track], entries: [...lists[track].entries] };
+    const newEntry: SF2OrderEntry = { transpose: 0x80, seqIdx: 0 };
+    ol.entries.splice(pos, 0, newEntry);
+    lists[track] = ol;
+    return { orderLists: lists, redoStack: [] };
+  }),
+
+  deleteOrderEntry: (track, pos) => set((s) => {
+    const lists = [...s.orderLists];
+    if (track >= lists.length) return {};
+    const ol = { ...lists[track], entries: [...lists[track].entries] };
+    if (pos >= ol.entries.length || ol.entries.length <= 1) return {};
+    ol.entries.splice(pos, 1);
+    if (ol.loopIndex >= ol.entries.length) ol.loopIndex = ol.entries.length - 1;
+    lists[track] = ol;
+    return { orderLists: lists, redoStack: [] };
   }),
 
   // ── Sequence editing ───────────────────────────────────────────────────
@@ -316,10 +395,126 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     const seqs = new Map(s.sequences);
     const seq = seqs.get(seqIdx);
     if (!seq || row >= seq.length) return {};
+    // Snapshot for undo
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
     const newSeq = [...seq];
     newSeq[row] = { ...newSeq[row], [field]: value };
     seqs.set(seqIdx, newSeq);
-    return { sequences: seqs };
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  insertRow: (seqIdx, row) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq = [...seq];
+    newSeq.splice(row, 0, { ...EMPTY_EVENT });
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  deleteRow: (seqIdx, row) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq || seq.length <= 1 || row >= seq.length) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq = [...seq];
+    newSeq.splice(row, 1);
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  // ── Block operations (clipboard, transpose) ────────────────────────────
+
+  copyBlock: (seqIdx, fromRow, toRow) => set((s) => {
+    const seq = s.sequences.get(seqIdx);
+    if (!seq) return {};
+    const from = Math.max(0, Math.min(fromRow, toRow));
+    const to = Math.min(seq.length - 1, Math.max(fromRow, toRow));
+    const clipboard = seq.slice(from, to + 1).map(e => ({ ...e }));
+    return { clipboard };
+  }),
+
+  cutBlock: (seqIdx, fromRow, toRow) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq) return {};
+    const from = Math.max(0, Math.min(fromRow, toRow));
+    const to = Math.min(seq.length - 1, Math.max(fromRow, toRow));
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const clipboard = seq.slice(from, to + 1).map(e => ({ ...e }));
+    const newSeq = [...seq];
+    // Replace cut region with empty events (don't shrink — matches original SF2 behavior)
+    for (let i = from; i <= to; i++) {
+      newSeq[i] = { ...EMPTY_EVENT };
+    }
+    seqs.set(seqIdx, newSeq);
+    return {
+      clipboard,
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  pasteBlock: (seqIdx, atRow) => set((s) => {
+    if (!s.clipboard || s.clipboard.length === 0) return {};
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq = [...seq];
+    // Overwrite from atRow, extending if necessary
+    for (let i = 0; i < s.clipboard.length; i++) {
+      const targetRow = atRow + i;
+      if (targetRow < newSeq.length) {
+        newSeq[targetRow] = { ...s.clipboard[i] };
+      } else {
+        newSeq.push({ ...s.clipboard[i] });
+      }
+    }
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  transposeBlock: (seqIdx, fromRow, toRow, semitones) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq) return {};
+    const from = Math.max(0, Math.min(fromRow, toRow));
+    const to = Math.min(seq.length - 1, Math.max(fromRow, toRow));
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq = [...seq];
+    for (let i = from; i <= to; i++) {
+      const note = newSeq[i].note;
+      // Only transpose actual notes (1-111), skip rest(0), tie(0x7E), markers
+      if (note >= 1 && note <= 111) {
+        newSeq[i] = { ...newSeq[i], note: Math.max(1, Math.min(111, note + semitones)) };
+      }
+    }
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
   }),
 
   // ── Instrument editing ─────────────────────────────────────────────────
@@ -333,6 +528,82 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     }
     insts[instIdx] = inst;
     return { instruments: insts };
+  }),
+
+  // ── Table editing ──────────────────────────────────────────────────────
+
+  setTableByte: (tableDef, row, col, value) => set((s) => {
+    const addr = tableDef.address + col * tableDef.rowCount + row;
+    if (addr < 0 || addr >= s.c64Memory.length) return {};
+    const newMem = new Uint8Array(s.c64Memory);
+    newMem[addr] = value;
+    return { c64Memory: newMem };
+  }),
+
+  // ── Channel mute ───────────────────────────────────────────────────────
+
+  toggleChannelMute: (channel) => set((s) => {
+    const mutes = [...s.channelMutes];
+    if (channel >= mutes.length) return {};
+    mutes[channel] = !mutes[channel];
+    return { channelMutes: mutes };
+  }),
+
+  soloChannel: (channel) => set((s) => {
+    const mutes = s.channelMutes.map((_, i) => i !== channel);
+    return { channelMutes: mutes };
+  }),
+
+  unmuteAll: () => set((s) => ({
+    channelMutes: s.channelMutes.map(() => false),
+  })),
+
+  // ── Undo/redo ──────────────────────────────────────────────────────────
+
+  undo: () => set((s) => {
+    if (s.undoStack.length === 0) return {};
+    const entry = s.undoStack[s.undoStack.length - 1];
+    const newUndo = s.undoStack.slice(0, -1);
+
+    if (entry.type === 'sequence') {
+      const seqs = new Map(s.sequences);
+      const currentSeq = seqs.get(entry.key);
+      const redoEntry: SF2UndoEntry = {
+        type: 'sequence',
+        key: entry.key,
+        before: currentSeq ? [...currentSeq.map(e => ({ ...e }))] : [],
+      };
+      seqs.set(entry.key, (entry.before as SF2SeqEvent[]).map(e => ({ ...e })));
+      return {
+        sequences: seqs,
+        undoStack: newUndo,
+        redoStack: [...s.redoStack, redoEntry],
+      };
+    }
+    return {};
+  }),
+
+  redo: () => set((s) => {
+    if (s.redoStack.length === 0) return {};
+    const entry = s.redoStack[s.redoStack.length - 1];
+    const newRedo = s.redoStack.slice(0, -1);
+
+    if (entry.type === 'sequence') {
+      const seqs = new Map(s.sequences);
+      const currentSeq = seqs.get(entry.key);
+      const undoEntry: SF2UndoEntry = {
+        type: 'sequence',
+        key: entry.key,
+        before: currentSeq ? [...currentSeq.map(e => ({ ...e }))] : [],
+      };
+      seqs.set(entry.key, (entry.before as SF2SeqEvent[]).map(e => ({ ...e })));
+      return {
+        sequences: seqs,
+        undoStack: [...s.undoStack, undoEntry],
+        redoStack: newRedo,
+      };
+    }
+    return {};
   }),
 
   exportSF2File: () => {

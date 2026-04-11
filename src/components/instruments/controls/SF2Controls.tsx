@@ -244,6 +244,7 @@ const TablesTab: React.FC<{
 }> = ({ tableDefs, c64Memory }) => {
   const [selectedTable, setSelectedTable] = useState(0);
   const td = tableDefs[selectedTable];
+  const setTableByte = useSF2Store((s) => s.setTableByte);
 
   if (tableDefs.length === 0) {
     return <div className="text-text-muted text-center py-8">No driver tables defined</div>;
@@ -282,7 +283,7 @@ const TablesTab: React.FC<{
         </div>
       )}
 
-      {/* Table hex grid */}
+      {/* Table hex grid — editable */}
       {td && (
         <div className="overflow-auto max-h-[400px]">
           <table className="border-collapse text-[10px]">
@@ -303,13 +304,24 @@ const TablesTab: React.FC<{
                     {hex(r)}
                   </td>
                   {Array.from({ length: cols }, (_, c) => {
-                    const addr = td.address + r * cols + c;
+                    const addr = td.address + c * td.rowCount + r;
                     const val = addr < c64Memory.length ? c64Memory[addr] : 0;
                     return (
-                      <td key={c} className={`text-center px-0.5 border-r border-dark-border/30 ${
-                        val === 0 ? 'text-text-muted/40' : 'text-accent-primary'
-                      }`}>
-                        {hex(val)}
+                      <td key={c} className="border-r border-dark-border/30 p-0">
+                        <input
+                          type="text"
+                          value={hex(val)}
+                          onChange={(e) => {
+                            const parsed = parseInt(e.target.value, 16);
+                            if (!isNaN(parsed) && parsed >= 0 && parsed <= 0xFF) {
+                              setTableByte(td, r, c, parsed);
+                            }
+                          }}
+                          className={`w-6 px-0.5 py-0 text-center bg-transparent border-none font-mono text-[10px] focus:bg-dark-bgSecondary focus:outline-none focus:ring-1 focus:ring-accent-primary/50 ${
+                            val === 0 ? 'text-text-muted/40' : 'text-accent-primary'
+                          }`}
+                          maxLength={2}
+                        />
                       </td>
                     );
                   })}

@@ -6,6 +6,11 @@
  * - Hex value entry for instrument/command columns
  * - Navigation (arrows, pgup/pgdn, home/end)
  * - Order list position changes (F1/F2 or ctrl+arrows)
+ * - Insert/Delete row (Insert, Backspace with Ctrl)
+ * - Clipboard: Ctrl+C (copy), Ctrl+X (cut), Ctrl+V (paste)
+ * - Transpose: Ctrl+Shift+Up/Down (+/- 1 semitone), Ctrl+Shift+F1/F2 (+/- 12)
+ * - Undo/Redo: Ctrl+Z / Ctrl+Shift+Z
+ * - Channel mute: F5-F8 toggle mute, Ctrl+F5-F8 solo
  *
  * Attaches to window keydown; only active when SF2 editor is focused.
  */
@@ -45,6 +50,12 @@ export function useSF2KeyboardHandler(active: boolean) {
     const state = useSF2Store.getState();
     const { cursor, editStep, currentOctave, currentInstrument, orderCursor, orderLists } = state;
     const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
+    const mod = e.ctrlKey || e.metaKey;
+
+    // ── Undo/Redo ──
+    if (mod && e.key === 'z' && !e.shiftKey) { e.preventDefault(); state.undo(); return; }
+    if (mod && e.key === 'z' && e.shiftKey) { e.preventDefault(); state.redo(); return; }
+    if (mod && e.key === 'y') { e.preventDefault(); state.redo(); return; }
 
     // ── Transport ──
     if (e.key === ' ') {
@@ -69,11 +80,24 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (e.key === 'F3') { e.preventDefault(); state.setCurrentOctave(currentOctave - 1); return; }
     if (e.key === 'F4') { e.preventDefault(); state.setCurrentOctave(currentOctave + 1); return; }
 
-    // ── Navigation ──
-    // Arrow keys, PageUp/Down, Home/End are handled by PatternEditorCanvas
-    // (which provides smooth hold-to-scroll). The canvas fires onFormatCursorChange
-    // to sync the SF2 store cursor. We only handle SF2-specific keys here.
+    // ── Channel mute (F5-F8) ──
+    if (e.key === 'F5' || e.key === 'F6' || e.key === 'F7' || e.key === 'F8') {
+      e.preventDefault();
+      const ch = parseInt(e.key[1]) - 5; // F5=0, F6=1, F7=2, F8=3
+      if (ch < state.trackCount) {
+        if (mod) {
+          state.soloChannel(ch);
+        } else {
+          state.toggleChannelMute(ch);
+        }
+      }
+      return;
+    }
 
+    // ── Follow mode toggle ──
+    if (e.key === 'F11') { e.preventDefault(); state.setFollowPlay(!state.followPlay); return; }
+
+    // ── Navigation ──
     switch (e.key) {
       case 'Tab':
         e.preventDefault();
@@ -90,25 +114,69 @@ export function useSF2KeyboardHandler(active: boolean) {
     const seq = seqIdx !== null ? state.sequences.get(seqIdx) : null;
     const maxRow = seq ? seq.length - 1 : 63;
 
-    // ── Delete ──
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    // ── Clipboard (Ctrl+C/X/V) ──
+    if (mod && e.key === 'c' && !e.shiftKey) {
+      e.preventDefault();
+      if (seqIdx !== null) state.copyBlock(seqIdx, 0, maxRow);
+      return;
+    }
+    if (mod && e.key === 'x' && !e.shiftKey) {
+      e.preventDefault();
+      if (seqIdx !== null) state.cutBlock(seqIdx, 0, maxRow);
+      return;
+    }
+    if (mod && e.key === 'v' && !e.shiftKey) {
+      e.preventDefault();
+      if (seqIdx !== null) state.pasteBlock(seqIdx, cursor.row);
+      return;
+    }
+
+    // ── Transpose (Ctrl+Shift+Up/Down = +/-1, Ctrl+Shift+F1/F2 = +/-12) ──
+    if (mod && e.shiftKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (seqIdx !== null) state.transposeBlock(seqIdx, 0, maxRow, 1);
+      return;
+    }
+    if (mod && e.shiftKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (seqIdx !== null) state.transposeBlock(seqIdx, 0, maxRow, -1);
+      return;
+    }
+
+    // ── Insert/Delete row ──
+    if (e.key === 'Insert') {
+      e.preventDefault();
+      if (seqIdx !== null) state.insertRow(seqIdx, cursor.row);
+      return;
+    }
+    if (mod && e.key === 'Backspace') {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        state.deleteRow(seqIdx, cursor.row);
+        const newMax = seq ? seq.length - 2 : 63;
+        if (cursor.row > newMax) state.setCursor({ row: Math.max(0, newMax) });
+      }
+      return;
+    }
+
+    // ── Delete current cell ──
+    if (e.key === 'Delete' || (e.key === 'Backspace' && !mod)) {
       e.preventDefault();
       if (seqIdx === null) return;
       const field: keyof SF2SeqEvent = cursor.column === 0 ? 'note' : cursor.column === 1 ? 'instrument' : 'command';
-      state.setSequenceCell(seqIdx, cursor.row, field, 0);
+      state.setSequenceCell(seqIdx, cursor.row, field, cursor.column === 0 ? 0 : 0x80);
       state.setCursor({ row: Math.min(maxRow, cursor.row + editStep) });
       return;
     }
 
     // ── Note entry (column 0) ──
-    if (cursor.column === 0 && !e.ctrlKey && !e.metaKey) {
+    if (cursor.column === 0 && !mod) {
       const noteOffset = PIANO_MAP[e.key.toLowerCase()];
       if (noteOffset !== undefined) {
         e.preventDefault();
         if (seqIdx === null) return;
         const noteVal = 1 + currentOctave * 12 + noteOffset; // SF2: 1-111 = notes
         state.setSequenceCell(seqIdx, cursor.row, 'note', Math.min(111, noteVal));
-        // Also set instrument if configured
         if (currentInstrument > 0) {
           state.setSequenceCell(seqIdx, cursor.row, 'instrument', currentInstrument);
         }
@@ -118,7 +186,7 @@ export function useSF2KeyboardHandler(active: boolean) {
     }
 
     // ── Hex entry (columns 1-2: instrument, command) ──
-    if (cursor.column > 0 && !e.ctrlKey && !e.metaKey) {
+    if (cursor.column > 0 && !mod) {
       const h = hexVal(e.key);
       if (h !== null) {
         e.preventDefault();
