@@ -25,6 +25,7 @@ import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import type { SunVoxSongMeta, SunVoxPatternData } from '@/engine/sunvox/SunVoxEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
+import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
 import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
@@ -67,6 +68,8 @@ export async function importTrackerModule(
   info: ModuleInfo,
   options: ImportOptions,
 ): Promise<void> {
+  suppressFormatChecks(); // never show format dialogs during import
+  try {
   clearExplicitlySaved();
 
   let format = info.metadata.type;
@@ -473,6 +476,9 @@ export async function importTrackerModule(
   if (samplerCount > 0) await engine.preloadInstruments(instruments);
   notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
   if (info.file) checkModlandFileWithPatternHash(info.file, null);
+  } finally {
+    restoreFormatChecks();
+  }
 }
 
 /**
@@ -513,8 +519,9 @@ export async function loadFile(
   file: File,
   options: FileLoadOptions = {}
 ): Promise<FileLoadResult> {
+  suppressFormatChecks(); // never show format dialogs during file load
   const filename = file.name.toLowerCase();
-  
+
   try {
     // === V2M FILES — handle before isSongFormat check ===
     // V2M has its own player and shouldn't go through the ImportModuleDialog
@@ -589,6 +596,8 @@ export async function loadFile(
   } catch (error) {
     console.error('[UnifiedFileLoader] Failed to load file:', error);
     return { success: false, error: `Failed to load ${file.name}: ${error}` };
+  } finally {
+    restoreFormatChecks();
   }
 }
 
