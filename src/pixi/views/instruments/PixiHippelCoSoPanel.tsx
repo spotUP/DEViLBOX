@@ -17,12 +17,13 @@
  * positions are preserved during a drag.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
-import { PixiKnob, PixiLabel } from '../../components';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { PixiKnob, PixiLabel, PixiButton, PixiNumericInput } from '../../components';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { Graphics, FederatedPointerEvent, Container } from 'pixi.js';
 import { writeBipolarBar, writeUnipolarBar } from '@/lib/pixi/barChartDraw';
+import { HippelCoSoSynth } from '@/engine/hippelcoso/HippelCoSoSynth';
 
 const KNOB_SIZE = 'sm' as const;
 
@@ -40,6 +41,31 @@ const SectionHeading: React.FC<{ text: string }> = ({ text }) => (
 export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
   const theme = usePixiTheme();
   const hc = instrument.hippelCoso!;
+
+  // ── Preview synth ──────────────────────────────────────────────────────────
+  const [previewNote, setPreviewNote] = useState(48);
+  const previewSynthRef = useRef<HippelCoSoSynth | null>(null);
+
+  useEffect(() => {
+    return () => {
+      previewSynthRef.current?.dispose();
+      previewSynthRef.current = null;
+    };
+  }, []);
+
+  const handlePreview = useCallback(async () => {
+    const cfg = instrument.hippelCoso;
+    if (!cfg) return;
+    let synth = previewSynthRef.current;
+    if (!synth) {
+      synth = new HippelCoSoSynth();
+      previewSynthRef.current = synth;
+      synth.output.connect(synth.output.context.destination);
+    }
+    await synth.setInstrument(cfg);
+    synth.triggerAttack(previewNote);
+    setTimeout(() => synth!.triggerRelease(), 800);
+  }, [instrument.hippelCoso, previewNote]);
 
   const updHC = useCallback(
     (key: string, value: number) => {
@@ -225,6 +251,21 @@ export const PixiHippelCoSoPanel: React.FC<Props> = ({ instrument, onUpdate }) =
           customColor={theme.accent.color}
         />
         <PixiLabel text={instrument.name} size="sm" color="textSecondary" />
+        <layoutContainer layout={{ flexGrow: 1 }} />
+        <PixiNumericInput
+          value={previewNote}
+          min={0}
+          max={95}
+          onChange={setPreviewNote}
+          width={40}
+        />
+        <PixiButton
+          label="Preview"
+          icon="play"
+          size="sm"
+          variant="ghost"
+          onClick={() => void handlePreview()}
+        />
       </layoutContainer>
 
       {/* Timing / Vibrato knobs */}
