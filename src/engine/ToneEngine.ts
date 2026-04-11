@@ -4896,7 +4896,11 @@ export class ToneEngine {
                   case 'seek': mgr.seekTo(order!, row!); break;
                   case 'pause': mgr.pause(); break;
                   case 'unpause': mgr.unpause(); break;
-                  case 'stop': mgr.teardown(); break;
+                  case 'stop':
+                    mgr.teardown();
+                    engine.setMuteMask(0xFFFFFFFF); // restore all channels
+                    engine.onTransportEvent = null;
+                    break;
                 }
               };
               console.log(`[ToneEngine] Channel isolation active: mask=0x${result.isolatedChannelsMask.toString(16)}, routed: ${routedIds.join(',')}`);

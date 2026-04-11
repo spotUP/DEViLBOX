@@ -60,6 +60,9 @@ export class ChannelIsolationNode {
     // Suppress position messages from isolation instances (we don't need them)
     this.workletNode.port.onmessage = () => {};
 
+    // Start with gain=0 to suppress audio burst during setup
+    this.outputGain.gain.value = 0;
+
     // Configure: repeat forever, match main engine settings
     this.workletNode.port.postMessage({
       cmd: 'config',
@@ -69,10 +72,11 @@ export class ChannelIsolationNode {
     // Connect worklet to output gain
     this.workletNode.connect(this.outputGain);
 
-    // Load the module
+    // Sequence: play → pause → meta (triggers channel count) → setMuteMask → seek → unpause
+    // This ensures mute mask is applied BEFORE any audible audio is rendered.
     this.workletNode.port.postMessage({ cmd: 'play', val: this.moduleBuffer });
-
-    // Set mute mask to only play target channels
+    this.workletNode.port.postMessage({ cmd: 'pause' });
+    this.workletNode.port.postMessage({ cmd: 'meta' }); // triggers getSong() → sets this.channels
     this.workletNode.port.postMessage({ cmd: 'setMuteMask', val: this._channelMask });
 
     // Seek to match main engine position
@@ -82,6 +86,18 @@ export class ChannelIsolationNode {
         val: { o: startPosition.order, r: startPosition.row },
       });
     }
+
+    // Resume playback now that muting and position are set
+    this.workletNode.port.postMessage({ cmd: 'unpause' });
+
+    // Fade in after a short delay to ensure worklet has processed all setup messages
+    const ctx = this.audioContext;
+    setTimeout(() => {
+      if (!this._disposed) {
+        this.outputGain.gain.setValueAtTime(0, ctx.currentTime);
+        this.outputGain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.02);
+      }
+    }, 60);
 
     console.log(`[ChannelIsolationNode] Started with mask 0x${this._channelMask.toString(16)} (channels: ${this.getActiveChannels().join(',')})`);
     return true;
