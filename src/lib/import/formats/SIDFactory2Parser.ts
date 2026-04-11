@@ -340,7 +340,13 @@ export async function parseSIDFactory2File(
       }
       if (val === 0xFF) {
         hasLoop = true;
-        loopIndex = 0;
+        // Read packed loop offset byte and convert to entry index
+        const loopPackedOffset = mem[a]; // byte after 0xFF
+        let entryCount = 0;
+        for (let i = olAddr; i < olAddr + loopPackedOffset; i++) {
+          if (mem[i] < 0x80) entryCount++;
+        }
+        loopIndex = entryCount;
         break;
       }
       if (val >= 0x80) {
