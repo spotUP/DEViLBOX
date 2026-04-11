@@ -43,10 +43,10 @@ const KNOB_TESTS: Record<string, { key: string; min: number; max: number }[]> = 
   Distortion:      [{ key: 'distortion', min: 0, max: 1 }],
   Reverb:          [{ key: 'decay', min: 0.1, max: 8 }],
   JCReverb:        [{ key: 'roomSize', min: 0, max: 0.99 }],
-  Delay:           [{ key: 'time', min: 0.01, max: 1 }],
-  FeedbackDelay:   [{ key: 'time', min: 0.01, max: 1 }],
+  Delay:           [{ key: 'feedback', min: 0, max: 0.9 }],  // feedback affects level; time only shifts echoes
+  FeedbackDelay:   [{ key: 'feedback', min: 0, max: 0.9 }],
   Chorus:          [{ key: 'depth', min: 0, max: 1 }],
-  Phaser:          [{ key: 'frequency', min: 0.1, max: 15 }],
+  Phaser:          [{ key: 'Q', min: 0.1, max: 10 }],  // Q affects resonance/level; frequency only affects LFO speed
   Filter:          [{ key: 'frequency', min: 100, max: 5000 }],
   BitCrusher:      [{ key: 'bits', min: 1, max: 8 }],
   Compressor:      [{ key: 'threshold', min: -60, max: 0 }],
