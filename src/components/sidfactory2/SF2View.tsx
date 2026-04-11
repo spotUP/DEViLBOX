@@ -177,18 +177,34 @@ const SF2OrderMatrix: React.FC<{
               const entry = pos < ol.entries.length ? ol.entries[pos] : null;
               const seqIdx = entry?.seqIdx ?? -1;
               const isEnd = entry === null || seqIdx < 0;
+              const isLoopPoint = ol.hasLoop && pos === ol.loopIndex;
+              const transpose = entry?.transpose ?? 0x80;
+              const transposeOffset = transpose - 0x80;
+              const showTranspose = transposeOffset !== 0;
               return (
                 <div
                   key={ch}
                   className={`flex-1 text-center text-[10px] py-px border-r border-dark-border/50 last:border-r-0 ${
                     isEnd
                       ? 'text-text-muted/30'
-                      : isCurrent
-                        ? 'text-accent-primary font-bold'
-                        : 'text-text-secondary'
+                      : isLoopPoint
+                        ? 'text-accent-success font-bold'
+                        : isCurrent
+                          ? 'text-accent-primary font-bold'
+                          : 'text-text-secondary'
                   }`}
                 >
-                  {isEnd ? '··' : seqIdx.toString(16).toUpperCase().padStart(2, '0')}
+                  {isEnd ? '··' : (
+                    <>
+                      {showTranspose && (
+                        <span className="text-[8px] text-accent-warning">
+                          {transposeOffset > 0 ? '+' : ''}{transposeOffset}{' '}
+                        </span>
+                      )}
+                      {seqIdx.toString(16).toUpperCase().padStart(2, '0')}
+                      {isLoopPoint && <span className="text-accent-success text-[8px]"> ↺</span>}
+                    </>
+                  )}
                 </div>
               );
             })}
