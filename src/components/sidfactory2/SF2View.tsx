@@ -47,6 +47,9 @@ export const SF2View: React.FC = () => {
   const sidModel = useSF2Store((s) => s.sidModel);
   const sidRegion = useSF2Store((s) => s.sidRegion);
   const notationMode = useSF2Store((s) => s.notationMode);
+  const songCount = useSF2Store((s) => s.songCount);
+  const currentSong = useSF2Store((s) => s.currentSong);
+  const songNames = useSF2Store((s) => s.songNames);
 
   useSF2KeyboardHandler(loaded);
   useSF2LiveSync();
@@ -88,6 +91,17 @@ export const SF2View: React.FC = () => {
         <span className="text-text-muted text-[10px]">{sidModel}</span>
         <span className="text-text-muted text-[10px]">{sidRegion}</span>
         <span className="text-text-muted text-[10px]">{notationMode === 'sharp' ? '♯' : '♭'}</span>
+        {songCount > 1 && (
+          <>
+            <span className="text-dark-border">│</span>
+            <span className="text-accent-primary text-[10px] font-bold">
+              Song {currentSong + 1}/{songCount}
+            </span>
+            <span className="text-text-muted text-[10px] truncate max-w-[80px]">
+              {songNames[currentSong] || ''}
+            </span>
+          </>
+        )}
         <span className="text-dark-border">│</span>
         {/* Play marker slots */}
         <div className="flex gap-px">
