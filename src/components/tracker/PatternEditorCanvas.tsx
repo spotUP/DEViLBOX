@@ -2183,11 +2183,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         isPlaying = fpsActive;
         playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
         if (fpsActive && fps.rowDuration > 0) {
-          const now = performance.now();
-          const clock = getClockPosition(now);
-          playRow = clock.row;
           const ts = useTransportStore.getState();
-          if (ts.smoothScrolling) smoothOffset = clock.progress * rowHeightRef.current;
+          if (ts.smoothScrolling) {
+            const now = performance.now();
+            const clock = getClockPosition(now);
+            playRow = clock.row;
+            smoothOffset = clock.progress * rowHeightRef.current;
+          }
         }
       } else {
         const ts = useTransportStore.getState();
@@ -2460,14 +2462,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           let smoothOffset = 0;
 
           if (fpsSmooth && fps.rowDuration > 0) {
-            const now = performance.now();
-            const clock = getClockPosition(now);
-            // Use clock row for display — perfectly constant-rate stepping
-            newRow = clock.row;
             const transportState = useTransportStore.getState();
             if (transportState.smoothScrolling) {
+              // Smooth scrolling: clock provides constant-rate row + sub-pixel offset
+              const now = performance.now();
+              const clock = getClockPosition(now);
+              newRow = clock.row;
               smoothOffset = clock.progress * rowHeightRef.current;
             }
+            // Stepped scrolling (default): fps.row from audio callback is used
+            // directly — steps at audio-clock rate, same as GT Ultra
           }
 
           // Send EVERY frame during playback for smooth scrolling; dedup when stopped

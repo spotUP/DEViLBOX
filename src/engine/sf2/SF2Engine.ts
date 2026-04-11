@@ -702,19 +702,24 @@ export class SF2Engine {
     // Hook onaudioprocess — fires at audio clock rate (~43Hz with 1024 buffer)
     this.sidEngine.setAfterProcessCallback(checkPosition);
 
-    // Diagnostic: verify callback is firing (remove after debugging)
-    let diagCount = 0;
+    // Safety: if onaudioprocess hook fails, fall back to setInterval
+    let callbackFired = false;
     const origCheck = checkPosition;
-    const diagCheck = () => {
-      diagCount++;
+    const monitoredCheck = () => {
+      callbackFired = true;
       origCheck();
     };
-    this.sidEngine.setAfterProcessCallback(diagCheck);
+    this.sidEngine.setAfterProcessCallback(monitoredCheck);
     setTimeout(() => {
-      console.log(`[SF2] onaudioprocess callback fired ${diagCount} times in 2s (expected ~86)`);
-      // Re-install without counter
-      this.sidEngine.setAfterProcessCallback(checkPosition);
-    }, 2000);
+      if (!callbackFired && this.capturing) {
+        console.warn('[SF2] onaudioprocess callback NOT firing — falling back to setInterval');
+        this.positionPollId = window.setInterval(checkPosition, 16);
+      } else {
+        console.log('[SF2] onaudioprocess callback is firing ✓');
+        // Re-install without monitor wrapper
+        this.sidEngine.setAfterProcessCallback(checkPosition);
+      }
+    }, 500);
   }
 
   /** Stop capturing */
