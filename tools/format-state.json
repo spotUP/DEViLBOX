@@ -6047,7 +6047,7 @@
   },
   "fx-spaceydelayer": {
     "auditStatus": "fail",
-    "notes": "Audio OK, KNOBS DEAD [feedback:0.3dB] diff=2.0dB",
+    "notes": "Code verified fixed (067f1aef4 + fa4cdeefa) — needs live re-audit",
     "rmsDb": -14.8,
     "diffDb": 2,
     "initMs": null,
@@ -6056,7 +6056,7 @@
   },
   "fx-retapeecho": {
     "auditStatus": "fail",
-    "notes": "SILENT rms=0.000000 diff=0.0dB",
+    "notes": "Code verified fixed (fa4cdeefa + 067f1aef4) — needs live re-audit",
     "rmsDb": -100,
     "diffDb": 0,
     "initMs": null,
@@ -6398,7 +6398,7 @@
   },
   "fx-sidechaingate": {
     "auditStatus": "fail",
-    "notes": "SILENT rms=0.000675 diff=-46.7dB",
+    "notes": "Code verified fixed (2fe8c6015 connect-first) — needs live re-audit",
     "rmsDb": -63.4,
     "diffDb": -46.7,
     "initMs": null,
@@ -7285,7 +7285,7 @@
   },
   "fx-tapesimulator": {
     "auditStatus": "fail",
-    "notes": "Audio OK, KNOBS DEAD [drive:0.0dB] diff=3.5dB",
+    "notes": "Code verified fixed (fa4cdeefa setParam) — needs live re-audit",
     "rmsDb": -13.3,
     "diffDb": 3.5,
     "initMs": null,

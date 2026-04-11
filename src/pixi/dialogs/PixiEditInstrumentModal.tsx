@@ -1883,6 +1883,18 @@ const NativeInstrumentPanel: React.FC<{
   if ((instrument.synthType === 'InStereo2Synth' || instrument.synthType === 'InStereo1Synth') && instrument.inStereo2) {
     return <PixiInStereo2Panel instrument={instrument} onUpdate={onUpdate} />;
   }
+  if (instrument.synthType === 'StartrekkerAMSynth' && instrument.startrekkerAM) {
+    return <PixiStartrekkerAMPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'SidMon1Synth' && instrument.sidmon1) {
+    return <PixiSidMon1Panel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'OctaMEDSynth' && instrument.octamed) {
+    return <PixiOctaMEDPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'SymphonieSynth' && instrument.symphonie) {
+    return <PixiSymphoniePanel instrument={instrument} onUpdate={onUpdate} />;
+  }
   // Generic Amiga synth panel for all formats with layout descriptors
   const amigaLayout = instrument.synthType ? AMIGA_SYNTH_LAYOUTS[instrument.synthType] : undefined;
   if (amigaLayout) {

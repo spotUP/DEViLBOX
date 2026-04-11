@@ -1858,6 +1858,29 @@ export class TrackerReplayer {
       }
     }
 
+    // Phase 5.4: If no libopenmptFileData exists (fresh song, never imported),
+    // create an empty XM module on-demand so the song routes through libopenmpt.
+    // Done HERE instead of in useTrackerStore.reset() to avoid the race condition
+    // where async init clobbers a concurrently-imported real module.
+    if (!this.song.libopenmptFileData && !this.useWasmSequencer && !this.song.furnaceNative) {
+      try {
+        const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+        if (gen !== this._playGeneration) return;
+        await osl.destroyModule();
+        const ok = await osl.createNewModule(1 /* XM */, this.song.numChannels || 4, this.song.patterns.length || 1);
+        if (ok) {
+          const data = await osl.saveModule('xm');
+          if (data && gen === this._playGeneration) {
+            this.song.libopenmptFileData = data;
+            const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+            bridge.markLoaded('xm');
+          }
+        }
+      } catch {
+        // Soundlib not available — fall through to TS scheduler
+      }
+    }
+
     // libopenmpt playback: if we have raw module data, delegate startup to
     // LibopenmptEngine.startWithCoordinator. The engine handles bridge
     // serialization, loadTune, audio routing, stereo separation, and the
@@ -1871,10 +1894,12 @@ export class TrackerReplayer {
 
         const mptEngine = LibopenmptEngine.getInstance();
 
-        // Resolve the destination node (stereo separation input) once. Skip
-        // for DJ decks — they manage their own routing chain.
+        // Resolve the destination node (stereo separation input). Always
+        // pass it so the engine reconnects if TrackerReplayer was recreated
+        // by HMR with a new separationNode (the singleton engine persists).
+        // Skip for DJ decks — they manage their own routing chain.
         let destination: AudioNode | null = null;
-        if (!this.isDJDeck && !this.routedNativeEngines.has('LibopenmptSynth')) {
+        if (!this.isDJDeck) {
           const { getNativeAudioNode } = await import('@/utils/audio-context');
           destination = getNativeAudioNode(this.separationNode.inputTone as any);
           this.routedNativeEngines.add('LibopenmptSynth');
