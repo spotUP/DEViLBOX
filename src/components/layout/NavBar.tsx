@@ -3,9 +3,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useThemeStore, themes } from '@stores';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings } from 'lucide-react';
+import { Plus, X, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings, Lightbulb } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -24,10 +23,9 @@ import { CustomSelect } from '@components/common/CustomSelect';
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
 
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const editorFullscreen = useUIStore((state) => state.editorFullscreen);
+  const openModal = useUIStore((state) => state.openModal);
 
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -53,19 +51,6 @@ const NavBarComponent: React.FC = () => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showUserMenu]);
-
-  // Close theme menu when clicking outside
-  useEffect(() => {
-    if (!showThemeMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-theme-menu]')) {
-        setShowThemeMenu(false);
-      }
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showThemeMenu]);
 
   const handleCollabClick = () => {
     if (n.collabStatus === 'connected' && n.collabViewMode === 'split') {
@@ -129,6 +114,14 @@ const NavBarComponent: React.FC = () => {
           >
             1.0.{BUILD_NUMBER}
           </span>
+          <button
+            onClick={() => openModal('tips', { initialTab: 'tips' })}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent-warning/10 text-accent-warning hover:bg-accent-warning/20 transition-colors"
+            title="Tip of the Day"
+          >
+            <Lightbulb size={14} />
+            <span className="text-xs font-bold uppercase tracking-tight">Tips</span>
+          </button>
         </div>
 
         {/* Right: MIDI, Theme Switcher and Master Volume */}
@@ -254,44 +247,6 @@ const NavBarComponent: React.FC = () => {
 
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />
-
-          {/* Theme Switcher */}
-          <div className="relative" data-theme-menu>
-            <button
-              onClick={() => setShowThemeMenu(!showThemeMenu)}
-              className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors whitespace-nowrap"
-              title="Change theme"
-            >
-              <Palette size={16} />
-              <span className="text-sm">{n.currentTheme.name}</span>
-            </button>
-            {showThemeMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-[99990] min-w-[140px]">
-                {themes.map((theme) => (
-                  <button
-                    key={theme.id}
-                    onClick={() => {
-                      n.setTheme(theme.id);
-                      setShowThemeMenu(false);
-                    }}
-                    className={`
-                      w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2
-                      ${currentThemeId === theme.id
-                        ? 'bg-dark-bgActive text-text-primary'
-                        : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-                      }
-                    `}
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full border border-dark-borderLight"
-                      style={{ backgroundColor: theme.colors.accent }}
-                    />
-                    {theme.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Master Volume */}
           <input

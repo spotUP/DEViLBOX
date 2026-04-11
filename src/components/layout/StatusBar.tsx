@@ -17,11 +17,9 @@ import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useShallow } from 'zustand/react/shallow';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
-import { Lightbulb, Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp } from 'lucide-react';
+import { Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp } from 'lucide-react';
 
-interface StatusBarProps {
-  onShowTips?: () => void;
-}
+interface StatusBarProps {}
 
 // ─── DJ Status Bar Content ────────────────────────────────────────────────────
 
@@ -388,7 +386,7 @@ const SIDHardwareBadge: React.FC = () => {
 
 // ─── Main StatusBar ───────────────────────────────────────────────────────────
 
-export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) => {
+export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const activeView = useUIStore((s) => s.activeView);
   const { contextState } = useAudioStore();
   const collabStatus = useCollaborationStore((s) => s.status);
@@ -490,20 +488,6 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
                 <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></span>
                 <span className="font-bold uppercase">{deviceName}</span>
                 {showKnobBar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-              </button>
-              <div className="w-px h-3 bg-border opacity-50"></div>
-            </>
-          )}
-
-          {onShowTips && (
-            <>
-              <button
-                onClick={onShowTips}
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-accent-warning/10 text-accent-warning hover:bg-accent-warning/20 transition-colors"
-                title="Tip of the Day"
-              >
-                <Lightbulb size={12} />
-                <span className="text-[10px] font-bold uppercase tracking-tight">Tips</span>
               </button>
               <div className="w-px h-3 bg-border opacity-50"></div>
             </>
