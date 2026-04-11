@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-10T20:03:57.687Z
+ * Generated: 2026-04-11T02:39:34.617Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4781';
-export const BUILD_NUMBER = '4781';
-export const BUILD_HASH = 'affb944e7';
-export const BUILD_DATE = '2026-04-10';
+export const BUILD_VERSION = '1.0.4823';
+export const BUILD_NUMBER = '4823';
+export const BUILD_HASH = '006142c08';
+export const BUILD_DATE = '2026-04-11';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,179 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4781',
+    version: '1.0.4823',
+    date: '2026-04-11',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Add sourceFormat metadata to patterns and read SF2 store in engine routing"
+      },
+      {
+        type: 'improvement',
+        "description": "Complete SF2Synth integration parity with GTUltra"
+      },
+      {
+        type: 'fix',
+        "description": "Fix channel routing: keep all effects in global chain"
+      },
+      {
+        type: 'fix',
+        "description": "Fix channel routing: fall back to global chain when channelOutputs unavailable"
+      },
+      {
+        type: 'feature',
+        "description": "Add SF2 live editing engine with C64 memory bridge"
+      },
+      {
+        type: 'fix',
+        "description": "Fix channel routing: use parallel send architecture (no disconnects)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix channel routing: use gain gate instead of surgical disconnect"
+      },
+      {
+        type: 'fix',
+        "description": "Fix channel routing: use native Web Audio API for surgical disconnect"
+      },
+      {
+        type: 'feature',
+        "description": "Add SF2 synth type, instrument editor, keyboard handler, SID register access"
+      },
+      {
+        type: 'feature',
+        "description": "Add channel routing selector to Master FX modal dialog"
+      },
+      {
+        type: 'improvement',
+        "description": "Make channel routing selector always visible on master FX pedals"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire SF2 format editor: store, adapter, views (DOM+GL), routing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix channel routing teardown, race guard, empty channel display"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-channel effect routing and channel selection UI"
+      },
+      {
+        type: 'improvement',
+        "description": "Update porting guide with SID Factory II case study"
+      },
+      {
+        type: 'fix',
+        "description": "Fix VocoderEditor and VinylNoiseEditor preset batch updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add SID Factory II (.sf2) format support"
+      },
+      {
+        type: 'fix',
+        "description": "Fix effect presets: batch parameter update to prevent clobbering"
+      },
+      {
+        type: 'feature',
+        "description": "Add RE Tape Echo dub presets + further tame ShimmerReverb"
+      },
+      {
+        type: 'feature',
+        "description": "Add comprehensive WASM effects porting guide"
+      },
+      {
+        type: 'feature',
+        "description": "Add comprehensive format porting guide"
+      },
+      {
+        type: 'fix',
+        "description": "Fix RE Tape Echo + SpaceyDelayer silence, tame ShimmerReverb + MoogFilters"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ShimmerReverb: tanhf soft clip on feedback + output, tame defaults"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AdPlug scroll stutter: check position every process() call"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AdPlug scroll: use dispatchEnginePosition for stable timing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AdPlug pattern scroll sync: row duration + onEnded"
+      },
+      {
+        type: 'fix',
+        "description": "Fix WASM effects: Embind base class binding for process()"
+      },
+      {
+        type: 'fix',
+        "description": "Fix cached WASM: density check fallback + cache-busting for extraction"
+      },
+      {
+        type: 'fix',
+        "description": "Fix missing AdPlug pattern notes: real-time channel state + OPL capture sort"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Masha button: momentary hold instead of toggle"
+      },
+      {
+        type: 'fix',
+        "description": "Fix worklet HEAPF32 crash: use DataView + try/catch for safety"
+      }
+    ]
+  },
+  {
+    version: '2026-04-10',
     date: '2026-04-10',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix RE Tape Echo silence + add per-effect default wet levels"
+      },
+      {
+        type: 'fix',
+        "description": "Fix worklet HEAPF32 crash: use Float32Array view from HEAPU8.buffer"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AdPlug distortion and pattern scroll jitter"
+      },
+      {
+        type: 'improvement',
+        "description": "AdPlug: per-channel mute/solo, VU meters, D00 native extraction, position sync"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove non-functional environments display from KissOfShame"
+      },
+      {
+        type: 'fix',
+        "description": "Fix KissOfShame VU meters and restore environment display"
+      },
+      {
+        type: 'fix',
+        "description": "Fix KissOfShame knob interaction: memoize FilmstripKnob + reduce re-renders"
+      },
+      {
+        type: 'improvement',
+        "description": "AdPlug hybrid playback: streaming audio + editable patterns"
+      },
+      {
+        type: 'fix',
+        "description": "Fix KissOfShame VU visibility and Environments control"
+      },
+      {
+        type: 'feature',
+        "description": "Add KissOfShame Bypass and Print Through buttons"
+      },
       {
         type: 'fix',
         "description": "KissOfShame UI: always show reels, red VU meters, fix cutoff"
@@ -64,176 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix OPL capture BPM: remove 5-7x tempo slowdown"
-      },
-      {
-        type: 'fix',
-        "description": "Fix WASM effects appearing unresponsive: wet defaults, NoiseGate bug, Maximizer range"
-      },
-      {
-        type: 'improvement',
-        "description": "D00/EdLib: native instrument extraction in WASM bridge"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPL3 note-on-drop: skip preload, create synth on play"
-      },
-      {
-        type: 'fix',
-        "description": "Add setParam to all WASM effects, fix updateEffectParameters routing"
-      },
-      {
-        type: 'feature',
-        "description": "Remove JS fallbacks from 5 handcrafted WASM effects, add diagnostics"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPL3 editable playback silence — three root causes"
-      },
-      {
-        type: 'fix',
-        "description": "OPL3 transient on drop and volume miscalculation"
-      },
-      {
-        type: 'feature',
-        "description": "Make AdLib/OPL formats fully editable via OPL3Synth"
-      },
-      {
-        type: 'feature',
-        "description": "Add LHA archive unwrapping for YM files"
-      },
-      {
-        type: 'fix',
-        "description": "Restore AdPlug gain on play after autoPlay=false load"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent instrument trigger on AdLib file drop"
-      },
-      {
-        type: 'feature',
-        "description": "Add OPL3 instrument editor for AdLib formats"
-      },
-      {
-        type: 'fix',
-        "description": "Proper AdPlug transport wiring — no auto-play, position sync, single audio source"
-      },
-      {
-        type: 'fix',
-        "description": "Remove non-functional Layout 1-4 preset buttons from toolbar"
-      },
-      {
-        type: 'fix',
-        "description": "Start WASM streaming player after AdLib extraction for audio"
-      },
-      {
-        type: 'feature',
-        "description": "Tabbed FX panes — show one effect at a time with tabs when multiple"
-      },
-      {
-        type: 'feature',
-        "description": "Pure WASM streaming for AdLib + OPL effect display"
-      },
-      {
-        type: 'fix',
-        "description": "Cap instrument panel height with scrollbar for tall content"
-      },
-      {
-        type: 'feature',
-        "description": "OPL native effect routing for AdLib formats (HSC/D00/LDS)"
-      },
-      {
-        type: 'fix',
-        "description": "Make SAMPLE button match other instrument list buttons"
-      },
-      {
-        type: 'fix',
-        "description": "Correct HSC/D00/LDS playback speed — derive BPM from refresh rate"
-      },
-      {
-        type: 'fix',
-        "description": "Auto-size instrument panel, effects side by side with horizontal scroll"
-      },
-      {
-        type: 'improvement',
-        "description": "Restyle synth panels to match FX pedal aesthetic"
-      },
-      {
-        type: 'fix',
-        "description": "Route HSC/RAD/CMF/DRO/IMF to WASM extractor instead of TS parser"
-      },
-      {
-        type: 'improvement',
-        "description": "Redo instrument panel: proper horizontal 3-pane layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Horizontal layout for synth + inst FX + master FX panels"
-      },
-      {
-        type: 'improvement',
-        "description": "Double per-channel visualizer height (36px → 72px)"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove border-right from FT2 toolbar sections"
-      },
-      {
-        type: 'feature',
-        "description": "Remove viz area, add About dialog with logo + sine scroller"
-      },
-      {
-        type: 'fix',
-        "description": "HSC instrument tracking + correct note/effect parsing"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove tap tempo, Ins, Del buttons from FT2 toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "Strip toolbar viz to logo-only + add Nibbles dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Track scopes always stretch to full width"
-      },
-      {
-        type: 'fix',
-        "description": "Remove redundant export buttons from pattern editor headers"
-      },
-      {
-        type: 'fix',
-        "description": "Track scopes react to MOD/XM/IT playback via master waveform"
-      },
-      {
-        type: 'fix',
-        "description": "Simplify track scopes to waveform-only oscilloscopes"
-      },
-      {
-        type: 'fix',
-        "description": "OPL3 multi-timbral channel routing + scratch mode grace period"
-      },
-      {
-        type: 'fix',
-        "description": "Instrument list context menu + double-click + scope channel colors"
-      },
-      {
-        type: 'fix',
-        "description": "Align track scopes strip with pattern editor channels"
-      }
-    ]
-  },
-  {
-    version: '2026-04-09',
-    date: '2026-04-09',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Stop all audio immediately when loading new AdLib song"
-      },
-      {
-        type: 'fix',
-        "description": "Flanger/doubling on WASM-backed formats + worklet memory leak"
       }
     ]
   }
