@@ -72,6 +72,11 @@
  *   F9          = Toggle SID model (6581/8580)
  *   Shift+F9    = Toggle region (PAL/NTSC)
  *
+ * Sequence tools:
+ *   F5          = Resize sequence (prompt for new length)
+ *   Shift+F5    = Expand sequence (double length, insert rests)
+ *   F6          = Utilities — remove unused sequences
+ *
  * Note input applies transposition offset (transpose - 0xA0) so stored
  * values are absolute. Display shows transposed notes.
  *
@@ -193,6 +198,50 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (e.key === 'F9' && e.shiftKey && !mod) {
       e.preventDefault();
       state.toggleRegion();
+      return;
+    }
+
+    // ── F5 = Resize sequence (prompt for new length) ──
+    if (e.key === 'F5' && !mod && !e.shiftKey) {
+      e.preventDefault();
+      const seqIdx = getCurrentSeqIdx(state, cursor.channel);
+      if (seqIdx === null) return;
+      const seq = state.sequences.get(seqIdx);
+      const currentLen = seq?.length ?? 32;
+      const input = window.prompt(`Resize sequence ${seqIdx} (current: ${currentLen} rows)\nNew length (1-1024):`, String(currentLen));
+      if (input !== null) {
+        const newLen = parseInt(input, 10);
+        if (!isNaN(newLen) && newLen >= 1 && newLen <= 1024) {
+          state.resizeSequence(seqIdx, newLen);
+        }
+      }
+      return;
+    }
+
+    // ── Shift+F5 = Expand sequence (double length, insert rests) ──
+    if (e.key === 'F5' && e.shiftKey && !mod) {
+      e.preventDefault();
+      const seqIdx = getCurrentSeqIdx(state, cursor.channel);
+      if (seqIdx !== null) state.expandSequence(seqIdx);
+      return;
+    }
+
+    // ── F6 = Utilities (remove unused sequences) ──
+    if (e.key === 'F6' && !mod && !e.shiftKey) {
+      e.preventDefault();
+      // Count used vs total sequences
+      const usedSet = new Set<number>();
+      for (const ol of state.orderLists) {
+        for (const entry of ol.entries) usedSet.add(entry.seqIdx);
+      }
+      const total = state.sequences.size;
+      const unused = total - usedSet.size;
+      if (unused === 0) {
+        window.alert(`All ${total} sequences are in use.`);
+      } else {
+        const ok = window.confirm(`Found ${unused} unused sequence(s) out of ${total}.\nRemove unused sequences?`);
+        if (ok) state.removeUnusedSequences();
+      }
       return;
     }
 
