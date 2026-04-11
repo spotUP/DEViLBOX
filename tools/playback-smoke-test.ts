@@ -34,6 +34,7 @@
  *   npx tsx tools/playback-smoke-test.ts --skip-furnace    # all EXCEPT furnace demos
  *   npx tsx tools/playback-smoke-test.ts --push-results    # push pass/fail to localhost:4444 tracker
  *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only (substring match)
+ *   npx tsx tools/playback-smoke-test.ts --resume          # skip tests that passed in the last run (reads /tmp/final-audit.txt)
  *   npx tsx tools/playback-smoke-test.ts --lockstep        # enable Furnace lock-step command comparison (slow)
  *
  * === HOW IT WORKS ===
@@ -1015,6 +1016,7 @@ async function main(): Promise<void> {
   const skipFx = args.includes('--skip-fx');
   const skipFurnace = args.includes('--skip-furnace');
   const lockstep = args.includes('--lockstep');
+  const resume = args.includes('--resume');  // skip tests that passed in the last run
   const onlyArg = args.find(a => a.startsWith('--only=') || a.startsWith('--only '));
   const onlyFamilies = onlyArg
     ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf('--only') + 1])
@@ -1043,9 +1045,36 @@ async function main(): Promise<void> {
     allTests.push(...REGRESSIONS);
   }
 
+  // --resume: read the previous run's output and skip tests that already passed.
+  // Looks for /tmp/final-audit.txt (or the file specified by --resume-file=<path>).
+  let skippedCount = 0;
+  if (resume) {
+    const resumeFileArg = args.find(a => a.startsWith('--resume-file='));
+    const resumeFile = resumeFileArg ? resumeFileArg.split('=')[1] : '/tmp/final-audit.txt';
+    try {
+      const { readFileSync } = await import('fs');
+      const prevOutput = readFileSync(resumeFile, 'utf-8');
+      // Extract passed test names: lines matching "+ pass" with the test name
+      const passedNames = new Set<string>();
+      for (const line of prevOutput.split('\n')) {
+        if (line.includes('+ pass')) {
+          // Extract the name between "] " and the status marker
+          const match = line.match(/\]\s+(.+?)\s+\+\s+pass/);
+          if (match) passedNames.add(match[1].trim());
+        }
+      }
+      const before = allTests.length;
+      allTests = allTests.filter(t => !passedNames.has(t.name));
+      skippedCount = before - allTests.length;
+    } catch {
+      console.warn('  ⚠ --resume: could not read previous results, running all tests');
+    }
+  }
+
   console.log('▶ DEViLBOX release-readiness test suite');
   console.log(`  Bridge: ${WS_URL}`);
   console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded, ${localTests.length} local, ${furnaceTests.length} furnace, ${effectTests.length} fx, ${REGRESSIONS.length} regressions)`);
+  if (skippedCount > 0) console.log(`  Resume: skipped ${skippedCount} already-passed tests`);
   if (onlyFamilies) console.log(`  Filter: ${onlyFamilies.join(', ')}`);
   if (lockstep) console.log(`  Lock-step: enabled (Furnace command comparison)`);
   if (pushResults) console.log(`  Push:   results -> http://localhost:4444`);
