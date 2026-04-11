@@ -66,6 +66,11 @@ class MPT extends AudioWorkletProcessor {
 		// The effective main mask = userMuteMask & ~isolatedBits.
 		this.userMuteMask = 0xFFFFFFFF  // all channels active (no user mute)
 		this.isolatedBits = 0            // no channels isolated
+		// MessagePorts for sending isolation audio to IsolationPlayerProcessors
+		this.isolationPorts = new Array(MAX_ISOLATION_SLOTS).fill(null)
+		// Pre-allocated transfer buffers for isolation audio (avoid GC in process())
+		this.isoTransferLeft = new Array(MAX_ISOLATION_SLOTS).fill(null)
+		this.isoTransferRight = new Array(MAX_ISOLATION_SLOTS).fill(null)
 	}
 
 	process(inputList, outputList, parameters) {
@@ -153,36 +158,30 @@ class MPT extends AudioWorkletProcessor {
 
 		this.port.postMessage( msg )
 
-		// Render isolation slots → outputs[1..N] (per-channel effect routing)
+		// Render isolation slots and send audio via MessagePorts to IsolationPlayerProcessors
 		for (let s = 0; s < MAX_ISOLATION_SLOTS; s++) {
 			const slot = this.isolationSlots[s]
-			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr) {
-				// Silence unused outputs
-				if (outputList[s + 1]) {
-					const oL = outputList[s + 1][0]
-					const oR = outputList[s + 1][1]
-					if (oL) oL.fill(0)
-					if (oR) oR.fill(0)
-				}
+			const port = this.isolationPorts[s]
+			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr || !port) {
 				continue
 			}
 			// Re-apply mute mask EVERY render to guard against loop/seek resets
 			const effectiveSlotMask = slot.channelMask & this.userMuteMask
 			this.applyMuteMask_(slot.extPtr, slot.muteFunc, effectiveSlotMask)
 
-			const outCh = outputList[s + 1]
-			if (!outCh || !outCh[0] || !outCh[1]) continue
-			const oL = outCh[0]
-			const oR = outCh[1]
+			const bufLen = left.length // same size as main output
 			const frames = libopenmpt._openmpt_module_read_float_stereo(
-				slot.modulePtr, sampleRate, oL.length, slot.leftPtr, slot.rightPtr
+				slot.modulePtr, sampleRate, bufLen, slot.leftPtr, slot.rightPtr
 			)
 			if (frames > 0) {
-				oL.set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
-				oR.set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
-			} else {
-				oL.fill(0)
-				oR.fill(0)
+				// Allocate transfer buffers (reuse if same size)
+				if (!this.isoTransferLeft[s] || this.isoTransferLeft[s].length !== frames) {
+					this.isoTransferLeft[s] = new Float32Array(frames)
+					this.isoTransferRight[s] = new Float32Array(frames)
+				}
+				this.isoTransferLeft[s].set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
+				this.isoTransferRight[s].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
+				port.postMessage({ left: this.isoTransferLeft[s], right: this.isoTransferRight[s] })
 			}
 		}
 
@@ -317,6 +316,18 @@ class MPT extends AudioWorkletProcessor {
 						hasExtPtr: !!s.extPtr,
 					} : null)
 				})
+				break
+			case 'setIsolationPort':
+				// Receive a MessagePort for sending isolation audio to an IsolationPlayerProcessor.
+				// v = { slotIndex: number, port: MessagePort }
+				if (v.slotIndex >= 0 && v.slotIndex < MAX_ISOLATION_SLOTS) {
+					this.isolationPorts[v.slotIndex] = v.port
+				}
+				break
+			case 'removeIsolationPort':
+				if (v.slotIndex >= 0 && v.slotIndex < MAX_ISOLATION_SLOTS) {
+					this.isolationPorts[v.slotIndex] = null
+				}
 				break
 			case 'decodeAll':
 				this.decodeAll(v)

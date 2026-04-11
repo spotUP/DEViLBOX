@@ -103,18 +103,27 @@ export class ChannelRoutedEffectsManager {
         continue;
       }
 
+      // Get the IsolationPlayerProcessor node for this slot (created by addIsolation)
+      const playerNode = engine.getIsolationPlayerNode(slotIdx);
+      if (!playerNode) {
+        console.warn(`[ChannelRoutedEffects] No isolation player node for slot ${slotIdx}`);
+        engine.removeIsolation(slotIdx);
+        for (const n of effectNodes) { try { n.dispose(); } catch { /* */ } }
+        continue;
+      }
+
       // Create output gain for this slot
       const audioContext = engine.getAudioContext();
       if (!audioContext) { engine.removeIsolation(slotIdx); continue; }
       const outputGain = audioContext.createGain();
       outputGain.gain.value = 1;
 
-      // Connect: worklet output[slotIdx+1] → outputGain → effect chain → masterEffectsInput
+      // Connect: IsolationPlayerNode → outputGain → effect chain → masterEffectsInput
       try {
-        workletNode.connect(outputGain, slotIdx + 1, 0);
-        console.log(`[ChannelRoutedEffects] Connected worklet output[${slotIdx + 1}] → outputGain (numberOfOutputs=${workletNode.numberOfOutputs})`);
+        playerNode.connect(outputGain);
+        console.log(`[ChannelRoutedEffects] Connected isolation player[${slotIdx}] → outputGain`);
       } catch (e) {
-        console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${slotIdx + 1} (numberOfOutputs=${workletNode.numberOfOutputs}):`, e);
+        console.warn(`[ChannelRoutedEffects] Failed to connect isolation player ${slotIdx}:`, e);
         engine.removeIsolation(slotIdx);
         for (const n of effectNodes) { try { n.dispose(); } catch { /* */ } }
         continue;
@@ -143,7 +152,7 @@ export class ChannelRoutedEffectsManager {
         outputGain,
       };
 
-      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}, outputIdx=${slotIdx + 1})`);
+      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via IsolationPlayerNode`);
       slotIdx++;
     }
 

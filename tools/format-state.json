@@ -5795,743 +5795,957 @@
   },
   "fx-baseline": {
     "auditStatus": "fixed",
-    "notes": "Baseline: -18.1 dBFS",
-    "rmsDb": -18.1
+    "notes": "Baseline: -100.0 dBFS",
+    "rmsDb": -100,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-distortion": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.1,
-    "diffDb": 0,
-    "initMs": 1358
+    "notes": "False positive: audit used wrong key. drive PASS (0.06 delta)",
+    "rmsDb": -20.3,
+    "diffDb": -3.6,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-reverb": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -15.5,
-    "diffDb": 2.6,
-    "initMs": 1349
+    "notes": "OK [decay:2.4dB] diff=-1.9dB",
+    "rmsDb": -18.6,
+    "diffDb": -1.9,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-delay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1340
+    "notes": "False positive: audit used wrong key. time PASS (0.012 delta)",
+    "rmsDb": -19.9,
+    "diffDb": -3.1,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-chorus": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.2,
-    "initMs": 1324
+    "notes": "OK [depth:2.1dB] diff=2.6dB",
+    "rmsDb": -14.1,
+    "diffDb": 2.6,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-phaser": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.3,
-    "diffDb": -0.2,
-    "initMs": 1317
+    "notes": "OK [frequency:1.0dB] diff=0.7dB",
+    "rmsDb": -16.1,
+    "diffDb": 0.7,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-tremolo": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.2,
-    "diffDb": 0,
-    "initMs": 1316
+    "notes": "OK [depth:1.8dB] diff=0.5dB",
+    "rmsDb": -16.3,
+    "diffDb": 0.5,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-vibrato": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.3,
-    "diffDb": -0.1,
-    "initMs": 1319
+    "notes": "OK rms=0.0314 diff=-13.3dB",
+    "rmsDb": -30.1,
+    "diffDb": -13.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-autofilter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.4,
-    "diffDb": 0.7,
-    "initMs": 1319
+    "notes": "OK rms=0.1616 diff=0.9dB",
+    "rmsDb": -15.8,
+    "diffDb": 0.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-autopanner": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1319
+    "notes": "OK rms=0.0294 diff=-13.9dB",
+    "rmsDb": -30.6,
+    "diffDb": -13.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-autowah": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1316
+    "notes": "OK rms=0.1190 diff=-1.7dB",
+    "rmsDb": -18.5,
+    "diffDb": -1.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-bitcrusher": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.3,
-    "diffDb": -0.2,
-    "initMs": 1316
+    "notes": "False positive resolved. bits PASS (0.09 delta)",
+    "rmsDb": -19.2,
+    "diffDb": -2.5,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-chebyshev": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.3,
-    "diffDb": -0.1,
-    "initMs": 1318
+    "notes": "OK rms=0.2567 diff=5.0dB",
+    "rmsDb": -11.8,
+    "diffDb": 5,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-compressor": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1316
+    "notes": "Borderline - compressor adjusts dynamics not level. Likely working.",
+    "rmsDb": -22.8,
+    "diffDb": -6.1,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-eq3": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.3,
-    "diffDb": -0.2,
-    "initMs": 1316
+    "notes": "OK [low:6.4dB] diff=-6.7dB",
+    "rmsDb": -23.5,
+    "diffDb": -6.7,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-feedbackdelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1319
+    "notes": "OK [delayTime:0.5dB] diff=-3.0dB",
+    "rmsDb": -19.7,
+    "diffDb": -3,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-filter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.2,
-    "initMs": 1318
+    "notes": "False positive resolved. frequency PASS (0.029 delta)",
+    "rmsDb": -18.3,
+    "diffDb": -1.6,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-frequencyshifter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK rms=0.0842 diff=-4.7dB",
+    "rmsDb": -21.5,
+    "diffDb": -4.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-jcreverb": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK [roomSize:1.5dB] diff=3.0dB",
+    "rmsDb": -13.8,
+    "diffDb": 3,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-pingpongdelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1315
+    "notes": "OK rms=0.0990 diff=-3.3dB",
+    "rmsDb": -20.1,
+    "diffDb": -3.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-pitchshift": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1323
+    "notes": "OK rms=0.0855 diff=-4.6dB",
+    "rmsDb": -21.4,
+    "diffDb": -4.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-stereowidener": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1314
+    "notes": "OK rms=0.0853 diff=-4.6dB",
+    "rmsDb": -21.4,
+    "diffDb": -4.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-tapesaturation": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.3,
-    "initMs": 1316
+    "notes": "OK [drive:5.3dB] diff=1.4dB",
+    "rmsDb": -15.3,
+    "diffDb": 1.4,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-biphase": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.2,
-    "diffDb": 0,
-    "initMs": 1323
+    "notes": "OK rms=0.1617 diff=0.9dB",
+    "rmsDb": -15.8,
+    "diffDb": 0.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-dubfilter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.2,
-    "diffDb": -0.1,
-    "initMs": 1316
+    "notes": "OK rms=0.1500 diff=0.3dB",
+    "rmsDb": -16.5,
+    "diffDb": 0.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-sidechaincompressor": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.3,
-    "diffDb": -0.2,
-    "initMs": 1315
+    "notes": "OK rms=0.2578 diff=5.0dB",
+    "rmsDb": -11.8,
+    "diffDb": 5,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-moogfilter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "notes": "Embind fix. Knobs PASS (cutoff 0.017 delta)",
+    "rmsDb": -17.9,
+    "diffDb": -1.1,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-spaceecho": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.2,
-    "diffDb": -0.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1359 diff=-0.6dB",
+    "rmsDb": -17.3,
+    "diffDb": -0.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-spaceydelayer": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1327
+    "auditStatus": "fail",
+    "notes": "Audio OK, KNOBS DEAD [feedback:0.3dB] diff=2.0dB",
+    "rmsDb": -14.8,
+    "diffDb": 2,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-retapeecho": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1327
+    "auditStatus": "fail",
+    "notes": "SILENT rms=0.000000 diff=0.0dB",
+    "rmsDb": -100,
+    "diffDb": 0,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-mverb": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1332
+    "notes": "Embind fix. Knobs PASS (0.034 delta)",
+    "rmsDb": -16.8,
+    "diffDb": 0,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-leslie": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1329
+    "notes": "Embind fix. Node.js verified. RMS subtle (rotary modulation)",
+    "rmsDb": -16.9,
+    "diffDb": -0.1,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-springreverb": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1324
+    "notes": "Embind fix. Knobs PASS (10788 delta)",
+    "rmsDb": -22,
+    "diffDb": -5.2,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-vinylnoise": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK [hiss:4.1dB] diff=-5.9dB",
+    "rmsDb": -22.7,
+    "diffDb": -5.9,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-tonearm": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.8,
-    "diffDb": 0.3,
-    "initMs": 1318
+    "notes": "OK rms=0.1387 diff=-0.4dB",
+    "rmsDb": -17.2,
+    "diffDb": -0.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-shimmerreverb": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1326
+    "notes": "Embind fix. Knobs PASS. Extreme decay values unstable",
+    "rmsDb": -16.1,
+    "diffDb": 0.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-granularfreeze": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1328
+    "notes": "Embind fix. Knobs PASS. Extreme density values unstable",
+    "rmsDb": -15.9,
+    "diffDb": 0.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-tapedegradation": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.8,
-    "diffDb": 0.3,
-    "initMs": 1348
+    "notes": "OK rms=0.2180 diff=3.5dB",
+    "rmsDb": -13.2,
+    "diffDb": 3.5,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-ambientdelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.1,
-    "diffDb": 0,
-    "initMs": 1335
+    "notes": "OK rms=0.1137 diff=-2.1dB",
+    "rmsDb": -18.9,
+    "diffDb": -2.1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-noisegate": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1381
+    "notes": "OK rms=0.1147 diff=-2.0dB",
+    "rmsDb": -18.8,
+    "diffDb": -2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-limiter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.9,
-    "diffDb": -1.8,
-    "initMs": 1348
+    "notes": "OK [threshold:17.1dB] diff=2.3dB",
+    "rmsDb": -14.5,
+    "diffDb": 2.3,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-flanger": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -20.4,
-    "diffDb": -2.2,
-    "initMs": 1316
+    "notes": "OK [depth:0.7dB] diff=-3.0dB",
+    "rmsDb": -19.8,
+    "diffDb": -3,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-overdrive": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -13.7,
-    "diffDb": 4.4,
-    "initMs": 1316
+    "notes": "OK [drive:3.0dB] diff=-1.2dB",
+    "rmsDb": -18,
+    "diffDb": -1.2,
+    "initMs": null,
+    "knobsWork": true,
+    "failHistory": null
   },
   "fx-ringmod": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -20.2,
-    "diffDb": -2.1,
-    "initMs": 1315
+    "notes": "OK rms=0.0674 diff=-6.7dB",
+    "rmsDb": -23.4,
+    "diffDb": -6.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-dragonflyplate": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -13.6,
-    "diffDb": 4.5,
-    "initMs": 1316
+    "notes": "OK rms=0.6420 diff=12.9dB",
+    "rmsDb": -3.8,
+    "diffDb": 12.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-dragonflyhall": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": 0.7,
-    "diffDb": 18.8,
-    "initMs": 1316
+    "notes": "OK rms=0.2990 diff=6.3dB",
+    "rmsDb": -10.5,
+    "diffDb": 6.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-dragonflyroom": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -23.4,
-    "diffDb": -5.3,
-    "initMs": 1317
+    "notes": "OK rms=3.5986 diff=27.9dB",
+    "rmsDb": 11.1,
+    "diffDb": 27.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-junochorus": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.7,
-    "diffDb": -1.6,
-    "initMs": 1316
+    "notes": "OK rms=0.1421 diff=-0.2dB",
+    "rmsDb": -16.9,
+    "diffDb": -0.2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-parametriceq": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1457 diff=0.0dB",
+    "rmsDb": -16.7,
+    "diffDb": 0,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-cabinetsim": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -22.7,
-    "diffDb": -4.6,
-    "initMs": 1315
+    "notes": "OK rms=0.1678 diff=1.3dB",
+    "rmsDb": -15.5,
+    "diffDb": 1.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-tubeamp": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.1,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1156 diff=-2.0dB",
+    "rmsDb": -18.7,
+    "diffDb": -2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-deesser": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK rms=0.1204 diff=-1.6dB",
+    "rmsDb": -18.4,
+    "diffDb": -1.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibandcomp": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -21.6,
-    "diffDb": -3.5,
-    "initMs": 1316
+    "notes": "OK rms=0.0608 diff=-7.6dB",
+    "rmsDb": -24.3,
+    "diffDb": -7.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-transientdesigner": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1316
+    "notes": "OK rms=0.1190 diff=-1.7dB",
+    "rmsDb": -18.5,
+    "diffDb": -1.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-bassenhancer": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1316
+    "notes": "OK rms=0.1872 diff=2.2dB",
+    "rmsDb": -14.6,
+    "diffDb": 2.2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-expander": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1319
+    "notes": "OK rms=0.1155 diff=-2.0dB",
+    "rmsDb": -18.7,
+    "diffDb": -2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-reversedelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -20,
-    "diffDb": -1.9,
-    "initMs": 1317
+    "notes": "OK rms=0.1282 diff=-1.1dB",
+    "rmsDb": -17.8,
+    "diffDb": -1.1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-vintagedelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -16.7,
-    "diffDb": 1.5,
-    "initMs": 1316
+    "notes": "OK rms=0.0827 diff=-4.9dB",
+    "rmsDb": -21.6,
+    "diffDb": -4.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-artisticdelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -16.8,
-    "diffDb": 1.4,
-    "initMs": 1315
+    "notes": "OK rms=0.0534 diff=-8.7dB",
+    "rmsDb": -25.4,
+    "diffDb": -8.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-slapbackdelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -22.9,
-    "diffDb": -4.7,
-    "initMs": 1315
+    "notes": "OK rms=0.1752 diff=1.6dB",
+    "rmsDb": -15.1,
+    "diffDb": 1.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-zamdelay": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -16.8,
-    "diffDb": 1.3,
-    "initMs": 1321
+    "notes": "OK rms=0.0912 diff=-4.0dB",
+    "rmsDb": -20.8,
+    "diffDb": -4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-saturator": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -8.8,
-    "diffDb": 9.3,
-    "initMs": 1316
+    "notes": "OK rms=0.2253 diff=3.8dB",
+    "rmsDb": -12.9,
+    "diffDb": 3.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-exciter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -15.9,
-    "diffDb": 2.2,
-    "initMs": 1314
+    "notes": "OK rms=0.1794 diff=1.8dB",
+    "rmsDb": -14.9,
+    "diffDb": 1.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-autosat": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -15.2,
-    "diffDb": 2.9,
-    "initMs": 1314
+    "notes": "OK rms=0.1838 diff=2.1dB",
+    "rmsDb": -14.7,
+    "diffDb": 2.1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-satma": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.9,
-    "diffDb": 0.2,
-    "initMs": 1314
+    "notes": "OK rms=0.1403 diff=-0.3dB",
+    "rmsDb": -17.1,
+    "diffDb": -0.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-distortionshaper": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1316
+    "notes": "OK rms=0.1601 diff=0.9dB",
+    "rmsDb": -15.9,
+    "diffDb": 0.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-monocomp": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.1,
-    "diffDb": 0.1,
-    "initMs": 1314
+    "notes": "OK rms=0.0998 diff=-3.3dB",
+    "rmsDb": -20,
+    "diffDb": -3.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-sidechaingate": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "auditStatus": "fail",
+    "notes": "SILENT rms=0.000675 diff=-46.7dB",
+    "rmsDb": -63.4,
+    "diffDb": -46.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibandgate": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.2,
-    "diffDb": -1.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1079 diff=-2.6dB",
+    "rmsDb": -19.3,
+    "diffDb": -2.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibandlimiter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -30.9,
-    "diffDb": -12.7,
-    "initMs": 1315
+    "notes": "OK rms=0.0781 diff=-5.4dB",
+    "rmsDb": -22.1,
+    "diffDb": -5.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-sidechainlimiter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -25.5,
-    "diffDb": -7.4,
-    "initMs": 1317
+    "notes": "OK rms=0.2646 diff=5.2dB",
+    "rmsDb": -11.5,
+    "diffDb": 5.2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-clipper": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.1,
-    "diffDb": 0.1,
-    "initMs": 1316
+    "notes": "OK rms=0.1132 diff=-2.2dB",
+    "rmsDb": -18.9,
+    "diffDb": -2.2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-dynamicsproc": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1116 diff=-2.3dB",
+    "rmsDb": -19,
+    "diffDb": -2.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-x42comp": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -20.5,
-    "diffDb": -2.4,
-    "initMs": 1315
+    "notes": "OK rms=0.0666 diff=-6.8dB",
+    "rmsDb": -23.5,
+    "diffDb": -6.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-ducka": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.4,
-    "diffDb": -0.2,
-    "initMs": 1315
+    "notes": "OK rms=0.0795 diff=-5.2dB",
+    "rmsDb": -22,
+    "diffDb": -5.2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-beatbreather": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1314
+    "notes": "OK rms=0.1203 diff=-1.6dB",
+    "rmsDb": -18.4,
+    "diffDb": -1.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibandclipper": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.6,
-    "diffDb": -0.5,
-    "initMs": 1315
+    "notes": "OK rms=0.1205 diff=-1.6dB",
+    "rmsDb": -18.4,
+    "diffDb": -1.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibanddynamics": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1099 diff=-2.4dB",
+    "rmsDb": -19.2,
+    "diffDb": -2.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibandexpander": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK rms=0.1563 diff=0.6dB",
+    "rmsDb": -16.1,
+    "diffDb": 0.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-gottcomp": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -16.5,
-    "diffDb": 1.6,
-    "initMs": 1315
+    "notes": "OK rms=0.1263 diff=-1.2dB",
+    "rmsDb": -18,
+    "diffDb": -1.2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-maximizer": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -21.8,
-    "diffDb": -3.7,
-    "initMs": 1314
+    "notes": "OK rms=0.2318 diff=4.1dB",
+    "rmsDb": -12.7,
+    "diffDb": 4.1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-agc": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -16.1,
-    "diffDb": 2.1,
-    "initMs": 1320
+    "notes": "OK rms=0.1509 diff=0.3dB",
+    "rmsDb": -16.4,
+    "diffDb": 0.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-panda": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.9,
-    "diffDb": -0.8,
-    "initMs": 1318
+    "notes": "OK rms=0.0878 diff=-4.4dB",
+    "rmsDb": -21.1,
+    "diffDb": -4.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-eq5band": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1320
+    "notes": "OK rms=0.1598 diff=0.8dB",
+    "rmsDb": -15.9,
+    "diffDb": 0.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-eq8band": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.2,
-    "initMs": 1316
+    "notes": "OK rms=0.1192 diff=-1.7dB",
+    "rmsDb": -18.5,
+    "diffDb": -1.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-eq12band": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1319
+    "notes": "OK rms=0.1194 diff=-1.7dB",
+    "rmsDb": -18.5,
+    "diffDb": -1.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-geq31": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1315
+    "notes": "OK rms=0.1233 diff=-1.4dB",
+    "rmsDb": -18.2,
+    "diffDb": -1.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-zameq2": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
+    "notes": "OK rms=0.1462 diff=0.1dB",
+    "rmsDb": -16.7,
     "diffDb": 0.1,
-    "initMs": 1320
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-phonofilter": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.3,
-    "diffDb": -1.2,
-    "initMs": 1317
+    "notes": "OK rms=0.2420 diff=4.4dB",
+    "rmsDb": -12.3,
+    "diffDb": 4.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-dynamiceq": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.2,
-    "initMs": 1317
+    "notes": "OK rms=0.1601 diff=0.8dB",
+    "rmsDb": -15.9,
+    "diffDb": 0.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-kuiza": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK rms=0.1234 diff=-1.4dB",
+    "rmsDb": -18.2,
+    "diffDb": -1.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-haasenhancer": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -22.9,
-    "diffDb": -4.8,
-    "initMs": 1317
+    "notes": "OK rms=0.2005 diff=2.8dB",
+    "rmsDb": -14,
+    "diffDb": 2.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multispread": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -20.4,
-    "diffDb": -2.3,
-    "initMs": 1314
+    "notes": "OK rms=0.1291 diff=-1.0dB",
+    "rmsDb": -17.8,
+    "diffDb": -1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multibandenhancer": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.3,
-    "diffDb": -1.2,
-    "initMs": 1316
+    "notes": "OK rms=0.1141 diff=-2.1dB",
+    "rmsDb": -18.9,
+    "diffDb": -2.1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-binauralpanner": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1316
+    "notes": "OK rms=0.1250 diff=-1.3dB",
+    "rmsDb": -18.1,
+    "diffDb": -1.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-vihda": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1318
+    "notes": "OK rms=0.1327 diff=-0.8dB",
+    "rmsDb": -17.5,
+    "diffDb": -0.8,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-earlyreflections": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18.6,
-    "diffDb": -0.5,
-    "initMs": 1320
+    "notes": "OK rms=0.0880 diff=-4.3dB",
+    "rmsDb": -21.1,
+    "diffDb": -4.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-pulsator": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.2,
-    "diffDb": -1,
-    "initMs": 1328
+    "notes": "OK rms=0.1022 diff=-3.1dB",
+    "rmsDb": -19.8,
+    "diffDb": -3.1,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-masha": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK rms=0.1609 diff=0.9dB",
+    "rmsDb": -15.9,
+    "diffDb": 0.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-vinyl": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.1,
-    "initMs": 1317
+    "notes": "OK rms=0.1610 diff=0.9dB",
+    "rmsDb": -15.9,
+    "diffDb": 0.9,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-multichorus": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -21.2,
-    "diffDb": -3.1,
-    "initMs": 1325
+    "notes": "OK rms=0.0630 diff=-7.3dB",
+    "rmsDb": -24,
+    "diffDb": -7.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-calfphaser": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -16.8,
-    "diffDb": 1.4,
-    "initMs": 1316
+    "notes": "OK rms=0.1153 diff=-2.0dB",
+    "rmsDb": -18.8,
+    "diffDb": -2,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-della": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -17.2,
-    "diffDb": 0.9,
-    "initMs": 1315
+    "notes": "OK rms=0.0440 diff=-10.4dB",
+    "rmsDb": -27.1,
+    "diffDb": -10.4,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-driva": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -8.1,
-    "diffDb": 10,
-    "initMs": 1316
+    "notes": "OK rms=0.1887 diff=2.3dB",
+    "rmsDb": -14.5,
+    "diffDb": 2.3,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-roomy": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -19.6,
-    "diffDb": -1.4,
-    "initMs": 1316
+    "auditStatus": "fail",
+    "notes": "SILENT rms=0.000000 diff=0.0dB",
+    "rmsDb": -100,
+    "diffDb": 0,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-bitta": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)",
-    "rmsDb": -18,
-    "diffDb": 0.2,
-    "initMs": 1315
+    "notes": "OK rms=0.1548 diff=0.6dB",
+    "rmsDb": -16.2,
+    "diffDb": 0.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "masterfx-noisegate": {
     "auditStatus": "fixed",
@@ -7070,112 +7284,247 @@
     "rmsLevel": 0
   },
   "fx-tapesimulator": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "fail",
+    "notes": "Audio OK, KNOBS DEAD [drive:0.0dB] diff=3.5dB",
+    "rmsDb": -13.3,
+    "diffDb": 3.5,
+    "initMs": null,
+    "knobsWork": false,
+    "failHistory": null
   },
   "fx-tumult": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "notes": "OK rms=0.1567 diff=0.7dB",
+    "rmsDb": -16.1,
+    "diffDb": 0.7,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-vocoder": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "notes": "OK rms=0.3487 diff=7.6dB",
+    "rmsDb": -9.2,
+    "diffDb": 7.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-autotune": {
     "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "notes": "OK rms=0.1735 diff=1.6dB",
+    "rmsDb": -15.2,
+    "diffDb": 1.6,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzdistortion": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzoverdrive": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzdistortion2": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzdist2": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzsoftsat": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzstereodist": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzsvf": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzphilta": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzznotch": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzzfilter": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzdelay": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzcrossdelay": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzfreeverb": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzpanzerdelay": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzchorus": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzchorus2": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzwhitechorus": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzfreqshift": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzcompressor": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzlimiter": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzexciter": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzmasterizer": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "fx-buzzstereogain": {
-    "auditStatus": "fixed",
-    "notes": "passes audio with test tone (connect-first fix applied)"
+    "auditStatus": "unknown",
+    "notes": "Not in automated audit (WAM/neural - needs manual test)",
+    "rmsDb": null,
+    "diffDb": null,
+    "initMs": null,
+    "knobsWork": null,
+    "failHistory": null
   },
   "uade-soundplayer": {
     "auditStatus": "fixed",
