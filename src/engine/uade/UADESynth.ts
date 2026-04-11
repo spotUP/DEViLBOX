@@ -28,7 +28,16 @@ export class UADESynth implements DevilboxSynth {
     this.output = this.audioContext.createGain();
 
     this.engine = UADEEngine.getInstance();
-    this.engine.output.connect(this.output);
+    // Guard: the engine singleton may have been created on a previous
+    // AudioContext (e.g. after HMR or rapid load/stop cycles during audits).
+    // If the contexts don't match, skip the connect — the engine will
+    // reconnect on next play() via NativeEngineRouting's destination wiring.
+    try {
+      this.engine.output.connect(this.output);
+    } catch {
+      // "cannot connect to an AudioNode belonging to a different audio context"
+      // — harmless; the routing layer handles the real connection.
+    }
   }
 
   /**
