@@ -205,10 +205,6 @@ export const useAudioStore = create<AudioStore>()(
           // have Tone nodes. Skip the per-param update path for enable/disable toggles.
           if ('enabled' in updates) return;
 
-          // When `selectedChannels` changes, routing topology changes — need full rebuild
-          // (handled by masterEffectsKey useEffect). Skip per-param update.
-          if ('selectedChannels' in updates) return;
-
           // Extract plain object from Immer draft before passing to ToneEngine
           const effectCopy = current(effect) as EffectConfig;
 

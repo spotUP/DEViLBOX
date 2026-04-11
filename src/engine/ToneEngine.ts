@@ -4854,97 +4854,19 @@ export class ToneEngine {
     return ctx;
   }
 
-  private _channelRoutedRebuildVersion = 0;
-
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
-    const myVersion = ++this._channelRoutedRebuildVersion;
-
-    // Split effects into those requesting channel routing vs global
-    const wantsChannelRouting = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
-    const wantsGlobal = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
-
-    // Attempt per-channel isolation via secondary libopenmpt worklets.
-    // If isolation fails for ANY reason, the effect falls back to the global chain.
-    let routedIds: string[] = [];
-
-    if (wantsChannelRouting.length > 0) {
-      try {
-        const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
-        if (LibopenmptEngine.hasInstance()) {
-          const engine = LibopenmptEngine.getInstance();
-          const moduleBuffer = engine.getModuleBuffer();
-          const audioContext = engine.getAudioContext();
-
-          if (engine.isPlaying() && moduleBuffer && audioContext) {
-            if (!this._channelRoutedEffects) {
-              const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
-              this._channelRoutedEffects = new ChannelRoutedEffectsManager(this.masterInput);
-            }
-
-            const result = await this._channelRoutedEffects.rebuild(
-              wantsChannelRouting, moduleBuffer, audioContext,
-              engine.getCurrentPosition(),
-            );
-            routedIds = result.routedIds;
-
-            // Mute isolated channels in the main engine + subscribe to transport
-            if (result.isolatedChannelsMask !== 0) {
-              engine.setMuteMask(0xFFFFFFFF & ~result.isolatedChannelsMask);
-              const mgr = this._channelRoutedEffects!;
-              engine.onTransportEvent = (event: string, order?: number, row?: number) => {
-                switch (event) {
-                  case 'seek': mgr.seekTo(order!, row!); break;
-                  case 'pause': mgr.pause(); break;
-                  case 'unpause': mgr.unpause(); break;
-                  case 'stop':
-                    mgr.teardown();
-                    engine.setMuteMask(0xFFFFFFFF); // restore all channels
-                    engine.onTransportEvent = null;
-                    break;
-                }
-              };
-              console.log(`[ToneEngine] Channel isolation active: mask=0x${result.isolatedChannelsMask.toString(16)}, routed: ${routedIds.join(',')}`);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[ToneEngine] Channel isolation failed, using global chain:', e);
-        routedIds = [];
-      }
-
-      // Clean up isolation if nothing was routed
-      if (routedIds.length === 0 && this._channelRoutedEffects) {
-        this._channelRoutedEffects.teardown();
-        this._restoreMainEngineMuteMask();
-      }
-    } else if (this._channelRoutedEffects) {
+    // Tear down any existing channel isolation (legacy dual-worklet approach)
+    if (this._channelRoutedEffects) {
       this._channelRoutedEffects.teardown();
       this._restoreMainEngineMuteMask();
+      this._channelRoutedEffects = null;
     }
 
-    // Abort if superseded by a newer rebuild
-    if (myVersion !== this._channelRoutedRebuildVersion) return;
-
-    // Effects that wanted channel routing but couldn't be isolated → global chain
-    const fallbackToGlobal = wantsChannelRouting.filter(e => !routedIds.includes(e.id));
-    if (fallbackToGlobal.length > 0) {
-      console.log(`[ToneEngine] Fallback to global: ${fallbackToGlobal.map(e => e.type).join(', ')}`);
-    }
-    const globalEffects = [...wantsGlobal, ...fallbackToGlobal];
-
-    // Build global master chain
-    await _rebuildMasterEffects(this._masterFxCtx, globalEffects);
-
-    // Abort if superseded during global rebuild
-    if (myVersion !== this._channelRoutedRebuildVersion) return;
-
-    // Register channel-routed effect nodes for parameter updates
-    if (this._channelRoutedEffects && routedIds.length > 0) {
-      const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
-      for (const [id, entry] of routedConfigs) {
-        this.masterEffectConfigs.set(id, entry);
-      }
-    }
+    // All effects go through the global master chain.
+    // selectedChannels is stored in config for future use but doesn't
+    // affect routing — true per-channel isolation requires a multi-output
+    // worklet which isn't implemented yet.
+    await _rebuildMasterEffects(this._masterFxCtx, effects);
   }
 
   /** Restore main LibopenmptEngine mute mask and clear transport subscription. */
