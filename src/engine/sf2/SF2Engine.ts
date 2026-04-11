@@ -378,6 +378,67 @@ export class SF2Engine {
     return this.writeRAM(writePos, entry.seqIdx);
   }
 
+  // ── Note Trigger (live preview) ────────────────────────────────────────
+
+  /**
+   * Play a test note by poking the driver's note trigger addresses.
+   * Mirrors SF2 native editor's screen_edit.cpp note input mechanism.
+   *
+   * @param track Which track/channel (0-based)
+   * @param note Note value (SF2 note encoding, e.g., 0x30 = C-4)
+   * @param instrument Instrument index (0-based)
+   * @param command Optional command index (0-based, -1 for no command)
+   */
+  playTestNote(track: number, note: number, instrument: number, command = -1): boolean {
+    const dc = this.driverCommonData;
+    if (!dc || !this.musicData || !this.canEdit) return false;
+
+    const trackCount = this.musicData.trackCount;
+    const syncValue = dc.noteEventTriggerSyncValue;
+
+    // Hold tempo counter away from updating sequences
+    this.writeRAM(dc.tempoCounterAddress, 0x0F);
+
+    for (let i = 0; i < trackCount; i++) {
+      if (i === track) {
+        // Target track: set note + instrument + optional command
+        this.writeRAM(dc.nextNoteAddress + i, note & 0xFF);
+        this.writeRAM(dc.nextInstrumentAddress + i, (instrument & 0x7F) | 0x80);
+        if (command >= 0) {
+          this.writeRAM(dc.nextCommandAddress + i, (command & 0x7F) | 0x80);
+        }
+        this.writeRAM(dc.nextNoteIsTiedAddress + i, 0); // not tied
+        this.writeRAM(dc.triggerSyncAddress + i, syncValue);
+      } else {
+        // Other tracks: silence (tied rest)
+        this.writeRAM(dc.nextNoteAddress + i, 0);
+        this.writeRAM(dc.nextNoteIsTiedAddress + i, 1);
+        this.writeRAM(dc.triggerSyncAddress + i, syncValue);
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Release a test note (set note to 0 = rest).
+   */
+  releaseTestNote(_track: number): boolean {
+    const dc = this.driverCommonData;
+    if (!dc || !this.musicData || !this.canEdit) return false;
+
+    const trackCount = this.musicData.trackCount;
+    const syncValue = dc.noteEventTriggerSyncValue;
+
+    for (let i = 0; i < trackCount; i++) {
+      this.writeRAM(dc.nextNoteAddress + i, 0);
+      this.writeRAM(dc.nextNoteIsTiedAddress + i, 1);
+      this.writeRAM(dc.triggerSyncAddress + i, syncValue);
+    }
+
+    return true;
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────
 
   /** Get max bytes available for a sequence (distance to next sequence) */

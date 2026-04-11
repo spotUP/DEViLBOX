@@ -226,6 +226,15 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-green-400',
   },
+  SF2Synth: {
+    type: 'SF2Synth',
+    name: 'SID Factory II',
+    shortName: 'SF2',
+    description: 'SID Factory II — C64 SID editor with driver-defined instrument tables and live 6502 emulation',
+    bestFor: ['C64', 'SID', 'Chiptune', 'Tracker'],
+    icon: 'Cpu',
+    color: 'text-cyan-400',
+  },
   KlysSynth: {
     type: 'KlysSynth',
     name: 'Klystrack',

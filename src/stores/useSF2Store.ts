@@ -29,6 +29,22 @@ export interface SF2DriverCommon {
   initAddress: number;
   stopAddress: number;
   updateAddress: number;
+  sidChannelOffsetAddress: number;
+  driverStateAddress: number;
+  tickCounterAddress: number;
+  orderListIndexAddress: number;
+  sequenceIndexAddress: number;
+  sequenceInUseAddress: number;
+  currentSequenceAddress: number;
+  currentTransposeAddress: number;
+  currentSeqEventDurationAddress: number;
+  nextInstrumentAddress: number;
+  nextCommandAddress: number;
+  nextNoteAddress: number;
+  nextNoteIsTiedAddress: number;
+  tempoCounterAddress: number;
+  triggerSyncAddress: number;
+  noteEventTriggerSyncValue: number;
 }
 
 export interface SF2TableDef {
