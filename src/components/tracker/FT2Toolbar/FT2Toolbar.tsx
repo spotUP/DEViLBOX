@@ -1052,14 +1052,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       {/* Nibbles Game Dialog */}
       {showNibbles && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowNibbles(false)}>
-          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border bg-dark-bgSecondary">
+          <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl overflow-hidden w-[820px] h-[520px] max-w-[90vw] max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border bg-dark-bgSecondary shrink-0">
               <span className="text-sm font-bold text-text-primary">Nibbles</span>
               <button onClick={() => setShowNibbles(false)} className="text-text-muted hover:text-text-primary transition-colors">
                 <X size={14} />
               </button>
             </div>
-            <NibblesGame height={400} onExit={() => setShowNibbles(false)} />
+            <div className="flex-1 min-h-0">
+              <NibblesGame height={480} onExit={() => setShowNibbles(false)} />
+            </div>
           </div>
         </div>
       )}
