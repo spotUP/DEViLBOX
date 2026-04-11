@@ -14,6 +14,7 @@ import { usePixiTheme } from '../theme';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { PixiInstrumentEditor } from './PixiInstrumentEditor';
 import { PixiMasterFxView } from './PixiMasterFxView';
+import { useUIStore } from '@stores/useUIStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,7 @@ export const PixiMixerView: React.FC = () => {
                 sendLevels={ch.sendLevels}
                 onSendLevelChange={(sendIdx, level) => useMixerStore.getState().setChannelSendLevel(i, sendIdx, level)}
                 insertEffectCount={ch.insertEffects?.length ?? 0}
+                onFxClick={() => useUIStore.getState().openModal('channelEffects', { channelIndex: i })}
               />
             ))}
           </pixiContainer>

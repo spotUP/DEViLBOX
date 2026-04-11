@@ -1769,7 +1769,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'PC AdLib/OPL music formats',
     family: 'chip-dump',
     matchMode: 'extension',
-    extRegex: /\.(rad|hsc|cmf|d00|dro|imf|sa2|raw|lds|ksm|sci|got|bam|mus|cff|dtm|mkj|rix|sng|jbm|a2m|a2t|amd|xad|adl|agd|bmf|dfm|dmo|ha2|hsp|hsq|laa|m|mad|mdi|mdy|ims|mkf|msc|mtk|mtr|pis|plx|rac|rol|sat|sdb|sop|sqx|xms|xsm|edl|dtl|as3m|adlib|wlf)$/i,
+    extRegex: /\.(rad|hsc|cmf|d00|dro|imf|sa2|lds|sci|got|bam|cff|dtm|mkj|rix|jbm|a2m|a2t|amd|xad|adl|agd|bmf|dfm|dmo|ha2|hsp|hsq|laa|mad|mdi|mdy|mkf|msc|mtk|mtr|pis|plx|rac|rol|sat|sdb|sop|sqx|xms|xsm|edl|dtl|as3m|adlib|wlf)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AdPlugParser', parseFn: 'parseAdPlugFile' },
   },
