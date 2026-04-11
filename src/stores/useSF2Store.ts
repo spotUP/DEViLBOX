@@ -289,6 +289,7 @@ export interface SF2StoreState {
   // Sequence operations
   expandSequence: (seqIdx: number) => void;
   resizeSequence: (seqIdx: number, newLength: number) => void;
+  removeUnusedSequences: () => void;
 
   // Export
   exportSF2File: () => Uint8Array | null;
@@ -1104,6 +1105,25 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
       undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
       redoStack: [],
     };
+  }),
+
+  // ── Remove unused sequences (not referenced by any order list) ─────────
+
+  removeUnusedSequences: () => set((s) => {
+    const usedSet = new Set<number>();
+    for (const ol of s.orderLists) {
+      for (const entry of ol.entries) usedSet.add(entry.seqIdx);
+    }
+    const seqs = new Map(s.sequences);
+    let removed = 0;
+    for (const [idx] of s.sequences) {
+      if (!usedSet.has(idx)) {
+        seqs.delete(idx);
+        removed++;
+      }
+    }
+    if (removed === 0) return {};
+    return { sequences: seqs };
   }),
 
   exportSF2File: () => {
