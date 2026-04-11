@@ -1895,6 +1895,17 @@ export class TrackerReplayer {
           this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
           this.coordinator.markDispatchActive();
 
+          // Re-activate the edit bridge if it was reset by loadSong. This
+          // handles fresh songs where initFreshSoundlib created the soundlib
+          // module but loadSong's bridge.reset() deactivated it. The soundlib
+          // WASM is still in memory — just re-mark it so cell edits sync.
+          try {
+            const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+            if (!bridge.isActive() && this.song.libopenmptFileData) {
+              bridge.markLoaded('xm');
+            }
+          } catch { /* bridge not available */ }
+
           _log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes,
             'replacedInstruments =', this._replacedInstruments.size);
           return;
