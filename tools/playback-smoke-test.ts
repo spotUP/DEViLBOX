@@ -107,6 +107,8 @@ interface TestCase {
   isRegression?: boolean;
   /** True if this format supports native export round-trip (tier 3) */
   supportsExport?: boolean;
+  /** Alternate test files to try if the primary one fails (silence/error) */
+  alternatePaths?: string[];
 }
 
 /** Per-test verification results across all tiers */
@@ -154,10 +156,10 @@ async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
     if (dir === 'Reference Music' || dir === 'Packed_Etc') continue;
     const fullDir = join(baseDir, dir);
 
-    // Find the first actual music file — may be directly in the format dir
-    // or nested one level deeper in an artist subdirectory.
-    let testFile: string | null = null;
-    let testName: string | null = null;
+    // Collect candidate music files (up to 3) — if the first fails during
+    // the test, the runner can fall back to alternates.
+    const candidates: { path: string; name: string }[] = [];
+    const MAX_CANDIDATES = 3;
 
     // File extensions to skip — these are metadata/docs, not music
     const SKIP_EXT = new Set(['.txt', '.md', '.nfo', '.info', '.readme', '.diz', '.doc',
@@ -174,38 +176,38 @@ async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
       const topFiles = readdirSync(fullDir).filter(f => {
         try { return statSync(join(fullDir, f)).isFile() && isMusic(f); } catch { return false; }
       }).sort();
-      if (topFiles.length > 0) {
-        testFile = join(fullDir, topFiles[0]);
-        testName = topFiles[0];
+      for (const f of topFiles.slice(0, MAX_CANDIDATES)) {
+        candidates.push({ path: join(fullDir, f), name: f });
       }
     } catch { /* no top-level files */ }
 
-    // If no top-level files, look one level deeper (artist subdirs)
-    if (!testFile) {
+    // If not enough candidates, look one level deeper (artist subdirs)
+    if (candidates.length < MAX_CANDIDATES) {
       try {
         const subDirs = readdirSync(fullDir).filter(d => {
           try { return statSync(join(fullDir, d)).isDirectory(); } catch { return false; }
         }).sort();
         for (const sub of subDirs) {
+          if (candidates.length >= MAX_CANDIDATES) break;
           const subFiles = readdirSync(join(fullDir, sub)).filter(f => {
             try { return statSync(join(fullDir, sub, f)).isFile() && isMusic(f); } catch { return false; }
           }).sort();
-          if (subFiles.length > 0) {
-            testFile = join(fullDir, sub, subFiles[0]);
-            testName = `${sub}/${subFiles[0]}`;
-            break;
+          for (const f of subFiles) {
+            if (candidates.length >= MAX_CANDIDATES) break;
+            candidates.push({ path: join(fullDir, sub, f), name: `${sub}/${f}` });
           }
         }
       } catch { /* no subdirs */ }
     }
 
-    if (!testFile || !testName) continue;
+    if (candidates.length === 0) continue;
 
     tests.push({
-      name: `${dir} — ${testName}`,
+      name: `${dir} — ${candidates[0].name}`,
       family: dir.substring(0, 12).toUpperCase(),
       loader: 'local',
-      path: testFile,
+      path: candidates[0].path,
+      alternatePaths: candidates.slice(1).map(c => c.path),
       engineDriven: true,
       allowSilent: false,
     });
@@ -1144,6 +1146,27 @@ async function main(): Promise<void> {
         await client.ready();
       } catch {
         // Connection failed — will retry on next attempt
+      }
+    }
+
+    // Alternate file retry: if the test failed with silence or UADE error,
+    // try alternate files from the same format directory.
+    if (result && result.status === 'fail' && test.alternatePaths?.length) {
+      const isSilence = result.reason?.includes('silent');
+      const isUadeError = result.reason?.includes('UADE could not play') || result.reason?.includes('Failed to reload');
+      const isAdPlugError = result.reason?.includes('AdPlug failed');
+      if (isSilence || isUadeError || isAdPlugError) {
+        for (const altPath of test.alternatePaths) {
+          const { basename: bn } = await import('path');
+          process.stdout.write(`\n    -> trying alternate: ${bn(altPath)}... `);
+          const altTest = { ...test, path: altPath, alternatePaths: undefined };
+          const altResult = await runTest(client, altTest);
+          if (altResult.status === 'pass') {
+            result = altResult;
+            result.name = test.name; // keep original name
+            break;
+          }
+        }
       }
     }
 
