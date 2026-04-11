@@ -303,6 +303,8 @@ export interface InstrumentConfig {
   davidWhittaker?: DavidWhittakerConfig;
   futurePlayer?: FuturePlayerConfig;
   symphonie?: SymphonieConfig;
+  // Geonkick (percussion synthesizer; Quamplex GPL-3 WASM port)
+  geonkick?: import('./exotic').GeonkickConfig;
   // SunVox WASM patch
   sunvox?: SunVoxConfig;
   // StarTrekker AM synthesis (from NT companion file)

@@ -635,6 +635,21 @@ export interface SunVoxConfig {
 }
 
 /**
+ * Geonkick (percussion synthesizer) instrument configuration.
+ *
+ * MVP shape: stores the entire .gkick preset as an opaque JSON object so
+ * the runtime can apply it via GeonkickPresetLoader. The full parameter
+ * surface is exposed by GeonkickEngine; this config is just the
+ * persistable shape that round-trips through project save/load.
+ */
+export interface GeonkickConfig {
+  /** Display name (matches the preset's `kick.name`, if any). */
+  name?: string;
+  /** Parsed `.gkick` preset JSON, applied via applyGeonkickPreset. */
+  preset?: Record<string, unknown>;
+}
+
+/**
  * GoatTracker Ultra (C64 SID tracker) instrument configuration.
  *
  * All values are raw bytes matching the GT Ultra WASM engine's internal format.
