@@ -41,13 +41,26 @@ export class ChannelRoutedEffectsManager {
     this.getChannelOutput = getChannelOutput;
   }
 
+  /**
+   * Rebuild channel-routed effects. Returns IDs of effects that were
+   * ACTUALLY connected to live channel outputs. Effects that couldn't
+   * connect (e.g. WASM engines that bypass channelOutputs) are NOT
+   * included — the caller should fall them back into the global chain.
+   */
   async rebuild(configs: EffectConfig[]): Promise<string[]> {
     this.teardown();
 
-    const handledIds: string[] = [];
+    const successfullyRoutedIds: string[] = [];
 
     for (const config of configs) {
       if (!config.enabled || !config.selectedChannels?.length) continue;
+
+      // Pre-check: do ANY of the requested channels have audio nodes?
+      const availableChannels = config.selectedChannels.filter(ch => this.getChannelOutput(ch) !== null);
+      if (availableChannels.length === 0) {
+        console.log(`[ChannelRoutedEffects] ${config.type}: no channel outputs available for ch[${config.selectedChannels}] — falling back to global chain`);
+        continue; // Caller will put this in the global chain
+      }
 
       let node: Tone.ToneAudioNode;
       try {
@@ -73,13 +86,9 @@ export class ChannelRoutedEffectsManager {
       subMix.connect(node);
       node.connect(this.masterInput);
 
-      for (const ch of config.selectedChannels) {
-        const output = this.getChannelOutput(ch);
-        if (!output) continue;
-
+      for (const ch of availableChannels) {
+        const output = this.getChannelOutput(ch)!;
         try {
-          // Parallel send: tap the channel output into the subMix
-          // (channel → masterInput stays untouched)
           output.channel.connect(subMix);
           channels.push({ channelIndex: ch });
           console.log(`[ChannelRoutedEffects] ✓ ch${ch + 1}: send to ${config.type} (${config.wet}% wet)`);
@@ -88,11 +97,19 @@ export class ChannelRoutedEffectsManager {
         }
       }
 
-      this.effects.push({ config, node, subMix, channels });
-      handledIds.push(config.id);
+      if (channels.length > 0) {
+        this.effects.push({ config, node, subMix, channels });
+        successfullyRoutedIds.push(config.id);
+      } else {
+        // Connected to zero channels — clean up the orphaned nodes
+        try { node.disconnect(); } catch { /* */ }
+        try { node.dispose(); } catch { /* */ }
+        try { subMix.disconnect(); } catch { /* */ }
+        try { subMix.dispose(); } catch { /* */ }
+      }
     }
 
-    return handledIds;
+    return successfullyRoutedIds;
   }
 
   teardown(): void {
