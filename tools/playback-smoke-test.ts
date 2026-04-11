@@ -1045,6 +1045,21 @@ async function main(): Promise<void> {
     allTests.push(...REGRESSIONS);
   }
 
+  // CRITICAL: reorder tests so stable engines run FIRST, UADE-heavy formats LAST.
+  // Once UADE's internal state machine hits a bad file, it corrupts ALL subsequent
+  // loads — including non-UADE formats that share the audio context. By running
+  // PC formats, Furnace, effects, and regressions BEFORE the UADE-heavy local
+  // formats, we get clean results for the majority of tests even if UADE cascades.
+  //
+  // Order: hardcoded PC → regressions → furnace → effects → local (alphabetical)
+  const stableTests = allTests.filter(t =>
+    t.loader === 'modland' || t.loader === 'hvsc' || t.loader === 'fur' || t.loader === 'fx' || t.isRegression
+  );
+  const localUADETests = allTests.filter(t =>
+    t.loader === 'local' && !t.isRegression
+  );
+  allTests = [...stableTests, ...localUADETests];
+
   // --resume: read the previous run's output and skip tests that already passed.
   // Looks for /tmp/final-audit.txt (or the file specified by --resume-file=<path>).
   let skippedCount = 0;
