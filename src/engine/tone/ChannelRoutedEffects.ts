@@ -1,17 +1,15 @@
 /**
- * ChannelRoutedEffects — Pre-mix per-channel effect routing for master effects.
+ * ChannelRoutedEffects — Per-channel effect routing via parallel send.
  *
- * When a master effect has `selectedChannels`, it can't run in the post-mix
- * master chain (channels are already summed to stereo). Instead, selected
- * channels get a parallel wet path through the effect:
+ * Architecture: NO disconnects, NO volume manipulation. Instead:
+ *   - Selected channels get an additional parallel connection:
+ *     channel → subMix → effect(wet=100%) → effectOut → masterInput
+ *   - The effect's own wet/dry controls determine how much processing is applied
+ *   - The channel's normal path (channel → masterInput) stays untouched
+ *   - effectOut gain compensates for signal doubling (set to effect wet level)
  *
- *   selected channels → gain(0) on direct path, gain(1) on wet path → effect → masterInput
- *   non-selected channels → masterInput (unchanged)
- *
- * Architecture: Instead of disconnect/reconnect (fragile with Tone.js wrappers),
- * we insert a gain gate on the direct path and add a parallel wet connection.
- * The channel stays connected to masterInput, but its direct gain is set to 0
- * while a parallel connection through the effect carries the signal.
+ * This is a parallel send architecture (like a send bus), which is the safest
+ * approach since we never disconnect or modify existing connections.
  */
 
 import * as Tone from 'tone';
@@ -21,8 +19,6 @@ import type { ChannelOutput } from './ChannelRouting';
 
 interface RoutedChannel {
   channelIndex: number;
-  /** Gain node inserted between channel and masterInput to mute the direct path */
-  directGate: Tone.Gain;
 }
 
 interface RoutedEffect {
@@ -45,10 +41,6 @@ export class ChannelRoutedEffectsManager {
     this.getChannelOutput = getChannelOutput;
   }
 
-  /**
-   * Rebuild all channel-routed effects. Called during rebuildMasterEffects.
-   * Returns the configs that were handled (so they can be excluded from the global chain).
-   */
   async rebuild(configs: EffectConfig[]): Promise<string[]> {
     this.teardown();
 
@@ -65,7 +57,16 @@ export class ChannelRoutedEffectsManager {
         continue;
       }
 
-      const subMix = new Tone.Gain(1);
+      // Force the effect to 100% wet internally — we control send level via subMix
+      try {
+        if ('wet' in node && (node as any).wet instanceof Tone.Signal) {
+          ((node as any).wet as Tone.Signal).value = 1;
+        } else if ('wet' in node && typeof (node as any).wet === 'number') {
+          (node as any).wet = 1;
+        }
+      } catch { /* some effects don't have wet */ }
+
+      const subMix = new Tone.Gain(config.wet / 100); // send level = effect wet%
       const channels: RoutedChannel[] = [];
 
       // Connect: subMix → effect → masterInput
@@ -77,59 +78,31 @@ export class ChannelRoutedEffectsManager {
         if (!output) continue;
 
         try {
-          // Insert a gate: channel → directGate(0) → masterInput
-          // This replaces the existing channel → masterInput connection
-          const directGate = new Tone.Gain(0); // mute direct path
-
-          // First: disconnect channel from masterInput
-          output.channel.disconnect(this.masterInput);
-          // Reconnect through the gate (muted)
-          output.channel.connect(directGate);
-          directGate.connect(this.masterInput);
-          // Also connect channel to subMix (the wet/effect path)
+          // Parallel send: tap the channel output into the subMix
+          // (channel → masterInput stays untouched)
           output.channel.connect(subMix);
-
-          channels.push({ channelIndex: ch, directGate });
-          console.log(`[ChannelRoutedEffects] ✓ ch${ch + 1}: routed through ${config.type}`);
+          channels.push({ channelIndex: ch });
+          console.log(`[ChannelRoutedEffects] ✓ ch${ch + 1}: send to ${config.type} (${config.wet}% wet)`);
         } catch (e) {
-          console.warn(`[ChannelRoutedEffects] Failed to reroute ch${ch}:`, e);
+          console.warn(`[ChannelRoutedEffects] Failed to send ch${ch}:`, e);
         }
       }
 
       this.effects.push({ config, node, subMix, channels });
       handledIds.push(config.id);
-
-      console.log(
-        `[ChannelRoutedEffects] ${config.type} routed to channels: [${channels.map(c => c.channelIndex + 1).join(',')}]`
-      );
     }
 
     return handledIds;
   }
 
-  /**
-   * Tear down all channel-routed effects and restore direct connections.
-   */
   teardown(): void {
     for (const effect of this.effects) {
-      for (const { channelIndex, directGate } of effect.channels) {
+      for (const { channelIndex } of effect.channels) {
         const output = this.getChannelOutput(channelIndex);
         if (!output) continue;
-
-        try {
-          // Disconnect channel from subMix and directGate
-          try { output.channel.disconnect(effect.subMix); } catch { /* */ }
-          try { output.channel.disconnect(directGate); } catch { /* */ }
-          // Dispose gate
-          try { directGate.disconnect(); directGate.dispose(); } catch { /* */ }
-          // Restore direct connection
-          output.channel.connect(this.masterInput);
-        } catch {
-          // Connection may have already been changed
-        }
+        try { output.channel.disconnect(effect.subMix); } catch { /* */ }
       }
 
-      // Dispose effect and sub-mix
       try { effect.node.disconnect(); } catch { /* */ }
       try { effect.node.dispose(); } catch { /* */ }
       try { effect.subMix.disconnect(); } catch { /* */ }
