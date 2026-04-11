@@ -148,11 +148,17 @@ export interface SF2StoreState {
   // C64 memory image (for table/instrument data access)
   c64Memory: Uint8Array;
 
-  // Sequences (expanded events per sequence index)
+  // Sequences (expanded events per sequence index) — SHARED across all songs
   sequences: Map<number, SF2SeqEvent[]>;
 
-  // Order lists per track
+  // Order lists per track — for CURRENT song
   orderLists: SF2OrderList[];
+
+  // Multi-song support (max 16 songs, shared sequence pool)
+  songCount: number;
+  currentSong: number;          // 0-based index
+  songNames: string[];          // per-song names
+  allSongOrderLists: SF2OrderList[][]; // [songIdx][trackIdx]
 
   // Instruments (raw bytes + name)
   instruments: SF2InstrumentData[];
@@ -286,6 +292,12 @@ export interface SF2StoreState {
   toggleSIDModel: () => void;
   toggleRegion: () => void;
 
+  // Multi-song management
+  selectSong: (songIdx: number) => void;
+  addSong: () => void;
+  removeSong: (songIdx: number) => void;
+  renameSong: (songIdx: number, name: string) => void;
+
   // Sequence operations
   expandSequence: (seqIdx: number) => void;
   resizeSequence: (seqIdx: number, newLength: number) => void;
@@ -308,6 +320,10 @@ export interface SF2LoadPayload {
   orderLists: SF2OrderList[];
   instruments: SF2InstrumentData[];
   songName: string;
+  // Multi-song (optional — single-song files just have 1 entry)
+  songCount?: number;
+  songNames?: string[];
+  allSongOrderLists?: SF2OrderList[][];
 }
 
 // ── Undo/redo entry ──────────────────────────────────────────────────────
@@ -343,6 +359,10 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   instruments: [],
   songName: '',
   trackCount: 3,
+  songCount: 1,
+  currentSong: 0,
+  songNames: ['Song 1'],
+  allSongOrderLists: [],
 
   cursor: { ...INITIAL_CURSOR },
   currentInstrument: 1,
@@ -371,33 +391,43 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
 
   // ── Load ───────────────────────────────────────────────────────────────
 
-  loadSF2Data: (data) => set({
-    loaded: true,
-    rawFileData: data.rawFileData,
-    loadAddress: data.loadAddress,
-    descriptor: data.descriptor,
-    driverCommon: data.driverCommon,
-    musicData: data.musicData,
-    tableDefs: data.tableDefs,
-    instrumentDescriptions: data.instrumentDescriptions,
-    c64Memory: data.c64Memory,
-    sequences: data.sequences,
-    orderLists: data.orderLists,
-    instruments: data.instruments,
-    songName: data.songName,
-    trackCount: data.musicData.trackCount,
-    cursor: { ...INITIAL_CURSOR },
-    playbackPos: { row: 0, songPos: 0 },
-    orderCursor: 0,
-    clipboard: null,
-    undoStack: [],
-    redoStack: [],
-    channelMutes: new Array(data.musicData.trackCount).fill(false),
-    markStart: null,
-    markEnd: null,
-    playMarkers: Array.from({ length: SF2_MAX_PLAY_MARKERS }, () => ({ orderPos: 0, eventPos: 0, isSet: false })),
-    selectedMarker: 0,
-  }),
+  loadSF2Data: (data) => {
+    const sc = data.songCount ?? 1;
+    const sn = data.songNames ?? [data.songName || 'Song 1'];
+    // Build allSongOrderLists: song 0 = provided orderLists, rest from payload
+    const all = data.allSongOrderLists ?? [data.orderLists];
+    set({
+      loaded: true,
+      rawFileData: data.rawFileData,
+      loadAddress: data.loadAddress,
+      descriptor: data.descriptor,
+      driverCommon: data.driverCommon,
+      musicData: data.musicData,
+      tableDefs: data.tableDefs,
+      instrumentDescriptions: data.instrumentDescriptions,
+      c64Memory: data.c64Memory,
+      sequences: data.sequences,
+      orderLists: data.orderLists,
+      instruments: data.instruments,
+      songName: data.songName,
+      trackCount: data.musicData.trackCount,
+      songCount: sc,
+      currentSong: 0,
+      songNames: sn,
+      allSongOrderLists: all,
+      cursor: { ...INITIAL_CURSOR },
+      playbackPos: { row: 0, songPos: 0 },
+      orderCursor: 0,
+      clipboard: null,
+      undoStack: [],
+      redoStack: [],
+      channelMutes: new Array(data.musicData.trackCount).fill(false),
+      markStart: null,
+      markEnd: null,
+      playMarkers: Array.from({ length: SF2_MAX_PLAY_MARKERS }, () => ({ orderPos: 0, eventPos: 0, isSet: false })),
+      selectedMarker: 0,
+    });
+  },
 
   reset: () => set({
     loaded: false,
@@ -414,6 +444,10 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     instruments: [],
     songName: '',
     trackCount: 3,
+    songCount: 1,
+    currentSong: 0,
+    songNames: ['Song 1'],
+    allSongOrderLists: [],
     cursor: { ...INITIAL_CURSOR },
     playbackPos: { row: 0, songPos: 0 },
     orderCursor: 0,
@@ -1057,6 +1091,106 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   toggleRegion: () => set((s) => ({
     sidRegion: s.sidRegion === 'PAL' ? 'NTSC' : 'PAL',
   })),
+
+  // ── Multi-song management ──────────────────────────────────────────────
+
+  selectSong: (songIdx) => set((s) => {
+    if (songIdx < 0 || songIdx >= s.songCount) return {};
+    if (songIdx === s.currentSong) return {};
+
+    // Save current song's order lists back
+    const all = [...s.allSongOrderLists];
+    all[s.currentSong] = s.orderLists;
+
+    // Load new song's order lists
+    const newOl = all[songIdx] ?? [];
+
+    return {
+      allSongOrderLists: all,
+      currentSong: songIdx,
+      orderLists: newOl,
+      orderCursor: 0,
+      cursor: { ...INITIAL_CURSOR },
+      playbackPos: { row: 0, songPos: 0 },
+      playing: false,
+      markStart: null,
+      markEnd: null,
+    };
+  }),
+
+  addSong: () => set((s) => {
+    if (s.songCount >= 16) return {}; // max 16 songs
+
+    // Save current song's order lists
+    const all = [...s.allSongOrderLists];
+    all[s.currentSong] = s.orderLists;
+
+    // Create default order lists for new song (1 entry per track, seq 0, transpose 0xA0)
+    const newOl: SF2OrderList[] = [];
+    for (let t = 0; t < s.trackCount; t++) {
+      newOl.push({
+        entries: [{ transpose: 0xA0, seqIdx: 0 }],
+        loopIndex: 0,
+        hasLoop: true,
+      });
+    }
+    all.push(newOl);
+
+    const newIdx = s.songCount;
+    const names = [...s.songNames, `Song ${newIdx + 1}`];
+
+    return {
+      allSongOrderLists: all,
+      songCount: s.songCount + 1,
+      songNames: names,
+      currentSong: newIdx,
+      orderLists: newOl,
+      orderCursor: 0,
+      cursor: { ...INITIAL_CURSOR },
+      playbackPos: { row: 0, songPos: 0 },
+      playing: false,
+    };
+  }),
+
+  removeSong: (songIdx) => set((s) => {
+    if (s.songCount <= 1) return {}; // can't remove last song
+    if (songIdx < 0 || songIdx >= s.songCount) return {};
+
+    // Save current order lists first
+    const all = [...s.allSongOrderLists];
+    all[s.currentSong] = s.orderLists;
+
+    // Remove the song
+    all.splice(songIdx, 1);
+    const names = [...s.songNames];
+    names.splice(songIdx, 1);
+
+    // Adjust current song index
+    let newCurrent = s.currentSong;
+    if (songIdx <= newCurrent) {
+      newCurrent = Math.max(0, newCurrent - 1);
+    }
+    if (newCurrent >= all.length) newCurrent = all.length - 1;
+
+    return {
+      allSongOrderLists: all,
+      songCount: s.songCount - 1,
+      songNames: names,
+      currentSong: newCurrent,
+      orderLists: all[newCurrent],
+      orderCursor: 0,
+      cursor: { ...INITIAL_CURSOR },
+      playbackPos: { row: 0, songPos: 0 },
+      playing: false,
+    };
+  }),
+
+  renameSong: (songIdx, name) => set((s) => {
+    if (songIdx < 0 || songIdx >= s.songCount) return {};
+    const names = [...s.songNames];
+    names[songIdx] = name.slice(0, 256);
+    return { songNames: names };
+  }),
 
   // ── Expand sequence (doubles length, inserts rests between events) ─────
 

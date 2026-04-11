@@ -76,6 +76,7 @@
  *   F5          = Resize sequence (prompt for new length)
  *   Shift+F5    = Expand sequence (double length, insert rests)
  *   F6          = Utilities — remove unused sequences
+ *   F7          = Songs dialog (switch/add/remove/rename songs)
  *
  * Note input applies transposition offset (transpose - 0xA0) so stored
  * values are absolute. Display shows transposed notes.
@@ -241,6 +242,49 @@ export function useSF2KeyboardHandler(active: boolean) {
       } else {
         const ok = window.confirm(`Found ${unused} unused sequence(s) out of ${total}.\nRemove unused sequences?`);
         if (ok) state.removeUnusedSequences();
+      }
+      return;
+    }
+
+    // ── F7 = Songs dialog (multi-song management) ──
+    if (e.key === 'F7' && !mod && !e.shiftKey) {
+      e.preventDefault();
+      const lines = state.songNames.map((n, i) =>
+        `${i === state.currentSong ? '>' : ' '} ${i + 1}: ${n}`
+      ).join('\n');
+      const input = window.prompt(
+        `Songs (${state.songCount}/16):\n${lines}\n\n` +
+        `Enter song number (1-${state.songCount}) to switch,\n` +
+        `"+" to add a new song,\n` +
+        `"-N" to remove song N,\n` +
+        `"=N name" to rename song N:`,
+        String(state.currentSong + 1)
+      );
+      if (input === null) return;
+      const trimmed = input.trim();
+      if (trimmed === '+') {
+        state.addSong();
+      } else if (trimmed.startsWith('-')) {
+        const idx = parseInt(trimmed.slice(1), 10) - 1;
+        if (!isNaN(idx) && idx >= 0 && idx < state.songCount) {
+          if (window.confirm(`Remove song ${idx + 1} "${state.songNames[idx]}"?`)) {
+            state.removeSong(idx);
+          }
+        }
+      } else if (trimmed.startsWith('=')) {
+        const match = trimmed.match(/^=(\d+)\s+(.+)$/);
+        if (match) {
+          const idx = parseInt(match[1], 10) - 1;
+          const name = match[2].trim();
+          if (idx >= 0 && idx < state.songCount && name) {
+            state.renameSong(idx, name);
+          }
+        }
+      } else {
+        const idx = parseInt(trimmed, 10) - 1;
+        if (!isNaN(idx) && idx >= 0 && idx < state.songCount) {
+          state.selectSong(idx);
+        }
       }
       return;
     }
