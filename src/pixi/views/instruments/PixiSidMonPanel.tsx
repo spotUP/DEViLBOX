@@ -17,6 +17,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PixiKnob, PixiLabel, PixiButton } from '../../components';
+import { PixiNumericInput } from '../../components/PixiNumericInput';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SidMonConfig } from '@/types/instrument/exotic';
@@ -395,18 +396,46 @@ export const PixiSidMonPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
             color="textMuted"
           />
 
-          {/* Loop points (read-only display) */}
-          <SectionHeading text="LOOP POINTS" />
-          <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
-            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <PixiLabel text="Start" size="xs" color="textMuted" />
-              <PixiLabel text={String(sid.loopStart ?? 0)} size="xs" color="text" />
-            </layoutContainer>
-            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <PixiLabel text="Length" size="xs" color="textMuted" />
-              <PixiLabel text={String(sid.loopLength ?? 0)} size="xs" color="text" />
-            </layoutContainer>
-          </layoutContainer>
+          {/* Loop points — editable */}
+          {(() => {
+            const pcmLen = sid.pcmData?.length ?? 0;
+            const loopStart = sid.loopStart ?? 0;
+            const maxLoopLen = Math.max(0, pcmLen - loopStart);
+            return (
+              <>
+                <SectionHeading text="LOOP POINTS" />
+                <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
+                  <layoutContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                    <PixiLabel text="Start" size="xs" color="textMuted" />
+                    <PixiNumericInput
+                      value={loopStart}
+                      min={0}
+                      max={Math.max(0, pcmLen - 1)}
+                      onChange={(v) => {
+                        const clamped = Math.max(0, Math.min(pcmLen, Math.round(v)));
+                        upd('loopStart', clamped);
+                        const curLen = sidRef.current.loopLength ?? 0;
+                        if (clamped + curLen > pcmLen) {
+                          upd('loopLength', Math.max(0, pcmLen - clamped));
+                        }
+                      }}
+                      width={80}
+                    />
+                  </layoutContainer>
+                  <layoutContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                    <PixiLabel text="Length" size="xs" color="textMuted" />
+                    <PixiNumericInput
+                      value={sid.loopLength ?? 0}
+                      min={0}
+                      max={maxLoopLen}
+                      onChange={(v) => upd('loopLength', Math.max(0, Math.min(maxLoopLen, Math.round(v))))}
+                      width={80}
+                    />
+                  </layoutContainer>
+                </layoutContainer>
+              </>
+            );
+          })()}
 
           {/* Finetune */}
           <SectionHeading text="FINETUNE" />
