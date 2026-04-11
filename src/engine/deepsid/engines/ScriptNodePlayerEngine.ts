@@ -353,6 +353,78 @@ export class ScriptNodePlayerEngine {
   }
 
   /**
+   * Read a byte from emulated C64 RAM.
+   * Only works with backends that expose getRAM (websid, tinyrsid).
+   */
+  readRAM(address: number): number | null {
+    if (!this.adapter?.getRAM) return null;
+    try {
+      return this.adapter.getRAM(address) & 0xFF;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write a byte to emulated C64 RAM.
+   * Only works with websid backend (has setRAM).
+   */
+  writeRAM(address: number, value: number): boolean {
+    if (!this.adapter?.setRAM) return false;
+    try {
+      this.adapter.setRAM(address, value & 0xFF);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Read a block of bytes from emulated C64 RAM.
+   */
+  readRAMBlock(address: number, length: number): Uint8Array | null {
+    if (!this.adapter?.getRAM) return null;
+    try {
+      const data = new Uint8Array(length);
+      for (let i = 0; i < length; i++) {
+        data[i] = this.adapter.getRAM(address + i) & 0xFF;
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write a block of bytes to emulated C64 RAM.
+   */
+  writeRAMBlock(address: number, data: Uint8Array): boolean {
+    if (!this.adapter?.setRAM) return false;
+    try {
+      for (let i = 0; i < data.length; i++) {
+        this.adapter.setRAM(address + i, data[i] & 0xFF);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if this engine supports memory read access.
+   */
+  hasReadAccess(): boolean {
+    return !!this.adapter?.getRAM;
+  }
+
+  /**
+   * Check if this engine supports memory write access.
+   */
+  hasWriteAccess(): boolean {
+    return !!this.adapter?.setRAM;
+  }
+
+  /**
    * Set playback speed
    */
   setSpeed(_multiplier: number): void {

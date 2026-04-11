@@ -18,6 +18,7 @@ import { SF2_COLUMNS } from './sf2Adapter';
 import { useSF2FormatData } from './useSF2FormatData';
 import { useSF2Store } from '@/stores/useSF2Store';
 import { useSF2KeyboardHandler } from './SF2KeyboardHandler';
+import { useSF2LiveSync } from '@/hooks/useSF2Engine';
 
 const TOOLBAR_H = 36;
 
@@ -32,6 +33,9 @@ export const SF2View: React.FC = () => {
 
   // Keyboard handler active when SF2 view is shown
   useSF2KeyboardHandler(loaded);
+
+  // Live sync: push store edits to C64 memory for immediate audio feedback
+  useSF2LiveSync();
 
   const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
 
