@@ -1862,7 +1862,13 @@ export class TrackerReplayer {
     // create an empty XM module on-demand so the song routes through libopenmpt.
     // Done HERE instead of in useTrackerStore.reset() to avoid the race condition
     // where async init clobbers a concurrently-imported real module.
-    if (!this.song.libopenmptFileData && !this.useWasmSequencer && !this.song.furnaceNative) {
+    //
+    // IMPORTANT: skip this if a native WASM engine already started (suppressNotes
+    // or coordinator.hasActiveDispatch). Otherwise HVL, FC, JamCracker, SID, TFMX
+    // and all UADE formats get a spurious libopenmpt XM created that overrides
+    // their dedicated engine at the playback routing step below.
+    if (!this.song.libopenmptFileData && !this.useWasmSequencer && !this.song.furnaceNative
+        && !this._suppressNotes && !this.coordinator.hasActiveDispatch) {
       try {
         const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
         if (gen !== this._playGeneration) return;
