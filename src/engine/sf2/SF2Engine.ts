@@ -499,9 +499,51 @@ export class SF2Engine {
   private startCapture(): void {
     if (this.capturing) return;
     this.capturing = true;
+
+    // Import FormatPlaybackState for pattern follow
+    let setRow: ((row: number) => void) | null = null;
+    let setPlaying: ((playing: boolean) => void) | null = null;
+    let sf2StoreReady = false;
+    let sf2SetPlaying: ((p: boolean) => void) | null = null;
+    let sf2UpdatePos: ((pos: { row: number; songPos: number }) => void) | null = null;
+
+    import('@/engine/FormatPlaybackState').then(mod => {
+      setRow = mod.setFormatPlaybackRow;
+      setPlaying = mod.setFormatPlaybackPlaying;
+      setPlaying!(true);
+    });
+    import('@stores/useSF2Store').then(mod => {
+      const store = mod.useSF2Store.getState();
+      sf2SetPlaying = store.setPlaying;
+      sf2UpdatePos = store.updatePlaybackPos;
+      sf2StoreReady = true;
+      sf2SetPlaying!(true);
+    });
+
+    let lastSeqRow = -1;
+    let lastOrderIdx = -1;
+
     const tick = () => {
       if (!this.capturing) return;
       this.flightRecorder.capture(this.sidEngine);
+
+      // Read playback position from C64 driver memory
+      if (setRow && this.driverCommonData) {
+        const seqRow = this.readRAM(this.driverCommonData.sequenceIndexAddress) ?? 0;
+        const orderIdx = this.readRAM(this.driverCommonData.orderListIndexAddress) ?? 0;
+        const rowChanged = seqRow !== lastSeqRow;
+        const orderChanged = orderIdx !== lastOrderIdx;
+
+        if (rowChanged) {
+          lastSeqRow = seqRow;
+          setRow(seqRow);
+        }
+        if (sf2StoreReady && (rowChanged || orderChanged)) {
+          lastOrderIdx = orderIdx;
+          sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
+        }
+      }
+
       this.captureRAFId = requestAnimationFrame(tick);
     };
     this.captureRAFId = requestAnimationFrame(tick);
@@ -514,6 +556,13 @@ export class SF2Engine {
       cancelAnimationFrame(this.captureRAFId);
       this.captureRAFId = 0;
     }
+    // Clear playback state
+    import('@/engine/FormatPlaybackState').then(mod => {
+      mod.setFormatPlaybackPlaying(false);
+    });
+    import('@stores/useSF2Store').then(mod => {
+      mod.useSF2Store.getState().setPlaying(false);
+    });
   }
 
   // ── Accessors ─────────────────────────────────────────────────────────

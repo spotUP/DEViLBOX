@@ -70,51 +70,11 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (e.key === 'F4') { e.preventDefault(); state.setCurrentOctave(currentOctave + 1); return; }
 
     // ── Navigation ──
-    const seqIdx = getCurrentSeqIdx(state, cursor.channel);
-    const seq = seqIdx !== null ? state.sequences.get(seqIdx) : null;
-    const maxRow = seq ? seq.length - 1 : 63;
+    // Arrow keys, PageUp/Down, Home/End are handled by PatternEditorCanvas
+    // (which provides smooth hold-to-scroll). The canvas fires onFormatCursorChange
+    // to sync the SF2 store cursor. We only handle SF2-specific keys here.
 
     switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        state.setCursor({ row: Math.max(0, cursor.row - (e.ctrlKey ? 8 : 1)) });
-        return;
-      case 'ArrowDown':
-        e.preventDefault();
-        state.setCursor({ row: Math.min(maxRow, cursor.row + (e.ctrlKey ? 8 : 1)) });
-        return;
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (cursor.column > 0) {
-          state.setCursor({ column: cursor.column - 1, digit: 0 });
-        } else if (cursor.channel > 0) {
-          state.setCursor({ channel: cursor.channel - 1, column: 2, digit: 0 });
-        }
-        return;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (cursor.column < 2) {
-          state.setCursor({ column: cursor.column + 1, digit: 0 });
-        } else if (cursor.channel < state.trackCount - 1) {
-          state.setCursor({ channel: cursor.channel + 1, column: 0, digit: 0 });
-        }
-        return;
-      case 'PageUp':
-        e.preventDefault();
-        state.setCursor({ row: Math.max(0, cursor.row - 16) });
-        return;
-      case 'PageDown':
-        e.preventDefault();
-        state.setCursor({ row: Math.min(maxRow, cursor.row + 16) });
-        return;
-      case 'Home':
-        e.preventDefault();
-        state.setCursor({ row: 0 });
-        return;
-      case 'End':
-        e.preventDefault();
-        state.setCursor({ row: maxRow });
-        return;
       case 'Tab':
         e.preventDefault();
         if (e.shiftKey) {
@@ -124,6 +84,11 @@ export function useSF2KeyboardHandler(active: boolean) {
         }
         return;
     }
+
+    // ── Data editing needs sequence context ──
+    const seqIdx = getCurrentSeqIdx(state, cursor.channel);
+    const seq = seqIdx !== null ? state.sequences.get(seqIdx) : null;
+    const maxRow = seq ? seq.length - 1 : 63;
 
     // ── Delete ──
     if (e.key === 'Delete' || e.key === 'Backspace') {
