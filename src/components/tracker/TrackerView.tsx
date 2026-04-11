@@ -61,6 +61,7 @@ import { HivelyView } from '@components/hively/HivelyView';
 import { TFMXView } from '@components/tfmx/TFMXView';
 import { KlysView } from '@components/klystrack/KlysView';
 import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
+import { SF2View } from '@components/sidfactory2/SF2View';
 import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
@@ -587,10 +588,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out
-              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline', 'furnace', 'tfmx'].includes(editorMode);
+              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'sidfactory2', 'musicline', 'furnace', 'tfmx'].includes(editorMode);
               const formatLabels: Record<string, string> = {
                 goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
-                jamcracker: 'JamCracker', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX',
+                jamcracker: 'JamCracker', sidfactory2: 'SID Factory II', musicline: 'MusicLine', furnace: 'Furnace', tfmx: 'TFMX',
               };
 
               // Build the editor content
@@ -602,6 +603,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <KlysView />
               ) : editorMode === 'jamcracker' ? (
                 <JamCrackerView />
+              ) : editorMode === 'sidfactory2' ? (
+                <SF2View />
               ) : editorMode === 'furnace' ? (
                 <FurnaceView />
               ) : editorMode === 'tfmx' ? (

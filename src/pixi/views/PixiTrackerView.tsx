@@ -29,6 +29,7 @@ import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
 import { PixiKlysView } from './klystrack/PixiKlysView';
 import { PixiJamCrackerView } from './jamcracker/PixiJamCrackerView';
+import { PixiSF2View } from './sidfactory2/PixiSF2View';
 import { PixiTFMXView } from './tfmx/PixiTFMXView';
 import { PixiPitchSlider } from './tracker/PixiPitchSlider';
 import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
@@ -345,6 +346,12 @@ export const PixiTrackerView: React.FC = () => {
             )}
             {viewMode === 'tracker' && editorMode === 'jamcracker' && (
               <PixiJamCrackerView
+                width={Math.max(100, editorWidth)}
+                height={Math.max(100, instrumentPanelHeight)}
+              />
+            )}
+            {viewMode === 'tracker' && editorMode === 'sidfactory2' && (
+              <PixiSF2View
                 width={Math.max(100, editorWidth)}
                 height={Math.max(100, instrumentPanelHeight)}
               />
