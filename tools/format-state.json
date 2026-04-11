@@ -4563,7 +4563,8 @@
   },
   "c64sid": {
     "status": "works",
-    "notes": ""
+    "notes": "smoke pass — SIDEngine",
+    "auditStatus": "fixed"
   },
   "midi": {
     "status": "works",
@@ -7556,47 +7557,47 @@
   },
   "pc-mod": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix (dialog blocked audio in retest)"
+    "notes": "PASS 10/10 ch=4 pat=41 inst=31[Sampler] rms=0.0404 exp=343608b [10/10]"
   },
   "pc-s3m": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "notes": "PASS 10/10 ch=12 pat=31 inst=99[Sampler] rms=0.0039 exp=481939b [10/10]"
   },
   "pc-it": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "notes": "PASS 10/10 ch=14 pat=52 inst=31[Sampler] rms=0.0132 exp=2278167b [10/10]"
   },
   "pc-xm": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "notes": "PASS 10/10 ch=32 pat=60 inst=53[Sampler] rms=0.0253 exp=1660005b [10/10]"
   },
   "pc-amf": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=4 pat=8 inst=5[Sampler] rms=0.0872 exp=18891b [10/10]"
   },
   "pc-dbm": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=18 pat=51 inst=22[Sampler] rms=0.0188 exp=465926b [10/10]"
   },
   "pc-dmf": {
     "auditStatus": "fixed",
-    "notes": "10/10 — DMF routing fix (was 5/10)"
+    "notes": "PASS 10/10 ch=21 pat=37 inst=6[Sampler] rms=0.1228 exp=603208b [10/10]"
   },
   "pc-dsm": {
-    "auditStatus": "fixed",
-    "notes": "DSM v1 (RIFF) unsupported upstream in both OpenMPT and UADE — v2 works"
+    "auditStatus": "fail",
+    "notes": "FAIL 5/10: no instruments | first 1 patterns have no notes | silent (rms=0.000489) | export failed: No native exporter available. editorMode=\"classic\" hasUadeFileData=false uadeFil | 2 errors: [UADEEngine] UADE could not play: andante.dsm (ret=-1); [LibopenmptEngine] Worklet error: dur"
   },
   "pc-gdm": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=4 pat=12 inst=18[Sampler] rms=0.0997 exp=164408b [10/10]"
   },
   "pc-gt2": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=8 pat=33 inst=20[Sampler] rms=0.0754 exp=383616b [10/10]"
   },
   "pc-imf": {
-    "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "auditStatus": "fail",
+    "notes": "FAIL 9/10: 1 errors: [AdPlugPlayer] Error: AdPlug failed to load file"
   },
   "pc-j2b": {
     "auditStatus": "fixed",
@@ -7604,35 +7605,35 @@
   },
   "pc-mdl": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=8 pat=28 inst=22[Sampler] rms=0.0799 exp=124663b [10/10]"
   },
   "pc-mo3": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "notes": "PASS 10/10 ch=7 pat=13 inst=11[Sampler] rms=0.0489 exp=341835b [10/10]"
   },
   "pc-mt2": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "notes": "PASS 10/10 ch=16 pat=51 inst=49[Sampler] rms=0.0038 exp=1448601b [10/10]"
   },
   "pc-ptm": {
     "auditStatus": "fixed",
-    "notes": "10/10 (dialog blocked retest)"
+    "notes": "PASS 10/10 ch=6 pat=11 inst=6[Sampler] rms=0.0455 exp=17928b [10/10]"
   },
   "pc-psm": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=6 pat=12 inst=31[Sampler] rms=0.0565 exp=76776b [10/10]"
   },
   "pc-rtm": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=5 pat=9 inst=31[Sampler] rms=0.0475 exp=109759b [10/10]"
   },
   "pc-ult": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=18 pat=40 inst=26[Sampler] rms=0.0439 exp=330962b [10/10]"
   },
   "pc-plm": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=8 pat=34 inst=34[Sampler] rms=0.1212 exp=439230b [10/10]"
   },
   "pc-stx": {
     "auditStatus": "fixed",
@@ -7640,19 +7641,19 @@
   },
   "pc-okt": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=8 pat=26 inst=36[Sampler] rms=0.0120 exp=261920b [10/10]"
   },
   "pc-mptm": {
     "auditStatus": "fixed",
-    "notes": "10/10 — export fix worked"
+    "notes": "PASS 10/10 ch=11 pat=22 inst=17[Sampler] rms=0.0748 exp=28552b [10/10]"
   },
   "pc-dsym": {
     "auditStatus": "fixed",
-    "notes": "10/10"
+    "notes": "PASS 10/10 ch=4 pat=6 inst=63[Sampler] rms=0.0808 exp=34296b [10/10]"
   },
   "pc-puma": {
     "auditStatus": "fixed",
-    "notes": "ch=4 pat=34 inst=9 rms=0.1251"
+    "notes": "PASS 10/10 ch=4 pat=7 inst=6[Sampler] rms=0.0357 exp=1230b [10/10]"
   },
   "packed-abk": {
     "auditStatus": "fixed",
@@ -7864,22 +7865,22 @@
   },
   "mod": {
     "auditStatus": "fixed",
-    "notes": "PASS \"a sleep so deep\" ch=4 pat=24 inst=31 notes=214 rms=0.106 synth=[Sampler]",
+    "notes": "8/8 smoke + 10/10 pc-audit — OpenMPT routed post-refactor",
     "status": "works"
   },
   "s3m": {
     "auditStatus": "fixed",
-    "notes": "PASS \"Andante\" ch=8 pat=31 inst=31 notes=72 rms=0.065 synth=[Sampler]",
+    "notes": "10/10 pc-audit — OpenMPT routed",
     "status": "works"
   },
   "it": {
     "auditStatus": "fixed",
-    "notes": "PASS \"ABSM Chain Mod #1\" ch=25 pat=42 inst=50 rms=0.035 + MPTM: \"Cubical Stadium\" ch=11 rms=0.098",
+    "notes": "10/10 pc-audit — OpenMPT routed",
     "status": "works"
   },
   "xm": {
     "auditStatus": "fixed",
-    "notes": "PASS \"flo boarding - level 1\" ch=4 pat=32 inst=30 notes=259 rms=0.155 synth=[Sampler]",
+    "notes": "10/10 pc-audit — OpenMPT routed",
     "status": "works"
   },
   "activisionPro": {
@@ -7980,7 +7981,8 @@
   },
   "jamcracker": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke pass — JamCrackerEngine",
+    "auditStatus": "fixed"
   },
   "jankoMrsicFlogel": {
     "status": "works",
@@ -8110,7 +8112,8 @@
   },
   "tfmx": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke pass — TFMXEngine",
+    "auditStatus": "fixed"
   },
   "thomasHermann": {
     "status": "works",
@@ -8142,7 +8145,8 @@
   },
   "fc": {
     "status": "works",
-    "notes": "10/10"
+    "notes": "smoke pass — UADE engine",
+    "auditStatus": "fixed"
   },
   "graoumfTracker2": {
     "status": "works",
@@ -8150,7 +8154,8 @@
   },
   "hvl": {
     "status": "works",
-    "notes": "UADE engine (verified working) - no individual test file"
+    "notes": "smoke pass — HivelyEngine (not OpenMPT)",
+    "auditStatus": "fixed"
   },
   "imagesMusicSystem": {
     "status": "works",
