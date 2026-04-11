@@ -175,6 +175,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   const registerParamMenuItems = useMemo((): MenuItemType[] => {
     const fmt: AutomationFormat | null =
       editorMode === 'goattracker' ? 'gtultra' :
+      editorMode === 'sidfactory2' ? 'sidfactory2' :
       editorMode === 'furnace' ? 'furnace' :
       editorMode === 'hively' ? 'hively' :
       editorMode === 'klystrack' ? 'klystrack' :

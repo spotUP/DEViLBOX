@@ -167,6 +167,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isHivelyType(synthType)) return 'hively';
   if (isGTUltraType(synthType)) return 'gtultra';
   if (synthType === 'JamCrackerSynth') return 'jamcracker';
+  if (synthType === 'SF2Synth') return 'sidfactory2';
   if (isSoundMonType(synthType)) return 'soundmon';
   if (isSidMonType(synthType)) return 'sidmon';
   if (isDigMugType(synthType)) return 'digmug';

@@ -332,16 +332,34 @@ export async function parseSIDFactory2File(
   const instCount = instrTable ? Math.min(instrTable.rowCount, 64) : 32;
 
   for (let i = 0; i < instCount; i++) {
+    const instName = i < instrumentDescriptions.length && instrumentDescriptions[i]
+      ? instrumentDescriptions[i]
+      : `Instrument ${i + 1}`;
+
+    // Extract raw instrument bytes from C64 memory
+    let rawBytes = new Uint8Array(0);
+    if (instrTable) {
+      const addr = instrTable.address + i * instrTable.columnCount;
+      rawBytes = new Uint8Array(instrTable.columnCount);
+      for (let b = 0; b < instrTable.columnCount; b++) {
+        rawBytes[b] = mem[addr + b];
+      }
+    }
+
     instruments.push({
       id: i + 1,
-      name: i < instrumentDescriptions.length && instrumentDescriptions[i]
-        ? instrumentDescriptions[i]
-        : `Instrument ${i + 1}`,
+      name: instName,
       type: 'synth',
-      synthType: 'C64SID',
+      synthType: 'SF2Synth',
       effects: [],
       volume: 0,
       pan: 0,
+      sf2: {
+        rawBytes,
+        name: instName,
+        instIndex: i,
+        columnCount: instrTable?.columnCount ?? 0,
+      },
     } as InstrumentConfig);
   }
 

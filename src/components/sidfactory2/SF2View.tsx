@@ -17,6 +17,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { SF2_COLUMNS } from './sf2Adapter';
 import { useSF2FormatData } from './useSF2FormatData';
 import { useSF2Store } from '@/stores/useSF2Store';
+import { useSF2KeyboardHandler } from './SF2KeyboardHandler';
 
 const TOOLBAR_H = 36;
 
@@ -28,6 +29,9 @@ export const SF2View: React.FC = () => {
   const orderLists = useSF2Store((s) => s.orderLists);
   const orderCursor = useSF2Store((s) => s.orderCursor);
   const loaded = useSF2Store((s) => s.loaded);
+
+  // Keyboard handler active when SF2 view is shown
+  useSF2KeyboardHandler(loaded);
 
   const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
 

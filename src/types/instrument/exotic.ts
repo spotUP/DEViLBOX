@@ -654,3 +654,16 @@ export interface GTUltraConfig {
   filterPtr: number;    // Index into global filter table (0-255)
   speedPtr: number;     // Index into global speed table (0-255)
 }
+
+// ── SID Factory II Configuration ─────────────────────────────────────────────
+// SF2 instruments are driver-defined byte tables; shape varies by driver version.
+// We store the raw bytes + table definition metadata from the header blocks.
+
+export interface SF2Config {
+  rawBytes: Uint8Array;       // Raw instrument bytes from driver table
+  name: string;               // Instrument name (from instrument descriptor block)
+  instIndex: number;          // 0-based index in the driver's instrument table
+  columnCount: number;        // Number of bytes per instrument (from table definition)
+  /** Optional column labels from the driver's table descriptor */
+  columnLabels?: string[];
+}

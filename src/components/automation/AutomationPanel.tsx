@@ -226,6 +226,7 @@ const RegisterParamsSection: React.FC<{ channelIndex: number; patternId: string;
 
   const fmt: AutomationFormat | null = useMemo(() => {
     if (editorMode === 'goattracker') return 'gtultra';
+    if (editorMode === 'sidfactory2') return 'sidfactory2';
     if (editorMode === 'furnace') return 'furnace';
     if (editorMode === 'hively') return 'hively';
     if (editorMode === 'klystrack') return 'klystrack';
