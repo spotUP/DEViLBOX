@@ -21,11 +21,15 @@
  *   4. Format tracker running (optional): `npx tsx tools/format-server.ts &`
  *
  * === USAGE ===
- *   npx tsx tools/playback-smoke-test.ts                   # all tests (hardcoded + local)
- *   npx tsx tools/playback-smoke-test.ts --local-only      # only local Reference Music (164 formats)
- *   npx tsx tools/playback-smoke-test.ts --hardcoded-only  # only hardcoded Modland/HVSC tests
+ *   npx tsx tools/playback-smoke-test.ts                   # ALL tests (~300: hardcoded + local + furnace + fx)
+ *   npx tsx tools/playback-smoke-test.ts --local-only      # only local Reference Music (~164 formats)
+ *   npx tsx tools/playback-smoke-test.ts --furnace-only    # only Furnace chip demos (~30 chips)
+ *   npx tsx tools/playback-smoke-test.ts --fx-only         # only master effects (~90 effects)
+ *   npx tsx tools/playback-smoke-test.ts --hardcoded-only  # only hardcoded Modland/HVSC tests (~8)
+ *   npx tsx tools/playback-smoke-test.ts --skip-fx         # all EXCEPT effects
+ *   npx tsx tools/playback-smoke-test.ts --skip-furnace    # all EXCEPT furnace demos
  *   npx tsx tools/playback-smoke-test.ts --push-results    # push pass/fail to localhost:4444 tracker
- *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only
+ *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only (substring match)
  *
  * === HOW IT WORKS ===
  *   1. Connects to the MCP WebSocket relay at ws://localhost:4003/mcp
@@ -475,6 +479,64 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       await client.call('load_file', { filename, data: base64, ...(companionFiles ? { companionFiles } : {}) });
     } else if (test.loader === 'fur') {
       await client.call('play_fur', { path: test.path });
+    } else if (test.loader === 'fx') {
+      // Effect test: add the effect as a master effect on the currently loaded
+      // song. If no song is loaded, load a known-good MOD first.
+      const songCheck = await client.call<SongInfoResp>('get_song_info').catch(() => null);
+      if (!songCheck || (songCheck.numPatterns ?? 0) <= 0) {
+        // Load a reference song for the effect to process
+        const { readFileSync } = await import('fs');
+        const refPath = '/Users/spot/Code/Reference Music/Protracker IFF/DJ Pie/heaven.ptm';
+        try {
+          const refData = readFileSync(refPath);
+          await client.call('load_file', { filename: 'heaven.ptm', data: refData.toString('base64') });
+          await client.call('play', { mode: 'song' });
+          await sleep(1000);
+        } catch {
+          // If ref song fails, try any loaded song
+        }
+      }
+      // Add the effect
+      try {
+        await client.call('add_master_effect', { type: test.path });
+      } catch (e) {
+        return {
+          name: test.name, family: test.family, status: 'fail',
+          reason: `add_master_effect failed: ${e instanceof Error ? e.message : e}`,
+          durationMs: Date.now() - start,
+        };
+      }
+      // Play + measure
+      try { await client.call('play', { mode: 'song' }); } catch { /* may already be playing */ }
+      await sleep(PLAY_DURATION_MS);
+      const level = await client.call<{ rmsAvg: number; rmsMax: number; isSilent: boolean }>(
+        'get_audio_level', { durationMs: 1500 },
+      );
+      const errs = await client.call<{ entries: Array<{ level: string; message: string }> }>('get_console_errors');
+      const critical = errs.entries.filter(e => e.level === 'error' && !e.message.includes('Failed to load resource'));
+      // Remove the effect
+      try {
+        const audioState = await client.call<{ masterEffects?: { id: string; type?: string }[] }>('get_audio_state');
+        const added = audioState?.masterEffects?.find(fx => fx.type === test.path);
+        if (added) await client.call('remove_master_effect', { effectId: added.id });
+      } catch { /* best-effort cleanup */ }
+      await client.call('clear_console_errors').catch(() => {});
+
+      const audible = (level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4;
+      if (!audible) {
+        return { name: test.name, family: test.family, status: 'fail',
+          rmsAvg: level.rmsAvg, rmsMax: level.rmsMax,
+          reason: `silent with effect (rmsAvg=${level.rmsAvg?.toFixed(6)})`,
+          durationMs: Date.now() - start };
+      }
+      if (critical.length > 0) {
+        return { name: test.name, family: test.family, status: 'fail',
+          rmsAvg: level.rmsAvg, rmsMax: level.rmsMax, errorCount: critical.length,
+          reason: `${critical.length} error(s): ${critical[0].message.slice(0, 80)}`,
+          durationMs: Date.now() - start };
+      }
+      return { name: test.name, family: test.family, status: 'pass',
+        rmsAvg: level.rmsAvg, rmsMax: level.rmsMax, durationMs: Date.now() - start };
     } else if (test.loader === 'local') {
       // Read from disk, base64-encode, and send to browser via the bridge.
       // The WS bridge goes directly to the browser which expects {filename, data},
@@ -684,30 +746,49 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
 // ── Main ────────────────────────────────────────────────────────────────────
 
 const REFERENCE_MUSIC_DIR = process.env.REFERENCE_MUSIC ?? '/Users/spot/Code/Reference Music';
+const FURNACE_DEMOS_DIR = process.env.FURNACE_DEMOS ?? '/Users/spot/Code/DEViLBOX/third-party/furnace-master/demos';
 
 async function main(): Promise<void> {
-  // Auto-discover tests from the local Reference Music collection
+  // Auto-discover all test sources
   const localTests = await discoverLocalTests(REFERENCE_MUSIC_DIR);
+  const furnaceTests = await discoverFurnaceTests(FURNACE_DEMOS_DIR);
+  const effectTests = buildEffectTests();
 
   // CLI flags
   const args = process.argv.slice(2);
   const localOnly = args.includes('--local-only');
   const hardcodedOnly = args.includes('--hardcoded-only');
+  const furnaceOnly = args.includes('--furnace-only');
+  const fxOnly = args.includes('--fx-only');
   const pushResults = args.includes('--push-results');
+  const skipFx = args.includes('--skip-fx');
+  const skipFurnace = args.includes('--skip-furnace');
   const onlyArg = args.find(a => a.startsWith('--only=') || a.startsWith('--only '));
   const onlyFamilies = onlyArg
     ? (onlyArg.includes('=') ? onlyArg.split('=')[1] : args[args.indexOf('--only') + 1])
       ?.split(',').map(s => s.trim().toUpperCase())
     : null;
 
-  let allTests = hardcodedOnly ? TESTS : localOnly ? localTests : [...TESTS, ...localTests];
+  // Build the test set based on flags
+  let allTests: TestCase[];
+  if (hardcodedOnly) allTests = TESTS;
+  else if (localOnly) allTests = localTests;
+  else if (furnaceOnly) allTests = furnaceTests;
+  else if (fxOnly) allTests = effectTests;
+  else {
+    // Default: all sources combined
+    allTests = [...TESTS, ...localTests];
+    if (!skipFurnace) allTests.push(...furnaceTests);
+    if (!skipFx) allTests.push(...effectTests);
+  }
+
   if (onlyFamilies) {
     allTests = allTests.filter(t => onlyFamilies.some(f => t.family.toUpperCase().includes(f)));
   }
 
   console.log('▶ DEViLBOX playback smoke test');
   console.log(`  Bridge: ${WS_URL}`);
-  console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded + ${localTests.length} local)`);
+  console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded, ${localTests.length} local, ${furnaceTests.length} furnace, ${effectTests.length} fx)`);
   if (onlyFamilies) console.log(`  Filter: ${onlyFamilies.join(', ')}`);
   if (pushResults) console.log(`  Push:   results → http://localhost:4444`);
   console.log('');
