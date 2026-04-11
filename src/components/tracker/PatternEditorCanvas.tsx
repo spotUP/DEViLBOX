@@ -2172,7 +2172,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // to prevent it from scrolling when FormatPlaybackState is globally active.
         const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
         isPlaying = fpsActive;
-        playRow = fpsActive ? fps.row : formatCursorRef.current.rowIndex;
+        playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
         if (fpsActive && fps.rowDuration > 0) {
           const elapsed = performance.now() - fps.rowChangeTime;
           const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
@@ -2296,7 +2296,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // ── Read cursor/selection ──────────────────────────────────────
       const cursor = isFormatModeRef.current
-        ? { rowIndex: formatCursorRef.current.rowIndex, channelIndex: formatCursorRef.current.channelIndex, columnType: '0', digitIndex: 0, noteColumnIndex: 0 }
+        ? { rowIndex: formatCurrentRowRef.current, channelIndex: formatCursorRef.current.channelIndex, columnType: '0', digitIndex: 0, noteColumnIndex: 0 }
         : { rowIndex: cs.cursor.rowIndex, channelIndex: cs.cursor.channelIndex,
             columnType: cs.cursor.columnType, digitIndex: cs.cursor.digitIndex,
             noteColumnIndex: cs.cursor.noteColumnIndex ?? 0 };
@@ -2444,7 +2444,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const fps = getFormatPlaybackState();
           const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
           const newPlaying = formatIsPlayingRef.current;
-          let newRow = newPlaying ? formatCurrentRowRef.current : formatCursorRef.current.rowIndex;
+          let newRow = formatCurrentRowRef.current;
           let smoothOffset = 0;
 
           if (fpsSmooth && fps.rowDuration > 0) {
@@ -2475,7 +2475,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             // cursor→worker subscription, so we push it here.
             if (!newPlaying) {
               bridge.post({ type: 'cursor', cursor: {
-                rowIndex:     formatCursorRef.current.rowIndex,
+                rowIndex:     formatCurrentRowRef.current,
                 channelIndex: formatCursorRef.current.channelIndex,
                 columnType:   '0',
                 digitIndex:   0,
