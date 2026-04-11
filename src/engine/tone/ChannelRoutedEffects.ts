@@ -49,11 +49,14 @@ export class ChannelRoutedEffectsManager {
   async rebuild(
     channelEffects: Map<number, EffectConfig[]>,
   ): Promise<void> {
+    console.log(`[ChannelRoutedEffects] rebuild() called with ${channelEffects.size} channels:`,
+      [...channelEffects.entries()].map(([ch, fx]) => `ch${ch}: ${fx.length} effects (${fx.filter(e=>e.enabled).length} enabled)`));
+
     // Lazy import to avoid circular dependency
     const { LibopenmptEngine } = await import('../libopenmpt/LibopenmptEngine');
-    if (!LibopenmptEngine.hasInstance()) return;
+    if (!LibopenmptEngine.hasInstance()) { console.warn('[ChannelRoutedEffects] No LibopenmptEngine instance'); return; }
     const engine = LibopenmptEngine.getInstance();
-    if (!engine.isAvailable()) return;
+    if (!engine.isAvailable()) { console.warn('[ChannelRoutedEffects] Engine not available'); return; }
 
     const workletNode = engine.getWorkletNode();
     if (!workletNode) return;
@@ -108,9 +111,10 @@ export class ChannelRoutedEffectsManager {
 
       // Connect: worklet output[slotIdx+1] → outputGain → effect chain → masterEffectsInput
       try {
-        workletNode.connect(outputGain, slotIdx + 1);
+        workletNode.connect(outputGain, slotIdx + 1, 0);
+        console.log(`[ChannelRoutedEffects] Connected worklet output[${slotIdx + 1}] → outputGain (numberOfOutputs=${workletNode.numberOfOutputs})`);
       } catch (e) {
-        console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${slotIdx + 1}:`, e);
+        console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${slotIdx + 1} (numberOfOutputs=${workletNode.numberOfOutputs}):`, e);
         engine.removeIsolation(slotIdx);
         for (const n of effectNodes) { try { n.dispose(); } catch { /* */ } }
         continue;
@@ -139,8 +143,13 @@ export class ChannelRoutedEffectsManager {
         outputGain,
       };
 
-      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')}`);
+      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}, outputIdx=${slotIdx + 1})`);
       slotIdx++;
+    }
+
+    // Request diagnostic from worklet after a short delay to let messages settle
+    if (slotIdx > 0) {
+      setTimeout(() => engine.diagIsolation(), 200);
     }
   }
 

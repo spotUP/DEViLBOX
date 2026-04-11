@@ -71,6 +71,12 @@ class MPT extends AudioWorkletProcessor {
 	process(inputList, outputList, parameters) {
 		if (!this.modulePtr || !this.leftPtr || !this.rightPtr || this.paused) return true	//silence
 
+		// Re-apply main mute mask every render to guard against loop/seek resets
+		if (this.isolatedBits && this.muteFunc) {
+			const effectiveMainMask = this.userMuteMask & ~this.isolatedBits
+			this.applyMuteMask_(this.extPtr, this.muteFunc, effectiveMainMask)
+		}
+
 		const left = outputList[0][0]
 		const right = outputList[0][1]
 
@@ -160,6 +166,10 @@ class MPT extends AudioWorkletProcessor {
 				}
 				continue
 			}
+			// Re-apply mute mask EVERY render to guard against loop/seek resets
+			const effectiveSlotMask = slot.channelMask & this.userMuteMask
+			this.applyMuteMask_(slot.extPtr, slot.muteFunc, effectiveSlotMask)
+
 			const outCh = outputList[s + 1]
 			if (!outCh || !outCh[0] || !outCh[1]) continue
 			const oL = outCh[0]
@@ -285,6 +295,28 @@ class MPT extends AudioWorkletProcessor {
 				// Extract isolatedBits from the complement
 				this.isolatedBits = ~v & ((1 << Math.min(this.channels || 32, 32)) - 1)
 				this.recomputeMainMask_()
+				break
+			case 'diagIsolation':
+				// Diagnostic: report current isolation state
+				this.port.postMessage({
+					cmd: 'diagIsolation',
+					mainMuteFunc: this.muteFunc,
+					userMuteMask: this.userMuteMask,
+					isolatedBits: this.isolatedBits,
+					effectiveMainMask: this.userMuteMask & ~this.isolatedBits,
+					channels: this.channels,
+					hasWasmTable: !!libopenmpt.wasmTable,
+					hasModuleBuffer: !!this.moduleBuffer,
+					hasExtCreate: !!libopenmpt._openmpt_module_ext_create_from_memory,
+					hasExtGetInterface: !!libopenmpt._openmpt_module_ext_get_interface,
+					slots: this.isolationSlots.map((s, i) => s ? {
+						index: i,
+						channelMask: s.channelMask,
+						muteFunc: s.muteFunc,
+						hasModulePtr: !!s.modulePtr,
+						hasExtPtr: !!s.extPtr,
+					} : null)
+				})
 				break
 			case 'decodeAll':
 				this.decodeAll(v)
@@ -691,7 +723,13 @@ class MPT extends AudioWorkletProcessor {
 		}
 
 		this.isolationSlots[slotIndex] = slot
-		this.port.postMessage({ cmd: 'isolationReady', slotIndex })
+		this.port.postMessage({
+			cmd: 'isolationReady', slotIndex,
+			channelMask, muteFunc,
+			effectiveSlotMask: effectiveSlotMask,
+			userMuteMask: this.userMuteMask,
+			isolatedBits: this.isolatedBits,
+		})
 	}
 
 	/**
