@@ -527,14 +527,21 @@ export class LibopenmptEngine {
 
     // Create MessageChannel: port1 → main worklet, port2 → isolation player
     const channel = new MessageChannel();
-    this.workletNode.port.postMessage(
-      { cmd: 'setIsolationPort', val: { slotIndex, port: channel.port1 } },
-      [channel.port1]
-    );
-    playerNode.port.postMessage(
-      { cmd: 'setSourcePort', port: channel.port2 },
-      [channel.port2]
-    );
+    try {
+      this.workletNode.port.postMessage(
+        { cmd: 'setIsolationPort', val: { slotIndex, port: channel.port1 } },
+        [channel.port1]
+      );
+      playerNode.port.postMessage(
+        { cmd: 'setSourcePort', port: channel.port2 },
+        [channel.port2]
+      );
+    } catch (e) {
+      console.error(`[LibopenmptEngine] Failed to transfer MessagePort for slot ${slotIndex}:`, e);
+      this._destroyIsolationPlayerNode(slotIndex);
+      this._isolationSlotMasks[slotIndex] = null;
+      return;
+    }
 
     // Tell main worklet to create the isolation module
     this.workletNode.port.postMessage({ cmd: 'addIsolation', val: { slotIndex, channelMask } });
