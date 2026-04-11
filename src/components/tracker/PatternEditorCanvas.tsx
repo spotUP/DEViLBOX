@@ -2453,7 +2453,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const fps = getFormatPlaybackState();
           const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
           const newPlaying = formatIsPlayingRef.current;
-          let newRow = formatCurrentRowRef.current;
+          // During playback, read row from the lightweight singleton (updated by
+          // engine poll at 250Hz) instead of the React prop (updated via Zustand
+          // → re-render, which adds variable latency and causes uneven scroll).
+          let newRow = fpsSmooth ? fps.row : formatCurrentRowRef.current;
           let smoothOffset = 0;
 
           if (fpsSmooth && fps.rowDuration > 0) {

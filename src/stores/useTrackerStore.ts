@@ -318,6 +318,40 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
   })),
 });
 
+/**
+ * Phase 5.4: Create an empty libopenmpt soundlib module for fresh songs.
+ * This makes fresh DEViLBOX songs route through LibopenmptEngine for playback
+ * so the TS scheduler never needs to run. Called fire-and-forget from reset().
+ *
+ * Creates an empty XM module (XM supports the widest feature set of the
+ * formats libopenmpt can write: 2 effect columns, volume column, up to 32
+ * channels) and stores the serialized buffer as libopenmptFileData.
+ */
+async function initFreshSoundlib(): Promise<void> {
+  try {
+    const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+    // Destroy any previously loaded module (from a previous song)
+    await osl.destroyModule();
+    // Create a new empty XM with the default channel/pattern count
+    const ok = await osl.createNewModule(1 /* XM */, DEFAULT_NUM_CHANNELS, 1);
+    if (!ok) {
+      console.warn('[initFreshSoundlib] createNewModule failed');
+      return;
+    }
+    // Serialize to ArrayBuffer and store for LibopenmptEngine
+    const data = await osl.saveModule('xm');
+    if (data) {
+      useFormatStore.setState({ libopenmptFileData: data });
+      // Mark the bridge as loaded so cell edits sync to the soundlib
+      OpenMPTEditBridge.markLoaded('xm');
+    }
+  } catch (err) {
+    // Soundlib WASM may not be loaded yet on first page load — that's OK,
+    // the TS scheduler handles playback until the user imports a real file.
+    console.warn('[initFreshSoundlib] failed (soundlib not ready?):', err);
+  }
+}
+
 // ── Channel-type validation (fires once per mismatch type) ───────────────────
 const _warnedMismatches = new Set<string>();
 
@@ -1933,6 +1967,11 @@ export const useTrackerStore = create<TrackerStore>()(
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
       });
+      // Phase 5.4: Initialize an empty libopenmpt soundlib module so fresh
+      // songs route through LibopenmptEngine for playback (skipping the TS
+      // scheduler entirely). Fire-and-forget — the async init completes
+      // before the user can press play.
+      void initFreshSoundlib();
     },
   }))
 );
