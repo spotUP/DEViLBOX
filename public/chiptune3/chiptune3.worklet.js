@@ -41,8 +41,12 @@ function writeAsciiToMemory(str,buffer,dontAddNull){for(let i=0;i<str.length;++i
 //
 // Processor
 //
+// Maximum number of isolation slots for per-channel effect routing.
+// Output 0 = main mix, outputs 1..MAX = isolation slots.
+const MAX_ISOLATION_SLOTS = 4
+
 class MPT extends AudioWorkletProcessor {
-	constructor() {
+	constructor(options) {
 		super()
 		this.port.onmessage = this.handleMessage_.bind(this)
 		this.paused = false
@@ -54,6 +58,10 @@ class MPT extends AudioWorkletProcessor {
 		this.channels = 0
 		this.lastStateRow = -1
 		this.lastStateOrder = -1
+		// Per-channel effect isolation: secondary module instances that render
+		// only specific channels. All share the same process() call for perfect sync.
+		this.isolationSlots = new Array(MAX_ISOLATION_SLOTS).fill(null)
+		this.moduleBuffer = null  // Cached ArrayBuffer for creating isolation instances
 	}
 
 	process(inputList, outputList, parameters) {
@@ -135,6 +143,35 @@ class MPT extends AudioWorkletProcessor {
 
 		this.port.postMessage( msg )
 
+		// Render isolation slots → outputs[1..N] (per-channel effect routing)
+		for (let s = 0; s < MAX_ISOLATION_SLOTS; s++) {
+			const slot = this.isolationSlots[s]
+			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr) {
+				// Silence unused outputs
+				if (outputList[s + 1]) {
+					const oL = outputList[s + 1][0]
+					const oR = outputList[s + 1][1]
+					if (oL) oL.fill(0)
+					if (oR) oR.fill(0)
+				}
+				continue
+			}
+			const outCh = outputList[s + 1]
+			if (!outCh || !outCh[0] || !outCh[1]) continue
+			const oL = outCh[0]
+			const oR = outCh[1]
+			const frames = libopenmpt._openmpt_module_read_float_stereo(
+				slot.modulePtr, sampleRate, oL.length, slot.leftPtr, slot.rightPtr
+			)
+			if (frames > 0) {
+				oL.set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
+				oR.set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
+			} else {
+				oL.fill(0)
+				oR.fill(0)
+			}
+		}
+
 		return true // def. needed for Chrome
 	}
 
@@ -150,14 +187,17 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'pause':
 				this.paused = true
+				this.forEachIsolationSlot_(s => { s.paused = true })
 				break
 			case 'unpause':
 				this.paused = false
+				this.forEachIsolationSlot_(s => { s.paused = false })
 				break
 			case 'togglePause':
 				this.paused = !this.paused
 				break
 			case 'stop':
+				this.teardownAllIsolation_()
 				this.stop()
 				break
 			case 'meta':
@@ -184,10 +224,16 @@ class MPT extends AudioWorkletProcessor {
 			case 'setPos':
 				if (!this.modulePtr) return
 				libopenmpt._openmpt_module_set_position_seconds(this.modulePtr, v)
+				this.forEachIsolationSlot_(s => {
+					libopenmpt._openmpt_module_set_position_seconds(s.modulePtr, v)
+				})
 				break
 			case 'setOrderRow':
 				if (!this.modulePtr) return
 				libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, v.o, v.r)
+				this.forEachIsolationSlot_(s => {
+					libopenmpt._openmpt_module_set_position_order_row(s.modulePtr, v.o, v.r)
+				})
 				break
 			case 'hotReload':
 				// Reload module data while preserving playback position.
@@ -212,13 +258,26 @@ class MPT extends AudioWorkletProcessor {
 			case 'setMuteMask':
 				// Set mute state for all channels via ext interactive interface
 				if (!this.modulePtr) break
-				if (this.muteFunc && this.extPtr && libopenmpt.wasmTable) {
-					const fn = libopenmpt.wasmTable.get(this.muteFunc)
-					for (let ch = 0; ch < Math.min(this.channels, 16); ch++) {
-						const muted = (v & (1 << ch)) === 0
-						try { fn(this.extPtr, ch, muted ? 1 : 0) } catch(e) { /* ignore */ }
-					}
-				}
+				this.applyMuteMask_(this.extPtr, this.muteFunc, v)
+				break
+			case 'addIsolation':
+				// Create a secondary module instance for per-channel effect routing.
+				// v = { slotIndex: number, channelMask: number }
+				this.addIsolationSlot_(v.slotIndex, v.channelMask)
+				break
+			case 'removeIsolation':
+				// Destroy an isolation slot. v = { slotIndex: number }
+				this.removeIsolationSlot_(v.slotIndex)
+				break
+			case 'updateIsolationMask':
+				// Change which channels an isolation slot renders.
+				// v = { slotIndex: number, channelMask: number }
+				this.updateIsolationMask_(v.slotIndex, v.channelMask)
+				break
+			case 'updateMainMask':
+				// Update main module mute mask (exclude isolated channels).
+				// v = channelMask (bit N=1 = active)
+				this.applyMuteMask_(this.extPtr, this.muteFunc, v)
 				break
 			case 'decodeAll':
 				this.decodeAll(v)
@@ -253,9 +312,13 @@ class MPT extends AudioWorkletProcessor {
 	}
 
 	play(buffer, paused = false) {
+		this.teardownAllIsolation_()
 		this.stop()
 		this.lastStateRow = -1
 		this.lastStateOrder = -1
+
+		// Cache the raw buffer so isolation slots can create their own module instances
+		this.moduleBuffer = buffer.slice ? buffer.slice(0) : new Int8Array(buffer).buffer
 
 		const maxFramesPerChunk = 128	// thats what worklet is using
 		const byteArray = new Int8Array(buffer)
@@ -460,6 +523,163 @@ class MPT extends AudioWorkletProcessor {
 			libopenmpt._openmpt_free_string(namePtr)
 		}
 		return names
+	}
+
+	// ============================================
+	// ISOLATION SLOT MANAGEMENT (per-channel FX)
+	// ============================================
+
+	/**
+	 * Apply a mute mask to an ext module via its interactive interface.
+	 * Shared by main module and isolation modules.
+	 */
+	applyMuteMask_(extPtr, muteFunc, mask) {
+		if (!muteFunc || !extPtr || !libopenmpt.wasmTable) return
+		const fn = libopenmpt.wasmTable.get(muteFunc)
+		for (let ch = 0; ch < Math.min(this.channels, 32); ch++) {
+			const muted = (mask & (1 << ch)) === 0
+			try { fn(extPtr, ch, muted ? 1 : 0) } catch(e) { /* ignore */ }
+		}
+	}
+
+	/**
+	 * Create a secondary module instance in isolation slot N.
+	 * The slot renders ONLY channels set in channelMask.
+	 */
+	addIsolationSlot_(slotIndex, channelMask) {
+		if (slotIndex < 0 || slotIndex >= MAX_ISOLATION_SLOTS) return
+		if (!this.moduleBuffer || !libopenmpt._openmpt_module_ext_create_from_memory) return
+
+		// Tear down existing slot if any
+		this.removeIsolationSlot_(slotIndex)
+
+		const byteArray = new Int8Array(this.moduleBuffer)
+		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
+		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
+
+		let extPtr = libopenmpt._openmpt_module_ext_create_from_memory(
+			ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0
+		)
+		libopenmpt._free(ptrToFile)
+		if (!extPtr) return
+
+		const modulePtr = libopenmpt._openmpt_module_ext_get_module(extPtr)
+		if (!modulePtr) {
+			libopenmpt._openmpt_module_ext_destroy(extPtr)
+			return
+		}
+
+		// Extract mute function pointer from interactive interface
+		let muteFunc = 0
+		if (libopenmpt._openmpt_module_ext_get_interface && libopenmpt.stackSave) {
+			const INTERACTIVE_STRUCT_SIZE = 64
+			const ifacePtr = libopenmpt._malloc(INTERACTIVE_STRUCT_SIZE)
+			if (ifacePtr) {
+				for (let i = 0; i < INTERACTIVE_STRUCT_SIZE; i++) {
+					libopenmpt.HEAPU8[ifacePtr + i] = 0
+				}
+				const stack = libopenmpt.stackSave()
+				const ok = libopenmpt._openmpt_module_ext_get_interface(
+					extPtr, asciiToStack('interactive'), ifacePtr, INTERACTIVE_STRUCT_SIZE
+				)
+				libopenmpt.stackRestore(stack)
+				if (ok) {
+					muteFunc = libopenmpt.HEAPU32
+						? libopenmpt.HEAPU32[(ifacePtr + 40) >> 2]
+						: new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + 40, true)
+				}
+				libopenmpt._free(ifacePtr)
+			}
+		}
+
+		// Apply config to match main module
+		libopenmpt._openmpt_module_set_repeat_count(modulePtr, this.config.repeatCount)
+		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, this.config.stereoSeparation)
+		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
+
+		if (libopenmpt.stackSave) {
+			const stack = libopenmpt.stackSave()
+			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
+			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
+			libopenmpt.stackRestore(stack)
+		}
+
+		// Seek to main module's current position for sync
+		if (this.modulePtr) {
+			const order = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
+			const row = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
+			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
+		}
+
+		// Allocate render buffers
+		const maxFramesPerChunk = 128
+		const leftPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
+		const rightPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
+
+		const slot = {
+			modulePtr,
+			extPtr,
+			muteFunc,
+			leftPtr,
+			rightPtr,
+			channelMask,
+			paused: this.paused,
+		}
+
+		// Apply mute mask — only the target channels are audible
+		this.applyMuteMask_(extPtr, muteFunc, channelMask)
+
+		this.isolationSlots[slotIndex] = slot
+		this.port.postMessage({ cmd: 'isolationReady', slotIndex })
+	}
+
+	/**
+	 * Destroy an isolation slot and free its resources.
+	 */
+	removeIsolationSlot_(slotIndex) {
+		if (slotIndex < 0 || slotIndex >= MAX_ISOLATION_SLOTS) return
+		const slot = this.isolationSlots[slotIndex]
+		if (!slot) return
+
+		if (slot.extPtr) {
+			libopenmpt._openmpt_module_ext_destroy(slot.extPtr)
+		} else if (slot.modulePtr) {
+			libopenmpt._openmpt_module_destroy(slot.modulePtr)
+		}
+		if (slot.leftPtr) libopenmpt._free(slot.leftPtr)
+		if (slot.rightPtr) libopenmpt._free(slot.rightPtr)
+
+		this.isolationSlots[slotIndex] = null
+	}
+
+	/**
+	 * Update which channels an isolation slot renders.
+	 */
+	updateIsolationMask_(slotIndex, channelMask) {
+		if (slotIndex < 0 || slotIndex >= MAX_ISOLATION_SLOTS) return
+		const slot = this.isolationSlots[slotIndex]
+		if (!slot) return
+		slot.channelMask = channelMask
+		this.applyMuteMask_(slot.extPtr, slot.muteFunc, channelMask)
+	}
+
+	/**
+	 * Tear down all isolation slots.
+	 */
+	teardownAllIsolation_() {
+		for (let i = 0; i < MAX_ISOLATION_SLOTS; i++) {
+			this.removeIsolationSlot_(i)
+		}
+	}
+
+	/**
+	 * Apply a callback to each active isolation slot.
+	 */
+	forEachIsolationSlot_(fn) {
+		for (let i = 0; i < MAX_ISOLATION_SLOTS; i++) {
+			const slot = this.isolationSlots[i]
+			if (slot && slot.modulePtr) fn(slot)
+		}
 	}
 
 }

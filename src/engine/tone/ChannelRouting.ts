@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
 import { TrackerEnvelope } from '../TrackerEnvelope';
+import { getChannelEffectsManager } from '../ChannelEffectsManager';
 
 // Voice state type (mirrors ToneEngine.ts interface)
 export interface VoiceState {
@@ -156,7 +157,9 @@ export function getRealtimeChannelLevels(state: ChannelMeterState, numChannels: 
 
 /**
  * Get or create a channel's audio chain
- * Route: [Voices] → channelInput → channel (volume/pan) → masterInput
+ * Route: [Voices] → channelInput → [effectChain] → channel (volume/pan) → masterInput
+ * The effect chain is always present (passthrough when empty) so effects can be
+ * added/removed dynamically without reconnecting external nodes.
  */
 export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: number): Tone.Gain {
   if (!ctx.channelOutputs.has(channelIndex)) {
@@ -165,8 +168,15 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const channel = new Tone.Channel({ volume: 0, pan: 0 });
     const meter = new Tone.Meter({ smoothing: 0.15 });
 
-    // Connect: input → channel → meter → masterInput
-    input.connect(channel);
+    // Get per-channel effect chain (creates passthrough if no effects exist)
+    const mgr = getChannelEffectsManager();
+    const chainInput = mgr.getChainInput(channelIndex);
+    const chainOutput = mgr.getChainOutput(channelIndex);
+
+    // Connect: input → [effect chain] → channel → meter + masterInput
+    // Effects are PRE-FADER (before volume/pan) — standard insert position
+    input.connect(chainInput);
+    chainOutput.connect(channel);
     channel.connect(meter);
     channel.connect(ctx.masterInput);
 

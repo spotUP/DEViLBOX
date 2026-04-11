@@ -14,6 +14,41 @@ import { useFormatStore } from './useFormatStore';
 import type { EffectConfig } from '@typedefs/instrument';
 import { getChannelEffectsManager } from '../engine/ChannelEffectsManager';
 import { getSendBusManager } from '../engine/SendBusManager';
+import { getChannelRoutedEffectsManager } from '../engine/tone/ChannelRoutedEffects';
+
+// Rebuild WASM per-channel effect routing after any insert-effect mutation.
+// Debounced to coalesce rapid changes (e.g. loading a preset adds 4 effects).
+let _wasmRebuildTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleWasmEffectRebuild(): void {
+  if (_wasmRebuildTimer) clearTimeout(_wasmRebuildTimer);
+  _wasmRebuildTimer = setTimeout(() => {
+    _wasmRebuildTimer = null;
+    void (async () => {
+      try {
+        const { LibopenmptEngine } = await import('../engine/libopenmpt/LibopenmptEngine');
+        if (!LibopenmptEngine.hasInstance()) return;
+        const engine = LibopenmptEngine.getInstance();
+        if (!engine.isAvailable()) return;
+
+        const { getToneEngine } = await import('../engine/ToneEngine');
+        const masterEffectsInput = getToneEngine().masterEffectsInput;
+        const mgr = getChannelRoutedEffectsManager(masterEffectsInput);
+
+        const state = useMixerStore.getState();
+        const channelEffects = new Map<number, EffectConfig[]>();
+        for (let ch = 0; ch < state.channels.length; ch++) {
+          const effects = state.channels[ch].insertEffects;
+          if (effects.length > 0) {
+            channelEffects.set(ch, effects.map(e => ({ ...e, parameters: { ...e.parameters } })));
+          }
+        }
+        await mgr.rebuild(channelEffects);
+      } catch (e) {
+        console.warn('[MixerStore] Failed to rebuild WASM per-channel effects:', e);
+      }
+    })();
+  }, 50);
+}
 
 // Forward effective mute state to TrackerReplayer's channelMuteMask.
 // This is essential for WASM synth engines (FC, TFMX, etc.) whose audio
@@ -717,8 +752,9 @@ export const useMixerStore = create<MixerStore>()(
         if (state.channels[ch].insertEffects.length >= 4) return;
         state.channels[ch].insertEffects.push(effect);
       });
-      // Apply to audio engine
+      // Apply to native audio engine + WASM isolation
       getChannelEffectsManager().addEffect(ch, effect);
+      scheduleWasmEffectRebuild();
     },
 
     removeChannelInsertEffect(ch: number, effectIndex: number): void {
@@ -727,6 +763,7 @@ export const useMixerStore = create<MixerStore>()(
         state.channels[ch].insertEffects.splice(effectIndex, 1);
       });
       getChannelEffectsManager().removeEffect(ch, effectIndex);
+      scheduleWasmEffectRebuild();
     },
 
     toggleChannelInsertEffect(ch: number, effectIndex: number): void {
@@ -736,6 +773,7 @@ export const useMixerStore = create<MixerStore>()(
         if (fx) fx.enabled = !fx.enabled;
       });
       getChannelEffectsManager().toggleEffect(ch, effectIndex);
+      scheduleWasmEffectRebuild();
     },
 
     moveChannelInsertEffect(ch: number, fromIndex: number, toIndex: number): void {
@@ -746,6 +784,7 @@ export const useMixerStore = create<MixerStore>()(
         if (item) arr.splice(toIndex, 0, item);
       });
       getChannelEffectsManager().moveEffect(ch, fromIndex, toIndex);
+      scheduleWasmEffectRebuild();
     },
 
     updateChannelInsertEffect(ch: number, effectIndex: number, updates: Partial<EffectConfig>): void {
@@ -762,14 +801,22 @@ export const useMixerStore = create<MixerStore>()(
 
       if (updates.enabled !== undefined) {
         getChannelEffectsManager().toggleEffect(ch, effectIndex);
+        // Toggle changes which effects are active — needs rebuild
+        scheduleWasmEffectRebuild();
       } else {
-        // Push parameter/wet changes to the audio engine in real-time
+        // Push parameter/wet changes to both engines in real-time
         const state = get();
         const effect = state.channels[ch]?.insertEffects[effectIndex];
         if (effect) {
-          getChannelEffectsManager().updateEffectParams(
-            ch, effectIndex, structuredClone(effect) as EffectConfig
-          );
+          const cloned = structuredClone(effect) as EffectConfig;
+          getChannelEffectsManager().updateEffectParams(ch, effectIndex, cloned);
+          // Also update WASM routed effects (no rebuild needed for param changes)
+          try {
+            const mgr = getChannelRoutedEffectsManager();
+            if (mgr?.hasActiveSlots) {
+              mgr.updateEffectParams(ch, effectIndex, cloned);
+            }
+          } catch { /* manager not initialized yet */ }
         }
       }
     },
@@ -892,6 +939,8 @@ export const useMixerStore = create<MixerStore>()(
         });
         mgr.addEffect(ch, fx);
       }
+      // Rebuild WASM isolation for the new effect chain
+      scheduleWasmEffectRebuild();
     },
   }))
 );

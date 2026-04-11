@@ -79,6 +79,7 @@ import { PixiDrumPadManager } from './dialogs/PixiDrumPadManager';
 import { PixiSettingsModal } from './dialogs/PixiSettingsModal';
 import { PixiEditInstrumentModal } from './dialogs/PixiEditInstrumentModal';
 import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
+import { PixiChannelEffectsModal } from './dialogs/PixiChannelEffectsModal';
 import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
 import { PixiNonEditableDialog } from './dialogs/PixiNonEditableDialog';
 import { PixiAddToHomeScreenModal } from './dialogs/PixiAddToHomeScreenModal';
@@ -484,6 +485,11 @@ export const PixiRoot: React.FC = () => {
         <PixiEditInstrumentModal isOpen={modalOpen === 'instruments'} onClose={closeModal} />
         <PixiEditInstrumentModal isOpen={modalOpen === 'newInstrument'} onClose={closeModal} createMode />
         <PixiMasterEffectsModal isOpen={modalOpen === 'masterFx'} onClose={closeModal} />
+        <PixiChannelEffectsModal
+          isOpen={modalOpen === 'channelEffects'}
+          onClose={closeModal}
+          channelIndex={(modalData?.channelIndex as number) ?? 0}
+        />
         <PixiInstrumentEffectsModal isOpen={modalOpen === 'instrumentFx'} onClose={closeModal} />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
