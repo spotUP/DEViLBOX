@@ -46,7 +46,6 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
-  const [showChannels, setShowChannels] = useState(false);
   const selected = effect.selectedChannels;
   const hasSelection = Array.isArray(selected);
 
@@ -123,54 +122,49 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
         />
       </div>
 
-      {/* Channel selection row */}
-      <div className="px-2 pb-1">
-        <button
-          onClick={() => setShowChannels(!showChannels)}
-          className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-secondary transition-colors w-full py-1"
-        >
-          <ChevronDown size={10} className={`transition-transform ${showChannels ? '' : '-rotate-90'}`} />
-          <span className="font-medium">
+      {/* Channel routing selector — always visible */}
+      <div className="mx-2 mb-2 mt-1 p-1.5 rounded-lg bg-dark-bg/60 border border-dark-border/40">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Route</span>
+          <button
+            onClick={selectAll}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+              !hasSelection
+                ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
+                : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-transparent'
+            }`}
+          >
+            ALL
+          </button>
+          <span className="text-[9px] text-text-muted/60 ml-auto">
             {hasSelection && selected!.length === 0
-              ? 'No Channels'
+              ? 'No channels'
               : hasSelection
-                ? `CH: ${selected!.map(c => c + 1).join(', ')}`
-                : 'All Channels'}
+                ? `${selected!.length}/${numChannels} ch`
+                : 'All channels'}
           </span>
-        </button>
-        {showChannels && (
-          <div className="flex flex-wrap items-center gap-1 pb-2 pt-0.5">
-            <button
-              onClick={selectAll}
-              className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
-                !hasSelection
-                  ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-transparent'
-              }`}
-            >
-              ALL
-            </button>
-            {Array.from({ length: numChannels }, (_, i) => {
-              const isSelected = !hasSelection || (selected?.includes(i) ?? false);
-              return (
-                <button
-                  key={i}
-                  onClick={() => toggleChannel(i)}
-                  className={`w-5 h-5 text-[9px] font-bold rounded transition-colors ${
-                    isSelected && hasSelection
-                      ? 'bg-accent-primary/30 text-accent-primary border border-accent-primary/50'
-                      : isSelected
-                        ? 'bg-dark-bgTertiary text-text-muted border border-dark-border'
-                        : 'bg-dark-bg text-text-muted/30 border border-dark-border/50'
-                  }`}
-                  title={`Channel ${i + 1}`}
-                >
-                  {i + 1}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {Array.from({ length: numChannels }, (_, i) => {
+            const isSelected = !hasSelection || (selected?.includes(i) ?? false);
+            return (
+              <button
+                key={i}
+                onClick={() => toggleChannel(i)}
+                className={`w-5 h-5 text-[9px] font-bold rounded transition-colors ${
+                  isSelected && hasSelection
+                    ? 'bg-accent-primary/30 text-accent-primary border border-accent-primary/50'
+                    : isSelected
+                      ? 'bg-dark-bgTertiary text-text-secondary border border-dark-border'
+                      : 'bg-dark-bg text-text-muted/30 border border-dark-border/50'
+                }`}
+                title={`Channel ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
