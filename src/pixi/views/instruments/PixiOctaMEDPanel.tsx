@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PixiKnob, PixiLabel, PixiButton } from '../../components';
+import { PixiNumericInput } from '../../components/PixiNumericInput';
 import { usePixiTheme } from '../../theme';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { OctaMEDConfig } from '@/types/instrument/exotic';
@@ -194,15 +195,29 @@ export const PixiOctaMEDPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
             />
           </layoutContainer>
 
-          <SectionHeading text="LOOP (read-only)" />
+          <SectionHeading text="LOOP (BYTES)" />
           <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
-            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
               <PixiLabel text="Loop Start" size="xs" color="textMuted" />
-              <PixiLabel text={`${med.loopStart} bytes`} size="xs" color="text" />
+              <PixiNumericInput
+                value={med.loopStart}
+                min={0}
+                max={65534}
+                step={2}
+                onChange={(v) => upd('loopStart', Math.max(0, Math.round(v)))}
+                width={70}
+              />
             </layoutContainer>
-            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
               <PixiLabel text="Loop Length" size="xs" color="textMuted" />
-              <PixiLabel text={`${med.loopLen} bytes`} size="xs" color="text" />
+              <PixiNumericInput
+                value={med.loopLen}
+                min={0}
+                max={65534}
+                step={2}
+                onChange={(v) => upd('loopLen', Math.max(0, Math.round(v)))}
+                width={70}
+              />
             </layoutContainer>
           </layoutContainer>
         </layoutContainer>

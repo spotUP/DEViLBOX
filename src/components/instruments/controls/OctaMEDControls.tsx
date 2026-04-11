@@ -185,25 +185,37 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
         </div>
       </div>
 
-      {/* Loop reference section */}
+      {/* Loop section — editable, writes through to chip RAM via upd() */}
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
-        <SectionLabel color={accent} label="Loop (read-only reference)" />
-        <div className="flex gap-3">
+        <SectionLabel color={accent} label="Loop" />
+        <div className="flex gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>
-              Loop Start
+              Loop Start (bytes)
             </span>
-            <span className="text-sm font-mono" style={{ color: dim === '#004444' ? '#00cccc' : '#3399cc' }}>
-              {config.loopStart} bytes
-            </span>
+            <input
+              type="number"
+              min={0}
+              step={2}
+              value={config.loopStart}
+              onChange={(e) => upd('loopStart', Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-24 text-sm font-mono border rounded px-2 py-1"
+              style={{ background: '#001833', borderColor: dim, color: accent }}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>
-              Loop Length
+              Loop Length (bytes)
             </span>
-            <span className="text-sm font-mono" style={{ color: dim === '#004444' ? '#00cccc' : '#3399cc' }}>
-              {config.loopLen} bytes
-            </span>
+            <input
+              type="number"
+              min={0}
+              step={2}
+              value={config.loopLen}
+              onChange={(e) => upd('loopLen', Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-24 text-sm font-mono border rounded px-2 py-1"
+              style={{ background: '#001833', borderColor: dim, color: accent }}
+            />
           </div>
         </div>
       </div>
