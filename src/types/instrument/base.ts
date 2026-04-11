@@ -276,6 +276,7 @@ export type SynthType =
   | 'MAMEVLM5030'     // Sanyo VLM5030 LPC speech (Konami arcade)
   | 'MAMEHC55516'     // Harris HC55516 CVSD speech codec (Williams/Bally)
   | 'StartrekkerAMSynth' // Startrekker AM synth (WASM replayer)
+  | 'Geonkick'        // Geonkick percussion synth (Quamplex, GPL-3 WASM port)
   | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
