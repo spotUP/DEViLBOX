@@ -17,7 +17,7 @@ export async function applyUADEWriteBack(
     console.log(
       `[UADEWriteBack] row=${sourceRef.row} ch=${sourceRef.channel} effect=C${rawValue.toString(16).padStart(2, '0')}`,
     );
-    // TODO: Wire to UADEChipEditor.patchPatternCell() when format encoder supports it
+    // NOTE: UADE format encoder not yet available — writeback is a no-op
     return true;
   }
 

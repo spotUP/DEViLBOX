@@ -318,15 +318,6 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
   })),
 });
 
-/**
- * Phase 5.4: Create an empty libopenmpt soundlib module for fresh songs.
- * This makes fresh DEViLBOX songs route through LibopenmptEngine for playback
- * so the TS scheduler never needs to run. Called fire-and-forget from reset().
- *
- * Creates an empty XM module (XM supports the widest feature set of the
- * formats libopenmpt can write: 2 effect columns, volume column, up to 32
- * channels) and stores the serialized buffer as libopenmptFileData.
- */
 // ── Channel-type validation (fires once per mismatch type) ───────────────────
 const _warnedMismatches = new Set<string>();
 
@@ -1942,13 +1933,8 @@ export const useTrackerStore = create<TrackerStore>()(
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
       });
-      // Phase 5.4: initFreshSoundlib is NOT called from reset() because
-      // reset() fires during import pipelines too (loadFile handler calls
-      // ts.reset() before loading a real song). Calling it here creates a
-      // race where the async init clobbers the real module data.
-      // Instead, the playback path (TrackerReplayer.play) handles this:
-      // if libopenmptFileData is null at play time, it creates an empty
-      // soundlib on-demand.
+      // Empty soundlib is created on-demand by TrackerReplayer.play()
+      // when libopenmptFileData is null — not here in reset().
     },
   }))
 );

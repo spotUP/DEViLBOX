@@ -118,7 +118,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
       trackerStore.deletePattern(idx);
     }
 
-    // TODO: loop tail truncation — requires slicing the audioBuffer at loopEnd
+    // NOTE: Loop tail truncation not yet implemented — requires slicing audioBuffer at loopEnd
     // and writing it back through the instrument store. Skipped for now.
     // Selected loop tails are acknowledged but not acted upon.
 
