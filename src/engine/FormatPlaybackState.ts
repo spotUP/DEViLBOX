@@ -5,17 +5,19 @@
  * write their playback row here. The PatternEditorCanvas RAF loop reads it
  * every frame for smooth scrolling — no React props in the hot path.
  *
- * Smooth interpolation: tracks when the row last changed and estimates
- * row duration from recent history, allowing sub-pixel scroll offset
- * computation identical to the normal mode's replayer-based approach.
+ * Constant-rate scrolling: instead of recording the wall-clock time when a
+ * poll detects a row change (which has jitter), we PREDICT the transition time
+ * as `lastChangeTime + rowDuration`. This gives perfectly even timestamps and
+ * constant-rate visual scrolling. Hard-resets only happen on seek, pattern
+ * boundary, or speed change.
  */
 
 export interface FormatPlaybackSnapshot {
   row: number;
   isPlaying: boolean;
-  /** performance.now() timestamp when the row last changed */
+  /** Predicted timestamp of the most recent row transition */
   rowChangeTime: number;
-  /** Estimated milliseconds per row (rolling average) */
+  /** Milliseconds per row (from explicit duration or rolling average) */
   rowDuration: number;
 }
 
@@ -27,33 +29,57 @@ const state: FormatPlaybackSnapshot = {
 };
 
 let lastRow = -1;
-let lastRowTime = 0;
 // When > 0, an engine has set the duration explicitly (e.g. from driver speed)
 // and the rolling average is suppressed.
 let explicitDuration = 0;
+// Duration of the row that just completed — saved before rowDuration is updated
+// for the new row, so predictions use the correct elapsed time.
+let completedRowDuration = 0;
 
 /**
- * Called by format engines (e.g. GT Ultra onPosition callback) whenever
- * the playback row changes. High-frequency calls are fine — only actual
- * row changes trigger timestamp updates.
+ * Called by format engines whenever the playback row changes.
+ *
+ * Instead of recording performance.now() (which has poll jitter), we predict
+ * the transition time as `lastChangeTime + completedRowDuration`. This yields
+ * perfectly even timestamps → constant-rate scrolling. We hard-reset only when
+ * the prediction is unreasonable (seek, pattern boundary, speed change).
  */
 export function setFormatPlaybackRow(row: number): void {
   if (row !== lastRow) {
     const now = performance.now();
-    // Only estimate rowDuration from timing if no explicit duration is set
-    if (explicitDuration <= 0 && lastRow >= 0 && lastRowTime > 0) {
-      const dt = now - lastRowTime;
-      // Rolling average: blend new measurement with existing estimate.
-      // High smoothing factor (0.85) dampens jitter from rAF polling —
-      // engines that poll memory (SF2) have ±16ms noise per sample.
-      if (dt > 5 && dt < 2000) {
-        state.rowDuration = state.rowDuration * 0.85 + dt * 0.15;
+
+    // Predict when this transition actually happened
+    const dur = completedRowDuration > 0 ? completedRowDuration : state.rowDuration;
+    if (state.rowChangeTime > 0 && dur > 0) {
+      const predicted = state.rowChangeTime + dur;
+      // Accept prediction if it's in the past and within one row-duration of now.
+      // Otherwise hard-reset (seek, pattern boundary, or major desync).
+      if (predicted <= now + 2 && (now - predicted) < dur) {
+        state.rowChangeTime = predicted;
+      } else {
+        state.rowChangeTime = now;
       }
+
+      // Rolling-average duration for engines that don't set explicit duration
+      // (e.g. GT Ultra). Uses the predicted-corrected timestamp for accuracy.
+      if (explicitDuration <= 0) {
+        const dt = now - (state.rowChangeTime - dur); // time since previous predicted transition
+        if (dt > 5 && dt < 2000) {
+          state.rowDuration = state.rowDuration * 0.85 + dt * 0.15;
+        }
+      }
+    } else {
+      // First row change — no history to predict from
+      state.rowChangeTime = now;
     }
+
+    // Save current rowDuration as "completed" for the next prediction.
+    // This is the duration of the row that is NOW starting — when it ends,
+    // we'll use this value to predict when the next transition happened.
+    completedRowDuration = state.rowDuration;
+
     lastRow = row;
-    lastRowTime = now;
     state.row = row;
-    state.rowChangeTime = now;
   }
 }
 
@@ -73,8 +99,8 @@ export function setFormatPlaybackPlaying(playing: boolean): void {
   state.isPlaying = playing;
   if (!playing) {
     lastRow = -1;
-    lastRowTime = 0;
     explicitDuration = 0;
+    completedRowDuration = 0;
   }
 }
 
@@ -89,6 +115,6 @@ export function resetFormatPlaybackState(): void {
   state.rowChangeTime = 0;
   state.rowDuration = 120;
   lastRow = -1;
-  lastRowTime = 0;
   explicitDuration = 0;
+  completedRowDuration = 0;
 }
