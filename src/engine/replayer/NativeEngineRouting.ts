@@ -17,11 +17,13 @@ import { HivelyEngine } from '../hively/HivelyEngine';
 import type { UADEEngine } from '../uade/UADEEngine';
 import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
+import { SF2Engine } from '../sf2/SF2Engine';
 import { SilenceDetector } from './SilenceDetector';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 
 export { C64SIDEngine };
+export { SF2Engine };
 
 /** Active silence detectors keyed by engine synthType */
 const activeSilenceDetectors = new Map<string, SilenceDetector>();
@@ -471,6 +473,7 @@ function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolea
 export interface NativeEngineStartResult {
   suppressNotes: boolean;
   c64SidEngine: C64SIDEngine | null;
+  sf2Engine: SF2Engine | null;
   hivelyEngine: HivelyEngine | null;
   uadeEngine: UADEEngine | null;
   musicLineEngine: MusicLineEngine | null;
@@ -498,6 +501,7 @@ export async function startNativeEngines(
   const toneEngine = getToneEngine();
   let suppressNotes = false;
   let c64SidEngine: C64SIDEngine | null = null;
+  let sf2Engine: SF2Engine | null = null;
   let hivelyEngine: HivelyEngine | null = null;
   let uadeEngine: UADEEngine | null = null;
   let musicLineEngine: MusicLineEngine | null = null;
@@ -693,20 +697,49 @@ export async function startNativeEngines(
       const audioContext = Tone.getContext().rawContext as AudioContext;
       const synthBusNode = getNativeAudioNode(toneEngine.synthBus as any);
 
-      c64SidEngine = new C64SIDEngine(song.c64SidFileData);
-      await c64SidEngine.init(audioContext, synthBusNode ?? undefined);
+      // SF2 files: use SF2Engine for live editing support
+      if (song.sf2StoreData) {
+        const engine = new SF2Engine(song.c64SidFileData);
+        engine.setDriverInfo({
+          descriptor: song.sf2StoreData.descriptor,
+          driverCommon: song.sf2StoreData.driverCommon,
+          musicData: song.sf2StoreData.musicData,
+          tableDefs: song.sf2StoreData.tableDefs,
+          loadAddress: song.sf2StoreData.loadAddress,
+        });
+        await engine.init(audioContext, synthBusNode ?? undefined);
+        sf2Engine = engine;
+        c64SidEngine = engine.engine;
 
-      const { useTransportStore } = await import('@stores/useTransportStore');
-      const globalPitch = useTransportStore.getState().globalPitch ?? 0;
-      if (globalPitch !== 0) {
-        c64SidEngine.setPlaybackRate(Math.pow(2, globalPitch / 12));
-      }
+        const { useTransportStore } = await import('@stores/useTransportStore');
+        const globalPitch = useTransportStore.getState().globalPitch ?? 0;
+        if (globalPitch !== 0) {
+          c64SidEngine.setPlaybackRate(Math.pow(2, globalPitch / 12));
+        }
 
-      if (!muted) {
-        await c64SidEngine.play();
-        console.log('[NativeEngineRouting] C64SIDEngine loaded & playing');
+        if (!muted) {
+          await engine.play();
+          console.log('[NativeEngineRouting] SF2Engine loaded & playing (live editing enabled:', engine.canEdit, ')');
+        } else {
+          console.log('[NativeEngineRouting] SF2Engine loaded but skipping play (muted)');
+        }
       } else {
-        console.log('[NativeEngineRouting] C64SIDEngine loaded but skipping play (muted)');
+        // Regular SID file (PSID/RSID)
+        c64SidEngine = new C64SIDEngine(song.c64SidFileData);
+        await c64SidEngine.init(audioContext, synthBusNode ?? undefined);
+
+        const { useTransportStore } = await import('@stores/useTransportStore');
+        const globalPitch = useTransportStore.getState().globalPitch ?? 0;
+        if (globalPitch !== 0) {
+          c64SidEngine.setPlaybackRate(Math.pow(2, globalPitch / 12));
+        }
+
+        if (!muted) {
+          await c64SidEngine.play();
+          console.log('[NativeEngineRouting] C64SIDEngine loaded & playing');
+        } else {
+          console.log('[NativeEngineRouting] C64SIDEngine loaded but skipping play (muted)');
+        }
       }
     } catch (err) {
       console.error('[NativeEngineRouting] Failed to start C64SIDEngine:', err);
@@ -831,7 +864,7 @@ export async function startNativeEngines(
     }
   }
 
-  return { suppressNotes, c64SidEngine, hivelyEngine, uadeEngine, musicLineEngine };
+  return { suppressNotes, c64SidEngine, sf2Engine, hivelyEngine, uadeEngine, musicLineEngine };
 }
 
 // ---------------------------------------------------------------------------
