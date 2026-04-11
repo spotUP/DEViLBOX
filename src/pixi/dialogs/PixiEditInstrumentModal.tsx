@@ -43,6 +43,12 @@ import { PixiTFMXMacroPanel } from '../views/instruments/PixiTFMXMacroPanel';
 import { PixiHippelCoSoPanel } from '../views/instruments/PixiHippelCoSoPanel';
 import { PixiFuturePlayerPanel } from '../views/instruments/PixiFuturePlayerPanel';
 import { PixiSonicArrangerPanel } from '../views/instruments/PixiSonicArrangerPanel';
+import { PixiSoundMonPanel } from '../views/instruments/PixiSoundMonPanel';
+import { PixiSidMonPanel } from '../views/instruments/PixiSidMonPanel';
+import { PixiDigMugPanel } from '../views/instruments/PixiDigMugPanel';
+import { PixiFCPanel } from '../views/instruments/PixiFCPanel';
+import { PixiDeltaMusic1Panel } from '../views/instruments/PixiDeltaMusic1Panel';
+import { PixiDeltaMusic2Panel } from '../views/instruments/PixiDeltaMusic2Panel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
@@ -1830,6 +1836,24 @@ const NativeInstrumentPanel: React.FC<{
   }
   if (instrument.synthType === 'SonicArrangerSynth' && instrument.sonicArranger) {
     return <PixiSonicArrangerPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'SoundMonSynth' && instrument.soundMon) {
+    return <PixiSoundMonPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'SidMonSynth' && instrument.sidMon) {
+    return <PixiSidMonPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'DigMugSynth' && instrument.digMug) {
+    return <PixiDigMugPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'FCSynth' && instrument.fc) {
+    return <PixiFCPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'DeltaMusic1Synth' && instrument.deltaMusic1) {
+    return <PixiDeltaMusic1Panel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'DeltaMusic2Synth' && instrument.deltaMusic2) {
+    return <PixiDeltaMusic2Panel instrument={instrument} onUpdate={onUpdate} />;
   }
   // Generic Amiga synth panel for all formats with layout descriptors
   const amigaLayout = instrument.synthType ? AMIGA_SYNTH_LAYOUTS[instrument.synthType] : undefined;
