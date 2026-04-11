@@ -264,8 +264,8 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                     onClick={() => upd('pitchMod1Negate', !config.pitchMod1Negate)}
                     className={`px-2 py-1 text-xs rounded ${
                       config.pitchMod1Negate
-                        ? 'bg-red-900/40 text-red-300'
-                        : (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
+                        ? 'bg-accent-error/40 text-accent-error'
+                        : (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-accent-success/40 text-accent-success')
                     }`}
                   >
                     {config.pitchMod1Negate ? 'Yes' : 'No'}
@@ -312,8 +312,8 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
                     onClick={() => upd('pitchMod2Negate', !config.pitchMod2Negate)}
                     className={`px-2 py-1 text-xs rounded ${
                       config.pitchMod2Negate
-                        ? 'bg-red-900/40 text-red-300'
-                        : (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-green-900/40 text-green-300')
+                        ? 'bg-accent-error/40 text-accent-error'
+                        : (isCyan ? 'bg-accent-highlight/20 text-accent-highlight' : 'bg-accent-success/40 text-accent-success')
                     }`}
                   >
                     {config.pitchMod2Negate ? 'Yes' : 'No'}
