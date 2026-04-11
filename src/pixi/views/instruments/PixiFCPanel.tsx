@@ -8,16 +8,20 @@
  *   - Waveform select (0-46, named options from FC_WAVE_NAMES)
  *   - Synth macro table display (read-only row list: waveNum + transposition)
  *   - Arpeggio table display (read-only bar chart)
- *   - volMacroSpeed knob + volMacroData hex preview (read-only)
+ *   - volMacroSpeed knob + editable 59-byte vol macro grid (hex cells with
+ *     opcode annotations, click to edit, re-encode / clear override buttons)
  *
  * Data shape: instrument.fc (FCConfig). Mutations flow through
  * onUpdate(instrumentId, { fc: { ...prev, [key]: value } }).
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PixiKnob, PixiLabel, PixiButton, PixiSelect } from '../../components';
 import type { SelectOption } from '../../components';
+import { PixiPureTextInput } from '../../input/PixiPureTextInput';
+import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
+import { encodeFCVolEnvelope } from '@/engine/uade/chipRamEncoders';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { FCConfig } from '@/types/instrument/exotic';
 import type { Graphics } from 'pixi.js';
@@ -163,11 +167,63 @@ export const PixiFCPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
 
   const synthTableHeight = Math.max(14, (fc.synthTable?.length ?? 0) * 14);
 
-  // -- Vol macro hex string (read-only) --
-  const volMacroHex = (fc.volMacroData ?? [])
-    .slice(0, 59)
-    .map((b) => (b & 0xFF).toString(16).padStart(2, '0').toUpperCase())
-    .join(' ');
+  // -- Vol macro 59-byte effective buffer (use stored override or derive from ADSR) --
+  const effectiveVolBytes = useMemo<number[]>(() => {
+    const out = new Array(59).fill(0xE1);
+    if (fc.volMacroData && fc.volMacroData.length > 0) {
+      for (let i = 0; i < Math.min(59, fc.volMacroData.length); i++) {
+        out[i] = fc.volMacroData[i] & 0xFF;
+      }
+      return out;
+    }
+    const encoded = encodeFCVolEnvelope(fc);
+    for (let i = 0; i < Math.min(59, encoded.length); i++) out[i] = encoded[i];
+    return out;
+  }, [fc]);
+
+  const annotateByte = useCallback((bytes: number[], i: number): string => {
+    const b = bytes[i];
+    if (b === 0xE1) return 'END';
+    if (b === 0xE0) return `LOOP→${bytes[i + 1] ?? '?'}`;
+    if (b === 0xE8) return `SUS ${bytes[i + 1] ?? '?'}`;
+    if (b === 0xEA) return `SLD ${bytes[i + 1] ?? '?'},${bytes[i + 2] ?? '?'}`;
+    if (i > 0) {
+      const prev = bytes[i - 1];
+      if (prev === 0xE0) return '(dest)';
+      if (prev === 0xE8) return '(count)';
+      if (prev === 0xEA) return '(speed)';
+    }
+    if (i > 1 && bytes[i - 2] === 0xEA) return '(target)';
+    if (b <= 64) return `v${b}`;
+    return `$${b.toString(16).toUpperCase()}`;
+  }, []);
+
+  const updateRawVolByte = useCallback(
+    (index: number, newVal: number) => {
+      const clamped = newVal & 0xFF;
+      const current = fcRef.current.volMacroData
+        ? [...fcRef.current.volMacroData]
+        : [...effectiveVolBytes];
+      while (current.length < 59) current.push(0xE1);
+      current[index] = clamped;
+      onUpdate(instrumentIdRef.current, { fc: { ...fcRef.current, volMacroData: current } });
+    },
+    [effectiveVolBytes, onUpdate],
+  );
+
+  const reencodeFromADSR = useCallback(() => {
+    const encoded = encodeFCVolEnvelope(fcRef.current);
+    const out = new Array(59).fill(0xE1);
+    for (let i = 0; i < Math.min(59, encoded.length); i++) out[i] = encoded[i];
+    onUpdate(instrumentIdRef.current, { fc: { ...fcRef.current, volMacroData: out } });
+  }, [onUpdate]);
+
+  const clearOverride = useCallback(() => {
+    onUpdate(instrumentIdRef.current, { fc: { ...fcRef.current, volMacroData: undefined } });
+  }, [onUpdate]);
+
+  // Which cell is currently being edited (-1 = none). Only one cell edits at a time.
+  const [editingCell, setEditingCell] = useState<number>(-1);
 
   return (
     <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
@@ -413,24 +469,117 @@ export const PixiFCPanel: React.FC<Props> = ({ instrument, onUpdate }) => {
             <PixiLabel text="Ticks per vol macro step (aliases synthSpeed)" size="xs" color="textMuted" />
           </layoutContainer>
 
-          <SectionHeading text="RAW VOL MACRO BYTES (59)" />
-          <PixiButton
-            label={rawVolExpanded ? 'Hide hex' : 'Show hex'}
-            variant="ghost"
-            onClick={() => setRawVolExpanded((v) => !v)}
-          />
+          <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', paddingTop: 2 }}>
+            <PixiLabel
+              text={`RAW VOL MACRO (59) ${rawVolExpanded ? '▾' : '▸'}`}
+              size="xs"
+              weight="bold"
+              color="textMuted"
+            />
+            <PixiButton
+              label={rawVolExpanded ? 'Hide' : 'Show'}
+              variant="ghost"
+              onClick={() => setRawVolExpanded((v) => !v)}
+            />
+            <layoutContainer layout={{ flex: 1 }} />
+            <PixiLabel
+              text={fc.volMacroData ? 'custom override' : 'derived from ADSR'}
+              size="xs"
+              color="textMuted"
+            />
+          </layoutContainer>
+
           {rawVolExpanded && (
-            <layoutContainer layout={{ padding: 4 }}>
-              <PixiLabel
-                text={volMacroHex || '(no data)'}
-                size="xs"
-                color="text"
-              />
-              <PixiLabel
-                text={fc.volMacroData ? 'custom override' : 'derived from ADSR'}
-                size="xs"
-                color="textMuted"
-              />
+            <layoutContainer layout={{ flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+              <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <PixiButton label="Re-encode from ADSR" variant="primary" onClick={reencodeFromADSR} />
+                {fc.volMacroData && (
+                  <PixiButton label="Clear override" variant="ghost" onClick={clearOverride} />
+                )}
+                <layoutContainer layout={{ flex: 1 }} />
+                <PixiLabel
+                  text="$E0=LOOP $E1=END $E8=SUS $EA=SLD 00..40=vol"
+                  size="xs"
+                  color="textMuted"
+                />
+              </layoutContainer>
+
+              {/* 12-column grid of 59 editable hex cells */}
+              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingTop: 4 }}>
+                {effectiveVolBytes.map((b, i) => {
+                  const ann = annotateByte(effectiveVolBytes, i);
+                  const isOpcode = b >= 0xE0;
+                  const cellBg = isOpcode ? theme.bgSecondary.color : theme.bg.color;
+                  const valueColor = isOpcode ? theme.warning.color : theme.accent.color;
+                  const annColor = isOpcode ? theme.warning.color : theme.textMuted.color;
+                  const isEditing = editingCell === i;
+                  return (
+                    <layoutContainer
+                      key={i}
+                      layout={{
+                        width: 26,
+                        height: 32,
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 0,
+                        paddingTop: 1,
+                        paddingBottom: 1,
+                        borderWidth: 1,
+                        borderColor: theme.border.color,
+                        borderRadius: 2,
+                        backgroundColor: cellBg,
+                      }}
+                      eventMode="static"
+                      cursor="text"
+                      onPointerTap={() => setEditingCell(i)}
+                    >
+                      <pixiBitmapText
+                        text={String(i).padStart(2, '0')}
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+                        tint={theme.textMuted.color}
+                        layout={{}}
+                      />
+                      {isEditing ? (
+                        <PixiPureTextInput
+                          value={b.toString(16).padStart(2, '0').toUpperCase()}
+                          onChange={() => { /* committed on submit/blur */ }}
+                          onSubmit={(txt) => {
+                            const parsed = parseInt(txt, 16);
+                            if (!isNaN(parsed)) updateRawVolByte(i, parsed);
+                            setEditingCell(-1);
+                          }}
+                          onCancel={() => setEditingCell(-1)}
+                          onBlur={(txt) => {
+                            const parsed = parseInt(txt, 16);
+                            if (!isNaN(parsed)) updateRawVolByte(i, parsed);
+                            setEditingCell(-1);
+                          }}
+                          width={22}
+                          height={14}
+                          fontSize={10}
+                          font="mono"
+                          autoFocus
+                          layout={{}}
+                        />
+                      ) : (
+                        <pixiBitmapText
+                          text={b.toString(16).padStart(2, '0').toUpperCase()}
+                          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+                          tint={valueColor}
+                          layout={{}}
+                        />
+                      )}
+                      <pixiBitmapText
+                        text={ann.length > 5 ? ann.slice(0, 5) : ann}
+                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 6, fill: 0xffffff }}
+                        tint={annColor}
+                        layout={{}}
+                      />
+                    </layoutContainer>
+                  );
+                })}
+              </layoutContainer>
             </layoutContainer>
           )}
         </layoutContainer>
