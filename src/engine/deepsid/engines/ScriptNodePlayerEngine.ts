@@ -159,11 +159,11 @@ export class ScriptNodePlayerEngine {
       ScriptNodePlayer._setGlobalWebAudioCtx();
     }
 
-    // Reduce ScriptProcessorNode buffer from default 2048 to 512 samples.
+    // Reduce ScriptProcessorNode buffer from default 2048 to 1024 samples.
     // 2048 samples @ 44.1kHz = ~46ms between emulator advances, causing
-    // visibly jerky pattern scrolling. 512 = ~11.6ms = much smoother.
+    // visibly jerky pattern scrolling. 1024 = ~23ms = smoother without underruns.
     if (this.adapter?.setProcessorBufSize) {
-      this.adapter.setProcessorBufSize(512);
+      this.adapter.setProcessorBufSize(1024);
     }
 
     // Use the Promise-based initialize API
