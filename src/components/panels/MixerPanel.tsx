@@ -485,17 +485,21 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
       {/* 11. Send bars */}
       <SendBars levels={sendLevels} onCycle={onSendLevelCycle} />
 
-      {/* 12. Insert FX indicator */}
-      {insertEffectCount > 0 && onFxClick ? (
+      {/* 12. Insert FX button — always clickable, opens per-channel effects dialog */}
+      {onFxClick ? (
         <button
           onClick={onFxClick}
-          className="text-[7px] font-mono text-teal-400/60 leading-tight cursor-pointer hover:text-teal-400 transition-colors"
-          title="Edit insert effects"
+          className={`text-[8px] font-mono leading-tight cursor-pointer transition-colors px-1 py-0.5 rounded border ${
+            insertEffectCount > 0
+              ? 'text-teal-400 border-teal-400/40 hover:bg-teal-400/10'
+              : 'text-text-muted border-border-primary hover:text-teal-400 hover:border-teal-400/30'
+          }`}
+          title={insertEffectCount > 0 ? `Edit ${insertEffectCount} insert effect(s)` : 'Add insert effects to this channel'}
         >
-          FX:{insertEffectCount}
+          FX{insertEffectCount > 0 ? `:${insertEffectCount}` : ''}
         </button>
       ) : (
-        <div className="text-[7px] font-mono text-teal-400/60 leading-tight">
+        <div className="text-[7px] font-mono text-text-muted leading-tight">
           FX:{insertEffectCount}
         </div>
       )}

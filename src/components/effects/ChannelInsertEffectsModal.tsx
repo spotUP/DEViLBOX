@@ -1,15 +1,19 @@
 /**
- * ChannelInsertEffectsModal — Edit channel insert effect parameters.
+ * ChannelInsertEffectsModal — Add/edit/remove per-channel insert effects.
  *
- * Two-column layout: left lists insert effects with enabled toggle + wet%,
- * right shows EffectParameterEditor for the selected effect.
+ * Left column: effect chain list + add button.
+ * Right column: effect parameter editor or effect browser.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { EffectParameterEditor } from './EffectParameterEditor';
-import type { EffectConfig } from '@typedefs/instrument';
+import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
+import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+
+const MAX_INSERT_EFFECTS = 4;
 
 interface ChannelInsertEffectsModalProps {
   isOpen: boolean;
@@ -23,17 +27,19 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
   channelIndex,
 }) => {
   const insertEffects = useMixerStore(s => s.channels[channelIndex]?.insertEffects ?? []);
+  const addChannelInsertEffect = useMixerStore(s => s.addChannelInsertEffect);
+  const removeChannelInsertEffect = useMixerStore(s => s.removeChannelInsertEffect);
   const updateChannelInsertEffect = useMixerStore(s => s.updateChannelInsertEffect);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // configRef pattern — avoid stale state in callbacks
   const effectsRef = useRef(insertEffects);
   useEffect(() => { effectsRef.current = insertEffects; }, [insertEffects]);
 
   useModalClose({ isOpen, onClose, enableEnter: false });
 
-  // Clamp selectedIndex when effects list changes
   useEffect(() => {
     if (selectedIndex >= insertEffects.length && insertEffects.length > 0) {
       setSelectedIndex(insertEffects.length - 1);
@@ -62,6 +68,39 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
     updateChannelInsertEffect(channelIndex, index, { enabled: !fx.enabled });
   }, [channelIndex, updateChannelInsertEffect]);
 
+  const handleRemove = useCallback((index: number) => {
+    removeChannelInsertEffect(channelIndex, index);
+    if (selectedIndex >= insertEffects.length - 1) {
+      setSelectedIndex(Math.max(0, insertEffects.length - 2));
+    }
+  }, [channelIndex, selectedIndex, insertEffects.length, removeChannelInsertEffect]);
+
+  const handleAddEffect = useCallback((available: AvailableEffect) => {
+    if (insertEffects.length >= MAX_INSERT_EFFECTS) return;
+    const type = (available.type as EffectType) || 'Distortion';
+    const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
+    addChannelInsertEffect(channelIndex, {
+      category: available.category,
+      type,
+      enabled: true,
+      wet: 100,
+      parameters: params,
+    } as EffectConfig);
+    setShowBrowser(false);
+    setSelectedIndex(insertEffects.length); // select the newly added effect
+  }, [channelIndex, insertEffects.length, addChannelInsertEffect]);
+
+  // Filter available effects by search
+  const groupedEffects = getEffectsByGroup();
+  const filteredGroups: Record<string, AvailableEffect[]> = {};
+  const query = searchQuery.toLowerCase();
+  for (const [group, effects] of Object.entries(groupedEffects)) {
+    const filtered = query
+      ? effects.filter(e => e.label.toLowerCase().includes(query) || (e.type ?? '').toLowerCase().includes(query))
+      : effects;
+    if (filtered.length > 0) filteredGroups[group] = filtered;
+  }
+
   if (!isOpen) return null;
 
   return (
@@ -73,69 +112,130 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border-primary">
           <span className="text-sm font-medium text-text-primary">
-            Channel {channelIndex + 1} Insert Effects
+            Channel {channelIndex + 1} — Insert Effects
           </span>
-          <button onClick={onClose} className="text-text-muted hover:text-text-primary text-lg leading-none">
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-text-muted">
+              {insertEffects.length}/{MAX_INSERT_EFFECTS}
+            </span>
+            <button onClick={onClose} className="text-text-muted hover:text-text-primary text-lg leading-none">
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body — two columns */}
         <div className="flex" style={{ height: '60vh' }}>
-          {insertEffects.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-text-muted text-sm px-8 text-center">
-              No insert effects. Use the FX preset button on the channel strip to add effects.
+          {/* Left column: effect chain + add button */}
+          <div className="w-[200px] border-r border-border-primary flex flex-col">
+            <div className="flex-1 overflow-y-auto">
+              {insertEffects.map((fx, i) => (
+                <button
+                  key={fx.id ?? `fx-${i}`}
+                  onClick={() => { setSelectedIndex(i); setShowBrowser(false); }}
+                  className={`w-full text-left px-3 py-2 border-b border-border-primary transition-colors ${
+                    i === selectedIndex && !showBrowser
+                      ? 'bg-accent-primary/10 text-text-primary'
+                      : 'text-text-muted hover:bg-surface-secondary'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggle(i); }}
+                      className={`w-2.5 h-2.5 rounded-full flex-shrink-0 border ${
+                        fx.enabled
+                          ? 'bg-accent-primary border-accent-primary'
+                          : 'bg-transparent border-text-muted'
+                      }`}
+                      title={fx.enabled ? 'Disable' : 'Enable'}
+                    />
+                    <span className="text-xs font-mono truncate flex-1">{fx.type}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+                      className="text-text-muted hover:text-accent-error text-xs opacity-0 group-hover:opacity-100"
+                      title="Remove"
+                      style={{ opacity: i === selectedIndex && !showBrowser ? 1 : undefined }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-text-muted mt-0.5 pl-[18px]">
+                    wet: {Math.round(fx.wet)}%
+                  </div>
+                </button>
+              ))}
+              {insertEffects.length === 0 && !showBrowser && (
+                <div className="px-3 py-4 text-text-muted text-xs text-center">
+                  No effects on this channel.
+                  <br />Click + to add one.
+                </div>
+              )}
             </div>
-          ) : (
-            <>
-              {/* Left column: effect list */}
-              <div className="w-[180px] border-r border-border-primary overflow-y-auto">
-                {insertEffects.map((fx, i) => (
-                  <button
-                    key={fx.id}
-                    onClick={() => setSelectedIndex(i)}
-                    className={`w-full text-left px-3 py-2 border-b border-border-primary transition-colors ${
-                      i === selectedIndex
-                        ? 'bg-accent-primary/10 text-text-primary'
-                        : 'text-text-muted hover:bg-surface-secondary'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {/* Enabled toggle */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleToggle(i); }}
-                        className={`w-2.5 h-2.5 rounded-full flex-shrink-0 border ${
-                          fx.enabled
-                            ? 'bg-accent-primary border-accent-primary'
-                            : 'bg-transparent border-text-muted'
-                        }`}
-                        title={fx.enabled ? 'Disable' : 'Enable'}
-                      />
-                      <span className="text-xs font-mono truncate">{fx.type}</span>
-                    </div>
-                    <div className="text-[10px] text-text-muted mt-0.5 pl-[18px]">
-                      wet: {Math.round(fx.wet)}%
-                    </div>
-                  </button>
-                ))}
-              </div>
+            {/* Add button */}
+            <button
+              onClick={() => setShowBrowser(true)}
+              disabled={insertEffects.length >= MAX_INSERT_EFFECTS}
+              className={`px-3 py-2 border-t border-border-primary text-xs font-mono transition-colors ${
+                insertEffects.length >= MAX_INSERT_EFFECTS
+                  ? 'text-text-muted/30 cursor-not-allowed'
+                  : showBrowser
+                    ? 'bg-accent-primary/10 text-accent-primary'
+                    : 'text-text-muted hover:text-text-primary hover:bg-surface-secondary'
+              }`}
+            >
+              + Add Effect ({AVAILABLE_EFFECTS.length} available)
+            </button>
+          </div>
 
-              {/* Right column: parameter editor */}
-              <div className="flex-1 overflow-y-auto">
-                {selectedEffect ? (
-                  <EffectParameterEditor
-                    effect={selectedEffect}
-                    onUpdateParameter={handleUpdateParameter}
-                    onUpdateWet={handleWetChange}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-text-muted text-sm">
-                    Select an effect to edit
+          {/* Right column: parameter editor or effect browser */}
+          <div className="flex-1 overflow-y-auto">
+            {showBrowser ? (
+              <div className="p-3">
+                <input
+                  type="text"
+                  placeholder="Search effects..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full px-2 py-1 mb-3 text-xs bg-surface-secondary border border-border-primary rounded text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
+                  autoFocus
+                />
+                {Object.entries(filteredGroups).map(([group, effects]) => (
+                  <div key={group} className="mb-3">
+                    <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider mb-1">
+                      {group}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {effects.map(fx => (
+                        <button
+                          key={fx.type}
+                          onClick={() => handleAddEffect(fx)}
+                          className="text-left px-2 py-1.5 text-xs font-mono rounded border border-border-primary text-text-muted hover:text-text-primary hover:bg-surface-secondary hover:border-accent-primary/30 transition-colors"
+                          title={fx.description}
+                        >
+                          {fx.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {Object.keys(filteredGroups).length === 0 && (
+                  <div className="text-text-muted text-xs text-center py-4">
+                    No effects matching &quot;{searchQuery}&quot;
                   </div>
                 )}
               </div>
-            </>
-          )}
+            ) : selectedEffect ? (
+              <EffectParameterEditor
+                effect={selectedEffect}
+                onUpdateParameter={handleUpdateParameter}
+                onUpdateWet={handleWetChange}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-text-muted text-sm">
+                Click + Add Effect to get started
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

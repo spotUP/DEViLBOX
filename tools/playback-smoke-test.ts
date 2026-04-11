@@ -34,7 +34,7 @@ const DOWNLOAD_TIMEOUT_MS = 30000;
 interface TestCase {
   name: string;
   family: string;
-  loader: 'modland' | 'hvsc' | 'fur';
+  loader: 'modland' | 'hvsc' | 'fur' | 'local';
   path: string;
   /** Subset of editorMode the loaded file should report (substring match) */
   expectedEditorMode?: string;
@@ -50,22 +50,125 @@ interface TestCase {
   companionPaths?: string[];
 }
 
+/**
+ * Auto-discover test cases from the local Reference Music collection.
+ * For each format directory, picks the first file (alphabetically) as the test case.
+ * This gives us ~170 format tests without any hardcoded paths.
+ */
+async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
+  const { readdirSync, statSync } = await import('fs');
+  const { join } = await import('path');
+  const tests: TestCase[] = [];
+
+  let dirs: string[];
+  try {
+    dirs = readdirSync(baseDir).filter(d => {
+      try { return statSync(join(baseDir, d)).isDirectory(); } catch { return false; }
+    }).sort();
+  } catch { return tests; }
+
+  for (const dir of dirs) {
+    if (dir === 'Reference Music' || dir === 'Packed_Etc') continue;
+    const fullDir = join(baseDir, dir);
+    let files: string[];
+    try {
+      files = readdirSync(fullDir).filter(f => {
+        try { return statSync(join(fullDir, f)).isFile() && !f.startsWith('.'); } catch { return false; }
+      }).sort();
+    } catch { continue; }
+
+    if (files.length === 0) continue;
+
+    // Pick first file as test case
+    const testFile = join(fullDir, files[0]);
+    tests.push({
+      name: `${dir} — ${files[0]}`,
+      family: dir.substring(0, 12).toUpperCase(),
+      loader: 'local',
+      path: testFile,
+      engineDriven: true,  // most UADE formats are engine-driven
+      allowSilent: false,
+    });
+  }
+  return tests;
+}
+
 const TESTS: TestCase[] = [
-  // ── PC tracker formats (libopenmpt path) ──
-  { name: 'Captain - Space Debris',           family: 'MOD',  loader: 'modland', path: 'pub/modules/Protracker/Captain/space debris.mod', expectedEditorMode: 'classic' },
-  { name: 'Skaven - Bookworm',                family: 'IT',   loader: 'modland', path: 'pub/modules/Impulsetracker/Skaven/bookworm.it', expectedEditorMode: 'classic' },
-  { name: 'Skaven - Catch That Goblin',       family: 'S3M',  loader: 'modland', path: 'pub/modules/Screamtracker 3/Skaven/catch that goblin!!.s3m', expectedEditorMode: 'classic' },
-  // ── Hively / AHX (HVL engine) ──
-  { name: 'AceMan - Hexplosion',              family: 'HVL',  loader: 'modland', path: 'pub/modules/HivelyTracker/AceMan/hexplosion.hvl', expectedEditorMode: 'hively' },
-  // ── UADE Amiga formats ──
-  { name: 'Future Composer - Blaizer',        family: 'FC',   loader: 'modland', path: 'pub/modules/Future Composer 1.4/Blaizer/horizon v2.fc' },
-  { name: 'JamCracker - bartmanintro',        family: 'JAM',  loader: 'modland', path: 'pub/modules/JamCracker/Ape/bartmanintro.jam' },
-  // ── C64 SID ──
-  // SID is engine-driven (6502 code on emulated CPU + SID chip) — no tracker
-  // pattern data, so skip the pattern check.
-  { name: 'Hubbard - Commando',               family: 'SID',  loader: 'hvsc',    path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', engineDriven: true },
-  // ── TFMX (needs companion smpl file) ──
-  { name: 'TFMX - Turrican Aliens',           family: 'TFMX', loader: 'modland', path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens', companionPaths: ['pub/modules/TFMX/Chris Huelsbeck/smpl.turrican aliens'] },
+  // ── PC tracker formats (libopenmpt/OpenMPT WASM path) ──
+  { name: 'Captain - Space Debris',           family: 'MOD',      loader: 'modland', path: 'pub/modules/Protracker/Captain/space debris.mod', expectedEditorMode: 'classic' },
+  { name: 'Skaven - Bookworm',                family: 'IT',       loader: 'modland', path: 'pub/modules/Impulsetracker/Skaven/bookworm.it', expectedEditorMode: 'classic' },
+  { name: 'Skaven - Catch That Goblin',       family: 'S3M',      loader: 'modland', path: 'pub/modules/Screamtracker 3/Skaven/catch that goblin!!.s3m', expectedEditorMode: 'classic' },
+  { name: 'XM - Believe',                     family: 'XM',       loader: 'modland', path: 'pub/modules/Fasttracker 2/Skaven/believe.xm', expectedEditorMode: 'classic' },
+  { name: 'Multitracker - cthulhu',           family: 'MTM',      loader: 'modland', path: 'pub/modules/Multitracker/Starscream/cthulhu.mtm' },
+  { name: 'Composer 669 - test',              family: '669',      loader: 'modland', path: 'pub/modules/Composer 669/- unknown/brain.669' },
+  { name: 'Ultratracker - test',              family: 'ULT',      loader: 'modland', path: 'pub/modules/Ultratracker/Emax/nightfly.ult' },
+  { name: 'Farandole - test',                 family: 'FAR',      loader: 'modland', path: 'pub/modules/Farandole Composer/Brain Slayer/brain slayer - break.far' },
+  { name: 'Screamtracker 2 - test',           family: 'STM',      loader: 'modland', path: 'pub/modules/Screamtracker 2/Purple Motion/space debris.stm' },
+  { name: 'DigiTracker DTM',                  family: 'DTM',      loader: 'modland', path: 'pub/modules/Digital Tracker DTM/- unknown/atsea.dtm' },
+  { name: 'Oktalyzer - test',                 family: 'OKT',      loader: 'modland', path: 'pub/modules/Oktalyzer/- unknown/aftersun.okt' },
+  { name: 'DigiBooster Pro',                  family: 'DBM',      loader: 'modland', path: 'pub/modules/Digibooster Pro/Asle/sweet dreams.dbm' },
+  { name: 'Graoumf Tracker 2',               family: 'GT2',      loader: 'modland', path: 'pub/modules/Graoumf Tracker 2/Doh/fading out.gt2' },
+  { name: 'OpenMPT MPTM',                    family: 'MPTM',     loader: 'modland', path: 'pub/modules/OpenMPT MPTM/Saga Musix/the prisoner.mptm' },
+  // ── Hively / AHX (dedicated HivelyEngine) ──
+  { name: 'AceMan - Hexplosion',              family: 'HVL',      loader: 'modland', path: 'pub/modules/HivelyTracker/AceMan/hexplosion.hvl', expectedEditorMode: 'hively' },
+  { name: 'AHX - test',                       family: 'AHX',      loader: 'modland', path: 'pub/modules/AHX/Laxity/laxity-ingame.ahx', expectedEditorMode: 'hively' },
+  // ── UADE Amiga formats (dedicated WASM engines or UADE fallback) ──
+  { name: 'Future Composer 1.4 - Blaizer',    family: 'FC14',     loader: 'modland', path: 'pub/modules/Future Composer 1.4/Blaizer/horizon v2.fc' },
+  { name: 'Future Composer 1.3 - test',       family: 'FC13',     loader: 'modland', path: 'pub/modules/Future Composer 1.3/- unknown/all my dreams.fc13' },
+  { name: 'JamCracker - bartmanintro',        family: 'JAM',      loader: 'modland', path: 'pub/modules/JamCracker/Ape/bartmanintro.jam' },
+  { name: 'SoundMon 2 - test',               family: 'SM2',      loader: 'modland', path: 'pub/modules/BP SoundMon 2/Hippel/axel f.bp' },
+  { name: 'SoundMon 3 - test',               family: 'SM3',      loader: 'modland', path: 'pub/modules/BP SoundMon 3/Dexter/last ninja ingame.bp3' },
+  { name: 'SidMon 1 - test',                 family: 'SIDMON1',  loader: 'modland', path: 'pub/modules/SidMon 1/Daglish/cobra.sid1' },
+  { name: 'SidMon 2 - test',                 family: 'SIDMON2',  loader: 'modland', path: 'pub/modules/SidMon 2/- unknown/alchemist.sid2' },
+  { name: 'Digital Mugician - test',          family: 'DIGMUG',   loader: 'modland', path: 'pub/modules/Digital Mugician/Laxity/commando.dmu' },
+  { name: 'Sonic Arranger - test',            family: 'SA',       loader: 'modland', path: 'pub/modules/Sonic Arranger/Hippel/battle squadron title.sa' },
+  { name: 'Hippel COSO - test',              family: 'COSO',     loader: 'modland', path: 'pub/modules/Hippel COSO/Hippel/chambers of shaolin title.coso' },
+  { name: 'David Whittaker - test',           family: 'DW',       loader: 'modland', path: 'pub/modules/David Whittaker/- unknown/afterburner.dw' },
+  { name: 'Rob Hubbard - test',              family: 'RH',       loader: 'modland', path: 'pub/modules/Rob Hubbard/- unknown/goldrunner.rh' },
+  { name: 'Delta Music 2 - test',            family: 'DM2',      loader: 'modland', path: 'pub/modules/Delta Music 2/- unknown/axel f.dm2' },
+  { name: 'Delta Music - test',              family: 'DM1',      loader: 'modland', path: 'pub/modules/Delta Music/- unknown/batman.dm' },
+  { name: 'Art of Noise - test',             family: 'AON',      loader: 'modland', path: 'pub/modules/Art Of Noise/- unknown/art of noise.aon' },
+  { name: 'SoundFX - test',                  family: 'SFX',      loader: 'modland', path: 'pub/modules/SoundFX/- unknown/androids.sfx' },
+  { name: 'Richard Joseph - test',           family: 'RJ',       loader: 'modland', path: 'pub/modules/Richard Joseph/- unknown/barbarian 2 ingame.rj' },
+  { name: 'Fred Editor - test',              family: 'FRED',     loader: 'modland', path: 'pub/modules/FredMon/Gray/batman.fred' },
+  { name: 'Dave Lowe - test',                family: 'DL',       loader: 'modland', path: 'pub/modules/Dave Lowe/- unknown/battle squadron.dl' },
+  { name: 'Ben Daglish - test',              family: 'BD',       loader: 'modland', path: 'pub/modules/Ben Daglish/- unknown/deflektor.bd' },
+  { name: 'Mark Cooksey - test',             family: 'MC',       loader: 'modland', path: 'pub/modules/Mark Cooksey/- unknown/ghosts n goblins.mk' },
+  { name: 'Jason Page - test',               family: 'JP',       loader: 'modland', path: 'pub/modules/Jason Page/- unknown/shadow of the beast.jp' },
+  { name: 'Infogrames - test',               family: 'INFO',     loader: 'modland', path: 'pub/modules/Infogrames/- unknown/hostages.infogrames' },
+  { name: 'Steve Turner - test',             family: 'ST',       loader: 'modland', path: 'pub/modules/- unknown/steve turner/quazatron.stt', allowSilent: true },
+  { name: 'InStereo 2.0 - test',             family: 'IS2',      loader: 'modland', path: 'pub/modules/InStereo! 2.0/- unknown/enigma tune.is20' },
+  { name: 'Hippel ST - test',                family: 'HIPST',    loader: 'modland', path: 'pub/modules/Hippel ST/Hippel/seven gates of jambala ingame.hip' },
+  { name: 'Hippel - test',                   family: 'HIP',      loader: 'modland', path: 'pub/modules/Hippel/Hippel/turrican ii - the final fight (title).hip7' },
+  { name: 'TCB Tracker - test',              family: 'TCB',      loader: 'modland', path: 'pub/modules/TCB Tracker/- unknown/cauldron.tcb' },
+  { name: 'Pretracker - test',               family: 'PRT',      loader: 'modland', path: 'pub/modules/Pretracker/Virgill/still got the magic.prt', engineDriven: true },
+  { name: 'PumaTracker - test',              family: 'PUMA',     loader: 'modland', path: 'pub/modules/Pumatracker/Virgill/puma1.puma' },
+  { name: 'Music Assembler - test',          family: 'MA',       loader: 'modland', path: 'pub/modules/Music Assembler/- unknown/batman.ma' },
+  { name: 'Special FX - test',               family: 'SPECFX',   loader: 'modland', path: 'pub/modules/Special FX/- unknown/goldrunner 2.sfx' },
+  { name: 'Maniacs of Noise - test',         family: 'MON',      loader: 'modland', path: 'pub/modules/Maniacs Of Noise/- unknown/battle isle.mon' },
+  { name: 'Quadra Composer - test',          family: 'QC',       loader: 'modland', path: 'pub/modules/Quadra Composer/- unknown/aquanaut.qc' },
+  { name: 'Wally Beben - test',              family: 'WB',       loader: 'modland', path: 'pub/modules/Wally Beben/- unknown/beast 3.wb' },
+  { name: 'Ron Klaren - test',               family: 'RK',       loader: 'modland', path: 'pub/modules/Ron Klaren/- unknown/espionage.rk' },
+  { name: 'Sound Master - test',             family: 'SNDM',     loader: 'modland', path: 'pub/modules/Sound Master/- unknown/beast lord.sm' },
+  { name: 'Sean Conran - test',              family: 'SC',       loader: 'modland', path: 'pub/modules/Sean Conran/- unknown/sean conran 01.sc' },
+  { name: 'Kris Hatlelid - test',            family: 'KH',       loader: 'modland', path: 'pub/modules/Kris Hatlelid/- unknown/cardiaxx.kh' },
+  { name: 'Anders Oland - test',             family: 'AO',       loader: 'modland', path: 'pub/modules/Anders Oland/- unknown/apidya.ao' },
+  { name: 'Jeroen Tel - test',               family: 'JT',       loader: 'modland', path: 'pub/modules/Jeroen Tel/- unknown/9 fingers.jt' },
+  { name: 'Paul Robotham - test',            family: 'PR',       loader: 'modland', path: 'pub/modules/Paul Robotham/- unknown/apidya.pr' },
+  { name: 'Jesper Olsen - test',             family: 'JO',       loader: 'modland', path: 'pub/modules/Jesper Olsen/- unknown/barbarian.jo' },
+  { name: 'Fashion Tracker - test',          family: 'FT',       loader: 'modland', path: 'pub/modules/Fashion Tracker/- unknown/intro.ft' },
+  { name: 'Pierre Adane - test',             family: 'PA',       loader: 'modland', path: 'pub/modules/Pierre Adane Packer/- unknown/bubble ghost.pa' },
+  { name: 'MultiMedia Sound - test',         family: 'MMS',      loader: 'modland', path: 'pub/modules/MultiMedia Sound/- unknown/hybris title.mms' },
+  { name: 'Maximum Effect - test',           family: 'MXE',      loader: 'modland', path: 'pub/modules/Maximum Effect/- unknown/apidya.mxe' },
+  { name: 'Thomas Hermann - test',           family: 'TH',       loader: 'modland', path: 'pub/modules/Thomas Hermann/- unknown/thomas hermann 01.th' },
+  { name: 'SCUMM - test',                    family: 'SCUMM',    loader: 'modland', path: 'pub/modules/SCUMM/- unknown/monkey island 2 - map.scumm', engineDriven: true },
+  { name: 'Medley - test',                   family: 'MDLY',     loader: 'modland', path: 'pub/modules/Medley/- unknown/medley 01.mdly', allowSilent: true },
+  // ── C64 SID (engine-driven — no pattern data) ──
+  { name: 'Hubbard - Commando',               family: 'SID',     loader: 'hvsc',    path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', engineDriven: true },
+  // ── TFMX (companion files required) ──
+  { name: 'TFMX - Turrican Aliens',           family: 'TFMX',    loader: 'modland', path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens', companionPaths: ['pub/modules/TFMX/Chris Huelsbeck/smpl.turrican aliens'] },
+  // ── Chiptune formats (dedicated engines) ──
+  { name: 'Klystrack - test',                 family: 'KT',      loader: 'modland', path: 'pub/modules/Klystrack/kometbomb/one.kt', expectedEditorMode: 'klystrack', engineDriven: true },
 ];
 
 // ── WebSocket bridge client ────────────────────────────────────────────────
@@ -208,6 +311,9 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       await client.call('load_file', { filename, data: base64, ...(companionFiles ? { companionFiles } : {}) });
     } else if (test.loader === 'fur') {
       await client.call('play_fur', { path: test.path });
+    } else if (test.loader === 'local') {
+      // Load directly from disk via the MCP load_file tool
+      await client.call('load_file', { path: test.path });
     }
 
     // 3. Verify the song actually loaded with pattern data BEFORE play()
@@ -351,10 +457,20 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
+const REFERENCE_MUSIC_DIR = process.env.REFERENCE_MUSIC ?? '/Users/spot/Code/Reference Music';
+
 async function main(): Promise<void> {
+  // Auto-discover tests from the local Reference Music collection
+  const localTests = await discoverLocalTests(REFERENCE_MUSIC_DIR);
+  // CLI: --local-only skips the hardcoded Modland/HVSC tests, --hardcoded-only skips local
+  const args = process.argv.slice(2);
+  const localOnly = args.includes('--local-only');
+  const hardcodedOnly = args.includes('--hardcoded-only');
+  const allTests = hardcodedOnly ? TESTS : localOnly ? localTests : [...TESTS, ...localTests];
+
   console.log('▶ DEViLBOX playback smoke test');
   console.log(`  Bridge: ${WS_URL}`);
-  console.log(`  Tests:  ${TESTS.length}`);
+  console.log(`  Tests:  ${allTests.length} (${TESTS.length} hardcoded + ${localTests.length} local)`);
   console.log('');
 
   const client = new MCPBridgeClient(WS_URL);
@@ -368,7 +484,7 @@ async function main(): Promise<void> {
   }
 
   const results: TestResult[] = [];
-  for (const test of TESTS) {
+  for (const test of allTests) {
     // Brief pause between tests to let AudioContext and WASM settle
     if (results.length > 0) await sleep(2000);
     process.stdout.write(`  [${test.family.padEnd(5)}] ${test.name.padEnd(40)} `);
