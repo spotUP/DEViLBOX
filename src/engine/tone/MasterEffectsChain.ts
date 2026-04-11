@@ -142,19 +142,31 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   });
 
   // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
-  // Some effects (Buzzmachine, etc.) are DevilboxSynth objects with .input/.output
-  // GainNodes instead of being Tone.ToneAudioNodes directly. Use helper functions
-  // to get the connectable input/output for each node.
-  const getInput = (n: any): Tone.ToneAudioNode => n.input instanceof GainNode || n.input?.gain ? n.input : n;
-  const getOutput = (n: any): Tone.ToneAudioNode => n.output instanceof GainNode || n.output?.gain ? n.output : n;
+  // Some effects (Buzzmachine, etc.) are DevilboxSynth objects with native
+  // Web Audio .input/.output GainNodes instead of Tone.ToneAudioNodes.
+  // Use getNativeAudioNode to bridge between Tone.js and native nodes.
+  const isNativeSynth = (n: any): boolean => !!(n.input && n.output && !(n instanceof Tone.ToneAudioNode));
+
+  /** Connect src (Tone or native) → dst (Tone or native) */
+  const chainConnect = (src: any, dst: any) => {
+    const srcNode = isNativeSynth(src) ? src.output : getNativeAudioNode(src) ?? src;
+    const dstNode = isNativeSynth(dst) ? dst.input : getNativeAudioNode(dst) ?? dst;
+    if (srcNode instanceof AudioNode && dstNode instanceof AudioNode) {
+      srcNode.connect(dstNode);
+    } else {
+      // Tone→Tone fallback
+      src.connect(dst);
+    }
+  };
+
   try {
-    ctx.masterEffectsInput.connect(getInput(chainNodes[0]));
+    chainConnect(ctx.masterEffectsInput, chainNodes[0]);
 
     for (let i = 0; i < chainNodes.length - 1; i++) {
-      getOutput(chainNodes[i]).connect(getInput(chainNodes[i + 1]));
+      chainConnect(chainNodes[i], chainNodes[i + 1]);
     }
 
-    getOutput(chainNodes[chainNodes.length - 1]).connect(ctx.blepInput);
+    chainConnect(chainNodes[chainNodes.length - 1], ctx.blepInput);
   } catch (e) {
     console.error('[MasterEffectsChain] Chain connection failed:', e,
       'chainNodes:', chainNodes.map(n => n?.name || n?.constructor?.name));
