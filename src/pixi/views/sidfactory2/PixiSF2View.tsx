@@ -38,6 +38,8 @@ export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
   const sidRegion = useSF2Store((s) => s.sidRegion);
   const playMarkers = useSF2Store((s) => s.playMarkers);
   const selectedMarker = useSF2Store((s) => s.selectedMarker);
+  const songCount = useSF2Store((s) => s.songCount);
+  const currentSong = useSF2Store((s) => s.currentSong);
 
   const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
 
@@ -55,6 +57,7 @@ export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
     driverVersion,
     `Tracks: ${trackCount}`,
     `${sidModel} ${sidRegion}`,
+    songCount > 1 ? `Song: ${currentSong + 1}/${songCount}` : '',
     `Pos: ${orderCursor + 1}/${maxOlLen}`,
     `M:${markerStr}`,
   ].filter(Boolean).join('  |  ');

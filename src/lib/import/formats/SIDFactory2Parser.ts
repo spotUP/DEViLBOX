@@ -317,60 +317,82 @@ export async function parseSIDFactory2File(
 
   const numChannels = musicData.trackCount; // typically 3
 
-  // ── Parse order lists (packed format) ─────────────────────────────────
-  // Each track's order list is at the address pointed to by the pointer tables
   interface OrderEntry { transpose: number; seqIdx: number }
-  const orderLists: { entries: OrderEntry[]; loopIndex: number; hasLoop: boolean }[] = [];
 
-  for (let t = 0; t < numChannels; t++) {
-    const olAddrLo = mem[musicData.orderListPtrsLo + t];
-    const olAddrHi = mem[musicData.orderListPtrsHi + t];
-    const olAddr = olAddrLo | (olAddrHi << 8);
+  // ── Parse auxiliary data for multi-song info ─────────────────────────────
+  // Auxiliary data pointer at C64 address 0x0FFB (2 bytes, little-endian)
+  const auxPtr = readWord(mem, 0x0FFB);
+  let songCount = 1;
+  let songNames: string[] = [filename.replace(/\.sf2$/i, '')];
 
-    const entries: OrderEntry[] = [];
-    let loopIndex = 0;
-    let hasLoop = false;
-    let currentTranspose = 0;
-    let a = olAddr;
-
-    while (a < 0x10000) {
-      const val = mem[a++];
-      if (val === 0xFE) {
-        break;
-      }
-      if (val === 0xFF) {
-        hasLoop = true;
-        // Read packed loop offset byte and convert to entry index
-        const loopPackedOffset = mem[a]; // byte after 0xFF
-        let entryCount = 0;
-        for (let i = olAddr; i < olAddr + loopPackedOffset; i++) {
-          if (mem[i] < 0x80) entryCount++;
-        }
-        loopIndex = entryCount;
-        break;
-      }
-      if (val >= 0x80) {
-        currentTranspose = val;
-      } else {
-        entries.push({ transpose: currentTranspose, seqIdx: val });
+  if (auxPtr > 0 && auxPtr < 0xFFF0) {
+    // Auxiliary data starts with songs block:
+    // [songCount: 1 byte] [selectedSong: 1 byte] [256 * songCount bytes: song names]
+    const sc = mem[auxPtr];
+    if (sc > 0 && sc <= 16) {
+      songCount = sc;
+      // skip selectedSong byte at auxPtr + 1
+      songNames = [];
+      let nameOff = auxPtr + 2;
+      for (let s = 0; s < songCount; s++) {
+        const { str } = readNullStr(mem, nameOff, 256);
+        songNames.push(str || `Song ${s + 1}`);
+        // Each song name occupies 256 bytes in the format
+        nameOff += 256;
       }
     }
-
-    orderLists.push({ entries, loopIndex, hasLoop });
   }
 
-  // ── Parse sequences ──────────────────────────────────────────────────
-  // Each sequence is variable-length, stored at addresses from pointer tables
-  // Sequence format (packed): bytes that are:
-  //   >= 0x80 with bit 7 set and bit 6..4 pattern = duration/tie byte
-  //   other bytes = command, instrument, note
-  // For simplicity, we treat sequences as fixed-length patterns of note events
+  // ── Parse order lists for ALL songs ──────────────────────────────────
+  // Song N's order lists start at: orderListTrack1 + (N * orderListSize * trackCount)
+  const orderListByteSize = musicData.orderListSize * numChannels;
+  const allSongOrderLists: { entries: OrderEntry[]; loopIndex: number; hasLoop: boolean }[][] = [];
 
-  // First, find which sequences are actually used
+  for (let song = 0; song < songCount; song++) {
+    const songOl: { entries: OrderEntry[]; loopIndex: number; hasLoop: boolean }[] = [];
+    const songBaseAddr = musicData.orderListTrack1 + (song * orderListByteSize);
+
+    for (let t = 0; t < numChannels; t++) {
+      const olAddr = songBaseAddr + (t * musicData.orderListSize);
+      const entries: OrderEntry[] = [];
+      let loopIndex = 0;
+      let hasLoop = false;
+      let currentTranspose = 0;
+      let a = olAddr;
+
+      while (a < olAddr + musicData.orderListSize && a < 0x10000) {
+        const val = mem[a++];
+        if (val === 0xFE) break;
+        if (val === 0xFF) {
+          hasLoop = true;
+          const loopPackedOffset = mem[a];
+          let entryCount = 0;
+          for (let i = olAddr; i < olAddr + loopPackedOffset; i++) {
+            if (mem[i] < 0x80) entryCount++;
+          }
+          loopIndex = entryCount;
+          break;
+        }
+        if (val >= 0x80) {
+          currentTranspose = val;
+        } else {
+          entries.push({ transpose: currentTranspose, seqIdx: val });
+        }
+      }
+
+      songOl.push({ entries, loopIndex, hasLoop });
+    }
+    allSongOrderLists.push(songOl);
+  }
+
+  // Use song 0's order lists as the "current" (replaces the single-song parse)
+  const orderLists = allSongOrderLists[0] ?? [];
+
+  // ── Collect all used sequences across ALL songs ──────────────────────
   const usedSeqs = new Set<number>();
-  for (const ol of orderLists) {
-    for (const e of ol.entries) {
-      usedSeqs.add(e.seqIdx);
+  for (const songOls of allSongOrderLists) {
+    for (const ol of songOls) {
+      for (const e of ol.entries) usedSeqs.add(e.seqIdx);
     }
   }
 
@@ -585,7 +607,7 @@ export async function parseSIDFactory2File(
   const speed = 6;
   const bpm = 125; // 50Hz PAL standard
 
-  console.log(`[SF2] Parsed: "${title}" driver=${driverName} v${descriptor.versionMajor}.${String(descriptor.versionMinor).padStart(2, '0')} tracks=${numChannels} seqs=${usedSeqs.size} patterns=${patterns.length}`);
+  console.log(`[SF2] Parsed: "${title}" driver=${driverName} v${descriptor.versionMajor}.${String(descriptor.versionMinor).padStart(2, '0')} tracks=${numChannels} seqs=${usedSeqs.size} patterns=${patterns.length} songs=${songCount}`);
 
   // ── Build SF2 store data for the format editor ────────────────────────
   // Collect all sequences into a Map<seqIdx, SeqEvent[]>
@@ -647,6 +669,9 @@ export async function parseSIDFactory2File(
       orderLists,
       instruments: sf2Instruments,
       songName: title,
+      songCount,
+      songNames,
+      allSongOrderLists,
     },
   };
 }
