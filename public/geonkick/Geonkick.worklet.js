@@ -23,37 +23,66 @@ class GeonkickProcessor extends AudioWorkletProcessor {
   }
 
   async handleMessage(data) {
+    if (data.type === 'init') {
+      await this.initWasm(data.wasmBinary, data.jsCode);
+      return;
+    }
+    if (!this.initialized || !this.handle) return;
+
+    const h = this.handle;
+    const w = this.wasm;
+
     switch (data.type) {
-      case 'init':
-        await this.initWasm(data.wasmBinary, data.jsCode);
-        break;
       case 'noteOn':
-        if (this.initialized && this.handle) {
-          this.wasm._gk_wasm_key_pressed(this.handle, 1, data.note | 0, data.velocity | 0);
-        }
+        w._gk_wasm_key_pressed(h, 1, data.note | 0, data.velocity | 0);
         break;
       case 'noteOff':
-        if (this.initialized && this.handle) {
-          this.wasm._gk_wasm_key_pressed(this.handle, 0, data.note | 0, 0);
-        }
+        w._gk_wasm_key_pressed(h, 0, data.note | 0, 0);
         break;
       case 'setLength':
-        if (this.initialized && this.handle) {
-          this.wasm._gk_wasm_set_length(this.handle, Number(data.seconds) || 0.3);
-        }
+        w._gk_wasm_set_length(h, Number(data.seconds) || 0.3);
         break;
       case 'setLimiter':
-        if (this.initialized && this.handle) {
-          this.wasm._gk_wasm_set_limiter(this.handle, Number(data.value) || 1.0);
-        }
+        w._gk_wasm_set_limiter(h, Number(data.value) || 1.0);
+        break;
+      case 'setFilterEnabled':
+        w._gk_wasm_set_filter_enabled(h, data.enabled ? 1 : 0);
+        break;
+      case 'setFilterCutoff':
+        w._gk_wasm_set_filter_cutoff(h, Number(data.frequency) || 200);
+        break;
+      case 'setFilterFactor':
+        w._gk_wasm_set_filter_factor(h, Number(data.q) || 1);
+        break;
+      case 'setFilterType':
+        w._gk_wasm_set_filter_type(h, data.filterType | 0);
+        break;
+      case 'setDistortionEnabled':
+        w._gk_wasm_set_distortion_enabled(h, data.enabled ? 1 : 0);
+        break;
+      case 'setDistortionDrive':
+        w._gk_wasm_set_distortion_drive(h, Number(data.drive) || 1);
+        break;
+      case 'setDistortionVolume':
+        w._gk_wasm_set_distortion_volume(h, Number(data.volume) || 1);
+        break;
+      case 'enableOsc':
+        w._gk_wasm_enable_osc(h, data.oscIndex | 0, data.enabled ? 1 : 0);
+        break;
+      case 'setOscAmplitude':
+        w._gk_wasm_set_osc_amplitude(h, data.oscIndex | 0, Number(data.amplitude) || 0);
+        break;
+      case 'setOscFrequency':
+        w._gk_wasm_set_osc_frequency(h, data.oscIndex | 0, Number(data.frequency) || 440);
+        break;
+      case 'setOscFunction':
+        w._gk_wasm_set_osc_function(h, data.oscIndex | 0, data.func | 0);
         break;
       case 'dispose':
-        if (this.handle && this.wasm) {
-          this.wasm._gk_wasm_destroy(this.handle);
-          this.handle = 0;
-        }
-        if (this.outPtr && this.wasm) {
-          this.wasm._free(this.outPtr);
+        w._gk_wasm_destroy(h);
+        this.handle = 0;
+        if (this.outPtr) {
+          w._free(this.outPtr);
           this.outPtr = 0;
         }
         this.initialized = false;
