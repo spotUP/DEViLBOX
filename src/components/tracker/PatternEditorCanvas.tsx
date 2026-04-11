@@ -190,6 +190,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const [formatCursor, setFormatCursor] = useState({
     channelIndex: 0, rowIndex: 0, columnIndex: 0,
   });
+  // Mutable ref so rAF loops can read the latest cursor without re-renders
+  const formatCursorRef = useRef({ channelIndex: 0, rowIndex: 0, columnIndex: 0 });
+  formatCursorRef.current = formatCursor;
   const [formatOctave, setFormatOctave] = useState(3);
 
   // Format mode selection: normalized range (startRow <= endRow, startCol <= endCol)
@@ -2138,6 +2141,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let prevPlaying = false;
     let prevThemeId: unknown = null;       // theme store identity
     let prevFormatChannels: unknown = null;
+    let prevFormatCursorRow = -1;          // format mode cursor row
+    let prevFormatCursorCh = -1;           // format mode cursor channel
     let cachedPatterns: PatternSnapshot[] = [];
     // Per-pattern snapshot cache — only re-snapshot patterns whose identity changed
     const patternSnapshotCache = new Map<unknown, PatternSnapshot>();
@@ -2167,7 +2172,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // to prevent it from scrolling when FormatPlaybackState is globally active.
         const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
         isPlaying = fpsActive;
-        playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
+        playRow = fpsActive ? fps.row : formatCursorRef.current.rowIndex;
         if (fpsActive && fps.rowDuration > 0) {
           const elapsed = performance.now() - fps.rowChangeTime;
           const progress = Math.min(Math.max(elapsed / fps.rowDuration, 0), 1);
@@ -2259,6 +2264,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       if (cs.cursor !== prevCursorRef) { prevCursorRef = cs.cursor; needsRender = true; }
       if (cs.selection !== prevSelectionRef) { prevSelectionRef = cs.selection; needsRender = true; }
+      // Format mode cursor changed (arrow key navigation when not playing)
+      if (isFormatModeRef.current) {
+        const fc = formatCursorRef.current;
+        if (fc.rowIndex !== prevFormatCursorRow || fc.channelIndex !== prevFormatCursorCh) {
+          prevFormatCursorRow = fc.rowIndex;
+          prevFormatCursorCh = fc.channelIndex;
+          needsRender = true;
+        }
+      }
       if (playRow !== prevPlayRow || isPlaying !== prevPlaying) {
         prevPlayRow = playRow; prevPlaying = isPlaying; needsRender = true;
       }
@@ -2282,7 +2296,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // ── Read cursor/selection ──────────────────────────────────────
       const cursor = isFormatModeRef.current
-        ? { rowIndex: formatCurrentRowRef.current, channelIndex: 0, columnType: '0', digitIndex: 0, noteColumnIndex: 0 }
+        ? { rowIndex: formatCursorRef.current.rowIndex, channelIndex: formatCursorRef.current.channelIndex, columnType: '0', digitIndex: 0, noteColumnIndex: 0 }
         : { rowIndex: cs.cursor.rowIndex, channelIndex: cs.cursor.channelIndex,
             columnType: cs.cursor.columnType, digitIndex: cs.cursor.digitIndex,
             noteColumnIndex: cs.cursor.noteColumnIndex ?? 0 };
@@ -2424,13 +2438,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             prevRow = -1;
           }
 
-          // Row always comes from the React prop (formatCurrentRow).
+          // Row comes from playback state when playing, or internal cursor when stopped.
           // FormatPlaybackState is only used for smooth sub-row interpolation
           // when BOTH fps.isPlaying AND formatIsPlaying prop are true.
           const fps = getFormatPlaybackState();
           const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
           const newPlaying = formatIsPlayingRef.current;
-          let newRow = formatCurrentRowRef.current;
+          let newRow = newPlaying ? formatCurrentRowRef.current : formatCursorRef.current.rowIndex;
           let smoothOffset = 0;
 
           if (fpsSmooth && fps.rowDuration > 0) {
@@ -2446,7 +2460,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const shouldSend = newPlaying ||
             newRow !== prevRow || newPlaying !== prevPlaying;
           if (shouldSend) {
-            const wasPlaying = prevPlaying;
             prevRow     = newRow;
             prevPlaying = newPlaying;
             bridge.post({
@@ -2456,17 +2469,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               patternIndex: 0,
               isPlaying: newPlaying,
             });
-            // On stop transition: sync worker cursor to last playback row.
-            // Worker renderers use cursor.rowIndex when !isPlaying, but format
-            // mode skips cursor→worker sync (line ~1835), so cursor.rowIndex
-            // stays at 0. Post the last row so the editor doesn't jump.
-            if (wasPlaying && !newPlaying) {
-              const cs = useCursorStore.getState().cursor;
+            // When not playing (includes stop transition), sync cursor position
+            // so arrow key navigation scrolls the view. Worker renderers use
+            // cursor.rowIndex when !isPlaying, but format mode skips the normal
+            // cursor→worker subscription, so we push it here.
+            if (!newPlaying) {
               bridge.post({ type: 'cursor', cursor: {
-                rowIndex:     newRow,
-                channelIndex: cs.channelIndex,
-                columnType:   cs.columnType,
-                digitIndex:   cs.digitIndex,
+                rowIndex:     formatCursorRef.current.rowIndex,
+                channelIndex: formatCursorRef.current.channelIndex,
+                columnType:   '0',
+                digitIndex:   0,
               }});
             }
           }
