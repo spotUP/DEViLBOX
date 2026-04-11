@@ -3,10 +3,99 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import * as Tone from 'tone';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { NIBBLES_LEVELS } from './nibblesLevels';
 import { scoreLibrary, type NibblesScore } from '@/lib/scoreLibrary';
 import { useAudioStore } from '@stores';
+
+// ── Nibbles Sound Effects (Tone.js synths) ─────────────────────────────────
+// Lazy-initialized — created on first use so we don't spin up synths until
+// the game is actually played. All effects route to Tone.Destination directly
+// (short-lived, don't need the tracker master chain).
+
+let sfxInitialized = false;
+let sfxEat: Tone.MonoSynth | null = null;
+let sfxDie: Tone.NoiseSynth | null = null;
+let sfxTurn: Tone.MembraneSynth | null = null;
+let sfxLevelUp: Tone.PolySynth | null = null;
+let sfxStartGame: Tone.MetalSynth | null = null;
+
+function initSfx(): void {
+  if (sfxInitialized) return;
+  sfxInitialized = true;
+
+  // Eat food — short rising chirp, 8-bit character
+  sfxEat = new Tone.MonoSynth({
+    oscillator: { type: 'square' },
+    envelope: { attack: 0.005, decay: 0.08, sustain: 0, release: 0.02 },
+    filterEnvelope: { attack: 0.005, decay: 0.06, sustain: 0, release: 0.01, baseFrequency: 800, octaves: 3 },
+    volume: -18,
+  }).toDestination();
+
+  // Death — harsh noise burst with pitch drop
+  sfxDie = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 },
+    volume: -14,
+  }).toDestination();
+
+  // Turn — subtle percussive tick
+  sfxTurn = new Tone.MembraneSynth({
+    pitchDecay: 0.01,
+    octaves: 2,
+    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.01 },
+    volume: -28,
+  }).toDestination();
+
+  // Level up — ascending arpeggio chord
+  sfxLevelUp = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.4 },
+    volume: -16,
+  }).toDestination();
+
+  // Start game — metallic hit
+  sfxStartGame = new Tone.MetalSynth({
+    envelope: { attack: 0.001, decay: 0.2, release: 0.1 },
+    harmonicity: 5.1,
+    modulationIndex: 16,
+    resonance: 4000,
+    octaves: 1.5,
+    volume: -22,
+  }).toDestination();
+}
+
+function playEatSound(foodValue: number): void {
+  initSfx();
+  // Higher food numbers → higher pitch for satisfying escalation
+  const baseNote = 60 + foodValue * 3; // C4 + offset
+  const freq = Tone.Frequency(baseNote, 'midi').toFrequency();
+  sfxEat?.triggerAttackRelease(freq, '32n');
+}
+
+function playDeathSound(): void {
+  initSfx();
+  sfxDie?.triggerAttackRelease('16n');
+}
+
+function playTurnSound(): void {
+  initSfx();
+  sfxTurn?.triggerAttackRelease('C5', '64n');
+}
+
+function playLevelUpSound(): void {
+  initSfx();
+  const now = Tone.now();
+  sfxLevelUp?.triggerAttackRelease(['C5', 'E5', 'G5'], '8n', now);
+  sfxLevelUp?.triggerAttackRelease(['E5', 'G5', 'B5'], '8n', now + 0.12);
+  sfxLevelUp?.triggerAttackRelease(['G5', 'B5', 'D6'], '8n', now + 0.24);
+}
+
+function playStartSound(): void {
+  initSfx();
+  sfxStartGame?.triggerAttackRelease('C3', '8n');
+}
 
 interface NibblesGameProps {
   height?: number;
@@ -620,18 +709,28 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       beatFoodQueueRef.current--;
     }
 
-    if (inputBuffer1.current.length > 0) {
-      const d = inputBuffer1.current.shift()!;
-      if (!((d === 0 && p1DirRef.current === 2) || (d === 2 && p1DirRef.current === 0) || 
-            (d === 1 && p1DirRef.current === 3) || (d === 3 && p1DirRef.current === 1))) {
-        p1DirRef.current = d;
+    // Drain the entire input buffer each tick — apply the LAST valid direction.
+    // This eliminates the "missed keystroke" feel where rapid inputs queued up
+    // and played back one-per-tick with multi-frame delay.
+    {
+      let changed = false;
+      while (inputBuffer1.current.length > 0) {
+        const d = inputBuffer1.current.shift()!;
+        if (!((d === 0 && p1DirRef.current === 2) || (d === 2 && p1DirRef.current === 0) ||
+              (d === 1 && p1DirRef.current === 3) || (d === 3 && p1DirRef.current === 1))) {
+          p1DirRef.current = d;
+          changed = true;
+        }
       }
+      if (changed) playTurnSound();
     }
-    if (numPlayers === 2 && inputBuffer2.current.length > 0) {
-      const d = inputBuffer2.current.shift()!;
-      if (!((d === 0 && p2DirRef.current === 2) || (d === 2 && p2DirRef.current === 0) || 
-            (d === 1 && p2DirRef.current === 3) || (d === 3 && p2DirRef.current === 1))) {
-        p2DirRef.current = d;
+    if (numPlayers === 2) {
+      while (inputBuffer2.current.length > 0) {
+        const d = inputBuffer2.current.shift()!;
+        if (!((d === 0 && p2DirRef.current === 2) || (d === 2 && p2DirRef.current === 0) ||
+              (d === 1 && p2DirRef.current === 3) || (d === 3 && p2DirRef.current === 1))) {
+          p2DirRef.current = d;
+        }
       }
     }
 
@@ -657,6 +756,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
     const headOnHead = nextP2 && nextP1.x === nextP2.x && nextP1.y === nextP2.y;
     
     if (die1 || die2 || headOnHead) {
+      playDeathSound();
       lives1Ref.current -= (die1 || headOnHead) ? 1 : 0;
       lives2Ref.current -= (die2 || headOnHead) ? 1 : 0;
       if (lives1Ref.current <= 0 || (numPlayers === 2 && lives2Ref.current <= 0)) {
@@ -675,6 +775,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
 
     const cell1 = gridRef.current[nextP1.y][nextP1.x];
     if (cell1 >= 16) {
+      playEatSound(cell1 - 16);
       const now = Date.now();
       const points = (cell1 - 16) * 999 * (levelRef.current + 1);
 
@@ -715,6 +816,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
     if (nextP2) {
       const cell2 = gridRef.current[nextP2.y][nextP2.x];
       if (cell2 >= 16) {
+        playEatSound(cell2 - 16);
         const now = Date.now();
         const points = (cell2 - 16) * 999 * (levelRef.current + 1);
 
@@ -755,6 +857,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
 
     if (p1Eating || p2Eating) {
       if (currentNumberRef.current === 9) {
+        playLevelUpSound();
         levelRef.current++;
         initLevel(levelRef.current);
         syncUI();
@@ -1047,6 +1150,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                playStartSound();
                 resetGame();
                 setIsPlaying(true);
               }}
