@@ -11,6 +11,7 @@ import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/inst
 import type { ToneEngine } from '@engine/ToneEngine';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
+import { AVAILABLE_EFFECTS } from '@constants/unifiedEffects';
 
 interface AudioStore {
   // State
@@ -158,9 +159,7 @@ export const useAudioStore = create<AudioStore>()(
       // Look up the correct category from AVAILABLE_EFFECTS so non-tonejs
       // effects (buzzmachine, wasm, wam, neural) get the right category.
       // Falls back to 'tonejs' for unregistered/legacy types.
-      const { AVAILABLE_EFFECTS } = require('@constants/unifiedEffects');
-      const effectDef = (AVAILABLE_EFFECTS as Array<{ type?: string; category: string }>)
-        .find(e => e.type === effectType);
+      const effectDef = AVAILABLE_EFFECTS.find(e => e.type === effectType);
       const category = (effectDef?.category ?? 'tonejs') as EffectConfig['category'];
 
       set((state) => {
