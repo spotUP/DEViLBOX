@@ -31,6 +31,8 @@
  *   Backspace   = Clear row + move up
  *   Ctrl+Bksp   = Delete row + shrink + move up
  *   Insert      = Insert blank row
+ *   Ctrl+Shift+Down = Fill gate until next note event
+ *   Ctrl+Shift+Up   = Fill gate since previous note event
  *
  * Clipboard:
  *   Ctrl+C      = Copy (marked region or full sequence)
@@ -42,10 +44,26 @@
  *   Shift+Up    = Extend mark upward
  *   Shift+Down  = Extend mark downward
  *
+ * Sequence management:
+ *   Ctrl+D        = Duplicate & replace sequence
+ *   Ctrl+Shift+D  = Duplicate & append sequence (keep original)
+ *   Ctrl+B        = Split sequence at cursor
+ *   Ctrl+F        = Insert first free sequence
+ *   Ctrl+Shift+F  = Insert first empty sequence
+ *   Ctrl+L        = Set order loop point (all tracks)
+ *   Ctrl+Shift+L  = Set order loop point (current track)
+ *
  * Navigation:
  *   Tab / Shift+Tab = Next/prev channel
  *   Ctrl+I      = Set instrument from cursor
  *   Ctrl+O      = Set command from cursor
+ *
+ * Display:
+ *   Ctrl+U      = Toggle hex uppercase/lowercase
+ *   Ctrl+S      = Quick save (export download)
+ *
+ * Note input applies transposition offset (transpose - 0xA0) so stored
+ * values are absolute. Display shows transposed notes.
  *
  * Column order: 0=Instrument, 1=Command, 2=Note (matching original)
  */
@@ -75,6 +93,14 @@ function getCurrentSeqIdx(state: ReturnType<typeof useSF2Store.getState>, track:
   const ol = state.orderLists[track];
   if (!ol || state.orderCursor >= ol.entries.length) return null;
   return ol.entries[state.orderCursor].seqIdx;
+}
+
+/** Get the transposition offset for the current track at the current order position.
+ *  Matches original: transpose = rawByte - 0xA0 (0xA0 = no transposition) */
+function getCurrentTranspose(state: ReturnType<typeof useSF2Store.getState>, track: number): number {
+  const ol = state.orderLists[track];
+  if (!ol || state.orderCursor >= ol.entries.length) return 0;
+  return state.orderLists[track].entries[state.orderCursor].transpose - 0xA0;
 }
 
 export function useSF2KeyboardHandler(active: boolean) {
@@ -133,6 +159,12 @@ export function useSF2KeyboardHandler(active: boolean) {
     // ── Set command from cursor: Ctrl+O ──
     if (mod && e.key === 'o') {
       e.preventDefault();
+      const seqIdx = getCurrentSeqIdx(state, cursor.channel);
+      const seq = seqIdx !== null ? state.sequences.get(seqIdx) : null;
+      if (seq && cursor.row < seq.length) {
+        const cmd = seq[cursor.row].command;
+        if (cmd > 0 && cmd < 0x80) state.setCurrentCommand(cmd);
+      }
       return;
     }
 
@@ -141,6 +173,12 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (mod && e.key === 'd' && !e.shiftKey) {
       e.preventDefault();
       state.duplicateSequence(cursor.channel, state.orderCursor);
+      return;
+    }
+    // Ctrl+Shift+D = Duplicate & append sequence (keep original, insert copy after)
+    if (mod && e.key === 'D' && e.shiftKey) {
+      e.preventDefault();
+      state.duplicateSequenceAppend(cursor.channel, state.orderCursor);
       return;
     }
     // Ctrl+B = Split sequence at cursor
@@ -153,6 +191,18 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (mod && e.key === 'f' && !e.shiftKey) {
       e.preventDefault();
       state.insertFirstFreeSequence(cursor.channel, state.orderCursor);
+      return;
+    }
+    // Ctrl+Shift+F = Insert first empty sequence
+    if (mod && e.key === 'F' && e.shiftKey) {
+      e.preventDefault();
+      state.insertFirstEmptySequence(cursor.channel, state.orderCursor);
+      return;
+    }
+    // Ctrl+U = Toggle hex uppercase
+    if (mod && e.key === 'u') {
+      e.preventDefault();
+      state.toggleHexUppercase();
       return;
     }
     // Ctrl+L = Set order loop point (all tracks)
@@ -413,8 +463,11 @@ export function useSF2KeyboardHandler(active: boolean) {
       if (noteOffset !== undefined) {
         e.preventDefault();
         if (seqIdx === null) return;
-        const noteVal = 1 + currentOctave * 12 + noteOffset;
-        state.setSequenceCell(seqIdx, cursor.row, 'note', Math.min(111, noteVal));
+        // Subtract transposition so stored value is absolute (matches original)
+        const transpose = getCurrentTranspose(state, cursor.channel);
+        const noteVal = 1 + currentOctave * 12 + noteOffset - transpose;
+        if (noteVal < 1 || noteVal >= 0x60) return; // out of range after transpose
+        state.setSequenceCell(seqIdx, cursor.row, 'note', noteVal);
         if (currentInstrument > 0) {
           state.setSequenceCell(seqIdx, cursor.row, 'instrument', currentInstrument);
         }
@@ -446,6 +499,9 @@ export function useSF2KeyboardHandler(active: boolean) {
           state.setCursor({ digit: 1 });
         } else {
           newVal = (current & 0xF0) | h;
+          // Validate combined value: instrument max 0x1F, command max 0x3F
+          if (cursor.column === 0 && newVal > 0x1F) return;
+          if (cursor.column === 1 && newVal > 0x3F) return;
           state.setCursor({ digit: 0, row: Math.min(maxRow, cursor.row + editStep) });
         }
         state.setSequenceCell(seqIdx, cursor.row, field, newVal);

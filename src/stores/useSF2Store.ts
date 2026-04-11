@@ -148,6 +148,7 @@ export interface SF2StoreState {
   // Editor state
   cursor: SF2EditorCursor;
   currentInstrument: number;
+  currentCommand: number;
   currentOctave: number;
   editStep: number;
 
@@ -173,6 +174,11 @@ export interface SF2StoreState {
   markStart: number | null;  // null = no mark active
   markEnd: number | null;
 
+  // Display preferences
+  highlightInterval: number;  // row highlight every N rows (default 4)
+  highlightOffset: number;    // offset for highlight interval
+  hexUppercase: boolean;      // true = uppercase hex display
+
   // ── Actions ────────────────────────────────────────────────────────────
 
   /** Load parsed SF2 data into the store */
@@ -184,6 +190,7 @@ export interface SF2StoreState {
   // Cursor
   setCursor: (patch: Partial<SF2EditorCursor>) => void;
   setCurrentInstrument: (inst: number) => void;
+  setCurrentCommand: (cmd: number) => void;
   setCurrentOctave: (oct: number) => void;
   setEditStep: (step: number) => void;
 
@@ -217,8 +224,10 @@ export interface SF2StoreState {
 
   // Sequence management
   duplicateSequence: (track: number, orderPos: number) => void;
+  duplicateSequenceAppend: (track: number, orderPos: number) => void;
   splitSequenceAtRow: (track: number, orderPos: number, atRow: number) => void;
   insertFirstFreeSequence: (track: number, orderPos: number) => void;
+  insertFirstEmptySequence: (track: number, orderPos: number) => void;
   setOrderLoopPoint: (track: number, loopIndex: number) => void;
   setAllOrderLoopPoints: (loopIndex: number) => void;
 
@@ -236,6 +245,11 @@ export interface SF2StoreState {
   // Undo/redo
   undo: () => void;
   redo: () => void;
+
+  // Display preferences
+  setHighlightInterval: (interval: number) => void;
+  setHighlightOffset: (offset: number) => void;
+  toggleHexUppercase: () => void;
 
   // Export
   exportSF2File: () => Uint8Array | null;
@@ -292,6 +306,7 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
 
   cursor: { ...INITIAL_CURSOR },
   currentInstrument: 1,
+  currentCommand: 0,
   currentOctave: 4,
   editStep: 1,
 
@@ -305,6 +320,9 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   channelMutes: [],
   markStart: null,
   markEnd: null,
+  highlightInterval: 4,
+  highlightOffset: 0,
+  hexUppercase: true,
 
   // ── Load ───────────────────────────────────────────────────────────────
 
@@ -365,6 +383,7 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
 
   setCursor: (patch) => set((s) => ({ cursor: { ...s.cursor, ...patch } })),
   setCurrentInstrument: (inst) => set({ currentInstrument: inst }),
+  setCurrentCommand: (cmd) => set({ currentCommand: cmd }),
   setCurrentOctave: (oct) => set({ currentOctave: Math.max(0, Math.min(7, oct)) }),
   setEditStep: (step) => set({ editStep: Math.max(0, Math.min(16, step)) }),
 
@@ -383,33 +402,45 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   setOrderEntry: (track, pos, entry) => set((s) => {
     const lists = [...s.orderLists];
     if (track >= lists.length) return {};
+    const undoEntry: SF2UndoEntry = {
+      type: 'orderList', key: track,
+      before: { ...s.orderLists[track], entries: [...s.orderLists[track].entries.map(e => ({ ...e }))] },
+    };
     const ol = { ...lists[track], entries: [...lists[track].entries] };
     if (pos < ol.entries.length) {
       ol.entries[pos] = { ...ol.entries[pos], ...entry };
     }
     lists[track] = ol;
-    return { orderLists: lists, redoStack: [] };
+    return { orderLists: lists, undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry], redoStack: [] };
   }),
 
   insertOrderEntry: (track, pos) => set((s) => {
     const lists = [...s.orderLists];
     if (track >= lists.length) return {};
+    const undoEntry: SF2UndoEntry = {
+      type: 'orderList', key: track,
+      before: { ...s.orderLists[track], entries: [...s.orderLists[track].entries.map(e => ({ ...e }))] },
+    };
     const ol = { ...lists[track], entries: [...lists[track].entries] };
-    const newEntry: SF2OrderEntry = { transpose: 0x80, seqIdx: 0 };
+    const newEntry: SF2OrderEntry = { transpose: 0xA0, seqIdx: 0 };
     ol.entries.splice(pos, 0, newEntry);
     lists[track] = ol;
-    return { orderLists: lists, redoStack: [] };
+    return { orderLists: lists, undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry], redoStack: [] };
   }),
 
   deleteOrderEntry: (track, pos) => set((s) => {
     const lists = [...s.orderLists];
     if (track >= lists.length) return {};
+    const undoEntry: SF2UndoEntry = {
+      type: 'orderList', key: track,
+      before: { ...s.orderLists[track], entries: [...s.orderLists[track].entries.map(e => ({ ...e }))] },
+    };
     const ol = { ...lists[track], entries: [...lists[track].entries] };
     if (pos >= ol.entries.length || ol.entries.length <= 1) return {};
     ol.entries.splice(pos, 1);
     if (ol.loopIndex >= ol.entries.length) ol.loopIndex = ol.entries.length - 1;
     lists[track] = ol;
-    return { orderLists: lists, redoStack: [] };
+    return { orderLists: lists, undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry], redoStack: [] };
   }),
 
   // ── Sequence editing ───────────────────────────────────────────────────
@@ -554,13 +585,22 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     if (!seq) return {};
     const from = Math.max(0, Math.min(fromRow, toRow));
     const to = Math.min(seq.length - 1, Math.max(fromRow, toRow));
+
+    // Validation pass: reject if ANY note would go out of bounds (matches original)
+    for (let i = from; i <= to; i++) {
+      const note = seq[i].note;
+      if (note >= 1 && note < 0x60) {
+        const transposed = note + semitones;
+        if (transposed < 1 || transposed >= 0x60) return {}; // reject entire operation
+      }
+    }
+
     const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
     const newSeq = [...seq];
     for (let i = from; i <= to; i++) {
       const note = newSeq[i].note;
-      // Only transpose actual notes (1-111), skip rest(0), tie(0x7E), markers
-      if (note >= 1 && note <= 111) {
-        newSeq[i] = { ...newSeq[i], note: Math.max(1, Math.min(111, note + semitones)) };
+      if (note >= 1 && note < 0x60) {
+        newSeq[i] = { ...newSeq[i], note: note + semitones };
       }
     }
     seqs.set(seqIdx, newSeq);
@@ -604,6 +644,38 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     const lists = [...s.orderLists];
     const olCopy = { ...lists[track], entries: [...lists[track].entries] };
     olCopy.entries[orderPos] = { ...olCopy.entries[orderPos], seqIdx: freeIdx };
+    lists[track] = olCopy;
+
+    return { sequences: seqs, orderLists: lists, redoStack: [] };
+  }),
+
+  duplicateSequenceAppend: (track, orderPos) => set((s) => {
+    const ol = s.orderLists[track];
+    if (!ol || orderPos >= ol.entries.length) return {};
+    const srcSeqIdx = ol.entries[orderPos].seqIdx;
+    const srcSeq = s.sequences.get(srcSeqIdx);
+    if (!srcSeq) return {};
+
+    // Find first unused sequence index
+    const maxSeq = s.musicData?.sequenceCount ?? 128;
+    let freeIdx = -1;
+    for (let i = 0; i < maxSeq; i++) {
+      if (!s.sequences.has(i) || (s.sequences.get(i)?.length === 0)) {
+        freeIdx = i;
+        break;
+      }
+    }
+    if (freeIdx === -1) return {};
+
+    // Clone sequence data (keep original, insert new entry after)
+    const seqs = new Map(s.sequences);
+    seqs.set(freeIdx, srcSeq.map(e => ({ ...e })));
+
+    // Insert new order entry AFTER current (original stays)
+    const lists = [...s.orderLists];
+    const olCopy = { ...lists[track], entries: [...lists[track].entries] };
+    const newEntry = { transpose: olCopy.entries[orderPos].transpose, seqIdx: freeIdx };
+    olCopy.entries.splice(orderPos + 1, 0, newEntry);
     lists[track] = olCopy;
 
     return { sequences: seqs, orderLists: lists, redoStack: [] };
@@ -668,8 +740,40 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     // Insert order entry at current position
     const lists = [...s.orderLists];
     const olCopy = { ...lists[track], entries: [...lists[track].entries] };
-    const newEntry = { transpose: 0x80, seqIdx: freeIdx };
+    const newEntry = { transpose: 0xA0, seqIdx: freeIdx };
     olCopy.entries.splice(orderPos, 0, newEntry);
+    lists[track] = olCopy;
+
+    return { sequences: seqs, orderLists: lists, redoStack: [] };
+  }),
+
+  insertFirstEmptySequence: (track, orderPos) => set((s) => {
+    const ol = s.orderLists[track];
+    if (!ol) return {};
+
+    // Find first sequence where ALL events are empty
+    const maxSeq = s.musicData?.sequenceCount ?? 128;
+    let emptyIdx = -1;
+    for (let i = 0; i < maxSeq; i++) {
+      const seq = s.sequences.get(i);
+      if (!seq || seq.length === 0) { emptyIdx = i; break; }
+      const allEmpty = seq.every(e => e.note === 0 && e.instrument === 0x80 && e.command === 0x80);
+      if (allEmpty) { emptyIdx = i; break; }
+    }
+    if (emptyIdx === -1) return {};
+
+    // Ensure the sequence exists (may need to create it)
+    const seqs = new Map(s.sequences);
+    if (!seqs.has(emptyIdx) || seqs.get(emptyIdx)!.length === 0) {
+      const emptySeq: SF2SeqEvent[] = [];
+      for (let r = 0; r < 32; r++) emptySeq.push({ note: 0, instrument: 0x80, command: 0x80 });
+      seqs.set(emptyIdx, emptySeq);
+    }
+
+    // Insert order entry at current position
+    const lists = [...s.orderLists];
+    const olCopy = { ...lists[track], entries: [...lists[track].entries] };
+    olCopy.entries.splice(orderPos, 0, { transpose: 0xA0, seqIdx: emptyIdx });
     lists[track] = olCopy;
 
     return { sequences: seqs, orderLists: lists, redoStack: [] };
@@ -699,12 +803,16 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   setInstrumentByte: (instIdx, byteOffset, value) => set((s) => {
     const insts = [...s.instruments];
     if (instIdx >= insts.length) return {};
+    const undoEntry: SF2UndoEntry = {
+      type: 'instrument', key: instIdx,
+      before: new Uint8Array(insts[instIdx].rawBytes),
+    };
     const inst = { ...insts[instIdx], rawBytes: new Uint8Array(insts[instIdx].rawBytes) };
     if (byteOffset < inst.rawBytes.length) {
       inst.rawBytes[byteOffset] = value;
     }
     insts[instIdx] = inst;
-    return { instruments: insts };
+    return { instruments: insts, undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry], redoStack: [] };
   }),
 
   // ── Table editing ──────────────────────────────────────────────────────
@@ -712,9 +820,13 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   setTableByte: (tableDef, row, col, value) => set((s) => {
     const addr = tableDef.address + col * tableDef.rowCount + row;
     if (addr < 0 || addr >= s.c64Memory.length) return {};
+    const undoEntry: SF2UndoEntry = {
+      type: 'table', key: 0,
+      before: new Uint8Array(s.c64Memory),
+    };
     const newMem = new Uint8Array(s.c64Memory);
     newMem[addr] = value;
-    return { c64Memory: newMem };
+    return { c64Memory: newMem, undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry], redoStack: [] };
   }),
 
   // ── Channel mute ───────────────────────────────────────────────────────
@@ -757,6 +869,44 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
         redoStack: [...s.redoStack, redoEntry],
       };
     }
+
+    if (entry.type === 'orderList') {
+      const lists = [...s.orderLists];
+      const track = entry.key;
+      if (track < lists.length) {
+        const redoEntry: SF2UndoEntry = {
+          type: 'orderList',
+          key: track,
+          before: { ...lists[track], entries: [...lists[track].entries.map(e => ({ ...e }))] },
+        };
+        lists[track] = entry.before as SF2OrderList;
+        return { orderLists: lists, undoStack: newUndo, redoStack: [...s.redoStack, redoEntry] };
+      }
+    }
+
+    if (entry.type === 'instrument') {
+      const insts = [...s.instruments];
+      const idx = entry.key;
+      if (idx < insts.length) {
+        const redoEntry: SF2UndoEntry = {
+          type: 'instrument',
+          key: idx,
+          before: new Uint8Array(insts[idx].rawBytes),
+        };
+        insts[idx] = { ...insts[idx], rawBytes: new Uint8Array(entry.before as Uint8Array) };
+        return { instruments: insts, undoStack: newUndo, redoStack: [...s.redoStack, redoEntry] };
+      }
+    }
+
+    if (entry.type === 'table') {
+      const redoEntry: SF2UndoEntry = {
+        type: 'table',
+        key: 0,
+        before: new Uint8Array(s.c64Memory),
+      };
+      return { c64Memory: new Uint8Array(entry.before as Uint8Array), undoStack: newUndo, redoStack: [...s.redoStack, redoEntry] };
+    }
+
     return {};
   }),
 
@@ -780,8 +930,52 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
         redoStack: newRedo,
       };
     }
+
+    if (entry.type === 'orderList') {
+      const lists = [...s.orderLists];
+      const track = entry.key;
+      if (track < lists.length) {
+        const undoEntry: SF2UndoEntry = {
+          type: 'orderList',
+          key: track,
+          before: { ...lists[track], entries: [...lists[track].entries.map(e => ({ ...e }))] },
+        };
+        lists[track] = entry.before as SF2OrderList;
+        return { orderLists: lists, undoStack: [...s.undoStack, undoEntry], redoStack: newRedo };
+      }
+    }
+
+    if (entry.type === 'instrument') {
+      const insts = [...s.instruments];
+      const idx = entry.key;
+      if (idx < insts.length) {
+        const undoEntry: SF2UndoEntry = {
+          type: 'instrument',
+          key: idx,
+          before: new Uint8Array(insts[idx].rawBytes),
+        };
+        insts[idx] = { ...insts[idx], rawBytes: new Uint8Array(entry.before as Uint8Array) };
+        return { instruments: insts, undoStack: [...s.undoStack, undoEntry], redoStack: newRedo };
+      }
+    }
+
+    if (entry.type === 'table') {
+      const undoEntry: SF2UndoEntry = {
+        type: 'table',
+        key: 0,
+        before: new Uint8Array(s.c64Memory),
+      };
+      return { c64Memory: new Uint8Array(entry.before as Uint8Array), undoStack: [...s.undoStack, undoEntry], redoStack: newRedo };
+    }
+
     return {};
   }),
+
+  // ── Display preferences ────────────────────────────────────────────────
+
+  setHighlightInterval: (interval) => set({ highlightInterval: Math.max(1, Math.min(32, interval)) }),
+  setHighlightOffset: (offset) => set({ highlightOffset: Math.max(0, Math.min(31, offset)) }),
+  toggleHexUppercase: () => set((s) => ({ hexUppercase: !s.hexUppercase })),
 
   exportSF2File: () => {
     const s = get();
