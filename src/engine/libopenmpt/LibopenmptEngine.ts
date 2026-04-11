@@ -52,6 +52,14 @@ export class LibopenmptEngine {
   private _onEnded: (() => void) | null = null;
   private _onChannelState: ((state: LibopenmptChannelState[], time: number) => void) | null = null;
   private _durationSeconds: number = 0;
+  private _lastOrder: number = 0;
+  private _lastRow: number = 0;
+  private _onTransportEvent: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null = null;
+
+  /** Subscribe to transport events (seek, pause, unpause, stop) for syncing isolation nodes. */
+  set onTransportEvent(cb: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null) {
+    this._onTransportEvent = cb;
+  }
 
   /** The raw Web Audio output node for routing into the stereo separation chain */
   public output!: GainNode;
@@ -132,6 +140,8 @@ export class LibopenmptEngine {
     const { cmd, order, pattern, row, chLevels, chState, audioTime } = msg.data;
     switch (cmd) {
       case 'pos':
+        this._lastOrder = order;
+        this._lastRow = row;
         if (this._playing) this._onPosition?.(order, pattern, row, audioTime);
         if (chLevels) {
           try {
@@ -239,16 +249,19 @@ export class LibopenmptEngine {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'stop' });
     this._playing = false;
+    this._onTransportEvent?.('stop');
   }
 
   pause(): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'pause' });
+    this._onTransportEvent?.('pause');
   }
 
   resume(): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'unpause' });
+    this._onTransportEvent?.('unpause');
   }
 
   /** Hot-reload module data without restarting playback. Preserves position. */
@@ -267,6 +280,7 @@ export class LibopenmptEngine {
   seekTo(order: number, row: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'setOrderRow', val: { o: order, r: row } });
+    this._onTransportEvent?.('seek', order, row);
   }
 
   /** Set stereo separation (0-200, libopenmpt scale). */
@@ -399,6 +413,21 @@ export class LibopenmptEngine {
     }
 
     return { started: true };
+  }
+
+  /** Get the current module buffer (for creating isolation worklet instances). */
+  getModuleBuffer(): ArrayBuffer | null {
+    return this._pendingData;
+  }
+
+  /** Get the AudioContext used by this engine (for creating additional worklet nodes). */
+  getAudioContext(): AudioContext | null {
+    return this.context;
+  }
+
+  /** Get current playback position (last known from worklet position messages). */
+  getCurrentPosition(): { order: number; row: number } {
+    return { order: this._lastOrder, row: this._lastRow };
   }
 
   dispose(): void {
