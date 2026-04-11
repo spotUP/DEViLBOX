@@ -13,6 +13,28 @@ import { MoogFilterEffect, type MoogFilterModel, type MoogFilterMode } from '../
 import { MVerbEffect } from '../effects/MVerbEffect';
 import { LeslieEffect } from '../effects/LeslieEffect';
 import { SpringReverbEffect } from '../effects/SpringReverbEffect';
+import {
+  AelapseEffect,
+  PARAM_DELAY_ACTIVE as AEL_DELAY_ACTIVE,
+  PARAM_DELAY_DRYWET as AEL_DELAY_DRYWET,
+  PARAM_DELAY_SECONDS as AEL_DELAY_SECONDS,
+  PARAM_DELAY_FEEDBACK as AEL_DELAY_FEEDBACK,
+  PARAM_DELAY_CUT_LOW as AEL_DELAY_CUT_LOW,
+  PARAM_DELAY_CUT_HI as AEL_DELAY_CUT_HI,
+  PARAM_DELAY_SATURATION as AEL_DELAY_SATURATION,
+  PARAM_DELAY_DRIFT as AEL_DELAY_DRIFT,
+  PARAM_DELAY_MODE as AEL_DELAY_MODE,
+  PARAM_SPRINGS_ACTIVE as AEL_SPRINGS_ACTIVE,
+  PARAM_SPRINGS_DRYWET as AEL_SPRINGS_DRYWET,
+  PARAM_SPRINGS_WIDTH as AEL_SPRINGS_WIDTH,
+  PARAM_SPRINGS_LENGTH as AEL_SPRINGS_LENGTH,
+  PARAM_SPRINGS_DECAY as AEL_SPRINGS_DECAY,
+  PARAM_SPRINGS_DAMP as AEL_SPRINGS_DAMP,
+  PARAM_SPRINGS_SHAPE as AEL_SPRINGS_SHAPE,
+  PARAM_SPRINGS_TONE as AEL_SPRINGS_TONE,
+  PARAM_SPRINGS_SCATTER as AEL_SPRINGS_SCATTER,
+  PARAM_SPRINGS_CHAOS as AEL_SPRINGS_CHAOS,
+} from '../effects/AelapseEffect';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { TumultEffect, type TumultOptions } from '../effects/TumultEffect';
 import { TapeSimulatorEffect } from '../effects/TapeSimulatorEffect';
@@ -299,6 +321,33 @@ export function applyEffectParametersDiff(
         if ('mix' in changed) node.setSpringMix(Number(changed.mix));
         if ('drip' in changed) node.setDrip(Number(changed.drip));
         if ('diffusion' in changed) node.setDiffusion(Number(changed.diffusion));
+      }
+      break;
+
+    case 'Aelapse':
+      if (node instanceof AelapseEffect) {
+        // Store values are stored as 0..100 integers from the getDefaultParameters
+        // shape. The AelapseEffect.setParamById() expects 0..1 normalized.
+        const norm = (k: string) => Number(changed[k]) / 100;
+        if ('delayActive'     in changed) node.setParamById(AEL_DELAY_ACTIVE,     Number(changed.delayActive) > 50 ? 1 : 0);
+        if ('delayDryWet'     in changed) node.setParamById(AEL_DELAY_DRYWET,     norm('delayDryWet'));
+        if ('delayTime'       in changed) node.setParamById(AEL_DELAY_SECONDS,    norm('delayTime'));
+        if ('delayFeedback'   in changed) node.setParamById(AEL_DELAY_FEEDBACK,   norm('delayFeedback'));
+        if ('delayCutLow'     in changed) node.setParamById(AEL_DELAY_CUT_LOW,    norm('delayCutLow'));
+        if ('delayCutHi'      in changed) node.setParamById(AEL_DELAY_CUT_HI,     norm('delayCutHi'));
+        if ('delaySaturation' in changed) node.setParamById(AEL_DELAY_SATURATION, norm('delaySaturation'));
+        if ('delayDrift'      in changed) node.setParamById(AEL_DELAY_DRIFT,      norm('delayDrift'));
+        if ('delayMode'       in changed) node.setParamById(AEL_DELAY_MODE,       Number(changed.delayMode) / 2);
+        if ('springsActive'   in changed) node.setParamById(AEL_SPRINGS_ACTIVE,   Number(changed.springsActive) > 50 ? 1 : 0);
+        if ('springsDryWet'   in changed) node.setParamById(AEL_SPRINGS_DRYWET,   norm('springsDryWet'));
+        if ('springsWidth'    in changed) node.setParamById(AEL_SPRINGS_WIDTH,    norm('springsWidth'));
+        if ('springsLength'   in changed) node.setParamById(AEL_SPRINGS_LENGTH,   norm('springsLength'));
+        if ('springsDecay'    in changed) node.setParamById(AEL_SPRINGS_DECAY,    norm('springsDecay'));
+        if ('springsDamp'     in changed) node.setParamById(AEL_SPRINGS_DAMP,     norm('springsDamp'));
+        if ('springsShape'    in changed) node.setParamById(AEL_SPRINGS_SHAPE,    norm('springsShape'));
+        if ('springsTone'     in changed) node.setParamById(AEL_SPRINGS_TONE,     norm('springsTone'));
+        if ('springsScatter'  in changed) node.setParamById(AEL_SPRINGS_SCATTER,  norm('springsScatter'));
+        if ('springsChaos'    in changed) node.setParamById(AEL_SPRINGS_CHAOS,    norm('springsChaos'));
       }
       break;
 
