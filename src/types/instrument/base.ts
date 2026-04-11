@@ -223,6 +223,8 @@ export type SynthType =
   | 'HivelySynth'     // HivelyTracker 16-channel chip synth (WASM)
   // GoatTracker Ultra (C64 SID tracker)
   | 'GTUltraSynth'    // GoatTracker Ultra SID instrument (shared WASM engine)
+  // SID Factory II (C64 SID tracker — driver-defined instruments)
+  | 'SF2Synth'        // SID Factory II instrument (playback via C64SIDEngine)
   // UADE - Universal Amiga Demod-player (130+ exotic Amiga formats)
   | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
   | 'UADEEditableSynth' // UADE editable (native pattern display + UADE audio streaming)

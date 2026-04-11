@@ -83,6 +83,7 @@ import type {
   InStereo2Config,
   FuturePlayerConfig,
   SymphonieConfig,
+  SF2Config,
 } from './exotic';
 import type {
   DrumMachineConfig,
@@ -276,6 +277,8 @@ export interface InstrumentConfig {
   hively?: HivelyConfig;
   // GoatTracker Ultra (C64 SID tracker)
   gtUltra?: GTUltraConfig;
+  // SID Factory II (C64 SID tracker — driver-defined instrument tables)
+  sf2?: SF2Config;
   // JamCracker Pro (AM synth / PCM instruments)
   jamCracker?: JamCrackerConfig;
   // UADE exotic Amiga format (playback-only)
@@ -554,6 +557,13 @@ export const DEFAULT_GTULTRA: GTUltraConfig = {
   pulsePtr: 0,
   filterPtr: 0,
   speedPtr: 0,
+};
+
+export const DEFAULT_SF2: SF2Config = {
+  rawBytes: new Uint8Array(0),
+  name: 'SF2 Instrument',
+  instIndex: 0,
+  columnCount: 0,
 };
 
 export const DEFAULT_JAMCRACKER: JamCrackerConfig = {
