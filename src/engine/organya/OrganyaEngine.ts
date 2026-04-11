@@ -34,7 +34,12 @@ export class OrganyaEngine {
   }
 
   static getInstance(): OrganyaEngine {
-    if (!OrganyaEngine.instance || OrganyaEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!OrganyaEngine.instance || OrganyaEngine.instance._disposed ||
+        OrganyaEngine.instance.audioContext !== currentCtx) {
+      if (OrganyaEngine.instance && !OrganyaEngine.instance._disposed) {
+        OrganyaEngine.instance.dispose();
+      }
       OrganyaEngine.instance = new OrganyaEngine();
     }
     return OrganyaEngine.instance;

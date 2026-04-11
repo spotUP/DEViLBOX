@@ -2,7 +2,7 @@
  * FurnaceChipEngine - Centralized manager for WASM-based chip emulators
  */
 
-import { getNativeContext } from '@utils/audio-context';
+import { getNativeContext, getDevilboxAudioContext } from '@utils/audio-context';
 
 export const FurnaceChipType = {
   // === FM CHIPS ===
@@ -129,7 +129,22 @@ export class FurnaceChipEngine {
         console.log('[FurnaceChipEngine] Syncing with globalThis instance #' + globalInstance.myInstanceId);
         FurnaceChipEngine.instance = globalInstance;
       }
-      return globalInstance;
+      // Invalidate singleton when AudioContext changes (e.g. HMR / ToneEngine recreate)
+      if (globalInstance.nativeContext) {
+        try {
+          const currentCtx = getDevilboxAudioContext();
+          const currentNative = getNativeContext(currentCtx);
+          if (globalInstance.nativeContext !== currentNative) {
+            console.log('[FurnaceChipEngine] AudioContext changed, invalidating instance');
+            FurnaceChipEngine.instance = null;
+            delete (globalThis as unknown as Record<string, unknown>)[GLOBAL_KEY];
+          } else {
+            return globalInstance;
+          }
+        } catch { /* context not yet set */ return globalInstance; }
+      } else {
+        return globalInstance;
+      }
     }
 
     // Create new instance if none exists

@@ -38,7 +38,12 @@ export class HippelCoSoEngine {
   }
 
   static getInstance(): HippelCoSoEngine {
-    if (!HippelCoSoEngine.instance || HippelCoSoEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!HippelCoSoEngine.instance || HippelCoSoEngine.instance._disposed ||
+        HippelCoSoEngine.instance.audioContext !== currentCtx) {
+      if (HippelCoSoEngine.instance && !HippelCoSoEngine.instance._disposed) {
+        HippelCoSoEngine.instance.dispose();
+      }
       HippelCoSoEngine.instance = new HippelCoSoEngine();
     }
     return HippelCoSoEngine.instance;

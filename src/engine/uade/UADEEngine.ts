@@ -192,7 +192,12 @@ export class UADEEngine {
   }
 
   static getInstance(): UADEEngine {
-    if (!UADEEngine.instance || UADEEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!UADEEngine.instance || UADEEngine.instance._disposed ||
+        UADEEngine.instance.audioContext !== currentCtx) {
+      if (UADEEngine.instance && !UADEEngine.instance._disposed) {
+        UADEEngine.instance.dispose();
+      }
       UADEEngine.instance = new UADEEngine();
     }
     return UADEEngine.instance;

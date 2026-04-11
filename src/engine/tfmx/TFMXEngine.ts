@@ -40,7 +40,12 @@ export class TFMXEngine {
   }
 
   static getInstance(): TFMXEngine {
-    if (!TFMXEngine.instance || TFMXEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!TFMXEngine.instance || TFMXEngine.instance._disposed ||
+        TFMXEngine.instance.audioContext !== currentCtx) {
+      if (TFMXEngine.instance && !TFMXEngine.instance._disposed) {
+        TFMXEngine.instance.dispose();
+      }
       TFMXEngine.instance = new TFMXEngine();
     }
     return TFMXEngine.instance;

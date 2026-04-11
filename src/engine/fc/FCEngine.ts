@@ -38,7 +38,12 @@ export class FCEngine {
   }
 
   static getInstance(): FCEngine {
-    if (!FCEngine.instance || FCEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!FCEngine.instance || FCEngine.instance._disposed ||
+        FCEngine.instance.audioContext !== currentCtx) {
+      if (FCEngine.instance && !FCEngine.instance._disposed) {
+        FCEngine.instance.dispose();
+      }
       FCEngine.instance = new FCEngine();
     }
     return FCEngine.instance;

@@ -9,6 +9,7 @@
  * Multiple SymphonieSynth instances share this single engine.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import type { SymphoniePlaybackData } from './SymphoniePlaybackData';
 
 export class SymphonieEngine {
@@ -20,16 +21,24 @@ export class SymphonieEngine {
   private static jsCode: string | null = null;
 
   private workletNode: AudioWorkletNode | null = null;
+  private audioContext: AudioContext;
   private _disposed = false;
 
-  private constructor() {}
+  private constructor() {
+    this.audioContext = getDevilboxAudioContext();
+  }
 
   static hasInstance(): boolean {
     return SymphonieEngine.instance !== null && !SymphonieEngine.instance._disposed;
   }
 
   static getInstance(): SymphonieEngine {
-    if (!SymphonieEngine.instance || SymphonieEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!SymphonieEngine.instance || SymphonieEngine.instance._disposed ||
+        SymphonieEngine.instance.audioContext !== currentCtx) {
+      if (SymphonieEngine.instance && !SymphonieEngine.instance._disposed) {
+        SymphonieEngine.instance.dispose();
+      }
       SymphonieEngine.instance = new SymphonieEngine();
     }
     return SymphonieEngine.instance;

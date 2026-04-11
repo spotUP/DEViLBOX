@@ -35,7 +35,12 @@ export class FredEngine {
   }
 
   static getInstance(): FredEngine {
-    if (!FredEngine.instance || FredEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!FredEngine.instance || FredEngine.instance._disposed ||
+        FredEngine.instance.audioContext !== currentCtx) {
+      if (FredEngine.instance && !FredEngine.instance._disposed) {
+        FredEngine.instance.dispose();
+      }
       FredEngine.instance = new FredEngine();
     }
     return FredEngine.instance;
