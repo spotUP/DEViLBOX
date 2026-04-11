@@ -114,6 +114,22 @@ export interface SF2PlaybackPosition {
 
 // ── Store state ──────────────────────────────────────────────────────────
 
+// ── Notation mode (Sharp/Flat) matching original ─────────────────────────
+export type SF2NotationMode = 'sharp' | 'flat';
+
+// ── SID hardware preferences ─────────────────────────────────────────────
+export type SF2SIDModel = '6581' | '8580';
+export type SF2Region = 'PAL' | 'NTSC';
+
+// ── Play marker ──────────────────────────────────────────────────────────
+export const SF2_MAX_PLAY_MARKERS = 8;
+
+export interface SF2PlayMarker {
+  orderPos: number;   // order list position
+  eventPos: number;   // row within sequence
+  isSet: boolean;     // whether this marker slot has a position
+}
+
 export interface SF2StoreState {
   // Loaded flag
   loaded: boolean;
@@ -178,6 +194,15 @@ export interface SF2StoreState {
   highlightInterval: number;  // row highlight every N rows (default 4)
   highlightOffset: number;    // offset for highlight interval
   hexUppercase: boolean;      // true = uppercase hex display
+  notationMode: SF2NotationMode; // Sharp (C#) or Flat (Db)
+
+  // Play markers (8 slots, matching original)
+  playMarkers: SF2PlayMarker[];
+  selectedMarker: number;  // 0-7: which marker slot is selected
+
+  // SID hardware preferences
+  sidModel: SF2SIDModel;
+  sidRegion: SF2Region;
 
   // ── Actions ────────────────────────────────────────────────────────────
 
@@ -250,6 +275,20 @@ export interface SF2StoreState {
   setHighlightInterval: (interval: number) => void;
   setHighlightOffset: (offset: number) => void;
   toggleHexUppercase: () => void;
+  toggleNotationMode: () => void;
+
+  // Play markers
+  selectMarker: (slot: number) => void;
+  setPlayMarker: () => void;     // set marker at current cursor/order position
+  gotoPlayMarker: () => void;    // jump to selected marker
+
+  // SID hardware preferences
+  toggleSIDModel: () => void;
+  toggleRegion: () => void;
+
+  // Sequence operations
+  expandSequence: (seqIdx: number) => void;
+  resizeSequence: (seqIdx: number, newLength: number) => void;
 
   // Export
   exportSF2File: () => Uint8Array | null;
@@ -323,6 +362,11 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   highlightInterval: 4,
   highlightOffset: 0,
   hexUppercase: true,
+  notationMode: 'sharp' as SF2NotationMode,
+  playMarkers: Array.from({ length: SF2_MAX_PLAY_MARKERS }, () => ({ orderPos: 0, eventPos: 0, isSet: false })),
+  selectedMarker: 0,
+  sidModel: '6581' as SF2SIDModel,
+  sidRegion: 'PAL' as SF2Region,
 
   // ── Load ───────────────────────────────────────────────────────────────
 
@@ -350,6 +394,8 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
     channelMutes: new Array(data.musicData.trackCount).fill(false),
     markStart: null,
     markEnd: null,
+    playMarkers: Array.from({ length: SF2_MAX_PLAY_MARKERS }, () => ({ orderPos: 0, eventPos: 0, isSet: false })),
+    selectedMarker: 0,
   }),
 
   reset: () => set({
@@ -976,6 +1022,89 @@ export const useSF2Store = create<SF2StoreState>((set, get) => ({
   setHighlightInterval: (interval) => set({ highlightInterval: Math.max(1, Math.min(32, interval)) }),
   setHighlightOffset: (offset) => set({ highlightOffset: Math.max(0, Math.min(31, offset)) }),
   toggleHexUppercase: () => set((s) => ({ hexUppercase: !s.hexUppercase })),
+  toggleNotationMode: () => set((s) => ({ notationMode: s.notationMode === 'sharp' ? 'flat' : 'sharp' })),
+
+  // ── Play markers ───────────────────────────────────────────────────────
+
+  selectMarker: (slot) => set({ selectedMarker: Math.max(0, Math.min(SF2_MAX_PLAY_MARKERS - 1, slot)) }),
+
+  setPlayMarker: () => set((s) => {
+    const markers = [...s.playMarkers.map(m => ({ ...m }))];
+    markers[s.selectedMarker] = {
+      orderPos: s.orderCursor,
+      eventPos: s.cursor.row,
+      isSet: true,
+    };
+    return { playMarkers: markers };
+  }),
+
+  gotoPlayMarker: () => set((s) => {
+    const marker = s.playMarkers[s.selectedMarker];
+    if (!marker.isSet) return {};
+    return {
+      orderCursor: marker.orderPos,
+      cursor: { ...s.cursor, row: marker.eventPos },
+    };
+  }),
+
+  // ── SID hardware preferences ───────────────────────────────────────────
+
+  toggleSIDModel: () => set((s) => ({
+    sidModel: s.sidModel === '6581' ? '8580' : '6581',
+  })),
+
+  toggleRegion: () => set((s) => ({
+    sidRegion: s.sidRegion === 'PAL' ? 'NTSC' : 'PAL',
+  })),
+
+  // ── Expand sequence (doubles length, inserts rests between events) ─────
+
+  expandSequence: (seqIdx) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq || seq.length === 0) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq: SF2SeqEvent[] = [];
+    for (let i = 0; i < seq.length; i++) {
+      const ev = seq[i];
+      newSeq.push({ ...ev });
+      // Insert rest (0x7E) if original had a note, otherwise empty
+      newSeq.push({
+        note: ev.note !== 0 ? 0x7E : 0,
+        instrument: 0x80,
+        command: 0x80,
+      });
+    }
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
+
+  // ── Resize sequence (change length, truncate or pad with empty events) ─
+
+  resizeSequence: (seqIdx, newLength) => set((s) => {
+    const seqs = new Map(s.sequences);
+    const seq = seqs.get(seqIdx);
+    if (!seq || newLength < 1 || newLength > 1024) return {};
+    const undoEntry: SF2UndoEntry = { type: 'sequence', key: seqIdx, before: [...seq.map(e => ({ ...e }))] };
+    const newSeq: SF2SeqEvent[] = [];
+    for (let i = 0; i < newLength; i++) {
+      if (i < seq.length) {
+        newSeq.push({ ...seq[i] });
+      } else {
+        newSeq.push({ ...EMPTY_EVENT });
+      }
+    }
+    seqs.set(seqIdx, newSeq);
+    return {
+      sequences: seqs,
+      undoStack: [...s.undoStack.slice(-(MAX_UNDO - 1)), undoEntry],
+      redoStack: [],
+    };
+  }),
 
   exportSF2File: () => {
     const s = get();

@@ -6,11 +6,12 @@
  */
 
 import type { ColumnDef, FormatCell, FormatChannel } from '@/components/shared/format-editor-types';
-import type { SF2SeqEvent, SF2OrderList } from '@/stores/useSF2Store';
+import type { SF2SeqEvent, SF2OrderList, SF2NotationMode } from '@/stores/useSF2Store';
 
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+const NOTE_NAMES_SHARP = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+const NOTE_NAMES_FLAT  = ['C-', 'Db', 'D-', 'Eb', 'E-', 'F-', 'Gb', 'G-', 'Ab', 'A-', 'Bb', 'B-'];
 
-export function sf2NoteToString(note: number, transpose = 0): string {
+export function sf2NoteToString(note: number, transpose = 0, notation: SF2NotationMode = 'sharp'): string {
   if (note === 0) return '---';      // rest (matches original)
   if (note === 0x7E) return '+++';   // tie/hold (matches original)
   if (note >= 0x70) return '---';    // reserved
@@ -21,7 +22,8 @@ export function sf2NoteToString(note: number, transpose = 0): string {
 
   const n = transposed - 1;
   const octave = Math.floor(n / 12);
-  const name = NOTE_NAMES[n % 12];
+  const names = notation === 'flat' ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP;
+  const name = names[n % 12];
   return `${name}${octave}`;
 }
 
@@ -86,6 +88,7 @@ export function sf2ToFormatChannels(
   orderLists: SF2OrderList[],
   sequences: Map<number, SF2SeqEvent[]>,
   currentOrderPos: number,
+  notation: SF2NotationMode = 'sharp',
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
   let maxRows = 0;
@@ -130,7 +133,7 @@ export function sf2ToFormatChannels(
       SF2_COLUMNS[1],
       {
         ...SF2_COLUMNS[2],
-        formatter: (val: number) => sf2NoteToString(val, transpose),
+        formatter: (val: number) => sf2NoteToString(val, transpose, notation),
       },
     ];
 

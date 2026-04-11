@@ -30,12 +30,14 @@ export function useSF2FormatData(): SF2FormatData {
 
   const cursorRow = useSF2Store((s) => s.cursor.row);
 
+  const notationMode = useSF2Store((s) => s.notationMode);
+
   const currentOrderPos = playing ? playbackPos.songPos : orderCursor;
   const displayRow = playing ? playbackRow : cursorRow;
 
   const channels = useMemo(
-    () => sf2ToFormatChannels(trackCount, orderLists, sequences, currentOrderPos),
-    [trackCount, orderLists, sequences, currentOrderPos],
+    () => sf2ToFormatChannels(trackCount, orderLists, sequences, currentOrderPos, notationMode),
+    [trackCount, orderLists, sequences, currentOrderPos, notationMode],
   );
 
   const handleCellChange = useCallback(
