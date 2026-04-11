@@ -23,7 +23,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { EnvelopeVisualization, SampleBrowserPane } from '@components/instruments/shared';
 import { FuturePlayerEngine } from '@/engine/futureplayer/FuturePlayerEngine';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { FP_DETAIL_OFFSET, FP_NEGATE_OFFSET } from '@/lib/futureplayer/detailOffsets';
@@ -389,38 +389,34 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
 
       {/* Sample browser pane (toggle via SMP button) */}
       {showSamplePane && (
-        <div className="w-[220px] flex-shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto">
-          <div className="px-2 py-1 font-bold text-xs text-accent-primary border-b border-dark-border bg-dark-bgSecondary sticky top-0">
-            SAMPLES ({sampleRows.length})
-          </div>
-          {sampleRows.length === 0 && (
-            <div className="p-2 text-[10px] text-text-muted italic">
-              No Future Player instruments loaded.
-            </div>
-          )}
-          {sampleRows.map((s) => (
-            <div
-              key={s.id}
-              className={`px-2 py-1.5 border-b border-dark-border text-[10px] ${
-                s.isCurrent ? 'bg-accent-primary/10' : ''
-              }`}
-              title={`Instrument #${s.id}: ${s.instrName}`}
-            >
-              <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
-                {String(s.id).padStart(2, '0')}. {s.instrName}
-              </div>
-              <div className="text-text-muted mt-0.5">
-                {s.size > 0 ? `${s.size} bytes` : '—'}
-              </div>
-              <div className="mt-0.5 text-[9px]">
-                <span className={s.isWavetable ? 'text-accent-highlight' : 'text-accent-secondary'}>
-                  {s.isWavetable ? 'WAVETABLE' : 'PCM'}
-                </span>
-                {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
-              </div>
-            </div>
-          ))}
-        </div>
+        <SampleBrowserPane
+          entries={sampleRows.map((s) => ({
+            id: s.id,
+            name: `${String(s.id).padStart(2, '0')}. ${s.instrName}`,
+            sizeBytes: s.size,
+            isCurrent: s.isCurrent,
+          }))}
+          emptyMessage="No Future Player instruments loaded."
+          renderEntry={(entry) => {
+            const s = sampleRows.find((r) => r.id === entry.id)!;
+            return (
+              <>
+                <div className={`font-mono truncate ${s.isCurrent ? 'text-accent-primary' : 'text-text-primary'}`}>
+                  {String(s.id).padStart(2, '0')}. {s.instrName}
+                </div>
+                <div className="text-text-muted mt-0.5">
+                  {s.size > 0 ? `${s.size} bytes` : '\u2014'}
+                </div>
+                <div className="mt-0.5 text-[9px]">
+                  <span className={s.isWavetable ? 'text-accent-highlight' : 'text-accent-secondary'}>
+                    {s.isWavetable ? 'WAVETABLE' : 'PCM'}
+                  </span>
+                  {s.isCurrent && <span className="ml-1 text-accent-primary">(this instrument)</span>}
+                </div>
+              </>
+            );
+          }}
+        />
       )}
     </div>
   );
