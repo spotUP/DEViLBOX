@@ -10,8 +10,6 @@
  *   worklet output[0] (main mix, ch1 muted) → gainNode → synthBus → master
  *   worklet output[1] (ch1 only) → BitCrusher → masterEffectsInput
  *   worklet output[2] (ch3 only) → Reverb → masterEffectsInput
- *
- * This replaces the old dual-worklet approach that had sync issues.
  */
 
 import * as Tone from 'tone';
@@ -26,7 +24,7 @@ interface IsolationSlot {
   channelMask: number;
   effectConfigs: EffectConfig[];
   effectNodes: Tone.ToneAudioNode[];
-  /** Native GainNode connected to the worklet's isolation output for this slot */
+  /** Native GainNode connected between worklet output and effect chain */
   outputGain: GainNode;
 }
 
@@ -40,11 +38,7 @@ export class ChannelRoutedEffectsManager {
 
   /**
    * Rebuild per-channel effect routing based on mixer store state.
-   * Groups channels that have insert effects, assigns them to isolation slots,
-   * creates effects, and wires everything up.
-   *
-   * @param channelEffects Map of channelIndex → EffectConfig[] (from mixer store)
-   * @param engine The LibopenmptEngine instance (for slot management and worklet node access)
+   * Connects worklet outputs[1..4] → per-channel effect chains → masterEffectsInput.
    */
   async rebuild(
     channelEffects: Map<number, EffectConfig[]>,
@@ -58,11 +52,12 @@ export class ChannelRoutedEffectsManager {
     const engine = LibopenmptEngine.getInstance();
     if (!engine.isAvailable()) { console.warn('[ChannelRoutedEffects] Engine not available'); return; }
 
+    const workletNode = engine.getWorkletNode();
+    if (!workletNode) { console.warn('[ChannelRoutedEffects] No worklet node'); return; }
+
     // Tear down existing slots
     this.teardown(engine);
 
-    // Group channels that have enabled effects into isolation slots (max 4)
-    // Each slot gets one channel (simplest mapping; could group channels sharing effects later)
     let slotIdx = 0;
     for (const [channelIndex, effects] of channelEffects) {
       if (slotIdx >= 4) {
@@ -84,7 +79,6 @@ export class ChannelRoutedEffectsManager {
         try {
           const node = await createEffect(config) as Tone.ToneAudioNode;
           if (node) {
-            // Set wet level
             if ('wet' in node && (node as any).wet instanceof Tone.Signal) {
               ((node as any).wet as Tone.Signal).value = config.wet / 100;
             }
@@ -100,45 +94,31 @@ export class ChannelRoutedEffectsManager {
         continue;
       }
 
-      // Get the IsolationPlayerProcessor node for this slot (created by addIsolation)
-      const playerNode = engine.getIsolationPlayerNode(slotIdx);
-      if (!playerNode) {
-        console.warn(`[ChannelRoutedEffects] No isolation player node for slot ${slotIdx}`);
-        engine.removeIsolation(slotIdx);
-        for (const n of effectNodes) { try { n.dispose(); } catch { /* */ } }
-        continue;
-      }
-
       // Create output gain for this slot
       const audioContext = engine.getAudioContext();
       if (!audioContext) { engine.removeIsolation(slotIdx); continue; }
       const outputGain = audioContext.createGain();
       outputGain.gain.value = 1;
 
-      // Connect: IsolationPlayerNode → outputGain → effect chain → masterEffectsInput
+      // Connect worklet output[slotIdx+1] → outputGain → effect chain → masterEffectsInput
+      const outputIndex = slotIdx + 1;
       try {
-        playerNode.connect(outputGain);
-        console.log(`[ChannelRoutedEffects] Connected isolation player[${slotIdx}] → outputGain`);
+        workletNode.connect(outputGain, outputIndex);
+        console.log(`[ChannelRoutedEffects] Connected worklet output[${outputIndex}] → outputGain → effects`);
       } catch (e) {
-        console.warn(`[ChannelRoutedEffects] Failed to connect isolation player ${slotIdx}:`, e);
+        console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${outputIndex}:`, e);
         engine.removeIsolation(slotIdx);
         for (const n of effectNodes) { try { n.dispose(); } catch { /* */ } }
         continue;
       }
 
       // Chain: outputGain → effect1 → effect2 → ... → masterEffectsInput
-      if (effectNodes.length === 1) {
-        const nativeIn = getNativeAudioNode(effectNodes[0]);
-        if (nativeIn) outputGain.connect(nativeIn);
-        effectNodes[0].connect(this.masterEffectsInput);
-      } else {
-        const firstNative = getNativeAudioNode(effectNodes[0]);
-        if (firstNative) outputGain.connect(firstNative);
-        for (let i = 0; i < effectNodes.length - 1; i++) {
-          effectNodes[i].connect(effectNodes[i + 1]);
-        }
-        effectNodes[effectNodes.length - 1].connect(this.masterEffectsInput);
+      const firstNative = getNativeAudioNode(effectNodes[0]);
+      if (firstNative) outputGain.connect(firstNative);
+      for (let i = 0; i < effectNodes.length - 1; i++) {
+        effectNodes[i].connect(effectNodes[i + 1]);
       }
+      effectNodes[effectNodes.length - 1].connect(this.masterEffectsInput);
 
       this.slots[slotIdx] = {
         slotIndex: slotIdx,
@@ -149,7 +129,7 @@ export class ChannelRoutedEffectsManager {
         outputGain,
       };
 
-      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via IsolationPlayerNode`);
+      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via worklet output[${outputIndex}]`);
       slotIdx++;
     }
 

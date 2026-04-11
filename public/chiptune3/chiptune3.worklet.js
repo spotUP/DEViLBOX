@@ -66,11 +66,6 @@ class MPT extends AudioWorkletProcessor {
 		// The effective main mask = userMuteMask & ~isolatedBits.
 		this.userMuteMask = 0xFFFFFFFF  // all channels active (no user mute)
 		this.isolatedBits = 0            // no channels isolated
-		// MessagePorts for sending isolation audio to IsolationPlayerProcessors
-		this.isolationPorts = new Array(MAX_ISOLATION_SLOTS).fill(null)
-		// Pre-allocated transfer buffers for isolation audio (avoid GC in process())
-		this.isoTransferLeft = new Array(MAX_ISOLATION_SLOTS).fill(null)
-		this.isoTransferRight = new Array(MAX_ISOLATION_SLOTS).fill(null)
 		this._diagCounter = 0
 	}
 
@@ -159,13 +154,13 @@ class MPT extends AudioWorkletProcessor {
 
 		this.port.postMessage( msg )
 
-		// Render isolation slots and send audio via MessagePorts to IsolationPlayerProcessors
+		// Render isolation slots directly to worklet outputs[1..4]
 		for (let s = 0; s < MAX_ISOLATION_SLOTS; s++) {
 			const slot = this.isolationSlots[s]
-			const port = this.isolationPorts[s]
-			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr || !port) {
-				continue
-			}
+			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr) continue
+			const outSlot = outputList[s + 1]
+			if (!outSlot || !outSlot[0] || !outSlot[1]) continue
+
 			// Re-apply mute + volume EVERY render to guard against loop/seek resets
 			const effectiveSlotMask = slot.channelMask & this.userMuteMask
 			this.applyChannelIsolation_(slot.extPtr, slot.muteFunc, slot.volumeFunc, effectiveSlotMask)
@@ -175,14 +170,8 @@ class MPT extends AudioWorkletProcessor {
 				slot.modulePtr, sampleRate, bufLen, slot.leftPtr, slot.rightPtr
 			)
 			if (frames > 0) {
-				// Allocate transfer buffers (reuse if same size)
-				if (!this.isoTransferLeft[s] || this.isoTransferLeft[s].length !== frames) {
-					this.isoTransferLeft[s] = new Float32Array(frames)
-					this.isoTransferRight[s] = new Float32Array(frames)
-				}
-				this.isoTransferLeft[s].set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
-				this.isoTransferRight[s].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
-				port.postMessage({ left: this.isoTransferLeft[s], right: this.isoTransferRight[s] })
+				outSlot[0].set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
+				outSlot[1].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
 			}
 		}
 
@@ -190,7 +179,6 @@ class MPT extends AudioWorkletProcessor {
 		if (this.isolatedBits && ++this._diagCounter >= 750) {
 			this._diagCounter = 0
 			const numSlots = this.isolationSlots.filter(Boolean).length
-			const numPorts = this.isolationPorts.filter(Boolean).length
 			const effMainMask = this.userMuteMask & ~this.isolatedBits
 			// Compute RMS of main output to verify it's not silent
 			let mainRms = 0
@@ -203,7 +191,6 @@ class MPT extends AudioWorkletProcessor {
 				effectiveMainMask: effMainMask,
 				channels: this.channels,
 				activeSlots: numSlots,
-				activePorts: numPorts,
 				slotMasks: this.isolationSlots.map(s => s ? s.channelMask : null),
 				mainRms: mainRms.toFixed(6),
 			})
@@ -340,18 +327,6 @@ class MPT extends AudioWorkletProcessor {
 						hasExtPtr: !!s.extPtr,
 					} : null)
 				})
-				break
-			case 'setIsolationPort':
-				// Receive a MessagePort for sending isolation audio to an IsolationPlayerProcessor.
-				// v = { slotIndex: number, port: MessagePort }
-				if (v.slotIndex >= 0 && v.slotIndex < MAX_ISOLATION_SLOTS) {
-					this.isolationPorts[v.slotIndex] = v.port
-				}
-				break
-			case 'removeIsolationPort':
-				if (v.slotIndex >= 0 && v.slotIndex < MAX_ISOLATION_SLOTS) {
-					this.isolationPorts[v.slotIndex] = null
-				}
 				break
 			case 'decodeAll':
 				this.decodeAll(v)
@@ -686,7 +661,10 @@ class MPT extends AudioWorkletProcessor {
 	 */
 	addIsolationSlot_(slotIndex, channelMask) {
 		if (slotIndex < 0 || slotIndex >= MAX_ISOLATION_SLOTS) return
-		if (!this.moduleBuffer || !libopenmpt._openmpt_module_ext_create_from_memory) return
+		if (!this.moduleBuffer || !libopenmpt._openmpt_module_ext_create_from_memory) {
+			this.port.postMessage({ cmd: 'isolationError', slotIndex, error: 'no moduleBuffer or ext API: buf=' + !!this.moduleBuffer + ' api=' + !!libopenmpt._openmpt_module_ext_create_from_memory })
+			return
+		}
 		// Main module must have working mute, otherwise isolation can't exclude channels
 		if (!this.muteFunc || !libopenmpt.wasmTable) {
 			this.port.postMessage({ cmd: 'isolationError', slotIndex, error: 'no mute support' })
