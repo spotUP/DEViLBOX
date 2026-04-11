@@ -96,6 +96,22 @@ interface SF2DriverCommon {
   initAddress: number;
   stopAddress: number;
   updateAddress: number;
+  sidChannelOffsetAddress: number;
+  driverStateAddress: number;
+  tickCounterAddress: number;
+  orderListIndexAddress: number;
+  sequenceIndexAddress: number;
+  sequenceInUseAddress: number;
+  currentSequenceAddress: number;
+  currentTransposeAddress: number;
+  currentSeqEventDurationAddress: number;
+  nextInstrumentAddress: number;
+  nextCommandAddress: number;
+  nextNoteAddress: number;
+  nextNoteIsTiedAddress: number;
+  tempoCounterAddress: number;
+  triggerSyncAddress: number;
+  noteEventTriggerSyncValue: number;
 }
 
 interface SF2MusicData {
@@ -209,7 +225,33 @@ export async function parseSIDFactory2File(
         const initAddress = readWord(raw, p); p += 2;
         const stopAddress = readWord(raw, p); p += 2;
         const updateAddress = readWord(raw, p); p += 2;
-        driverCommon = { initAddress, stopAddress, updateAddress };
+        const sidChannelOffsetAddress = readWord(raw, p); p += 2;
+        const driverStateAddress = readWord(raw, p); p += 2;
+        const tickCounterAddress = readWord(raw, p); p += 2;
+        const orderListIndexAddress = readWord(raw, p); p += 2;
+        const sequenceIndexAddress = readWord(raw, p); p += 2;
+        const sequenceInUseAddress = readWord(raw, p); p += 2;
+        const currentSequenceAddress = readWord(raw, p); p += 2;
+        const currentTransposeAddress = readWord(raw, p); p += 2;
+        const currentSeqEventDurationAddress = readWord(raw, p); p += 2;
+        const nextInstrumentAddress = readWord(raw, p); p += 2;
+        const nextCommandAddress = readWord(raw, p); p += 2;
+        const nextNoteAddress = readWord(raw, p); p += 2;
+        const nextNoteIsTiedAddress = readWord(raw, p); p += 2;
+        const tempoCounterAddress = readWord(raw, p); p += 2;
+        const triggerSyncAddress = readWord(raw, p); p += 2;
+        const noteEventTriggerSyncValue = raw[p++];
+        p += 1; // reserved byte
+        p += 2; // reserved word
+        driverCommon = {
+          initAddress, stopAddress, updateAddress,
+          sidChannelOffsetAddress, driverStateAddress,
+          tickCounterAddress, orderListIndexAddress, sequenceIndexAddress,
+          sequenceInUseAddress, currentSequenceAddress, currentTransposeAddress,
+          currentSeqEventDurationAddress, nextInstrumentAddress, nextCommandAddress,
+          nextNoteAddress, nextNoteIsTiedAddress, tempoCounterAddress,
+          triggerSyncAddress, noteEventTriggerSyncValue,
+        };
         break;
       }
 

@@ -642,6 +642,10 @@ export class InstrumentFactory {
         break;
       }
 
+      case 'SF2Synth':
+        // SF2 audio handled by SF2Engine (C64 memory-mapped SID) — no per-instrument synth
+        return null;
+
       case 'KlysSynth':
         instrument = new KlysSynth();
         break;
