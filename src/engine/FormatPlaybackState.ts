@@ -67,12 +67,10 @@ export function setFormatPlaybackRow(row: number): void {
     // First row — start the clock
     clockAnchorTime = now;
     clockAnchorRow = row;
-    console.log(`[FPS] Clock started: anchor row=${row}`);
   } else {
     const { row: clockRow } = getClockPosition(now);
     // Re-anchor on pattern boundary (row wrapped backwards) or major drift (>1 row)
     if (row < lastRow || Math.abs(row - clockRow) > 1) {
-      console.log(`[FPS] Re-anchor: actual=${row} clock=${clockRow} lastRow=${lastRow} drift=${row - clockRow}`);
       clockAnchorTime = now;
       clockAnchorRow = row;
     }
