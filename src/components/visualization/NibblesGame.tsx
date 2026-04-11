@@ -1008,11 +1008,11 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
         renderFrameId = requestAnimationFrame(render);
         return;
       }
-      const cellSize = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
-      const playWidth = WIDTH * cellSize;
-      const playHeight = HEIGHT * cellSize;
-      const offsetX = (canvas.width - playWidth) / 2;
-      const offsetY = (canvas.height - playHeight) / 2;
+      // Cell size derived from width — the container's aspect-ratio: 51/23
+      // ensures height matches exactly, so no centering offsets needed.
+      const cellSize = canvas.width / WIDTH;
+      const offsetX = 0;
+      const offsetY = 0;
 
       // Background tiles disabled per user request
       // if (musicReactive) {
@@ -1022,23 +1022,16 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       //   ctx.restore();
       // }
 
-      // Draw playfield border
+      // Draw playfield border only in surround mode (walls visible)
       if (surround) {
         ctx.strokeStyle = PALETTE[11]; // Cyan
         ctx.lineWidth = 2;
-
-        // Add glow effect on beats
         if (gridGlowIntensity > GRID_GLOW_THRESHOLD) {
           ctx.shadowColor = PALETTE[11];
           ctx.shadowBlur = GRID_GLOW_BLUR_MULTIPLIER * gridGlowIntensity;
         }
-
-        ctx.strokeRect(offsetX, offsetY, playWidth, playHeight);
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
         ctx.shadowBlur = 0;
-      } else {
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)'; // cyan-500/30
-        ctx.lineWidth = 2;
-        ctx.strokeRect(offsetX, offsetY, playWidth, playHeight);
       }
 
       for (let y = 0; y < HEIGHT; y++) {
