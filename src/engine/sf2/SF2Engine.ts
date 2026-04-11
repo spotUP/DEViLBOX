@@ -655,26 +655,18 @@ export class SF2Engine {
     };
     this.captureRAFId = requestAnimationFrame(captureTick);
 
-    // Position detection — after-process callback approach.
+    // Position polling — simple setInterval reading sequenceIndex from C64 RAM.
     //
-    // The original SF2 editor fires OnDriverPostUpdate AFTER EACH C64 FRAME
-    // (50Hz), reading tempoCounter==0 to advance position. We can't do that
-    // because the ScriptProcessorNode runs multiple C64 frames per buffer fill
-    // and we only get a callback after the entire buffer.
-    //
-    // Instead, we read sequenceIndex and orderListIndex from the after-process
-    // callback (fires at ~43Hz with 1024-sample buffer). This gives consistent
-    // timing locked to the audio clock — no setInterval jitter.
-    //
-    // The explicit rowDuration from currentSeqEventDuration tells the canvas
-    // exactly how long each row lasts, so FormatPlaybackState can provide
-    // smooth sub-row interpolation regardless of our check frequency.
+    // The original SF2 editor checks tempoCounter==0 after each C64 frame (50Hz).
+    // We can't hook per-frame, so we poll sequenceIndex which reflects the result.
+    // The explicit rowDuration from currentSeqEventDuration tells the display
+    // layer exactly how long each row lasts for consistent visual timing.
     let lastSeqRow = -1;
     let lastOrderIdx = -1;
     let lastDuration = -1;
     const PAL_TICK_MS = 20; // PAL frame: 50Hz = 20ms per tick
 
-    const checkPosition = () => {
+    this.positionPollId = window.setInterval(() => {
       if (!this.capturing || !setRow || !this.driverCommonData) return;
 
       const dc = this.driverCommonData;
@@ -686,8 +678,6 @@ export class SF2Engine {
         setRowDuration(eventDuration * PAL_TICK_MS);
       }
 
-      // Read actual driver position — this is the ground truth after all
-      // C64 frames in this buffer have executed
       const seqRow = this.readRAM(dc.sequenceIndexAddress) ?? 0;
       const orderIdx = this.readRAM(dc.orderListIndexAddress) ?? 0;
       const rowChanged = seqRow !== lastSeqRow;
@@ -702,12 +692,7 @@ export class SF2Engine {
         sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
       }
       lastOrderIdx = orderIdx;
-    };
-
-    // Hook into the audio processing callback — fires at audio buffer rate
-    // (~43Hz with 1024 samples @ 44.1kHz). This is locked to the audio clock
-    // so timing is consistent, unlike setInterval which drifts with GC pauses.
-    this.sidEngine.setAfterProcessCallback(checkPosition);
+    }, 8); // ~125Hz — fast enough to catch every row change, low enough to not waste CPU
   }
 
   /** Stop capturing */
@@ -721,7 +706,6 @@ export class SF2Engine {
       clearInterval(this.positionPollId);
       this.positionPollId = 0;
     }
-    this.sidEngine.removeAfterProcessCallback();
     // Clear playback state
     import('@/engine/FormatPlaybackState').then(mod => {
       mod.setFormatPlaybackPlaying(false);

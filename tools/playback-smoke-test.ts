@@ -235,20 +235,28 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     // bartmanintro symptom: song loads with patterns and channels declared,
     // but every cell is empty so playback is silent. Fail-fast on this.
     // Skipped for engine-driven formats (SID, etc.) that have no pattern data.
+    //
+    // Poll with retries: load_file returns from the bridge before the async
+    // parser finishes populating the TrackerStore, so pattern data may not
+    // be ready immediately. Wait up to 3s for notes to appear.
     if (!test.engineDriven) {
       let noteCells = 0;
-      try {
-        const stats = await client.call<PatternStatsResp>('get_pattern_stats', { patternIndex: 0 });
-        noteCells = stats.noteCells ?? 0;
-      } catch {
-        // get_pattern_stats unavailable — fall through; audio level check is
-        // the last line of defence.
+      const patternPollDeadline = Date.now() + 3000;
+      while (Date.now() < patternPollDeadline) {
+        try {
+          const stats = await client.call<PatternStatsResp>('get_pattern_stats', { patternIndex: 0 });
+          noteCells = stats.noteCells ?? 0;
+          if (noteCells > 0) break;
+        } catch {
+          // get_pattern_stats unavailable — wait and retry
+        }
+        await sleep(200);
       }
       if (noteCells === 0) {
         await client.call('stop').catch(() => {});
         return {
           name: test.name, family: test.family, status: 'fail',
-          reason: 'pattern 0 has no note cells (load decoded but pattern data is empty)',
+          reason: 'pattern 0 has no note cells after 3s (load decoded but pattern data is empty)',
           durationMs: Date.now() - start,
         };
       }
