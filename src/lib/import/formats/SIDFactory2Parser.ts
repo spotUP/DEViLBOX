@@ -598,6 +598,17 @@ export async function parseSIDFactory2File(
     }
   }
 
+  // Tag all patterns with sourceFormat so usePatternPlayback routes to C64SID engine
+  const meta = {
+    sourceFormat: 'SID' as const,
+    sourceFile: filename,
+    importedAt: new Date().toISOString(),
+    originalChannelCount: numChannels,
+    originalPatternCount: patterns.length,
+    originalInstrumentCount: instruments.length,
+  };
+  for (const p of patterns) p.importMetadata = meta;
+
   return {
     name: title,
     format: 'SID' as TrackerFormat,
