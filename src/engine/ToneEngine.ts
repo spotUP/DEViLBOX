@@ -243,6 +243,9 @@ export class ToneEngine {
     meter: Tone.Meter;
   }> = new Map();
 
+  // Channel-routed master effects (pre-mix sub-mix routing)
+  private _channelRoutedEffects: import('./tone/ChannelRoutedEffects').ChannelRoutedEffectsManager | null = null;
+
   // Channel mute/solo state for quick lookup during playback
   private channelMuteStates: Map<number, boolean> = new Map(); // true = should be muted
 
@@ -4851,7 +4854,30 @@ export class ToneEngine {
   }
 
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
-    return _rebuildMasterEffects(this._masterFxCtx, effects);
+    // Split effects into channel-routed (pre-mix) vs global (post-mix)
+    const channelRouted = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
+    const global = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
+
+    // Tear down and rebuild channel-routed effects (pre-mix sub-mixes)
+    if (!this._channelRoutedEffects) {
+      const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
+      this._channelRoutedEffects = new ChannelRoutedEffectsManager(
+        this.masterInput,
+        (idx) => this.channelOutputs.get(idx) ?? null,
+      );
+    }
+    await this._channelRoutedEffects.rebuild(channelRouted);
+
+    // Build global master chain (post-mix) with remaining effects
+    // NOTE: _rebuildMasterEffects clears masterEffectConfigs, so register
+    // channel-routed configs AFTER the global rebuild.
+    await _rebuildMasterEffects(this._masterFxCtx, global);
+
+    // Register channel-routed effect nodes in masterEffectConfigs for parameter updates
+    const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
+    for (const [id, entry] of routedConfigs) {
+      this.masterEffectConfigs.set(id, entry);
+    }
   }
 
   public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {

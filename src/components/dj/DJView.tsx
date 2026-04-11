@@ -187,7 +187,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   // FX chain (inserted between masterGain and limiter).
   const masterEffects = useAudioStore((s) => s.masterEffects);
   const masterEffectsKey = useMemo(
-    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}`).join('|'),
+    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}:${(e.selectedChannels ?? []).join(',')}`).join('|'),
     [masterEffects]
   );
   useEffect(() => {
