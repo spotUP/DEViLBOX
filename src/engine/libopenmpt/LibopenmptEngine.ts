@@ -59,8 +59,6 @@ export class LibopenmptEngine {
   /** Per-channel effect isolation: tracks which slots are active and their channel masks. */
   static readonly MAX_ISOLATION_SLOTS = 4;
   private _isolationSlotMasks: (number | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
-  /** IsolationPlayerProcessor AudioWorkletNodes — one per active slot */
-  private _isolationPlayerNodes: (AudioWorkletNode | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
 
   /** Subscribe to transport events (seek, pause, unpause, stop) for syncing isolation nodes. */
   set onTransportEvent(cb: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null) {
@@ -115,7 +113,6 @@ export class LibopenmptEngine {
     const cacheBuster = import.meta.env.DEV ? `?v=${Date.now()}` : '';
     try {
       await this.context.audioWorklet.addModule(`${baseUrl}chiptune3/chiptune3.worklet.js${cacheBuster}`);
-      await this.context.audioWorklet.addModule(`${baseUrl}chiptune3/isolation-player.worklet.js${cacheBuster}`);
     } catch (err) {
       console.warn('[LibopenmptEngine] Failed to load worklet:', err);
       this._ready = true;
@@ -123,11 +120,11 @@ export class LibopenmptEngine {
       return;
     }
 
-    // Single output — isolation audio is sent via MessagePort to separate IsolationPlayerProcessors
+    // 5 stereo outputs: [0]=main mix, [1..4]=isolation slots for per-channel effects
     this.workletNode = new AudioWorkletNode(this.context, 'libopenmpt-processor', {
       numberOfInputs: 0,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
+      numberOfOutputs: 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS,
+      outputChannelCount: [2, 2, 2, 2, 2],
     });
 
     this.workletNode.port.onmessage = this.handleMessage.bind(this);
@@ -230,7 +227,6 @@ export class LibopenmptEngine {
           effectiveMainMask: '0x' + (msg.data.effectiveMainMask ?? 0).toString(16),
           channels: msg.data.channels,
           activeSlots: msg.data.activeSlots,
-          activePorts: msg.data.activePorts,
           slotMasks: msg.data.slotMasks,
         });
         break;
@@ -515,72 +511,22 @@ export class LibopenmptEngine {
 
   /**
    * Create (or update) an isolation slot that renders ONLY the specified channels.
-   * Creates an IsolationPlayerProcessor worklet node and a MessageChannel to receive
-   * isolation audio from the main worklet. The main module's mute mask is automatically
-   * updated to exclude isolated channels.
+   * The worklet creates a secondary openmpt module instance and renders its audio
+   * to output[slotIndex+1]. The main module's mute mask is automatically updated
+   * to exclude isolated channels.
    * @param slotIndex 0..MAX_ISOLATION_SLOTS-1
    * @param channelMask Bitmask where bit N=1 means channel N is audible in this slot
    */
   addIsolation(slotIndex: number, channelMask: number): void {
     if (!this.workletNode || !this.context || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
 
-    // Clean up existing player node for this slot
-    this._destroyIsolationPlayerNode(slotIndex);
-
     this._isolationSlotMasks[slotIndex] = channelMask;
 
-    // Create IsolationPlayerProcessor node (single stereo output)
-    const playerNode = new AudioWorkletNode(this.context, 'isolation-player', {
-      numberOfInputs: 0,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
-    });
-    this._isolationPlayerNodes[slotIndex] = playerNode;
-
-    // Create MessageChannel: port1 → main worklet, port2 → isolation player
-    const channel = new MessageChannel();
-    try {
-      this.workletNode.port.postMessage(
-        { cmd: 'setIsolationPort', val: { slotIndex, port: channel.port1 } },
-        [channel.port1]
-      );
-      playerNode.port.postMessage(
-        { cmd: 'setSourcePort', port: channel.port2 },
-        [channel.port2]
-      );
-    } catch (e) {
-      console.error(`[LibopenmptEngine] Failed to transfer MessagePort for slot ${slotIndex}:`, e);
-      this._destroyIsolationPlayerNode(slotIndex);
-      this._isolationSlotMasks[slotIndex] = null;
-      return;
-    }
-
-    // Tell main worklet to create the isolation module
+    // Tell worklet to create the isolation module for this slot
     this.workletNode.port.postMessage({ cmd: 'addIsolation', val: { slotIndex, channelMask } });
     this._updateMainMuteMask();
 
-    console.log(`[LibopenmptEngine] addIsolation: slot=${slotIndex}, mask=0x${channelMask.toString(16)}, playerNode created`);
-  }
-
-  /**
-   * Get the IsolationPlayerProcessor AudioWorkletNode for a slot.
-   * This is what ChannelRoutedEffects connects to the effect chain.
-   */
-  getIsolationPlayerNode(slotIndex: number): AudioWorkletNode | null {
-    if (slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return null;
-    return this._isolationPlayerNodes[slotIndex];
-  }
-
-  private _destroyIsolationPlayerNode(slotIndex: number): void {
-    const node = this._isolationPlayerNodes[slotIndex];
-    if (node) {
-      try { node.disconnect(); } catch { /* */ }
-      this._isolationPlayerNodes[slotIndex] = null;
-    }
-    // Tell main worklet to remove the port
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({ cmd: 'removeIsolationPort', val: { slotIndex } });
-    }
+    console.log(`[LibopenmptEngine] addIsolation: slot=${slotIndex}, mask=0x${channelMask.toString(16)}, output=${slotIndex + 1}`);
   }
 
   /**
@@ -589,7 +535,6 @@ export class LibopenmptEngine {
   removeIsolation(slotIndex: number): void {
     if (!this.workletNode || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
     this._isolationSlotMasks[slotIndex] = null;
-    this._destroyIsolationPlayerNode(slotIndex);
     this.workletNode.port.postMessage({ cmd: 'removeIsolation', val: { slotIndex } });
     this._updateMainMuteMask();
   }
@@ -605,7 +550,8 @@ export class LibopenmptEngine {
   }
 
   /**
-   * Get the AudioWorkletNode (main worklet — NOT for connecting isolation outputs).
+   * Get the AudioWorkletNode (main worklet).
+   * Output 0 = main mix. Outputs 1..4 = isolation slots for per-channel effects.
    */
   getWorkletNode(): AudioWorkletNode | null {
     return this.workletNode;
