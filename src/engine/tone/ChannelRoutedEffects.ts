@@ -102,8 +102,10 @@ export class ChannelRoutedEffectsManager {
         const output = this.getChannelOutput(ch);
         if (!output) continue;
         try {
-          output.channel.connect(this.masterInput);
+          // Disconnect from sub-mix first, then restore direct path
+          // (brief dropout is preferable to signal doubling)
           output.channel.disconnect(effect.subMix);
+          output.channel.connect(this.masterInput);
         } catch {
           // Connection may have already been changed
         }

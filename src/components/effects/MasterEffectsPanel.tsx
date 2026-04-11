@@ -48,7 +48,7 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
   });
   const [showChannels, setShowChannels] = useState(false);
   const selected = effect.selectedChannels;
-  const hasSelection = selected && selected.length > 0;
+  const hasSelection = Array.isArray(selected);
 
   const toggleChannel = (ch: number) => {
     const current = new Set(selected ?? []);
@@ -131,9 +131,11 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
         >
           <ChevronDown size={10} className={`transition-transform ${showChannels ? '' : '-rotate-90'}`} />
           <span className="font-medium">
-            {hasSelection
-              ? `CH: ${selected!.map(c => c + 1).join(', ')}`
-              : 'All Channels'}
+            {hasSelection && selected!.length === 0
+              ? 'No Channels'
+              : hasSelection
+                ? `CH: ${selected!.map(c => c + 1).join(', ')}`
+                : 'All Channels'}
           </span>
         </button>
         {showChannels && (
