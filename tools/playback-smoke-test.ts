@@ -70,23 +70,50 @@ async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
   for (const dir of dirs) {
     if (dir === 'Reference Music' || dir === 'Packed_Etc') continue;
     const fullDir = join(baseDir, dir);
-    let files: string[];
+
+    // Find the first actual music file — may be directly in the format dir
+    // or nested one level deeper in an artist subdirectory.
+    let testFile: string | null = null;
+    let testName: string | null = null;
+
+    // Try top-level files first
     try {
-      files = readdirSync(fullDir).filter(f => {
-        try { return statSync(join(fullDir, f)).isFile() && !f.startsWith('.'); } catch { return false; }
+      const topFiles = readdirSync(fullDir).filter(f => {
+        try { return statSync(join(fullDir, f)).isFile() && !f.startsWith('.') && !f.endsWith('.txt') && !f.endsWith('.md') && !f.endsWith('.nfo'); } catch { return false; }
       }).sort();
-    } catch { continue; }
+      if (topFiles.length > 0) {
+        testFile = join(fullDir, topFiles[0]);
+        testName = topFiles[0];
+      }
+    } catch { /* no top-level files */ }
 
-    if (files.length === 0) continue;
+    // If no top-level files, look one level deeper (artist subdirs)
+    if (!testFile) {
+      try {
+        const subDirs = readdirSync(fullDir).filter(d => {
+          try { return statSync(join(fullDir, d)).isDirectory(); } catch { return false; }
+        }).sort();
+        for (const sub of subDirs) {
+          const subFiles = readdirSync(join(fullDir, sub)).filter(f => {
+            try { return statSync(join(fullDir, sub, f)).isFile() && !f.startsWith('.') && !f.endsWith('.txt') && !f.endsWith('.md') && !f.endsWith('.nfo'); } catch { return false; }
+          }).sort();
+          if (subFiles.length > 0) {
+            testFile = join(fullDir, sub, subFiles[0]);
+            testName = `${sub}/${subFiles[0]}`;
+            break;
+          }
+        }
+      } catch { /* no subdirs */ }
+    }
 
-    // Pick first file as test case
-    const testFile = join(fullDir, files[0]);
+    if (!testFile || !testName) continue;
+
     tests.push({
-      name: `${dir} — ${files[0]}`,
+      name: `${dir} — ${testName}`,
       family: dir.substring(0, 12).toUpperCase(),
       loader: 'local',
       path: testFile,
-      engineDriven: true,  // most UADE formats are engine-driven
+      engineDriven: true,
       allowSilent: false,
     });
   }
@@ -312,8 +339,42 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     } else if (test.loader === 'fur') {
       await client.call('play_fur', { path: test.path });
     } else if (test.loader === 'local') {
-      // Load directly from disk via the MCP load_file tool
-      await client.call('load_file', { path: test.path });
+      // Read from disk, base64-encode, and send to browser via the bridge.
+      // The WS bridge goes directly to the browser which expects {filename, data},
+      // NOT {path} — the path→base64 conversion is normally done by the MCP HTTP
+      // server, but we bypass it here for speed.
+      const { readFileSync } = await import('fs');
+      const { basename: bn, dirname: dn } = await import('path');
+      const fileData = readFileSync(test.path);
+      const base64 = fileData.toString('base64');
+      const filename = bn(test.path);
+
+      // Auto-discover companion files (same logic as mcpServer.ts load_file)
+      const companionFiles: Record<string, string> = {};
+      const dir = dn(test.path);
+      const lowerFilename = filename.toLowerCase();
+      try {
+        const { readdirSync } = await import('fs');
+        const dirFiles = readdirSync(dir);
+        const prefixPairs: [string, string][] = [
+          ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
+          ['midi.', 'smpl.'], ['smpl.', 'midi.'],
+          ['jpn.', 'smp.'], ['smp.', 'jpn.'],
+        ];
+        for (const [myPrefix, pairPrefix] of prefixPairs) {
+          if (lowerFilename.startsWith(myPrefix)) {
+            const suffix = filename.slice(myPrefix.length);
+            const pairName = dirFiles.find(f => f.toLowerCase() === `${pairPrefix}${suffix.toLowerCase()}`);
+            if (pairName) {
+              const pairData = readFileSync(`${dir}/${pairName}`);
+              companionFiles[pairName] = pairData.toString('base64');
+            }
+          }
+        }
+      } catch { /* companion discovery failed — OK for most formats */ }
+
+      const hasCompanions = Object.keys(companionFiles).length > 0;
+      await client.call('load_file', { filename, data: base64, ...(hasCompanions ? { companionFiles } : {}) });
     }
 
     // 3. Verify the song actually loaded with pattern data BEFORE play()
@@ -369,7 +430,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     }
 
     // 4. Now play
-    if (test.loader === 'modland' || test.loader === 'hvsc') {
+    if (test.loader === 'modland' || test.loader === 'hvsc' || test.loader === 'local') {
       await client.call('play', { mode: 'song' });
     }
     // (fur loader already started playback inside play_fur)
