@@ -49,6 +49,16 @@ import { PixiDigMugPanel } from '../views/instruments/PixiDigMugPanel';
 import { PixiFCPanel } from '../views/instruments/PixiFCPanel';
 import { PixiDeltaMusic1Panel } from '../views/instruments/PixiDeltaMusic1Panel';
 import { PixiDeltaMusic2Panel } from '../views/instruments/PixiDeltaMusic2Panel';
+import { PixiRobHubbardPanel } from '../views/instruments/PixiRobHubbardPanel';
+import { PixiSteveTurnerPanel } from '../views/instruments/PixiSteveTurnerPanel';
+import { PixiDavidWhittakerPanel } from '../views/instruments/PixiDavidWhittakerPanel';
+import { PixiHivelyPanel } from '../views/instruments/PixiHivelyPanel';
+import { PixiFredPanel } from '../views/instruments/PixiFredPanel';
+import { PixiInStereo2Panel } from '../views/instruments/PixiInStereo2Panel';
+import { PixiStartrekkerAMPanel } from '../views/instruments/PixiStartrekkerAMPanel';
+import { PixiSidMon1Panel } from '../views/instruments/PixiSidMon1Panel';
+import { PixiOctaMEDPanel } from '../views/instruments/PixiOctaMEDPanel';
+import { PixiSymphoniePanel } from '../views/instruments/PixiSymphoniePanel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
@@ -1854,6 +1864,24 @@ const NativeInstrumentPanel: React.FC<{
   }
   if (instrument.synthType === 'DeltaMusic2Synth' && instrument.deltaMusic2) {
     return <PixiDeltaMusic2Panel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'RobHubbardSynth' && instrument.robHubbard) {
+    return <PixiRobHubbardPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'SteveTurnerSynth' && instrument.steveTurner) {
+    return <PixiSteveTurnerPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'DavidWhittakerSynth' && instrument.davidWhittaker) {
+    return <PixiDavidWhittakerPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'HivelySynth' && instrument.hively) {
+    return <PixiHivelyPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'FredSynth' && instrument.fred) {
+    return <PixiFredPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if ((instrument.synthType === 'InStereo2Synth' || instrument.synthType === 'InStereo1Synth') && instrument.inStereo2) {
+    return <PixiInStereo2Panel instrument={instrument} onUpdate={onUpdate} />;
   }
   // Generic Amiga synth panel for all formats with layout descriptors
   const amigaLayout = instrument.synthType ? AMIGA_SYNTH_LAYOUTS[instrument.synthType] : undefined;
