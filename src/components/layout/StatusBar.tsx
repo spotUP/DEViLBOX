@@ -146,22 +146,22 @@ const TrackerStatusContent: React.FC = () => {
   return (
     <div className="flex items-center gap-4">
       <span className="text-text-primary">
-        Row <span className="text-accent-primary font-semibold">{rowDisplay}</span>
+        Row <span className="text-accent-primary font-semibold tabular-nums">{rowDisplay}</span>
       </span>
       <div className="w-px h-3 bg-border opacity-50" />
-      <span className="text-text-primary">{channelDisplay}</span>
+      <span className="text-text-primary tabular-nums min-w-[3.5ch]">{channelDisplay}</span>
       <div className="w-px h-3 bg-border opacity-50" />
-      <span className="text-text-primary capitalize">{cursor.columnType}</span>
+      <span className="text-text-primary min-w-[6ch]">{cursor.columnType}</span>
       <div className="w-px h-3 bg-border opacity-50" />
       <span className="text-text-primary">
-        Oct <span className="text-accent-primary font-semibold">{currentOctave}</span>
+        Oct <span className="text-accent-primary font-semibold tabular-nums">{currentOctave}</span>
       </span>
       <div className="w-px h-3 bg-border opacity-50" />
-      <span className="text-text-primary" title={insertMode ? 'Insert mode: new data shifts rows down' : 'Overwrite mode: new data replaces existing'}>
+      <span className="text-text-primary min-w-[7ch]" title={insertMode ? 'Insert mode: new data shifts rows down' : 'Overwrite mode: new data replaces existing'}>
         Mode: <span className={insertMode ? 'text-accent-warning' : 'text-accent-primary'}>{insertMode ? 'INS' : 'OVR'}</span>
       </span>
       <div className="w-px h-3 bg-border opacity-50" />
-      <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
+      <span className={`px-2 py-0.5 rounded min-w-[4ch] text-center ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
         {recordMode ? 'REC' : 'EDIT'}
       </span>
       {sidMetadata && (
@@ -181,7 +181,7 @@ const TrackerStatusContent: React.FC = () => {
               <span className="text-text-muted">{sidMetadata.clockSpeed}</span>
             )}
             {sidMetadata.subsongs > 1 && (
-              <span className="text-text-muted">Sub {sidMetadata.currentSubsong + 1}/{sidMetadata.subsongs}</span>
+              <span className="text-text-muted tabular-nums">Sub {sidMetadata.currentSubsong + 1}/{sidMetadata.subsongs}</span>
             )}
           </div>
         </>
@@ -228,9 +228,9 @@ const PianoRollStatusContent: React.FC = () => {
     <div className="flex items-center gap-4">
       <span className="text-accent-primary font-semibold">Tool: {tool.toUpperCase()}</span>
       {sep}
-      <span className="text-text-primary">Ch {view.channelIndex + 1}/{channelCount}</span>
+      <span className="text-text-primary tabular-nums">Ch {view.channelIndex + 1}/{channelCount}</span>
       {sep}
-      <span className="text-text-primary">Grid: 1/{view.gridDivision}</span>
+      <span className="text-text-primary tabular-nums">Grid: 1/{view.gridDivision}</span>
       {sep}
       <span className={view.snapToGrid ? 'text-accent-success' : 'text-text-muted'}>
         {view.snapToGrid ? 'Snap ON' : 'Snap OFF'}
@@ -252,11 +252,11 @@ const ArrangementStatusContent: React.FC = () => {
     <div className="flex items-center gap-4">
       <span className="text-accent-primary font-semibold">Tool: {tool.toUpperCase()}</span>
       {sep}
-      <span className="text-text-primary">{trackCount} track{trackCount !== 1 ? 's' : ''}</span>
+      <span className="text-text-primary tabular-nums">{trackCount} track{trackCount !== 1 ? 's' : ''}</span>
       {sep}
-      <span className="text-text-primary">Snap: {view.snapDivision}</span>
+      <span className="text-text-primary tabular-nums">Snap: {view.snapDivision}</span>
       {sep}
-      <span className="text-text-muted">Row: {view.scrollRow}</span>
+      <span className="text-text-muted tabular-nums">Row: {view.scrollRow}</span>
     </div>
   );
 };
@@ -331,7 +331,7 @@ const StudioStatusContent: React.FC = () => {
       {sep}
       <span className="text-text-primary">{windowCount} window{windowCount !== 1 ? 's' : ''}</span>
       {sep}
-      <span className="text-text-muted">Zoom: {Math.round(zoom * 100)}%</span>
+      <span className="text-text-muted tabular-nums">Zoom: {Math.round(zoom * 100)}%</span>
     </div>
   );
 };
