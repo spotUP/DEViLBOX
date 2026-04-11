@@ -11,7 +11,7 @@ export async function applyFurnaceWriteBack(
   const rawValue = Math.round(newValue * (paramDef.max - paramDef.min) + paramDef.min);
 
   if (sourceRef.type === 'macro') {
-    // TODO: Wire to Furnace instrument macro editing API when available
+    // NOTE: Furnace macro editing API not yet exposed — writeback is a no-op
     console.log(
       `[FurnaceWriteBack] macro ${sourceRef.macroType} instr=${sourceRef.instrumentId} frame=${sourceRef.frame} = ${rawValue}`,
     );
@@ -19,7 +19,7 @@ export async function applyFurnaceWriteBack(
   }
 
   if (sourceRef.type === 'furnace-effect') {
-    // TODO: Wire to Furnace pattern editing API when available
+    // NOTE: Furnace pattern editing API not yet exposed — writeback is a no-op
     console.log(
       `[FurnaceWriteBack] effect row=${sourceRef.row} ch=${sourceRef.channel} col=${sourceRef.effectCol} = ${rawValue}`,
     );
