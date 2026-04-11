@@ -111,7 +111,9 @@ export class LibopenmptEngine {
 
     const baseUrl = import.meta.env.BASE_URL || '/';
     try {
-      await this.context.audioWorklet.addModule(`${baseUrl}chiptune3/chiptune3.worklet.js`);
+      // Cache-bust the worklet URL in dev mode to ensure latest code is loaded
+      const cacheBuster = import.meta.env.DEV ? `?v=${Date.now()}` : '';
+      await this.context.audioWorklet.addModule(`${baseUrl}chiptune3/chiptune3.worklet.js${cacheBuster}`);
     } catch (err) {
       console.warn('[LibopenmptEngine] Failed to load worklet:', err);
       this._ready = true;
@@ -199,7 +201,13 @@ export class LibopenmptEngine {
         this._playing = false;
         break;
       case 'isolationReady':
-        console.log(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} ready`);
+        console.log(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} ready:`, {
+          channelMask: '0x' + (msg.data.channelMask ?? 0).toString(16),
+          muteFunc: msg.data.muteFunc,
+          effectiveSlotMask: '0x' + (msg.data.effectiveSlotMask ?? 0).toString(16),
+          userMuteMask: '0x' + (msg.data.userMuteMask ?? 0).toString(16),
+          isolatedBits: '0x' + (msg.data.isolatedBits ?? 0).toString(16),
+        });
         break;
       case 'isolationError':
         console.warn(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} failed: ${msg.data.error}`);
@@ -208,6 +216,9 @@ export class LibopenmptEngine {
           this._isolationSlotMasks[msg.data.slotIndex] = null;
           this._updateMainMuteMask();
         }
+        break;
+      case 'diagIsolation':
+        console.log('[LibopenmptEngine] Isolation diagnostics:', msg.data);
         break;
     }
   }
@@ -256,8 +267,46 @@ export class LibopenmptEngine {
       return;
     }
     console.log('[LibopenmptEngine] play(): sending', data.byteLength, 'bytes to worklet');
+    // Clear isolation state — worklet's play() destroys all slots
+    this._isolationSlotMasks.fill(null);
     this.workletNode.port.postMessage({ cmd: 'play', val: data });
     this._playing = true;
+
+    // Rebuild per-channel effect isolation after a short delay (let worklet create the module first)
+    setTimeout(() => this._rebuildIsolationAfterPlay(), 100);
+  }
+
+  /**
+   * After a new song starts, recreate isolation slots if the mixer store has per-channel effects.
+   */
+  private _rebuildIsolationAfterPlay(): void {
+    try {
+      // Dynamic import to avoid circular dependency
+      void import('../../stores/useMixerStore').then(({ useMixerStore }) => {
+        const state = useMixerStore.getState();
+        const hasEffects = state.channels.some(ch => ch.insertEffects.some(e => e.enabled));
+        if (hasEffects) {
+          console.log('[LibopenmptEngine] Rebuilding per-channel effects after song start');
+          // Trigger the same rebuild the mixer store uses
+          void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+            void import('../ToneEngine').then(({ getToneEngine }) => {
+              const masterEffectsInput = getToneEngine().masterEffectsInput;
+              const mgr = getChannelRoutedEffectsManager(masterEffectsInput);
+              const channelEffects = new Map<number, import('@typedefs/instrument').EffectConfig[]>();
+              for (let ch = 0; ch < state.channels.length; ch++) {
+                const effects = state.channels[ch].insertEffects;
+                if (effects.length > 0) {
+                  channelEffects.set(ch, effects.map(e => ({ ...e, parameters: { ...e.parameters } })));
+                }
+              }
+              void mgr.rebuild(channelEffects);
+            });
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('[LibopenmptEngine] Failed to rebuild isolation after play:', e);
+    }
   }
 
   stop(): void {
@@ -514,7 +563,18 @@ export class LibopenmptEngine {
     }
     // Main module renders everything EXCEPT isolated channels
     const mainMask = 0xFFFFFFFF & ~isolatedBits;
+    console.log(`[LibopenmptEngine] updateMainMask: isolatedBits=0x${isolatedBits.toString(16)}, mainMask=0x${mainMask.toString(16)}, slotMasks=${JSON.stringify(this._isolationSlotMasks)}`);
     this.workletNode.port.postMessage({ cmd: 'updateMainMask', val: mainMask });
+  }
+
+  /**
+   * Request diagnostic info about isolation state from the worklet.
+   * Results are logged to the console via handleMessage.
+   */
+  diagIsolation(): void {
+    if (!this.workletNode) { console.warn('[LibopenmptEngine] No worklet node'); return; }
+    console.log(`[LibopenmptEngine] TS-side isolation masks:`, this._isolationSlotMasks);
+    this.workletNode.port.postMessage({ cmd: 'diagIsolation' });
   }
 
   dispose(): void {
