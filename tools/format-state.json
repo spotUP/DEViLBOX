@@ -5808,7 +5808,7 @@
   },
   "fx-distortion": {
     "auditStatus": "fixed",
-    "notes": "OK [distortion:0.8dB] diff=-2.5dB",
+    "notes": "PASS [distortion:0.8dB]",
     "rmsDb": -23,
     "diffDb": -2.5,
     "initMs": null,
@@ -5817,7 +5817,7 @@
   },
   "fx-reverb": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
+    "notes": "PASS [decay:1.3dB]",
     "rmsDb": -23.6,
     "diffDb": -3,
     "initMs": null,
@@ -5827,8 +5827,8 @@
     "instrumentCount": 0
   },
   "fx-delay": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "auditStatus": "fail",
+    "notes": "Audio OK, KNOBS DEAD [delayTime:0.3dB]",
     "rmsDb": -21.8,
     "diffDb": -1.2,
     "initMs": null,
@@ -5839,7 +5839,7 @@
   },
   "fx-chorus": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "notes": "PASS [depth:0.9dB]",
     "rmsDb": -16.4,
     "diffDb": 4.1,
     "initMs": null,
@@ -5849,8 +5849,8 @@
     "instrumentCount": 0
   },
   "fx-phaser": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1193 [] (2026-04-11)",
+    "auditStatus": "fail",
+    "notes": "Audio OK, KNOBS DEAD [frequency:0.0dB]",
     "rmsDb": -20.6,
     "diffDb": -0.1,
     "initMs": null,
@@ -5861,7 +5861,7 @@
   },
   "fx-tremolo": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
+    "notes": "PASS [depth:2.9dB]",
     "rmsDb": -20.6,
     "diffDb": 0,
     "initMs": null,
@@ -5872,7 +5872,7 @@
   },
   "fx-vibrato": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "notes": "PASS rms=0.0790",
     "rmsDb": -22.1,
     "diffDb": -1.5,
     "initMs": null,
@@ -5883,7 +5883,7 @@
   },
   "fx-autofilter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0828 diff=-1.1dB",
+    "notes": "PASS rms=0.0828",
     "rmsDb": -21.6,
     "diffDb": -1.1,
     "initMs": null,
@@ -5892,7 +5892,7 @@
   },
   "fx-autopanner": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0830 diff=-1.1dB",
+    "notes": "PASS rms=0.0830",
     "rmsDb": -21.6,
     "diffDb": -1.1,
     "initMs": null,
@@ -5901,7 +5901,7 @@
   },
   "fx-autowah": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1191 [] (2026-04-11)",
+    "notes": "PASS rms=0.0892",
     "rmsDb": -21,
     "diffDb": -0.5,
     "initMs": null,
@@ -5912,7 +5912,7 @@
   },
   "fx-bitcrusher": {
     "auditStatus": "fixed",
-    "notes": "OK [bits:8.1dB] diff=-3.2dB",
+    "notes": "PASS [bits:8.1dB]",
     "rmsDb": -23.7,
     "diffDb": -3.2,
     "initMs": null,
@@ -5921,7 +5921,7 @@
   },
   "fx-chebyshev": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0703 diff=-2.5dB",
+    "notes": "PASS rms=0.0703",
     "rmsDb": -23.1,
     "diffDb": -2.5,
     "initMs": null,
@@ -5930,7 +5930,7 @@
   },
   "fx-compressor": {
     "auditStatus": "fixed",
-    "notes": "OK [threshold:2.9dB] diff=-0.9dB",
+    "notes": "PASS [threshold:2.9dB]",
     "rmsDb": -21.4,
     "diffDb": -0.9,
     "initMs": null,
@@ -5939,7 +5939,7 @@
   },
   "fx-eq3": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1195 [] (2026-04-11)",
+    "notes": "PASS [low:1.1dB]",
     "rmsDb": -21.2,
     "diffDb": -0.7,
     "initMs": null,
@@ -5950,7 +5950,7 @@
   },
   "fx-feedbackdelay": {
     "auditStatus": "fixed",
-    "notes": "OK [delayTime:2.9dB] diff=-6.9dB",
+    "notes": "PASS [delayTime:2.9dB]",
     "rmsDb": -27.5,
     "diffDb": -6.9,
     "initMs": null,
@@ -5959,7 +5959,7 @@
   },
   "fx-filter": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1199 [] (2026-04-11)",
+    "notes": "PASS [frequency:1.1dB]",
     "rmsDb": -21.5,
     "diffDb": -1,
     "initMs": null,
@@ -5970,7 +5970,7 @@
   },
   "fx-frequencyshifter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0512 diff=-5.3dB",
+    "notes": "PASS rms=0.0512",
     "rmsDb": -25.8,
     "diffDb": -5.3,
     "initMs": null,
@@ -5979,7 +5979,7 @@
   },
   "fx-jcreverb": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1192 [] (2026-04-11)",
+    "notes": "PASS [roomSize:2.1dB]",
     "rmsDb": -18,
     "diffDb": 2.5,
     "initMs": null,
@@ -5990,7 +5990,7 @@
   },
   "fx-pingpongdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0731 diff=-2.2dB",
+    "notes": "PASS rms=0.0731",
     "rmsDb": -22.7,
     "diffDb": -2.2,
     "initMs": null,
@@ -5999,7 +5999,7 @@
   },
   "fx-pitchshift": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0435 diff=-6.7dB",
+    "notes": "PASS rms=0.0435",
     "rmsDb": -27.2,
     "diffDb": -6.7,
     "initMs": null,
@@ -6008,7 +6008,7 @@
   },
   "fx-stereowidener": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0596 diff=-4.0dB",
+    "notes": "PASS rms=0.0596",
     "rmsDb": -24.5,
     "diffDb": -4,
     "initMs": null,
@@ -6017,7 +6017,7 @@
   },
   "fx-tapesaturation": {
     "auditStatus": "fixed",
-    "notes": "OK [drive:8.1dB] diff=2.1dB",
+    "notes": "PASS [drive:8.1dB]",
     "rmsDb": -18.4,
     "diffDb": 2.1,
     "initMs": null,
@@ -6026,7 +6026,7 @@
   },
   "fx-biphase": {
     "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1202 [] (2026-04-11)",
+    "notes": "PASS rms=0.1069",
     "rmsDb": -19.4,
     "diffDb": 1.1,
     "initMs": null,
@@ -6037,7 +6037,7 @@
   },
   "fx-dubfilter": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1342 diff=3.1dB",
+    "notes": "PASS rms=0.1342",
     "rmsDb": -17.4,
     "diffDb": 3.1,
     "initMs": null,
@@ -6046,7 +6046,7 @@
   },
   "fx-sidechaincompressor": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1308 diff=2.9dB",
+    "notes": "PASS rms=0.1308",
     "rmsDb": -17.7,
     "diffDb": 2.9,
     "initMs": null,
@@ -6055,7 +6055,7 @@
   },
   "fx-moogfilter": {
     "auditStatus": "fixed",
-    "notes": "OK [cutoff:13.8dB] diff=-0.8dB",
+    "notes": "PASS [cutoff:13.8dB]",
     "rmsDb": -21.3,
     "diffDb": -0.8,
     "initMs": null,
@@ -6064,7 +6064,7 @@
   },
   "fx-spaceecho": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.0738 diff=-2.1dB",
+    "notes": "PASS rms=0.0738",
     "rmsDb": -22.6,
     "diffDb": -2.1,
     "initMs": null,
@@ -6073,7 +6073,7 @@
   },
   "fx-spaceydelayer": {
     "auditStatus": "fail",
-    "notes": "SILENT rms=0.000306 diff=-49.8dB",
+    "notes": "SILENT rms=0.000306 — WASM Embind rebuild issue",
     "rmsDb": -70.3,
     "diffDb": -49.8,
     "initMs": null,
@@ -6082,7 +6082,7 @@
   },
   "fx-retapeecho": {
     "auditStatus": "fail",
-    "notes": "SILENT rms=0.000000 diff=-79.5dB",
+    "notes": "SILENT rms=0.0 — WASM Embind rebuild issue",
     "rmsDb": -100,
     "diffDb": -79.5,
     "initMs": null,
@@ -6090,8 +6090,8 @@
     "failHistory": null
   },
   "fx-mverb": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1194 [] (2026-04-11)",
+    "auditStatus": "fail",
+    "notes": "SILENT — WASM Embind rebuild issue",
     "rmsDb": -100,
     "diffDb": -79.5,
     "initMs": null,
@@ -6101,8 +6101,8 @@
     "instrumentCount": 0
   },
   "fx-leslie": {
-    "auditStatus": "fixed",
-    "notes": "smoke-test PASS -- rms=0.1202 [] (2026-04-11)",
+    "auditStatus": "fail",
+    "notes": "BROWSER CRASH — WASM works in Node but crashes browser AudioWorklet",
     "rmsDb": -16.9,
     "diffDb": -0.1,
     "initMs": null,
@@ -6169,7 +6169,7 @@
   },
   "fx-ambientdelay": {
     "auditStatus": "fixed",
-    "notes": "OK rms=0.1037 diff=0.8dB",
+    "notes": "PASS rms=0.1037",
     "rmsDb": -19.7,
     "diffDb": 0.8,
     "initMs": null,
