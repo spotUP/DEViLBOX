@@ -84,7 +84,12 @@ export class KlysEngine {
   }
 
   static getInstance(): KlysEngine {
-    if (!KlysEngine.instance || KlysEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!KlysEngine.instance || KlysEngine.instance._disposed ||
+        KlysEngine.instance.audioContext !== currentCtx) {
+      if (KlysEngine.instance && !KlysEngine.instance._disposed) {
+        KlysEngine.instance.dispose();
+      }
       KlysEngine.instance = new KlysEngine();
     }
     return KlysEngine.instance;

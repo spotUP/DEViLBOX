@@ -35,7 +35,12 @@ export class DigMugEngine {
   }
 
   static getInstance(): DigMugEngine {
-    if (!DigMugEngine.instance || DigMugEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!DigMugEngine.instance || DigMugEngine.instance._disposed ||
+        DigMugEngine.instance.audioContext !== currentCtx) {
+      if (DigMugEngine.instance && !DigMugEngine.instance._disposed) {
+        DigMugEngine.instance.dispose();
+      }
       DigMugEngine.instance = new DigMugEngine();
     }
     return DigMugEngine.instance;

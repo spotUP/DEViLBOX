@@ -7,7 +7,7 @@
  * - Oscilloscope data reception for visualization
  */
 
-import { getNativeContext } from '@utils/audio-context';
+import { getNativeContext, getDevilboxAudioContext } from '@utils/audio-context';
 import { FurnaceEffectRouter } from './FurnaceEffectRouter';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
@@ -948,6 +948,16 @@ export class FurnaceDispatchEngine {
   private constructor() {}
 
   static getInstance(): FurnaceDispatchEngine {
+    // Invalidate singleton when AudioContext changes (e.g. HMR / ToneEngine recreate)
+    if (FurnaceDispatchEngine.instance && FurnaceDispatchEngine.instance._nativeCtx) {
+      try {
+        const currentCtx = getDevilboxAudioContext();
+        const currentNative = getNativeContext(currentCtx);
+        if (FurnaceDispatchEngine.instance._nativeCtx !== currentNative) {
+          FurnaceDispatchEngine.instance.dispose();
+        }
+      } catch { /* context not yet set */ }
+    }
     if (!FurnaceDispatchEngine.instance) {
       FurnaceDispatchEngine.instance = new FurnaceDispatchEngine();
     }

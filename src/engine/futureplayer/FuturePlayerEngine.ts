@@ -58,7 +58,12 @@ export class FuturePlayerEngine {
   }
 
   static getInstance(): FuturePlayerEngine {
-    if (!FuturePlayerEngine.instance || FuturePlayerEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!FuturePlayerEngine.instance || FuturePlayerEngine.instance._disposed ||
+        FuturePlayerEngine.instance.audioContext !== currentCtx) {
+      if (FuturePlayerEngine.instance && !FuturePlayerEngine.instance._disposed) {
+        FuturePlayerEngine.instance.dispose();
+      }
       FuturePlayerEngine.instance = new FuturePlayerEngine();
     }
     return FuturePlayerEngine.instance;

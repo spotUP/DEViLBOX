@@ -38,7 +38,12 @@ export class SoundMonEngine {
   }
 
   static getInstance(): SoundMonEngine {
-    if (!SoundMonEngine.instance || SoundMonEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!SoundMonEngine.instance || SoundMonEngine.instance._disposed ||
+        SoundMonEngine.instance.audioContext !== currentCtx) {
+      if (SoundMonEngine.instance && !SoundMonEngine.instance._disposed) {
+        SoundMonEngine.instance.dispose();
+      }
       SoundMonEngine.instance = new SoundMonEngine();
     }
     return SoundMonEngine.instance;

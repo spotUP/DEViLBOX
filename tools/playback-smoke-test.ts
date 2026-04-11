@@ -1107,8 +1107,8 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  const MAX_RETRIES = 5;
-  const RETRY_BACKOFF_MS = 3000;
+  const MAX_RETRIES = 2;
+  const RETRY_BACKOFF_MS = 2000;
 
   const results: TestResult[] = [];
   for (const test of allTests) {
@@ -1134,7 +1134,9 @@ async function main(): Promise<void> {
 
       if (!isTransient || attempt >= MAX_RETRIES) break;
 
-      // Back off: log a warning and wait before retrying
+      // Browser disconnected — the UADE WASM likely crashed the tab.
+      // Don't retry the same file (it'll just crash again). Instead,
+      // reconnect and move on. The browser auto-reconnects after HMR/reload.
       const waitMs = RETRY_BACKOFF_MS * (attempt + 1);
       process.stdout.write(`\n    -> browser disconnected (attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${waitMs / 1000}s)... `);
       await sleep(waitMs);
@@ -1144,8 +1146,16 @@ async function main(): Promise<void> {
         client.close();
         client = new MCPBridgeClient(WS_URL);
         await client.ready();
+        // Verify the browser is actually back by calling a lightweight tool
+        await client.call('get_playback_state');
       } catch {
-        // Connection failed — will retry on next attempt
+        // Still disconnected — wait longer for browser to recover
+        await sleep(5000);
+        try {
+          client.close();
+          client = new MCPBridgeClient(WS_URL);
+          await client.ready();
+        } catch { /* give up */ }
       }
     }
 

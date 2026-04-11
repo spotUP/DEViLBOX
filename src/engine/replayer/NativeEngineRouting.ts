@@ -109,7 +109,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     loadMethod: 'loadSong',
     supportsPause: true,
     supportsResume: true,
-    needsDirectRouting: false,
+    needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/klystrack/KlysEngine')).KlysEngine as unknown as WASMSingletonStatic,
     onStarted: (instance, _song) => {
@@ -147,7 +147,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
-    needsDirectRouting: false,
+    needsDirectRouting: true,
     staticRef: JamCrackerEngine as unknown as WASMSingletonStatic,
   },
   {
@@ -159,7 +159,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     loadMethod: 'loadTune',
     supportsPause: true,
     supportsResume: true,
-    needsDirectRouting: false,
+    needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/futureplayer/FuturePlayerEngine')).FuturePlayerEngine as unknown as WASMSingletonStatic,
   },
@@ -662,9 +662,24 @@ export async function startNativeEngines(
         if (desc.needsDirectRouting && !isDJDeck && !routedNativeEngines.has(desc.synthType)) {
           const nativeInput = getNativeAudioNode(separationInputTone as any);
           if (nativeInput) {
-            instance.output.connect(nativeInput);
+            // Handle cross-context routing (stale AudioContext from HMR)
+            if (instance.output.context !== nativeInput.context) {
+              try {
+                const msDest = (instance.output.context as AudioContext).createMediaStreamDestination();
+                instance.output.connect(msDest);
+                const msSource = (nativeInput.context as AudioContext).createMediaStreamSource(msDest.stream);
+                msSource.connect(nativeInput);
+                console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation (cross-context bridge)`);
+              } catch (bridgeErr) {
+                console.error(`[NativeEngineRouting] ${desc.key} cross-context bridge failed:`, bridgeErr);
+                // Fallback: connect to engine's own context destination
+                instance.output.connect(instance.output.context.destination);
+              }
+            } else {
+              instance.output.connect(nativeInput);
+              console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation`);
+            }
             routedNativeEngines.add(desc.synthType);
-            console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation`);
           } else {
             // Fallback: connect directly to audio context destination
             const ctx = instance.output.context;

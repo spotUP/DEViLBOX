@@ -30,7 +30,12 @@ export class HippelEngine {
   }
 
   static getInstance(): HippelEngine {
-    if (!HippelEngine.instance || HippelEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!HippelEngine.instance || HippelEngine.instance._disposed ||
+        HippelEngine.instance.audioContext !== currentCtx) {
+      if (HippelEngine.instance && !HippelEngine.instance._disposed) {
+        HippelEngine.instance.dispose();
+      }
       HippelEngine.instance = new HippelEngine();
     }
     return HippelEngine.instance;

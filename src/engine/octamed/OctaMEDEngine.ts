@@ -35,7 +35,12 @@ export class OctaMEDEngine {
   }
 
   static getInstance(): OctaMEDEngine {
-    if (!OctaMEDEngine.instance || OctaMEDEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!OctaMEDEngine.instance || OctaMEDEngine.instance._disposed ||
+        OctaMEDEngine.instance.audioContext !== currentCtx) {
+      if (OctaMEDEngine.instance && !OctaMEDEngine.instance._disposed) {
+        OctaMEDEngine.instance.dispose();
+      }
       OctaMEDEngine.instance = new OctaMEDEngine();
     }
     return OctaMEDEngine.instance;
