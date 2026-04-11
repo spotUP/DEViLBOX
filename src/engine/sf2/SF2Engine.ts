@@ -701,6 +701,20 @@ export class SF2Engine {
 
     // Hook onaudioprocess — fires at audio clock rate (~43Hz with 1024 buffer)
     this.sidEngine.setAfterProcessCallback(checkPosition);
+
+    // Diagnostic: verify callback is firing (remove after debugging)
+    let diagCount = 0;
+    const origCheck = checkPosition;
+    const diagCheck = () => {
+      diagCount++;
+      origCheck();
+    };
+    this.sidEngine.setAfterProcessCallback(diagCheck);
+    setTimeout(() => {
+      console.log(`[SF2] onaudioprocess callback fired ${diagCount} times in 2s (expected ~86)`);
+      // Re-install without counter
+      this.sidEngine.setAfterProcessCallback(checkPosition);
+    }, 2000);
   }
 
   /** Stop capturing */

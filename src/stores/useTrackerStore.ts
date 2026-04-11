@@ -329,7 +329,19 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
  */
 async function initFreshSoundlib(): Promise<void> {
   try {
+    // Brief yield — if a real song import is running concurrently (load_modland
+    // triggered right after reset), let it populate libopenmptFileData first.
+    // If the store already has real module data, skip — we'd clobber it.
+    await new Promise(r => setTimeout(r, 100));
+    if (useFormatStore.getState().libopenmptFileData) return;
+
     const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+
+    // Double-check after the async import — another path may have loaded a
+    // real module into the soundlib while we were waiting for the import.
+    if (useFormatStore.getState().libopenmptFileData) return;
+    if (OpenMPTEditBridge.isActive()) return;
+
     // Destroy any previously loaded module (from a previous song)
     await osl.destroyModule();
     // Create a new empty XM with the default channel/pattern count
@@ -341,6 +353,8 @@ async function initFreshSoundlib(): Promise<void> {
     // Serialize to ArrayBuffer and store for LibopenmptEngine
     const data = await osl.saveModule('xm');
     if (data) {
+      // Final guard — check one more time that nothing loaded while we serialized
+      if (useFormatStore.getState().libopenmptFileData) return;
       useFormatStore.setState({ libopenmptFileData: data });
       // Mark the bridge as loaded so cell edits sync to the soundlib
       OpenMPTEditBridge.markLoaded('xm');
@@ -1967,11 +1981,13 @@ export const useTrackerStore = create<TrackerStore>()(
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
       });
-      // Phase 5.4: Initialize an empty libopenmpt soundlib module so fresh
-      // songs route through LibopenmptEngine for playback (skipping the TS
-      // scheduler entirely). Fire-and-forget — the async init completes
-      // before the user can press play.
-      void initFreshSoundlib();
+      // Phase 5.4: initFreshSoundlib is NOT called from reset() because
+      // reset() fires during import pipelines too (loadFile handler calls
+      // ts.reset() before loading a real song). Calling it here creates a
+      // race where the async init clobbers the real module data.
+      // Instead, the playback path (TrackerReplayer.play) handles this:
+      // if libopenmptFileData is null at play time, it creates an empty
+      // soundlib on-demand.
     },
   }))
 );

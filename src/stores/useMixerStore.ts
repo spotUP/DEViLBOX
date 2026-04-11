@@ -26,9 +26,15 @@ function scheduleWasmEffectRebuild(): void {
     void (async () => {
       try {
         const { LibopenmptEngine } = await import('../engine/libopenmpt/LibopenmptEngine');
-        if (!LibopenmptEngine.hasInstance()) return;
+        if (!LibopenmptEngine.hasInstance()) {
+          console.log('[MixerStore] scheduleWasmEffectRebuild: no LibopenmptEngine instance');
+          return;
+        }
         const engine = LibopenmptEngine.getInstance();
-        if (!engine.isAvailable()) return;
+        if (!engine.isAvailable()) {
+          console.log('[MixerStore] scheduleWasmEffectRebuild: engine not available');
+          return;
+        }
 
         const { getToneEngine } = await import('../engine/ToneEngine');
         const masterEffectsInput = getToneEngine().masterEffectsInput;
@@ -42,6 +48,7 @@ function scheduleWasmEffectRebuild(): void {
             channelEffects.set(ch, effects.map(e => ({ ...e, parameters: { ...e.parameters } })));
           }
         }
+        console.log(`[MixerStore] scheduleWasmEffectRebuild: rebuilding with ${channelEffects.size} channels having effects`);
         await mgr.rebuild(channelEffects);
       } catch (e) {
         console.warn('[MixerStore] Failed to rebuild WASM per-channel effects:', e);
