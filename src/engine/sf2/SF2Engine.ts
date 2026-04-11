@@ -85,28 +85,45 @@ export function packSequence(events: SF2SeqEvent[]): Uint8Array {
   while (i < events.length) {
     const ev = events[i];
 
+    // Skip duration fill rows (instrument=0x80 or command=0x80)
+    if (ev.instrument === 0x80 || ev.command === 0x80) {
+      i++;
+      continue;
+    }
+
     // Count hold/rest rows following this event to determine duration
     let duration = 0;
     let j = i + 1;
-    while (j < events.length && events[j].note === 0 && events[j].instrument === 0 && events[j].command === 0) {
+    while (j < events.length) {
+      const next = events[j];
+      // Duration fill rows have instrument=0x80 and command=0x80
+      if (next.instrument !== 0x80 || next.command !== 0x80) break;
+      // Rest rows have note=0, tie rows have note=0x7E
+      if (ev.note !== 0x00) {
+        if (next.note !== 0x7E) break;
+      } else {
+        if (next.note !== 0x00) break;
+      }
       duration++;
       j++;
     }
     duration = Math.min(duration, 15); // 4 bits max
 
+    const isTie = ev.instrument === 0x90;
+
     // Command byte (1-based → 0xC0 + (cmd-1))
-    if (ev.command > 0) {
+    if (ev.command > 0 && ev.command < 0x80) {
       bytes.push(0xC0 + (ev.command - 1));
     }
 
     // Instrument byte (1-based → 0xA0 + (inst-1))
-    if (ev.instrument > 0) {
+    if (ev.instrument > 0 && ev.instrument < 0x80) {
       bytes.push(0xA0 + (ev.instrument - 1));
     }
 
-    // Duration byte (if > 0)
-    if (duration > 0) {
-      bytes.push(0x80 | duration);
+    // Duration byte (if > 0), with tie flag in bit 4
+    if (duration > 0 || isTie) {
+      bytes.push(0x80 | duration | (isTie ? 0x10 : 0x00));
     }
 
     // Note byte (always present)
@@ -182,22 +199,28 @@ export function unpackSequence(mem: Uint8Array | ((addr: number) => number), sta
 
     // Duration byte (>= 0x80, < 0xA0)
     let duration = 0;
+    let tieNote = false;
     if (value >= 0x80 && value < 0xA0) {
       duration = value & 0x0F;
+      tieNote = (value & 0x10) !== 0;
       value = read(i++);
       if (value === 0x7F) break;
     }
 
     const note = value;
     events.push({
-      note: note === 0x7E ? 0 : note,
-      instrument: eventInst,
+      note,
+      instrument: tieNote ? 0x90 : eventInst,
       command: eventCmd,
     });
 
-    // Fill duration extra rows with hold/rest
+    // Fill duration rows: tie (0x7E) if note was non-zero, rest (0x00) if rest
     for (let d = 0; d < duration; d++) {
-      events.push({ note: 0, instrument: 0, command: 0 });
+      events.push({
+        note: note !== 0x00 ? 0x7E : 0x00,
+        instrument: 0x80,
+        command: 0x80,
+      });
     }
   }
 

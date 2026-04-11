@@ -11,21 +11,28 @@ import type { SF2SeqEvent, SF2OrderList } from '@/stores/useSF2Store';
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 export function sf2NoteToString(note: number): string {
-  if (note === 0) return '...';
-  if (note === 0x7E) return '~~~'; // tie
-  if (note >= 0x70) return '...'; // reserved
+  if (note === 0) return '---';      // rest (matches original)
+  if (note === 0x7E) return '+++';   // tie/hold (matches original)
+  if (note >= 0x70) return '---';    // reserved
   const n = note - 1;
   const octave = Math.floor(n / 12);
   const name = NOTE_NAMES[n % 12];
   return `${name}${octave}`;
 }
 
-function hex2(val: number): string {
-  if (val === 0) return '..';
-  return val.toString(16).toUpperCase().padStart(2, '0');
+function sf2InstToString(val: number): string {
+  if (val === 0 || val === 0x80) return '--'; // no change / empty
+  if (val === 0x90) return '**';              // tie instrument (matches original)
+  return (val & 0x1F).toString(16).toUpperCase().padStart(2, '0');
+}
+
+function sf2CmdToString(val: number): string {
+  if (val === 0 || val === 0x80) return '--'; // no command / empty
+  return (val & 0x3F).toString(16).toUpperCase().padStart(2, '0');
 }
 
 // Column definitions: Note | Instrument | Command
+// Matches original SF2 editor display: "---" rest, "+++" tie, "--" empty
 export const SF2_COLUMNS: ColumnDef[] = [
   {
     key: 'note',
@@ -46,7 +53,7 @@ export const SF2_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
-    formatter: hex2,
+    formatter: sf2InstToString,
   },
   {
     key: 'command',
@@ -57,7 +64,7 @@ export const SF2_COLUMNS: ColumnDef[] = [
     emptyColor: 'var(--color-border-light)',
     emptyValue: 0,
     hexDigits: 2,
-    formatter: hex2,
+    formatter: sf2CmdToString,
   },
 ];
 

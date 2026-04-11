@@ -16,10 +16,11 @@ import { getChannelEffectsManager } from '../engine/ChannelEffectsManager';
 import { getSendBusManager } from '../engine/SendBusManager';
 import { getChannelRoutedEffectsManager } from '../engine/tone/ChannelRoutedEffects';
 
-// Rebuild WASM per-channel effect routing after any insert-effect mutation.
+// Rebuild WASM per-channel effect routing after any insert-effect mutation
+// or when a master effect's selectedChannels changes.
 // Debounced to coalesce rapid changes (e.g. loading a preset adds 4 effects).
 let _wasmRebuildTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleWasmEffectRebuild(): void {
+export function scheduleWasmEffectRebuild(): void {
   if (_wasmRebuildTimer) clearTimeout(_wasmRebuildTimer);
   _wasmRebuildTimer = setTimeout(() => {
     _wasmRebuildTimer = null;
@@ -40,14 +41,30 @@ function scheduleWasmEffectRebuild(): void {
         const masterEffectsInput = getToneEngine().masterEffectsInput;
         const mgr = getChannelRoutedEffectsManager(masterEffectsInput);
 
-        const state = useMixerStore.getState();
         const channelEffects = new Map<number, EffectConfig[]>();
+
+        // 1. Per-channel insert effects from mixer store
+        const state = useMixerStore.getState();
         for (let ch = 0; ch < state.channels.length; ch++) {
           const effects = state.channels[ch].insertEffects;
           if (effects.length > 0) {
             channelEffects.set(ch, effects.map(e => ({ ...e, parameters: { ...e.parameters } })));
           }
         }
+
+        // 2. Master effects with selectedChannels (per-channel targeting from master FX panel)
+        const { useAudioStore } = await import('./useAudioStore');
+        const masterEffects = useAudioStore.getState().masterEffects;
+        for (const fx of masterEffects) {
+          if (fx.enabled && Array.isArray(fx.selectedChannels) && fx.selectedChannels.length > 0) {
+            for (const ch of fx.selectedChannels) {
+              const existing = channelEffects.get(ch) ?? [];
+              existing.push({ ...fx, parameters: { ...fx.parameters } });
+              channelEffects.set(ch, existing);
+            }
+          }
+        }
+
         console.log(`[MixerStore] scheduleWasmEffectRebuild: rebuilding with ${channelEffects.size} channels having effects`);
         await mgr.rebuild(channelEffects);
       } catch (e) {

@@ -454,6 +454,7 @@ export async function parseSIDFactory2File(
 
       let eventCmd = 0;
       let eventInst = 0;
+      let tieNote = false;
 
       // Command byte (>= 0xC0)
       if (value >= 0xC0) {
@@ -473,22 +474,28 @@ export async function parseSIDFactory2File(
       // Duration byte (>= 0x80, < 0xA0)
       if (value >= 0x80 && value < 0xA0) {
         duration = value & 0x0F;
-        // bit 4 = tie flag (0x90-0x9F)
+        // bit 4 = tie flag (0x90-0x9F) — marks instrument as tie
+        tieNote = (value & 0x10) !== 0;
         value = mem[i++];
         if (value === 0x7F) break;
       }
 
-      // Note value (< 0x80)
-      const note = value; // 0=rest, 1-111=note, 0x7E=tie
+      // Note value (< 0x80): 0=rest, 1-111=note, 0x7E=tie/hold
+      const note = value;
       events.push({
-        note: note === 0x7E ? 0 : note, // tie shows as empty
-        instrument: eventInst,
+        note,
+        instrument: tieNote ? 0x90 : eventInst, // 0x90 = tie instrument marker (matches original)
         command: eventCmd,
       });
 
-      // Fill duration extra rows with hold/rest
+      // Fill duration extra rows: tie (0x7E) if note was non-zero, rest (0x00) if rest
+      // Matches original: m_Note = value != 0x00 ? 0x7e : 0x00
       for (let d = 0; d < duration; d++) {
-        events.push({ note: 0, instrument: 0, command: 0 }); // hold rows
+        events.push({
+          note: note !== 0x00 ? 0x7E : 0x00,
+          instrument: 0x80, // empty marker (matches original)
+          command: 0x80,    // empty marker (matches original)
+        });
       }
     }
 
