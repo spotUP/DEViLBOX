@@ -49,6 +49,7 @@ class SIDHardwareManager {
   private unsubUSBState: (() => void) | null = null;
   private _firmwareVersion: string | null = null;
   private _detectedChips: Array<{ slot: number; detected: boolean; type?: string }> | null = null;
+  private flushScheduled = false;
 
   get mode(): SIDHardwareMode { return this._mode; }
   get writeCount(): number { return this._writeCount; }
@@ -162,6 +163,7 @@ class SIDHardwareManager {
       if (pico.isConnected) {
         pico.write(chip, reg, value);
         this._writeCount++;
+        this.scheduleFlush();
       }
     } else if (this._mode === 'asid') {
       const port = getASIDDeviceManager().getSelectedPort();
@@ -219,6 +221,51 @@ class SIDHardwareManager {
   flush(): void {
     if (this._mode === 'webusb') {
       getUSBSIDPico().flush();
+    }
+  }
+
+  /**
+   * Debounced flush — coalesces a burst of writes into one USB transfer.
+   *
+   * GoatTracker dumps 25 register writes per audio quantum via postMessage,
+   * which arrive as 25 separate main-thread events. Without draining the
+   * pico buffer between events, writes sit there until MAX_WRITE_BUFFER (31)
+   * is hit — typically ~100+ ms of lag at normal song pacing.
+   *
+   * setTimeout(0) queues a macrotask that runs AFTER all currently-pending
+   * message events, so a full frame's worth of writes batch into one flush.
+   */
+  private scheduleFlush(): void {
+    if (this.flushScheduled) return;
+    this.flushScheduled = true;
+    setTimeout(() => {
+      this.flushScheduled = false;
+      if (this._mode === 'webusb') {
+        getUSBSIDPico().flush();
+      }
+    }, 0);
+  }
+
+  /**
+   * Clear the diff cache. Call before starting a new playback session so
+   * the first frame's register dump is sent in full rather than being
+   * filtered against stale values from a previous song.
+   */
+  clearDiffCache(): void {
+    this.lastRegisters.clear();
+  }
+
+  /** Apply the persisted clock rate setting to the hardware (WebUSB only). */
+  async applyClockFromSettings(): Promise<void> {
+    if (this._mode !== 'webusb') return;
+    try {
+      const { useSettingsStore } = await import('@stores/useSettingsStore');
+      const rate = useSettingsStore.getState().webusbClockRate;
+      if (rate >= 0 && rate <= 3) {
+        getUSBSIDPico().setClock(rate as ClockRateValue);
+      }
+    } catch (err) {
+      console.warn('[SIDHardware] Apply clock from settings failed:', err);
     }
   }
 

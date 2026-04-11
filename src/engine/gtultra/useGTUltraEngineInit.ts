@@ -12,6 +12,7 @@ import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { GTUltraEngine } from './GTUltraEngine';
 import { getGTUltraASIDBridge } from './GTUltraASIDBridge';
+import { getSIDHardwareManager } from '@/lib/sid/SIDHardwareManager';
 import { setFormatPlaybackRow } from '@engine/FormatPlaybackState';
 
 /** Populate DEViLBOX instrument store from GT Ultra WASM instrument data */
@@ -35,6 +36,7 @@ export function useGTUltraEngineInit(): void {
 
     let gtEngine: GTUltraEngine | null = null;
     let disposed = false;
+    let bridgeUnsub: (() => void) | null = null;
 
     const setup = async () => {
       const audioCtx = Tone.getContext().rawContext as AudioContext;
@@ -147,12 +149,32 @@ export function useGTUltraEngineInit(): void {
       await gtEngine.ready;
       if (disposed) { gtEngine.dispose(); return; }
       gtEngine.output.connect(audioCtx.destination);
+
+      // Mute softsynth output whenever the hardware bridge is on — otherwise
+      // the WASM reSID emulator and the USB-SID-Pico would play the same song
+      // in parallel.
+      const bridge = getGTUltraASIDBridge();
+      const syncOutputGain = (enabled: boolean) => {
+        if (!gtEngine) return;
+        gtEngine.output.gain.value = enabled ? 0 : 1;
+      };
+      bridgeUnsub = bridge.onChange(syncOutputGain);
+      syncOutputGain(bridge.isEnabled);
+
+      // Auto-enable hardware bridge if a USB-SID-Pico / ASID device is already
+      // active (user connected it via Settings → SID Hardware wizard). Saves
+      // the user from having to click the toolbar toggle every session.
+      if (getSIDHardwareManager().isActive && !bridge.isEnabled) {
+        bridge.enable();
+        gtEngine.enableAsid(true);
+      }
     };
 
     setup().catch(console.error);
 
     return () => {
       disposed = true;
+      if (bridgeUnsub) bridgeUnsub();
       if (gtEngine) {
         gtEngine.dispose();
         useGTUltraStore.getState().setEngine(null);
