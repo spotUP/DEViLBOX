@@ -73,4 +73,13 @@ export const percussionSynthEntries: Record<string, SynthInfo> = {
     icon: 'Drum',
     color: 'text-yellow-500',
   },
+  Geonkick: {
+    type: 'Geonkick',
+    name: 'Geonkick',
+    shortName: 'Gkick',
+    description: 'Quamplex Geonkick percussion synthesizer (WASM port) — multi-oscillator, envelope-driven kick/snare/hat synth',
+    bestFor: ['808 kicks', 'Hard kicks', 'Snares', 'Hi-hats', 'Toms', 'Synthetic percussion'],
+    icon: 'Drum',
+    color: 'text-accent-primary',
+  },
 };
