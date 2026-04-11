@@ -46,6 +46,7 @@ export class MusicLineEngine {
 
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
+  private _rejectInit: ((err: Error) => void) | null = null;
   private _loadPromise: Promise<MusicLineSongInfo> | null = null;
   private _resolveLoad: ((info: MusicLineSongInfo) => void) | null = null;
   private _rejectLoad: ((err: Error) => void) | null = null;
@@ -58,8 +59,9 @@ export class MusicLineEngine {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
-    this._initPromise = new Promise<void>((resolve) => {
+    this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
+      this._rejectInit = reject;
     });
 
     this.initialize();
@@ -89,6 +91,11 @@ export class MusicLineEngine {
       this.createNode();
     } catch (err) {
       console.error('[MusicLineEngine] Initialization failed:', err);
+      if (this._rejectInit) {
+        this._rejectInit(err instanceof Error ? err : new Error(String(err)));
+        this._rejectInit = null;
+        this._resolveInit = null;
+      }
     }
   }
 
@@ -102,11 +109,7 @@ export class MusicLineEngine {
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       // Register worklet module with this context
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}musicline/MusicLine.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
+      await context.audioWorklet.addModule(`${baseUrl}musicline/MusicLine.worklet.js`);
 
       // Fetch WASM binary and JS code (shared across contexts)
       if (!this.wasmBinary || !this.jsCode) {

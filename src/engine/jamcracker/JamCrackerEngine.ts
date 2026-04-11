@@ -56,7 +56,12 @@ export class JamCrackerEngine {
   }
 
   static getInstance(): JamCrackerEngine {
-    if (!JamCrackerEngine.instance || JamCrackerEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!JamCrackerEngine.instance || JamCrackerEngine.instance._disposed ||
+        JamCrackerEngine.instance.audioContext !== currentCtx) {
+      if (JamCrackerEngine.instance && !JamCrackerEngine.instance._disposed) {
+        JamCrackerEngine.instance.dispose();
+      }
       JamCrackerEngine.instance = new JamCrackerEngine();
     }
     return JamCrackerEngine.instance;

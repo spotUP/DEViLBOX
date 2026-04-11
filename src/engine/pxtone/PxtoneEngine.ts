@@ -34,7 +34,12 @@ export class PxtoneEngine {
   }
 
   static getInstance(): PxtoneEngine {
-    if (!PxtoneEngine.instance || PxtoneEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!PxtoneEngine.instance || PxtoneEngine.instance._disposed ||
+        PxtoneEngine.instance.audioContext !== currentCtx) {
+      if (PxtoneEngine.instance && !PxtoneEngine.instance._disposed) {
+        PxtoneEngine.instance.dispose();
+      }
       PxtoneEngine.instance = new PxtoneEngine();
     }
     return PxtoneEngine.instance;

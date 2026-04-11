@@ -36,7 +36,12 @@ export class ArtOfNoiseEngine {
   }
 
   static getInstance(): ArtOfNoiseEngine {
-    if (!ArtOfNoiseEngine.instance || ArtOfNoiseEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!ArtOfNoiseEngine.instance || ArtOfNoiseEngine.instance._disposed ||
+        ArtOfNoiseEngine.instance.audioContext !== currentCtx) {
+      if (ArtOfNoiseEngine.instance && !ArtOfNoiseEngine.instance._disposed) {
+        ArtOfNoiseEngine.instance.dispose();
+      }
       ArtOfNoiseEngine.instance = new ArtOfNoiseEngine();
     }
     return ArtOfNoiseEngine.instance;

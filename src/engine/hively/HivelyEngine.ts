@@ -61,7 +61,12 @@ export class HivelyEngine {
   }
 
   static getInstance(): HivelyEngine {
-    if (!HivelyEngine.instance || HivelyEngine.instance._disposed) {
+    const currentCtx = getDevilboxAudioContext();
+    if (!HivelyEngine.instance || HivelyEngine.instance._disposed ||
+        HivelyEngine.instance.audioContext !== currentCtx) {
+      if (HivelyEngine.instance && !HivelyEngine.instance._disposed) {
+        HivelyEngine.instance.dispose();
+      }
       HivelyEngine.instance = new HivelyEngine();
     }
     return HivelyEngine.instance;
