@@ -854,6 +854,20 @@ export const useMixerStore = create<MixerStore>()(
       for (const fx of effects) {
         bus.addBusEffect(busIndex, fx);
       }
+
+      // Auto-route: when loading a preset with effects, set all channels'
+      // send levels to 50% so the user hears the effect immediately.
+      // When clearing (empty effects), reset send levels to 0.
+      const autoLevel = effects.length > 0 ? 0.5 : 0;
+      const state = get();
+      for (let ch = 0; ch < state.channels.length; ch++) {
+        const current = state.channels[ch].sendLevels[busIndex] ?? 0;
+        // Only auto-route if currently at 0 (don't overwrite user adjustments)
+        if (effects.length > 0 && current > 0) continue;
+        // For clearing, always reset
+        if (effects.length === 0 && current === 0) continue;
+        get().setChannelSendLevel(ch, busIndex, autoLevel);
+      }
     },
 
     // Effect presets — load a full effect chain onto a channel

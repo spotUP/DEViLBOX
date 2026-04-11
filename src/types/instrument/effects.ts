@@ -101,4 +101,10 @@ export interface EffectConfig {
 
   // Sidechain routing (only for SidechainCompressor)
   sidechainSource?: number;  // Channel index to use as sidechain input (-1 or undefined = none)
+
+  // Per-channel routing: which channels this effect applies to.
+  // undefined or empty = all channels (default master bus behavior).
+  // When set, the effect is applied via a dedicated send bus to only
+  // the selected channels instead of the full master chain.
+  selectedChannels?: number[];
 }
