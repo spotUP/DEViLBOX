@@ -1513,7 +1513,8 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
  * as streaming audio via OPL emulation.
  */
 // All AdPlug WASM-supported extensions (from adplug.cpp player registry)
-const ADPLUG_WASM_EXTS = /\.(adl|agd|a2m|a2t|amd|bam|bmf|cff|cmf|d00|dfm|dmo|dro|dtm|got|ha2|hsc|hsp|hsq|imf|jbm|ksm|laa|lds|m|mad|mdi|mkf|mkj|msc|mtk|mtr|mus|mdy|ims|pis|plx|rac|rad|raw|rix|rol|sa2|sat|sci|sdb|sng|sop|sqx|xad|xms|xsm|edl|dtl|as3m|adlib|wlf)$/i;
+// REMOVED: m (too broad), mus/ims/ksm/raw/sng (conflict with UADE/GoatTracker)
+const ADPLUG_WASM_EXTS = /\.(adl|agd|a2m|a2t|amd|bam|bmf|cff|cmf|d00|dfm|dmo|dro|dtm|got|ha2|hsc|hsp|hsq|imf|jbm|laa|lds|mad|mdi|mkf|mkj|msc|mtk|mtr|mdy|pis|plx|rac|rad|rix|rol|sa2|sat|sci|sdb|sop|sqx|xad|xms|xsm|edl|dtl|as3m|adlib|wlf)$/i;
 
 export function isAdPlugWasmFormat(filename: string): boolean {
   return ADPLUG_WASM_EXTS.test(filename);

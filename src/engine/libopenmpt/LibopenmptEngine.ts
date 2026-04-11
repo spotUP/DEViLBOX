@@ -56,6 +56,10 @@ export class LibopenmptEngine {
   private _lastRow: number = 0;
   private _onTransportEvent: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null = null;
 
+  /** Per-channel effect isolation: tracks which slots are active and their channel masks. */
+  static readonly MAX_ISOLATION_SLOTS = 4;
+  private _isolationSlotMasks: (number | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
+
   /** Subscribe to transport events (seek, pause, unpause, stop) for syncing isolation nodes. */
   set onTransportEvent(cb: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null) {
     this._onTransportEvent = cb;
@@ -117,8 +121,8 @@ export class LibopenmptEngine {
 
     this.workletNode = new AudioWorkletNode(this.context, 'libopenmpt-processor', {
       numberOfInputs: 0,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
+      numberOfOutputs: 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS,
+      outputChannelCount: [2, 2, 2, 2, 2],  // main + 4 isolation slots, all stereo
     });
 
     this.workletNode.port.onmessage = this.handleMessage.bind(this);
@@ -193,6 +197,9 @@ export class LibopenmptEngine {
       case 'err':
         console.error('[LibopenmptEngine] Worklet error:', msg.data.val);
         this._playing = false;
+        break;
+      case 'isolationReady':
+        console.log(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} ready`);
         break;
     }
   }
@@ -430,7 +437,80 @@ export class LibopenmptEngine {
     return { order: this._lastOrder, row: this._lastRow };
   }
 
+  // ---------------------------------------------------------------------------
+  // Per-channel effect isolation (multi-output worklet)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Create (or update) an isolation slot that renders ONLY the specified channels.
+   * The main module's mute mask is automatically updated to exclude isolated channels.
+   * @param slotIndex 0..MAX_ISOLATION_SLOTS-1
+   * @param channelMask Bitmask where bit N=1 means channel N is audible in this slot
+   */
+  addIsolation(slotIndex: number, channelMask: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = channelMask;
+    this.workletNode.port.postMessage({ cmd: 'addIsolation', val: { slotIndex, channelMask } });
+    this._updateMainMuteMask();
+  }
+
+  /**
+   * Destroy an isolation slot and return its channels to the main mix.
+   */
+  removeIsolation(slotIndex: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = null;
+    this.workletNode.port.postMessage({ cmd: 'removeIsolation', val: { slotIndex } });
+    this._updateMainMuteMask();
+  }
+
+  /**
+   * Update which channels an isolation slot renders (without destroying/recreating).
+   */
+  updateIsolationMask(slotIndex: number, channelMask: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = channelMask;
+    this.workletNode.port.postMessage({ cmd: 'updateIsolationMask', val: { slotIndex, channelMask } });
+    this._updateMainMuteMask();
+  }
+
+  /**
+   * Get the AudioWorkletNode for connecting isolation slot outputs to effects.
+   * Use: `engine.getWorkletNode().connect(effectNode, slotIndex + 1)`
+   */
+  getWorkletNode(): AudioWorkletNode | null {
+    return this.workletNode;
+  }
+
+  /**
+   * Remove all isolation slots (called on stop/dispose).
+   */
+  removeAllIsolation(): void {
+    for (let i = 0; i < LibopenmptEngine.MAX_ISOLATION_SLOTS; i++) {
+      if (this._isolationSlotMasks[i] !== null) {
+        this.removeIsolation(i);
+      }
+    }
+  }
+
+  /**
+   * Recompute and send the main module's mute mask.
+   * The main module renders all channels EXCEPT those currently isolated.
+   */
+  private _updateMainMuteMask(): void {
+    if (!this.workletNode) return;
+    // Combine all isolation masks
+    let isolatedBits = 0;
+    for (const mask of this._isolationSlotMasks) {
+      if (mask !== null) isolatedBits |= mask;
+    }
+    // Main module renders everything EXCEPT isolated channels
+    const mainMask = 0xFFFFFFFF & ~isolatedBits;
+    this.workletNode.port.postMessage({ cmd: 'updateMainMask', val: mainMask });
+  }
+
   dispose(): void {
+    this.removeAllIsolation();
     this.stop();
     try { this.workletNode?.disconnect(); } catch { /* ignored */ }
     try { this.gainNode?.disconnect(); } catch { /* ignored */ }
@@ -440,6 +520,7 @@ export class LibopenmptEngine {
     this._available = false;
     this._pendingData = null;
     this._routed = false;
+    this._isolationSlotMasks = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
     LibopenmptEngine.instance = null;
   }
 }

@@ -56,6 +56,7 @@ interface PixiMixerChannelStripProps {
   sendLevels?: number[];       // 0-1 per send bus
   onSendLevelChange?: (sendIndex: number, level: number) => void;
   insertEffectCount?: number;  // Number of active insert effects
+  onFxClick?: () => void;      // Opens per-channel effects modal
   armRecord?: boolean;
   onArmRecordToggle?: () => void;
 }
@@ -264,6 +265,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   sendLevels,
   onSendLevelChange,
   insertEffectCount,
+  onFxClick,
   armRecord,
   onArmRecordToggle,
 }) => {
@@ -536,15 +538,34 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         </layoutContainer>
       )}
 
-      {/* 11. Insert FX indicator */}
-      {insertEffectCount !== undefined && insertEffectCount > 0 && (
-        <pixiBitmapText
-          text={`FX:${insertEffectCount}`}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-          tint={theme.accent.color}
+      {/* 11. Insert FX indicator (clickable to open channel FX modal) */}
+      {insertEffectCount !== undefined && insertEffectCount > 0 ? (
+        <layoutContainer
+          eventMode="static"
+          cursor="pointer"
+          onPress={onFxClick}
           layout={{ width: STRIP_WIDTH, marginTop: 2 }}
-        />
-      )}
+        >
+          <pixiBitmapText
+            text={`FX:${insertEffectCount}`}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            tint={theme.accent.color}
+          />
+        </layoutContainer>
+      ) : !isMaster ? (
+        <layoutContainer
+          eventMode="static"
+          cursor="pointer"
+          onPress={onFxClick}
+          layout={{ width: STRIP_WIDTH, marginTop: 2 }}
+        >
+          <pixiBitmapText
+            text="FX"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+          />
+        </layoutContainer>
+      ) : null}
 
       {/* 11b. Channel FX preset button (hidden for master) */}
       {!isMaster && (
