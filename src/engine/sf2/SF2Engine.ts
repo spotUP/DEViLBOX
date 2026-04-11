@@ -22,6 +22,8 @@ import type {
   SF2TableDef,
   SF2SeqEvent,
   SF2OrderEntry,
+  SF2OrderList,
+  SF2InstrumentData,
 } from '@stores/useSF2Store';
 
 // ── SID register snapshot (25 bytes per frame) ─────────────────────────
@@ -119,6 +121,35 @@ export function packSequence(events: SF2SeqEvent[]): Uint8Array {
   return new Uint8Array(bytes);
 }
 
+// ── Order List Packer ──────────────────────────────────────────────────
+
+/**
+ * Pack an SF2 order list into the compact C64 format.
+ * Format: [transpose>=0x80]? <seqIdx>  ... terminated by 0xFE (no loop) or 0xFF <loopIdx> (loop)
+ */
+export function packOrderList(ol: { entries: SF2OrderEntry[]; loopIndex: number; hasLoop: boolean }): Uint8Array {
+  const bytes: number[] = [];
+  let prevTranspose = 0;
+
+  for (const entry of ol.entries) {
+    // Emit transpose byte only when it changes
+    if (entry.transpose >= 0x80 && entry.transpose !== prevTranspose) {
+      bytes.push(entry.transpose);
+      prevTranspose = entry.transpose;
+    }
+    bytes.push(entry.seqIdx & 0x7F);
+  }
+
+  if (ol.hasLoop) {
+    bytes.push(0xFF);
+    bytes.push(ol.loopIndex & 0xFF);
+  } else {
+    bytes.push(0xFE);
+  }
+
+  return new Uint8Array(bytes);
+}
+
 /**
  * Unpack a sequence from C64 memory into SF2SeqEvent[].
  * Mirrors the parser's readSequence but works on live C64 RAM.
@@ -171,6 +202,99 @@ export function unpackSequence(mem: Uint8Array | ((addr: number) => number), sta
   }
 
   return events;
+}
+
+// ── SF2 File Exporter ─────────────────────────────────────────────────
+
+export interface SF2ExportOptions {
+  rawFileData: Uint8Array;
+  loadAddress: number;
+  descriptor: SF2Descriptor;
+  driverCommon: SF2DriverCommon;
+  musicData: SF2MusicData;
+  tableDefs: SF2TableDef[];
+  instrumentDescriptions: string[];
+  c64Memory: Uint8Array;
+  sequences: Map<number, SF2SeqEvent[]>;
+  orderLists: SF2OrderList[];
+  instruments: SF2InstrumentData[];
+}
+
+/**
+ * Export an SF2 file as a C64 PRG with embedded driver.
+ *
+ * Strategy: start from the original rawFileData (which preserves the driver binary
+ * and all header blocks exactly), then patch the mutable music data regions in the
+ * C64 memory image (sequences, order lists, instrument/table data) and rewrite
+ * those regions back into the PRG.
+ *
+ * This preserves the driver binary, header structure, and any data we don't edit.
+ */
+export function exportSF2File(opts: SF2ExportOptions): Uint8Array {
+  const {
+    rawFileData, loadAddress, musicData, c64Memory,
+    sequences, orderLists, tableDefs, instruments,
+  } = opts;
+
+  // Work on a copy of C64 memory
+  const mem = new Uint8Array(c64Memory);
+
+  // ── Pack sequences into memory ──────────────────────────────────────
+  for (const [seqIdx, events] of sequences) {
+    if (seqIdx >= musicData.sequenceCount) continue;
+    const lo = mem[musicData.sequencePtrsLo + seqIdx];
+    const hi = mem[musicData.sequencePtrsHi + seqIdx];
+    const seqAddr = lo | (hi << 8);
+    if (seqAddr === 0) continue;
+
+    const packed = packSequence(events);
+    // Write packed sequence (must fit within allocated space)
+    for (let i = 0; i < packed.length; i++) {
+      mem[seqAddr + i] = packed[i];
+    }
+  }
+
+  // ── Pack order lists into memory ────────────────────────────────────
+  for (let t = 0; t < orderLists.length && t < musicData.trackCount; t++) {
+    const olAddrLo = mem[musicData.orderListPtrsLo + t];
+    const olAddrHi = mem[musicData.orderListPtrsHi + t];
+    const olAddr = olAddrLo | (olAddrHi << 8);
+    if (olAddr === 0) continue;
+
+    const packed = packOrderList(orderLists[t]);
+    for (let i = 0; i < packed.length; i++) {
+      mem[olAddr + i] = packed[i];
+    }
+  }
+
+  // ── Write instrument data from tables ───────────────────────────────
+  const instrTable = tableDefs.find(t => t.type === 0x80);
+  if (instrTable && instruments.length > 0) {
+    for (let i = 0; i < instruments.length && i < instrTable.rowCount; i++) {
+      const addr = instrTable.address + i * instrTable.columnCount;
+      const raw = instruments[i].rawBytes;
+      for (let b = 0; b < Math.min(raw.length, instrTable.columnCount); b++) {
+        mem[addr + b] = raw[b];
+      }
+    }
+  }
+
+  // ── Rebuild PRG from patched memory ─────────────────────────────────
+  // Original rawFileData layout: [loadAddrLo, loadAddrHi, ...c64_data]
+  // c64_data starts at loadAddress in C64 memory space
+  const dataLen = rawFileData.length - 2; // minus 2-byte load address prefix
+  const prg = new Uint8Array(rawFileData.length);
+
+  // Copy load address prefix
+  prg[0] = loadAddress & 0xFF;
+  prg[1] = (loadAddress >> 8) & 0xFF;
+
+  // Copy patched C64 memory region back into PRG data
+  for (let i = 0; i < dataLen; i++) {
+    prg[2 + i] = mem[loadAddress + i];
+  }
+
+  return prg;
 }
 
 // ── SF2 Engine ─────────────────────────────────────────────────────────

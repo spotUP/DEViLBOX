@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand';
+import { exportSF2File as _exportSF2File } from '@/engine/sf2/SF2Engine';
 
 // ── Driver info parsed from header blocks ────────────────────────────────
 
@@ -186,6 +187,9 @@ export interface SF2StoreState {
 
   // Instrument editing
   setInstrumentByte: (instIdx: number, byteOffset: number, value: number) => void;
+
+  // Export
+  exportSF2File: () => Uint8Array | null;
 }
 
 export interface SF2LoadPayload {
@@ -207,7 +211,7 @@ export interface SF2LoadPayload {
 
 const INITIAL_CURSOR: SF2EditorCursor = { channel: 0, row: 0, column: 0, digit: 0 };
 
-export const useSF2Store = create<SF2StoreState>((set) => ({
+export const useSF2Store = create<SF2StoreState>((set, get) => ({
   loaded: false,
   rawFileData: null,
   loadAddress: 0,
@@ -330,4 +334,22 @@ export const useSF2Store = create<SF2StoreState>((set) => ({
     insts[instIdx] = inst;
     return { instruments: insts };
   }),
+
+  exportSF2File: () => {
+    const s = get();
+    if (!s.rawFileData || !s.descriptor || !s.driverCommon || !s.musicData) return null;
+    return _exportSF2File({
+      rawFileData: s.rawFileData,
+      loadAddress: s.loadAddress,
+      descriptor: s.descriptor,
+      driverCommon: s.driverCommon,
+      musicData: s.musicData,
+      tableDefs: s.tableDefs,
+      instrumentDescriptions: s.instrumentDescriptions,
+      c64Memory: s.c64Memory,
+      sequences: s.sequences,
+      orderLists: s.orderLists,
+      instruments: s.instruments,
+    });
+  },
 }));
