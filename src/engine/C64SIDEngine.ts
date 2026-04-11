@@ -445,6 +445,23 @@ export class C64SIDEngine {
   }
 
   /**
+   * Install a callback that fires after each ScriptProcessorNode buffer fill.
+   * The C64 emulator advances inside onaudioprocess, so RAM reads in this
+   * callback see the freshest state — no polling jitter.
+   */
+  setAfterProcessCallback(cb: () => void): void {
+    if (this.engine && 'setAfterProcessCallback' in this.engine) {
+      (this.engine as ScriptNodePlayerEngine).setAfterProcessCallback(cb);
+    }
+  }
+
+  removeAfterProcessCallback(): void {
+    if (this.engine && 'removeAfterProcessCallback' in this.engine) {
+      (this.engine as ScriptNodePlayerEngine).removeAfterProcessCallback();
+    }
+  }
+
+  /**
    * Set master volume (0-1 linear). Combined with per-engine gain compensation.
    * NOTE: When routed through synthBus (default), the Tone.js masterChannel
    * handles the actual master volume. This method only applies per-engine

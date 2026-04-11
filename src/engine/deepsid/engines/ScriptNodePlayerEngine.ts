@@ -53,6 +53,7 @@ export class ScriptNodePlayerEngine {
   private playing = false;
   private subsong = 0;
   private numSubsongs = 1;
+  private _originalOnaudioprocess: ((e: AudioProcessingEvent) => void) | null = null;
 
   constructor(
     sidData: Uint8Array,
@@ -468,6 +469,7 @@ export class ScriptNodePlayerEngine {
    */
   dispose(): void {
     this.stop();
+    this.removeAfterProcessCallback();
     // Call WASM _emu_teardown to reset emulator state for reuse.
     // The spp_backend_state_* globals ARE the Emscripten Modules.
     const stateKey = MODULE_STATE_MAP[this.engineType];
@@ -479,5 +481,33 @@ export class ScriptNodePlayerEngine {
     }
     this.player = null;
     this.adapter = null;
+  }
+
+  /**
+   * Install a callback that fires immediately after each ScriptProcessorNode
+   * audio buffer fill. The C64 emulator advances inside onaudioprocess, so
+   * reading RAM in this callback gives the freshest possible position data
+   * — no polling jitter.
+   */
+  setAfterProcessCallback(cb: () => void): void {
+    this.removeAfterProcessCallback();
+
+    // Wrap the ScriptProcessorNode's onaudioprocess to call our callback after
+    const node = this.player?._producerNode;
+    if (node && node.onaudioprocess) {
+      this._originalOnaudioprocess = node.onaudioprocess;
+      const original = this._originalOnaudioprocess!;
+      node.onaudioprocess = (e: AudioProcessingEvent) => {
+        original(e);
+        cb();
+      };
+    }
+  }
+
+  removeAfterProcessCallback(): void {
+    if (this._originalOnaudioprocess && this.player?._producerNode) {
+      this.player._producerNode.onaudioprocess = this._originalOnaudioprocess;
+    }
+    this._originalOnaudioprocess = null;
   }
 }
