@@ -10,11 +10,16 @@ import type { SF2SeqEvent, SF2OrderList } from '@/stores/useSF2Store';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
-export function sf2NoteToString(note: number): string {
+export function sf2NoteToString(note: number, transpose = 0): string {
   if (note === 0) return '---';      // rest (matches original)
   if (note === 0x7E) return '+++';   // tie/hold (matches original)
   if (note >= 0x70) return '---';    // reserved
-  const n = note - 1;
+
+  // Apply transposition for display (matches original component_track.cpp)
+  const transposed = note + transpose;
+  if (transposed < 0x01 || transposed >= 0x60) return '???'; // out of range after transpose
+
+  const n = transposed - 1;
   const octave = Math.floor(n / 12);
   const name = NOTE_NAMES[n % 12];
   return `${name}${octave}`;
@@ -102,6 +107,10 @@ export function sf2ToFormatChannels(
     const seq = sequences.get(seqIdx);
     const rows: FormatCell[] = [];
 
+    // Transposition: original stores notes as absolute, displays with transpose applied
+    // transpose = rawByte - 0xA0 (0xA0 = no transposition)
+    const transpose = entry ? (entry.transpose - 0xA0) : 0;
+
     for (let r = 0; r < maxRows; r++) {
       if (seq && r < seq.length) {
         const ev = seq[r];
@@ -115,12 +124,23 @@ export function sf2ToFormatChannels(
       }
     }
 
+    // Build per-channel columns with transpose-aware note formatter
+    const channelColumns: ColumnDef[] = [
+      SF2_COLUMNS[0],
+      SF2_COLUMNS[1],
+      {
+        ...SF2_COLUMNS[2],
+        formatter: (val: number) => sf2NoteToString(val, transpose),
+      },
+    ];
+
     const transStr = entry ? ` T${(((entry.transpose & 0x7F) - 0x20) | 0).toString(16).toUpperCase()}` : '';
     result.push({
       label: `CH${t + 1} S${String(seqIdx).padStart(2, '0')}${transStr}`,
       patternLength: maxRows,
       rows,
       isPatternChannel: true,
+      columns: channelColumns,
     });
   }
 
