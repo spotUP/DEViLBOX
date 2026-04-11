@@ -154,10 +154,19 @@ export const useAudioStore = create<AudioStore>()(
     addMasterEffect: (effectType) => {
       // Format compat: master effects — deferred to export-time validation
       // (effects still work in DEViLBOX; only matters when exporting to native format)
+
+      // Look up the correct category from AVAILABLE_EFFECTS so non-tonejs
+      // effects (buzzmachine, wasm, wam, neural) get the right category.
+      // Falls back to 'tonejs' for unregistered/legacy types.
+      const { AVAILABLE_EFFECTS } = require('@constants/unifiedEffects');
+      const effectDef = (AVAILABLE_EFFECTS as Array<{ type?: string; category: string }>)
+        .find(e => e.type === effectType);
+      const category = (effectDef?.category ?? 'tonejs') as EffectConfig['category'];
+
       set((state) => {
         const newEffect: EffectConfig = {
           id: `master-fx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          category: 'tonejs',  // Master effects are Tone.js by default
+          category,
           type: effectType,
           enabled: true,
           wet: getDefaultEffectWet(effectType),
