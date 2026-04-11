@@ -20,13 +20,24 @@ const Module = await factory({ wasmBinary });
 
 // Cwrap the exported C functions.
 const gk = {
-  create:       Module.cwrap('gk_wasm_create',       'number', ['number']),
-  destroy:      Module.cwrap('gk_wasm_destroy',      null,     ['number']),
-  keyPressed:   Module.cwrap('gk_wasm_key_pressed',  null,     ['number', 'number', 'number', 'number']),
-  renderMono:   Module.cwrap('gk_wasm_render_mono',  null,     ['number', 'number', 'number']),
-  getLength:    Module.cwrap('gk_wasm_get_length',   'number', ['number']),
-  setLength:    Module.cwrap('gk_wasm_set_length',   null,     ['number', 'number']),
-  setLimiter:   Module.cwrap('gk_wasm_set_limiter',  null,     ['number', 'number']),
+  create:               Module.cwrap('gk_wasm_create',                'number', ['number']),
+  destroy:              Module.cwrap('gk_wasm_destroy',               null,     ['number']),
+  keyPressed:           Module.cwrap('gk_wasm_key_pressed',           null,     ['number', 'number', 'number', 'number']),
+  renderMono:           Module.cwrap('gk_wasm_render_mono',           null,     ['number', 'number', 'number']),
+  getLength:            Module.cwrap('gk_wasm_get_length',            'number', ['number']),
+  setLength:            Module.cwrap('gk_wasm_set_length',            null,     ['number', 'number']),
+  setLimiter:           Module.cwrap('gk_wasm_set_limiter',           null,     ['number', 'number']),
+  setFilterEnabled:     Module.cwrap('gk_wasm_set_filter_enabled',    null,     ['number', 'number']),
+  setFilterCutoff:      Module.cwrap('gk_wasm_set_filter_cutoff',     null,     ['number', 'number']),
+  setFilterFactor:      Module.cwrap('gk_wasm_set_filter_factor',     null,     ['number', 'number']),
+  setFilterType:        Module.cwrap('gk_wasm_set_filter_type',       null,     ['number', 'number']),
+  setDistortionEnabled: Module.cwrap('gk_wasm_set_distortion_enabled', null,    ['number', 'number']),
+  setDistortionDrive:   Module.cwrap('gk_wasm_set_distortion_drive',  null,     ['number', 'number']),
+  setDistortionVolume:  Module.cwrap('gk_wasm_set_distortion_volume', null,     ['number', 'number']),
+  enableOsc:            Module.cwrap('gk_wasm_enable_osc',            null,     ['number', 'number', 'number']),
+  setOscAmplitude:      Module.cwrap('gk_wasm_set_osc_amplitude',     null,     ['number', 'number', 'number']),
+  setOscFrequency:      Module.cwrap('gk_wasm_set_osc_frequency',     null,     ['number', 'number', 'number']),
+  setOscFunction:       Module.cwrap('gk_wasm_set_osc_function',      null,     ['number', 'number', 'number']),
 };
 
 const SAMPLE_RATE = 48000;
@@ -44,29 +55,60 @@ console.log('[smoke] default kick length (sec):', gk.getLength(handle));
 const bufPtr = Module._malloc(N * 4);
 const bufView = new Float32Array(Module.HEAPF32.buffer, bufPtr, N);
 
-// Trigger: note 69 (A4), velocity 127.
-console.log('[smoke] triggering note...');
-gk.keyPressed(handle, 1, 69, 127);
-
-// Render the whole window.
-console.log('[smoke] rendering', N, 'samples...');
-gk.renderMono(handle, bufPtr, N);
-
-// Quick stats.
-let peak = 0, sumSq = 0, nonZero = 0;
-for (let i = 0; i < N; i++) {
-  const v = bufView[i];
-  const a = Math.abs(v);
-  if (a > peak) peak = a;
-  sumSq += v * v;
-  if (a > 1e-6) nonZero++;
+function renderAndStat(label) {
+  gk.keyPressed(handle, 1, 69, 127);
+  gk.renderMono(handle, bufPtr, N);
+  let peak = 0, sumSq = 0, nonZero = 0;
+  for (let i = 0; i < N; i++) {
+    const v = bufView[i];
+    const a = Math.abs(v);
+    if (a > peak) peak = a;
+    sumSq += v * v;
+    if (a > 1e-6) nonZero++;
+  }
+  const rms = Math.sqrt(sumSq / N);
+  console.log(
+    '[smoke]', label.padEnd(22),
+    'nonZero=' + String(nonZero).padStart(6),
+    'peak=' + peak.toFixed(4),
+    'rms=' + rms.toFixed(4),
+  );
+  return { peak, rms };
 }
-const rms = Math.sqrt(sumSq / N);
 
-console.log('[smoke] samples:', N);
-console.log('[smoke] non-zero count:', nonZero, '(' + ((nonZero / N) * 100).toFixed(1) + '%)');
-console.log('[smoke] peak:', peak.toFixed(4));
-console.log('[smoke] rms:',  rms.toFixed(4));
+// Variant 1: out-of-the-box default kick.
+const a = renderAndStat('default');
+
+// Variant 2: add filter at 200 Hz with resonance.
+gk.setFilterEnabled(handle, 1);
+gk.setFilterType(handle, 0);          // 0 = LP
+gk.setFilterCutoff(handle, 200);
+gk.setFilterFactor(handle, 10);
+const b = renderAndStat('LP 200Hz Q=10');
+
+// Variant 3: disable filter, crank up osc 0 frequency + distortion.
+gk.setFilterEnabled(handle, 0);
+gk.setOscFrequency(handle, 0, 600);   // way above the default
+gk.setDistortionEnabled(handle, 1);
+gk.setDistortionDrive(handle, 2.0);
+gk.setDistortionVolume(handle, 1.0);
+const c = renderAndStat('600 Hz + drive');
+
+// Variant 4: switch osc 0 to sawtooth.
+gk.setOscFunction(handle, 0, 3);      // 3 = sawtooth
+const d = renderAndStat('saw @600 Hz');
+
+// Pass gate: all variants produced sound AND at least two variants
+// differ from each other (params actually change the audio).
+const allPlayed = a.peak > 0.01 && b.peak > 0.01 && c.peak > 0.01 && d.peak > 0.01;
+const differs = Math.abs(a.rms - b.rms) > 0.005 || Math.abs(a.rms - c.rms) > 0.005 || Math.abs(c.rms - d.rms) > 0.005;
+
+console.log('\n[smoke] all variants played:', allPlayed);
+console.log('[smoke] rms differs across variants:', differs);
+
+// Reset state for the final dump.
+const peak = d.peak;
+const rms = d.rms;
 
 // Dump to WAV for listening.
 function writeWavMono(filepath, samples, sampleRate) {
@@ -106,10 +148,10 @@ Module._free(bufPtr);
 gk.destroy(handle);
 
 // Pass/fail gate.
-if (rms > 0.001 && peak > 0.01) {
-  console.log('[smoke] PASS — non-silent output');
+if (allPlayed && differs && rms > 0.001 && peak > 0.01) {
+  console.log('[smoke] PASS — all variants audible and params change the audio');
   process.exit(0);
 } else {
-  console.log('[smoke] FAIL — output too quiet (silent default kick?)');
+  console.log('[smoke] FAIL — allPlayed=' + allPlayed + ' differs=' + differs);
   process.exit(1);
 }

@@ -4,14 +4,35 @@
  * Geonkick bakes each kick sample offline via its synth engine, then reads
  * from the baked buffer when a note is triggered. The worklet handles the
  * bake (worker_stub.c runs it synchronously on any parameter change) and
- * exposes a tiny trigger-only surface over a MessagePort.
+ * exposes a typed setter surface over a MessagePort.
  *
- * MVP: default single-kick preset, no parameter tweaking exposed beyond
- * length and limiter. Expand the wire protocol in Geonkick.worklet.js to
- * surface the ~130 upstream setters when UI work starts.
+ * Phase 2a: scalar parameter surface — length, limiter, filter, distortion,
+ * per-oscillator amplitude/frequency/function/enable. Envelopes (the variable
+ * -length point lists) and preset loading come in a follow-up.
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+
+/** Matches gkick_filter_type in src/dsp/src/geonkick.h. */
+export const GeonkickFilterType = {
+  LowPass:  0,
+  HighPass: 1,
+  BandPass: 2,
+} as const;
+export type GeonkickFilterType = (typeof GeonkickFilterType)[keyof typeof GeonkickFilterType];
+
+/** Matches geonkick_osc_func_type in src/dsp/src/geonkick.h. */
+export const GeonkickOscFunction = {
+  Sine:          0,
+  Square:        1,
+  Triangle:      2,
+  Sawtooth:      3,
+  NoiseWhite:    4,
+  NoisePink:     5,
+  NoiseBrownian: 6,
+  Sample:        7,
+} as const;
+export type GeonkickOscFunction = (typeof GeonkickOscFunction)[keyof typeof GeonkickOscFunction];
 
 export class GeonkickEngine {
   private static instance: GeonkickEngine | null = null;
@@ -176,6 +197,90 @@ export class GeonkickEngine {
     this.workletNode?.port.postMessage({
       type: 'setLimiter',
       value: Math.max(0, Math.min(1.5, value)),
+    });
+  }
+
+  // ── Kick filter ──────────────────────────────────────────────────────────
+
+  setFilterEnabled(enabled: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'setFilterEnabled', enabled });
+  }
+
+  /** Cutoff frequency in Hz. Typical kick range: 60..20000. */
+  setFilterCutoff(frequencyHz: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setFilterCutoff',
+      frequency: Math.max(20, Math.min(20000, frequencyHz)),
+    });
+  }
+
+  /** Filter Q / resonance. Range depends on type; 1..20 is safe. */
+  setFilterFactor(q: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setFilterFactor',
+      q: Math.max(0.1, Math.min(20, q)),
+    });
+  }
+
+  setFilterType(type: GeonkickFilterType): void {
+    this.workletNode?.port.postMessage({ type: 'setFilterType', filterType: type | 0 });
+  }
+
+  // ── Distortion ──────────────────────────────────────────────────────────
+
+  setDistortionEnabled(enabled: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'setDistortionEnabled', enabled });
+  }
+
+  /** Drive amount; 1.0 is unity, higher values push harder into saturation. */
+  setDistortionDrive(drive: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setDistortionDrive',
+      drive: Math.max(0, Math.min(10, drive)),
+    });
+  }
+
+  /** Distortion out-limiter ("volume" knob in the upstream UI). */
+  setDistortionVolume(volume: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setDistortionVolume',
+      volume: Math.max(0, Math.min(2, volume)),
+    });
+  }
+
+  // ── Oscillators ─────────────────────────────────────────────────────────
+  // 9 oscillators per instrument: 0..2 = group 0, 3..5 = group 1, 6..8 = group 2.
+
+  enableOscillator(oscIndex: number, enabled: boolean): void {
+    this.workletNode?.port.postMessage({
+      type: 'enableOsc',
+      oscIndex: oscIndex | 0,
+      enabled,
+    });
+  }
+
+  setOscillatorAmplitude(oscIndex: number, amplitude: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscAmplitude',
+      oscIndex: oscIndex | 0,
+      amplitude: Math.max(0, Math.min(1, amplitude)),
+    });
+  }
+
+  /** Oscillator base frequency in Hz. Kick fundamentals typically 40..200 Hz. */
+  setOscillatorFrequency(oscIndex: number, frequencyHz: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFrequency',
+      oscIndex: oscIndex | 0,
+      frequency: Math.max(0, Math.min(20000, frequencyHz)),
+    });
+  }
+
+  setOscillatorFunction(oscIndex: number, func: GeonkickOscFunction): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFunction',
+      oscIndex: oscIndex | 0,
+      func: func | 0,
     });
   }
 
