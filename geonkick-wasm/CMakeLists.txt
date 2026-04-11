@@ -75,7 +75,7 @@ target_link_options(Geonkick PRIVATE
     "SHELL:-s INITIAL_MEMORY=33554432"
     "SHELL:-s ENVIRONMENT='web,worker'"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue','HEAPF32','HEAPU8']"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_gk_wasm_create','_gk_wasm_destroy','_gk_wasm_key_pressed','_gk_wasm_render_mono','_gk_wasm_get_length','_gk_wasm_set_length','_gk_wasm_set_limiter']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_gk_wasm_create','_gk_wasm_destroy','_gk_wasm_key_pressed','_gk_wasm_render_mono','_gk_wasm_get_length','_gk_wasm_set_length','_gk_wasm_set_limiter','_gk_wasm_set_filter_enabled','_gk_wasm_set_filter_cutoff','_gk_wasm_set_filter_factor','_gk_wasm_set_filter_type','_gk_wasm_set_distortion_enabled','_gk_wasm_set_distortion_drive','_gk_wasm_set_distortion_volume','_gk_wasm_enable_osc','_gk_wasm_set_osc_amplitude','_gk_wasm_set_osc_frequency','_gk_wasm_set_osc_function']"
     "SHELL:-s FILESYSTEM=0"
     "SHELL:-s NO_EXIT_RUNTIME=1"
     "SHELL:--no-entry"

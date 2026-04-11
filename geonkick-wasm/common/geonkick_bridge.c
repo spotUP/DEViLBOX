@@ -154,3 +154,99 @@ void gk_wasm_set_limiter(gk_instance *kick, double value)
                 return;
         geonkick_set_limiter_value(kick, (gkick_real)value);
 }
+
+/* ────────────────────────────────────────────────────────────────────
+ * Kick filter — after the oscillator mix, before the amp envelope.
+ * gkick_filter_type: 0=LP, 1=HP, 2=BP.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_filter_enabled(gk_instance *kick, int enable)
+{
+        if (!kick) return;
+        geonkick_kick_filter_enable(kick, enable);
+}
+
+GK_EXPORT
+void gk_wasm_set_filter_cutoff(gk_instance *kick, double frequency_hz)
+{
+        if (!kick) return;
+        geonkick_kick_set_filter_frequency(kick, (gkick_real)frequency_hz);
+}
+
+GK_EXPORT
+void gk_wasm_set_filter_factor(gk_instance *kick, double q)
+{
+        if (!kick) return;
+        geonkick_kick_set_filter_factor(kick, (gkick_real)q);
+}
+
+GK_EXPORT
+void gk_wasm_set_filter_type(gk_instance *kick, int type)
+{
+        if (!kick) return;
+        geonkick_set_kick_filter_type(kick, (enum gkick_filter_type)type);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Distortion — waveshaper + drive + out limiter.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_distortion_enabled(gk_instance *kick, int enable)
+{
+        if (!kick) return;
+        geonkick_distortion_enable(kick, enable);
+}
+
+GK_EXPORT
+void gk_wasm_set_distortion_drive(gk_instance *kick, double drive)
+{
+        if (!kick) return;
+        geonkick_distortion_set_drive(kick, (gkick_real)drive);
+}
+
+GK_EXPORT
+void gk_wasm_set_distortion_volume(gk_instance *kick, double volume)
+{
+        if (!kick) return;
+        /* Upstream exposes in/out limiters around the waveshaper.
+         * "Volume" in the UI sense = out_limiter. */
+        geonkick_distortion_set_out_limiter(kick, (gkick_real)volume);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Oscillators — 9 total (3 groups × 3 oscillators per group).
+ * osc_index 0..2 = group 0 (main), 3..5 = group 1, 6..8 = group 2.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_enable_osc(gk_instance *kick, int osc_index, int enable)
+{
+        if (!kick || osc_index < 0) return;
+        if (enable)
+                geonkick_enable_oscillator(kick, (size_t)osc_index);
+        else
+                geonkick_disable_oscillator(kick, (size_t)osc_index);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_amplitude(gk_instance *kick, int osc_index, double amplitude)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_amplitude(kick, (size_t)osc_index, (gkick_real)amplitude);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_frequency(gk_instance *kick, int osc_index, double frequency_hz)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_frequency(kick, (size_t)osc_index, (gkick_real)frequency_hz);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_function(gk_instance *kick, int osc_index, int func)
+{
+        if (!kick || osc_index < 0) return;
+        /* 0=sine, 1=square, 2=triangle, 3=sawtooth,
+         * 4=noise_white, 5=noise_pink, 6=noise_brownian, 7=sample */
+        geonkick_set_osc_function(kick, (size_t)osc_index,
+                                  (enum geonkick_osc_func_type)func);
+}
