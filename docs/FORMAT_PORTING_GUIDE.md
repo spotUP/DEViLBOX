@@ -508,3 +508,75 @@ Without this, the pattern display keeps scrolling after the audio stops.
 **Best example for Model D (UADE hybrid):** Future Composer, SoundMon
 - Parser: `src/lib/import/formats/FutureComposerParser.ts`
 - UADE wiring: `src/engine/TrackerReplayer.ts` (search `uadeEditableFileData`)
+
+**Best example for PSID wrapping (C64 format with embedded driver):** SID Factory II
+- Parser: `src/lib/import/formats/SIDFactory2Parser.ts`
+- Pattern: Parse header blocks → extract patterns + PSID-wrap PRG → c64SidFileData
+- Audio uses C64SIDEngine (reSID emulation), patterns extracted from header metadata
+
+---
+
+## Case Study: Porting SID Factory II (.sf2)
+
+### What Made This Port Unique
+
+SF2 files are C64 PRG files with an embedded 6502 music driver and structured header
+blocks. The header blocks describe the driver's init/play addresses and the memory layout
+of sequences and order lists — everything needed for both audio playback and pattern display.
+
+### Key Decisions
+
+1. **PSID wrapping for audio** — Instead of writing a 6502 emulator or porting the driver,
+   we wrap the raw PRG in a standard PSID v2 header and feed it to the existing C64SIDEngine.
+   The PSID header provides init/play addresses from the DriverCommon block. This gives us
+   perfect audio using reSID emulation with zero additional WASM work.
+
+2. **Native pattern extraction** — The SF2 header blocks provide exact memory addresses for
+   sequence data and order lists. We build a C64 memory image, read the pointer tables,
+   and unpack sequences using the documented byte format (command → instrument → duration → note).
+
+3. **PETSCII string decoding** — Driver names use C64 PETSCII encoding (0x01-0x1A = A-Z).
+   Always check for platform-specific text encodings.
+
+4. **SoundFont disambiguation** — `.sf2` extension is shared with SoundFont files. We check
+   for RIFF header first (SoundFont), then 0x1337 magic (SID Factory II).
+
+### Sequence Format (the tricky part)
+
+The packed sequence format has strict byte ordering per event:
+```
+[command >= 0xC0] [instrument >= 0xA0] [duration >= 0x80] <note 0x00-0x7F>
+```
+Each prefix byte is optional. Duration specifies extra rows to fill with hold/rest after
+the note, which expands a compact sequence into a full-length pattern. The `Unpack()` method
+in `datasource_sequence.cpp` is the authoritative reference.
+
+### PSID Header Construction
+
+```typescript
+// PSID v2 header = 124 bytes, loadAddress=0 means data starts with 2-byte LE addr
+// This is exactly what PRG files provide (first 2 bytes = load address)
+const sidFile = new Uint8Array(124 + rawPRG.length);
+sidFile.set(psidHeader, 0);     // 124-byte PSID header
+sidFile.set(rawPRG, 124);       // Full PRG including 2-byte load address
+// Set c64SidFileData on TrackerSong → C64SIDEngine handles everything
+```
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `src/lib/import/formats/SIDFactory2Parser.ts` | New — 530 lines, full parser |
+| `src/lib/import/FormatRegistry.ts` | Added entry (key: sidFactory2, family: c64-chip) |
+| `src/lib/import/parsers/AmigaFormatParsers.ts` | Added .sf2 routing with SoundFont check |
+
+### Lessons Learned
+
+- **Read the actual source code** — The SF2 C++ source on GitHub has the exact binary format
+  documented in code comments. `driver_info.cpp`, `datasource_orderlist.cpp`, and
+  `datasource_sequence.cpp` provided everything needed.
+- **PSID wrapping is powerful** — Any C64 format with known init/play addresses can reuse
+  C64SIDEngine for audio. This pattern works for GoatTracker, SID Factory II, and potentially
+  other C64 trackers.
+- **Duration expansion is critical** — Without expanding duration bytes into hold rows,
+  patterns look compressed and don't align with the actual playback timing.
