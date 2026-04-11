@@ -89,6 +89,8 @@ interface PatternEditorCanvasProps {
   formatCurrentRow?: number;
   formatIsPlaying?: boolean;
   onFormatCellChange?: OnCellChange;
+  /** Called when the format cursor moves (row/channel/column). Lets parent sync external state. */
+  onFormatCursorChange?: (cursor: { channelIndex: number; rowIndex: number; columnIndex: number }) => void;
   /** Hide VU meters (for sub-editors like perf list that aren't main song views) */
   hideVUMeters?: boolean;
   /** Hide automation lanes overlay (for order matrices that reuse PatternEditorCanvas) */
@@ -114,6 +116,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatCurrentRow,
   formatIsPlaying,
   onFormatCellChange,
+  onFormatCursorChange,
   hideVUMeters = false,
   hideAutomationLanes: hideAutoLanesProp = false,
   formatChannelOffset = 0,
@@ -193,6 +196,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Mutable ref so rAF loops can read the latest cursor without re-renders
   const formatCursorRef = useRef({ channelIndex: 0, rowIndex: 0, columnIndex: 0 });
   formatCursorRef.current = formatCursor;
+  // Notify parent of cursor changes (so SF2/GT stores stay in sync)
+  const onFormatCursorChangeRef = useRef(onFormatCursorChange);
+  onFormatCursorChangeRef.current = onFormatCursorChange;
+  useEffect(() => {
+    onFormatCursorChangeRef.current?.(formatCursor);
+  }, [formatCursor]);
   const [formatOctave, setFormatOctave] = useState(3);
 
   // Format mode selection: normalized range (startRow <= endRow, startCol <= endCol)

@@ -28,6 +28,13 @@ const ORDER_MATRIX_W = 150;
 
 export const SF2View: React.FC = () => {
   const { channels, currentRow, isPlaying, handleCellChange } = useSF2FormatData();
+  const handleCursorChange = useCallback((cursor: { channelIndex: number; rowIndex: number; columnIndex: number }) => {
+    useSF2Store.getState().setCursor({
+      channel: cursor.channelIndex,
+      row: cursor.rowIndex,
+      column: cursor.columnIndex,
+    });
+  }, []);
   const descriptor = useSF2Store((s) => s.descriptor);
   const songName = useSF2Store((s) => s.songName);
   const trackCount = useSF2Store((s) => s.trackCount);
@@ -112,6 +119,7 @@ export const SF2View: React.FC = () => {
               formatCurrentRow={currentRow}
               formatIsPlaying={isPlaying}
               onFormatCellChange={handleCellChange}
+              onFormatCursorChange={handleCursorChange}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-text-muted text-sm">
