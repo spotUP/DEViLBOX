@@ -73,6 +73,44 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 }),
   },
   {
+    id: 'Aelapse', name: 'Ælapse Tape+Springs', category: 'wasm', group: 'Reverb & Delay',
+    loadMode: 'eager',
+    description: 'Tape delay chained into a 4-spring reverb tank. Port of smiarx/aelapse. Hardware UI runs the real JUCE editor in WASM with a WebGL2 springs-shader overlay.',
+    create: async (c: EffectConfig) => {
+      const { AelapseEffect } = await import('@engine/effects/AelapseEffect');
+      const p = c.parameters;
+      return new AelapseEffect({
+        delayActive:     (Number(p.delayActive) ?? 100) > 50,
+        delayDryWet:     (Number(p.delayDryWet) ?? 35) / 100,
+        delayTime:       (Number(p.delayTime) ?? 30) / 100,
+        delayFeedback:   (Number(p.delayFeedback) ?? 45) / 100,
+        delayCutLow:     (Number(p.delayCutLow) ?? 5) / 100,
+        delayCutHi:      (Number(p.delayCutHi) ?? 75) / 100,
+        delaySaturation: (Number(p.delaySaturation) ?? 25) / 100,
+        delayDrift:      (Number(p.delayDrift) ?? 15) / 100,
+        delayMode:       Number(p.delayMode) ?? 0,
+        springsActive:   (Number(p.springsActive) ?? 100) > 50,
+        springsDryWet:   (Number(p.springsDryWet) ?? 40) / 100,
+        springsWidth:    (Number(p.springsWidth) ?? 100) / 100,
+        springsLength:   (Number(p.springsLength) ?? 50) / 100,
+        springsDecay:    (Number(p.springsDecay) ?? 40) / 100,
+        springsDamp:     (Number(p.springsDamp) ?? 30) / 100,
+        springsShape:    (Number(p.springsShape) ?? 30) / 100,
+        springsTone:     (Number(p.springsTone) ?? 50) / 100,
+        springsScatter:  (Number(p.springsScatter) ?? 50) / 100,
+        springsChaos:    (Number(p.springsChaos) ?? 10) / 100,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({
+      delayActive: 100, delayDryWet: 35, delayTime: 30, delayFeedback: 45,
+      delayCutLow: 5, delayCutHi: 75, delaySaturation: 25, delayDrift: 15, delayMode: 0,
+      springsActive: 100, springsDryWet: 40, springsWidth: 100, springsLength: 50,
+      springsDecay: 40, springsDamp: 30, springsShape: 30, springsTone: 50,
+      springsScatter: 50, springsChaos: 10,
+    }),
+  },
+  {
     id: 'ShimmerReverb', name: 'Shimmer Reverb', category: 'wasm', group: 'Reverb & Delay',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
