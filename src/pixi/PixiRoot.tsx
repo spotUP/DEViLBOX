@@ -176,6 +176,9 @@ export const PixiRoot: React.FC = () => {
       if (result.success === 'pending-import') {
         if (companionFiles && companionFiles.size > 0) {
           // Companions already fetched (server path) — import directly, skip dialog
+          const { suppressFormatChecks: sfc, restoreFormatChecks: rfc } = await import('@/lib/formatCompatibility');
+          sfc();
+          try {
           const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
           const song = await parseModuleToSong(file, 0, undefined, undefined, companionFiles);
           const { useTrackerStore: ts } = await import('../stores/useTrackerStore');
@@ -196,6 +199,7 @@ export const PixiRoot: React.FC = () => {
           trs.getState().setBPM(song.initialBPM ?? 125);
           ps.getState().setMetadata({ name: song.name });
           fs.getState().applyEditorMode(song);
+          } finally { rfc(); }
         } else {
           setPendingModuleFile(result.file);
         }
