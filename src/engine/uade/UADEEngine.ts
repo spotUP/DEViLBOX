@@ -601,7 +601,10 @@ export class UADEEngine {
     });
 
     // Clone buffer before transferring (caller may need it later for subsong switching)
-    const transferBuf = data.slice(0);
+    // Ensure we have a real ArrayBuffer — Uint8Array.slice() returns a Uint8Array,
+    // which is not transferable. ArrayBuffer.slice() returns an ArrayBuffer.
+    const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
+    const transferBuf = raw.slice(0);
     this.workletNode.port.postMessage(
       { type: 'load', buffer: transferBuf, filenameHint, skipScan, subsong, scanTimeoutSec },
       [transferBuf]
@@ -648,7 +651,8 @@ export class UADEEngine {
   async addCompanionFile(filename: string, data: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
-    const transferBuf = data.slice(0);
+    const raw = data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer;
+    const transferBuf = raw.slice(0);
     this.workletNode.port.postMessage(
       { type: 'addCompanionFile', filename, buffer: transferBuf },
       [transferBuf],

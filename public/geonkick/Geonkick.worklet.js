@@ -74,6 +74,9 @@ class GeonkickProcessor extends AudioWorkletProcessor {
       case 'enableOsc':
         w._gk_wasm_enable_osc(h, data.oscIndex | 0, data.enabled ? 1 : 0);
         break;
+      case 'enableGroup':
+        w._gk_wasm_enable_group(h, data.groupIndex | 0, data.enabled ? 1 : 0);
+        break;
       case 'setOscAmplitude':
         w._gk_wasm_set_osc_amplitude(h, data.oscIndex | 0, Number(data.amplitude) || 0);
         break;
