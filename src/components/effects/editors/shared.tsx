@@ -9,6 +9,7 @@ import { isEffectBpmSynced, getEffectSyncDivision, type SyncDivision } from '@en
 export interface VisualEffectEditorProps {
   effect: EffectConfig;
   onUpdateParameter: (key: string, value: number | string) => void;
+  onUpdateParameters?: (params: Record<string, number | string>) => void;
   onUpdateWet: (wet: number) => void;
 }
 

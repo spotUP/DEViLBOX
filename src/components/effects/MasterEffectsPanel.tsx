@@ -35,10 +35,11 @@ interface SortableVisualEffectProps {
   onToggle: () => void;
   onRemove: () => void;
   onUpdateParameter: (key: string, value: number | string) => void;
+  onUpdateParameters?: (params: Record<string, number | string>) => void;
   onWetChange: (wet: number) => void;
 }
 
-function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onWetChange }: SortableVisualEffectProps) {
+function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange }: SortableVisualEffectProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -96,6 +97,7 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
         <VisualEffectEditorWrapper
           effect={effect}
           onUpdateParameter={onUpdateParameter}
+          onUpdateParameters={onUpdateParameters}
           onUpdateWet={onWetChange}
         />
       </div>
@@ -301,6 +303,15 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     if (effect) {
       updateMasterEffect(effectId, {
         parameters: { ...effect.parameters, [key]: value },
+      });
+    }
+  }, [updateMasterEffect]);
+
+  const handleUpdateParameters = useCallback((effectId: string, params: Record<string, number | string>) => {
+    const effect = masterEffectsRef.current.find(fx => fx.id === effectId);
+    if (effect) {
+      updateMasterEffect(effectId, {
+        parameters: { ...effect.parameters, ...params },
       });
     }
   }, [updateMasterEffect]);
@@ -521,6 +532,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                   onToggle={() => handleToggle(effect.id)}
                   onRemove={() => handleRemove(effect.id)}
                   onUpdateParameter={(key, value) => handleUpdateParameter(effect.id, key, value)}
+                  onUpdateParameters={(params) => handleUpdateParameters(effect.id, params)}
                   onWetChange={(wet) => handleWetChange(effect.id, wet)}
                 />
               ))}
