@@ -876,8 +876,11 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
           subsong,
           companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
         });
-      } else if (format?.nativeParser) {
-        // Direct native parser path — format has a dedicated TS parser (e.g. AdPlug OPL formats)
+      } else if (format?.nativeParser?.parseFn === 'parseAdPlugFile') {
+        // Direct AdPlug OPL parser path — only for formats whose registered
+        // nativeParser is explicitly the AdPlug parser. Other formats with
+        // nativeParsers (MOD, XM, IT, S3M, HVL, FC, JAM, etc.) fall through
+        // to the parseModuleToSong pipeline which routes them correctly.
         const { parseAdPlugFile } = await import('../../lib/import/formats/AdPlugParser');
         const song = parseAdPlugFile(arrayBuffer, filename);
 
