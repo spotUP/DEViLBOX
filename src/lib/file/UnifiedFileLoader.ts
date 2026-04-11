@@ -522,6 +522,17 @@ export async function loadFile(
       return await loadV2MFile(file);
     }
 
+    // === GoatTracker .sng — detect by magic bytes BEFORE AdPlug claims it ===
+    // Both GoatTracker and AdPlug use .sng extension. Check magic bytes first.
+    if (filename.endsWith('.sng')) {
+      const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
+      const buf = await file.arrayBuffer();
+      if (isGoatTrackerSong(buf)) {
+        return await loadSongFile(file, options, buf);
+      }
+      // Not GoatTracker — fall through to AdPlug below
+    }
+
     // === ADPLUG WASM STREAMING — OPL/AdLib formats not handled by TS parser ===
     if (isAdPlugWasmFormat(filename)) {
       return await loadAdPlugFile(file, options.companionFiles);
@@ -536,15 +547,8 @@ export async function loadFile(
         return { success: 'pending-confirmation', file };
       }
 
-      // GoatTracker .sng files can be detected by magic bytes and always bypass
-      // the confirmation dialog — they route directly to the GTUltra engine.
-      if (filename.endsWith('.sng')) {
-        const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
-        const buf = await file.arrayBuffer();
-        if (isGoatTrackerSong(buf)) {
-          return await loadSongFile(file, options, buf);
-        }
-      }
+      // GoatTracker .sng already handled above (before AdPlug check)
+
       // .sunvox files bypass the confirmation dialog — they use their own
       // SunVox engine loading path in loadSongFile, not importTrackerModule.
       if (filename.endsWith('.sunvox')) {
