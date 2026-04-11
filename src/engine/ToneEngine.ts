@@ -243,9 +243,6 @@ export class ToneEngine {
     meter: Tone.Meter;
   }> = new Map();
 
-  // Channel-routed master effects (pre-mix sub-mix routing)
-  private _channelRoutedEffects: import('./tone/ChannelRoutedEffects').ChannelRoutedEffectsManager | null = null;
-
   // Channel mute/solo state for quick lookup during playback
   private channelMuteStates: Map<number, boolean> = new Map(); // true = should be muted
 
@@ -4855,30 +4852,10 @@ export class ToneEngine {
   }
 
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
-    // Tear down any existing channel isolation (legacy dual-worklet approach)
-    if (this._channelRoutedEffects) {
-      this._channelRoutedEffects.teardown();
-      this._restoreMainEngineMuteMask();
-      this._channelRoutedEffects = null;
-    }
-
-    // All effects go through the global master chain.
-    // selectedChannels is stored in config for future use but doesn't
-    // affect routing — true per-channel isolation requires a multi-output
-    // worklet which isn't implemented yet.
+    // Channel-targeted effects (those with selectedChannels) are routed via
+    // WASM isolation in scheduleWasmEffectRebuild, NOT the master serial chain.
+    // Don't tear down isolation here — it's managed by ChannelRoutedEffects.
     await _rebuildMasterEffects(this._masterFxCtx, effects);
-  }
-
-  /** Restore main LibopenmptEngine mute mask and clear transport subscription. */
-  private async _restoreMainEngineMuteMask(): Promise<void> {
-    try {
-      const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
-      if (LibopenmptEngine.hasInstance()) {
-        const engine = LibopenmptEngine.getInstance();
-        engine.setMuteMask(0xFFFFFFFF);
-        engine.onTransportEvent = null;
-      }
-    } catch { /* */ }
   }
 
   public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {

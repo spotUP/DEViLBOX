@@ -217,16 +217,22 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
 export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects: EffectConfig[]): boolean {
   // Filter to enabled effects (like rebuild does)
   const enabledNew = newEffects.filter((fx) => fx.enabled);
+  // For the fast path, compare GLOBAL effects (no selectedChannels) against current chain.
+  // If selectedChannels changed, we need a full rebuild to move effects between
+  // the global serial chain and the per-channel WASM isolation system.
+  const globalNew = enabledNew.filter(
+    fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0
+  );
   const currentIds = Array.from(ctx.masterEffectConfigs.keys());
 
-  // Different number of effects - need full rebuild
-  if (enabledNew.length !== currentIds.length) {
+  // Different number of global effects - need full rebuild
+  if (globalNew.length !== currentIds.length) {
     return false;
   }
 
   // Check if IDs and order match
-  for (let i = 0; i < enabledNew.length; i++) {
-    if (enabledNew[i].id !== currentIds[i]) {
+  for (let i = 0; i < globalNew.length; i++) {
+    if (globalNew[i].id !== currentIds[i]) {
       return false; // Order changed or different effect
     }
 
@@ -234,7 +240,7 @@ export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects:
     if (!current) return false;
 
     // Type changed - need rebuild
-    if (enabledNew[i].type !== current.config.type) {
+    if (globalNew[i].type !== current.config.type) {
       return false;
     }
   }
