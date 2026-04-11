@@ -178,8 +178,8 @@ const SF2OrderMatrix: React.FC<{
               const seqIdx = entry?.seqIdx ?? -1;
               const isEnd = entry === null || seqIdx < 0;
               const isLoopPoint = ol.hasLoop && pos === ol.loopIndex;
-              const transpose = entry?.transpose ?? 0x80;
-              const transposeOffset = transpose - 0x80;
+              const transpose = entry?.transpose ?? 0xA0;
+              const transposeOffset = transpose - 0xA0;
               const showTranspose = transposeOffset !== 0;
               return (
                 <div
