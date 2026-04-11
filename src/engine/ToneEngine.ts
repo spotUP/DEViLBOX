@@ -4859,20 +4859,114 @@ export class ToneEngine {
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
     const myVersion = ++this._channelRoutedRebuildVersion;
 
-    // Channel routing via parallel sends is not yet supported for WASM engines
-    // (LibopenmptEngine, FurnaceDispatch, SunVox, etc.) because their audio bypasses
-    // channelOutputs entirely. The selectedChannels preference is stored in the config
-    // for future use, but ALL effects go through the global chain for now.
-    // Tear down any stale channel-routed sends
-    if (this._channelRoutedEffects) {
+    // Split effects into those requesting channel routing vs global
+    const wantsChannelRouting = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
+    const wantsGlobal = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
+
+    // Attempt per-channel isolation via secondary libopenmpt worklets
+    let routedIds: string[] = [];
+    let isolatedChannelsMask = 0;
+
+    if (wantsChannelRouting.length > 0) {
+      // Get module buffer from active LibopenmptEngine (if any)
+      let moduleBuffer: ArrayBuffer | null = null;
+      let audioContext: AudioContext | null = null;
+      let currentPosition: { order: number; row: number } | null = null;
+
+      try {
+        const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+        if (LibopenmptEngine.hasInstance()) {
+          const engine = LibopenmptEngine.getInstance();
+          moduleBuffer = engine.getModuleBuffer();
+          audioContext = engine.getAudioContext();
+          currentPosition = engine.getCurrentPosition();
+        }
+      } catch { /* LibopenmptEngine not available */ }
+
+      if (moduleBuffer && audioContext) {
+        if (!this._channelRoutedEffects) {
+          const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
+          this._channelRoutedEffects = new ChannelRoutedEffectsManager(this.masterInput);
+        }
+
+        const result = await this._channelRoutedEffects.rebuild(
+          wantsChannelRouting,
+          moduleBuffer,
+          audioContext,
+          currentPosition,
+        );
+        routedIds = result.routedIds;
+        isolatedChannelsMask = result.isolatedChannelsMask;
+
+        // Update main LibopenmptEngine mute mask to exclude isolated channels.
+        // The isolated channels are now played by their own worklet instances.
+        if (isolatedChannelsMask !== 0) {
+          try {
+            const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+            if (LibopenmptEngine.hasInstance()) {
+              const engine = LibopenmptEngine.getInstance();
+              // Preserve user mute mask (from mixer), add isolation mask
+              const allActive = 0xFFFFFFFF;
+              engine.setMuteMask(allActive & ~isolatedChannelsMask);
+              console.log(`[ToneEngine] Main engine mute mask updated: isolated channels ${isolatedChannelsMask.toString(2)}`);
+
+              // Subscribe to transport events to keep isolation nodes in sync
+              const mgr = this._channelRoutedEffects!;
+              engine.onTransportEvent = (event: string, order?: number, row?: number) => {
+                switch (event) {
+                  case 'seek': mgr.seekTo(order!, row!); break;
+                  case 'pause': mgr.pause(); break;
+                  case 'unpause': mgr.unpause(); break;
+                  case 'stop': mgr.teardown(); break;
+                }
+              };
+            }
+          } catch { /* */ }
+        }
+      } else {
+        // No libopenmpt module loaded — tear down old isolation nodes
+        if (this._channelRoutedEffects) {
+          this._channelRoutedEffects.teardown();
+        }
+      }
+    } else if (this._channelRoutedEffects) {
       this._channelRoutedEffects.teardown();
+      // Restore full mute mask and clear transport subscription on main engine
+      this._restoreMainEngineMuteMask();
     }
 
     // Abort if superseded by a newer rebuild
     if (myVersion !== this._channelRoutedRebuildVersion) return;
 
-    // Build global master chain with ALL effects (ignore selectedChannels for routing)
-    await _rebuildMasterEffects(this._masterFxCtx, effects);
+    // Effects that wanted channel routing but couldn't connect fall back to global
+    const fallbackToGlobal = wantsChannelRouting.filter(e => !routedIds.includes(e.id));
+    const globalEffects = [...wantsGlobal, ...fallbackToGlobal];
+
+    // Build global master chain with all remaining effects
+    await _rebuildMasterEffects(this._masterFxCtx, globalEffects);
+
+    // Abort if superseded during global rebuild
+    if (myVersion !== this._channelRoutedRebuildVersion) return;
+
+    // Register channel-routed effect nodes in masterEffectConfigs for parameter updates
+    if (this._channelRoutedEffects) {
+      const routedConfigs = this._channelRoutedEffects.getRoutedConfigs();
+      for (const [id, entry] of routedConfigs) {
+        this.masterEffectConfigs.set(id, entry);
+      }
+    }
+  }
+
+  /** Restore main LibopenmptEngine mute mask and clear transport subscription. */
+  private async _restoreMainEngineMuteMask(): Promise<void> {
+    try {
+      const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+      if (LibopenmptEngine.hasInstance()) {
+        const engine = LibopenmptEngine.getInstance();
+        engine.setMuteMask(0xFFFFFFFF);
+        engine.onTransportEvent = null;
+      }
+    } catch { /* */ }
   }
 
   public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {
