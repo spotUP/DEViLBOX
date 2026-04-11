@@ -58,9 +58,6 @@ export class ChannelRoutedEffectsManager {
     const engine = LibopenmptEngine.getInstance();
     if (!engine.isAvailable()) { console.warn('[ChannelRoutedEffects] Engine not available'); return; }
 
-    const workletNode = engine.getWorkletNode();
-    if (!workletNode) return;
-
     // Tear down existing slots
     this.teardown(engine);
 
