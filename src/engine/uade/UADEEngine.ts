@@ -179,6 +179,10 @@ export class UADEEngine {
   private _liveTickSnapshots: UADETickSnapshot[] = [];
   private _liveTickCallbacks: Set<(snapshots: UADETickSnapshot[]) => void> = new Set();
 
+  /** True when UADE WASM hit a fatal error (protocol cascade, OOM abort).
+   *  getInstance() checks this and recreates the engine. */
+  private _poisoned = false;
+
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
@@ -194,8 +198,12 @@ export class UADEEngine {
   static getInstance(): UADEEngine {
     const currentCtx = getDevilboxAudioContext();
     if (!UADEEngine.instance || UADEEngine.instance._disposed ||
+        UADEEngine.instance._poisoned ||
         UADEEngine.instance.audioContext !== currentCtx) {
       if (UADEEngine.instance && !UADEEngine.instance._disposed) {
+        if (UADEEngine.instance._poisoned) {
+          console.warn('[UADEEngine] Recreating poisoned UADE instance (protocol cascade recovery)');
+        }
         UADEEngine.instance.dispose();
       }
       UADEEngine.instance = new UADEEngine();
@@ -323,6 +331,14 @@ export class UADEEngine {
 
         case 'error':
           console.error('[UADEEngine]', data.message);
+          // Detect protocol cascade corruption — mark engine as poisoned
+          // so getInstance() recreates it on next access.
+          if (data.message?.includes('protocol error') ||
+              data.message?.includes('Aborted') ||
+              data.message?.includes('abort()') ||
+              data.message?.includes('module check failed')) {
+            this._poisoned = true;
+          }
           // Reject init promise if still pending (WASM init failed)
           if (this._rejectInit) {
             this._rejectInit(new Error(data.message));
