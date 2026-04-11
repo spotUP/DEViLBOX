@@ -207,6 +207,48 @@ function detectEffect(
     }
   }
 
+  // ── Tremolo detection ──────────────────────────────────────────────────
+  // Volume oscillates around a center value (alternating +/-).
+  // XM effect 7 (0x07): xy — x=speed, y=depth.
+  if (volDeltas.length >= 3) {
+    let volSignChanges = 0;
+    for (let i = 1; i < volDeltas.length; i++) {
+      if ((volDeltas[i] > 0 && volDeltas[i - 1] < 0) ||
+          (volDeltas[i] < 0 && volDeltas[i - 1] > 0)) {
+        volSignChanges++;
+      }
+    }
+    if (volSignChanges >= 2) {
+      const maxVolDelta = Math.max(...volDeltas.map(Math.abs));
+      const depth = Math.min(0xF, Math.max(1, Math.round(maxVolDelta)));
+      const tSpeed = Math.min(0xF, Math.max(1, Math.round(volSignChanges * 2)));
+      if (depth > 0) {
+        return { effTyp: 0x07, eff: (tSpeed << 4) | depth };
+      }
+    }
+  }
+
+  // ── Tone portamento detection ──────────────────────────────────────────
+  // Period slides smoothly toward a target (converging). Unlike plain portamento
+  // (constant delta), tone portamento slows as it approaches the target.
+  // XM effect 3 (0x03): xx — portamento speed.
+  if (periodDeltas.length >= 3) {
+    const allSameSign = periodDeltas.every(d => d > 0) || periodDeltas.every(d => d < 0);
+    if (allSameSign) {
+      const absDeltaFirst = Math.abs(periodDeltas[0]);
+      const absDeltaLast = Math.abs(periodDeltas[periodDeltas.length - 1]);
+      // Converging: deltas get smaller over time (approaching target)
+      if (absDeltaFirst > absDeltaLast && absDeltaFirst > 0) {
+        const portaSpeed = Math.min(0xFF, Math.round(
+          periodDeltas.reduce((s, d) => s + Math.abs(d), 0) / periodDeltas.length,
+        ));
+        if (portaSpeed > 0) {
+          return { effTyp: 0x03, eff: portaSpeed };
+        }
+      }
+    }
+  }
+
   // ── Retrigger detection ────────────────────────────────────────────────
   // Multiple DMA restarts within a single row = note retrigger.
   // XM effect E9x: retrigger note every x ticks.
@@ -241,12 +283,15 @@ function detectEffect(
  * @param snapshots            Tick snapshots from UADEEngine.getTickSnapshots()
  * @param samplePtrToInstrIndex  Map from chip RAM address (lc register) to 1-based instrument index
  * @param channelCount         Number of Paula channels to reconstruct (default 4)
+ * @param speedHint            If provided, override auto-detected speed
+ * @param scanDurationMs       Duration of the scan in milliseconds (for BPM estimation)
  */
 export function reconstructPatterns(
   snapshots: UADETickSnapshot[],
   samplePtrToInstrIndex: Map<number, number>,
   channelCount = 4,
   speedHint?: number,
+  scanDurationMs?: number,
 ): ReconstructedSong {
   const warnings: string[] = [];
 
@@ -428,7 +473,29 @@ export function reconstructPatterns(
     );
   }
 
-  // BPM is not derivable from CIA tick snapshots alone (would need CIA timer rate vs audio SR).
-  // Return 125 as the standard ProTracker/UADE default.
-  return { patterns, bpm: 125, speed, firstTick, warnings };
+  // ── BPM estimation ────────────────────────────────────────────────────────
+  // If we know the scan duration, derive BPM from actual tick rate.
+  // tickRate = (lastTick - firstTick) / (scanDurationMs / 1000)
+  // rowRate = tickRate / speed (rows per second)
+  // BPM = rowRate * 60 / 24 * speed (ProTracker: BPM = 24 * tickRate / speed... actually:
+  //   ProTracker row rate = BPM * 2 / 5 rows/sec → BPM = rowRate * 5 / 2 * speed... nope)
+  // Standard: 125 BPM → 50 ticks/sec. So BPM = tickRate * 2.5.
+  // More precisely: BPM = tickRate * 125 / 50 = tickRate * 2.5
+  let bpm = 125;
+  if (scanDurationMs && scanDurationMs > 0) {
+    const tickSpan = lastTick - firstTick;
+    if (tickSpan > 0) {
+      const tickRate = tickSpan / (scanDurationMs / 1000); // ticks per second
+      // Standard CIA-based BPM: 50Hz = 125 BPM, so BPM = tickRate * 2.5
+      const estimatedBpm = Math.round(tickRate * 2.5);
+      // Sanity check: most Amiga formats are 50-300 BPM
+      if (estimatedBpm >= 40 && estimatedBpm <= 400) {
+        bpm = estimatedBpm;
+      } else {
+        warnings.push(`Estimated BPM ${estimatedBpm} out of range (40-400), using default 125`);
+      }
+    }
+  }
+
+  return { patterns, bpm, speed, firstTick, warnings };
 }
