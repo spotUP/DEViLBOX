@@ -48,14 +48,18 @@ export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
     `Pos: ${orderCursor + 1}/${maxOlLen}`,
   ].filter(Boolean).join('  |  ');
 
-  // Order list overview text
+  // Order list overview text with transpose + loop indicators
   const orderLines: string[] = [];
   for (let t = 0; t < trackCount; t++) {
     const ol = orderLists[t];
     if (!ol) continue;
     const entries = ol.entries.map((e, i) => {
       const seqStr = e.seqIdx.toString(16).toUpperCase().padStart(2, '0');
-      return i === orderCursor ? `[${seqStr}]` : ` ${seqStr} `;
+      const tOff = e.transpose - 0x80;
+      const tStr = tOff !== 0 ? (tOff > 0 ? `+${tOff}` : `${tOff}`) : '';
+      const loopMark = ol.hasLoop && i === ol.loopIndex ? '*' : '';
+      const prefix = tStr ? `${tStr}:` : '';
+      return i === orderCursor ? `[${prefix}${seqStr}${loopMark}]` : ` ${prefix}${seqStr}${loopMark} `;
     }).join('');
     orderLines.push(`CH${t + 1}: ${entries}`);
   }

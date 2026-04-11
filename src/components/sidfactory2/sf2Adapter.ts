@@ -23,11 +23,13 @@ export function sf2NoteToString(note: number): string {
 function sf2InstToString(val: number): string {
   if (val === 0 || val === 0x80) return '--'; // no change / empty
   if (val === 0x90) return '**';              // tie instrument (matches original)
+  if (val > 0x1F && val < 0x80) return '??';  // invalid instrument value
   return (val & 0x1F).toString(16).toUpperCase().padStart(2, '0');
 }
 
 function sf2CmdToString(val: number): string {
   if (val === 0 || val === 0x80) return '--'; // no command / empty
+  if (val > 0x3F && val < 0x80) return '??';  // invalid command value
   return (val & 0x3F).toString(16).toUpperCase().padStart(2, '0');
 }
 
