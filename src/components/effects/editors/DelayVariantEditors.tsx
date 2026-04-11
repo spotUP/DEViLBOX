@@ -9,6 +9,7 @@ import { Knob } from '@components/controls/Knob';
 import { isEffectBpmSynced } from '@engine/bpmSync';
 import { getToneEngine } from '@engine/ToneEngine';
 import { SectionHeader, getParam, renderBpmSync, type VisualEffectEditorProps } from './shared';
+import { RE_TAPE_ECHO_PRESETS, type RETapeEchoPreset } from '@constants/reTapeEchoPresets';
 
 // ============================================================================
 // SPACEY DELAYER (WASM Multitap Delay)
@@ -131,9 +132,41 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
 
   const modeLabels = ['Head 1', 'Head 2', 'Both', 'H1+FB', 'H2+FB', 'Both+FB'];
 
+  const applyPreset = (preset: RETapeEchoPreset) => {
+    const p = preset.params;
+    onUpdateParameter('mode', p.mode);
+    onUpdateParameter('repeatRate', p.repeatRate);
+    onUpdateParameter('intensity', p.intensity);
+    onUpdateParameter('echoVolume', p.echoVolume);
+    onUpdateParameter('wow', p.wow);
+    onUpdateParameter('flutter', p.flutter);
+    onUpdateParameter('dirt', p.dirt);
+    onUpdateParameter('inputBleed', p.inputBleed);
+    onUpdateParameter('loopAmount', p.loopAmount);
+    onUpdateParameter('playheadFilter', p.playheadFilter);
+  };
+
   return (
     <div className="space-y-4">
       <EffectOscilloscope pre={pre} post={post} color="#dc2626" />
+      {/* Dub Presets */}
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader size="lg" color="#dc2626" title="Presets" />
+        <div className="flex flex-wrap gap-1">
+          {RE_TAPE_ECHO_PRESETS.map((preset) => (
+            <button
+              key={preset.name}
+              onClick={() => applyPreset(preset)}
+              title={preset.description}
+              className="px-2.5 py-1.5 rounded text-xs font-medium transition-colors
+                bg-dark-bgTertiary text-text-secondary hover:bg-red-600/30 hover:text-text-primary
+                active:bg-red-600 active:text-text-primary"
+            >
+              {preset.name}
+            </button>
+          ))}
+        </div>
+      </section>
       {/* Main Controls */}
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader size="lg" color="#dc2626" title="RE Tape Echo" />
