@@ -2321,6 +2321,7 @@ export class ToneEngine {
       case 'C64SID':
       case 'Sc68Synth':
       case 'GTUltraSynth':
+      case 'SF2Synth':
         return null;
 
       default: {
@@ -4858,27 +4859,39 @@ export class ToneEngine {
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
     const myVersion = ++this._channelRoutedRebuildVersion;
 
-    // Split effects into channel-routed (pre-mix) vs global (post-mix)
-    const channelRouted = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
-    const global = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
+    // Split effects into those requesting channel routing vs global
+    const wantsChannelRouting = effects.filter(e => e.selectedChannels && e.selectedChannels.length > 0);
+    const wantsGlobal = effects.filter(e => !e.selectedChannels || e.selectedChannels.length === 0);
 
-    // Tear down and rebuild channel-routed effects (pre-mix sub-mixes)
-    if (!this._channelRoutedEffects) {
-      const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
-      this._channelRoutedEffects = new ChannelRoutedEffectsManager(
-        this.masterInput,
-        (idx) => this.channelOutputs.get(idx) ?? null,
-      );
+    // Attempt to build channel-routed effects (parallel sends)
+    let actuallyRoutedIds: string[] = [];
+    if (wantsChannelRouting.length > 0) {
+      if (!this._channelRoutedEffects) {
+        const { ChannelRoutedEffectsManager } = await import('./tone/ChannelRoutedEffects');
+        this._channelRoutedEffects = new ChannelRoutedEffectsManager(
+          this.masterInput,
+          (idx) => this.channelOutputs.get(idx) ?? null,
+        );
+      }
+      actuallyRoutedIds = await this._channelRoutedEffects.rebuild(wantsChannelRouting);
+    } else if (this._channelRoutedEffects) {
+      this._channelRoutedEffects.teardown();
     }
-    await this._channelRoutedEffects.rebuild(channelRouted);
 
     // Abort if superseded by a newer rebuild
     if (myVersion !== this._channelRoutedRebuildVersion) return;
 
-    // Build global master chain (post-mix) with remaining effects
+    // Effects that WANTED channel routing but couldn't connect fall back to global chain
+    const fallbackToGlobal = wantsChannelRouting.filter(e => !actuallyRoutedIds.includes(e.id));
+    if (fallbackToGlobal.length > 0) {
+      console.log(`[ToneEngine] Channel routing unavailable for: ${fallbackToGlobal.map(e => e.type).join(', ')} — using global chain`);
+    }
+    const globalEffects = [...wantsGlobal, ...fallbackToGlobal];
+
+    // Build global master chain (post-mix) with all global effects
     // NOTE: _rebuildMasterEffects clears masterEffectConfigs, so register
     // channel-routed configs AFTER the global rebuild.
-    await _rebuildMasterEffects(this._masterFxCtx, global);
+    await _rebuildMasterEffects(this._masterFxCtx, globalEffects);
 
     // Abort if superseded during global rebuild
     if (myVersion !== this._channelRoutedRebuildVersion) return;
