@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-11T02:39:34.617Z
+ * Generated: 2026-04-11T18:02:08.922Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4823';
-export const BUILD_NUMBER = '4823';
-export const BUILD_HASH = '006142c08';
+export const BUILD_VERSION = '1.0.4904';
+export const BUILD_NUMBER = '4904';
+export const BUILD_HASH = '86d56bdb9';
 export const BUILD_DATE = '2026-04-11';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,210 +30,196 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4823',
+    version: '1.0.4904',
     date: '2026-04-11',
     changes: [
       {
         type: 'fix',
-        "description": "Add sourceFormat metadata to patterns and read SF2 store in engine routing"
+        "description": "Status bar fixed-width numerals to prevent layout jumps"
+      },
+      {
+        type: 'feature',
+        "description": "F5 resize, Shift+F5 expand, F6 remove unused sequences"
+      },
+      {
+        type: 'feature',
+        "description": "Play markers, notation mode, SID toggle, expand/resize sequence"
+      },
+      {
+        type: 'fix',
+        "description": "VisualEffectEditorWrapper crash + Furnace frozen config mutation"
+      },
+      {
+        type: 'fix',
+        "description": "Reorder audit tests — stable engines first, UADE-heavy formats last"
+      },
+      {
+        type: 'fix',
+        "description": "SF2: fix transposition base 0xA0 in order matrix, GL view, and channel labels"
       },
       {
         type: 'improvement',
-        "description": "Complete SF2Synth integration parity with GTUltra"
+        "description": "SF2 deep audit: transposition, loop parsing, undo, validation, seq management"
       },
       {
         type: 'fix',
-        "description": "Fix channel routing: keep all effects in global chain"
+        "description": "MusicLine _ml_set_channel_on guard + chiptune3 registerProcessor guard"
       },
       {
         type: 'fix',
-        "description": "Fix channel routing: fall back to global chain when channelOutputs unavailable"
+        "description": "Add Ctrl+Shift+Up/Down gate fill — toggle gate until next/prev event"
+      },
+      {
+        type: 'fix',
+        "description": "Validation, seq management, order display — closing remaining gaps"
+      },
+      {
+        type: 'fix',
+        "description": "1:1 parity with original SID Factory II editor"
       },
       {
         type: 'feature',
-        "description": "Add SF2 live editing engine with C64 memory bridge"
+        "description": "--resume flag skips already-passed tests from previous run"
       },
       {
         type: 'fix',
-        "description": "Fix channel routing: use parallel send architecture (no disconnects)"
+        "description": "Three audit-revealed bugs — V2 routing, UADESynth cross-context crash, worklet registration"
       },
       {
         type: 'fix',
-        "description": "Fix channel routing: use gain gate instead of surgical disconnect"
+        "description": "Guard V2Synth worklet registerProcessor against double-registration"
       },
       {
         type: 'fix',
-        "description": "Fix channel routing: use native Web Audio API for surgical disconnect"
+        "description": "Per-channel FX now works — two root causes found and fixed"
+      },
+      {
+        type: 'fix',
+        "description": "Remove guessed Modland paths, rely on local Reference Music collection"
       },
       {
         type: 'feature',
-        "description": "Add SF2 synth type, instrument editor, keyboard handler, SID register access"
+        "description": "Ultimate release-readiness test suite — 7 tiers, 300+ tests, all formats"
+      },
+      {
+        type: 'fix',
+        "description": "Master FX selectedChannels triggers per-channel WASM isolation routing"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: remove dead code and clean up TODO/FIXME comments"
       },
       {
         type: 'feature',
-        "description": "Add channel routing selector to Master FX modal dialog"
+        "description": "Unified audit — merge formats + furnace + effects into one script"
+      },
+      {
+        type: 'fix',
+        "description": "Display raw sequence data matching original editor 1:1"
+      },
+      {
+        type: 'feature',
+        "description": "Retry on browser interference + song identity check"
+      },
+      {
+        type: 'feature',
+        "description": "--push-results and --only flags for playback smoke test"
+      },
+      {
+        type: 'fix',
+        "description": "Playback smoke test — stop between tests, retry audio, better docs"
+      },
+      {
+        type: 'feature',
+        "description": "Expand playback smoke test to 163 local formats + fix local loader"
+      },
+      {
+        type: 'feature',
+        "description": "Make per-channel FX button always clickable with add-effect UI"
+      },
+      {
+        type: 'fix',
+        "description": "Don't create spurious libopenmpt XM for native-engine formats"
       },
       {
         type: 'improvement',
-        "description": "Make channel routing selector always visible on master FX pedals"
+        "description": "Chore: remove noisy success log from SF2 callback monitor"
       },
       {
         type: 'improvement',
-        "description": "Wire SF2 format editor: store, adapter, views (DOM+GL), routing"
+        "description": "Simplify per-channel FX to multi-output worklet (remove MessagePort isolation)"
       },
       {
         type: 'fix',
-        "description": "Fix channel routing teardown, race guard, empty channel display"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-channel effect routing and channel selection UI"
+        "description": "Add missing label prop to PixiToggle in PixiSymphoniePanel"
       },
       {
         type: 'improvement',
-        "description": "Update porting guide with SID Factory II case study"
+        "description": "Chore: remove diagnostic logging from FormatPlaybackState"
       },
       {
         type: 'fix',
-        "description": "Fix VocoderEditor and VinylNoiseEditor preset batch updates"
+        "description": "Only use clock for smooth scrolling, use fps.row for stepped"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add logging to scheduleWasmEffectRebuild to trace per-channel FX path"
       },
       {
         type: 'feature',
-        "description": "Add SID Factory II (.sf2) format support"
+        "description": "PixiRobHubbardPanel + PixiSteveTurnerPanel + PixiDavidWhittakerPanel with routing"
       },
       {
         type: 'fix',
-        "description": "Fix effect presets: batch parameter update to prevent clobbering"
+        "description": "Use audio-clock-driven position like GT Ultra, not setInterval"
+      },
+      {
+        type: 'fix',
+        "description": "Belt-and-suspenders channel isolation using both mute AND volume"
+      },
+      {
+        type: 'fix',
+        "description": "Free-running clock for constant-rate pattern scrolling"
+      },
+      {
+        type: 'fix',
+        "description": "Remove blue border and black gap below playfield"
+      },
+      {
+        type: 'fix',
+        "description": "Constant-rate pattern scroll via predicted timestamps"
+      },
+      {
+        type: 'fix',
+        "description": "Remove black space below playfield — use grid aspect ratio"
+      },
+      {
+        type: 'fix',
+        "description": "MessagePort per-channel FX isolation (replace broken multi-output approach)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove stale workletNode guard that could abort per-channel FX rebuild"
       },
       {
         type: 'feature',
-        "description": "Add RE Tape Echo dub presets + further tame ShimmerReverb"
-      },
-      {
-        type: 'feature',
-        "description": "Add comprehensive WASM effects porting guide"
-      },
-      {
-        type: 'feature',
-        "description": "Add comprehensive format porting guide"
+        "description": "Synth sound effects + tighter input handling"
       },
       {
         type: 'fix',
-        "description": "Fix RE Tape Echo + SpaceyDelayer silence, tame ShimmerReverb + MoogFilters"
-      },
-      {
-        type: 'fix',
-        "description": "Fix ShimmerReverb: tanhf soft clip on feedback + output, tame defaults"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AdPlug scroll stutter: check position every process() call"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AdPlug scroll: use dispatchEnginePosition for stable timing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AdPlug pattern scroll sync: row duration + onEnded"
-      },
-      {
-        type: 'fix',
-        "description": "Fix WASM effects: Embind base class binding for process()"
-      },
-      {
-        type: 'fix',
-        "description": "Fix cached WASM: density check fallback + cache-busting for extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Fix missing AdPlug pattern notes: real-time channel state + OPL capture sort"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Masha button: momentary hold instead of toggle"
-      },
-      {
-        type: 'fix',
-        "description": "Fix worklet HEAPF32 crash: use DataView + try/catch for safety"
-      }
-    ]
-  },
-  {
-    version: '2026-04-10',
-    date: '2026-04-10',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Fix RE Tape Echo silence + add per-effect default wet levels"
-      },
-      {
-        type: 'fix',
-        "description": "Fix worklet HEAPF32 crash: use Float32Array view from HEAPU8.buffer"
-      },
-      {
-        type: 'fix',
-        "description": "Fix AdPlug distortion and pattern scroll jitter"
+        "description": "Replace broken after-process callback with reliable setInterval polling"
       },
       {
         type: 'improvement',
-        "description": "AdPlug: per-channel mute/solo, VU meters, D00 native extraction, position sync"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove non-functional environments display from KissOfShame"
-      },
-      {
-        type: 'fix',
-        "description": "Fix KissOfShame VU meters and restore environment display"
-      },
-      {
-        type: 'fix',
-        "description": "Fix KissOfShame knob interaction: memoize FilmstripKnob + reduce re-renders"
-      },
-      {
-        type: 'improvement',
-        "description": "AdPlug hybrid playback: streaming audio + editable patterns"
-      },
-      {
-        type: 'fix',
-        "description": "Fix KissOfShame VU visibility and Environments control"
+        "description": "SF2 position: use sequenceIndex in after-process callback, remove setInterval"
       },
       {
         type: 'feature',
-        "description": "Add KissOfShame Bypass and Print Through buttons"
+        "description": "Preview buttons for HippelCoSo + SonicArranger instrument editors (DOM + Pixi)"
       },
       {
         type: 'fix',
-        "description": "KissOfShame UI: always show reels, red VU meters, fix cutoff"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPL3 distortion properly: normalize in WASM bridge, not gain node"
-      },
-      {
-        type: 'improvement',
-        "description": "Animate KissOfShame VU meters from post-effect audio level"
-      },
-      {
-        type: 'fix',
-        "description": "Fix capture BPM: use speed=ticksPerRow, BPM=refresh*5/2"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TapeSimulator killing all audio — missing WASM memory capture in worklet"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPL capture ticksPerRow + distortion: measure actual note spacing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPL capture volume: was sending Fxx (speed) instead of Cxx (volume)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPL capture BPM: remove 5-7x tempo slowdown"
+        "description": "Robust per-channel FX isolation with multiple safeguards"
       }
     ]
   }
