@@ -11,7 +11,6 @@ import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/inst
 import type { ToneEngine } from '@engine/ToneEngine';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
-import { AVAILABLE_EFFECTS } from '@constants/unifiedEffects';
 
 interface AudioStore {
   // State
@@ -156,11 +155,12 @@ export const useAudioStore = create<AudioStore>()(
       // Format compat: master effects — deferred to export-time validation
       // (effects still work in DEViLBOX; only matters when exporting to native format)
 
-      // Look up the correct category from AVAILABLE_EFFECTS so non-tonejs
-      // effects (buzzmachine, wasm, wam, neural) get the right category.
-      // Falls back to 'tonejs' for unregistered/legacy types.
-      const effectDef = AVAILABLE_EFFECTS.find(e => e.type === effectType);
-      const category = (effectDef?.category ?? 'tonejs') as EffectConfig['category'];
+      // Determine effect category. Buzzmachine effects start with 'Buzz',
+      // WAM effects start with 'WAM'. Everything else defaults to 'tonejs'.
+      // This avoids importing unifiedEffects (which causes circular deps in prod).
+      const category: EffectConfig['category'] = (effectType as string).startsWith('Buzz') ? 'buzzmachine'
+        : (effectType as string).startsWith('WAM') ? 'wam'
+        : 'tonejs';
 
       set((state) => {
         const newEffect: EffectConfig = {
