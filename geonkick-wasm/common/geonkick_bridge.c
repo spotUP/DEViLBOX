@@ -312,3 +312,16 @@ void gk_wasm_set_osc_envelope(gk_instance *kick, int osc_index, int env_index,
                                          (size_t)env_index,
                                          buf, n);
 }
+
+/**
+ * Enable/disable an oscillator group. There are 3 groups (0..2), each
+ * containing 3 oscillators. gk_wasm_create only enables group 0 to keep
+ * the default kick quiet — preset loaders enable groups 1 and 2 when
+ * the preset's higher-numbered oscillators are in use.
+ */
+GK_EXPORT
+void gk_wasm_enable_group(gk_instance *kick, int group_index, int enable)
+{
+        if (!kick || group_index < 0 || group_index > 2) return;
+        geonkick_enable_group(kick, (size_t)group_index, enable ? true : false);
+}

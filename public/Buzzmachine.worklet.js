@@ -1203,10 +1203,16 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
 
   process(inputs, outputs, parameters) {
     if (!this.isInitialized || !this.machinePtr || this.processingDisabled) {
-      // Pass through silence
+      // Pass input through when disabled (bypass instead of silence)
+      const input = inputs[0];
       const output = outputs[0];
-      if (output[0]) output[0].fill(0);
-      if (output[1]) output[1].fill(0);
+      if (input && input[0] && output[0]) {
+        output[0].set(input[0]);
+        if (output[1]) output[1].set(input[1] || input[0]);
+      } else {
+        if (output[0]) output[0].fill(0);
+        if (output[1]) output[1].fill(0);
+      }
       return true;
     }
 
@@ -1306,9 +1312,9 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       // Track errors and disable processing after too many
       this.errorCount = (this.errorCount || 0) + 1;
 
-      // Only log first few errors to prevent spam
-      if (this.errorCount <= 3) {
-        console.error('[BuzzmachineWorklet] Process error #' + this.errorCount + ':', err.message || err);
+      // Only log first error to prevent spam
+      if (this.errorCount === 1) {
+        console.error('[BuzzmachineWorklet] Process error in', this.machineTypeName + ':', err.message || err);
       }
 
       // Disable processing after 10 consecutive errors
@@ -1318,9 +1324,15 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'error', error: 'Processing disabled due to repeated errors' });
       }
 
-      // Output silence on error
-      output[0].fill(0);
-      if (output[1]) output[1].fill(0);
+      // Pass input through on error (bypass instead of silence)
+      const errInput = inputs[0];
+      if (errInput && errInput[0] && output[0]) {
+        output[0].set(errInput[0]);
+        if (output[1]) output[1].set(errInput[1] || errInput[0]);
+      } else {
+        output[0].fill(0);
+        if (output[1]) output[1].fill(0);
+      }
     }
 
     return true;
