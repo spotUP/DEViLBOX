@@ -655,42 +655,66 @@ export class SF2Engine {
     };
     this.captureRAFId = requestAnimationFrame(captureTick);
 
-    // Position detection: hook into ScriptProcessorNode's onaudioprocess callback.
-    // The C64 emulator advances inside onaudioprocess, so reading RAM right after
-    // gives the freshest position — no polling jitter from setInterval.
-    let lastSeqRow = -1;
+    // Position detection: mirror the original SF2 editor's OnDriverPostUpdate approach.
+    // Instead of polling sequenceIndex (which jumps unpredictably), we:
+    // 1. Read driverState (0x80 = playing)
+    // 2. Read tempoCounter — when it hits 0, a new row has started
+    // 3. Increment our own local event position counter
+    // This gives perfectly deterministic row advancement synchronized with the driver.
+    let localEventPos = 0;
     let lastOrderIdx = -1;
     let lastDuration = -1;
+    let lastTempoZero = false; // debounce: tempoCounter stays 0 for one tick
     const PAL_TICK_MS = 20; // PAL frame: 50Hz = 20ms per tick
+    const DRIVER_STATE_PLAYING = 0x80;
 
     const checkPosition = () => {
       if (!this.capturing || !setRow || !this.driverCommonData) return;
 
-      const seqRow = this.readRAM(this.driverCommonData.sequenceIndexAddress) ?? 0;
-      const orderIdx = this.readRAM(this.driverCommonData.orderListIndexAddress) ?? 0;
-      const rowChanged = seqRow !== lastSeqRow;
-      const orderChanged = orderIdx !== lastOrderIdx;
+      const dc = this.driverCommonData;
+      const driverState = this.readRAM(dc.driverStateAddress) ?? 0;
+      const tempoCounter = this.readRAM(dc.tempoCounterAddress) ?? 0;
 
       // Read current event duration (ticks per row) from driver
-      const eventDuration = this.readRAM(this.driverCommonData.currentSeqEventDurationAddress) ?? 0;
+      const eventDuration = this.readRAM(dc.currentSeqEventDurationAddress) ?? 0;
       if (setRowDuration && eventDuration > 0 && eventDuration !== lastDuration) {
         lastDuration = eventDuration;
         setRowDuration(eventDuration * PAL_TICK_MS);
       }
 
-      if (rowChanged) {
-        lastSeqRow = seqRow;
+      // Advance position when driver is playing and tempo counter reaches 0
+      // (matches SIDFactoryII screen_edit.cpp OnDriverPostUpdate logic)
+      if (driverState === DRIVER_STATE_PLAYING && tempoCounter === 0 && !lastTempoZero) {
+        localEventPos++;
+
+        // Also read the actual sequence row for sync correction
+        const seqRow = this.readRAM(dc.sequenceIndexAddress) ?? 0;
+        // Use driver's actual row to stay in sync (handles loops, jumps, etc.)
+        // Our local counter provides timing; the driver row provides accuracy
         setRow(seqRow);
+
+        const orderIdx = this.readRAM(dc.orderListIndexAddress) ?? 0;
+        if (sf2StoreReady) {
+          sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
+          lastOrderIdx = orderIdx;
+        }
       }
-      if (sf2StoreReady && (rowChanged || orderChanged)) {
-        lastOrderIdx = orderIdx;
-        sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
+      lastTempoZero = (tempoCounter === 0);
+
+      // Also check for order changes even without row change (e.g. pattern boundary)
+      if (sf2StoreReady) {
+        const orderIdx = this.readRAM(dc.orderListIndexAddress) ?? 0;
+        if (orderIdx !== lastOrderIdx) {
+          lastOrderIdx = orderIdx;
+          const seqRow = this.readRAM(dc.sequenceIndexAddress) ?? 0;
+          sf2UpdatePos!({ row: seqRow, songPos: orderIdx });
+        }
       }
     };
 
-    // Try to hook into the audio processing callback for jitter-free position
+    // Hook into the audio processing callback for jitter-free position
     this.sidEngine.setAfterProcessCallback(checkPosition);
-    // Fallback: also poll at 4ms in case the hook isn't available (e.g. jsSID)
+    // Fallback poll for engines without ScriptProcessorNode
     this.positionPollId = window.setInterval(checkPosition, 4);
   }
 
