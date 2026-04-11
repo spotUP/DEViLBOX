@@ -95,6 +95,36 @@ interface TestCase {
   engineDriven?: boolean;
   /** Companion file paths (e.g. TFMX smpl.* alongside mdat.*) */
   companionPaths?: string[];
+  /** Expected synthTypes for instruments (tier 2). If set, all instruments must match one of these. */
+  expectedSynthTypes?: string[];
+  /** True for regression tests — always included, never filterable */
+  isRegression?: boolean;
+  /** True if this format supports native export round-trip (tier 3) */
+  supportsExport?: boolean;
+}
+
+/** Per-test verification results across all tiers */
+interface TestVerification {
+  // Tier 1: Audio (existing)
+  audioPass: boolean;
+  rmsAvg: number;
+  // Tier 2: Instruments
+  instrumentCount: number;
+  instrumentPass: boolean;
+  instrumentIssue?: string;
+  // Tier 3: Export round-trip
+  exportTested: boolean;
+  exportPass: boolean;
+  exportIssue?: string;
+  // Tier 5: Parameter completeness
+  paramTested: boolean;
+  paramPass: boolean;
+  paramCoverage?: number; // 0-100 percentage
+  paramIssue?: string;
+  // Tier 7: Lock-step (Furnace only)
+  lockstepTested: boolean;
+  lockstepPass: boolean;
+  lockstepIssue?: string;
 }
 
 /**
@@ -329,7 +359,77 @@ const TESTS: TestCase[] = [
   { name: 'TFMX - Turrican Aliens',           family: 'TFMX',    loader: 'modland', path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens', companionPaths: ['pub/modules/TFMX/Chris Huelsbeck/smpl.turrican aliens'] },
   // ── Chiptune formats (dedicated engines) ──
   { name: 'Klystrack - test',                 family: 'KT',      loader: 'modland', path: 'pub/modules/Klystrack/kometbomb/one.kt', expectedEditorMode: 'klystrack', engineDriven: true },
+  // ── Tier 4: MIDI + special format imports ──
+  { name: 'MIDI - Dub Organizer',              family: 'MIDI',    loader: 'local', path: '/Users/spot/Code/DEViLBOX/public/data/songs/midi/dub_organizer.mid', engineDriven: true },
+  { name: 'V2M - Gamma Projection',            family: 'V2M',     loader: 'local', path: '/Users/spot/Code/Reference Music/V2/BetA/gamma projection.v2m', engineDriven: true },
 ];
+
+// ── Tier 6: Regression test catalog ──────────────────────────────────────────
+// Specific bugs that were fixed and must not regress.
+// These are always included in the test run regardless of --only filters.
+const REGRESSIONS: TestCase[] = [
+  // Routing bug: non-OpenMPT formats routed through libopenmpt (fixed b1ab3631e)
+  {
+    name: 'REGRESSION: HVL not routed to HivelyEngine',
+    family: 'REG', loader: 'modland',
+    path: 'pub/modules/HivelyTracker/AceMan/hexplosion.hvl',
+    expectedEditorMode: 'hively',
+    isRegression: true,
+  },
+  // JamCracker bartmanintro: loaded but pattern data was empty
+  {
+    name: 'REGRESSION: JamCracker empty patterns',
+    family: 'REG', loader: 'modland',
+    path: 'pub/modules/JamCracker/Ape/bartmanintro.jam',
+    isRegression: true,
+    // Must have noteCells > 0 in pattern 0 (engineDriven is NOT set)
+  },
+  // FC14 must route to FCSynth, not Sampler
+  {
+    name: 'REGRESSION: FC14 uses FCSynth not Sampler',
+    family: 'REG', loader: 'modland',
+    path: 'pub/modules/Future Composer 1.4/Blaizer/horizon v2.fc',
+    expectedSynthTypes: ['FCSynth'],
+    isRegression: true,
+    engineDriven: true,
+  },
+  // SID must route to C64SIDEngine (engine-driven, no patterns expected)
+  {
+    name: 'REGRESSION: SID routes to C64SIDEngine',
+    family: 'REG', loader: 'hvsc',
+    path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid',
+    engineDriven: true,
+    isRegression: true,
+  },
+  // TFMX must load with companion sample file
+  {
+    name: 'REGRESSION: TFMX loads with companion smpl file',
+    family: 'REG', loader: 'modland',
+    path: 'pub/modules/TFMX/Chris Huelsbeck/mdat.turrican aliens',
+    companionPaths: ['pub/modules/TFMX/Chris Huelsbeck/smpl.turrican aliens'],
+    engineDriven: true,
+    isRegression: true,
+  },
+];
+
+// ── Synth type → expected config field mapping (tier 5) ─────────────────────
+// Maps synthType to the config field name on the instrument that must be populated.
+const SYNTH_CONFIG_FIELDS: Record<string, string> = {
+  'TB303': 'tb303',
+  'Sampler': 'sampler',
+  'FCSynth': 'fc',
+  'Furnace': 'furnace',
+  'FMSynth': 'fm',
+  'MonoSynth': 'mono',
+  'DuoSynth': 'duo',
+  'TR808': 'tr808',
+  'TR909': 'tr909',
+  'DrumMachine': 'drumMachine',
+  'Wavetable': 'wavetable',
+  'GranularSynth': 'granular',
+  'SuperSaw': 'superSaw',
+  'ChipSynth': 'chip',
+};
 
 // ── WebSocket bridge client ────────────────────────────────────────────────
 

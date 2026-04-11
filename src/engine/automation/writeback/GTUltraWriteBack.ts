@@ -14,7 +14,7 @@ export async function applyGTUltraWriteBack(
 ): Promise<boolean> {
   const rawValue = Math.round(newValue * (paramDef.max - paramDef.min) + paramDef.min);
 
-  // TODO: Wire to GTUltra engine table editing API when available
+  // NOTE: GTUltra table editing API not yet exposed — writeback is a no-op
   // The engine needs a setTableEntry(tableType, tableId, index, value) method
   console.log(
     `[GTUltraWriteBack] ${sourceRef.tableType} table[${sourceRef.tableId}][${sourceRef.index}] = ${rawValue}`,
