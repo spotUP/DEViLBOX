@@ -31,19 +31,9 @@ function sf2CmdToString(val: number): string {
   return (val & 0x3F).toString(16).toUpperCase().padStart(2, '0');
 }
 
-// Column definitions: Note | Instrument | Command
-// Matches original SF2 editor display: "---" rest, "+++" tie, "--" empty
+// Column definitions: Instrument | Command | Note
+// Matches original SF2 editor column order (left to right)
 export const SF2_COLUMNS: ColumnDef[] = [
-  {
-    key: 'note',
-    label: 'Note',
-    charWidth: 3,
-    type: 'note',
-    color: '#ff6666',
-    emptyColor: 'var(--color-border-light)',
-    emptyValue: 0,
-    formatter: sf2NoteToString,
-  },
   {
     key: 'instrument',
     label: 'Ins',
@@ -65,6 +55,16 @@ export const SF2_COLUMNS: ColumnDef[] = [
     emptyValue: 0,
     hexDigits: 2,
     formatter: sf2CmdToString,
+  },
+  {
+    key: 'note',
+    label: 'Note',
+    charWidth: 3,
+    type: 'note',
+    color: '#ff6666',
+    emptyColor: 'var(--color-border-light)',
+    emptyValue: 0,
+    formatter: sf2NoteToString,
   },
 ];
 

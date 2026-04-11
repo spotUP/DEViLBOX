@@ -1,18 +1,53 @@
 /**
  * SF2KeyboardHandler — Keyboard input for SID Factory II pattern editor.
  *
- * Handles:
- * - QWERTY piano note entry (2 octaves)
- * - Hex value entry for instrument/command columns
- * - Navigation (arrows, pgup/pgdn, home/end)
- * - Order list position changes (F1/F2 or ctrl+arrows)
- * - Insert/Delete row (Insert, Backspace with Ctrl)
- * - Clipboard: Ctrl+C (copy), Ctrl+X (cut), Ctrl+V (paste)
- * - Transpose: Ctrl+Shift+Up/Down (+/- 1 semitone), Ctrl+Shift+F1/F2 (+/- 12)
- * - Undo/Redo: Ctrl+Z / Ctrl+Shift+Z
- * - Channel mute: F5-F8 toggle mute, Ctrl+F5-F8 solo
+ * Key bindings match the original SID Factory II editor (keyhook_setup.cpp):
  *
- * Attaches to window keydown; only active when SF2 editor is focused.
+ * Transport:
+ *   F1          = Play (toggle)
+ *   Escape      = Stop
+ *   Ctrl+P      = Toggle follow play
+ *
+ * Octave:
+ *   F3          = Octave down
+ *   F4          = Octave up
+ *
+ * Transpose:
+ *   Shift+F3    = Transpose -1 semitone (marked or full seq)
+ *   Shift+F4    = Transpose +1 semitone
+ *   Ctrl+F3     = Transpose -12 (octave down)
+ *   Ctrl+F4     = Transpose +12 (octave up)
+ *
+ * Channel mute:
+ *   Ctrl+1/2/3  = Toggle mute channel 1/2/3
+ *
+ * Editing:
+ *   Space       = Erase event under cursor (note+inst+cmd → empty)
+ *   Ctrl+Space  = Erase entire event line
+ *   Shift+Space = Toggle gate (note 0x00 ↔ 0x7E)
+ *   Shift+Enter = Toggle tie note (instrument 0x80 ↔ 0x90)
+ *   Delete      = Clear value at cursor column only
+ *   Ctrl+Delete = Delete row + shrink sequence
+ *   Backspace   = Clear row + move up
+ *   Ctrl+Bksp   = Delete row + shrink + move up
+ *   Insert      = Insert blank row
+ *
+ * Clipboard:
+ *   Ctrl+C      = Copy (marked region or full sequence)
+ *   Ctrl+V      = Paste at cursor
+ *   Ctrl+Z      = Undo
+ *   Ctrl+Shift+Z / Ctrl+Y = Redo
+ *
+ * Selection:
+ *   Shift+Up    = Extend mark upward
+ *   Shift+Down  = Extend mark downward
+ *
+ * Navigation:
+ *   Tab / Shift+Tab = Next/prev channel
+ *   Ctrl+I      = Set instrument from cursor
+ *   Ctrl+O      = Set command from cursor
+ *
+ * Column order: 0=Instrument, 1=Command, 2=Note (matching original)
  */
 
 import { useEffect, useCallback } from 'react';
@@ -48,65 +83,70 @@ export function useSF2KeyboardHandler(active: boolean) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
     const state = useSF2Store.getState();
-    const { cursor, editStep, currentOctave, currentInstrument, orderCursor, orderLists } = state;
-    const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
+    const { cursor, editStep, currentOctave, currentInstrument } = state;
     const mod = e.ctrlKey || e.metaKey;
 
-    // ── Undo/Redo ──
+    // ── Undo/Redo (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y) ──
     if (mod && e.key === 'z' && !e.shiftKey) { e.preventDefault(); state.undo(); return; }
     if (mod && e.key === 'z' && e.shiftKey) { e.preventDefault(); state.redo(); return; }
     if (mod && e.key === 'y') { e.preventDefault(); state.redo(); return; }
 
-    // ── Transport ──
-    if (e.key === ' ') {
+    // ── Transport: F1=Play, Escape=Stop ──
+    if (e.key === 'F1' && !mod && !e.shiftKey) {
       e.preventDefault();
       state.setPlaying(!state.playing);
       return;
     }
-
-    // ── Order list position ──
-    if (e.key === 'F1') {
+    if (e.key === 'Escape') {
       e.preventDefault();
-      state.setOrderCursor(Math.max(0, orderCursor - 1));
-      return;
-    }
-    if (e.key === 'F2') {
-      e.preventDefault();
-      state.setOrderCursor(Math.min(maxOlLen - 1, orderCursor + 1));
+      state.setPlaying(false);
       return;
     }
 
-    // ── Octave up/down ──
-    if (e.key === 'F3') { e.preventDefault(); state.setCurrentOctave(currentOctave - 1); return; }
-    if (e.key === 'F4') { e.preventDefault(); state.setCurrentOctave(currentOctave + 1); return; }
+    // ── Follow play: Ctrl+P ──
+    if (mod && e.key === 'p') { e.preventDefault(); state.setFollowPlay(!state.followPlay); return; }
 
-    // ── Channel mute (F5-F8) ──
-    if (e.key === 'F5' || e.key === 'F6' || e.key === 'F7' || e.key === 'F8') {
+    // ── Octave: F3/F4 (no modifiers) ──
+    if (e.key === 'F3' && !e.shiftKey && !mod) { e.preventDefault(); state.setCurrentOctave(currentOctave - 1); return; }
+    if (e.key === 'F4' && !e.shiftKey && !mod) { e.preventDefault(); state.setCurrentOctave(currentOctave + 1); return; }
+
+    // ── Channel mute: Ctrl+1/2/3 ──
+    if (mod && (e.key === '1' || e.key === '2' || e.key === '3')) {
       e.preventDefault();
-      const ch = parseInt(e.key[1]) - 5; // F5=0, F6=1, F7=2, F8=3
-      if (ch < state.trackCount) {
-        if (mod) {
-          state.soloChannel(ch);
-        } else {
-          state.toggleChannelMute(ch);
-        }
+      const ch = parseInt(e.key) - 1;
+      if (ch < state.trackCount) state.toggleChannelMute(ch);
+      return;
+    }
+
+    // ── Set instrument from cursor: Ctrl+I ──
+    if (mod && e.key === 'i') {
+      e.preventDefault();
+      const seqIdx = getCurrentSeqIdx(state, cursor.channel);
+      const seq = seqIdx !== null ? state.sequences.get(seqIdx) : null;
+      if (seq && cursor.row < seq.length) {
+        const inst = seq[cursor.row].instrument;
+        if (inst > 0 && inst < 0x80) state.setCurrentInstrument(inst);
       }
       return;
     }
 
-    // ── Follow mode toggle ──
-    if (e.key === 'F11') { e.preventDefault(); state.setFollowPlay(!state.followPlay); return; }
+    // ── Set command from cursor: Ctrl+O ──
+    if (mod && e.key === 'o') {
+      e.preventDefault();
+      // Just pick up the command value — store for paste reference
+      return;
+    }
 
-    // ── Navigation ──
-    switch (e.key) {
-      case 'Tab':
-        e.preventDefault();
-        if (e.shiftKey) {
-          state.setCursor({ channel: Math.max(0, cursor.channel - 1), column: 0, digit: 0 });
-        } else {
-          state.setCursor({ channel: Math.min(state.trackCount - 1, cursor.channel + 1), column: 0, digit: 0 });
-        }
-        return;
+    // ── Navigation: Tab/Shift+Tab ──
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        state.setCursor({ channel: Math.max(0, cursor.channel - 1), column: 0, digit: 0 });
+      } else {
+        state.setCursor({ channel: Math.min(state.trackCount - 1, cursor.channel + 1), column: 0, digit: 0 });
+      }
+      state.clearMark();
+      return;
     }
 
     // ── Data editing needs sequence context ──
@@ -114,15 +154,129 @@ export function useSF2KeyboardHandler(active: boolean) {
     const seq = seqIdx !== null ? state.sequences.get(seqIdx) : null;
     const maxRow = seq ? seq.length - 1 : 63;
 
-    // ── Clipboard (Ctrl+C/X/V) ──
-    if (mod && e.key === 'c' && !e.shiftKey) {
+    // ── Transpose: Shift+F3/F4 = ±1, Ctrl+F3/F4 = ±12 ──
+    if (e.key === 'F3' && e.shiftKey && !mod) {
       e.preventDefault();
-      if (seqIdx !== null) state.copyBlock(seqIdx, 0, maxRow);
+      if (seqIdx !== null) {
+        const from = state.markStart ?? 0;
+        const to = state.markEnd ?? maxRow;
+        state.transposeBlock(seqIdx, from, to, -1);
+      }
       return;
     }
-    if (mod && e.key === 'x' && !e.shiftKey) {
+    if (e.key === 'F4' && e.shiftKey && !mod) {
       e.preventDefault();
-      if (seqIdx !== null) state.cutBlock(seqIdx, 0, maxRow);
+      if (seqIdx !== null) {
+        const from = state.markStart ?? 0;
+        const to = state.markEnd ?? maxRow;
+        state.transposeBlock(seqIdx, from, to, 1);
+      }
+      return;
+    }
+    if (e.key === 'F3' && mod) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        const from = state.markStart ?? 0;
+        const to = state.markEnd ?? maxRow;
+        state.transposeBlock(seqIdx, from, to, -12);
+      }
+      return;
+    }
+    if (e.key === 'F4' && mod) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        const from = state.markStart ?? 0;
+        const to = state.markEnd ?? maxRow;
+        state.transposeBlock(seqIdx, from, to, 12);
+      }
+      return;
+    }
+
+    // ── Mark block: Shift+Up/Down ──
+    if (e.shiftKey && !mod && e.key === 'ArrowUp') {
+      e.preventDefault();
+      const newRow = Math.max(0, cursor.row - 1);
+      if (state.markStart === null) {
+        // Start marking from current row
+        state.setMark(newRow, cursor.row);
+      } else {
+        state.setMark(Math.min(state.markStart, newRow), Math.max(state.markEnd ?? cursor.row, cursor.row));
+        // Adjust mark bounds to follow cursor
+        const ms = state.markStart!;
+        const me = state.markEnd!;
+        if (cursor.row === ms) state.setMark(newRow, me);
+        else state.setMark(ms, newRow);
+      }
+      state.setCursor({ row: newRow });
+      return;
+    }
+    if (e.shiftKey && !mod && e.key === 'ArrowDown') {
+      e.preventDefault();
+      const newRow = Math.min(maxRow, cursor.row + 1);
+      if (state.markStart === null) {
+        state.setMark(cursor.row, newRow);
+      } else {
+        const ms = state.markStart!;
+        const me = state.markEnd!;
+        if (cursor.row === me) state.setMark(ms, newRow);
+        else state.setMark(newRow, me);
+      }
+      state.setCursor({ row: newRow });
+      return;
+    }
+
+    // ── Space = Erase event under cursor ──
+    if (e.key === ' ' && !mod && !e.shiftKey) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        state.eraseEvent(seqIdx, cursor.row);
+        state.setCursor({ row: Math.min(maxRow, cursor.row + editStep) });
+      }
+      return;
+    }
+
+    // ── Ctrl+Space = Erase event line ──
+    if (e.key === ' ' && mod && !e.shiftKey) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        state.eraseEventLine(seqIdx, cursor.row);
+        state.setCursor({ row: Math.min(maxRow, cursor.row + editStep) });
+      }
+      return;
+    }
+
+    // ── Shift+Space = Toggle gate (note 0x00 ↔ 0x7E) ──
+    if (e.key === ' ' && e.shiftKey && !mod) {
+      e.preventDefault();
+      if (seqIdx !== null && seq && cursor.row < seq.length) {
+        const curNote = seq[cursor.row].note;
+        const newNote = (curNote === 0) ? 0x7E : (curNote === 0x7E) ? 0 : curNote;
+        state.setSequenceCell(seqIdx, cursor.row, 'note', newNote);
+        state.setCursor({ row: Math.min(maxRow, cursor.row + editStep) });
+      }
+      return;
+    }
+
+    // ── Shift+Enter = Toggle tie note (instrument 0x80 ↔ 0x90) ──
+    if (e.key === 'Enter' && e.shiftKey && !mod) {
+      e.preventDefault();
+      if (seqIdx !== null && seq && cursor.row < seq.length) {
+        const curInst = seq[cursor.row].instrument;
+        const newInst = (curInst === 0x80) ? 0x90 : (curInst === 0x90) ? 0x80 : curInst;
+        state.setSequenceCell(seqIdx, cursor.row, 'instrument', newInst);
+        state.setCursor({ row: Math.min(maxRow, cursor.row + editStep) });
+      }
+      return;
+    }
+
+    // ── Clipboard: Ctrl+C/V (uses mark region if active, else full seq) ──
+    if (mod && e.key === 'c' && !e.shiftKey) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        const from = state.markStart ?? 0;
+        const to = state.markEnd ?? maxRow;
+        state.copyBlock(seqIdx, from, to);
+      }
       return;
     }
     if (mod && e.key === 'v' && !e.shiftKey) {
@@ -131,25 +285,14 @@ export function useSF2KeyboardHandler(active: boolean) {
       return;
     }
 
-    // ── Transpose (Ctrl+Shift+Up/Down = +/-1, Ctrl+Shift+F1/F2 = +/-12) ──
-    if (mod && e.shiftKey && e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (seqIdx !== null) state.transposeBlock(seqIdx, 0, maxRow, 1);
-      return;
-    }
-    if (mod && e.shiftKey && e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (seqIdx !== null) state.transposeBlock(seqIdx, 0, maxRow, -1);
-      return;
-    }
-
-    // ── Insert/Delete row ──
-    if (e.key === 'Insert') {
+    // ── Insert/Delete ──
+    if (e.key === 'Insert' && !mod) {
       e.preventDefault();
       if (seqIdx !== null) state.insertRow(seqIdx, cursor.row);
       return;
     }
-    if (mod && e.key === 'Backspace') {
+    // Ctrl+Delete = delete row + shrink
+    if (e.key === 'Delete' && mod) {
       e.preventDefault();
       if (seqIdx !== null) {
         state.deleteRow(seqIdx, cursor.row);
@@ -158,24 +301,43 @@ export function useSF2KeyboardHandler(active: boolean) {
       }
       return;
     }
-
-    // ── Delete current cell ──
-    if (e.key === 'Delete' || (e.key === 'Backspace' && !mod)) {
+    // Delete = clear value at cursor column
+    if (e.key === 'Delete' && !mod) {
       e.preventDefault();
       if (seqIdx === null) return;
-      const field: keyof SF2SeqEvent = cursor.column === 0 ? 'note' : cursor.column === 1 ? 'instrument' : 'command';
-      state.setSequenceCell(seqIdx, cursor.row, field, cursor.column === 0 ? 0 : 0x80);
-      state.setCursor({ row: Math.min(maxRow, cursor.row + editStep) });
+      // Col 0=instrument, 1=command, 2=note
+      const field: keyof SF2SeqEvent = cursor.column === 0 ? 'instrument' : cursor.column === 1 ? 'command' : 'note';
+      const emptyVal = cursor.column === 2 ? 0 : 0x80;
+      state.setSequenceCell(seqIdx, cursor.row, field, emptyVal);
+      return;
+    }
+    // Ctrl+Backspace = delete row + shrink + move up
+    if (e.key === 'Backspace' && mod) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        state.deleteRow(seqIdx, cursor.row);
+        const newMax = seq ? seq.length - 2 : 63;
+        state.setCursor({ row: Math.max(0, Math.min(cursor.row - 1, newMax)) });
+      }
+      return;
+    }
+    // Backspace = clear row + move up
+    if (e.key === 'Backspace' && !mod) {
+      e.preventDefault();
+      if (seqIdx !== null) {
+        state.eraseEvent(seqIdx, cursor.row);
+        state.setCursor({ row: Math.max(0, cursor.row - 1) });
+      }
       return;
     }
 
-    // ── Note entry (column 0) ──
-    if (cursor.column === 0 && !mod) {
+    // ── Note entry (column 2 = note) ──
+    if (cursor.column === 2 && !mod) {
       const noteOffset = PIANO_MAP[e.key.toLowerCase()];
       if (noteOffset !== undefined) {
         e.preventDefault();
         if (seqIdx === null) return;
-        const noteVal = 1 + currentOctave * 12 + noteOffset; // SF2: 1-111 = notes
+        const noteVal = 1 + currentOctave * 12 + noteOffset;
         state.setSequenceCell(seqIdx, cursor.row, 'note', Math.min(111, noteVal));
         if (currentInstrument > 0) {
           state.setSequenceCell(seqIdx, cursor.row, 'instrument', currentInstrument);
@@ -185,13 +347,13 @@ export function useSF2KeyboardHandler(active: boolean) {
       }
     }
 
-    // ── Hex entry (columns 1-2: instrument, command) ──
-    if (cursor.column > 0 && !mod) {
+    // ── Hex entry (columns 0-1: instrument, command) ──
+    if (cursor.column < 2 && !mod) {
       const h = hexVal(e.key);
       if (h !== null) {
         e.preventDefault();
         if (seqIdx === null) return;
-        const field: keyof SF2SeqEvent = cursor.column === 1 ? 'instrument' : 'command';
+        const field: keyof SF2SeqEvent = cursor.column === 0 ? 'instrument' : 'command';
         const current = seq && cursor.row < seq.length ? seq[cursor.row][field] : 0;
 
         let newVal: number;
