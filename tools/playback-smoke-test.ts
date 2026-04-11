@@ -849,14 +849,24 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
       verification.instrumentIssue = 'get_instruments_list failed';
     }
 
-    // ── Tier 3: Native export round-trip (PC tracker formats only) ────────
-    if (test.supportsExport && songInfo.editorMode === 'classic') {
+    // ── Tier 3: Native export round-trip (ALL formats with exporters) ─────
+    // DEViLBOX has 80+ native exporters. Try export_native for every format —
+    // it returns an error string for unsupported formats, which we log but don't
+    // count as a failure. Only count as a failure if export CLAIMS to succeed but
+    // the reimported data is corrupt.
+    if (!test.loader || test.loader !== 'fx') { // skip for effect tests
       verification.exportTested = true;
       try {
         const exp = await client.call<any>('export_native');
         if (exp?.error) {
-          verification.exportPass = false;
-          verification.exportIssue = `export error: ${String(exp.error).slice(0, 80)}`;
+          const errMsg = String(exp.error);
+          // "No native exporter" is expected for some formats — don't count as failure
+          if (errMsg.includes('No native exporter') || errMsg.includes('not supported')) {
+            verification.exportTested = false; // mark as not applicable
+          } else {
+            verification.exportPass = false;
+            verification.exportIssue = `export error: ${errMsg.slice(0, 80)}`;
+          }
         } else {
           const exportSize = exp?.sizeBytes ?? 0;
           const exportData = exp?.data ?? null;
@@ -884,6 +894,14 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
               }
               verification.exportPass = issues.length === 0;
               if (issues.length > 0) verification.exportIssue = `round-trip: ${issues.join(', ')}`;
+
+              // Reload the original song so the next test isn't confused by the reimport
+              if (test.loader === 'local') {
+                const { readFileSync } = await import('fs');
+                const { basename: bn2 } = await import('path');
+                const origData = readFileSync(test.path);
+                await client.call('load_file', { filename: bn2(test.path), data: origData.toString('base64') });
+              }
             } catch (e: unknown) {
               verification.exportPass = false;
               verification.exportIssue = `reimport failed: ${e instanceof Error ? e.message.slice(0, 60) : e}`;
