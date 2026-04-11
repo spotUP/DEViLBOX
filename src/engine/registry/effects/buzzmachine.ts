@@ -8,7 +8,7 @@
 import type { EffectConfig } from '@typedefs/instrument';
 import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
-import type { BuzzmachineType } from '@engine/buzzmachines/BuzzmachineEngine';
+import { BUZZMACHINE_INFO, type BuzzmachineType } from '@engine/buzzmachines/BuzzmachineEngine';
 
 /** Helper: create a buzzmachine effect descriptor */
 function buzzEffect(
@@ -25,7 +25,17 @@ function buzzEffect(
       });
       return synth;
     },
-    getDefaultParameters: () => ({}),
+    getDefaultParameters: () => {
+      // Populate defaults from BUZZMACHINE_INFO so the store has initial
+      // values and the knobs render at their correct starting positions.
+      const info = BUZZMACHINE_INFO[machineType];
+      if (!info?.parameters?.length) return {};
+      const defaults: Record<string, number> = {};
+      for (const p of info.parameters) {
+        defaults[String(p.index)] = p.defaultValue;
+      }
+      return defaults;
+    },
   };
 }
 
