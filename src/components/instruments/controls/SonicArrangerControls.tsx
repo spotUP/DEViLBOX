@@ -18,6 +18,7 @@ import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { SonicArrangerSynth } from '@/engine/sonic-arranger/SonicArrangerSynth';
 
 // SA instrument struct byte offsets (from SonicArrangerParser.ts file header).
 // All multi-byte fields are uint16 big-endian unless noted.
@@ -255,6 +256,31 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     }
     return false;
   }, [instrumentId]);
+
+  // ── Preview synth — dedicated instance for audition ──────────────────────
+  const [previewNote, setPreviewNote] = useState(48); // C-3
+  const previewSynthRef = useRef<SonicArrangerSynth | null>(null);
+
+  // Dispose preview synth on unmount
+  useEffect(() => {
+    return () => {
+      previewSynthRef.current?.dispose();
+      previewSynthRef.current = null;
+    };
+  }, []);
+
+  const handlePreview = useCallback(async () => {
+    let synth = previewSynthRef.current;
+    if (!synth) {
+      synth = new SonicArrangerSynth();
+      previewSynthRef.current = synth;
+      synth.output.connect(synth.output.context.destination);
+    }
+    await synth.setInstrument(config);
+    synth.triggerAttack(previewNote);
+    // Auto-release after 800ms so the note doesn't ring forever
+    setTimeout(() => synth!.triggerRelease(), 800);
+  }, [config, previewNote]);
 
   const chipEditorRef = useRef<UADEChipEditor | null>(null);
   const getEditor = useCallback(() => {
@@ -701,6 +727,32 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           </button>
         ))}
         <div className="ml-auto mr-2 my-1 flex items-center gap-1">
+          <input
+            type="number"
+            min={0}
+            max={95}
+            value={previewNote}
+            onChange={(e) => setPreviewNote(Math.max(0, Math.min(95, parseInt(e.target.value) || 0)))}
+            title="MIDI note (0-95) for preview audition"
+            style={{
+              width: '40px', fontSize: '10px', padding: '3px 4px',
+              background: 'var(--color-bg)', color: '#c084fc',
+              border: '1px solid #c084fc', borderRadius: '3px',
+              fontFamily: 'inherit', textAlign: 'center',
+            }}
+          />
+          <button
+            onClick={() => void handlePreview()}
+            title="Play a preview note using this instrument"
+            style={{
+              fontSize: '10px', padding: '4px 8px', cursor: 'pointer',
+              background: 'rgba(192,132,252,0.15)', color: '#c084fc',
+              border: '1px solid #c084fc', borderRadius: '3px',
+              fontFamily: 'inherit', whiteSpace: 'nowrap',
+            }}
+          >
+            &#9834; Preview
+          </button>
           {instrumentId !== undefined && (
             <button
               onClick={() => {
