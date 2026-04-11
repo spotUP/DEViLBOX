@@ -1619,6 +1619,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     hasMetadata: true,
     customDispatch: true, // .sid is ambiguous: PSID/RSID first, then SidMon1, then UADE
   },
+  {
+    key: 'sidFactory2',
+    label: 'SID Factory II',
+    description: 'SID Factory II project file (.sf2) — PSID-wrapped C64SIDEngine',
+    family: 'c64-chip',
+    matchMode: 'extension',
+    extRegex: /\.sf2$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/SIDFactory2Parser', parseFn: 'parseSIDFactory2File', detectFn: 'isSIDFactory2File' },
+    customDispatch: true, // Must distinguish from SoundFont (.sf2 = RIFF header)
+  },
 
   // ── Chip dump formats ─────────────────────────────────────────────────────
   {
