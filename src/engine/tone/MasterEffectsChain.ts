@@ -142,14 +142,19 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   });
 
   // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
+  // Some effects (Buzzmachine, etc.) are DevilboxSynth objects with .input/.output
+  // GainNodes instead of being Tone.ToneAudioNodes directly. Use helper functions
+  // to get the connectable input/output for each node.
+  const getInput = (n: any): Tone.ToneAudioNode => n.input instanceof GainNode || n.input?.gain ? n.input : n;
+  const getOutput = (n: any): Tone.ToneAudioNode => n.output instanceof GainNode || n.output?.gain ? n.output : n;
   try {
-    ctx.masterEffectsInput.connect(chainNodes[0]);
+    ctx.masterEffectsInput.connect(getInput(chainNodes[0]));
 
     for (let i = 0; i < chainNodes.length - 1; i++) {
-      chainNodes[i].connect(chainNodes[i + 1]);
+      getOutput(chainNodes[i]).connect(getInput(chainNodes[i + 1]));
     }
 
-    chainNodes[chainNodes.length - 1].connect(ctx.blepInput);
+    getOutput(chainNodes[chainNodes.length - 1]).connect(ctx.blepInput);
   } catch (e) {
     console.error('[MasterEffectsChain] Chain connection failed:', e,
       'chainNodes:', chainNodes.map(n => n?.name || n?.constructor?.name));
