@@ -306,6 +306,20 @@ export class GeonkickEngine {
     });
   }
 
+  /**
+   * Enable/disable an oscillator group (0..2). Each group contains 3
+   * oscillators (group 0 = osc 0..2, group 1 = osc 3..5, group 2 = osc 6..8).
+   * gk_wasm_create only enables group 0; preset loaders enable groups 1
+   * and 2 when the preset uses oscillators beyond index 2.
+   */
+  enableGroup(groupIndex: number, enabled: boolean): void {
+    this.workletNode?.port.postMessage({
+      type: 'enableGroup',
+      groupIndex: groupIndex | 0,
+      enabled,
+    });
+  }
+
   setOscillatorAmplitude(oscIndex: number, amplitude: number): void {
     this.workletNode?.port.postMessage({
       type: 'setOscAmplitude',

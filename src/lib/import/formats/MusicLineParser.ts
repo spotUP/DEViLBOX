@@ -587,8 +587,6 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     initialSpeed: speed,
     initialBPM: ciaTempoBPM(tempo),
     linearPeriods: false,
-    uadeEditableFileData: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
-    uadeEditableFileName: 'musicline',
     channelTrackTables: mappedTrackTables,
     channelSpeeds,
     channelGrooves,

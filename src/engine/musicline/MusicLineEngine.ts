@@ -108,8 +108,12 @@ export class MusicLineEngine {
     const initPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
 
-      // Register worklet module with this context
-      await context.audioWorklet.addModule(`${baseUrl}musicline/MusicLine.worklet.js`);
+      // Register worklet module with this context (may already be registered)
+      try {
+        await context.audioWorklet.addModule(`${baseUrl}musicline/MusicLine.worklet.js`);
+      } catch (e) {
+        console.warn('[MusicLineEngine] addModule failed (may already be registered):', e);
+      }
 
       // Fetch WASM binary and JS code (shared across contexts)
       if (!this.wasmBinary || !this.jsCode) {
