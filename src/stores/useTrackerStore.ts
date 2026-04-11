@@ -327,45 +327,6 @@ const createEmptyPattern = (length: number = DEFAULT_PATTERN_LENGTH, numChannels
  * formats libopenmpt can write: 2 effect columns, volume column, up to 32
  * channels) and stores the serialized buffer as libopenmptFileData.
  */
-async function initFreshSoundlib(): Promise<void> {
-  try {
-    // Brief yield — if a real song import is running concurrently (load_modland
-    // triggered right after reset), let it populate libopenmptFileData first.
-    // If the store already has real module data, skip — we'd clobber it.
-    await new Promise(r => setTimeout(r, 100));
-    if (useFormatStore.getState().libopenmptFileData) return;
-
-    const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-
-    // Double-check after the async import — another path may have loaded a
-    // real module into the soundlib while we were waiting for the import.
-    if (useFormatStore.getState().libopenmptFileData) return;
-    if (OpenMPTEditBridge.isActive()) return;
-
-    // Destroy any previously loaded module (from a previous song)
-    await osl.destroyModule();
-    // Create a new empty XM with the default channel/pattern count
-    const ok = await osl.createNewModule(1 /* XM */, DEFAULT_NUM_CHANNELS, 1);
-    if (!ok) {
-      console.warn('[initFreshSoundlib] createNewModule failed');
-      return;
-    }
-    // Serialize to ArrayBuffer and store for LibopenmptEngine
-    const data = await osl.saveModule('xm');
-    if (data) {
-      // Final guard — check one more time that nothing loaded while we serialized
-      if (useFormatStore.getState().libopenmptFileData) return;
-      useFormatStore.setState({ libopenmptFileData: data });
-      // Mark the bridge as loaded so cell edits sync to the soundlib
-      OpenMPTEditBridge.markLoaded('xm');
-    }
-  } catch (err) {
-    // Soundlib WASM may not be loaded yet on first page load — that's OK,
-    // the TS scheduler handles playback until the user imports a real file.
-    console.warn('[initFreshSoundlib] failed (soundlib not ready?):', err);
-  }
-}
-
 // ── Channel-type validation (fires once per mismatch type) ───────────────────
 const _warnedMismatches = new Set<string>();
 

@@ -77,7 +77,7 @@ const DOWNLOAD_TIMEOUT_MS = 30000;
 interface TestCase {
   name: string;
   family: string;
-  loader: 'modland' | 'hvsc' | 'fur' | 'local';
+  loader: 'modland' | 'hvsc' | 'fur' | 'local' | 'fx';
   path: string;
   /** Subset of editorMode the loaded file should report (substring match) */
   expectedEditorMode?: string;
@@ -171,6 +171,82 @@ async function discoverLocalTests(baseDir: string): Promise<TestCase[]> {
     });
   }
   return tests;
+}
+
+/**
+ * Auto-discover Furnace chip demo tests from the demos directory.
+ * One test per chip subdirectory (picks the first .fur file).
+ * ~30 chip categories, ~452 total .fur files — we test one per chip.
+ */
+async function discoverFurnaceTests(demosDir: string): Promise<TestCase[]> {
+  const { readdirSync, statSync } = await import('fs');
+  const { join } = await import('path');
+  const tests: TestCase[] = [];
+
+  let chipDirs: string[];
+  try {
+    chipDirs = readdirSync(demosDir).filter(d => {
+      try { return statSync(join(demosDir, d)).isDirectory() && d !== 'blank'; } catch { return false; }
+    }).sort();
+  } catch { return tests; }
+
+  for (const chip of chipDirs) {
+    const chipDir = join(demosDir, chip);
+    try {
+      const furFiles = readdirSync(chipDir).filter(f => f.endsWith('.fur')).sort();
+      if (furFiles.length === 0) continue;
+      tests.push({
+        name: `Furnace ${chip} — ${furFiles[0]}`,
+        family: `FUR-${chip.substring(0, 8).toUpperCase()}`,
+        loader: 'fur',
+        path: join(chipDir, furFiles[0]),
+        engineDriven: true,
+        allowSilent: false,
+      });
+    } catch { continue; }
+  }
+  return tests;
+}
+
+/**
+ * Build effect test cases from the master effects list.
+ * Each test: load a known-good song, add the effect, play, measure audio.
+ * The effect is tested as a master effect on whatever song is currently loaded.
+ */
+const ALL_EFFECTS = [
+  'Compressor', 'EQ3', 'Distortion', 'BitCrusher', 'Chebyshev', 'TapeSaturation',
+  'Reverb', 'JCReverb', 'Delay', 'FeedbackDelay', 'PingPongDelay',
+  'Chorus', 'Phaser', 'Tremolo', 'Vibrato', 'AutoPanner',
+  'Filter', 'AutoFilter', 'AutoWah', 'StereoWidener', 'PitchShift', 'FrequencyShifter',
+  'BiPhase', 'DubFilter', 'MoogFilter', 'AmbientDelay', 'SidechainCompressor',
+  'SpaceEcho', 'SpaceyDelayer', 'RETapeEcho', 'MVerb', 'Leslie', 'SpringReverb',
+  'VinylNoise', 'ToneArm', 'Tumult', 'TapeSimulator', 'ShimmerReverb', 'GranularFreeze',
+  'TapeDegradation', 'Masha',
+  'Maximizer', 'Limiter', 'MonoComp', 'Expander', 'Clipper', 'NoiseGate',
+  'GOTTComp', 'MultibandComp', 'MultibandClipper', 'MultibandExpander',
+  'MultibandDynamics', 'MultibandGate', 'MultibandLimiter', 'X42Comp',
+  'AGC', 'Panda', 'BeatBreather', 'Ducka', 'TransientDesigner', 'DeEsser',
+  'Overdrive', 'Flanger', 'RingMod', 'DragonflyPlate', 'DragonflyHall', 'DragonflyRoom',
+  'JunoChorus', 'ParametricEQ', 'CabinetSim', 'TubeAmp', 'BassEnhancer',
+  'ReverseDelay', 'VintageDelay', 'ArtisticDelay', 'Della', 'SlapbackDelay', 'ZamDelay',
+  'AutoSat', 'DistortionShaper', 'Driva', 'Exciter', 'Satma', 'Saturator',
+  'DynamicsProc', 'DynamicEQ', 'EQ5Band', 'EQ8Band', 'EQ12Band', 'GEQ31',
+  'PhonoFilter', 'Kuiza', 'ZamEQ2',
+  'Bitta', 'Vinyl', 'Vocoder', 'AutoTune',
+  'CalfPhaser', 'Roomy', 'EarlyReflections', 'Pulsator', 'MultiChorus', 'MultiSpread',
+  'MultibandEnhancer', 'HaasEnhancer', 'BinauralPanner', 'Vihda',
+  'SidechainGate', 'SidechainLimiter',
+];
+
+function buildEffectTests(): TestCase[] {
+  return ALL_EFFECTS.map(fx => ({
+    name: `FX: ${fx}`,
+    family: `FX-${fx.substring(0, 8).toUpperCase()}`,
+    loader: 'fx' as any,
+    path: fx,  // path field stores the effect type name for fx tests
+    engineDriven: true,
+    allowSilent: false,
+  }));
 }
 
 const TESTS: TestCase[] = [

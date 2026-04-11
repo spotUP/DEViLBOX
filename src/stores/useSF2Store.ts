@@ -73,9 +73,9 @@ export interface SF2MusicData {
 // ── Sequence event (expanded from packed format) ─────────────────────────
 
 export interface SF2SeqEvent {
-  note: number;      // 0=rest, 1-111=note, 0x7E=tie
-  instrument: number; // 0=no change, 1-32=set instrument
-  command: number;    // 0=no command, 1-64=set command
+  note: number;      // 0=rest, 1-111=note, 0x7E=tie/hold
+  instrument: number; // 0=no change, 1-31=instrument, 0x80=empty (duration row), 0x90=tie
+  command: number;    // 0=no command, 1-63=command, 0x80=empty (duration row)
 }
 
 // ── Order list entry ─────────────────────────────────────────────────────
