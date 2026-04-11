@@ -2453,9 +2453,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const fps = getFormatPlaybackState();
           const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
           const newPlaying = formatIsPlayingRef.current;
-          // Use singleton row directly during playback (no React→ref latency).
-          // Fall back to React prop when stopped (cursor navigation).
-          let newRow = fpsSmooth ? fps.row : formatCurrentRowRef.current;
+          let newRow = formatCurrentRowRef.current;
           let smoothOffset = 0;
 
           if (fpsSmooth && fps.rowDuration > 0) {
