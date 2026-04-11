@@ -34,6 +34,53 @@ export const GeonkickOscFunction = {
 } as const;
 export type GeonkickOscFunction = (typeof GeonkickOscFunction)[keyof typeof GeonkickOscFunction];
 
+/** Matches geonkick_envelope_type in src/dsp/src/geonkick.h. */
+export const GeonkickKickEnvelope = {
+  Amplitude:        0,
+  Frequency:        1,
+  FilterCutoff:     2,
+  DistortionDrive:  3,
+  DistortionVolume: 4,
+  PitchShift:       5,
+  FilterQ:          6,
+  NoiseDensity:     7,
+} as const;
+export type GeonkickKickEnvelope = (typeof GeonkickKickEnvelope)[keyof typeof GeonkickKickEnvelope];
+
+/**
+ * Per-oscillator envelope slots. Matches GKICK_OSC_*_ENVELOPE in
+ * src/dsp/src/synthesizer.h.
+ */
+export const GeonkickOscEnvelope = {
+  Amplitude:    0,
+  Frequency:    1,
+  FilterCutoff: 2,
+  PitchShift:   3,
+} as const;
+export type GeonkickOscEnvelope = (typeof GeonkickOscEnvelope)[keyof typeof GeonkickOscEnvelope];
+
+/**
+ * One envelope control point. x and y are normalised to [0, 1]:
+ *   x = time as a fraction of the kick length (0 = start, 1 = end)
+ *   y = value as a fraction of the parameter's dynamic range
+ *   controlPoint = true means this is a curve-shaping handle, not a vertex
+ */
+export interface GeonkickEnvelopePoint {
+  x: number;
+  y: number;
+  controlPoint?: boolean;
+}
+
+function serializeEnvelopePoints(points: GeonkickEnvelopePoint[]): Float32Array {
+  const out = new Float32Array(points.length * 3);
+  for (let i = 0; i < points.length; i++) {
+    out[i * 3 + 0] = points[i].x;
+    out[i * 3 + 1] = points[i].y;
+    out[i * 3 + 2] = points[i].controlPoint ? 1 : 0;
+  }
+  return out;
+}
+
 export class GeonkickEngine {
   private static instance: GeonkickEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
@@ -282,6 +329,44 @@ export class GeonkickEngine {
       oscIndex: oscIndex | 0,
       func: func | 0,
     });
+  }
+
+  // ── Envelopes ───────────────────────────────────────────────────────────
+
+  /**
+   * Replace a kick-level envelope (amp, freq, filter cutoff, pitch shift,
+   * distortion, etc.). Triggers a rebake on the worker stub.
+   */
+  setKickEnvelope(envType: GeonkickKickEnvelope, points: GeonkickEnvelopePoint[]): void {
+    if (!this.workletNode || points.length === 0) return;
+    const serialized = serializeEnvelopePoints(points);
+    this.workletNode.port.postMessage(
+      {
+        type: 'setKickEnvelope',
+        envType: envType | 0,
+        points: serialized,
+      },
+      [serialized.buffer],
+    );
+  }
+
+  /** Replace a per-oscillator envelope (0..8 for oscIndex, 0..3 for envIndex). */
+  setOscillatorEnvelope(
+    oscIndex: number,
+    envIndex: GeonkickOscEnvelope,
+    points: GeonkickEnvelopePoint[],
+  ): void {
+    if (!this.workletNode || points.length === 0) return;
+    const serialized = serializeEnvelopePoints(points);
+    this.workletNode.port.postMessage(
+      {
+        type: 'setOscEnvelope',
+        oscIndex: oscIndex | 0,
+        envIndex: envIndex | 0,
+        points: serialized,
+      },
+      [serialized.buffer],
+    );
   }
 
   dispose(): void {

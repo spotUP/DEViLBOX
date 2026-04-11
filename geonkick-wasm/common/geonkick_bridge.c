@@ -250,3 +250,65 @@ void gk_wasm_set_osc_function(gk_instance *kick, int osc_index, int func)
         geonkick_set_osc_function(kick, (size_t)osc_index,
                                   (enum geonkick_osc_func_type)func);
 }
+
+/* ────────────────────────────────────────────────────────────────────
+ * Envelopes.
+ *
+ * Wire format: `flat_ptr` points at npoints × 3 floats — interleaved
+ * [x0, y0, ctrl0, x1, y1, ctrl1, ...]. x/y ∈ [0,1]; ctrl is a curve
+ * flag stored as 1.0f (control point) or 0.0f (vertex). The C side
+ * unpacks into a stack-allocated gkick_envelope_point_info[] so we
+ * never expose the struct layout to JS.
+ *
+ * Max points per envelope is capped at GK_MAX_ENV_POINTS — anything
+ * beyond that is silently clipped. Geonkick's UI tops out well below.
+ * ─────────────────────────────────────────────────────────────────── */
+#define GK_MAX_ENV_POINTS 256
+
+static size_t
+gk_unpack_points(const float *flat, size_t npoints,
+                 struct gkick_envelope_point_info *out)
+{
+        if (npoints > GK_MAX_ENV_POINTS) npoints = GK_MAX_ENV_POINTS;
+        for (size_t i = 0; i < npoints; i++) {
+                out[i].x             = flat[i * 3 + 0];
+                out[i].y             = flat[i * 3 + 1];
+                out[i].control_point = flat[i * 3 + 2] > 0.5f;
+        }
+        return npoints;
+}
+
+/**
+ * Set a kick-level envelope. env_type values mirror geonkick_envelope_type:
+ *   0=amplitude, 1=frequency, 2=filter_cutoff, 3=distortion_drive,
+ *   4=distortion_volume, 5=pitch_shift, 6=filter_q, 7=noise_density.
+ */
+GK_EXPORT
+void gk_wasm_set_kick_envelope(gk_instance *kick, int env_type,
+                               const float *flat_ptr, int npoints)
+{
+        if (!kick || !flat_ptr || npoints <= 0) return;
+        struct gkick_envelope_point_info buf[GK_MAX_ENV_POINTS];
+        size_t n = gk_unpack_points(flat_ptr, (size_t)npoints, buf);
+        geonkick_kick_envelope_set_points(kick,
+                                          (enum geonkick_envelope_type)env_type,
+                                          buf, n);
+}
+
+/**
+ * Set a per-oscillator envelope. env_index is 0..3 (amp, freq, filter cutoff,
+ * pitch shift — matches GKICK_OSC_*_ENVELOPE constants in synthesizer.h).
+ */
+GK_EXPORT
+void gk_wasm_set_osc_envelope(gk_instance *kick, int osc_index, int env_index,
+                              const float *flat_ptr, int npoints)
+{
+        if (!kick || !flat_ptr || osc_index < 0 || env_index < 0 || npoints <= 0)
+                return;
+        struct gkick_envelope_point_info buf[GK_MAX_ENV_POINTS];
+        size_t n = gk_unpack_points(flat_ptr, (size_t)npoints, buf);
+        geonkick_osc_envelope_set_points(kick,
+                                         (size_t)osc_index,
+                                         (size_t)env_index,
+                                         buf, n);
+}

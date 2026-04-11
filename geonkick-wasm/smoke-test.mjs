@@ -38,7 +38,22 @@ const gk = {
   setOscAmplitude:      Module.cwrap('gk_wasm_set_osc_amplitude',     null,     ['number', 'number', 'number']),
   setOscFrequency:      Module.cwrap('gk_wasm_set_osc_frequency',     null,     ['number', 'number', 'number']),
   setOscFunction:       Module.cwrap('gk_wasm_set_osc_function',      null,     ['number', 'number', 'number']),
+  setKickEnvelope:      Module.cwrap('gk_wasm_set_kick_envelope',     null,     ['number', 'number', 'number', 'number']),
+  setOscEnvelope:       Module.cwrap('gk_wasm_set_osc_envelope',      null,     ['number', 'number', 'number', 'number', 'number']),
 };
+
+/** Upload a list of [x, y, control] points to WASM heap and return the pointer. */
+function uploadPoints(points) {
+  const n = points.length;
+  const ptr = Module._malloc(n * 3 * 4);
+  const view = new Float32Array(Module.HEAPF32.buffer, ptr, n * 3);
+  for (let i = 0; i < n; i++) {
+    view[i * 3 + 0] = points[i][0];
+    view[i * 3 + 1] = points[i][1];
+    view[i * 3 + 2] = points[i][2] ? 1 : 0;
+  }
+  return { ptr, count: n };
+}
 
 const SAMPLE_RATE = 48000;
 const DURATION_SEC = 2;
@@ -98,17 +113,62 @@ const c = renderAndStat('600 Hz + drive');
 gk.setOscFunction(handle, 0, 3);      // 3 = sawtooth
 const d = renderAndStat('saw @600 Hz');
 
-// Pass gate: all variants produced sound AND at least two variants
-// differ from each other (params actually change the audio).
-const allPlayed = a.peak > 0.01 && b.peak > 0.01 && c.peak > 0.01 && d.peak > 0.01;
-const differs = Math.abs(a.rms - b.rms) > 0.005 || Math.abs(a.rms - c.rms) > 0.005 || Math.abs(c.rms - d.rms) > 0.005;
+// Variant 5: replace amplitude envelope with a razor-sharp pluck
+// (fast attack, very fast decay, silent tail). env_type 0 = amplitude.
+{
+  const { ptr, count } = uploadPoints([
+    [0.00, 0.0, false],
+    [0.02, 1.0, false],  // snap to full
+    [0.05, 0.2, false],  // 90% decay in 30 ms
+    [0.20, 0.0, false],  // silent from 20% onward
+    [1.00, 0.0, false],
+  ]);
+  gk.setKickEnvelope(handle, 0, ptr, count);
+  Module._free(ptr);
+}
+const e = renderAndStat('pluck amp env');
+
+// Variant 6: restore amp env + apply a descending frequency envelope (pitch
+// sweep — the signature kick shape). env_type 1 = frequency.
+{
+  const { ptr, count } = uploadPoints([
+    [0.00, 1.0, false],
+    [1.00, 1.0, false],
+  ]);
+  gk.setKickEnvelope(handle, 0, ptr, count);       // amp back to flat
+  Module._free(ptr);
+}
+{
+  const { ptr, count } = uploadPoints([
+    [0.00, 1.00, false],  // start high
+    [0.15, 0.25, false],  // fast drop
+    [1.00, 0.05, false],  // long tail at low freq
+  ]);
+  gk.setKickEnvelope(handle, 1, ptr, count);       // freq envelope
+  Module._free(ptr);
+}
+const f = renderAndStat('freq sweep env');
+
+// Pass gate: every variant must produce audible output AND the envelope
+// variants must measurably differ from the default (envelopes flow through).
+const variants = [a, b, c, d, e, f];
+const allPlayed = variants.every((v) => v.peak > 0.01);
+const scalarDiffers =
+  Math.abs(a.rms - b.rms) > 0.005 ||
+  Math.abs(a.rms - c.rms) > 0.005 ||
+  Math.abs(c.rms - d.rms) > 0.005;
+// The pluck envelope kills almost all audio after 60 ms — rms should
+// drop by at least 30% vs. the default (full-length) amp envelope.
+const envelopeWorks = e.rms < a.rms * 0.7;
+const differs = scalarDiffers && envelopeWorks;
 
 console.log('\n[smoke] all variants played:', allPlayed);
-console.log('[smoke] rms differs across variants:', differs);
+console.log('[smoke] scalar params differ:', scalarDiffers);
+console.log('[smoke] pluck env drops rms >30%:', envelopeWorks, '(' + e.rms.toFixed(3) + ' vs ' + a.rms.toFixed(3) + ')');
 
 // Reset state for the final dump.
-const peak = d.peak;
-const rms = d.rms;
+const peak = f.peak;
+const rms = f.rms;
 
 // Dump to WAV for listening.
 function writeWavMono(filepath, samples, sampleRate) {

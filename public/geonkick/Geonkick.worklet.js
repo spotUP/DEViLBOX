@@ -19,6 +19,11 @@ class GeonkickProcessor extends AudioWorkletProcessor {
     this.outPtr = 0;
     this.outLen = 0;
 
+    // Scratch buffer for envelope uploads — max 256 points × 3 floats.
+    // Shared across all envelope writes; the bridge copies before returning.
+    this.envPtr = 0;
+    this.envMaxPoints = 256;
+
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
 
@@ -78,6 +83,26 @@ class GeonkickProcessor extends AudioWorkletProcessor {
       case 'setOscFunction':
         w._gk_wasm_set_osc_function(h, data.oscIndex | 0, data.func | 0);
         break;
+      case 'setKickEnvelope': {
+        const n = this.uploadEnvPoints(data.points);
+        if (n > 0) {
+          w._gk_wasm_set_kick_envelope(h, data.envType | 0, this.envPtr, n);
+        }
+        break;
+      }
+      case 'setOscEnvelope': {
+        const n = this.uploadEnvPoints(data.points);
+        if (n > 0) {
+          w._gk_wasm_set_osc_envelope(
+            h,
+            data.oscIndex | 0,
+            data.envIndex | 0,
+            this.envPtr,
+            n,
+          );
+        }
+        break;
+      }
       case 'dispose':
         w._gk_wasm_destroy(h);
         this.handle = 0;
@@ -85,9 +110,31 @@ class GeonkickProcessor extends AudioWorkletProcessor {
           w._free(this.outPtr);
           this.outPtr = 0;
         }
+        if (this.envPtr) {
+          w._free(this.envPtr);
+          this.envPtr = 0;
+        }
         this.initialized = false;
         break;
     }
+  }
+
+  /**
+   * Copy a points Float32Array (interleaved [x, y, ctrl, x, y, ctrl, ...])
+   * into the preallocated envelope scratch buffer, clamping to the max
+   * point count. Returns the number of points written.
+   */
+  uploadEnvPoints(points) {
+    if (!points || !this.envPtr) return 0;
+    const available = Math.floor(points.length / 3);
+    const n = Math.min(available, this.envMaxPoints);
+    if (n === 0) return 0;
+    const heap = this.wasm.HEAPF32;
+    const offset = this.envPtr >> 2;
+    for (let i = 0; i < n * 3; i++) {
+      heap[offset + i] = points[i];
+    }
+    return n;
   }
 
   async initWasm(wasmBinary, jsCode) {
@@ -99,6 +146,9 @@ class GeonkickProcessor extends AudioWorkletProcessor {
       // 2048 headroom to match GK_RENDER_CHUNK in the bridge).
       this.outLen = 2048;
       this.outPtr = this.wasm._malloc(this.outLen * 4);
+
+      // Envelope scratch: 256 points × 3 floats × 4 bytes = 3 KB.
+      this.envPtr = this.wasm._malloc(this.envMaxPoints * 3 * 4);
 
       // Create the synth instance at the worklet's context sample rate.
       this.handle = this.wasm._gk_wasm_create(sampleRate | 0);
