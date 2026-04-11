@@ -334,7 +334,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     const editorMode = useFormatStore.getState().editorMode;
     const furnaceNative = useFormatStore.getState().furnaceNative;
     const fmtMap: Record<string, AutomationFormat> = {
-      goattracker: 'gtultra', furnace: 'furnace', hively: 'hively',
+      goattracker: 'gtultra', sidfactory2: 'sidfactory2', furnace: 'furnace', hively: 'hively',
       klystrack: 'klystrack', sc68: 'sc68', classic: 'uade',
     };
     const fmt = fmtMap[editorMode];

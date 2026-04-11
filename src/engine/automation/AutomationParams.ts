@@ -264,7 +264,7 @@ export function groupParams(params: AutomationParamDef[]): AutomationParamGroup[
 
 // ── Format → params lookup ──
 
-export type AutomationFormat = 'gtultra' | 'uade' | 'furnace' | 'hively' | 'klystrack' | 'sc68';
+export type AutomationFormat = 'gtultra' | 'sidfactory2' | 'uade' | 'furnace' | 'hively' | 'klystrack' | 'sc68';
 
 // ── Furnace chip ID classification ──
 // Maps Furnace DIV_SYSTEM enum values to param set categories
@@ -300,6 +300,7 @@ export function getParamsForFormat(format: AutomationFormat, config?: {
 }): AutomationParamDef[] {
   switch (format) {
     case 'gtultra':
+    case 'sidfactory2':
       return getSIDParams(config?.sidCount ?? 1);
     case 'uade':
       return getPaulaParams();

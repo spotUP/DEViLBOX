@@ -16,6 +16,7 @@ import {
   DEFAULT_HIVELY,
   DEFAULT_GTULTRA,
   DEFAULT_JAMCRACKER,
+  DEFAULT_SF2,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_STEVE_TURNER, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
@@ -132,6 +133,7 @@ const SurgeControls = lazy(() => import('../controls/SurgeControls').then(m => (
 const HivelyControls = lazy(() => import('../controls/HivelyControls').then(m => ({ default: m.HivelyControls })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
 const JamCrackerControls = lazy(() => import('../controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls })));
+const SF2Controls = lazy(() => import('../controls/SF2Controls').then(m => ({ default: m.SF2Controls })));
 const SoundMonControls = lazy(() => import('../controls/SoundMonControls').then(m => ({ default: m.SoundMonControls })));
 const SidMonControls = lazy(() => import('../controls/SidMonControls').then(m => ({ default: m.SidMonControls })));
 const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m => ({ default: m.DigMugControls })));
@@ -180,7 +182,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -306,6 +308,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   const handleJamCrackerChange = useCallback((updates: Partial<typeof instrument.jamCracker>) => {
     updateAmigaSynth('jamCracker', instrument.jamCracker || DEFAULT_JAMCRACKER, updates);
   }, [instrument.jamCracker, updateAmigaSynth]);
+
+  const handleSF2Change = useCallback((updates: Partial<typeof instrument.sf2>) => {
+    const current = instrument.sf2 || DEFAULT_SF2;
+    handleChange({ sf2: { ...current, ...updates } });
+  }, [instrument.sf2, handleChange]);
 
   const handleSoundMonChange = useCallback((updates: Partial<typeof instrument.soundMon>) => {
     updateAmigaSynth('soundMon', instrument.soundMon || DEFAULT_SOUNDMON, updates);
@@ -1497,6 +1504,30 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           <JamCrackerControls
             config={jcConfig}
             onChange={handleJamCrackerChange}
+            instrumentId={instrument.id}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SID FACTORY II EDITOR
+  // ============================================================================
+  if (editorMode === 'sidfactory2') {
+    const sf2Config = { ...DEFAULT_SF2, ...(instrument.sf2 || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a0a1a] to-[#050510]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SF2Controls
+            config={sf2Config}
+            onChange={handleSF2Change}
             instrumentId={instrument.id}
           />
         </Suspense>
