@@ -17,6 +17,7 @@
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
+import { getNativeAudioNode } from '@utils/audio-context';
 import { ChannelIsolationNode } from './ChannelIsolationNode';
 
 interface RoutedEffect {
@@ -92,22 +93,23 @@ export class ChannelRoutedEffectsManager {
         }
       } catch { /* some effects don't have wet */ }
 
-      // Connect: isolationNode.output → effectNode → masterInput
-      // Bridge native AudioNode (isolation GainNode) to Tone.js effect input
-      const effectInput = (effectNode as any).input as AudioNode | undefined;
-      if (effectInput) {
-        isolationNode.output.connect(effectInput);
-      } else {
-        // Fallback: try connecting to the node directly
-        const rawNode = (effectNode as any)._gainNode || (effectNode as any)._waveShaperNode || effectNode;
-        try {
-          isolationNode.output.connect(rawNode as AudioNode);
-        } catch {
-          console.warn(`[ChannelRoutedEffects] Cannot connect isolation to ${config.type} — no input node`);
-          isolationNode.dispose();
-          try { effectNode.disconnect(); effectNode.dispose(); } catch { /* */ }
-          continue;
-        }
+      // Connect: isolationNode.output (native GainNode) → effectNode → masterInput
+      // Must unwrap Tone.js effect to get native AudioNode for the connection
+      const nativeEffectInput = getNativeAudioNode(effectNode);
+      if (!nativeEffectInput) {
+        console.warn(`[ChannelRoutedEffects] Cannot get native input for ${config.type}`);
+        isolationNode.dispose();
+        try { effectNode.disconnect(); effectNode.dispose(); } catch { /* */ }
+        continue;
+      }
+
+      try {
+        isolationNode.output.connect(nativeEffectInput);
+      } catch (e) {
+        console.warn(`[ChannelRoutedEffects] Cannot connect isolation to ${config.type}:`, e);
+        isolationNode.dispose();
+        try { effectNode.disconnect(); effectNode.dispose(); } catch { /* */ }
+        continue;
       }
       effectNode.connect(this.masterInput);
 

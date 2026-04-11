@@ -4868,7 +4868,7 @@ export class ToneEngine {
     let isolatedChannelsMask = 0;
 
     if (wantsChannelRouting.length > 0) {
-      // Get module buffer from active LibopenmptEngine (if any)
+      // Get module buffer from active LibopenmptEngine (if currently playing)
       let moduleBuffer: ArrayBuffer | null = null;
       let audioContext: AudioContext | null = null;
       let currentPosition: { order: number; row: number } | null = null;
@@ -4877,9 +4877,12 @@ export class ToneEngine {
         const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
         if (LibopenmptEngine.hasInstance()) {
           const engine = LibopenmptEngine.getInstance();
-          moduleBuffer = engine.getModuleBuffer();
-          audioContext = engine.getAudioContext();
-          currentPosition = engine.getCurrentPosition();
+          // Only use isolation if libopenmpt is actively playing
+          if (engine.isPlaying() && engine.getModuleBuffer()) {
+            moduleBuffer = engine.getModuleBuffer();
+            audioContext = engine.getAudioContext();
+            currentPosition = engine.getCurrentPosition();
+          }
         }
       } catch { /* LibopenmptEngine not available */ }
 
