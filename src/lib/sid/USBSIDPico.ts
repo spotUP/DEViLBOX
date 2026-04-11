@@ -565,7 +565,11 @@ let instance: USBSIDPicoDevice | null = null;
 
 export function getUSBSIDPico(): USBSIDPicoDevice {
   if (!instance) {
-    instance = new USBSIDPicoDevice(true); // cycle-exact by default
+    // Non-cycled: every call site in the codebase uses write()/writeFrame(),
+    // never writeCycled(). With cycleExact=true, flush() would wrap 2-byte
+    // write entries in a CYCLED_WRITE command header, which the firmware
+    // parses as 4-byte entries — garbling the stream.
+    instance = new USBSIDPicoDevice(false);
   }
   return instance;
 }

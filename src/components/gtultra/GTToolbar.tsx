@@ -7,7 +7,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
-import { getASIDDeviceManager } from '../../lib/sid/ASIDDeviceManager';
+import { getSIDHardwareManager, type SIDHardwareStatus } from '../../lib/sid/SIDHardwareManager';
 
 const BTN = 'px-2 py-0.5 text-[10px] font-mono border cursor-pointer transition-colors';
 const BTN_DEFAULT = `${BTN} bg-ft2-header text-ft2-textDim border-ft2-border hover:bg-ft2-border hover:text-ft2-text`;
@@ -203,58 +203,66 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
   );
 };
 
-/** ASID hardware toggle */
+/** SID hardware output toggle — works for both ASID (Web MIDI) and WebUSB transports */
 const ASIDToggle: React.FC = () => {
-  const [asidEnabled, setAsidEnabled] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [deviceName, setDeviceName] = useState<string | null>(null);
+  const [hwStatus, setHwStatus] = useState<SIDHardwareStatus>(() => getSIDHardwareManager().getStatus());
+  const [bridgeEnabled, setBridgeEnabled] = useState(() => getGTUltraASIDBridge().isEnabled);
   const [writeCount, setWriteCount] = useState(0);
   const engine = useGTUltraStore((s) => s.engine);
 
   useEffect(() => {
-    const dm = getASIDDeviceManager();
-    dm.init();
-    const unsub = dm.onStateChange((state) => {
-      const isReady = state.selectedDevice?.state === 'connected';
-      setConnected(isReady);
-      setDeviceName(state.selectedDevice?.name ?? null);
-      if (isReady && asidEnabled) getGTUltraASIDBridge().enable();
-    });
-    setConnected(dm.isDeviceReady());
-    setDeviceName(dm.getSelectedDevice()?.name ?? null);
-    return unsub;
-  }, [asidEnabled]);
+    const mgr = getSIDHardwareManager();
+    const bridge = getGTUltraASIDBridge();
+    const unsubMgr = mgr.onStatusChange(setHwStatus);
+    const unsubBridge = bridge.onChange(setBridgeEnabled);
+    setHwStatus(mgr.getStatus());
+    setBridgeEnabled(bridge.isEnabled);
+    return () => { unsubMgr(); unsubBridge(); };
+  }, []);
 
   useEffect(() => {
-    if (!asidEnabled) return;
+    if (!bridgeEnabled) {
+      setWriteCount(0);
+      return;
+    }
     const interval = setInterval(() => {
       setWriteCount(getGTUltraASIDBridge().getWriteCount?.() ?? 0);
     }, 500);
     return () => clearInterval(interval);
-  }, [asidEnabled]);
+  }, [bridgeEnabled]);
+
+  const connected = hwStatus.connected;
+  const modeLabel = hwStatus.mode === 'webusb' ? 'USB' : hwStatus.mode === 'asid' ? 'ASID' : '';
+  const deviceName = hwStatus.deviceName;
 
   const toggle = useCallback(() => {
     const bridge = getGTUltraASIDBridge();
-    if (asidEnabled) {
-      bridge.disable(); engine?.enableAsid(false); setAsidEnabled(false); setWriteCount(0);
+    if (bridgeEnabled) {
+      bridge.disable();
+      engine?.enableAsid(false);
     } else {
-      bridge.enable(); engine?.enableAsid(true); setAsidEnabled(true);
+      bridge.enable();
+      engine?.enableAsid(true);
     }
-  }, [asidEnabled, engine]);
+  }, [bridgeEnabled, engine]);
 
-  const label = asidEnabled && connected
-    ? `${deviceName ? deviceName.slice(0, 10) : 'ASID'} ${writeCount > 0 ? `${(writeCount / 1000).toFixed(1)}k` : 'ON'}`
+  const label = bridgeEnabled && connected
+    ? `${modeLabel} ${writeCount > 0 ? `${(writeCount / 1000).toFixed(1)}k` : 'ON'}`
     : connected
-      ? `${deviceName ? deviceName.slice(0, 10) : 'ASID'}`
+      ? (deviceName ? deviceName.slice(0, 10) : modeLabel || 'HW')
       : 'No HW';
+
+  const title = connected
+    ? (bridgeEnabled
+        ? `${modeLabel} active: ${deviceName ?? 'device'} — softsynth muted`
+        : `Click to route to ${deviceName ?? (modeLabel || 'hardware')}`)
+    : 'No SID hardware — connect via Settings → SID Hardware';
 
   return (
     <button
       onClick={toggle}
-      title={connected
-        ? (asidEnabled ? `ASID active: ${deviceName}` : `Click to enable: ${deviceName}`)
-        : 'No ASID device — connect USB-SID-Pico or TherapSID'}
-      className={`${BTN} text-[9px] min-w-[60px] ${asidEnabled && connected ? 'bg-emerald-600 text-text-primary border-emerald-500' : connected ? BTN_DEFAULT : 'opacity-40 cursor-not-allowed bg-ft2-header text-ft2-textDim border-ft2-border'}`}
+      title={title}
+      className={`${BTN} text-[9px] min-w-[60px] ${bridgeEnabled && connected ? 'bg-emerald-600 text-text-primary border-emerald-500' : connected ? BTN_DEFAULT : 'opacity-40 cursor-not-allowed bg-ft2-header text-ft2-textDim border-ft2-border'}`}
       disabled={!connected}
     >
       {label}

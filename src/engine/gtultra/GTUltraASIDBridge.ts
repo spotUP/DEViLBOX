@@ -15,23 +15,48 @@ import { SIDRegisterDecoder } from '../automation/decoders/SIDRegisterDecoder';
 import { getAutomationCapture } from '../automation/AutomationCapture';
 import type { AutomationSourceRef } from '../../types/automation';
 
+type BridgeChangeCallback = (enabled: boolean) => void;
+
 export class GTUltraASIDBridge {
   private enabled = false;
   private _writeCount = 0;
   private sidDecoder = new SIDRegisterDecoder(2);
   private captureEnabled = true;
+  private listeners = new Set<BridgeChangeCallback>();
 
   /** Total number of register writes sent to hardware */
   getWriteCount(): number { return this._writeCount; }
 
+  /** Subscribe to enable/disable state changes. Returns unsubscribe. */
+  onChange(cb: BridgeChangeCallback): () => void {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb);
+  }
+
+  private notifyChange(): void {
+    const enabled = this.enabled;
+    this.listeners.forEach(cb => cb(enabled));
+  }
+
   /** Enable hardware output. Starts sending SID register writes. */
   enable(): void {
+    if (this.enabled) return;
     this.enabled = true;
-    console.log('[GTUltra HW] Bridge enabled, mode:', getSIDHardwareManager().mode);
+    const mgr = getSIDHardwareManager();
+    // Clear the diff cache so the first frame's register dump is sent in
+    // full, not filtered against stale values from a previous session.
+    mgr.clearDiffCache();
+    // Apply the persisted clock rate (PAL/NTSC/DREAN) so pitch matches the
+    // song's target frame rate. Without this the Pico plays at whatever
+    // rate it was last set to.
+    void mgr.applyClockFromSettings();
+    console.log('[GTUltra HW] Bridge enabled, mode:', mgr.mode);
+    this.notifyChange();
   }
 
   /** Disable hardware output. Silences hardware. */
   async disable(): Promise<void> {
+    if (!this.enabled) return;
     this.enabled = false;
     this._writeCount = 0;
     const mgr = getSIDHardwareManager();
@@ -44,6 +69,7 @@ export class GTUltraASIDBridge {
       mgr.flush();
     }
     console.log('[GTUltra HW] Bridge disabled');
+    this.notifyChange();
   }
 
   /**
