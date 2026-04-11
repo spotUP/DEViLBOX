@@ -22,6 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '../../types/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
@@ -37,12 +38,32 @@ interface SortableVisualEffectProps {
   onUpdateParameter: (key: string, value: number | string) => void;
   onUpdateParameters?: (params: Record<string, number | string>) => void;
   onWetChange: (wet: number) => void;
+  onChannelSelect: (channels: number[] | undefined) => void;
+  numChannels: number;
 }
 
-function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange }: SortableVisualEffectProps) {
+function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels }: SortableVisualEffectProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
+  const [showChannels, setShowChannels] = useState(false);
+  const selected = effect.selectedChannels;
+  const hasSelection = selected && selected.length > 0;
+
+  const toggleChannel = (ch: number) => {
+    const current = new Set(selected ?? []);
+    if (current.has(ch)) {
+      current.delete(ch);
+      onChannelSelect(current.size > 0 ? Array.from(current).sort((a, b) => a - b) : undefined);
+    } else {
+      current.add(ch);
+      onChannelSelect(Array.from(current).sort((a, b) => a - b));
+    }
+  };
+
+  const selectAll = () => {
+    onChannelSelect(undefined); // undefined = all channels
+  };
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -101,6 +122,54 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
           onUpdateWet={onWetChange}
         />
       </div>
+
+      {/* Channel selection row */}
+      <div className="px-2 pb-1">
+        <button
+          onClick={() => setShowChannels(!showChannels)}
+          className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-secondary transition-colors w-full py-1"
+        >
+          <ChevronDown size={10} className={`transition-transform ${showChannels ? '' : '-rotate-90'}`} />
+          <span className="font-medium">
+            {hasSelection
+              ? `CH: ${selected!.map(c => c + 1).join(', ')}`
+              : 'All Channels'}
+          </span>
+        </button>
+        {showChannels && (
+          <div className="flex flex-wrap items-center gap-1 pb-2 pt-0.5">
+            <button
+              onClick={selectAll}
+              className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+                !hasSelection
+                  ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
+                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-transparent'
+              }`}
+            >
+              ALL
+            </button>
+            {Array.from({ length: numChannels }, (_, i) => {
+              const isSelected = !hasSelection || (selected?.includes(i) ?? false);
+              return (
+                <button
+                  key={i}
+                  onClick={() => toggleChannel(i)}
+                  className={`w-5 h-5 text-[9px] font-bold rounded transition-colors ${
+                    isSelected && hasSelection
+                      ? 'bg-accent-primary/30 text-accent-primary border border-accent-primary/50'
+                      : isSelected
+                        ? 'bg-dark-bgTertiary text-text-muted border border-dark-border'
+                        : 'bg-dark-bg text-text-muted/30 border border-dark-border/50'
+                  }`}
+                  title={`Channel ${i + 1}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -141,6 +210,9 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     reorderMasterEffects,
     setMasterEffects,
   } = useAudioStore();
+
+  // Channel count for channel selection UI
+  const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
 
   // Keep masterEffects ref in sync to avoid stale closures (critical for smooth knobs)
   const masterEffectsRef = useRef(masterEffects);
@@ -314,6 +386,10 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
         parameters: { ...effect.parameters, ...params },
       });
     }
+  }, [updateMasterEffect]);
+
+  const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
+    updateMasterEffect(effectId, { selectedChannels: channels });
   }, [updateMasterEffect]);
 
   // Group effects by group for the add menu
@@ -534,6 +610,8 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                   onUpdateParameter={(key, value) => handleUpdateParameter(effect.id, key, value)}
                   onUpdateParameters={(params) => handleUpdateParameters(effect.id, params)}
                   onWetChange={(wet) => handleWetChange(effect.id, wet)}
+                  onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
+                  numChannels={numChannels}
                 />
               ))}
             </SortableContext>

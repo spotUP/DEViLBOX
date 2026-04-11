@@ -178,7 +178,7 @@ export const usePatternPlayback = () => {
   // (add/remove/enable/disable/reorder), NOT on parameter or wet changes.
   // Parameter updates are handled by updateMasterEffectParams in the store.
   const masterEffectsKey = useMemo(
-    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}`).join('|'),
+    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}:${(e.selectedChannels ?? []).join(',')}`).join('|'),
     [masterEffects]
   );
   useEffect(() => {
