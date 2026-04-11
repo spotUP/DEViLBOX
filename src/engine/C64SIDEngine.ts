@@ -379,6 +379,71 @@ export class C64SIDEngine {
     return null;
   }
 
+  // ── C64 Memory Access (for live editing) ─────────────────────────────
+
+  /**
+   * Read a byte from emulated C64 RAM.
+   * Requires websid or tinyrsid backend.
+   */
+  readRAM(address: number): number | null {
+    if (this.engine && 'readRAM' in this.engine) {
+      return (this.engine as ScriptNodePlayerEngine).readRAM(address);
+    }
+    return null;
+  }
+
+  /**
+   * Write a byte to emulated C64 RAM.
+   * Requires websid backend (only one with setRAM).
+   * Returns true if write succeeded.
+   */
+  writeRAM(address: number, value: number): boolean {
+    if (this.engine && 'writeRAM' in this.engine) {
+      return (this.engine as ScriptNodePlayerEngine).writeRAM(address, value);
+    }
+    return false;
+  }
+
+  /**
+   * Read a block of bytes from emulated C64 RAM.
+   */
+  readRAMBlock(address: number, length: number): Uint8Array | null {
+    if (this.engine && 'readRAMBlock' in this.engine) {
+      return (this.engine as ScriptNodePlayerEngine).readRAMBlock(address, length);
+    }
+    return null;
+  }
+
+  /**
+   * Write a block of bytes to emulated C64 RAM.
+   */
+  writeRAMBlock(address: number, data: Uint8Array): boolean {
+    if (this.engine && 'writeRAMBlock' in this.engine) {
+      return (this.engine as ScriptNodePlayerEngine).writeRAMBlock(address, data);
+    }
+    return false;
+  }
+
+  /**
+   * Check if the current engine supports memory read access.
+   */
+  hasReadAccess(): boolean {
+    if (this.engine && 'hasReadAccess' in this.engine) {
+      return (this.engine as ScriptNodePlayerEngine).hasReadAccess();
+    }
+    return false;
+  }
+
+  /**
+   * Check if the current engine supports memory write access.
+   */
+  hasWriteAccess(): boolean {
+    if (this.engine && 'hasWriteAccess' in this.engine) {
+      return (this.engine as ScriptNodePlayerEngine).hasWriteAccess();
+    }
+    return false;
+  }
+
   /**
    * Set master volume (0-1 linear). Combined with per-engine gain compensation.
    * NOTE: When routed through synthBus (default), the Tone.js masterChannel

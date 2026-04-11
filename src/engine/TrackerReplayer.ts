@@ -60,6 +60,7 @@ import {
 } from './replayer/EffectHandlers';
 import {
   C64SIDEngine,
+  SF2Engine,
   startNativeEngines,
   stopNativeEngines,
   pauseNativeEngines,
@@ -592,6 +593,7 @@ export class TrackerReplayer {
 
   // External playback engines for formats that don't use standard tracker playback
   private c64SidEngine: C64SIDEngine | null = null;
+  private sf2Engine: SF2Engine | null = null;
   private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
   private _mlPositionUnsub: (() => void) | null = null;
@@ -606,6 +608,11 @@ export class TrackerReplayer {
   /** Get the active C64 SID engine (for subsong switching etc.) */
   public getC64SIDEngine(): C64SIDEngine | null {
     return this.c64SidEngine;
+  }
+
+  /** Get the active SF2 engine (for live editing with memory patching) */
+  public getSF2Engine(): SF2Engine | null {
+    return this.sf2Engine;
   }
 
   // Stereo separation (0-100): controls how wide the stereo image is.
@@ -1687,6 +1694,7 @@ export class TrackerReplayer {
       if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
+      if (result.sf2Engine) this.sf2Engine = result.sf2Engine;
       // Wire the active WASM engine for hybrid playback mute mask updates.
       // Try engines returned in the result first, then probe singletons.
       if (result.uadeEngine && 'setMuteMask' in result.uadeEngine) {
@@ -2108,6 +2116,10 @@ export class TrackerReplayer {
     // Stop routed native engines (UADE/Hively/SID/MusicLine/JamCracker)
     if (!skipNativeStop) {
       this.c64SidEngine = stopNativeEngines(this.song, this.routedNativeEngines, this.c64SidEngine);
+      if (this.sf2Engine) {
+        this.sf2Engine.dispose();
+        this.sf2Engine = null;
+      }
     }
 
     // Clean up HVL position subscription

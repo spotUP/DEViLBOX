@@ -12,6 +12,7 @@ import { PixiGenericFormatView } from '@/pixi/views/shared/PixiGenericFormatView
 import { SF2_COLUMNS } from '@/components/sidfactory2/sf2Adapter';
 import { useSF2FormatData } from '@/components/sidfactory2/useSF2FormatData';
 import { useSF2Store } from '@/stores/useSF2Store';
+import { useSF2LiveSync } from '@/hooks/useSF2Engine';
 
 const ORDER_H = 80;
 const SF2_ACCENT = 0x66aaff;
@@ -24,6 +25,9 @@ interface Props {
 export const PixiSF2View: React.FC<Props> = ({ width, height }) => {
   const theme = usePixiTheme();
   const { channels, currentRow, isPlaying } = useSF2FormatData();
+
+  // Live sync: push store edits to C64 memory for immediate audio feedback
+  useSF2LiveSync();
   const descriptor = useSF2Store((s) => s.descriptor);
   const songName = useSF2Store((s) => s.songName);
   const trackCount = useSF2Store((s) => s.trackCount);
