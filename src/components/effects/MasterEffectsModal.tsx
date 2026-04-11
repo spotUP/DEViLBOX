@@ -25,6 +25,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
@@ -63,6 +64,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     reorderMasterEffects,
     setMasterEffects,
   } = useAudioStore();
+
+  const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
+
+  const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
+    updateMasterEffect(effectId, { selectedChannels: channels });
+  }, [updateMasterEffect]);
 
   // Derive editingEffect from store (never stale)
   const editingEffect = useMemo(
@@ -498,6 +505,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         onToggle={() => handleToggle(effect.id)}
                         onRemove={() => removeMasterEffect(effect.id)}
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
+                        onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
+                        numChannels={numChannels}
                       />
                     ))}
                   </SortableContext>
@@ -639,9 +648,11 @@ interface SortableEffectItemProps {
   onToggle: () => void;
   onRemove: () => void;
   onWetChange: (wet: number) => void;
+  onChannelSelect: (channels: number[] | undefined) => void;
+  numChannels: number;
 }
 
-function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange }: SortableEffectItemProps) {
+function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, numChannels }: SortableEffectItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -791,6 +802,61 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
           </button>
         </div>
       </div>
-    </div>
-  );
+
+      {/* Channel routing selector */}
+      <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: `${enc.accent}80` }}>Route</span>
+          <button
+            onClick={() => onChannelSelect(undefined)}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors ${
+              !Array.isArray(effect.selectedChannels)
+                ? 'text-white/90 border'
+                : 'text-white/30 hover:text-white/50 border border-transparent'
+            }`}
+            style={!Array.isArray(effect.selectedChannels) ? { background: `${enc.accent}30`, borderColor: `${enc.accent}60` } : {}}
+          >
+            ALL
+          </button>
+          <span className="text-[9px] ml-auto" style={{ color: `${enc.accent}60` }}>
+            {Array.isArray(effect.selectedChannels) && effect.selectedChannels.length === 0
+              ? 'No channels'
+              : Array.isArray(effect.selectedChannels)
+                ? `${effect.selectedChannels.length}/${numChannels} ch`
+                : 'All channels'}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {Array.from({ length: numChannels }, (_, i) => {
+            const sel = effect.selectedChannels;
+            const isOn = !Array.isArray(sel) || sel.includes(i);
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  const current = new Set(sel ?? []);
+                  if (current.has(i)) {
+                    current.delete(i);
+                    onChannelSelect(current.size > 0 ? Array.from(current).sort((a, b) => a - b) : undefined);
+                  } else {
+                    current.add(i);
+                    onChannelSelect(Array.from(current).sort((a, b) => a - b));
+                  }
+                }}
+                className="w-5 h-5 text-[9px] font-bold rounded transition-colors"
+                style={{
+                  background: isOn && Array.isArray(sel) ? `${enc.accent}30` : 'rgba(255,255,255,0.04)',
+                  border: isOn && Array.isArray(sel) ? `1px solid ${enc.accent}60` : '1px solid rgba(255,255,255,0.08)',
+                  color: isOn ? (Array.isArray(sel) ? `${enc.accent}` : 'rgba(255,255,255,0.5)') : 'rgba(255,255,255,0.15)',
+                }}
+                title={`Channel ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>  );
 }
+
