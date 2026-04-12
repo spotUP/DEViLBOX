@@ -1968,6 +1968,11 @@ export function createMcpServer(): McpServer {
           { tool: 'export_mod', description: 'Export loaded song to ProTracker MOD (base64); bakes OctaMED synths to PCM' },
           { tool: 'export_native', description: 'Export loaded song to its native format (55+ formats) with edits preserved' },
         ],
+        'Soak Test / Telemetry': [
+          { tool: 'dj_vj_action', description: 'Execute DJ/VJ soak-test action (dev-only)' },
+          { tool: 'get_frame_stats', description: 'Frame-time percentiles from rAF recorder (dev-only)' },
+          { tool: 'get_gpu_stats', description: 'GPU info from WebGL context (dev-only)' },
+        ],
         'Utility': [
           { tool: 'get_mcp_help', description: 'This help listing' },
           { tool: 'batch', description: 'Execute multiple tool calls atomically' },
@@ -2153,6 +2158,47 @@ export function createMcpServer(): McpServer {
         return textResult({ error: `Failed to load/play file: ${(e as Error).message}` });
       }
     },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // SOAK TEST / TELEMETRY (dev-only tools for DJ/VJ stress testing)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'dj_vj_action',
+    'Execute a DJ/VJ soak-test action in the browser (dev-only). Actions: switchView, loadDeck, playDeck, stopDeck, setCrossfader, setEQ, setFilter, setDeckVolume, nextVjPreset.',
+    {
+      action: z.string().describe('Action name (e.g. "switchView", "loadDeck", "playDeck")'),
+      args: z.record(z.string(), z.any()).optional().describe('Action arguments'),
+    },
+    async (p) => {
+      // For loadDeck, read the file server-side and pass base64 data
+      if (p.action === 'loadDeck' && p.args?.path && !p.args?.data) {
+        const filePath = p.args.path as string;
+        const fileData = await readFile(filePath);
+        const base64 = fileData.toString('base64');
+        const filename = basename(filePath);
+        return call('dj_vj_action', {
+          action: p.action,
+          args: { ...p.args, filename, data: base64 },
+        });
+      }
+      return call('dj_vj_action', { action: p.action, args: p.args ?? {} });
+    },
+  );
+
+  server.tool(
+    'get_frame_stats',
+    'Get frame-time statistics from the browser rAF recorder (dev-only soak telemetry). Returns p50/p95/p99/max/jankRatio, then resets the ring buffer.',
+    {},
+    () => call('get_frame_stats'),
+  );
+
+  server.tool(
+    'get_gpu_stats',
+    'Get GPU information from the browser WebGL context (dev-only soak telemetry). Returns renderer, vendor, maxTextureSize.',
+    {},
+    () => call('get_gpu_stats'),
   );
 
   server.tool(
