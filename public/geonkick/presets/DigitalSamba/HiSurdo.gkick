@@ -1,0 +1,266 @@
+{
+"osc8": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.65185, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.27742 , 0.14167], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 61.94109, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 264.37613
+}
+}
+,
+"osc7": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc6": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc5": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 540, 
+"ampl_env": {
+"amplitude": 0.10370, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.09548 , 0.71250], [ 0.25161 , 0.49583], [ 0.79742 , 0.43333], [ 0.96258 , 0.23750], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 246.59193, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 0.84869]], 
+"factor": 59.94843
+}
+}
+,
+"osc1": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.05290 , 0.68333], [ 0.13290 , 0.40417], [ 0.26452 , 0.34583], [ 0.34065 , 0.52083], [ 0.57032 , 0.24583], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 333.02127, 
+"points": [
+[ 0.00000 , 0.34425], [ 0.59742 , 0.34830], [ 1.00000 , 0.51880]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc2": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 160, 
+"ampl_env": {
+"amplitude": 0.07407, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.38452 , 0.89583], [ 0.74452 , 0.64167], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 114.45784, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 271.22726
+}
+}
+,
+"osc3": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc4": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 131074,
+"id": 11,
+"channel": 0,
+"name": "HiSurdo",
+"playing_key": 78,
+"layers": [0, 1, 2],
+"layers_amplitude": [1.00000, 1.00000, 1.00000],
+"limiter": 0.52533, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 0.80000, 
+"length": 300.00000, 
+"points": [[ 0.00000 , 1.00000], [ 0.47742 , 0.99167], [ 0.70710 , 0.89167], [ 0.74194 , 0.83333], [ 0.77677 , 0.30833], [ 1.00000 , 0.00000]]}, 
+"filter": {
+"enabled": true, 
+"type": 0, 
+"cutoff": 3336.20, 
+"factor": 2.27, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 0.70968 , 0.34438], [ 1.00000 , 0.00000]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.01000, 
+"release": 0.01000, 
+"threshold": 0.00000, 
+"ratio": 1.00000, 
+"knee": 0.00000, 
+"makeup": 1.00000
+}, 
+"distortion": {
+"enabled": true, 
+"in_limiter": 1.00000, 
+"volume": 1.00000, 
+"drive": 6.19441, 
+"drive_env": [
+[ 0.00000 , 1.00000], [ 0.34839 , 0.00000], [ 1.00000 , 0.00000]]
+}
+}
+}

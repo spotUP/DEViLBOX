@@ -1,0 +1,266 @@
+{
+"osc8": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 80, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.19226 , 0.97083], [ 0.30065 , 0.85833], [ 0.38839 , 0.58750], [ 0.44645 , 0.29583], [ 0.54323 , 0.16667], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 318.48575, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 48.85274
+}
+}
+,
+"osc7": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc6": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc5": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 60, 
+"ampl_env": {
+"amplitude": 0.46667, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.14839 , 0.95417], [ 0.38065 , 0.67500], [ 0.63355 , 0.45833], [ 0.80516 , 0.36667], [ 0.91613 , 0.27500], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": false, 
+"type": 2, 
+"cutoff": 259.53809, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 32.44226
+}
+}
+,
+"osc1": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 1.00531, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.08889, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.19097 , 0.96250], [ 0.40129 , 0.88333], [ 0.64645 , 0.75000], [ 0.89419 , 0.37083], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 446.01007, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.19613 , 0.80259], [ 1.00000 , 0.79228]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc2": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 740, 
+"ampl_env": {
+"amplitude": 1.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.16774 , 0.86667], [ 0.34710 , 0.46250], [ 0.64774 , 0.17917], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 504.76587, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 46.41589
+}
+}
+,
+"osc3": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc4": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 131074,
+"id": 6,
+"channel": 4,
+"name": "SoftSnareLow",
+"playing_key": 73,
+"layers": [0, 1, 2],
+"layers_amplitude": [1.00000, 1.00000, 1.00000],
+"limiter": 1.48608, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 0.80000, 
+"length": 95.18518, 
+"points": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]}, 
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 200.00, 
+"factor": 10.00, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.01000, 
+"release": 0.01000, 
+"threshold": 0.00000, 
+"ratio": 1.00000, 
+"knee": 0.00000, 
+"makeup": 1.00000
+}, 
+"distortion": {
+"enabled": true, 
+"in_limiter": 0.06310, 
+"volume": 0.75858, 
+"drive": 58.07644, 
+"drive_env": [
+[ 0.00000 , 1.00000], [ 0.14581 , 0.52500], [ 0.44516 , 0.25833], [ 1.00000 , 0.00000]]
+}
+}
+}
