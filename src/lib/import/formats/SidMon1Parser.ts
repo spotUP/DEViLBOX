@@ -526,6 +526,18 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
     numPatterns: songSteps,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSidMon1Cell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // 5 bytes: note, sample, effect, effectParam, speed
+      const sm1Note = raw[0];
+      const sample  = raw[1];
+      // raw[2] = effect, raw[3] = effectParam — SM1 effects have no XM mapping
+      const speed   = raw[4];
+
+      const note = sm1NoteToXM(sm1Note);
+      let effTyp = 0, eff = 0;
+      if (speed > 0) { effTyp = 0x0F; eff = speed; }
+      return { note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // pattern = TrackerSong pattern index (= song step index)
       // Resolve through track table: each step has CHANNELS tracks

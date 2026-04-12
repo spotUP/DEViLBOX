@@ -54,6 +54,7 @@ import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_ROB_HUBBARD } from '@/types/instrument';
 import { encodeRobHubbardCell } from '@/engine/uade/encoders/RobHubbardEncoder';
+import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -733,6 +734,7 @@ export async function parseRobHubbardFile(
     numPatterns: patterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeRobHubbardCell,
+    decodeCell: decodeMODCell,
     getCellFileOffset: (pat: number, row: number, channel: number): number => {
       const patternByteSize = ROWS * NUM_CHANNELS * 4;
       return pat * patternByteSize + row * NUM_CHANNELS * 4 + channel * 4;

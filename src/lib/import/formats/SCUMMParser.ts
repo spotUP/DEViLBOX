@@ -13,6 +13,7 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSCUMMCell } from '@/engine/uade/encoders/SCUMMEncoder';
+import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -132,6 +133,7 @@ export function parseSCUMMFile(buffer: ArrayBuffer, filename: string): TrackerSo
     numPatterns: 1,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSCUMMCell,
+    decodeCell: decodeMODCell,
   };
 
   return {

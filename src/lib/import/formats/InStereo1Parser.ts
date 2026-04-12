@@ -574,6 +574,24 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.length,
     encodeCell: encodeInStereo1Cell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const byt1 = raw[0];
+      const byt2 = raw[1];
+      const byt3 = raw[2];
+      const byt4 = raw[3];
+
+      let note = 0;
+      if (byt1 === 0x7F) {
+        note = 97; // note-off
+      } else if (byt1 > 0) {
+        note = Math.max(1, Math.min(96, byt1 + 36));
+      }
+      const instrument = byt2;
+      const effect = byt3 & 0x0F;
+      const effectArg = byt4;
+      const { effTyp, eff } = is10EffectToXm(effect, effectArg);
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // Each pattern maps to a position; each channel has a startTrackRow offset
       const posIdx = firstPos + pattern;

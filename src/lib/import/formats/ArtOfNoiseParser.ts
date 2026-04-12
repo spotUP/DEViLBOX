@@ -754,6 +754,20 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
     numPatterns: patterns?.length ?? 0,
     moduleSize: bytes.length,
     encodeCell: encodeAONCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const aonNote = raw[0] & 0x3F;
+      const instrument = raw[1] & 0x3F;
+      const effect = raw[2] & 0x3F;
+      const effectArg = raw[3];
+      // aonNoteToXM: xmNote = 49 + ((aonNote - 1) - 24) = aonNote + 24
+      const note = aonNote > 0 ? Math.max(1, Math.min(96, aonNote + 24)) : 0;
+      return {
+        note, instrument, volume: 0,
+        effTyp: (effect !== 0 || effectArg !== 0) ? effect : 0,
+        eff: (effect !== 0 || effectArg !== 0) ? effectArg : 0,
+        effTyp2: 0, eff2: 0,
+      };
+    },
   } : undefined;
 
   return {

@@ -588,6 +588,15 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeTFMX7VCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const noteByte = raw[0];
+      const infoByte = raw[1];
+      const tfmxNote = noteByte & 0x7F;
+      // tfmxNoteToXM(note, 0): note > 1 ? note + 1 : 0
+      const note = (tfmxNote > 1) ? Math.min(96, tfmxNote + 1) : 0;
+      const instrument = (infoByte & 0x1F) > 0 ? (infoByte & 0x1F) : 0;
+      return { note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= trackerPatterns.length) return -1;
       if (row < 0 || row >= 32) return -1;

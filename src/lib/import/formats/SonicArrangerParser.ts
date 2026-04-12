@@ -946,6 +946,24 @@ export async function parseSonicArrangerFile(
     numPatterns: builtPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSonicArrangerCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const b0 = raw[0]; // note
+      const b1 = raw[1]; // instrument
+      const b2 = raw[2]; // flags + arp + effect
+      const b3 = raw[3]; // effect arg
+
+      let note = 0;
+      if (b0 === 0x7F || b0 === 0x80) {
+        note = 97; // note-off
+      } else if (b0 > 0) {
+        const xm = b0 - 36;
+        note = (xm >= 1 && xm <= 96) ? xm : 0;
+      }
+      const instrument = b1;
+      const effect = b2 & 0x0F;
+      const { effTyp, eff, volCol } = saEffectToXM(effect, b3);
+      return { note, instrument, volume: volCol, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const posEntry = positions[pattern];
       if (!posEntry) return 0;
