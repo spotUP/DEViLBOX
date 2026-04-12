@@ -778,6 +778,15 @@ export async function startNativeEngines(
         } else {
           console.log('[NativeEngineRouting] C64SIDEngine loaded but skipping play (muted)');
         }
+
+        // Apply post-init RAM patches (CheeseCutter: restore $C000-$CFFF
+        // that the PSID driver overwrote with its init shim)
+        if (song.c64MemPatches) {
+          for (const patch of song.c64MemPatches) {
+            c64SidEngine.writeRAMBlock(patch.addr, patch.data);
+          }
+          console.log(`[NativeEngineRouting] Applied ${song.c64MemPatches.length} post-init RAM patch(es)`);
+        }
       }
     } catch (err) {
       console.error('[NativeEngineRouting] Failed to start C64SIDEngine:', err);
