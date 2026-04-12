@@ -104,6 +104,11 @@ createRoot(document.getElementById('root')!).render(
   </ErrorBoundary>,
 )
 
+// Soak test debug hooks: DJ/VJ actions + frame-time/GPU telemetry for MCP-driven stress test
+if (import.meta.env.DEV) {
+  import('./debug/soakActions').then(m => m.installSoakHooks()).catch(() => {});
+}
+
 // Register service worker for sample pack caching
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch((err) => {
