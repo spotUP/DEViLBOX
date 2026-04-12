@@ -319,10 +319,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           // works regardless of container scaling. The springs panel is
           // the right ~20% width, top ~50% height of the 720×400 editor.
           if (overlay.style.display === 'none') {
-            overlay.style.left   = '67%';
-            overlay.style.top    = '0%';
-            overlay.style.width  = '30%';
-            overlay.style.height = '55%';
+            overlay.style.left   = '73%';
+            overlay.style.top    = '2%';
+            overlay.style.width  = '22%';
+            overlay.style.height = '42%';
             overlay.style.display = 'block';
           }
 
