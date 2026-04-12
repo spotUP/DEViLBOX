@@ -395,6 +395,11 @@ export async function parseCheeseCutterFile(
   sidFileData.set(loadPrefix, 124);
   sidFileData.set(memSlice, 126);
 
+  // Post-init RAM patch: the PSID driver installs its shim at $C000-$CFFF,
+  // overwriting any CheeseCutter music data there. Restore it after init.
+  const patchData = mem.slice(0xC000, 0xD000);
+  const c64MemPatches = [{ addr: 0xC000, data: patchData }];
+
   // ── Build patterns for tracker display ──────────────────────────────
   // Determine order length as max non-end entries across the 3 voices
   const orderLengths = trackLists.map(
@@ -563,6 +568,7 @@ export async function parseCheeseCutterFile(
     initialSpeed: speed,
     initialBPM: bpm,
     c64SidFileData: sidFileData,
+    c64MemPatches,
     cheeseCutterStoreData: storeData,
   };
 }
