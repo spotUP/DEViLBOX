@@ -11,11 +11,19 @@
 import { create } from 'zustand';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-// NOTE: Circular import (useTrackerStore also imports useCursorStore).
-// Safe because both stores are initialized at module load time, and
-// getTrackerState() is only called at action invocation time.
-import { useTrackerStore } from './useTrackerStore';
-import { useEditorStore } from './useEditorStore';
+// Cross-store access goes through the late-bound storeAccess registry,
+// NOT through direct static imports. The previous cycle between these
+// three stores caused a production TDZ when Rollup froze the aggregator
+// namespace while one of the store const declarations was still pending.
+// Type-only imports are erased by TypeScript at build time, so they do
+// not create a runtime module cycle.
+import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
+import type { useEditorStore as _EditorStoreType } from './useEditorStore';
+import {
+  getTrackerStoreRef,
+  getEditorStoreRef,
+  registerCursorStore,
+} from './storeAccess';
 import { notifyScrollEvent } from '../pixi/scrollPerf';
 
 // Define column order for range selection
@@ -60,12 +68,12 @@ interface CursorStore {
   selectPattern: () => void;
 }
 
-function getTrackerState() {
-  return useTrackerStore.getState();
+function getTrackerState(): ReturnType<typeof _TrackerStoreType.getState> {
+  return getTrackerStoreRef().getState() as ReturnType<typeof _TrackerStoreType.getState>;
 }
 
-function getEditorState() {
-  return useEditorStore.getState();
+function getEditorState(): ReturnType<typeof _EditorStoreType.getState> {
+  return getEditorStoreRef().getState() as ReturnType<typeof _EditorStoreType.getState>;
 }
 
 export const useCursorStore = create<CursorStore>()((set, get) => ({
@@ -380,3 +388,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     });
   },
 }));
+
+// Register with the cross-store access leaf so useTrackerStore/useEditorStore
+// can reach us without a static import cycle.
+registerCursorStore(useCursorStore);
