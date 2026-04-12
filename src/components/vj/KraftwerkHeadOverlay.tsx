@@ -8,7 +8,7 @@
  * Handles WebGL context loss by remounting the R3F Canvas.
  */
 
-import React, { Suspense, useCallback, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
@@ -36,9 +36,19 @@ export const KraftwerkHeadOverlay: React.FC = () => {
   // Increment key to force-remount the Canvas after context restore
   const [canvasKey, setCanvasKey] = useState(0);
   const contextLostRef = useRef(false);
+  // Store listener refs for cleanup
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
+  const onLostRef = useRef<((e: Event) => void) | null>(null);
+  const onRestoredRef = useRef<(() => void) | null>(null);
 
   const handleCreated = useCallback((state: { gl: THREE.WebGLRenderer }) => {
     const canvas = state.gl.domElement;
+
+    // Remove previous listeners if canvas changed (remount)
+    if (canvasElRef.current && canvasElRef.current !== canvas) {
+      if (onLostRef.current) canvasElRef.current.removeEventListener('webglcontextlost', onLostRef.current);
+      if (onRestoredRef.current) canvasElRef.current.removeEventListener('webglcontextrestored', onRestoredRef.current);
+    }
 
     const onLost = (e: Event) => {
       e.preventDefault(); // tell browser we want a restore
@@ -53,8 +63,23 @@ export const KraftwerkHeadOverlay: React.FC = () => {
       setCanvasKey(k => k + 1);
     };
 
+    canvasElRef.current = canvas;
+    onLostRef.current = onLost;
+    onRestoredRef.current = onRestored;
+
     canvas.addEventListener('webglcontextlost', onLost);
     canvas.addEventListener('webglcontextrestored', onRestored);
+  }, []);
+
+  // Cleanup listeners on unmount
+  useEffect(() => {
+    return () => {
+      const canvas = canvasElRef.current;
+      if (canvas) {
+        if (onLostRef.current) canvas.removeEventListener('webglcontextlost', onLostRef.current);
+        if (onRestoredRef.current) canvas.removeEventListener('webglcontextrestored', onRestoredRef.current);
+      }
+    };
   }, []);
 
   return (

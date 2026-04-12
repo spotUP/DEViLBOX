@@ -110,6 +110,10 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     const [error, setError] = useState<string | null>(null);
     const audioBusRef = useRef<AudioDataBus | null>(null);
 
+    // Pre-allocated stereo buffer for audio push (avoids per-frame Float32Array allocation)
+    const stereoBufferRef = useRef<Float32Array | null>(null);
+    const stereoBufferLenRef = useRef(0);
+
     // Fade overlay for smooth preset transitions
     const fadeRef = useRef<HTMLDivElement>(null);
     const fadeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -305,7 +309,13 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         if (engine && bus) {
           const frame = bus.update();
           const waveform = frame.waveform;
-          const stereo = new Float32Array(waveform.length * 2);
+          const neededLen = waveform.length * 2;
+          // Reuse pre-allocated buffer; only reallocate if waveform size changed
+          if (stereoBufferLenRef.current !== neededLen || !stereoBufferRef.current) {
+            stereoBufferRef.current = new Float32Array(neededLen);
+            stereoBufferLenRef.current = neededLen;
+          }
+          const stereo = stereoBufferRef.current;
           for (let i = 0; i < waveform.length; i++) {
             stereo[i * 2] = waveform[i];
             stereo[i * 2 + 1] = waveform[i];
