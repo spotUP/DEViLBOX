@@ -11,6 +11,8 @@ import { getNativeContext, getDevilboxAudioContext } from '@utils/audio-context'
 import { FurnaceEffectRouter } from './FurnaceEffectRouter';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
+import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
+import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 
 /** Furnace platform types (matching C++ DivSystem enum in sysDef.h) */
 export const FurnaceDispatchPlatform = {
@@ -891,8 +893,10 @@ export const MacroCommands = {
 
 export type OscDataCallback = (channels: (Int16Array | null)[]) => void;
 
-export class FurnaceDispatchEngine {
+export class FurnaceDispatchEngine implements IsolationCapableEngine {
   private static instance: FurnaceDispatchEngine | null = null;
+  private static readonly MAX_ISOLATION_SLOTS = 4;
+  private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
 
   private workletNode: AudioWorkletNode | null = null;
   private _nativeCtx: AudioContext | null = null;
@@ -962,6 +966,10 @@ export class FurnaceDispatchEngine {
       FurnaceDispatchEngine.instance = new FurnaceDispatchEngine();
     }
     return FurnaceDispatchEngine.instance;
+  }
+
+  static hasInstance(): boolean {
+    return FurnaceDispatchEngine.instance !== null;
   }
 
   get isInitialized(): boolean { return this.initialized; }
@@ -1077,7 +1085,8 @@ export class FurnaceDispatchEngine {
       // (toneCreateAudioWorkletNode was throwing InvalidStateError)
       try {
         this.workletNode = new AudioWorkletNode(nativeCtx, 'furnace-dispatch-processor', {
-          outputChannelCount: [2],
+          numberOfOutputs: 1 + FurnaceDispatchEngine.MAX_ISOLATION_SLOTS,
+          outputChannelCount: [2, 2, 2, 2, 2],
           processorOptions: { sampleRate: nativeCtx.sampleRate }
         });
         console.log('[FurnaceDispatch] Worklet node created successfully');
@@ -1289,6 +1298,14 @@ export class FurnaceDispatchEngine {
         }
         break;
       }
+
+      case 'isolationReady':
+        console.log(`[FurnaceDispatch] Isolation slot ${data.slotIndex} ready, mask=0x${(data.channelMask as number).toString(16)}`);
+        break;
+
+      case 'diagIsolation':
+        console.log('[FurnaceDispatch] Isolation diagnostic:', data);
+        break;
 
       case 'debug':
         if ((window as any).FURNACE_DEBUG) console.log(data.msg);
@@ -1848,6 +1865,42 @@ export class FurnaceDispatchEngine {
     return this._nativeCtx;
   }
 
+  // ========== IsolationCapableEngine interface ==========
+
+  isAvailable(): boolean {
+    return this.initialized && this.workletNode !== null;
+  }
+
+  getAudioContext(): AudioContext | null {
+    return this._nativeCtx;
+  }
+
+  addIsolation(slotIndex: number, channelMask: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= FurnaceDispatchEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = channelMask;
+    this.workletNode.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
+    console.log(`[FurnaceDispatch] addIsolation: slot=${slotIndex}, mask=0x${channelMask.toString(16)}`);
+  }
+
+  removeIsolation(slotIndex: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= FurnaceDispatchEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = null;
+    this.workletNode.port.postMessage({ type: 'removeIsolation', slotIndex });
+  }
+
+  diagIsolation(): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'diagIsolation' });
+  }
+
+  removeAllIsolation(): void {
+    for (let i = 0; i < FurnaceDispatchEngine.MAX_ISOLATION_SLOTS; i++) {
+      if (this._isolationSlotMasks[i] !== null) {
+        this.removeIsolation(i);
+      }
+    }
+  }
+
   // ========== Platform-Specific Dispatch Helpers ==========
 
   /**
@@ -2189,6 +2242,8 @@ export class FurnaceDispatchEngine {
    * Dispose the engine and clean up resources.
    */
   dispose(): void {
+    this.removeAllIsolation();
+    this._isolationSlotMasks.fill(null);
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
       this.workletNode.disconnect();
@@ -2206,3 +2261,12 @@ export class FurnaceDispatchEngine {
     FurnaceDispatchEngine.instance = null;
   }
 }
+
+// Register with the per-channel isolation system
+registerIsolationEngineResolver(async () => {
+  if (FurnaceDispatchEngine.hasInstance()) {
+    const engine = FurnaceDispatchEngine.getInstance();
+    if (engine.isAvailable()) return engine;
+  }
+  return null;
+});

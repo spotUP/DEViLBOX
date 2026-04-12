@@ -94,6 +94,7 @@ interface CheeseCutterState {
   pulseTable: Uint8Array | null;
   filterTable: Uint8Array | null;
   commandTable: Uint8Array | null;
+  pointerTable: number[];
 
   // Editor state
   cursor: CCEditorCursor;
@@ -143,6 +144,7 @@ export interface CheeseCutterLoadPayload {
   pulseTable: Uint8Array | null;
   filterTable: Uint8Array | null;
   commandTable: Uint8Array | null;
+  pointerTable: number[];
 }
 
 // ── Initial state ───────────────────────────────────────────────────────
@@ -179,6 +181,7 @@ export const useCheeseCutterStore = create<CheeseCutterState>()(
     pulseTable: null,
     filterTable: null,
     commandTable: null,
+    pointerTable: [],
 
     cursor: { ...INITIAL_CURSOR },
     orderCursor: 0,
@@ -210,6 +213,7 @@ export const useCheeseCutterStore = create<CheeseCutterState>()(
         state.pulseTable = data.pulseTable;
         state.filterTable = data.filterTable;
         state.commandTable = data.commandTable;
+        state.pointerTable = data.pointerTable;
         state.cursor = { ...INITIAL_CURSOR };
         state.orderCursor = 0;
         state.playing = false;
