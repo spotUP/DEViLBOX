@@ -209,6 +209,9 @@ export function createVoice(ctx: ChannelRoutingContext, channelIndex: number, in
     // Use native AudioWorkletNode directly (matches FurnaceDispatch fix)
     const nCtx = ctx.nativeContext!;
     filter = new AudioWorkletNode(nCtx, 'it-filter-processor');
+    filter.onprocessorerror = (event) => {
+      console.error('[ChannelRouting] worklet processor error on channel', channelIndex, ':', event);
+    };
   } else {
     filter = new Tone.Filter({
       type: 'lowpass',
