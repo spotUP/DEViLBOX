@@ -1070,8 +1070,11 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
       let peakMax = 0;
 
       const startTime = performance.now();
-      // Use setInterval instead of rAF — rAF is throttled when tab is backgrounded
-      const interval = setInterval(() => {
+      // Use MessageChannel for timing — setInterval gets throttled to 1/sec
+      // in background tabs, making audio measurement useless. MessageChannel
+      // postMessage fires on the microtask queue and isn't throttled.
+      const channel = new MessageChannel();
+      const tick = () => {
         const frame = bus.update();
         framesAnalyzed++;
         rmsSum += frame.rms;
@@ -1079,7 +1082,7 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
         if (frame.peak > peakMax) peakMax = frame.peak;
 
         if (performance.now() - startTime >= durationMs) {
-          clearInterval(interval);
+          channel.port1.onmessage = null;
           const rmsAvg = framesAnalyzed > 0 ? rmsSum / framesAnalyzed : 0;
           resolve({
             rmsAvg: +rmsAvg.toFixed(6),
@@ -1089,8 +1092,14 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
             durationMs: Math.round(performance.now() - startTime),
             silent: rmsMax < 0.001,
           });
+          return;
         }
-      }, 16); // ~60 samples/sec
+        // Schedule next tick via MessageChannel (not throttled in background tabs)
+        channel.port2.postMessage(null);
+      };
+      channel.port1.onmessage = tick;
+      // Kick off the first tick
+      channel.port2.postMessage(null);
     } catch (e) {
       resolve({ error: `getAudioLevel failed: ${(e as Error).message}` });
     }

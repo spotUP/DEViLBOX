@@ -126,7 +126,7 @@ async function removeAll() {
   for (const fx of (state?.masterEffects ?? [])) {
     await mcpCall('remove_master_effect', { effectId: fx.id });
   }
-  await sleep(300);
+  await sleep(1500); // Chain rebuild is async — give it time to settle
 }
 
 async function auditOne(type: string, baseRms: number) {
@@ -137,14 +137,23 @@ async function auditOne(type: string, baseRms: number) {
     await ensurePlaying();
     await mcpCall('clear_console_errors');
     await mcpCall('add_master_effect', { effectType: type });
-    await sleep(2500);
+    await sleep(4000); // WASM effects need time to init worklet + connect
 
-    const state = await mcpCall('get_audio_state');
-    const fx = state?.masterEffects?.find((f: any) => f.type === type);
+    let state = await mcpCall('get_audio_state');
+    let fx = (state?.masterEffects ?? []).find((f: any) => f.type === type);
     if (!fx) {
-      console.log('FAIL: not created');
-      await pushTracker(key, { auditStatus: 'fail', notes: 'Effect not created' });
-      return;
+      // Debug: show what IS in the chain, then retry
+      const types = (state?.masterEffects ?? []).map((f: any) => f.type).join(', ') || '(empty)';
+      process.stdout.write('(retry, chain: [' + types + ']) ');
+      await sleep(3000);
+      state = await mcpCall('get_audio_state');
+      fx = (state?.masterEffects ?? []).find((f: any) => f.type === type);
+      if (!fx) {
+        const types2 = (state?.masterEffects ?? []).map((f: any) => f.type).join(', ') || '(empty)';
+        console.log('FAIL: not found [' + types2 + ']');
+        await pushTracker(key, { auditStatus: 'fail', notes: 'Not in store after 7s. Chain: ' + types2 });
+        return;
+      }
     }
 
     const lvl = await measure(2500);
@@ -195,7 +204,7 @@ async function auditOne(type: string, baseRms: number) {
     await pushTracker(key, { auditStatus: 'fail', notes: 'CRASH: ' + err.message });
   } finally {
     await removeAll();
-    await sleep(300);
+    await sleep(1000);
   }
 }
 
