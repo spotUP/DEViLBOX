@@ -164,6 +164,8 @@ const WobbleBassControls = lazy(() => import('../controls/WobbleBassControls').t
 const StartrekkerAMControls = lazy(() => import('../controls/StartrekkerAMControls').then(m => ({ default: m.StartrekkerAMControls })));
 const FuturePlayerControls = lazy(() => import('../controls/FuturePlayerControls').then(m => ({ default: m.FuturePlayerControls })));
 const OPL3Controls = lazy(() => import('../controls/OPL3Controls').then(m => ({ default: m.OPL3Controls })));
+const CheeseCutterControls = lazy(() => import('../controls/CheeseCutterControls').then(m => ({ default: m.CheeseCutterControls })));
+const GTUltraUnifiedControls = lazy(() => import('../controls/GTUltraUnifiedControls').then(m => ({ default: m.GTUltraUnifiedControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -184,7 +186,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -212,6 +214,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   isBaked, isBaking, handleBake, handleBakePro, handleUnbake,
   isCyanTheme,
 }) => {
+  const [sidViewMode, setSidViewMode] = useState<'original' | 'unified'>('original');
+
   // Shared header props for branded header components
   const headerProps: SynthHeaderProps = {
     instrument, handleChange, vizMode,
@@ -1504,13 +1508,28 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
+          customHeaderControls={
+            <button
+              onClick={() => setSidViewMode(m => m === 'original' ? 'unified' : 'original')}
+              className="px-2 py-0.5 text-[9px] font-bold rounded border transition-colors"
+              style={{
+                color: sidViewMode === 'unified' ? '#44ff88' : '#666',
+                borderColor: sidViewMode === 'unified' ? '#44ff88' : '#333',
+                background: sidViewMode === 'unified' ? '#44ff8815' : 'transparent',
+              }}
+            >SID</button>
+          }
         />
         <Suspense fallback={<LoadingControls />}>
-          <GTUltraControls
-            config={gtConfig}
-            instrumentId={instrument.id}
-            onChange={handleGTUltraChange}
-          />
+          {sidViewMode === 'unified' ? (
+            <GTUltraUnifiedControls config={gtConfig} onChange={handleGTUltraChange} />
+          ) : (
+            <GTUltraControls
+              config={gtConfig}
+              instrumentId={instrument.id}
+              onChange={handleGTUltraChange}
+            />
+          )}
         </Suspense>
       </div>
     );
@@ -3543,6 +3562,25 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={instrument}
             onChange={handleChange}
           />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // CHEESECUTTER EDITOR (Unified SID)
+  // ============================================================================
+  if (editorMode === 'cheesecutter') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a1200] to-[#0a0800]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <CheeseCutterControls />
         </Suspense>
       </div>
     );
