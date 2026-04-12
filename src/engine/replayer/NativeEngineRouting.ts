@@ -435,6 +435,24 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/uade/UADEEngine')).UADEEngine as unknown as WASMSingletonStatic,
+    onStarted: (_instance, song) => {
+      // After UADE loads, read pattern data from chip RAM for formats with a decoder
+      const layout = song.uadePatternLayout;
+      if (!layout) return;
+      // Async: read patterns from chip RAM after UADE finishes unpacking
+      setTimeout(async () => {
+        try {
+          const { UADEEngine } = await import('@/engine/uade/UADEEngine');
+          if (!UADEEngine.hasInstance()) return;
+          const { UADEChipEditor } = await import('@/engine/uade/UADEChipEditor');
+          const editor = new UADEChipEditor(UADEEngine.getInstance());
+          const { populatePatternsFromChipRAM } = await import('@/engine/uade/UADEChipRAMPatternReader');
+          await populatePatternsFromChipRAM(editor, layout);
+        } catch (err) {
+          console.warn('[NativeEngineRouting] Chip RAM pattern read failed:', err);
+        }
+      }, 500);
+    },
   },
 ];
 
