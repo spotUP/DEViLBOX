@@ -868,9 +868,12 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     if (loadResult.success === 'pending-import') {
       suppressFormatChecks();
       try {
-      const useLib = params.useLibopenmpt === true;
-      const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm)$/i;
-      const canUseLibopenmpt = useLib && libopenmptExts.test(filename);
+      // Default to libopenmpt for standard tracker formats (MOD/XM/IT/S3M etc.)
+      // unless explicitly disabled. The old code required useLibopenmpt=true which
+      // the MCP load_modland/load_file callers never set, causing MODs to silently
+      // fall through to parseModuleToSong which could fail.
+      const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm|m15)$/i;
+      const canUseLibopenmpt = params.useLibopenmpt !== false && libopenmptExts.test(filename);
 
       // Formats that loadModuleFile handles via its own native parser (useNativeParser):
       // .fur, .dmf, .xrns — plus .xm/.mod which are covered by canUseLibopenmpt above.
