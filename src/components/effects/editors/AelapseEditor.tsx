@@ -115,6 +115,7 @@ export const AelapseEditor: React.FC<VisualEffectEditorProps> = ({
         <AelapseHardwareUI
           onUpdateParameter={handleParam}
           getRMSSnapshot={getRMSSnapshot}
+          effectId={effect.id}
         />
       </div>
     </div>

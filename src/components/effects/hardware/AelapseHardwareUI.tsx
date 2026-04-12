@@ -22,6 +22,8 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { AelapseSpringsRenderer } from '@/engine/effects/AelapseSpringsRenderer';
+import { AelapseEffect } from '@/engine/effects/AelapseEffect';
+import { useAudioStore } from '@/stores/useAudioStore';
 
 // ─── WASM module shape ─────────────────────────────────────────────────────
 
@@ -168,6 +170,9 @@ export interface AelapseHardwareUIProps {
    * previous frame's data in place.
    */
   getRMSSnapshot?: () => { stack: Float32Array; pos: number } | null;
+
+  /** Effect ID for looking up the live AelapseEffect instance for direct DSP writes. */
+  effectId?: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -175,6 +180,7 @@ export interface AelapseHardwareUIProps {
 export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
   onUpdateParameter,
   getRMSSnapshot,
+  effectId,
 }) => {
   const containerRef   = useRef<HTMLDivElement>(null);
   const jcanvasRef     = useRef<HTMLCanvasElement>(null);
@@ -188,6 +194,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
   // Cached springs overlay bounds (set once from WASM, never changes).
   const springsBoundsRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  // Direct reference to the live AelapseEffect instance for DSP writes
+  // that bypass the store. Updated every frame from ToneEngine.
+  const directEffectRef = useRef<AelapseEffect | null>(null);
 
   const [loaded, setLoaded] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
@@ -391,15 +401,23 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           modRef._aelapse_ui_tick();
 
-          // Poll JUCE params for preset-load detection — only every
-          // 10th frame (~3Hz) to avoid flooding the store.
+          // Keep the direct DSP effect ref fresh
+          if (effectId) {
+            const eng = useAudioStore.getState().toneEngineInstance;
+            const n = eng?.getMasterEffectNode(effectId);
+            directEffectRef.current = n instanceof AelapseEffect ? n : null;
+          }
+
+          // Poll JUCE params and write directly to DSP — bypasses the
+          // store round-trip which may not be propagating changes.
+          // Only every 10th frame (~3Hz) to keep overhead low.
           pollCounter = (pollCounter + 1) % 10;
-          if (pollCounter === 0) {
+          if (pollCounter === 0 && directEffectRef.current) {
             for (let i = 0; i < paramCount; i++) {
               const cur = modRef._aelapse_ui_get_param(i);
               if (Math.abs(cur - prevParams[i]) > 0.001) {
                 prevParams[i] = cur;
-                onUpdateParameterRef.current?.(i, cur);
+                directEffectRef.current.forwardJuceParam(i, cur);
               }
             }
           }
