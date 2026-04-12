@@ -40,6 +40,8 @@ const ENGINE_GAIN: Record<SIDEngineType, number> = {
   jsidplay2: 0.75,
 };
 
+type HardwareChangeCallback = (enabled: boolean) => void;
+
 export class C64SIDEngine {
   private engine: EngineInstance | null = null;
   private engineType: SIDEngineType | null = null;
@@ -49,6 +51,13 @@ export class C64SIDEngine {
   private gainNode: GainNode | null = null;
   private masterVolume = 1.0; // 0-1 linear
   private playbackRate = 1.0; // pitch multiplier (1.0 = normal)
+
+  // Hardware SID output — reads emulated SID registers at audio-clock rate
+  // and forwards them to SIDHardwareManager (USB-SID-Pico / ASID). Skipped
+  // when the jsSID backend is active since it has its own cycle-exact bridge.
+  private hwEnabled = false;
+  private hwEngineGain = 1.0; // saved gain before mute
+  private hwListeners = new Set<HardwareChangeCallback>();
 
   constructor(sidData: Uint8Array) {
     this.sidData = sidData;
@@ -491,6 +500,84 @@ export class C64SIDEngine {
    */
   getOutputNode(): GainNode | null {
     return this.gainNode;
+  }
+
+  // ── Hardware SID Output ─────────────────────────────────────────────
+  //
+  // Reads the 25 SID registers ($D400-$D418) from emulated C64 RAM on
+  // each audio-process callback (~43 Hz with a 1024-sample buffer at
+  // 44.1 kHz) and forwards changed registers to SIDHardwareManager.
+  //
+  // The jsSID backend has its own cycle-exact WebUSB bridge that writes
+  // registers individually as the SID emulator produces them — much
+  // more accurate. This register-dump bridge is for the other backends
+  // (websid, tinyrsid, websidplay) that don't have built-in hardware
+  // output but DO expose readRAMBlock().
+
+  get isHardwareOutputEnabled(): boolean { return this.hwEnabled; }
+
+  onHardwareChange(cb: HardwareChangeCallback): () => void {
+    this.hwListeners.add(cb);
+    return () => this.hwListeners.delete(cb);
+  }
+
+  async enableHardwareOutput(): Promise<void> {
+    if (this.hwEnabled) return;
+    if (this.engineType === 'jssid') {
+      console.log('[C64SIDEngine HW] jsSID has its own WebUSB bridge — skipping register-dump bridge');
+      return;
+    }
+    this.hwEnabled = true;
+
+    const { getSIDHardwareManager } = await import('@/lib/sid/SIDHardwareManager');
+    const mgr = getSIDHardwareManager();
+    mgr.clearDiffCache();
+    void mgr.applyClockFromSettings();
+
+    // Mute softsynth — hardware plays instead
+    if (this.gainNode) {
+      this.hwEngineGain = this.gainNode.gain.value;
+      this.gainNode.gain.value = 0;
+    }
+
+    // Install afterProcess hook to dump registers at audio-clock rate.
+    // We chain with any existing callback by wrapping it.
+    const hwProcess = () => {
+      if (!this.hwEnabled) return;
+      const regs = this.readRAMBlock(0xD400, 25);
+      if (!regs) return;
+      const m = getSIDHardwareManager();
+      for (let r = 0; r < 25; r++) {
+        m.writeRegister(0, r, regs[r]);
+      }
+    };
+    this.setAfterProcessCallback(hwProcess);
+
+    console.log('[C64SIDEngine HW] Bridge enabled, mode:', mgr.mode);
+    this.hwListeners.forEach(cb => cb(true));
+  }
+
+  async disableHardwareOutput(): Promise<void> {
+    if (!this.hwEnabled) return;
+    this.hwEnabled = false;
+
+    // Restore softsynth gain
+    if (this.gainNode) {
+      this.gainNode.gain.value = this.hwEngineGain;
+    }
+
+    // Silence hardware
+    try {
+      const { getSIDHardwareManager } = await import('@/lib/sid/SIDHardwareManager');
+      const mgr = getSIDHardwareManager();
+      if (mgr.isActive) {
+        mgr.writeRegister(0, 0x18, 0); // volume = 0
+        mgr.flush();
+      }
+    } catch { /* ignore */ }
+
+    console.log('[C64SIDEngine HW] Bridge disabled');
+    this.hwListeners.forEach(cb => cb(false));
   }
 
   /**
