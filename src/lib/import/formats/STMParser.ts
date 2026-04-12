@@ -578,6 +578,47 @@ export async function parseSTMFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSTMCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 4-byte STM cell decode
+      const noteByte = bytes[0];
+      const insVol   = bytes[1];
+      const volCmd   = bytes[2];
+      const cmdInf   = bytes[3];
+
+      // Note
+      let note = 0;
+      if (noteByte === 0xFD || noteByte === 0xFE) {
+        note = XM_NOTE_CUT;
+      } else if (noteByte < 0x60) {
+        const octave   = (noteByte >> 4) & 0x0F;
+        const semitone = noteByte & 0x0F;
+        note = octave * 12 + semitone + 36 + NOTE_MIN;
+      }
+
+      // Instrument (upper 5 bits of insVol)
+      let instrument = insVol >> 3;
+      if (instrument > 31) instrument = 0;
+
+      // Volume: low 3 bits of insVol | ((high 4 bits of volCmd) >> 1)
+      const volLo  = insVol & 0x07;
+      const volHi  = (volCmd & 0xF0) >> 1;
+      const rawVol = volLo | volHi;
+      const volume = rawVol <= 64 ? rawVol : 0;
+
+      // Effect (simplified — ignores deferred Bxx/tempo injection)
+      const effIdx = volCmd & 0x0F;
+      let effTyp = 0;
+      let eff = 0;
+      if (effIdx > 0 && effIdx <= 0x0F && cmdInf !== 0) {
+        const xmEff = STM_EFFECTS[effIdx] ?? 0;
+        if (xmEff !== 0) {
+          effTyp = xmEff;
+          eff = cmdInf;
+        }
+      }
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

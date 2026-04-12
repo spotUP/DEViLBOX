@@ -384,6 +384,37 @@ export async function parseQuadraComposerFile(
     numPatterns: patternInfos.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeQCCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 4-byte QuadraComposer cell: [ins, note, fxt|_, fxp]
+      const ins  = bytes[0];
+      const note = bytes[1];
+      let   fxt  = bytes[2] & 0x0F;
+      let   fxp  = bytes[3];
+
+      // Fix effect 4 (vibrato): double depth nibble
+      if (fxt === 0x04) {
+        fxp = (fxp & 0xF0) | ((fxp & 0x0F) << 1);
+      }
+      // Fix effect 9 (sample offset): EMOD uses fxp*0x200, XM uses fxp*0x100
+      if (fxt === 0x09) {
+        fxp = Math.min(fxp * 2, 0xFF);
+      }
+
+      // Note: 0-35 = C-1 to B-3, >35 = empty
+      const xmNote = note <= 35 ? note + 13 : 0;
+
+      // Effect C (set volume) → XM volume column
+      let volCol = 0;
+      let effTyp = fxt;
+      let eff    = fxp;
+      if (fxt === 0x0C) {
+        volCol = 0x10 + Math.min(fxp, 64);
+        effTyp = 0;
+        eff    = 0;
+      }
+
+      return { note: xmNote, instrument: ins, volume: volCol, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const base = patternByteOffsets[pattern] ?? 0;
       return base + (row * 4 + channel) * 4;

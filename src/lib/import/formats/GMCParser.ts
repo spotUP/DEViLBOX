@@ -332,6 +332,33 @@ export async function parseGMCFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeMODCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // GMC uses standard MOD cell layout but with custom effect mapping
+      const b0 = bytes[0];
+      const b1 = bytes[1];
+      const b2 = bytes[2];
+      const b3 = bytes[3];
+
+      // Note cut special case
+      let note = 0;
+      if (b0 === 0xFF && b1 === 0xFE) {
+        note = XM_NOTE_CUT;
+      } else {
+        const period = ((b0 & 0x0F) << 8) | b1;
+        if (period > 0) {
+          const amigaNote = periodToNoteIndex(period);
+          note = amigaNoteToXM(amigaNote);
+        }
+      }
+
+      const instrument = (b0 & 0xF0) | (b2 >> 4);
+      const effType    = b2 & 0x0F;
+      const effParam   = b3;
+
+      const { effTyp, eff } = mapGMCEffect(effType, effParam);
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

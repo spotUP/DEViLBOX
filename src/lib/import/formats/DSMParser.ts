@@ -905,6 +905,53 @@ function parseDynamicStudioDSm(v: DataView, bytes: Uint8Array, filename: string)
     numPatterns,
     moduleSize: v.byteLength,
     encodeCell: encodeDSMDynCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's DSm 4-byte cell: [instrument, note_encoded, effect, param]
+      const d0 = bytes[0];  // instrument
+      const d1 = bytes[1];  // note_encoded
+      const d2 = bytes[2];  // effect
+      const d3 = bytes[3];  // param
+
+      // Note: d1 > 0 && d1 <= 84*2 → (d1 >> 1) + NOTE_MIN + 35 = (d1>>1) + 36
+      const note = (d1 > 0 && d1 <= 84 * 2) ? (d1 >> 1) + NOTE_MIN + 35 : 0;
+
+      // Effect handling (simplified — mirrors parser's main paths)
+      let effTyp = 0;
+      let eff    = d3;
+      let vol    = 0;
+
+      if (d2 === 0x08) {
+        // Panning / volume slide special commands
+        switch (d3 & 0xF0) {
+          case 0x00: effTyp = 0x0E; eff = d3 | 0x80; break;
+          case 0x10: effTyp = 0x0A; eff = (d3 & 0x0F) << 4; break;
+          case 0x20: effTyp = 0x0E; eff = d3 | 0xA0; break;
+          case 0x30: case 0x40: effTyp = 0x0E; eff = d3 - 0x20; break;
+          default: effTyp = 0; eff = 0; break;
+        }
+      } else if (d2 === 0x13) {
+        // 3D Simulate → panning
+        effTyp = 0x08;
+        let param = (d3 & 0x7F) * 2;
+        if      (d3 <= 0x40) param += 0x80;
+        else if (d3 < 0x80)  param  = 0x180 - param;
+        else if (d3 < 0xC0)  param  = 0x80 - param;
+        else                  param -= 0x80;
+        eff = Math.min(255, Math.max(0, param));
+      } else if ((d2 & 0xF0) === 0x20) {
+        // Offset + volume column
+        effTyp = 0x09;
+        eff    = d3;
+        vol    = (d2 & 0x0F) * 4 + 4;
+      } else if (d2 <= 0x0F || d2 === 0x11 || d2 === 0x12) {
+        const mappedCmd = (d2 === 0x11 || d2 === 0x12) ? (d2 - 0x10) : d2;
+        const result    = convertModCommand(mappedCmd, d3);
+        effTyp = result.effTyp;
+        eff    = result.eff;
+      }
+
+      return { note, instrument: d0, volume: vol, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // DSm stores data row-major: pattern × (numChannels × 64) + row × numChannels + ch
       return patternDataOffset

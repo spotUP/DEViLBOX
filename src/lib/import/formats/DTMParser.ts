@@ -727,6 +727,33 @@ export async function parseDTMFile(
     numPatterns: patterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: isPT ? encodeMODCell : encodeDTM204Cell,
+    decodeCell: isPT ? undefined : (bytes: Uint8Array): TrackerCell => {
+      // Inverse of decode204Cell — 2.04 format
+      const d0 = bytes[0];
+      const d1 = bytes[1];
+      const d2 = bytes[2];
+      const d3 = bytes[3];
+
+      // Note: 0=empty, 1-0x7F → octave*12 + semitone + 12
+      let note = 0;
+      if (d0 > 0 && d0 < 0x80) {
+        note = ((d0 >> 4) * 12) + (d0 & 0x0F) + 12;
+      }
+
+      // Volume: instrVol bits[7:2], non-zero means vol = (field - 1)
+      const volField = d1 >> 2;
+      const volume   = volField > 0 ? (volField - 1) : 0;
+
+      // Instrument
+      const instrument = ((d1 & 0x03) << 4) | (d2 >> 4);
+
+      // Effect
+      const cmd   = d2 & 0x0F;
+      const param = d3;
+      const { effTyp, eff } = convertModEffect(cmd, param);
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const info = patternDataOffsets.get(pattern);
       if (!info) return 0;

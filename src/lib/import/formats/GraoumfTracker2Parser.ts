@@ -519,6 +519,31 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
     numPatterns,
     moduleSize: buf.length,
     encodeCell: eventSize === 4 ? encodeGTK4Cell : encodeGTK5Cell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's GTK cell decode (4 or 5 bytes)
+      const data0 = bytes[0];
+      const data1 = bytes[1];
+      const data2 = bytes[2];
+      const data3 = bytes[3];
+      const data4 = eventSize >= 5 ? bytes[4] : 0;
+
+      // Note: data[0] >= 24 && data[0] < 84 → note = data[0] + 13
+      let note = 0;
+      if (data0 >= 24 && data0 < 84) {
+        note = data0 + 13;
+      }
+
+      const instr = data1;
+      const { effTyp, eff } = translateEffect(data2, data3, true /* isGTK */);
+
+      // Version >=4 has volume in 5th byte
+      let volume = 0;
+      if (data4 > 0) {
+        volume = Math.min(Math.trunc((data4 + 1) / 4), 64);
+      }
+
+      return { note, instrument: instr, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern, row, channel) => {
       // TrackerSong pattern index maps through orders to raw pattern index
       const patIdx = orders[pattern] ?? 0;
@@ -1096,6 +1121,31 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
     numPatterns: numOrderPatterns,
     moduleSize: buf.length,
     encodeCell: encodeGT2Cell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's GT2 5-byte cell decode
+      const data0 = bytes[0]; // note
+      const data1 = bytes[1]; // instr
+      const data2 = bytes[2]; // effect
+      const data3 = bytes[3]; // param
+      const data4 = bytes[4]; // volume
+
+      // Note: data0 > 0 && data0 <= 120 → data0 + 1
+      let note = 0;
+      if (data0 > 0 && data0 <= 120) {
+        note = data0 + 1;
+      }
+
+      const { effTyp, eff } = translateEffect(data2, data3, false /* not GTK */);
+
+      // Volume: codingVersion-dependent; use version 0 (vol/4) as default
+      // since codingVersion is per-pattern and not available in decodeCell context
+      let volume = 0;
+      if (data4 > 0) {
+        volume = Math.min(Math.trunc(data4 / 4), 64);
+      }
+
+      return { note, instrument: data1, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern, row, channel) => {
       // TrackerSong pattern index maps through orders to raw pattern number
       const patIdx = orders[pattern] ?? 0;

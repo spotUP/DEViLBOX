@@ -541,6 +541,24 @@ export async function parseUNICFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeUNICCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 3-byte UNIC cell decode
+      const b0 = bytes[0];
+      const b1 = bytes[1];
+      const b2 = bytes[2];
+
+      const noteIdx    = b0 & 0x3F;
+      const instrHi    = (b0 >> 2) & 0x30;  // bits [5:4]
+      const instrLo    = (b1 >> 4) & 0x0F;  // bits [3:0]
+      const instrument = instrHi | instrLo;
+      const effTyp     = b1 & 0x0F;
+      const eff        = b2;
+
+      // noteIdx > 0 → noteIdx + UNIC_NOTE_OFFSET (12)
+      const note = noteIdx > 0 ? noteIdx + UNIC_NOTE_OFFSET : 0;
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number =>
       HEADER_SIZE
       + pattern * (ROWS_PER_PATTERN * NUM_CHANNELS * 3)
