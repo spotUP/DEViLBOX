@@ -258,7 +258,7 @@ const tonejs: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ mode: 8, rate: 300, intensity: 0.74, echoVolume: 0.8, reverbVolume: 0.4, bass: 4, treble: 4, bpmSync: 1, syncDivision: '1/8' }),
     presets: [
-      { name: 'Classic', params: { mode: 8, rate: 300, intensity: 0.74, echoVolume: 0.8, reverbVolume: 0.4, bass: 4, treble: 4, bpmSync: 1, syncDivision: '1/8' } },
+      { name: 'Classic', params: { mode: 8, rate: 250, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.3, bass: 5, treble: 5 } },
       { name: 'Tape Wobble', params: { mode: 5, rate: 200, intensity: 0.85, echoVolume: 0.7, reverbVolume: 0.6, bass: 6, treble: 2, bpmSync: 0, syncDivision: '1/8' } },
       { name: 'Ambient Wash', params: { mode: 11, rate: 400, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.8, bass: 3, treble: 5, bpmSync: 1, syncDivision: '1/4' } },
     ],

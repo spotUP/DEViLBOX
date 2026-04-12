@@ -278,9 +278,9 @@ const wasmEffects: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ threshold: -40, attack: 0.5, hold: 50, release: 100, range: 0, hpf: 0 }),
     presets: [
-      { name: 'Gentle', params: { threshold: -50, attack: 2, hold: 80, release: 200, range: -20 } },
-      { name: 'Tight', params: { threshold: -30, attack: 0.1, hold: 20, release: 50, range: -60 } },
-      { name: 'Drums', params: { threshold: -35, attack: 0.2, hold: 30, release: 80, range: -40, hpf: 100 } },
+      { name: 'Gentle', params: { threshold: -50, attack: 2, hold: 80, release: 200, range: 20 } },
+      { name: 'Tight', params: { threshold: -30, attack: 0.1, hold: 20, release: 50, range: 60 } },
+      { name: 'Drums', params: { threshold: -35, attack: 0.2, hold: 30, release: 80, range: 40, hpf: 100 } },
     ],
   },
   {
@@ -815,7 +815,7 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ amount: 0.5, mix: 1 }),
     presets: [
       { name: 'Light', params: { amount: 0.2 } },
-      { name: 'Medium', params: { amount: 0.5 } },
+      { name: 'Medium', params: { amount: 0.6 } },
       { name: 'Heavy', params: { amount: 0.85 } },
     ],
   },
@@ -961,7 +961,7 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ lowCross: 200, highCross: 3000, lowCeil: -1, midCeil: -1, highCeil: -1, lowGain: 1, midGain: 1, highGain: 1, release: 50 }),
     presets: [
       { name: 'Soft', params: { lowCeil: -3, midCeil: -3, highCeil: -3, release: 80 } },
-      { name: 'Medium', params: { lowCeil: -1, midCeil: -1, highCeil: -1, release: 50 } },
+      { name: 'Medium', params: { lowCeil: -1.5, midCeil: -1.5, highCeil: -1.5, release: 60 } },
       { name: 'Loud', params: { lowCeil: -0.5, midCeil: -0.5, highCeil: -0.5, lowGain: 1.5, midGain: 1.3, highGain: 1.5, release: 30 } },
     ],
   },
@@ -1285,7 +1285,7 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ bands: 4, spread: 0.7, mix: 1 }),
     presets: [
       { name: 'Subtle', params: { bands: 2, spread: 0.4 } },
-      { name: 'Medium', params: { bands: 4, spread: 0.7 } },
+      { name: 'Medium', params: { bands: 6, spread: 0.6 } },
       { name: 'Full', params: { bands: 8, spread: 1.0 } },
     ],
   },
@@ -1571,7 +1571,7 @@ const wasmEffects: EffectDescriptor[] = [
     getDefaultParameters: () => ({ ceiling: -0.3, release: 50, mix: 1 }),
     presets: [
       { name: 'Soft', params: { ceiling: -1, release: 80 } },
-      { name: 'Medium', params: { ceiling: -0.3, release: 50 } },
+      { name: 'Medium', params: { ceiling: -0.5, release: 40 } },
       { name: 'Loud', params: { ceiling: -0.1, release: 20 } },
     ],
   },
@@ -1674,7 +1674,7 @@ const wasmEffects: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ azimuth: 0, elevation: 0, distance: 1, mix: 1 }),
     presets: [
-      { name: 'Front', params: { azimuth: 0, elevation: 0, distance: 1 } },
+      { name: 'Front Close', params: { azimuth: 0, elevation: 0, distance: 0.5 } },
       { name: 'Left', params: { azimuth: -90, elevation: 0, distance: 1 } },
       { name: 'Behind', params: { azimuth: 180, elevation: 0, distance: 2 } },
     ],
