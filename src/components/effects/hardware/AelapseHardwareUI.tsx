@@ -147,21 +147,11 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
     let rafId = 0;
     const eventCleanups: (() => void)[] = [];
 
-    // Intercept WebAssembly.instantiate so we can grab the Memory object —
-    // Emscripten 4.x no longer auto-exports HEAPF32/HEAPU8 on the module.
-    // See docs/WASM_EFFECTS_GUIDE.md § Memory Capture.
-    let capturedMemory: WebAssembly.Memory | null = null;
-    const origInstantiate = WebAssembly.instantiate.bind(WebAssembly);
-    const interceptInstantiate = async (...args: Parameters<typeof WebAssembly.instantiate>) => {
-      const result = await origInstantiate(...args);
-      const instance = (result as { instance?: WebAssembly.Instance }).instance ?? (result as WebAssembly.Instance);
-      if (instance && instance.exports) {
-        for (const v of Object.values(instance.exports)) {
-          if (v instanceof WebAssembly.Memory) { capturedMemory = v; break; }
-        }
-      }
-      return result;
-    };
+    // NOTE: Unlike the DSP AudioWorklet, the UI WASM does NOT need the
+    // WebAssembly.instantiate interception for memory capture. The UI
+    // WASM exports HEAPU8 directly via EXPORTED_RUNTIME_METHODS, and
+    // intercepting instantiate breaks Emscripten's EM_ASM const table
+    // setup (causes "ASM_CONSTS[code] is not a function" at init time).
 
     const init = async () => {
       try {
@@ -186,21 +176,11 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
         if (cancelled) return;
 
-        // Temporarily hijack WebAssembly.instantiate during module creation.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (WebAssembly as any).instantiate = interceptInstantiate;
-        let m: AelapseUIModule;
-        try {
-          m = await factory({
-            onAbort: (what: string) => console.error('[AelapseHardwareUI] WASM abort:', what),
-          });
-        } finally {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (WebAssembly as any).instantiate = origInstantiate;
-        }
+        const m = await factory({
+          onAbort: (what: string) => console.error('[AelapseHardwareUI] WASM abort:', what),
+        });
         if (cancelled) { m._aelapse_ui_shutdown(); return; }
 
-        if (capturedMemory) m.wasmMemory = capturedMemory;
         moduleRef.current = m;
 
         // Yield to the browser before the heavy init — JUCE allocates a
@@ -311,8 +291,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           modRef._aelapse_ui_tick();
 
-          const memBuf = modRef.wasmMemory?.buffer ?? modRef.HEAPU8?.buffer;
-          if (memBuf) blitFramebuffer(modRef, memBuf, ctx, imgData, w, h);
+          if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
           // Position the springs overlay exactly on top of the stubbed
           // SpringsGL component inside the JUCE editor.
