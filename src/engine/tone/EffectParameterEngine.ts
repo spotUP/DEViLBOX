@@ -1206,9 +1206,12 @@ export function applyEffectParametersDiff(
         for (const [key, value] of Object.entries(changed)) {
           const paramIndex = parseInt(key, 10);
           if (!isNaN(paramIndex)) {
+            console.log('[EffectParamEngine] Buzz setParameter:', type, paramIndex, Number(value));
             node.setParameter(paramIndex, Number(value));
           }
         }
+      } else {
+        console.warn('[EffectParamEngine] Buzz node is NOT instanceof BuzzmachineSynth!', type, node?.constructor?.name);
       }
       break;
   }
