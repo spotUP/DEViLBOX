@@ -179,8 +179,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
         if (cancelled) return;
 
+        const cacheBust = Date.now();
         const m = await factory({
           onAbort: (what: string) => console.error('[AelapseHardwareUI] WASM abort:', what),
+          locateFile: (path: string) => `/aelapse/${path}?v=${cacheBust}`,
         });
         if (cancelled) { m._aelapse_ui_shutdown(); return; }
 
