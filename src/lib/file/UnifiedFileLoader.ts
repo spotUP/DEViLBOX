@@ -117,6 +117,12 @@ export async function importTrackerModule(
   stop();
   engine.releaseAll();
 
+  // Stop native engines (CheeseCutter, UADE, Hively, etc.) from the previous song
+  try {
+    const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+    getTrackerReplayer().stop();
+  } catch { /* replayer not initialized yet */ }
+
   // Stop any running AdPlug streaming player from a previous song — otherwise
   // its worklet node stays connected and plays in parallel with the new song.
   try {
@@ -707,6 +713,11 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     transport.stop();
     transport.setCurrentRow(0);
     transport.setCurrentPattern(0);
+
+    try {
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      getTrackerReplayer().stop();
+    } catch { /* replayer not initialized yet */ }
 
     // Wait for any in-flight shared song load to finish — the worklet processes
     // messages sequentially, so a pending loadSong blocks new createHandle calls.
