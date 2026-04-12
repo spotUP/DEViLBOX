@@ -26,7 +26,6 @@ import { SCALES, isNoteInScale } from '../../lib/scales';
 import { useMIDI } from '../../hooks/useMIDI';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
 const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -94,9 +93,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // Scale mode state
   const [scaleKey, setScaleKey] = useState<string>('chromatic');
   const [rootNote, setRootNote] = useState<number>(0); // C
-
-  // Acid pattern generator state
-  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
   // Auto-sizing state - calculate cell size to fit viewport
   const [cellSize, setCellSize] = useState(28); // 28px default (Tailwind w-7)
@@ -307,11 +303,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     }
   }, [maxSteps, setNote, toggleAccent, toggleSlide]);
 
-  // Open acid pattern generator
-  const handleAcidGenerator = useCallback(() => {
-    setShowAcidGenerator(true);
-  }, []);
-
   // Generate step column indices
   const stepIndices = useMemo(() => Array.from({ length: maxSteps }, (_, i) => i), [maxSteps]);
 
@@ -425,7 +416,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         onRootNoteChange={setRootNote}
         onClearAll={clearAll}
         onRandomize={handleRandomize}
-        onAcidGenerator={handleAcidGenerator}
         cellSize={cellSize}
       />
 
@@ -569,13 +559,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         </div>
       </div>
 
-      {/* Acid Pattern Generator Dialog */}
-      {showAcidGenerator && (
-        <AcidPatternGeneratorDialog
-          channelIndex={channelIndex}
-          onClose={() => setShowAcidGenerator(false)}
-        />
-      )}
     </div>
   );
 };

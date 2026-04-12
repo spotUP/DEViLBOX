@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-11T18:02:08.922Z
+ * Generated: 2026-04-12T08:42:35.767Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4904';
-export const BUILD_NUMBER = '4904';
-export const BUILD_HASH = '86d56bdb9';
-export const BUILD_DATE = '2026-04-11';
+export const BUILD_VERSION = '1.0.4949';
+export const BUILD_NUMBER = '4949';
+export const BUILD_HASH = '6334cd705';
+export const BUILD_DATE = '2026-04-12';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,191 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4904',
+    version: '1.0.4949',
+    date: '2026-04-12',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Respect layers + add per-osc filter/FM/phase/seed"
+      },
+      {
+        type: 'fix',
+        "description": "Buzzmachine stereo buffer view + Core Design native parser routing"
+      },
+      {
+        type: 'feature',
+        "description": "Browser search fix + bundled presets + UI editor"
+      },
+      {
+        type: 'fix',
+        "description": "Break store cycle — late-bound access via storeAccess leaf"
+      },
+      {
+        type: 'fix',
+        "description": "TDZ on MASK_* exports — move bitmasks to leaf module"
+      }
+    ]
+  },
+  {
+    version: '2026-04-11',
     date: '2026-04-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "Route GoatTracker to USB-SID-Pico correctly"
+      },
+      {
+        type: 'feature',
+        "description": "Registry integration — usable as a tracker instrument"
+      },
+      {
+        type: 'feature',
+        "description": "TypeScript engine, springs shader, hardware UI + registry wire-up"
+      },
+      {
+        type: 'feature',
+        "description": "JUCE UI WASM build — real plugin editor in a canvas"
+      },
+      {
+        type: 'feature',
+        "description": "DSP WASM build — tape delay + 4-spring reverb"
+      },
+      {
+        type: 'feature',
+        "description": "Supreme Synthetics playlist end-to-end auto-DJ soak test"
+      },
+      {
+        type: 'feature',
+        "description": ".gkick preset loader (Phase 3)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove circular dep — use prefix check instead of AVAILABLE_EFFECTS import"
+      },
+      {
+        type: 'feature',
+        "description": "Envelope point surface (kick-level + per-oscillator)"
+      },
+      {
+        type: 'feature',
+        "description": "Scalar parameter surface (filter/distortion/oscillators)"
+      },
+      {
+        type: 'fix',
+        "description": "Replace require() with static import in useAudioStore"
+      },
+      {
+        type: 'feature',
+        "description": "AudioWorklet + TypeScript engine wrapper"
+      },
+      {
+        type: 'feature',
+        "description": "WASM build — CMake, C bridge, pthread-free worker stub"
+      },
+      {
+        type: 'improvement',
+        "description": "Third-party: import geonkick 3.7.0 DSP engine (GPL-3)"
+      },
+      {
+        type: 'fix',
+        "description": "Bridge Tone.js and native AudioNodes in master effects chain"
+      },
+      {
+        type: 'fix',
+        "description": "Handle DevilboxSynth effects in master effects chain"
+      },
+      {
+        type: 'fix',
+        "description": "UADE protocol cascade self-healing — mark poisoned, recreate on next access"
+      },
+      {
+        type: 'fix',
+        "description": "Buzzmachine effects get correct category + default parameters"
+      },
+      {
+        type: 'fix',
+        "description": "AudioContext staleness + direct routing for 20 WASM engines"
+      },
+      {
+        type: 'feature',
+        "description": "Add 23 Buzzmachine effects to the master effects UI"
+      },
+      {
+        type: 'fix',
+        "description": "Use level-affecting params for Delay/Phaser knob tests"
+      },
+      {
+        type: 'fix',
+        "description": "Delay/FeedbackDelay use 'time' param, not 'delayTime'"
+      },
+      {
+        type: 'fix',
+        "description": "Restore 6 WASM effect binaries to correct path (public/)"
+      },
+      {
+        type: 'feature',
+        "description": "Retry with alternate files on silence/UADE/AdPlug failure"
+      },
+      {
+        type: 'fix',
+        "description": "Dispose stale instance when AudioContext changes"
+      },
+      {
+        type: 'fix',
+        "description": "Route only Furnace/DefleMask/XRNS through ModuleLoader"
+      },
+      {
+        type: 'improvement',
+        "description": "Build(juce-wasm): pin 4MB INITIAL_MEMORY, disable ALLOW_MEMORY_GROWTH"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(audit): update format state — fx-delay regression (knobs dead)"
+      },
+      {
+        type: 'fix',
+        "description": "Bridge cross-context native synth via MediaStream"
+      },
+      {
+        type: 'feature',
+        "description": "Pixi mirror of raw vol macro byte editor"
+      },
+      {
+        type: 'feature',
+        "description": "Editable loop points for OctaMED/SidMon/SoundMon"
+      },
+      {
+        type: 'improvement',
+        "description": "Use design tokens for negate toggle buttons"
+      },
+      {
+        type: 'feature',
+        "description": "Make mode fields editable"
+      },
+      {
+        type: 'fix',
+        "description": "Rebuild-after-play uses scheduleWasmEffectRebuild for both paths"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: uncommitted local changes — writeHandlers, changelog, PixiRoot, tools"
+      },
+      {
+        type: 'fix',
+        "description": "Remove trailing spaces from MusicLine instrument filenames"
+      },
+      {
+        type: 'fix',
+        "description": "Export suppressFormatChecks/restoreFormatChecks"
+      },
+      {
+        type: 'feature',
+        "description": "F7 multi-song support — up to 16 songs per .sf2 file"
+      },
+      {
+        type: 'improvement',
+        "description": "Move theme picker to settings only, move Tips button to header"
+      },
       {
         type: 'fix',
         "description": "Status bar fixed-width numerals to prevent layout jumps"
@@ -52,174 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Reorder audit tests — stable engines first, UADE-heavy formats last"
-      },
-      {
-        type: 'fix',
-        "description": "SF2: fix transposition base 0xA0 in order matrix, GL view, and channel labels"
-      },
-      {
-        type: 'improvement',
-        "description": "SF2 deep audit: transposition, loop parsing, undo, validation, seq management"
-      },
-      {
-        type: 'fix',
-        "description": "MusicLine _ml_set_channel_on guard + chiptune3 registerProcessor guard"
-      },
-      {
-        type: 'fix',
-        "description": "Add Ctrl+Shift+Up/Down gate fill — toggle gate until next/prev event"
-      },
-      {
-        type: 'fix',
-        "description": "Validation, seq management, order display — closing remaining gaps"
-      },
-      {
-        type: 'fix',
-        "description": "1:1 parity with original SID Factory II editor"
-      },
-      {
-        type: 'feature',
-        "description": "--resume flag skips already-passed tests from previous run"
-      },
-      {
-        type: 'fix',
-        "description": "Three audit-revealed bugs — V2 routing, UADESynth cross-context crash, worklet registration"
-      },
-      {
-        type: 'fix',
-        "description": "Guard V2Synth worklet registerProcessor against double-registration"
-      },
-      {
-        type: 'fix',
-        "description": "Per-channel FX now works — two root causes found and fixed"
-      },
-      {
-        type: 'fix',
-        "description": "Remove guessed Modland paths, rely on local Reference Music collection"
-      },
-      {
-        type: 'feature',
-        "description": "Ultimate release-readiness test suite — 7 tiers, 300+ tests, all formats"
-      },
-      {
-        type: 'fix',
-        "description": "Master FX selectedChannels triggers per-channel WASM isolation routing"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: remove dead code and clean up TODO/FIXME comments"
-      },
-      {
-        type: 'feature',
-        "description": "Unified audit — merge formats + furnace + effects into one script"
-      },
-      {
-        type: 'fix',
-        "description": "Display raw sequence data matching original editor 1:1"
-      },
-      {
-        type: 'feature',
-        "description": "Retry on browser interference + song identity check"
-      },
-      {
-        type: 'feature',
-        "description": "--push-results and --only flags for playback smoke test"
-      },
-      {
-        type: 'fix',
-        "description": "Playback smoke test — stop between tests, retry audio, better docs"
-      },
-      {
-        type: 'feature',
-        "description": "Expand playback smoke test to 163 local formats + fix local loader"
-      },
-      {
-        type: 'feature',
-        "description": "Make per-channel FX button always clickable with add-effect UI"
-      },
-      {
-        type: 'fix',
-        "description": "Don't create spurious libopenmpt XM for native-engine formats"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove noisy success log from SF2 callback monitor"
-      },
-      {
-        type: 'improvement',
-        "description": "Simplify per-channel FX to multi-output worklet (remove MessagePort isolation)"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing label prop to PixiToggle in PixiSymphoniePanel"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove diagnostic logging from FormatPlaybackState"
-      },
-      {
-        type: 'fix',
-        "description": "Only use clock for smooth scrolling, use fps.row for stepped"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add logging to scheduleWasmEffectRebuild to trace per-channel FX path"
-      },
-      {
-        type: 'feature',
-        "description": "PixiRobHubbardPanel + PixiSteveTurnerPanel + PixiDavidWhittakerPanel with routing"
-      },
-      {
-        type: 'fix',
-        "description": "Use audio-clock-driven position like GT Ultra, not setInterval"
-      },
-      {
-        type: 'fix',
-        "description": "Belt-and-suspenders channel isolation using both mute AND volume"
-      },
-      {
-        type: 'fix',
-        "description": "Free-running clock for constant-rate pattern scrolling"
-      },
-      {
-        type: 'fix',
-        "description": "Remove blue border and black gap below playfield"
-      },
-      {
-        type: 'fix',
-        "description": "Constant-rate pattern scroll via predicted timestamps"
-      },
-      {
-        type: 'fix',
-        "description": "Remove black space below playfield — use grid aspect ratio"
-      },
-      {
-        type: 'fix',
-        "description": "MessagePort per-channel FX isolation (replace broken multi-output approach)"
-      },
-      {
-        type: 'fix',
-        "description": "Remove stale workletNode guard that could abort per-channel FX rebuild"
-      },
-      {
-        type: 'feature',
-        "description": "Synth sound effects + tighter input handling"
-      },
-      {
-        type: 'fix',
-        "description": "Replace broken after-process callback with reliable setInterval polling"
-      },
-      {
-        type: 'improvement',
-        "description": "SF2 position: use sequenceIndex in after-process callback, remove setInterval"
-      },
-      {
-        type: 'feature',
-        "description": "Preview buttons for HippelCoSo + SonicArranger instrument editors (DOM + Pixi)"
-      },
-      {
-        type: 'fix',
-        "description": "Robust per-channel FX isolation with multiple safeguards"
       }
     ]
   }

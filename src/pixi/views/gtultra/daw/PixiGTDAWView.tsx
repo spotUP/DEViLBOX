@@ -20,7 +20,6 @@ import {
 } from './dawTheme';
 import { PixiGTDAWToolbar } from './PixiGTDAWToolbar';
 import { PixiGTDAWArrangement } from './PixiGTDAWArrangement';
-import { PixiGTPianoRoll } from '../PixiGTPianoRoll';
 import { PixiGTInstrumentDesigner } from '../PixiGTInstrumentDesigner';
 import { PixiGTDAWBottomPanel } from './PixiGTDAWBottomPanel';
 
@@ -42,8 +41,6 @@ export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
   const centerW = width - sidebarW;
   const centerH = height - DAW_TOOLBAR_H - DAW_BOTTOM_H;
   const arrangementH = Math.min(DAW_ARRANGEMENT_H, centerH * 0.4);
-  const pianoRollH = centerH - arrangementH;
-
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height).fill({ color: theme.bg.color });
@@ -77,12 +74,6 @@ export const PixiGTDAWView: React.FC<Props> = ({ width, height }) => {
             <PixiGTDAWArrangement
               width={Math.max(100, centerW)}
               height={Math.max(50, arrangementH)}
-            />
-          </pixiContainer>
-          <pixiContainer layout={{ width: centerW, height: pianoRollH }}>
-            <PixiGTPianoRoll
-              width={Math.max(100, centerW)}
-              height={Math.max(50, pianoRollH)}
             />
           </pixiContainer>
         </pixiContainer>

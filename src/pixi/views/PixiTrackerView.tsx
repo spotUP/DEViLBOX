@@ -24,7 +24,6 @@ import { PixiMIDIKnobBar } from './tracker/PixiMIDIKnobBar';
 import { PixiEditorControlsBar } from './tracker/PixiEditorControlsBar';
 import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
 import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
-import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
 import { PixiKlysView } from './klystrack/PixiKlysView';
@@ -32,7 +31,6 @@ import { PixiJamCrackerView } from './jamcracker/PixiJamCrackerView';
 import { PixiSF2View } from './sidfactory2/PixiSF2View';
 import { PixiTFMXView } from './tfmx/PixiTFMXView';
 import { PixiPitchSlider } from './tracker/PixiPitchSlider';
-import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
 import { PixiSCKnobPanel, SC_PANEL_COLLAPSED_H, SC_PANEL_EXPANDED_H } from './tracker/PixiSCKnobPanel';
 import { PixiCMIKnobPanel, CMI_PANEL_COLLAPSED_H, CMI_PANEL_EXPANDED_H } from './tracker/PixiCMIKnobPanel';
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
@@ -40,9 +38,7 @@ import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
 import { PixiTrackerVisualBg } from './tracker/PixiTrackerVisualBg';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
-import { PixiTB303View } from './tracker/PixiTB303View';
 import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
-import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
 import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerView } from '@/hooks/views/useTrackerView';
@@ -109,7 +105,7 @@ export const PixiTrackerView: React.FC = () => {
 
   // Hide instrument panel on narrow windows (matches DOM TrackerView)
   const canShowInstrumentPanel = windowWidth >= 900;
-  const instrumentPanelVisible = viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
+  const instrumentPanelVisible = viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
   const INSTRUMENT_PANEL_W = editorFullscreen ? 140 : 200;
 
   // Pattern data for automation/macro lanes overlay.
@@ -118,10 +114,8 @@ export const PixiTrackerView: React.FC = () => {
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const patternEditorScrollLeft = useUIStore(s => s.patternEditorScrollLeft);
-  const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
   const scCollapsed = useUIStore(s => s.scCollapsed ?? true);
   const cmiCollapsed = useUIStore(s => s.cmiCollapsed ?? true);
-  const hasTB303 = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'TB303'));
   const hasSC = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'SuperCollider' && !!i.superCollider?.binary));
   const hasCMI = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'MAMECMI'));
   const patternId     = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.id ?? '');
@@ -214,17 +208,14 @@ export const PixiTrackerView: React.FC = () => {
   const CONTROLS_BAR_H = 36;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
   const toolbarH = FT2_TOOLBAR_HEIGHT;
-  const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'
-    ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
-    : 0;
-  const scPanelH = hasSC && viewMode !== 'tb303' && viewMode !== 'sunvox'
+  const scPanelH = hasSC && viewMode !== 'sunvox'
     ? (scCollapsed ? SC_PANEL_COLLAPSED_H : SC_PANEL_EXPANDED_H)
     : 0;
-  const cmiPanelH = hasCMI && viewMode !== 'tb303' && viewMode !== 'sunvox'
+  const cmiPanelH = hasCMI && viewMode !== 'sunvox'
     ? (cmiCollapsed ? CMI_PANEL_COLLAPSED_H : CMI_PANEL_EXPANDED_H)
     : 0;
   const midiKnobBarH = showKnobBar ? MIDI_KNOB_BAR_H_EXPANDED : MIDI_KNOB_BAR_H_COLLAPSED;
-  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - scPanelH - cmiPanelH - midiKnobBarH;
+  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - scPanelH - cmiPanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
@@ -241,9 +232,6 @@ export const PixiTrackerView: React.FC = () => {
       {/* Knob panels (hidden in fullscreen) */}
       {!editorFullscreen && (
         <>
-          <pixiContainer layout={{ width: '100%', height: tb303PanelH, flexShrink: 0 }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
-            <PixiTB303KnobPanel width={windowWidth} />
-          </pixiContainer>
           <pixiContainer layout={{ width: '100%', height: scPanelH, flexShrink: 0 }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
             <PixiSCKnobPanel width={windowWidth} />
           </pixiContainer>
@@ -281,12 +269,6 @@ export const PixiTrackerView: React.FC = () => {
             )}
             {viewMode === 'grid' && (
               <PixiGridSequencer channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive />
-            )}
-            {viewMode === 'pianoroll' && (
-              <PixiPianoRollView isActive />
-            )}
-            {viewMode === 'tb303' && (
-              <PixiTB303View channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
             )}
             {viewMode === 'sunvox' && (
               <PixiSunVoxChannelView channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
@@ -439,7 +421,7 @@ export const PixiTrackerView: React.FC = () => {
 
         {/* Instrument panel toggle button — always mounted, zero-width when hidden */}
         <PixiInstrumentToggle
-          show={canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox'}
+          show={canShowInstrumentPanel && viewMode !== 'sunvox'}
           visible={instrumentPanelVisible}
           onClick={() => useUIStore.getState().toggleInstrumentPanel()}
         />
@@ -461,11 +443,6 @@ export const PixiTrackerView: React.FC = () => {
       {/* Pixi-native dialogs (rendered in Pixi canvas, triggered via modalOpen state) */}
       <PixiRandomizeDialog
         isOpen={modalOpen === 'randomize'}
-        onClose={closeModal}
-        channelIndex={gridChannelIndex}
-      />
-      <PixiAcidPatternDialog
-        isOpen={modalOpen === 'acidPattern'}
         onClose={closeModal}
         channelIndex={gridChannelIndex}
       />

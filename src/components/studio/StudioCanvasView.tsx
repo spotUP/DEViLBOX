@@ -35,12 +35,6 @@ const MasterEffectsPanel = lazy(() =>
 const InstrumentEffectsPanel = lazy(() =>
   import('../effects/InstrumentEffectsPanel').then(m => ({ default: m.InstrumentEffectsPanel }))
 );
-const PianoRoll = lazy(() =>
-  import('../pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll }))
-);
-const ArrangementView = lazy(() =>
-  import('../arrangement/ArrangementView').then(m => ({ default: m.ArrangementView }))
-);
 const DJView = lazy(() =>
   import('../dj/DJView').then(m => ({ default: m.DJView }))
 );
@@ -49,7 +43,7 @@ const DJView = lazy(() =>
 
 // ─── Panel Layout ───────────────────────────────────────────────────────────
 
-type StudioPanelId = 'tracker' | 'instrument' | 'mixer' | 'masterFx' | 'instrumentFx' | 'pianoroll' | 'arrangement' | 'dj';
+type StudioPanelId = 'tracker' | 'instrument' | 'mixer' | 'masterFx' | 'instrumentFx' | 'dj';
 
 interface PanelLayout {
   x: number;
@@ -68,8 +62,6 @@ const PANEL_MIN_WIDTHS: Record<StudioPanelId, number> = {
   mixer: 400,
   masterFx: 300,
   instrumentFx: 300,
-  pianoroll: 600,
-  arrangement: 600,
   dj: 800,
 };
 const PANEL_MIN_W = 200; // fallback
@@ -88,17 +80,11 @@ function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelI
   const fxH = Math.max(400, Math.round(viewH * 0.40));
   const fxY = pad + topH + GAP;
 
-  // Row 3: Mixer + Piano Roll
+  // Row 3: Mixer + DJ
   const mixerW = Math.max(700, Math.min(900, Math.round(viewW * 0.45)));
-  const pianoW = Math.max(800, Math.round(viewW * 0.55));
+  const djW = Math.max(1000, Math.round(viewW * 0.50));
   const row3H = Math.max(500, Math.round(viewH * 0.45));
   const row3Y = fxY + fxH + GAP;
-
-  // Row 4: Arrangement + DJ
-  const arrW = Math.max(1200, Math.round(viewW * 0.55));
-  const djW = Math.max(1000, Math.round(viewW * 0.50));
-  const row4H = Math.max(700, Math.round(viewH * 0.65));
-  const row4Y = row3Y + row3H + GAP;
 
   return {
     tracker:      { x: pad, y: pad, w: trackerW, h: topH },
@@ -106,9 +92,7 @@ function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelI
     masterFx:     { x: pad, y: fxY, w: fxW, h: fxH },
     instrumentFx: { x: pad + fxW + GAP, y: fxY, w: fxW, h: fxH },
     mixer:        { x: pad, y: row3Y, w: mixerW, h: row3H },
-    pianoroll:    { x: pad + mixerW + GAP, y: row3Y, w: pianoW, h: row3H },
-    arrangement:  { x: pad, y: row4Y, w: arrW, h: row4H },
-    dj:           { x: pad + arrW + GAP, y: row4Y, w: djW, h: row4H },
+    dj:           { x: pad + mixerW + GAP, y: row3Y, w: djW, h: row3H },
   };
 }
 
@@ -121,8 +105,6 @@ const PANEL_LABELS: Record<StudioPanelId, string> = {
   mixer: 'MIXER',
   masterFx: 'MASTER FX',
   instrumentFx: 'INSTRUMENT FX',
-  pianoroll: 'PIANO ROLL',
-  arrangement: 'ARRANGEMENT',
   dj: 'DJ',
 };
 
@@ -132,8 +114,6 @@ const PANEL_COLORS: Record<StudioPanelId, string> = {
   mixer: 'border-2 border-green-500/40',
   masterFx: 'border-2 border-orange-500/40',
   instrumentFx: 'border-2 border-pink-500/40',
-  pianoroll: 'border-2 border-cyan-500/40',
-  arrangement: 'border-2 border-yellow-500/40',
   dj: 'border-2 border-red-500/40',
 };
 
@@ -395,8 +375,8 @@ export const StudioCanvasView: React.FC = () => {
 
   // Panel layouts
   const [panels, setPanels] = useState<Record<StudioPanelId, PanelLayout>>({ ...DEFAULT_PANELS });
-  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, mixer: false, masterFx: false, instrumentFx: false, pianoroll: false, arrangement: false, dj: false });
-  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['dj', 'arrangement', 'pianoroll', 'mixer', 'masterFx', 'instrumentFx', 'instrument', 'tracker']); // last = frontmost
+  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, mixer: false, masterFx: false, instrumentFx: false, dj: false });
+  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['dj', 'mixer', 'masterFx', 'instrumentFx', 'instrument', 'tracker']); // last = frontmost
   const initializedRef = useRef(false);
 
   // Auto-size panels and fit-to-view on first mount
@@ -594,7 +574,7 @@ export const StudioCanvasView: React.FC = () => {
 
   // Dynamic panel order — only includes visible (non-collapsed) panels,
   // sorted by spatial position (top-to-bottom, left-to-right)
-  const ALL_PANELS: StudioPanelId[] = ['tracker', 'instrument', 'masterFx', 'instrumentFx', 'mixer', 'pianoroll', 'arrangement', 'dj'];
+  const ALL_PANELS: StudioPanelId[] = ['tracker', 'instrument', 'masterFx', 'instrumentFx', 'mixer', 'dj'];
   const visiblePanels = useMemo(() =>
     ALL_PANELS
       .filter(id => !collapsed[id])
@@ -751,18 +731,6 @@ export const StudioCanvasView: React.FC = () => {
             <MixerContent />
           </Suspense>
         </div>
-      </DraggablePanel>
-
-      <DraggablePanel id="pianoroll" layout={panels.pianoroll} camera={camera} collapsed={collapsed.pianoroll} zIndex={zOrder.indexOf('pianoroll')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading piano roll...</div>}>
-          <PianoRoll channelIndex={0} />
-        </Suspense>
-      </DraggablePanel>
-
-      <DraggablePanel id="arrangement" layout={panels.arrangement} camera={camera} collapsed={collapsed.arrangement} zIndex={zOrder.indexOf('arrangement')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading arrangement...</div>}>
-          <ArrangementView />
-        </Suspense>
       </DraggablePanel>
 
       <DraggablePanel id="dj" layout={panels.dj} camera={camera} collapsed={collapsed.dj} zIndex={zOrder.indexOf('dj')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>

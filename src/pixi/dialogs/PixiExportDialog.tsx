@@ -26,7 +26,6 @@ import { pickFile } from '../services/glFilePicker';
 import {
   notify,
 } from '@stores';
-import { useArrangementStore } from '@stores/useArrangementStore';
 import { useTransportStore } from '@stores';
 import {
   useExportDialog,
@@ -71,10 +70,8 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
   // ── Pixi-only store hooks ──────────────────────────────────────────────────
   const { currentRow } = useTransportStore();
-  const arrangementClips = useArrangementStore(s => s.clips);
-
   // Audio export state
-  const [audioScope, setAudioScope] = useState<'pattern' | 'song' | 'arrangement'>('song');
+  const [audioScope, setAudioScope] = useState<'pattern' | 'song'>('song');
   const [audioSampleRate, setAudioSampleRate] = useState(44100);
   const [audioBitDepth, setAudioBitDepth] = useState<16 | 24 | 32>(16);
 
@@ -261,24 +258,6 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 0,
                 (p: number) => ex.setRenderProgress(p),
               );
-            } else if (audioScope === 'arrangement') {
-
-              const clips = useArrangementStore.getState?.()?.clips ?? [];
-              if (clips.length > 0) {
-                const patternIdToIndex = new Map(ex.patterns.map((p, i) => [p.id, i]));
-                const sequence = clips
-                  .filter((c: any) => !c.muted)
-                  .sort((a: any, b: any) => a.startRow - b.startRow)
-                  .map((c: any) => patternIdToIndex.get(c.patternId) ?? 0);
-                if (sequence.length === 0) {
-                  notify.warning('No unmuted clips in arrangement to export');
-                  break;
-                }
-                await exportSongAsWav(ex.patterns, sequence, ex.instruments, ex.bpm, ex.metadata.name || 'arrangement', (p: number) => ex.setRenderProgress(p));
-              } else {
-                notify.warning('No clips in arrangement to export');
-                break;
-              }
             } else if (audioScope === 'song') {
 
               const sequence = ex.patterns.map((_: any, i: number) => i);
@@ -578,10 +557,9 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                     options={[
                       { value: 'pattern', label: 'Current Pattern' },
                       { value: 'song', label: 'Full Song' },
-                      { value: 'arrangement', label: 'Arrangement' },
                     ]}
                     value={audioScope}
-                    onChange={(v) => setAudioScope(v as 'pattern' | 'song' | 'arrangement')}
+                    onChange={(v) => setAudioScope(v as 'pattern' | 'song')}
                     width={200}
                   />
                 </layoutContainer>
@@ -632,13 +610,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
                 {/* Metadata display */}
                 <PixiLabel text={`Format: WAV ${audioBitDepth}-bit ${(audioSampleRate / 1000).toFixed(1)}kHz`} size="xs" font="mono" color="textMuted" />
-                {audioScope === 'arrangement' ? (
-                  <>
-                    <PixiLabel text={`BPM: ${ex.bpm}`} size="xs" font="mono" color="textMuted" />
-                    <PixiLabel text={`Clips: ${arrangementClips.length} total, ${arrangementClips.filter((c: any) => !c.muted).length} unmuted`} size="xs" font="mono" color="textMuted" />
-                    <PixiLabel text={`Total Rows: ${arrangementClips.reduce((sum: number, c: any) => sum + (c.clipLengthRows ?? 64), 0)}`} size="xs" font="mono" color="textMuted" />
-                  </>
-                ) : audioScope === 'song' ? (
+                {audioScope === 'song' ? (
                   <>
                     <PixiLabel text={`BPM: ${ex.bpm}`} size="xs" font="mono" color="textMuted" />
                     <PixiLabel text={`Patterns: ${ex.patterns.length}`} size="xs" font="mono" color="textMuted" />

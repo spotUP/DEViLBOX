@@ -9,8 +9,6 @@ import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
-import { usePianoRollStore } from '@/stores/usePianoRollStore';
-import { useArrangementStore } from '@/stores/useArrangementStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -209,52 +207,6 @@ const TrackerStatusContent: React.FC = () => {
           </div>
         </>
       )}
-    </div>
-  );
-};
-
-// ─── Piano Roll Status Bar Content ───────────────────────────────────────────
-
-const PianoRollStatusContent: React.FC = () => {
-  const tool = usePianoRollStore(s => s.tool);
-  const view = usePianoRollStore(s => s.view);
-  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 4);
-
-  const sep = <div className="w-px h-3 bg-border opacity-50" />;
-
-  return (
-    <div className="flex items-center gap-4">
-      <span className="text-accent-primary font-semibold">Tool: {tool.toUpperCase()}</span>
-      {sep}
-      <span className="text-text-primary tabular-nums">Ch {view.channelIndex + 1}/{channelCount}</span>
-      {sep}
-      <span className="text-text-primary tabular-nums">Grid: 1/{view.gridDivision}</span>
-      {sep}
-      <span className={view.snapToGrid ? 'text-accent-success' : 'text-text-muted'}>
-        {view.snapToGrid ? 'Snap ON' : 'Snap OFF'}
-      </span>
-    </div>
-  );
-};
-
-// ─── Arrangement Status Bar Content ──────────────────────────────────────────
-
-const ArrangementStatusContent: React.FC = () => {
-  const tool = useArrangementStore(s => s.tool);
-  const trackCount = useArrangementStore(s => s.tracks.length);
-  const view = useArrangementStore(s => s.view);
-
-  const sep = <div className="w-px h-3 bg-border opacity-50" />;
-
-  return (
-    <div className="flex items-center gap-4">
-      <span className="text-accent-primary font-semibold">Tool: {tool.toUpperCase()}</span>
-      {sep}
-      <span className="text-text-primary tabular-nums">{trackCount} track{trackCount !== 1 ? 's' : ''}</span>
-      {sep}
-      <span className="text-text-primary tabular-nums">Snap: {view.snapDivision}</span>
-      {sep}
-      <span className="text-text-muted tabular-nums">Row: {view.scrollRow}</span>
     </div>
   );
 };
@@ -468,8 +420,6 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
               <span className="text-[10px]">Esc: back | Milkdrop | ISF | 3D</span>
             </div>
           )
-          : activeView === 'pianoroll' ? <PianoRollStatusContent />
-          : activeView === 'arrangement' ? <ArrangementStatusContent />
           : activeView === 'drumpad' ? <DrumPadStatusContent />
           : activeView === 'mixer' ? <MixerStatusContent />
           : activeView === 'studio' ? <StudioStatusContent />

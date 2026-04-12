@@ -1266,14 +1266,16 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       }
 
       // Copy input to WASM buffer if present
-      // Note: Buzz machines use MONO buffers - mix stereo to mono
+      // Buzz machines use int16-range values (-32768 to 32767) internally,
+      // so scale float input (-1 to 1) up by 32768 before writing.
+      // The output path divides by 32768 to convert back to float.
       if (hasInput && this.audioBufferPtr) {
         const leftIn = input[0];
         const rightIn = input[1] || leftIn;
 
-        // Mix stereo to mono
+        // Mix stereo to mono and scale to int16 range
         for (let i = 0; i < numSamples; i++) {
-          this.wasmAudioView[i] = (leftIn[i] + rightIn[i]) * 0.5;
+          this.wasmAudioView[i] = (leftIn[i] + rightIn[i]) * 0.5 * 32768.0;
         }
       }
 
