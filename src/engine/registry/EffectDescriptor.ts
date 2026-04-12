@@ -37,4 +37,6 @@ export interface EffectDescriptor {
   editorComponent?: string;
   /** Parameter keys that support BPM sync */
   bpmSyncParams?: string[];
+  /** Factory presets — named parameter configurations */
+  presets?: import('@typedefs/instrument').EffectPreset[];
 }
