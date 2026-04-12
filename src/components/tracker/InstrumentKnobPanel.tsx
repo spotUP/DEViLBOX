@@ -12,9 +12,8 @@ import React, { useCallback, useRef, memo, useState, useMemo, Suspense, lazy } f
 import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useShallow } from 'zustand/react/shallow';
-import { ChevronDown, ChevronUp, X, ExternalLink, Undo2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
-import { PopOutWindow, focusPopout } from '@components/ui/PopOutWindow';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { Knob } from '@components/controls/Knob';
 import { SynthControlsRouter } from './SynthControlsRouter';
@@ -373,12 +372,10 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     }))
   );
 
-  const { tb303Collapsed, toggleTB303Collapsed, tb303PoppedOut, setTB303PoppedOut } = useUIStore(
+  const { knobPanelCollapsed, toggleKnobPanelCollapsed } = useUIStore(
     useShallow((state) => ({
-      tb303Collapsed: state.tb303Collapsed,
-      toggleTB303Collapsed: state.toggleTB303Collapsed,
-      tb303PoppedOut: state.tb303PoppedOut,
-      setTB303PoppedOut: state.setTB303PoppedOut,
+      knobPanelCollapsed: state.knobPanelCollapsed,
+      toggleKnobPanelCollapsed: state.toggleKnobPanelCollapsed,
     }))
   );
 
@@ -476,31 +473,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     </div>
   ), []);
 
-  // Calculate popout dimensions based on content
-  const getPopoutDimensions = useCallback(() => {
-    if (isTB303) {
-      return { width: 1400, height: TB303_EXPANDED_HEIGHT + SECTION_HEADER_HEIGHT + 60 };
-    }
-    return { width: 1200, height: 400 };
-  }, [isTB303]);
-
   // No instrument on this channel — render nothing
   if (!targetInstrument) {
-    if (tb303PoppedOut) {
-      return (
-        <PopOutWindow
-          isOpen={true}
-          onClose={() => setTB303PoppedOut(false)}
-          title="DEViLBOX — Synth Panel"
-          width={400}
-          height={200}
-        >
-          <div className="flex items-center justify-center h-full text-text-muted text-sm">
-            No instrument selected
-          </div>
-        </PopOutWindow>
-      );
-    }
     return null;
   }
 
@@ -508,109 +482,6 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
   const fxCount = targetInstrument.effects?.length ?? 0;
 
-  // ─── Popped-out mode ───────────────────────────────────────────────────────
-  if (tb303PoppedOut) {
-    const { width: popoutWidth, height: popoutHeight } = getPopoutDimensions();
-    return (
-      <>
-        <PopOutWindow
-          isOpen={true}
-          onClose={() => setTB303PoppedOut(false)}
-          title={`DEViLBOX — ${targetInstrument.name || synthType}`}
-          width={popoutWidth}
-          height={popoutHeight}
-        >
-          <div style={{ background: 'var(--color-bg-tertiary)', display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Popout header */}
-            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-dark-border flex-shrink-0">
-              <span className="font-bold px-1.5 py-0.5 rounded text-[10px]"
-                style={{ backgroundColor: getSynthColor(synthType), color: 'var(--color-text-inverse)' }}>
-                {synthType}
-              </span>
-              <span className="text-xs text-text-secondary truncate">{instrumentName}</span>
-            </div>
-            {/* Horizontal layout */}
-            <div className="flex-1 min-h-0 flex overflow-hidden">
-              <div className="flex-[2] min-w-0 flex flex-col overflow-hidden">
-                <SectionHeader label={synthType === 'TB303' ? 'TB-303' : (synthType || 'Synth')} color={getSynthColor(synthType)} />
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <ScrollLockContainer>
-                    {isTB303 && targetInstrument.tb303 ? (
-                      <JC303StyledKnobPanel
-                        key={targetInstrument.id}
-                        config={targetInstrument.tb303}
-                        onChange={handleTB303ConfigChange}
-                        onPresetLoad={handlePresetLoad}
-                        instrumentId={targetInstrument.id}
-                      />
-                    ) : (
-                      <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
-                    )}
-                  </ScrollLockContainer>
-                </div>
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
-                <SectionHeader label="Inst FX" badge={fxCount > 0 ? String(fxCount) : undefined} actions={instFxActions} />
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <Suspense fallback={<FxLoadingFallback />}>
-                    <div className="fx-horizontal-layout p-2 h-full">
-                      <InstrumentEffectsPanel
-                        ref={instFxRef}
-                        instrumentId={targetInstrument.id}
-                        instrumentName={instrumentName}
-                        effects={targetInstrument.effects || []}
-                        hideHeader
-                      />
-                    </div>
-                  </Suspense>
-                </div>
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-dark-border">
-                <SectionHeader label="Master FX" actions={masterFxActions} />
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <Suspense fallback={<FxLoadingFallback />}>
-                    <div className="fx-horizontal-layout p-2 h-full">
-                      <MasterEffectsPanel ref={masterFxRef} hideHeader />
-                    </div>
-                  </Suspense>
-                </div>
-              </div>
-            </div>
-          </div>
-        </PopOutWindow>
-
-        {/* Placeholder strip in main window */}
-        <div
-          className="tb303-knob-panel"
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: '40px',
-            background: 'var(--color-bg-tertiary)',
-            borderTop: '1px solid var(--color-border-light)',
-          }}
-        >
-          <div className="absolute top-0 left-0 p-2 text-xs font-mono flex items-center gap-2">
-            <span className="font-bold px-1 py-0.5 rounded text-[10px]"
-              style={{ backgroundColor: getSynthColor(synthType), color: 'var(--color-text-inverse)' }}>
-              {synthType}
-            </span>
-            <span className="text-text-muted">Popped Out</span>
-          </div>
-          <div className="absolute top-0 right-0 z-[99990]">
-            <button
-              className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
-              onClick={() => setTB303PoppedOut(false)}
-              title="Restore panel inline"
-            >
-              <Undo2 size={14} />
-              Restore
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   // ─── Inline panel with collapse/expand animation ───────────────────────────
   const isTB303Height = isTB303;
@@ -621,19 +492,19 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
       style={{
         position: 'relative',
         width: '100%',
-        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? `${TB303_EXPANDED_HEIGHT}px` : 'auto'),
-        maxHeight: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? undefined : '50vh'),
+        height: knobPanelCollapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? `${TB303_EXPANDED_HEIGHT}px` : 'auto'),
+        maxHeight: knobPanelCollapsed ? `${COLLAPSED_HEIGHT}px` : (isTB303Height ? undefined : '50vh'),
         background: 'var(--color-bg-tertiary)',
         borderTop: '1px solid var(--color-border-light)',
-        overflow: tb303Collapsed ? 'hidden' : (isTB303Height ? 'hidden' : 'auto'),
+        overflow: knobPanelCollapsed ? 'hidden' : (isTB303Height ? 'hidden' : 'auto'),
         transition: isTB303Height ? 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
       }}
     >
       {/* Collapsed header — always visible */}
       <div
         className="absolute top-0 left-0 p-2 text-xs font-mono flex items-center gap-2 cursor-pointer select-none"
-        style={{ opacity: tb303Collapsed ? 1 : 0, transition: 'opacity 200ms ease', pointerEvents: tb303Collapsed ? 'auto' : 'none' }}
-        onClick={toggleTB303Collapsed}
+        style={{ opacity: knobPanelCollapsed ? 1 : 0, transition: 'opacity 200ms ease', pointerEvents: knobPanelCollapsed ? 'auto' : 'none' }}
+        onClick={toggleKnobPanelCollapsed}
       >
         <span className="font-bold px-1 py-0.5 rounded text-[10px]"
           style={{ backgroundColor: getSynthColor(synthType), color: 'var(--color-text-inverse)' }}>
@@ -645,10 +516,10 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
 
       {/* Action buttons — always pinned to top-right */}
       <div className="absolute top-1 right-1 z-[99990] flex items-center gap-1">
-        {tb303Collapsed ? (
+        {knobPanelCollapsed ? (
           <button
             className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg"
-            onClick={toggleTB303Collapsed}
+            onClick={toggleKnobPanelCollapsed}
             title="Expand synth panel"
           >
             <ChevronDown size={16} />
@@ -656,28 +527,15 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         ) : (
           <>
             <button
-              className="p-1.5 text-text-muted hover:text-accent-highlight bg-black/40 hover:bg-black/70 rounded transition-colors"
-              onClick={() => {
-                if (tb303PoppedOut) {
-                  focusPopout(`DEViLBOX — ${targetInstrument.name || synthType}`);
-                } else {
-                  setTB303PoppedOut(true);
-                }
-              }}
-              title="Pop out to separate window"
-            >
-              <ExternalLink size={14} />
-            </button>
-            <button
               className="p-1.5 text-text-muted hover:text-text-primary bg-black/40 hover:bg-black/70 rounded transition-colors"
-              onClick={toggleTB303Collapsed}
+              onClick={toggleKnobPanelCollapsed}
               title="Collapse synth panel"
             >
               <ChevronUp size={14} />
             </button>
             <button
               className="p-1.5 text-text-muted hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
-              onClick={() => useUIStore.getState().setTB303Collapsed(true)}
+              onClick={() => useUIStore.getState().setKnobPanelCollapsed(true)}
               title="Close synth panel"
             >
               <X size={14} />
@@ -688,9 +546,9 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
 
       {/* Full panel content — always in DOM, clipped when collapsed */}
       <div ref={contentRef} style={{
-        opacity: tb303Collapsed ? 0 : 1,
+        opacity: knobPanelCollapsed ? 0 : 1,
         transition: 'opacity 200ms ease',
-        pointerEvents: tb303Collapsed ? 'none' : 'auto',
+        pointerEvents: knobPanelCollapsed ? 'none' : 'auto',
         display: 'flex',
         flexDirection: 'column',
         ...(isTB303Height ? { height: `${TB303_EXPANDED_HEIGHT}px` } : {}),

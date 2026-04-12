@@ -149,8 +149,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setUseHexNumbers = useUIStore((s) => s.setUseHexNumbers);
   const blankEmptyCells = useUIStore((s) => s.blankEmptyCells);
   const setBlankEmptyCells = useUIStore((s) => s.setBlankEmptyCells);
-  const tb303Collapsed = useUIStore((s) => s.tb303Collapsed);
-  const setTB303Collapsed = useUIStore((s) => s.setTB303Collapsed);
+  const knobPanelCollapsed = useUIStore((s) => s.knobPanelCollapsed);
+  const setKnobPanelCollapsed = useUIStore((s) => s.setKnobPanelCollapsed);
   const oscilloscopeVisible = useUIStore((s) => s.oscilloscopeVisible);
   const setOscilloscopeVisible = useUIStore((s) => s.setOscilloscopeVisible);
   const scratchEnabled = useUIStore((s) => s.scratchEnabled);
@@ -385,7 +385,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     activeTab, setActiveTab,
     // UI store
     useHexNumbers, setUseHexNumbers, blankEmptyCells, setBlankEmptyCells,
-    tb303Collapsed, setTB303Collapsed, oscilloscopeVisible, setOscilloscopeVisible,
+    knobPanelCollapsed, setKnobPanelCollapsed, oscilloscopeVisible, setOscilloscopeVisible,
     scratchEnabled, setScratchEnabled, scratchAcceleration, setScratchAcceleration,
     platterMass, setPlatterMass,
     jogWheelSensitivity, setJogWheelSensitivity,

@@ -7,7 +7,7 @@ import type { PanelType } from '@typedefs/project';
 
 interface LayoutPreset {
   panels: PanelType[];
-  view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio' | 'split';
+  view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
   label: string;
 }
 
@@ -18,7 +18,7 @@ const LAYOUT_PRESETS: Record<number, LayoutPreset> = {
   4: { panels: ['instrument-editor'], view: 'tracker', label: 'Instrument Editor' },
   5: { panels: ['tracker', 'automation'], view: 'tracker', label: 'Pattern + Automation' },
   6: { panels: ['tracker', 'pattern-list', 'oscilloscope', 'instrument-editor'], view: 'tracker', label: 'Full View' },
-  7: { panels: ['arrangement'], view: 'arrangement', label: 'Arrangement' },
+  7: { panels: ['tracker', 'pattern-list'], view: 'mixer', label: 'Mixer' },
   8: { panels: ['tracker', 'oscilloscope', 'instrument-editor', 'automation', 'pattern-list'], view: 'tracker', label: 'All Panels' },
 };
 
@@ -125,7 +125,7 @@ const PANEL_LABELS: Partial<Record<string, string>> = {
   'instrument-editor': 'Instrument Editor',
   'oscilloscope': 'Oscilloscope',
   'automation': 'Automation',
-  'arrangement': 'Arrangement',
+  'mixer': 'Mixer',
 };
 
 export function focusNextPanel(): boolean {
@@ -151,9 +151,9 @@ export function focusPrevPanel(): boolean {
 }
 
 export function toggleBottomFrame(): boolean {
-  useUIStore.getState().toggleTB303Collapsed();
-  const collapsed = useUIStore.getState().tb303Collapsed;
-  useUIStore.getState().setStatusMessage(`TB-303: ${collapsed ? 'hidden' : 'shown'}`, false, 1000);
+  useUIStore.getState().toggleKnobPanelCollapsed();
+  const collapsed = useUIStore.getState().knobPanelCollapsed;
+  useUIStore.getState().setStatusMessage(`Knob panel: ${collapsed ? 'hidden' : 'shown'}`, false, 1000);
   return true;
 }
 

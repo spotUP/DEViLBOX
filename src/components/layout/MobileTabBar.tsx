@@ -5,14 +5,14 @@
  */
 
 import React, { useCallback, useState, useRef } from 'react';
-import { Grid3X3, Music2, Sliders, LayoutList, Disc3 } from 'lucide-react';
+import { Grid3X3, Music2, Sliders, Disc3 } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useMixerStore } from '@stores/useMixerStore';
 import { haptics } from '@/utils/haptics';
 import { MOBILE_TAB_BAR_VIEWS } from '@/constants/viewOptions';
 
-export type MobileTab = 'tracker' | 'instruments' | 'mixer' | 'arrangement' | 'drumpad';
+export type MobileTab = 'tracker' | 'instruments' | 'mixer' | 'drumpad';
 
 interface MobileTabBarProps {
   onShowInstruments?: () => void;
@@ -35,7 +35,6 @@ interface QuickAction {
 const TAB_ICONS: Record<string, React.ReactNode> = {
   tracker: <Grid3X3 size={20} />,
   mixer: <Sliders size={20} />,
-  arrangement: <LayoutList size={20} />,
   drumpad: <Disc3 size={20} />,
 };
 
@@ -64,14 +63,6 @@ function getQuickActions(tabId: MobileTab): QuickAction[] {
         { label: 'Reset All Volumes', action: () => { const s = useMixerStore.getState(); for (let i = 0; i < 16; i++) s.setChannelVolume(i, 0.8); } },
         { label: 'Unsolo All', action: () => { const s = useMixerStore.getState(); for (let i = 0; i < 16; i++) s.setChannelSolo(i, false); } },
         { label: 'Unmute All', action: () => { const s = useMixerStore.getState(); for (let i = 0; i < 16; i++) s.setChannelMute(i, false); } },
-      ];
-    case 'arrangement':
-      return [
-        { label: 'Add to Order', action: () => {
-          const ts = useTrackerStore.getState();
-          const order = [...(ts.patternOrder || []), ts.currentPatternIndex];
-          ts.setPatternOrder(order);
-        }},
       ];
     default:
       return [];
