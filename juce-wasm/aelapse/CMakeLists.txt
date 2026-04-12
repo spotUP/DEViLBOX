@@ -62,7 +62,7 @@ target_link_options(AelapseWASM PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createAelapseModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
-    "SHELL:-s INITIAL_MEMORY=33554432"          # 32 MB — Springs + TapeDelay delay lines + multi-rate buffers
+    "SHELL:-s INITIAL_MEMORY=67108864"          # 64 MB — Springs + TapeDelay delay lines + multi-rate buffers (32 MB was OOM in AudioWorklet)
     "SHELL:-s ENVIRONMENT='web,worker'"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue']"
     "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free']"

@@ -67,7 +67,7 @@ import { MultibandCompEffect } from '../effects/MultibandCompEffect';
 import { TransientDesignerEffect } from '../effects/TransientDesignerEffect';
 import { BassEnhancerEffect } from '../effects/BassEnhancerEffect';
 import { ExpanderEffect } from '../effects/ExpanderEffect';
-import { BuzzmachineSynth } from '../buzzmachines/BuzzmachineSynth';
+import { SwedishChainsawEffect } from '../effects/SwedishChainsawEffect';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -273,6 +273,18 @@ export function applyEffectParametersDiff(
         if ('cutoff' in changed) node.setCutoff(Number(changed.cutoff));
         if ('resonance' in changed) node.setResonance(Number(changed.resonance));
         if ('gain' in changed) node.setGain(Number(changed.gain));
+      }
+      break;
+
+    case 'SwedishChainsaw':
+      if (node instanceof SwedishChainsawEffect) {
+        if ('tight' in changed) node.setTight(Number(changed.tight) > 50 ? 1 : 0);
+        if ('pedalGain' in changed) node.setPedalGain(Number(changed.pedalGain) / 100);
+        if ('ampGain' in changed) node.setAmpGain(Number(changed.ampGain) / 100);
+        if ('bass' in changed) node.setBass(Number(changed.bass) / 100);
+        if ('middle' in changed) node.setMiddle(Number(changed.middle) / 100);
+        if ('treble' in changed) node.setTreble(Number(changed.treble) / 100);
+        if ('volume' in changed) node.setVolume(Number(changed.volume) / 100);
       }
       break;
 
@@ -1178,42 +1190,6 @@ export function applyEffectParametersDiff(
       }
       break;
 
-    // Buzzmachine WASM effects — indexed parameters
-    case 'BuzzDistortion':
-    case 'BuzzOverdrive':
-    case 'BuzzDistortion2':
-    case 'BuzzDist2':
-    case 'BuzzSoftSat':
-    case 'BuzzStereoDist':
-    case 'BuzzSVF':
-    case 'BuzzPhilta':
-    case 'BuzzNotch':
-    case 'BuzzZfilter':
-    case 'BuzzDelay':
-    case 'BuzzCrossDelay':
-    case 'BuzzFreeverb':
-    case 'BuzzPanzerDelay':
-    case 'BuzzChorus':
-    case 'BuzzChorus2':
-    case 'BuzzWhiteChorus':
-    case 'BuzzFreqShift':
-    case 'BuzzCompressor':
-    case 'BuzzLimiter':
-    case 'BuzzExciter':
-    case 'BuzzMasterizer':
-    case 'BuzzStereoGain':
-      if (node instanceof BuzzmachineSynth) {
-        for (const [key, value] of Object.entries(changed)) {
-          const paramIndex = parseInt(key, 10);
-          if (!isNaN(paramIndex)) {
-            console.log('[EffectParamEngine] Buzz setParameter:', type, paramIndex, Number(value));
-            node.setParameter(paramIndex, Number(value));
-          }
-        }
-      } else {
-        console.warn('[EffectParamEngine] Buzz node is NOT instanceof BuzzmachineSynth!', type, node?.constructor?.name);
-      }
-      break;
   }
 }
 

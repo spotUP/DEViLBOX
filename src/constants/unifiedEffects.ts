@@ -405,6 +405,7 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   { category: 'wasm', type: 'Satma', label: 'Satma', group: 'Distortion', description: 'Saturation and warming effect' },
   { category: 'wasm', type: 'Saturator', label: 'Saturator', group: 'Distortion', description: 'Multimode saturation processor' },
   { category: 'wasm', type: 'TubeAmp', label: 'Tube Amplifier', group: 'Distortion', description: 'Vacuum tube amplifier simulation' },
+  { category: 'wasm', type: 'SwedishChainsaw', label: 'Swedish Chainsaw (Boss HM-2 + JCM800)', group: 'Distortion', description: 'Boss HM-2 Heavy Metal pedal into Marshall JCM800 — Swedish death metal chainsaw distortion' },
 
   // ── Dynamics ──
   { category: 'wasm', type: 'AGC', label: 'Auto Gain Control', group: 'Dynamics', description: 'Automatic gain leveling' },
@@ -488,36 +489,6 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     description: `${model.fullName} - ${model.description}`,
   })),
 
-  // ===== BUZZMACHINE (Jeskola Buzz WASM effects) =====
-  // Distortion
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzDistortion', label: 'Arguru Distortion', group: 'Buzz Distortion', description: 'Classic Buzz distortion effect (Arguru)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzOverdrive', label: 'Geonik Overdrive', group: 'Buzz Distortion', description: 'Warm overdrive (Geonik)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzDistortion2', label: 'Jeskola Distortion', group: 'Buzz Distortion', description: 'Jeskola hard distortion' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzDist2', label: 'Elak Dist2', group: 'Buzz Distortion', description: 'Elak distortion v2' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzSoftSat', label: 'Graue Soft Saturation', group: 'Buzz Distortion', description: 'Gentle saturation (Graue)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzStereoDist', label: 'WhiteNoise Stereo Dist', group: 'Buzz Distortion', description: 'Stereo distortion (WhiteNoise)' },
-  // Filter
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzSVF', label: 'Elak State Variable Filter', group: 'Buzz Filter', description: 'Multi-mode SVF (LP/HP/BP/Notch)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzPhilta', label: 'FSM Philta', group: 'Buzz Filter', description: 'Resonant filter (FSM)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzNotch', label: 'CyanPhase Notch', group: 'Buzz Filter', description: 'Phase notch filter (CyanPhase)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzZfilter', label: 'Q Zfilter', group: 'Buzz Filter', description: 'Z-plane filter (Q)' },
-  // Reverb & Delay
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzDelay', label: 'Jeskola Delay', group: 'Buzz Delay', description: 'Classic Buzz delay (Jeskola)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzCrossDelay', label: 'Jeskola Cross Delay', group: 'Buzz Delay', description: 'Stereo cross-feedback delay' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzFreeverb', label: 'Jeskola Freeverb', group: 'Buzz Reverb', description: 'Freeverb reverb (Jeskola)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzPanzerDelay', label: 'FSM Panzer Delay', group: 'Buzz Delay', description: 'Heavy multi-tap delay (FSM)' },
-  // Modulation
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzChorus', label: 'FSM Chorus', group: 'Buzz Modulation', description: 'Chorus effect (FSM)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzChorus2', label: 'FSM Chorus 2', group: 'Buzz Modulation', description: 'Enhanced chorus v2 (FSM)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzWhiteChorus', label: 'WhiteNoise White Chorus', group: 'Buzz Modulation', description: 'White chorus (WhiteNoise)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzFreqShift', label: 'Bigyo Frequency Shifter', group: 'Buzz Modulation', description: 'Frequency shifter (Bigyo)' },
-  // Dynamics
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzCompressor', label: 'Geonik Compressor', group: 'Buzz Dynamics', description: 'Compressor (Geonik)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzLimiter', label: 'Ld Soft Limiter', group: 'Buzz Dynamics', description: 'Soft limiter (Ld)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzExciter', label: 'Oomek Exciter', group: 'Buzz Dynamics', description: 'Harmonic exciter (Oomek)' },
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzMasterizer', label: 'Oomek Masterizer', group: 'Buzz Dynamics', description: 'Mastering processor (Oomek)' },
-  // EQ & Stereo
-  { category: 'buzzmachine' as EffectCategory, type: 'BuzzStereoGain', label: 'DedaCode Stereo Gain', group: 'Buzz Stereo', description: 'Stereo gain/balance (DedaCode)' },
 ];
 
 /**
@@ -572,13 +543,12 @@ export function searchEffects(query: string): AvailableEffect[] {
 /**
  * Get total effect count
  */
-export function getTotalEffectCount(): { total: number; tonejs: number; neural: number; wasm: number; wam: number; buzzmachine: number } {
+export function getTotalEffectCount(): { total: number; tonejs: number; neural: number; wasm: number; wam: number } {
   const tonejs = AVAILABLE_EFFECTS.filter((e) => e.category === 'tonejs').length;
   const neural = AVAILABLE_EFFECTS.filter((e) => e.category === 'neural').length;
   const wasm = AVAILABLE_EFFECTS.filter((e) => e.category === 'wasm').length;
   const wam = AVAILABLE_EFFECTS.filter((e) => e.category === 'wam').length;
-  const buzzmachine = AVAILABLE_EFFECTS.filter((e) => e.category === 'buzzmachine').length;
-  return { total: tonejs + neural + wasm + wam + buzzmachine, tonejs, neural, wasm, wam, buzzmachine };
+  return { total: tonejs + neural + wasm + wam, tonejs, neural, wasm, wam };
 }
 
 /**
