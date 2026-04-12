@@ -1188,27 +1188,6 @@ export const INSTRUMENT_FX_PRESETS: InstrumentFxPreset[] = [
     ],
   },
   {
-    name: 'Buzz Chorus Wash',
-    description: 'FSM White Chorus + Freeverb — shimmering Buzz machine FX',
-    category: 'Modulation',
-    effects: [
-      {
-        category: 'buzzmachine',
-        type: 'BuzzWhiteChorus',
-        enabled: true,
-        wet: 45,
-        parameters: {},
-      },
-      {
-        category: 'buzzmachine',
-        type: 'BuzzFreeverb',
-        enabled: true,
-        wet: 30,
-        parameters: {},
-      },
-    ],
-  },
-  {
     name: 'El Coyote Blues',
     description: 'El Coyote crunch amp + spring + tremolo — desert blues tone',
     category: 'Amp',

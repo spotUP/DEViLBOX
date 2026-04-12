@@ -916,27 +916,6 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
       },
     ],
   },
-  {
-    name: 'Mastered by Buzz',
-    description: 'Oomek Masterizer + Exciter — Jeskola Buzz mastering chain',
-    category: 'Neural',
-    effects: [
-      {
-        category: 'buzzmachine',
-        type: 'BuzzExciter',
-        enabled: true,
-        wet: 100,
-        parameters: {},
-      },
-      {
-        category: 'buzzmachine',
-        type: 'BuzzMasterizer',
-        enabled: true,
-        wet: 100,
-        parameters: {},
-      },
-    ],
-  },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DJ — Creative FX for live mixing (using previously missing effects)

@@ -243,6 +243,8 @@ export interface AelapseSpringsState {
   rmsPos: number;
   /** Anti-aliasing subpixel count — 1 (1x), 2 (4x), 3 (9x). Default 1. */
   aaSubpixels?: number;
+  /** Optional clip bounds for the springs viewport */
+  clip?: { x: number; y: number; w: number; h: number };
 }
 
 export class AelapseSpringsRenderer {

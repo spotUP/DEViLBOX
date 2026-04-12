@@ -721,9 +721,6 @@ const MasterEffectChainRow: React.FC<MasterEffectChainRowProps> = ({
         {effect.category === 'wam' && (
           <PixiLabel text="WAM" size="xs" color="custom" customColor={0x14b8a6} />
         )}
-        {effect.category === 'buzzmachine' && (
-          <PixiLabel text="Buzz" size="xs" color="custom" customColor={0xf97316} />
-        )}
         <layoutContainer layout={{ flex: 1 }} />
       </layoutContainer>
 
