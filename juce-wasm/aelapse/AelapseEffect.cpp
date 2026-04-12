@@ -118,34 +118,65 @@ namespace {
 // Linear interpolation between two bounds.
 inline float lerp(float x, float a, float b) { return a + x * (b - a); }
 
-// Exponential interpolation for frequency-like params.
-inline float lerpExp(float x, float a, float b) {
-    const float la = std::log(a);
-    const float lb = std::log(b);
-    return std::exp(la + x * (lb - la));
+// JUCE NormalisableRange with skew factor — matches JUCE's convertFrom0to1.
+// skew < 1 = more resolution at low end (frequencies).
+inline float juceSkew(float x, float a, float b, float skew) {
+    return a + (b - a) * std::pow(x, skew);
 }
 
-// Delay time — 0.02 .. 5.0 s (aelapse range)
-inline float delaySeconds(float x)   { return lerp(x, 0.02f, 5.0f); }
+// ── Converters: 0..1 → native units matching createLayout() exactly ──
+//
+// Each function maps the DEViLBOX store's normalized 0..1 value to the
+// same native-unit value that aelapse's processBlock() receives from
+// the JUCE parameter system. The processBlock code then does its own
+// conversion (e.g., /100 for percentages) before calling DSP setters.
 
-// Tape filter cutoffs — logarithmic Hz
-inline float delayCutLowHz(float x)  { return lerpExp(x, 20.f, 500.f); }
-inline float delayCutHiHz(float x)   { return lerpExp(x, 1000.f, 20000.f); }
+// delay_seconds: NormalisableRange{0.01, 5.0, 0.001, 0.5}
+inline float delaySeconds(float x) { return juceSkew(x, 0.01f, 5.0f, 0.5f); }
 
-// Springs length (Td) — linear seconds, 0.02 .. 0.2 s
-inline float springsLengthSec(float x) { return lerp(x, 0.02f, 0.2f); }
+// delay_feedback: NormalisableRange{0, 120, 0.1}  → /100 in processBlock
+inline float delayFeedback(float x) { return lerp(x, 0.f, 120.f); }
 
-// Springs decay (T60) — 0.3 .. 10 s
-inline float springsDecaySec(float x) { return lerp(x, 0.3f, 10.f); }
+// delay_cutoff_low: NormalisableRange{100, 20000, 1, 0.5}
+// NOTE: processBlock passes this directly to setCutHiPass (swapped names in aelapse!)
+inline float delayCutLow(float x) { return juceSkew(x, 100.f, 20000.f, 0.5f); }
 
-// Springs damping frequency — 20 .. 1000 Hz
-inline float springsDampHz(float x)  { return lerpExp(x, 20.f, 1000.f); }
+// delay_cutoff_hi: NormalisableRange{20, 3000, 1, 0.5}
+// NOTE: processBlock passes this directly to setCutLowPass (swapped!)
+inline float delayCutHi(float x) { return juceSkew(x, 20.f, 3000.f, 0.5f); }
 
-// Springs tone cutoff — 80 .. 5000 Hz (kToneMin..kToneMax in Springs.h)
-inline float springsToneHz(float x)  { return lerpExp(x, 80.f, 5000.f); }
+// delay_saturation: range -40..15 (linear)
+inline float delaySaturation(float x) { return lerp(x, -40.f, 15.f); }
 
-// Springs shape (resonance coefficient) — 0 .. 0.95 (avoid runaway)
-inline float springsShape(float x)   { return x * 0.95f; }
+// delay_drift: NormalisableRange{0, 100, 0.1} → /100 in processBlock
+inline float delayDrift(float x) { return lerp(x, 0.f, 100.f); }
+
+// springs_drywet: NormalisableRange{0, 100, 0.1} → /100 in processBlock
+inline float springsDryWet(float x) { return lerp(x, 0.f, 100.f); }
+
+// springs_width: NormalisableRange{0, 100, 0.1} → /100 in processBlock
+inline float springsWidth(float x) { return lerp(x, 0.f, 100.f); }
+
+// springs_length: NormalisableRange{0.02, 0.2, 0.001, 0.6} → direct to setTd
+inline float springsLength(float x) { return juceSkew(x, 0.02f, 0.2f, 0.6f); }
+
+// springs_decay: NormalisableRange{0.3, 10, 0.001, 0.6} → direct to setT60
+inline float springsDecay(float x) { return juceSkew(x, 0.3f, 10.f, 0.6f); }
+
+// springs_damp: NormalisableRange{200, 12000, 1, 0.5} → direct to setFreq
+inline float springsDamp(float x) { return juceSkew(x, 200.f, 12000.f, 0.5f); }
+
+// springs_shape: NormalisableRange{-5, 5, 0.01, 0.3, true} → direct to setRes
+inline float springsShape(float x) { return juceSkew(x, -5.f, 5.f, 0.3f); }
+
+// springs_tone: 0..1 (direct) → direct to setTone
+inline float springsTone(float x) { return x; }
+
+// springs_scatter: NormalisableRange{0, 120, 0.1} → /100 in processBlock
+inline float springsScatter(float x) { return lerp(x, 0.f, 120.f); }
+
+// springs_chaos: NormalisableRange{0, 100, 0.1} → /100 in processBlock
+inline float springsChaos(float x) { return lerp(x, 0.f, 100.f); }
 
 } // namespace
 
@@ -267,68 +298,90 @@ private:
 
     float params_[PARAM_COUNT]{};
 
+    // applyParam: converts 0..1 normalized → native units → DSP setter.
+    // The conversion chain mirrors PluginProcessorArch.cpp::processBlock()
+    // exactly: first map 0..1 to the JUCE NormalisableRange value, then
+    // apply the same /100 or direct-pass the original code uses.
     void applyParam(int id, int blockSize) {
+        const float v = params_[id]; // 0..1 normalized
         switch (id) {
         case PARAM_DELAY_ACTIVE:
-            delayActive_ = params_[id] > 0.5f;
+            delayActive_ = v > 0.5f;
             break;
         case PARAM_DELAY_DRYWET:
-            tapedelay_.setDryWet(params_[id], blockSize);
+            // JUCE range 0..100 → processBlock: /100
+            tapedelay_.setDryWet(v, blockSize); // v is already 0..1
             break;
         case PARAM_DELAY_SECONDS:
-            tapedelay_.setDelay(delaySeconds(params_[id]), blockSize);
+            // JUCE range 0.01..5.0 skew 0.5 → processBlock: direct to setDelay
+            tapedelay_.setDelay(delaySeconds(v), blockSize);
             break;
         case PARAM_DELAY_FEEDBACK:
-            tapedelay_.setFeedback(params_[id], blockSize);
+            // JUCE range 0..120 → processBlock: /100 → 0..1.2
+            tapedelay_.setFeedback(delayFeedback(v) / 100.f, blockSize);
             break;
         case PARAM_DELAY_CUT_LOW:
-            tapedelay_.setCutHiPass(delayCutLowHz(params_[id]), blockSize);
+            // JUCE range 100..20000 Hz skew 0.5 → processBlock: direct to setCutHiPass
+            // (yes, "cut_low" controls the highpass in the original — swapped names)
+            tapedelay_.setCutHiPass(delayCutLow(v), blockSize);
             break;
         case PARAM_DELAY_CUT_HI:
-            tapedelay_.setCutLowPass(delayCutHiHz(params_[id]), blockSize);
+            // JUCE range 20..3000 Hz skew 0.5 → processBlock: direct to setCutLowPass
+            tapedelay_.setCutLowPass(delayCutHi(v), blockSize);
             break;
         case PARAM_DELAY_SATURATION:
-            tapedelay_.setSaturation(params_[id], blockSize);
+            // JUCE range -40..15 → processBlock: direct to setSaturation
+            tapedelay_.setSaturation(delaySaturation(v), blockSize);
             break;
         case PARAM_DELAY_DRIFT:
-            tapedelay_.setDrift(params_[id], blockSize);
+            // JUCE range 0..100 → processBlock: /100
+            tapedelay_.setDrift(delayDrift(v) / 100.f, blockSize);
             break;
         case PARAM_DELAY_MODE: {
-            // Quantize to 0/1/2.
-            const int m = static_cast<int>(params_[id] * 2.999f);
+            // 0..1 → 0/1/2 (Normal/BackForth/Reverse)
+            const int m = static_cast<int>(v * 2.999f);
             tapedelay_.setMode(
                 static_cast<processors::TapeDelay::Mode>(m), blockSize);
             break;
         }
         case PARAM_SPRINGS_ACTIVE:
-            springsActive_ = params_[id] > 0.5f;
+            springsActive_ = v > 0.5f;
             break;
         case PARAM_SPRINGS_DRYWET:
-            springs_.setDryWet(params_[id], blockSize);
+            // JUCE range 0..100 → processBlock: /100
+            springs_.setDryWet(springsDryWet(v) / 100.f, blockSize);
             break;
         case PARAM_SPRINGS_WIDTH:
-            springs_.setWidth(params_[id], blockSize);
+            // JUCE range 0..100 → processBlock: /100
+            springs_.setWidth(springsWidth(v) / 100.f, blockSize);
             break;
         case PARAM_SPRINGS_LENGTH:
-            springs_.setTd(springsLengthSec(params_[id]), blockSize);
+            // JUCE range 0.02..0.2 skew 0.6 → processBlock: direct to setTd
+            springs_.setTd(springsLength(v), blockSize);
             break;
         case PARAM_SPRINGS_DECAY:
-            springs_.setT60(springsDecaySec(params_[id]), blockSize);
+            // JUCE range 0.3..10 skew 0.6 → processBlock: direct to setT60
+            springs_.setT60(springsDecay(v), blockSize);
             break;
         case PARAM_SPRINGS_DAMP:
-            springs_.setFreq(springsDampHz(params_[id]), blockSize);
+            // JUCE range 200..12000 Hz skew 0.5 → processBlock: direct to setFreq
+            springs_.setFreq(springsDamp(v), blockSize);
             break;
         case PARAM_SPRINGS_SHAPE:
-            springs_.setRes(springsShape(params_[id]), blockSize);
+            // JUCE range -5..5 skew 0.3 → processBlock: direct to setRes
+            springs_.setRes(springsShape(v), blockSize);
             break;
         case PARAM_SPRINGS_TONE:
-            springs_.setTone(springsToneHz(params_[id]), blockSize);
+            // JUCE range 0..1 → processBlock: direct to setTone
+            springs_.setTone(springsTone(v), blockSize);
             break;
         case PARAM_SPRINGS_SCATTER:
-            springs_.setScatter(params_[id], blockSize);
+            // JUCE range 0..120 → processBlock: /100
+            springs_.setScatter(springsScatter(v) / 100.f, blockSize);
             break;
         case PARAM_SPRINGS_CHAOS:
-            springs_.setChaos(params_[id], blockSize);
+            // JUCE range 0..100 → processBlock: /100
+            springs_.setChaos(springsChaos(v) / 100.f, blockSize);
             break;
         default:
             break;
