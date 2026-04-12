@@ -71,11 +71,13 @@ export class DJMixerEngine {
     this.duckGain = new Tone.Gain(1);
 
     // Limiter: fast attack, high ratio compressor acting as a brickwall
+    // Attack 1ms catches crossfader transient spikes (10ms ramps) — matches DB303Synth limiter pattern
     this.limiter = new Tone.Compressor({
       threshold: -1,
       ratio: 20,
-      attack: 0.003,
+      attack: 0.001,
       release: 0.1,
+      knee: 4,
     });
 
     this.masterMeter = new Tone.Meter({ smoothing: 0.8 });

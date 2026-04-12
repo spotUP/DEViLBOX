@@ -123,18 +123,25 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       },
 
       addTrack: (playlistId: string, track: PlaylistTrack) => {
+        // Capture audio store state BEFORE mutating playlist store to avoid
+        // reading stale data if the audio store is mid-mutation.
+        let masterFxSnapshot: EffectConfig[] | null = null;
+        try {
+          const { useAudioStore } = require('@/stores/useAudioStore');
+          const fx = useAudioStore.getState().masterEffects;
+          if (fx.length > 0) {
+            masterFxSnapshot = JSON.parse(JSON.stringify(fx));
+          }
+        } catch { /* audio store not available */ }
+
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
             p.tracks.push(track);
             p.updatedAt = Date.now();
             // Auto-snapshot master FX to playlist if none saved yet
-            if (!p.masterEffects) {
-              const { useAudioStore } = require('@/stores/useAudioStore');
-              const fx = useAudioStore.getState().masterEffects;
-              if (fx.length > 0) {
-                p.masterEffects = JSON.parse(JSON.stringify(fx));
-              }
+            if (!p.masterEffects && masterFxSnapshot) {
+              p.masterEffects = masterFxSnapshot;
             }
           }
         });

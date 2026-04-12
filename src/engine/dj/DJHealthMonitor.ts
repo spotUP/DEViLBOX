@@ -63,7 +63,11 @@ export class DJHealthMonitor {
     };
 
     if (status.audioContext === 'suspended') {
-      Tone.start().catch(() => { /* needs user gesture */ });
+      Tone.start().catch((err) => {
+        console.warn('[DJHealthMonitor] AudioContext resume failed:', err?.message ?? err);
+        // Mark engine as not ready so UI can show "tap to resume" indicator
+        status.engineReady = false;
+      });
     }
 
     this.lastStatus = status;
