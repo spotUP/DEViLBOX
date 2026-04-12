@@ -519,6 +519,41 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* SunVox not active */ }
+      // Sync edit to PreTracker WASM engine (direct cell write)
+      try {
+        const fmt = require('./useFormatStore').useFormatStore.getState();
+        if (fmt.preTrackerFileData) {
+          const pattern = get().patterns[patternIndex];
+          const fullCell = pattern?.channels[channelIndex]?.rows[rowIndex];
+          if (fullCell && pattern) {
+            import('@engine/pretracker/PreTrackerEngine').then(({ PreTrackerEngine }) => {
+              if (!PreTrackerEngine.hasInstance()) return;
+              // Resolve the actual track number from the position→track map
+              const meta = pattern.importMetadata as Record<string, unknown> | undefined;
+              const trackMap = meta?.prtTrackMap as number[] | undefined;
+              const transposeMap = meta?.prtTransposeMap as number[] | undefined;
+              const trackNum = trackMap?.[channelIndex] ?? (patternIndex + 1);
+              if (trackNum === 0) return; // track 0 = empty/muted
+              // Reverse XM note → PreTracker note (undo transpose)
+              const transpose = transposeMap?.[channelIndex] ?? 0;
+              let prtNote = fullCell.note > 0 ? Math.max(0, fullCell.note - 12 - transpose) : 0;
+              if (prtNote < 0) prtNote = 0;
+              if (prtNote > 60) prtNote = 60;
+              // Encode 3-byte cell:
+              // b0: bits 5-0=note, bit 6=arpeggio flag, bit 7=inst high bit
+              const inst = fullCell.instrument & 0x1F; // 0-31
+              const instHi = (inst & 0x10) ? 0x80 : 0;
+              const hasArp = fullCell.effTyp === 0 && fullCell.eff !== 0;
+              const arpFlag = hasArp ? 0x40 : 0;
+              const pitchCtrl = (prtNote & 0x3F) | arpFlag | instHi;
+              // b1: bits 7-4=inst low nibble, bits 3-0=effect cmd
+              const instEffect = ((inst & 0x0F) << 4) | (fullCell.effTyp & 0x0F);
+              const effectData = fullCell.eff & 0xFF;
+              PreTrackerEngine.getInstance().setTrackCell(trackNum, rowIndex, pitchCtrl, instEffect, effectData);
+            });
+          }
+        }
+      } catch { /* PreTracker not active */ }
       // Sync edit to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
 

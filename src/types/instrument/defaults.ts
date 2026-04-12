@@ -85,6 +85,7 @@ import type {
   SymphonieConfig,
   SF2Config,
   RonKlarenConfig,
+  PreTrackerConfig,
 } from './exotic';
 import type {
   DrumMachineConfig,
@@ -276,6 +277,8 @@ export interface InstrumentConfig {
   chiptuneModule?: ChiptuneModuleConfig;
   // HivelyTracker / AHX instrument
   hively?: HivelyConfig;
+  // PreTracker (synth tracker by Pink/Abyss)
+  pretracker?: PreTrackerConfig;
   // GoatTracker Ultra (C64 SID tracker)
   gtUltra?: GTUltraConfig;
   // SID Factory II (C64 SID tracker — driver-defined instrument tables)
@@ -548,6 +551,18 @@ export const DEFAULT_HIVELY: HivelyConfig = {
     speed: 1,
     entries: [{ note: 0, waveform: 2, fixed: false, fx: [0, 0], fxParam: [0, 0] }],
   },
+};
+
+export const DEFAULT_PRETRACKER: PreTrackerConfig = {
+  waves: [],
+  instruments: [],
+  waveNames: [],
+  instrumentNames: [],
+  numPositions: 0,
+  numSteps: 0,
+  subsongCount: 1,
+  title: '',
+  author: '',
 };
 
 export const DEFAULT_GTULTRA: GTUltraConfig = {

@@ -711,3 +711,73 @@ export interface RonKlarenConfig {
   /** Optional: waveform PCM data for display (signed 8-bit) */
   waveformData?: number[];
 }
+
+// ── PreTracker Configuration ───────────────────────────────────────────────
+// PreTracker by Pink/Abyss — 4-channel Amiga synth tracker with wavetable
+// oscillators, filters, ADSR envelopes, chord support, and instrument command
+// sequences. Architecturally similar to AHX/HivelyTracker.
+
+export interface PreTrackerWaveConfig {
+  loopStart: number;
+  loopEnd: number;
+  subloopLen: number;
+  allow9xx: number;
+  subloopWait: number;
+  subloopStep: number;
+  chipram: number;
+  loopOffset: number;
+  chordNote1: number;
+  chordNote2: number;
+  chordNote3: number;
+  chordShift: number;
+  oscPhaseSpd: number;
+  oscType: number;        // 0=saw, 1=tri, 2=sqr, 3=noise
+  oscPhaseMin: number;
+  oscPhaseMax: number;
+  oscBasenote: number;
+  oscGain: number;
+  samLen: number;
+  mixWave: number;
+  volAttack: number;
+  volDelay: number;
+  volDecay: number;
+  volSustain: number;
+  fltType: number;        // 0=none, 1=LP, 2=HP, 3=BP, 4=notch
+  fltResonance: number;
+  pitchRamp: number;
+  fltStart: number;
+  fltMin: number;
+  fltMax: number;
+  fltSpeed: number;
+  modWetness: number;
+  modLength: number;
+  modPredelay: number;
+  modDensity: number;
+  boost: boolean;
+  pitchLinear: boolean;
+  volFast: boolean;
+  extraOctaves: boolean;
+}
+
+export interface PreTrackerInstConfig {
+  vibratoDelay: number;
+  vibratoDepth: number;
+  vibratoSpeed: number;
+  adsrAttack: number;
+  adsrDecay: number;
+  adsrSustain: number;
+  adsrRelease: number;
+  patternSteps: number;
+}
+
+export interface PreTrackerConfig {
+  waves: PreTrackerWaveConfig[];
+  instruments: PreTrackerInstConfig[];
+  waveNames: string[];
+  instrumentNames: string[];
+  numPositions: number;
+  numSteps: number;
+  subsongCount: number;
+  title: string;
+  author: string;
+}

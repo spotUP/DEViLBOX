@@ -14,6 +14,7 @@ import {
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
+  DEFAULT_PRETRACKER,
   DEFAULT_GTULTRA,
   DEFAULT_JAMCRACKER,
   DEFAULT_SF2,
@@ -132,6 +133,7 @@ const VitalControls = lazy(() => import('../controls/VitalControls').then(m => (
 const Odin2Controls = lazy(() => import('../controls/Odin2Controls').then(m => ({ default: m.Odin2Controls })));
 const SurgeControls = lazy(() => import('../controls/SurgeControls').then(m => ({ default: m.SurgeControls })));
 const HivelyControls = lazy(() => import('../controls/HivelyControls').then(m => ({ default: m.HivelyControls })));
+const PreTrackerControls = lazy(() => import('../controls/PreTrackerControls').then(m => ({ default: m.PreTrackerControls })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
 const JamCrackerControls = lazy(() => import('../controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls })));
 const SF2Controls = lazy(() => import('../controls/SF2Controls').then(m => ({ default: m.SF2Controls })));
@@ -186,7 +188,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -279,6 +281,14 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   const handleHivelyHardwareChange = useCallback((fullConfig: typeof DEFAULT_HIVELY) => {
     handleChange({ hively: fullConfig });
   }, [handleChange]);
+
+  // Handle PreTracker config updates
+  const handlePreTrackerChange = useCallback((updates: Partial<typeof instrument.pretracker>) => {
+    const current = instrument.pretracker || DEFAULT_PRETRACKER;
+    handleChange({
+      pretracker: { ...current, ...updates },
+    });
+  }, [instrument.pretracker, handleChange]);
 
   // Handle GTUltra config updates — push to WASM engine too
   const handleGTUltraChange = useCallback((updates: Partial<GTUltraConfig>) => {
@@ -1439,6 +1449,31 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         />
         <Suspense fallback={<LoadingControls />}>
           <MusicLineControls instrument={instrument} onChange={handleChange} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // PRETRACKER EDITOR
+  // ============================================================================
+  if (editorMode === 'pretracker') {
+    const prtConfig = deepMerge(DEFAULT_PRETRACKER, instrument.pretracker || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0f05] to-[#0f0805]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <PreTrackerControls
+            config={prtConfig}
+            instrumentId={instrument.id}
+            onChange={handlePreTrackerChange}
+          />
         </Suspense>
       </div>
     );
