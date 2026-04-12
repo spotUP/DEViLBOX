@@ -13,18 +13,6 @@ import './wasm';
 import './tumult';
 import './tapesimulator';
 
-// ── Lazy: Buzzmachine effects (23 effects) ────────────────────────────────
-EffectRegistry.registerLazy(
-  [
-    'BuzzDistortion', 'BuzzSVF', 'BuzzDelay', 'BuzzChorus', 'BuzzCompressor',
-    'BuzzOverdrive', 'BuzzDistortion2', 'BuzzCrossDelay', 'BuzzPhilta', 'BuzzDist2',
-    'BuzzFreeverb', 'BuzzFreqShift', 'BuzzNotch', 'BuzzStereoGain', 'BuzzSoftSat',
-    'BuzzLimiter', 'BuzzExciter', 'BuzzMasterizer', 'BuzzStereoDist', 'BuzzWhiteChorus',
-    'BuzzZfilter', 'BuzzChorus2', 'BuzzPanzerDelay',
-  ],
-  () => import('./buzzmachine').then(() => {}),
-);
-
 // ── Lazy: WAM 2.0 effects (11 effects) ───────────────────────────────────
 EffectRegistry.registerLazy(
   [

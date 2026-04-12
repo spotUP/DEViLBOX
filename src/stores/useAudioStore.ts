@@ -158,8 +158,7 @@ export const useAudioStore = create<AudioStore>()(
       // Determine effect category. Buzzmachine effects start with 'Buzz',
       // WAM effects start with 'WAM'. Everything else defaults to 'tonejs'.
       // This avoids importing unifiedEffects (which causes circular deps in prod).
-      const category: EffectConfig['category'] = (effectType as string).startsWith('Buzz') ? 'buzzmachine'
-        : (effectType as string).startsWith('WAM') ? 'wam'
+      const category: EffectConfig['category'] = (effectType as string).startsWith('WAM') ? 'wam'
         : 'tonejs';
 
       set((state) => {
