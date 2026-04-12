@@ -46,6 +46,28 @@ const EDITABLE_FORMAT_LABELS = new Set([
 
   // ── Native parsers with dedicated encoders ──
   'AMOS Music Bank',
+
+  // ── Compiled 68k / packed Amiga with chip RAM pattern editing ──
+  'Rob Hubbard', 'Rob Hubbard ST', 'David Whittaker',
+  'Activision Pro', 'Ron Klaren', 'Richard Joseph',
+  'Mark Cooksey', 'Jeroen Tel', 'Sound Master', 'Sound Factory',
+  'Jason Page', 'Jason Brooke', 'Laxity', 'Fred Gray',
+  'Jochen Hippel ST', 'Jochen Hippel 7V', 'Special FX',
+  'Time Tracker', 'Cinemaware', 'Fashion Tracker',
+  'Tomy Tracker', 'Sean Conran', 'Thomas Hermann',
+  'Core Design', 'Janko Mrsic-Flogel', 'Sound Player',
+  'Wally Beben', 'Steve Barrett', 'Paul Summers',
+  'Paul Shields', 'Paul Robotham', 'Paul Tonge',
+  'Pierre Adane', 'Andrew Parton', 'Custom Made',
+  'Digital Sonix Chrome', 'Jesper Olsen', 'Kim Christensen',
+  'Ashley Hogg', 'Maximum Effect', 'MIDI Loriciel',
+  'On Escapee', 'Maniacs of Noise', 'Martin Walker',
+  'Desire', 'MultiMedia Sound', 'Synth Pack', 'MMDC',
+  'Medley', 'Infogrames', 'Quartet',
+  'NovoTrade Packer', 'Alcatraz Packer', 'Blade Packer',
+  'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
+  'SunTronic', 'GlueMon', 'Sean Connolly',
+  'Art and Magic', 'Mike Davies', 'Mark II', 'Sonic Arranger SAS', 'A-Pro-Sys',
 ]);
 
 /** Format families (from FormatRegistry) that are always editable */
@@ -89,6 +111,28 @@ const NATIVE_EXPORTABLE_LABELS = new Set([
 
   // ── Native parsers with dedicated exporters ──
   'AMOS Music Bank',
+
+  // ── Compiled 68k / packed Amiga with chip RAM export ──
+  'Rob Hubbard', 'Rob Hubbard ST', 'David Whittaker',
+  'Activision Pro', 'Ron Klaren', 'Richard Joseph',
+  'Mark Cooksey', 'Jeroen Tel', 'Sound Master', 'Sound Factory',
+  'Jason Page', 'Jason Brooke', 'Laxity', 'Fred Gray',
+  'Jochen Hippel ST', 'Jochen Hippel 7V', 'Special FX',
+  'Time Tracker', 'Cinemaware', 'Fashion Tracker',
+  'Tomy Tracker', 'Sean Conran', 'Thomas Hermann',
+  'Core Design', 'Janko Mrsic-Flogel', 'Sound Player',
+  'Wally Beben', 'Steve Barrett', 'Paul Summers',
+  'Paul Shields', 'Paul Robotham', 'Paul Tonge',
+  'Pierre Adane', 'Andrew Parton', 'Custom Made',
+  'Digital Sonix Chrome', 'Jesper Olsen', 'Kim Christensen',
+  'Ashley Hogg', 'Maximum Effect', 'MIDI Loriciel',
+  'On Escapee', 'Maniacs of Noise', 'Martin Walker',
+  'Desire', 'MultiMedia Sound', 'Synth Pack', 'MMDC',
+  'Medley', 'Infogrames', 'Quartet',
+  'NovoTrade Packer', 'Alcatraz Packer', 'Blade Packer',
+  'Mosh Packer', 'Nick Pelling Packer', 'Peter Verswyvelen Packer',
+  'SunTronic', 'GlueMon', 'Sean Connolly',
+  'Art and Magic', 'Mike Davies', 'Mark II', 'Sonic Arranger SAS', 'A-Pro-Sys',
 
   // ── AdLib/OPL with OPL3 exporters (RAD, IMF, RAW) ──
   'AdPlug',
