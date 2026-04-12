@@ -1194,15 +1194,19 @@ function App() {
             )}
 
             {activeView === 'mixer' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading mixer...</div>}>
-                <MixerView />
-              </Suspense>
+              <DJErrorBoundary viewName="Mixer">
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading mixer...</div>}>
+                  <MixerView />
+                </Suspense>
+              </DJErrorBoundary>
             )}
 
             {activeView === 'drumpad' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading drum pads...</div>}>
-                <DrumPadManager />
-              </Suspense>
+              <DJErrorBoundary viewName="DrumPad">
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading drum pads...</div>}>
+                  <DrumPadManager />
+                </Suspense>
+              </DJErrorBoundary>
             )}
 
             {activeView === 'studio' && (
