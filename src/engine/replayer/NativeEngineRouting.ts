@@ -970,21 +970,21 @@ export function stopNativeEngines(
     }
   }
 
-  // Stop each registered WASM engine if active
-  if (song) {
-    for (const desc of WASM_ENGINES) {
-      if (!shouldActivate(desc, song)) continue;
-      const ref = tryResolveSync(desc);
-      if (ref) {
-        try { if (ref.hasInstance()) ref.getInstance().stop(); } catch { /* ignored */ }
-      }
-      // If not synchronously resolvable but was started this session, stop via
-      // cached dynamic resolver. This handles TFMXModule and other dynamicResolver engines.
-      if (!ref && desc.dynamicResolver && wasRunning.has(desc.key)) {
-        desc.dynamicResolver().then(cls => {
-          try { if (cls.hasInstance()) cls.getInstance().stop(); } catch { /* ignored */ }
-        }).catch(() => {});
-      }
+  // Stop ALL WASM engines that were running — not just ones matching the current song.
+  // The current song may have already been replaced by a new load, so shouldActivate()
+  // would miss the previous engine. Use wasRunning to stop everything that was started.
+  for (const desc of WASM_ENGINES) {
+    // Try synchronous stop first (fast path)
+    const ref = tryResolveSync(desc);
+    if (ref) {
+      try { if (ref.hasInstance()) ref.getInstance().stop(); } catch { /* ignored */ }
+    }
+    // If not synchronously resolvable but was started this session, stop via
+    // cached dynamic resolver. This handles TFMXModule and other dynamicResolver engines.
+    if (!ref && desc.dynamicResolver && wasRunning.has(desc.key)) {
+      desc.dynamicResolver().then(cls => {
+        try { if (cls.hasInstance()) cls.getInstance().stop(); } catch { /* ignored */ }
+      }).catch(() => {});
     }
   }
 
