@@ -486,6 +486,18 @@ export async function parseSTPFile(
     numPatterns: patternArray.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSTPCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 4-byte STP cell decode: [instr, note, cmd, param]
+      const instr   = bytes[0];
+      const noteRaw = bytes[1];
+      const command = bytes[2];
+      const param   = bytes[3];
+
+      const note = noteRaw > 0 ? STP_NOTE_OFFSET + noteRaw : 0;
+      const { effTyp, eff } = convertSTPEffect(command, param);
+
+      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const base = patternFileOffsets[pattern] ?? 0;
       const ch = patternChCounts[pattern] ?? numChannels;

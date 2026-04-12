@@ -491,6 +491,47 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
     numPatterns,
     moduleSize: bytes.byteLength,
     encodeCell: encodeGameMusicCreatorCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 4-byte GameMusicCreator cell decode
+      const b0  = bytes[0];
+      const b1  = bytes[1];
+      const cmd = bytes[2] & 0x0F;
+      const prm = bytes[3];
+
+      const noteCut = (b0 === 0xFF && b1 === 0xFE);
+
+      // Sample only from high nibble of b0
+      const sampleNum = noteCut ? 0 : (b0 & 0xF0) >> 4;
+
+      // Period from low nibble of b0 + b1
+      const periodHi  = noteCut ? 0 : b0 & 0x0F;
+      const periodRaw = (periodHi << 8) | b1;
+
+      let note = 0;
+      if (noteCut) {
+        note = 97; // XM note-cut
+      } else if (periodRaw > 0) {
+        note = periodToNote(periodRaw);
+      }
+
+      // Effect mapping (mirrors parser's switch)
+      let effTyp = 0;
+      let eff    = prm;
+      switch (cmd) {
+        case 0x00: effTyp = 0; eff = 0; break;
+        case 0x01: effTyp = 0x01; break;
+        case 0x02: effTyp = 0x02; break;
+        case 0x03: effTyp = 0x0C; eff = prm & 0x7F; break;
+        case 0x04: effTyp = 0x0D; break;
+        case 0x05: effTyp = 0x0B; break;
+        case 0x06: effTyp = 0x0E; eff = 0x00; break;
+        case 0x07: effTyp = 0x0E; eff = 0x01; break;
+        case 0x08: effTyp = 0x0F; break;
+        default:   effTyp = 0; eff = 0; break;
+      }
+
+      return { note, instrument: sampleNum, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

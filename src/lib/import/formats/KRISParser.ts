@@ -345,6 +345,24 @@ export async function parseKRISFile(
     numPatterns: patterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeKRISCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 4-byte KRIS cell decode
+      // NOTE: transpose is applied at pattern assembly time, not stored in the cell.
+      // decodeCell returns the raw cell data without transpose applied.
+      const noteByte   = bytes[0];
+      const instrument = bytes[1];
+      const effTyp     = bytes[2] & 0x0F;
+      const eff        = bytes[3];
+
+      // krisNoteToXM without transpose
+      let note = 0;
+      if (noteByte !== 0xA8 && !(noteByte & 1) && noteByte >= 0x18 && noteByte <= 0x9E) {
+        const rawNote = Math.floor((noteByte - 0x18) / 2);
+        note = Math.max(1, Math.min(96, 25 + rawNote));
+      }
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const refs = trackRefs[pattern];
       if (!refs) return 0;

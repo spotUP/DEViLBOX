@@ -535,6 +535,34 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     numPatterns,
     moduleSize: bytes.length,
     encodeCell: encodeXMFCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 6-byte XMF cell decode
+      const noteRaw = bytes[0];
+      const instr   = bytes[1];
+      const eff1Cmd = bytes[2];
+      const eff2Cmd = bytes[3];
+      const eff2Prm = bytes[4];
+      const eff1Prm = bytes[5];
+
+      // Note: 0=empty, 1-77 → 36 + noteRaw
+      let note = 0;
+      if (noteRaw > 0 && noteRaw <= 77) {
+        note = 36 + noteRaw;
+      }
+
+      const e1 = translateXMFEffect(eff1Cmd, eff1Prm, type);
+      const e2 = translateXMFEffect(eff2Cmd, eff2Prm, type);
+
+      return {
+        note,
+        instrument: instr,
+        volume: 0,
+        effTyp:  e1 ? e1.command : 0,
+        eff:     e1 ? e1.param : 0,
+        effTyp2: e2 ? e2.command : 0,
+        eff2:    e2 ? e2.param : 0,
+      };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number =>
       patternStart
       + pattern * (ROWS_PER_PATTERN * numChannels * CELL_SIZE)
