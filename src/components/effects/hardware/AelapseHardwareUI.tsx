@@ -318,11 +318,13 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           // Position springs overlay. Use percentage-based CSS so it
           // works regardless of container scaling. The springs panel is
           // the right ~20% width, top ~50% height of the 720×400 editor.
-          if (overlay.style.display === 'none') {
-            overlay.style.left   = '73%';
-            overlay.style.top    = '2%';
-            overlay.style.width  = '22%';
-            overlay.style.height = '42%';
+          if (overlay.style.display === 'none' && jcanvas.clientWidth > 0) {
+            const cw = jcanvas.clientWidth;
+            const ch = jcanvas.clientHeight;
+            overlay.style.left   = `${Math.round(cw * 0.73)}px`;
+            overlay.style.top    = `${Math.round(ch * 0.04)}px`;
+            overlay.style.width  = `${Math.round(cw * 0.22)}px`;
+            overlay.style.height = `${Math.round(ch * 0.42)}px`;
             overlay.style.display = 'block';
           }
 
