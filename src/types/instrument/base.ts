@@ -278,6 +278,7 @@ export type SynthType =
   | 'RonKlarenSynth' // Ron Klaren Sound Module (wavetable synthesis + ADSR + vibrato)
   | 'StartrekkerAMSynth' // Startrekker AM synth (WASM replayer)
   | 'Geonkick'        // Geonkick percussion synth (Quamplex, GPL-3 WASM port)
+  | 'AsapSynth'       // ASAP (Another Slight Atari Player) - Atari 8-bit POKEY music
   | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
