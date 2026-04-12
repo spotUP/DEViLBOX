@@ -22,6 +22,11 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.ringReadPos = 0;
     this.ringAvailable = 0;
 
+    // Per-channel isolation ring buffers (4 slots max)
+    this.isolationSlots = [null, null, null, null];
+    this.isoRings = [null, null, null, null]; // { ringL, ringR, ringWritePos, ringReadPos, ringAvailable }
+    this.savedChannelGains = null; // saved gains during isolation render
+
     // WASM float buffers for decode output
     this.decodePtrL = 0;
     this.decodePtrR = 0;
@@ -155,6 +160,37 @@ class HivelyProcessor extends AudioWorkletProcessor {
           }
         }
         break;
+
+      // --- Per-channel effect isolation ---
+      case 'addIsolation': {
+        const { slotIndex, channelMask } = data;
+        if (slotIndex >= 0 && slotIndex < 4) {
+          this.isolationSlots[slotIndex] = { channelMask };
+          this.isoRings[slotIndex] = {
+            ringL: new Float32Array(this.ringSize),
+            ringR: new Float32Array(this.ringSize),
+            ringWritePos: 0, ringReadPos: 0, ringAvailable: 0,
+          };
+          this.port.postMessage({ type: 'isolationReady', slotIndex, channelMask });
+        }
+        break;
+      }
+
+      case 'removeIsolation': {
+        if (data.slotIndex >= 0 && data.slotIndex < 4) {
+          this.isolationSlots[data.slotIndex] = null;
+          this.isoRings[data.slotIndex] = null;
+        }
+        break;
+      }
+
+      case 'diagIsolation': {
+        const activeSlots = this.isolationSlots
+          .map((s, i) => s ? { slot: i, mask: '0x' + s.channelMask.toString(16) } : null)
+          .filter(Boolean);
+        this.port.postMessage({ type: 'diagIsolation', slots: activeSlots });
+        break;
+      }
 
       case 'setTrackStep':
         if (this.wasm) {
@@ -308,18 +344,89 @@ class HivelyProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Decode one frame
-    const samples = this.wasm._hively_decode_frame(this.decodePtrL, this.decodePtrR);
+    const hasIsolation = this.isolationSlots.some(s => s !== null);
+    const hasSplitApi = typeof this.wasm._hively_tick_frame === 'function';
+
+    if (!hasIsolation || !hasSplitApi) {
+      // Fast path: no isolation, use combined decode
+      const samples = this.wasm._hively_decode_frame(this.decodePtrL, this.decodePtrR);
+      if (samples <= 0) return;
+      this._writeToMainRing(samples);
+      return;
+    }
+
+    // --- Isolation path: tick once, render N times with different gains ---
+    const numChannels = this.wasm._hively_get_channels ? this.wasm._hively_get_channels() : 4;
+
+    // Build combined isolation mask
+    let isolatedBits = 0;
+    for (let s = 0; s < 4; s++) {
+      if (this.isolationSlots[s]) isolatedBits |= this.isolationSlots[s].channelMask;
+    }
+
+    // 1. Tick the sequencer (advances song state, does NOT render audio)
+    this.wasm._hively_tick_frame();
+
+    // 2. Save voice positions (so we can re-render with different masks)
+    this.wasm._hively_save_voice_positions();
+
+    // 3. Save current channel gains
+    if (!this.savedChannelGains) this.savedChannelGains = new Float32Array(16);
+    // We don't have a getter — assume 1.0 for all unmuted channels, 0 for muted
+    // The gains are set to isolate channels below
+
+    // 4. Render main output (with isolated channels muted)
+    for (let ch = 0; ch < numChannels; ch++) {
+      const muted = (isolatedBits & (1 << ch)) !== 0;
+      this.wasm._hively_set_channel_gain(ch, muted ? 0.0 : 1.0);
+    }
+    const samples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
     if (samples <= 0) return;
+    this._writeToMainRing(samples);
 
-    // Read float data from WASM heap
+    // 5. Render each isolation slot
+    for (let s = 0; s < 4; s++) {
+      const slot = this.isolationSlots[s];
+      const ring = this.isoRings[s];
+      if (!slot || !ring) continue;
+
+      // Restore voice positions for re-render
+      this.wasm._hively_restore_voice_positions();
+
+      // Set gains: only channels in this slot's mask are audible
+      for (let ch = 0; ch < numChannels; ch++) {
+        const shouldPlay = (slot.channelMask & (1 << ch)) !== 0;
+        this.wasm._hively_set_channel_gain(ch, shouldPlay ? 1.0 : 0.0);
+      }
+
+      const isoSamples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
+      if (isoSamples > 0) {
+        const heapF32 = this.wasm.HEAPF32;
+        const offsetL = this.decodePtrL >> 2;
+        const offsetR = this.decodePtrR >> 2;
+        for (let i = 0; i < isoSamples; i++) {
+          if (ring.ringAvailable >= this.ringSize) break;
+          ring.ringL[ring.ringWritePos] = heapF32[offsetL + i];
+          ring.ringR[ring.ringWritePos] = heapF32[offsetR + i];
+          ring.ringWritePos = (ring.ringWritePos + 1) % this.ringSize;
+          ring.ringAvailable++;
+        }
+      }
+    }
+
+    // 6. Restore all channel gains to unity
+    for (let ch = 0; ch < numChannels; ch++) {
+      this.wasm._hively_set_channel_gain(ch, 1.0);
+    }
+  }
+
+  /** Write decoded samples from WASM heap to main ring buffer */
+  _writeToMainRing(samples) {
     const heapF32 = this.wasm.HEAPF32;
-    const offsetL = this.decodePtrL >> 2; // byte offset to float index
+    const offsetL = this.decodePtrL >> 2;
     const offsetR = this.decodePtrR >> 2;
-
-    // Write to ring buffer
     for (let i = 0; i < samples; i++) {
-      if (this.ringAvailable >= this.ringSize) break; // overflow protection
+      if (this.ringAvailable >= this.ringSize) break;
       this.ringL[this.ringWritePos] = heapF32[offsetL + i];
       this.ringR[this.ringWritePos] = heapF32[offsetR + i];
       this.ringWritePos = (this.ringWritePos + 1) % this.ringSize;
@@ -359,6 +466,25 @@ class HivelyProcessor extends AudioWorkletProcessor {
         this.ringReadPos = (this.ringReadPos + 1) % this.ringSize;
       }
       this.ringAvailable -= available;
+
+      // ── Isolation slot outputs ──
+      for (let s = 0; s < 4; s++) {
+        const ring = this.isoRings[s];
+        if (!ring || !this.isolationSlots[s]) continue;
+        const slotOutput = outputs[s + 1];
+        if (!slotOutput || slotOutput.length === 0) continue;
+        const slotL = slotOutput[0];
+        const slotR = slotOutput[1] || slotOutput[0];
+        slotL.fill(0);
+        slotR.fill(0);
+        const isoAvail = Math.min(numSamples, ring.ringAvailable);
+        for (let i = 0; i < isoAvail; i++) {
+          slotL[i] = ring.ringL[ring.ringReadPos];
+          slotR[i] = ring.ringR[ring.ringReadPos];
+          ring.ringReadPos = (ring.ringReadPos + 1) % this.ringSize;
+        }
+        ring.ringAvailable -= isoAvail;
+      }
     }
 
     // ── Mix in standalone instrument players ──
