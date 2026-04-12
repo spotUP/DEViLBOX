@@ -61,8 +61,9 @@ export const AelapseEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
 }) => {
-  // JUCE knob → store. Uses the _aelapseParamIds string array to look up
-  // the store key by JUCE param string ID (reliable across JUCE versions).
+  // JUCE knob → DSP (direct) + store (for persistence).
+  // The direct DSP path ensures JUCE preset changes are audible immediately,
+  // even if the store → EffectParameterEngine diff path doesn't trigger.
   const handleParam = useCallback(
     (juceIndex: number, value01: number) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,21 +74,26 @@ export const AelapseEditor: React.FC<VisualEffectEditorProps> = ({
       const key = JUCE_ID_TO_STORE_KEY[juceId];
       if (!key) return;
 
+      // Direct DSP path: forward the 0..1 value to the live effect
+      // instance immediately, bypassing the store round-trip.
+      const engine = useAudioStore.getState().toneEngineInstance;
+      const node = engine?.getMasterEffectNode(effect.id);
+      if (node instanceof AelapseEffect) {
+        node.forwardJuceParam(juceIndex, value01);
+      }
+
+      // Store path: persist the value for save/load.
       let stored: number;
       if (BOOL_PARAMS.has(key)) {
         stored = value01 > 0.5 ? 100 : 0;
       } else if (CHOICE_PARAMS.has(key)) {
-        // Choice params (mode): JUCE sends normalized 0..1 for N choices.
-        // Store as the raw choice index (0, 1, 2) × (100/N) so the
-        // engine's /100 recovers the 0..1 for the C++ converter.
         stored = Math.round(value01 * 100);
       } else {
         stored = value01 * 100;
       }
-
       onUpdateParameter(key, stored);
     },
-    [onUpdateParameter],
+    [onUpdateParameter, effect.id],
   );
 
   // Pull the RMS snapshot directly off the live effect instance. We look it
