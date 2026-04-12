@@ -38,6 +38,7 @@ import {
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { TumultEffect, type TumultOptions } from '../effects/TumultEffect';
 import { TapeSimulatorEffect } from '../effects/TapeSimulatorEffect';
+import { TapeDelayEffect } from '../effects/TapeDelayEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { NeuralEffectWrapper } from '../effects/NeuralEffectWrapper';
 import { WAMEffectNode } from '../wam/WAMEffectNode';
@@ -420,6 +421,14 @@ export function applyEffectParametersDiff(
         if ('shame'     in changed) node.setShame    (Number(changed.shame)     / 100);
         if ('hiss'      in changed) node.setHiss     (Number(changed.hiss)      / 100);
         if ('speed'     in changed) node.setSpeed    (Number(changed.speed)); // 0|1 integer, not /100
+      }
+      break;
+
+    case 'TapeDelay':
+      if (node instanceof TapeDelayEffect) {
+        for (const [key, value] of Object.entries(changed)) {
+          node.setParam(key, Number(value));
+        }
       }
       break;
 

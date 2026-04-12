@@ -1806,6 +1806,34 @@ const wasmEffects: EffectDescriptor[] = [
       { name: 'Deep', params: { rate: 0.3, depth: 1.0, stages: 12, feedback: 0.8, stereoPhase: 180, mix: 0.5 } },
     ],
   },
+  {
+    id: 'TapeDelay', name: 'Tape Delay', category: 'wasm', group: 'Reverb & Delay',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { TapeDelayEffect } = await import('@engine/effects/TapeDelayEffect');
+      const p = c.parameters;
+      return new TapeDelayEffect({
+        delayTime: Number(p.delayTime) ?? 0.3,
+        feedback: Number(p.feedback) ?? 0.4,
+        mix: Number(p.mix) ?? 0.5,
+        toneFreq: Number(p.toneFreq) ?? 4000,
+        drive: Number(p.drive) ?? 0,
+        wowRate: Number(p.wowRate) ?? 0.5,
+        wowDepth: Number(p.wowDepth) ?? 0,
+        flutterRate: Number(p.flutterRate) ?? 6,
+        flutterDepth: Number(p.flutterDepth) ?? 0,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ delayTime: 0.3, feedback: 0.4, mix: 0.5, toneFreq: 4000, drive: 0, wowRate: 0.5, wowDepth: 0, flutterRate: 6, flutterDepth: 0 }),
+    presets: [
+      { name: 'Clean Echo', params: { delayTime: 0.35, feedback: 0.4, mix: 0.4, toneFreq: 8000, drive: 0 } },
+      { name: 'Vintage Tape', params: { delayTime: 0.3, feedback: 0.5, mix: 0.45, toneFreq: 3000, drive: 0.3, wowDepth: 0.3, flutterDepth: 0.2 } },
+      { name: 'Space Echo', params: { delayTime: 0.45, feedback: 0.7, mix: 0.5, toneFreq: 2500, drive: 0.4, wowDepth: 0.4, flutterDepth: 0.3 } },
+      { name: 'Worn Tape', params: { delayTime: 0.25, feedback: 0.6, mix: 0.5, toneFreq: 2000, drive: 0.6, wowDepth: 0.6, flutterDepth: 0.5 } },
+      { name: 'Dub Delay', params: { delayTime: 0.5, feedback: 0.8, mix: 0.55, toneFreq: 1500, drive: 0.5, wowDepth: 0.2, flutterDepth: 0.1 } },
+    ],
+  },
 ];
 
 EffectRegistry.register(wasmEffects);

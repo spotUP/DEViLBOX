@@ -66,6 +66,7 @@ export type AudioEffectType =
   | 'TapeSimulator'   // Kiss of Shame tape deck emulator (WASM port)
   | 'ToneArm'         // Physics-based vinyl playback simulation (AudioWorklet, 1:1 port)
   | 'Aelapse'         // Ælapse tape delay + spring reverb (WASM, smiarx/aelapse port)
+  | 'TapeDelay'       // RE-201/Echoplex tape delay (AudioWorklet, cyrusasfa port)
   // *Wave / ambient effects
   | 'ShimmerReverb'   // Shimmer reverb with pitch-shifted feedback (WASM)
   | 'GranularFreeze'  // Live-capture granular freeze effect (WASM)
