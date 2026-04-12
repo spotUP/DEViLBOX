@@ -13,6 +13,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# CRITICAL: public/dist causes infinite recursion during vite build
+# (Vite copies public/ → dist/, so public/dist → dist/dist → ...)
+public/dist
 *.local
 
 # Editor directories and files
