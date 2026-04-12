@@ -7,6 +7,7 @@
  */
 
 import type { EffectDescriptor } from './EffectDescriptor';
+import type { EffectPreset } from '@typedefs/instrument';
 
 export class EffectRegistry {
   private static descriptors = new Map<string, EffectDescriptor>();
@@ -120,5 +121,14 @@ export class EffectRegistry {
    */
   static getByCategory(category: string): EffectDescriptor[] {
     return this.getAll().filter(d => d.category === category);
+  }
+
+  /**
+   * Get factory presets for an effect type (does NOT trigger lazy loading).
+   * Returns an empty array if the type is unknown or has no presets.
+   */
+  static getPresets(type: string): EffectPreset[] {
+    const desc = EffectRegistry.get(type);
+    return desc?.presets ?? [];
   }
 }

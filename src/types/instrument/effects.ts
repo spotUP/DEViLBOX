@@ -109,3 +109,9 @@ export interface EffectConfig {
   // the selected channels instead of the full master chain.
   selectedChannels?: number[];
 }
+
+/** Per-effect parameter preset (factory or user-saved) */
+export interface EffectPreset {
+  name: string;
+  params: Record<string, number | string>;
+}
