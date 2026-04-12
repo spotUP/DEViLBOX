@@ -1,0 +1,342 @@
+{
+"osc8": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.86000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.07355 , 0.84167], [ 0.25419 , 0.56250], [ 0.39613 , 0.38750], [ 0.55613 , 0.19167], [ 0.76516 , 0.07917], [ 1.00000 , 0.00000]]
+}
+,
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 7039.38037, 
+"cutoff_env": [[ 0.00000 , 0.00000], [ 0.00903 , 1.00000], [ 0.14323 , 0.82246], [ 0.52645 , 0.25457], [ 1.00000 , 0.00832]], 
+"factor": 10.00000
+}
+}
+,
+"osc7": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.54519, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"freq_env": {
+"amplitude": 4326.45361, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+[ 0.00000 , 0.50000], [ 1.00000 , 0.50000]]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 9091.70898, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc6": {
+"enabled": true, 
+"is_fm": true, 
+"function": 3,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 1.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"freq_env": {
+"amplitude": 1434.94519, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+[ 0.00000 , 0.50000], [ 1.00000 , 0.50000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc5": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.18222, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.20774 , 0.58333], [ 0.51613 , 0.29167], [ 1.00000 , 0.00000]]
+}
+,
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 2731.63916, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc4": {
+"enabled": true, 
+"is_fm": false, 
+"function": 1,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.56000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.99871 , 0.00000]]
+}
+,
+"freq_env": {
+"amplitude": 559.78778, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+[ 0.00000 , 0.50000], [ 1.00000 , 0.50000]]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 6861.56738, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc3": {
+"enabled": true, 
+"is_fm": false, 
+"function": 1,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.37852, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 0.00000]]
+}
+,
+"freq_env": {
+"amplitude": 2118.35571, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+[ 0.00000 , 0.50000], [ 1.00000 , 0.50000]]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 4113.40137, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc2": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 7039.38037, 
+"cutoff_env": [[ 0.00000 , 0.00000], [ 0.01032 , 0.34130], [ 1.00000 , 0.24843]], 
+"factor": 10.00000
+}
+}
+,
+"osc1": {
+"enabled": true, 
+"is_fm": false, 
+"function": 1,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.58963, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.11226 , 0.57500], [ 0.28645 , 0.30833], [ 0.52645 , 0.12917], [ 1.00000 , 0.00000]]
+}
+,
+"freq_env": {
+"amplitude": 302.12112, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+[ 0.00000 , 0.50000], [ 1.00000 , 0.50000]]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 4795.87402, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": false, 
+"function": 1,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.41185, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.19484 , 0.37500], [ 0.38839 , 0.19583], [ 1.00000 , 0.00000]]
+}
+,
+"freq_env": {
+"amplitude": 483.71222, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.00000, 
+"points": [
+[ 0.00000 , 0.50000], [ 1.00000 , 0.50000]]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 3025.99194, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 132097,
+"id": 3,
+"channel": 0,
+"mute": false,
+"solo": false,
+"name": "Crash Cymbal",
+"playing_key": 72,
+"layers": [0, 1, 2],
+"layers_amplitude": [1.00000, 1.00000, 1.00000],
+"limiter": 1.00000, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 0.38148, 
+"length": 2362.77783, 
+"points": [[ 0.00000 , 1.00000], [ 0.02194 , 0.82500], [ 0.05806 , 0.55000], [ 0.12903 , 0.24167], [ 0.29161 , 0.07083], [ 0.56774 , 0.01250], [ 1.00000 , 0.00000]]}, 
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 3089.72, 
+"factor": 3.13, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 0.26194 , 0.21752], [ 0.72387 , 0.08374], [ 1.00000 , 0.03484]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.01000, 
+"release": 0.01000, 
+"threshold": 0.00000, 
+"ratio": 1.00000, 
+"knee": 0.00000, 
+"makeup": 1.00000
+}, 
+"distortion": {
+"enabled": false, 
+"in_limiter": 1.00000, 
+"volume": 0.10000, 
+"drive": 0.00000, 
+"drive_env": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"volume_env": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+}
+}

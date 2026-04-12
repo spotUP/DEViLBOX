@@ -1,0 +1,390 @@
+{
+"osc8": {
+"enabled": false, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.0000000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 150.0000000, 
+"apply_type": 1, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.0000000, 
+"apply_type": 0, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc7": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc6": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc5": {
+"enabled": false, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.0000000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 150.0000000, 
+"apply_type": 1, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.0000000, 
+"apply_type": 0, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc4": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc3": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc2": {
+"enabled": false, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.0000000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 150.0000000, 
+"apply_type": 1, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.0000000, 
+"apply_type": 0, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc1": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.7044444, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.0041667], [ 0.0000000 , 0.3125000], [ 0.1006452 , 1.0000000], [ 0.2787097 , 0.9833333], [ 0.4877419 , 0.6375000], [ 0.8232258 , 0.0000000], [ 1.0000000 , 0.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 0.8041667], [ 0.0438710 , 0.6250000], [ 0.1277419 , 0.2333333], [ 1.0000000 , 0.2416667]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": false, 
+"sample": "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",
+"function": 7,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 0.0941935 , 0.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 23.8222218, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.1250000], [ 1.0000000 , 0.0000000]]
+}
+,
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 556.5119019, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 3.5938137,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 197120,
+"id": 0,
+"channel": 0,
+"mute": false,
+"solo": false,
+"name": "Default",
+"playing_key": -1,
+"layers": [0],
+"layers_amplitude": [1.0000000, 1.0000000, 1.0000000],
+"limiter": 2.4994781, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 0.8000000, 
+"length": 300.0000000, 
+"points": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]}, 
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 200.0000000, 
+"apply_type": 1, 
+"factor": 10.0000000, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]],
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.0100000, 
+"release": 0.0100000, 
+"threshold": 0.0000000, 
+"ratio": 1.0000000, 
+"knee": 0.0000000, 
+"makeup": 1.0000000
+}, 
+"distortion": {
+"enabled": false, 
+"in_limiter": 1.0000000, 
+"volume": 0.1000000, 
+"drive": 1.0000000, 
+"drive_env": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"volume_env": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+}
+}

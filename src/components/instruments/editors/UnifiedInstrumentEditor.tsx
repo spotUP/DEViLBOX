@@ -152,6 +152,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'PinkTrombone') return 'pinktrombone';
   if (synthType === 'DECtalk') return 'dectalk';
   if (isSynareType(synthType)) return 'synare';
+  if (synthType === 'Geonkick') return 'geonkick';
   if (isMAMEChipType(synthType)) return 'mamechip';
   if (isMAMEType(synthType)) return 'mame';
   // MdaEPiano/JX10/DX10 — fall through to 'layout' mode (knobs via DOMSynthPanel)
