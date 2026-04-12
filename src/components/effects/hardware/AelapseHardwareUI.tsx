@@ -315,35 +315,14 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
-          // Position the springs overlay at the SpringsGL region.
-          // Try to read bounds from WASM; if that fails or returns 0,
-          // fall back to known layout percentages from the JUCE grid
-          // (column 5 of 6 fractions, row 1 of 3, in the right 59.5% panel).
-          const jcw = jcanvas.clientWidth;
-          const jch = jcanvas.clientHeight;
-          if (!springsBoundsRef.current && jcw > 0 && jch > 0) {
-            let sprX = modRef._aelapse_ui_get_springs_x();
-            let sprY = modRef._aelapse_ui_get_springs_y();
-            let sprW = modRef._aelapse_ui_get_springs_w();
-            let sprH = modRef._aelapse_ui_get_springs_h();
-
-            // Fallback: if WASM returns 0 or implausible values, use
-            // hardcoded percentages derived from the JUCE layout analysis.
-            // SpringsGL is in the right ~20% of width, top ~45% of height.
-            if (sprW <= 10 || sprH <= 10 || sprW >= w || sprH >= h) {
-              sprX = Math.round(w * 0.79);
-              sprY = Math.round(h * 0.02);
-              sprW = Math.round(w * 0.19);
-              sprH = Math.round(h * 0.43);
-            }
-
-            springsBoundsRef.current = { x: sprX, y: sprY, w: sprW, h: sprH };
-            const sx = jcw / w;
-            const sy = jch / h;
-            overlay.style.left   = `${Math.round(sprX * sx)}px`;
-            overlay.style.top    = `${Math.round(sprY * sy)}px`;
-            overlay.style.width  = `${Math.round(sprW * sx)}px`;
-            overlay.style.height = `${Math.round(sprH * sy)}px`;
+          // Position springs overlay. Use percentage-based CSS so it
+          // works regardless of container scaling. The springs panel is
+          // the right ~20% width, top ~50% height of the 720×400 editor.
+          if (overlay.style.display === 'none') {
+            overlay.style.left   = '79%';
+            overlay.style.top    = '0%';
+            overlay.style.width  = '20%';
+            overlay.style.height = '48%';
             overlay.style.display = 'block';
           }
 
