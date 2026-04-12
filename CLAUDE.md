@@ -1,5 +1,24 @@
 # DEViLBOX Project Memory
 
+## CRITICAL: Deployment — Hetzner (NOT GitHub Pages)
+
+**!!! NEVER USE `gh-pages` OR `npx gh-pages -d dist` !!!**
+
+DEViLBOX is hosted on **Hetzner** at `devilbox.uprough.net`.
+
+**Deploy is fully automatic:**
+1. `git push origin main` — triggers GitHub Actions (`.github/workflows/deploy.yml`)
+2. CI builds, creates a GitHub Release with `devilbox-dist.tar.gz`
+3. Webhook triggers the Hetzner server to pull and deploy
+
+**To deploy:** just push to main. That's it. CI handles building + deploying.
+
+**If CI build fails:** fix the code issue (type errors, missing files, etc.) and push again.
+
+**Server setup docs:** `scripts/server-setup.sh`
+
+---
+
 ## CRITICAL: Always Fix the Root Cause
 
 **!!! NO WORKAROUNDS — FIX THE ACTUAL BUG !!!**
