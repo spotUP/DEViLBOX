@@ -113,6 +113,9 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
   // Zero-initialised RMS buffer used when no snapshot source is wired up yet.
   const fallbackRMSRef = useRef(new Float32Array(256));
 
+  // Cached springs overlay bounds (set once from WASM, never changes).
+  const springsBoundsRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+
   const [loaded, setLoaded] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
 
@@ -294,15 +297,20 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
           // Position the springs overlay exactly on top of the stubbed
-          // SpringsGL component inside the JUCE editor.
-          const sprX = modRef._aelapse_ui_get_springs_x();
-          const sprY = modRef._aelapse_ui_get_springs_y();
-          const sprW = modRef._aelapse_ui_get_springs_w();
-          const sprH = modRef._aelapse_ui_get_springs_h();
-
-          if (sprW > 0 && sprH > 0) {
-            // Convert framebuffer pixels to CSS pixels (match the JUCE
-            // canvas's CSS scaling so they stay 1:1).
+          // SpringsGL component inside the JUCE editor. Cache the bounds
+          // after the first successful read — they're set once in
+          // SpringsSection::resized() and never change at runtime.
+          if (!springsBoundsRef.current) {
+            const sprX = modRef._aelapse_ui_get_springs_x();
+            const sprY = modRef._aelapse_ui_get_springs_y();
+            const sprW = modRef._aelapse_ui_get_springs_w();
+            const sprH = modRef._aelapse_ui_get_springs_h();
+            if (sprW > 0 && sprH > 0) {
+              springsBoundsRef.current = { x: sprX, y: sprY, w: sprW, h: sprH };
+            }
+          }
+          if (springsBoundsRef.current) {
+            const { x: sprX, y: sprY, w: sprW, h: sprH } = springsBoundsRef.current;
             const cssScale = jcanvas.clientWidth / w;
             overlay.style.left   = `${Math.round(sprX * cssScale)}px`;
             overlay.style.top    = `${Math.round(sprY * cssScale)}px`;
