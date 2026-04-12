@@ -20,6 +20,9 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
     this.instInfoPtr = 0;
     this.processCount = 0;
 
+    // Per-channel isolation (4 slots, matching Hively/Furnace pattern)
+    this.isolationSlots = [null, null, null, null]; // { channelMask }
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -73,6 +76,21 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
       case 'setInterpMode':
         if (this.module && typeof this.module._player_set_interp_mode === 'function') {
           this.module._player_set_interp_mode(data.mode);
+        }
+        break;
+
+      case 'addIsolation': {
+        const { slotIndex, channelMask } = data;
+        if (slotIndex >= 0 && slotIndex < 4) {
+          this.isolationSlots[slotIndex] = { channelMask };
+          this.port.postMessage({ type: 'isolationReady', slotIndex, channelMask });
+        }
+        break;
+      }
+
+      case 'removeIsolation':
+        if (data.slotIndex >= 0 && data.slotIndex < 4) {
+          this.isolationSlots[data.slotIndex] = null;
         }
         break;
 
@@ -569,9 +587,75 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
       if (this.interleavedBuf) {
         const rendered = this.module._player_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
-          for (let i = 0; i < rendered; i++) {
-            outputL[i] = this.interleavedBuf[i * 2];
-            outputR[i] = this.interleavedBuf[i * 2 + 1];
+          const hasIsolation = this.isolationSlots.some(s => s !== null);
+
+          if (!hasIsolation) {
+            // Fast path: no isolation, just deinterleave
+            for (let i = 0; i < rendered; i++) {
+              outputL[i] = this.interleavedBuf[i * 2];
+              outputR[i] = this.interleavedBuf[i * 2 + 1];
+            }
+          } else {
+            // Isolation path: build isolated channel mask, mute those in main
+            let isolatedBits = 0;
+            for (let s = 0; s < 4; s++) {
+              if (this.isolationSlots[s]) isolatedBits |= this.isolationSlots[s].channelMask;
+            }
+
+            // Get scope buffers (per-channel mono audio from WASM)
+            const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+            const scopePtrs = [];
+            if (heapF32 && typeof this.module._player_get_scope_buffer === 'function') {
+              for (let ch = 0; ch < 4; ch++) {
+                const ptr = this.module._player_get_scope_buffer(ch);
+                scopePtrs.push(ptr ? (ptr >> 2) : -1);
+              }
+            }
+
+            // Main output: stereo mix minus isolated channels
+            // Reconstruct by subtracting isolated channel contributions from the mix
+            // Since scope buffers are mono per-channel, we pan them L/R (Amiga LRRL)
+            const PAN = [1.0, 0.0, 0.0, 1.0]; // 0=left, 1=right (Amiga LRRL)
+            for (let i = 0; i < rendered; i++) {
+              let mainL = this.interleavedBuf[i * 2];
+              let mainR = this.interleavedBuf[i * 2 + 1];
+              // Subtract isolated channels from main mix
+              for (let ch = 0; ch < 4; ch++) {
+                if ((isolatedBits & (1 << ch)) && scopePtrs[ch] >= 0) {
+                  const sample = heapF32[scopePtrs[ch] + i];
+                  const pan = PAN[ch];
+                  mainL -= sample * (1.0 - pan);
+                  mainR -= sample * pan;
+                }
+              }
+              outputL[i] = mainL;
+              outputR[i] = mainR;
+            }
+
+            // Write isolation slot outputs
+            for (let s = 0; s < 4; s++) {
+              const slot = this.isolationSlots[s];
+              if (!slot) continue;
+              const isoOut = outputs[1 + s];
+              if (!isoOut || isoOut.length < 2) continue;
+              const isoL = isoOut[0];
+              const isoR = isoOut[1];
+              if (!isoL || !isoR) continue;
+
+              for (let i = 0; i < rendered; i++) {
+                let sL = 0, sR = 0;
+                for (let ch = 0; ch < 4; ch++) {
+                  if ((slot.channelMask & (1 << ch)) && scopePtrs[ch] >= 0) {
+                    const sample = heapF32[scopePtrs[ch] + i];
+                    const pan = PAN[ch];
+                    sL += sample * (1.0 - pan);
+                    sR += sample * pan;
+                  }
+                }
+                isoL[i] = sL;
+                isoR[i] = sR;
+              }
+            }
           }
         }
       }
