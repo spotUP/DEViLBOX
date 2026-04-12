@@ -322,14 +322,14 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           const cw = jcanvas.clientWidth;
           const ch = jcanvas.clientHeight;
           if (cw > 0 && ch > 0) {
-            // Computed from JUCE layout source:
-            // Editor 720×400, kMargin=8, springs flex=1/(0.68+1)=59.5%
-            // Grid col5 = Fr(2)/Fr(6), row1 extended by kHeaderHeight=30
-            // → x=582 y=68 w=123 h=116 in editor pixels
-            overlay.style.left   = `${Math.round(cw * (582 / 720))}px`;
-            overlay.style.top    = `${Math.round(ch * (68 / 400))}px`;
-            overlay.style.width  = `${Math.round(cw * (123 / 720))}px`;
-            overlay.style.height = `${Math.round(ch * (116 / 400))}px`;
+            // SpringsGL column: x=582, full section height from header to bottom.
+            // The shader has transparent background so JUCE knobs show
+            // through the gaps between coils. pointer-events: none means
+            // clicks pass through to the JUCE canvas underneath.
+            overlay.style.left   = `${Math.round(cw * (575 / 720))}px`;
+            overlay.style.top    = `${Math.round(ch * (52 / 400))}px`;
+            overlay.style.width  = `${Math.round(cw * (140 / 720))}px`;
+            overlay.style.height = `${Math.round(ch * (340 / 400))}px`;
             if (overlay.style.display === 'none') overlay.style.display = 'block';
           }
 
