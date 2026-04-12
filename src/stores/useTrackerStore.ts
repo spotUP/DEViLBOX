@@ -20,8 +20,26 @@ import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompati
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { useHistoryStore } from './useHistoryStore';
-import { useCursorStore } from './useCursorStore';
-import { useEditorStore } from './useEditorStore';
+// Late-bound access to the sibling stores that used to form an import cycle
+// with this file. storeAccess is a leaf — it imports nothing — so the three
+// stores no longer participate in the same module-graph cycle that caused
+// Rollup to emit TDZ'd bindings in the production bundle. Type-only imports
+// are erased at compile time and do not create a runtime cycle.
+import type { useCursorStore as _CursorStoreType } from './useCursorStore';
+import type { useEditorStore as _EditorStoreType } from './useEditorStore';
+import {
+  getCursorStoreRef,
+  getEditorStoreRef,
+  registerTrackerStore,
+} from './storeAccess';
+const useCursorStore = {
+  get getState() { return getCursorStoreRef().getState as typeof _CursorStoreType.getState; },
+  get setState() { return getCursorStoreRef().setState as typeof _CursorStoreType.setState; },
+};
+const useEditorStore = {
+  get getState() { return getEditorStoreRef().getState as typeof _EditorStoreType.getState; },
+  get setState() { return getEditorStoreRef().setState as typeof _EditorStoreType.setState; },
+};
 import { useFormatStore } from './useFormatStore';
 import { useMixerStore } from './useMixerStore';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
@@ -1938,6 +1956,11 @@ export const useTrackerStore = create<TrackerStore>()(
     },
   }))
 );
+
+// Register with the cross-store access leaf so useCursorStore (and anyone
+// else caught in the old cycle) can reach this store without a static
+// import cycle at module-init time.
+registerTrackerStore(useTrackerStore);
 
 // Export mask constants for use in other modules. Re-export from the leaf
 // editorMasks module — NOT from useEditorStore — to avoid a circular-import

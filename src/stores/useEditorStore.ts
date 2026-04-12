@@ -10,7 +10,14 @@ import { immer } from 'zustand/middleware/immer';
 import type { ColumnVisibility } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY } from '@typedefs';
 import { MAX_CHANNELS } from '../constants/trackerConstants';
-import { useCursorStore } from './useCursorStore';
+// Late-bound cursor store access (see storeAccess.ts for why). Type-only
+// import of the real store type is erased at compile time, so no cycle.
+import type { useCursorStore as _CursorStoreType } from './useCursorStore';
+import { getCursorStoreRef, registerEditorStore } from './storeAccess';
+const useCursorStore = {
+  get getState() { return getCursorStoreRef().getState as typeof _CursorStoreType.getState; },
+  get setState() { return getCursorStoreRef().setState as typeof _CursorStoreType.setState; },
+};
 import { getBehaviorForScheme, DEFAULT_BEHAVIOR, type EditorBehavior } from '../engine/keyboard/EditorBehavior';
 // FT2-style copy/paste/transpose bitmasks. Live in a leaf module so
 // useTrackerStore can re-export them without dragging the whole editor
@@ -395,6 +402,10 @@ export const useEditorStore = create<EditorStore>()(
       }),
   }))
 );
+
+// Register with the cross-store access leaf so useCursorStore can reach us
+// without a static import cycle.
+registerEditorStore(useEditorStore);
 
 // Re-export mask constants for use in other modules
 export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL };
