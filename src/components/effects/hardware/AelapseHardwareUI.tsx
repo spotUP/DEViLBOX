@@ -378,6 +378,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
         // framebuffer blit is 720×400×4 = 1.15 MB/frame of byte-swapping;
         // at 60fps it causes jerky knob interaction.
         let lastFrameTime = 0;
+        let pollCounter = 0;
         const FRAME_INTERVAL = 1000 / 30;
         const renderLoop = (nowMs: number) => {
           if (cancelled) return;
@@ -390,13 +391,16 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           modRef._aelapse_ui_tick();
 
-          // Poll JUCE params for changes (catches preset loads that
-          // don't fire parameterValueChanged individually).
-          for (let i = 0; i < paramCount; i++) {
-            const cur = modRef._aelapse_ui_get_param(i);
-            if (cur !== prevParams[i]) {
-              prevParams[i] = cur;
-              onUpdateParameterRef.current?.(i, cur);
+          // Poll JUCE params for preset-load detection — only every
+          // 10th frame (~3Hz) to avoid flooding the store.
+          pollCounter = (pollCounter + 1) % 10;
+          if (pollCounter === 0) {
+            for (let i = 0; i < paramCount; i++) {
+              const cur = modRef._aelapse_ui_get_param(i);
+              if (Math.abs(cur - prevParams[i]) > 0.001) {
+                prevParams[i] = cur;
+                onUpdateParameterRef.current?.(i, cur);
+              }
             }
           }
 
