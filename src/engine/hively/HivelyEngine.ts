@@ -6,6 +6,8 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
+import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 
 export interface HivelyTuneInfo {
   name: string;
@@ -28,7 +30,9 @@ export interface HivelyPositionUpdate {
 
 type PositionCallback = (update: HivelyPositionUpdate) => void;
 
-export class HivelyEngine {
+export class HivelyEngine implements IsolationCapableEngine {
+  private static readonly MAX_ISOLATION_SLOTS = 4;
+  private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: HivelyEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
   private static jsCode: string | null = null;
@@ -145,8 +149,8 @@ export class HivelyEngine {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'hively-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
+      outputChannelCount: [2, 2, 2, 2, 2],
+      numberOfOutputs: 1 + HivelyEngine.MAX_ISOLATION_SLOTS,
     });
 
     this.workletNode.port.onmessage = (event) => {
@@ -343,8 +347,46 @@ export class HivelyEngine {
     });
   }
 
+  // ========== IsolationCapableEngine interface ==========
+
+  isAvailable(): boolean {
+    return this.workletNode !== null && !this._disposed;
+  }
+
+  getWorkletNode(): AudioWorkletNode | null {
+    return this.workletNode;
+  }
+
+  getAudioContext(): AudioContext | null {
+    try {
+      return (getDevilboxAudioContext() as any)?.rawContext ?? null;
+    } catch { return null; }
+  }
+
+  addIsolation(slotIndex: number, channelMask: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= HivelyEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = channelMask;
+    this.workletNode.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
+    console.log(`[HivelyEngine] addIsolation: slot=${slotIndex}, mask=0x${channelMask.toString(16)}`);
+  }
+
+  removeIsolation(slotIndex: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= HivelyEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = null;
+    this.workletNode.port.postMessage({ type: 'removeIsolation', slotIndex });
+  }
+
+  diagIsolation(): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'diagIsolation' });
+  }
+
   dispose(): void {
     this._disposed = true;
+    for (let i = 0; i < HivelyEngine.MAX_ISOLATION_SLOTS; i++) {
+      if (this._isolationSlotMasks[i] !== null) this.removeIsolation(i);
+    }
+    this._isolationSlotMasks.fill(null);
     this.workletNode?.port.postMessage({ type: 'dispose' });
     this.workletNode?.disconnect();
     this.workletNode = null;
@@ -355,3 +397,12 @@ export class HivelyEngine {
     }
   }
 }
+
+// Register with the per-channel isolation system
+registerIsolationEngineResolver(async () => {
+  if (HivelyEngine.hasInstance()) {
+    const engine = HivelyEngine.getInstance();
+    if (engine.isAvailable()) return engine;
+  }
+  return null;
+});

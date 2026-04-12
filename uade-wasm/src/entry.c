@@ -723,6 +723,19 @@ void uade_wasm_mute_channels(uint8_t channel_mask) {
     uade_wasm_channel_mute_mask = channel_mask;
 }
 
+/*
+ * Read per-channel Paula output captured during the last uade_wasm_render() call.
+ * Each channel's audio is written to separate float32 buffers (mono, not stereo).
+ * Returns number of frames available (same as last render call).
+ * Note: Paula channels 0+3 = left, 1+2 = right in the stereo mix.
+ */
+extern int uade_audio_read_channel_samples(float *ch0, float *ch1, float *ch2, float *ch3, int max_frames);
+
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_read_channel_samples(float *ch0, float *ch1, float *ch2, float *ch3, int max_frames) {
+    return uade_audio_read_channel_samples(ch0, ch1, ch2, ch3, max_frames);
+}
+
 EMSCRIPTEN_KEEPALIVE
 void uade_wasm_cleanup(void) {
     if (s_state) {

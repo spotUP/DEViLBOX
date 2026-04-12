@@ -13,6 +13,8 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
+import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 
@@ -111,7 +113,9 @@ export interface UADEChannelData {
 type PositionCallback = (update: UADEPositionUpdate) => void;
 type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => void;
 
-export class UADEEngine {
+export class UADEEngine implements IsolationCapableEngine {
+  private static readonly MAX_ISOLATION_SLOTS = 4;
+  private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: UADEEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
   private static jsCode: string | null = null;
@@ -280,8 +284,8 @@ export class UADEEngine {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'uade-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
+      outputChannelCount: [2, 2, 2, 2, 2],
+      numberOfOutputs: 1 + UADEEngine.MAX_ISOLATION_SLOTS,
     });
 
     this.workletNode.port.onmessage = (event) => {
@@ -1167,8 +1171,46 @@ export class UADEEngine {
     return promise;
   }
 
+  // ========== IsolationCapableEngine interface ==========
+
+  isAvailable(): boolean {
+    return this.workletNode !== null && !this._disposed;
+  }
+
+  getWorkletNode(): AudioWorkletNode | null {
+    return this.workletNode;
+  }
+
+  getAudioContext(): AudioContext | null {
+    try {
+      return (getDevilboxAudioContext() as any)?.rawContext ?? null;
+    } catch { return null; }
+  }
+
+  addIsolation(slotIndex: number, channelMask: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= UADEEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = channelMask;
+    this.workletNode.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
+    console.log(`[UADEEngine] addIsolation: slot=${slotIndex}, mask=0x${channelMask.toString(16)}`);
+  }
+
+  removeIsolation(slotIndex: number): void {
+    if (!this.workletNode || slotIndex < 0 || slotIndex >= UADEEngine.MAX_ISOLATION_SLOTS) return;
+    this._isolationSlotMasks[slotIndex] = null;
+    this.workletNode.port.postMessage({ type: 'removeIsolation', slotIndex });
+  }
+
+  diagIsolation(): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'diagIsolation' });
+  }
+
   dispose(): void {
     this._disposed = true;
+    for (let i = 0; i < UADEEngine.MAX_ISOLATION_SLOTS; i++) {
+      if (this._isolationSlotMasks[i] !== null) this.removeIsolation(i);
+    }
+    this._isolationSlotMasks.fill(null);
     this.workletNode?.port.postMessage({ type: 'dispose' });
     this.workletNode?.disconnect();
     this.workletNode = null;
@@ -1180,3 +1222,12 @@ export class UADEEngine {
     }
   }
 }
+
+// Register with the per-channel isolation system
+registerIsolationEngineResolver(async () => {
+  if (UADEEngine.hasInstance()) {
+    const engine = UADEEngine.getInstance();
+    if (engine.isAvailable()) return engine;
+  }
+  return null;
+});

@@ -420,6 +420,29 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      // --- Per-channel effect isolation ---
+      case 'addIsolation': {
+        const { slotIndex, channelMask } = data;
+        if (slotIndex >= 0 && slotIndex < 4) {
+          this._isolationSlots[slotIndex] = { channelMask };
+          this.port.postMessage({ type: 'isolationReady', slotIndex, channelMask });
+        }
+        break;
+      }
+      case 'removeIsolation': {
+        if (data.slotIndex >= 0 && data.slotIndex < 4) {
+          this._isolationSlots[data.slotIndex] = null;
+        }
+        break;
+      }
+      case 'diagIsolation': {
+        const activeSlots = this._isolationSlots
+          .map((s, i) => s ? { slot: i, mask: '0x' + s.channelMask.toString(16) } : null)
+          .filter(Boolean);
+        this.port.postMessage({ type: 'diagIsolation', slots: activeSlots });
+        break;
+      }
+
       case 'enableLiveTickCapture': {
         const { enable } = data;
         this._liveTickCapture = !!enable;
@@ -589,6 +612,15 @@ class UADEProcessor extends AudioWorkletProcessor {
       const frameBytes = this._outFrames * 4;  // float32
       this._ptrL = this._wasm._malloc(frameBytes);
       this._ptrR = this._wasm._malloc(frameBytes);
+
+      // Per-channel isolation buffers (4 Paula channels)
+      this._chPtrs = [
+        this._wasm._malloc(frameBytes),
+        this._wasm._malloc(frameBytes),
+        this._wasm._malloc(frameBytes),
+        this._wasm._malloc(frameBytes),
+      ];
+      this._isolationSlots = [null, null, null, null];
 
       // Initialize UADE engine
       const ret = this._wasm._uade_wasm_init(sampleRate || 44100);
@@ -1994,6 +2026,39 @@ class UADEProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < frames; i++) {
         outL[i] = heapF32[baseL + i];
         if (outR !== outL) outR[i] = heapF32[baseR + i];
+      }
+
+      // --- Per-channel isolation outputs ---
+      const hasIsolation = this._isolationSlots && this._isolationSlots.some(s => s !== null);
+      if (hasIsolation && this._wasm._uade_wasm_read_channel_samples && this._chPtrs) {
+        // Read per-channel audio captured during the render pass
+        const chFrames = this._wasm._uade_wasm_read_channel_samples(
+          this._chPtrs[0], this._chPtrs[1], this._chPtrs[2], this._chPtrs[3], frames
+        );
+        if (chFrames > 0) {
+          const chBases = this._chPtrs.map(p => p >> 2);
+          for (let s = 0; s < 4; s++) {
+            const slot = this._isolationSlots[s];
+            if (!slot) continue;
+            const slotOut = outputs[s + 1];
+            if (!slotOut || slotOut.length === 0) continue;
+            const sL = slotOut[0];
+            const sR = slotOut[1] || slotOut[0];
+            sL.fill(0);
+            sR.fill(0);
+            // Mix channels in this slot's mask to stereo using Amiga panning
+            // Paula: ch0+ch3 = left, ch1+ch2 = right
+            for (let ch = 0; ch < 4; ch++) {
+              if (!(slot.channelMask & (1 << ch))) continue;
+              const isLeft = (ch === 0 || ch === 3);
+              const chBase = chBases[ch];
+              for (let i = 0; i < chFrames; i++) {
+                const sample = heapF32[chBase + i];
+                if (isLeft) sL[i] += sample; else sR[i] += sample;
+              }
+            }
+          }
+        }
       }
 
       // Read Paula channel state for live pattern display (~20Hz)

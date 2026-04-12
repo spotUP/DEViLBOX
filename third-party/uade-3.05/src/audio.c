@@ -26,6 +26,7 @@
 #include <uade/compilersupport.h>
 
 #include "sinctable.h"
+#include <stdint.h>
 
 #include "text_scope.h"
 
@@ -40,6 +41,25 @@ static void (*sample_prehandler) (unsigned long best_evtime);
 /* Per-channel mute mask: bits 0-3 = channels 0-3; 1=active, 0=muted.
  * Default 0x0F = all channels active. Set from entry.c via uade_wasm_mute_channels(). */
 extern unsigned char uade_wasm_channel_mute_mask;
+
+/* Per-channel isolation buffers: capture each Paula channel's output separately.
+ * Written by the three sample handlers alongside the stereo mix.
+ * Read by uade_wasm_get_channel_samples() after each render pass. */
+#define UADE_CH_BUF_SIZE 8192
+static int16_t uade_ch_buf[4][UADE_CH_BUF_SIZE];
+static int uade_ch_buf_pos = 0;
+static int uade_ch_buf_frames = 0; /* frames written since last read */
+
+static inline void write_channel_samples(int ch0, int ch1, int ch2, int ch3) {
+    if (uade_ch_buf_pos < UADE_CH_BUF_SIZE) {
+        uade_ch_buf[0][uade_ch_buf_pos] = (int16_t)(ch0 < -32768 ? -32768 : (ch0 > 32767 ? 32767 : ch0));
+        uade_ch_buf[1][uade_ch_buf_pos] = (int16_t)(ch1 < -32768 ? -32768 : (ch1 > 32767 ? 32767 : ch1));
+        uade_ch_buf[2][uade_ch_buf_pos] = (int16_t)(ch2 < -32768 ? -32768 : (ch2 > 32767 ? 32767 : ch2));
+        uade_ch_buf[3][uade_ch_buf_pos] = (int16_t)(ch3 < -32768 ? -32768 : (ch3 > 32767 ? 32767 : ch3));
+        uade_ch_buf_pos++;
+        uade_ch_buf_frames++;
+    }
+}
 
 /* Average time in bus cycles to output a new sample */
 static float sample_evtime_interval;
@@ -249,6 +269,7 @@ static void sample16s_handler (void)
 	if (!(uade_wasm_channel_mute_mask & (1 << i))) output[i] = 0;
     }
 
+    write_channel_samples(output[0], output[1], output[2], output[3]);
     sample_backend(output[0] + output[3], output[1] + output[2]);
 }
 
@@ -270,6 +291,7 @@ static void sample16si_anti_handler (void)
 	if (!(uade_wasm_channel_mute_mask & (1 << i))) output[i] = 0;
     }
 
+    write_channel_samples(output[0], output[1], output[2], output[3]);
     sample_backend(output[0] + output[3], output[1] + output[2]);
 }
 
@@ -307,6 +329,8 @@ static void sample16si_sinc_handler (void)
         output[i] = sum >> 16;
 	if (!(uade_wasm_channel_mute_mask & (1 << i))) output[i] = 0;
     }
+
+    write_channel_samples(output[0], output[1], output[2], output[3]);
 
     const int left = clamp_sample(output[0] + output[3]);
     const int right = clamp_sample(output[1] + output[2]);
@@ -794,4 +818,24 @@ void AUDxVOL (int nr, uae_u16 v)
     update_audio ();
 
     audio_channel[nr].vol = v2;
+}
+
+/* ---- Per-channel isolation buffer accessors ---- */
+
+/* Read captured per-channel samples as float32. Returns frames available.
+ * Called from entry.c after uade_wasm_render() to get per-channel audio. */
+int uade_audio_read_channel_samples(float *ch0, float *ch1, float *ch2, float *ch3, int max_frames) {
+    int frames = uade_ch_buf_frames;
+    if (frames > max_frames) frames = max_frames;
+    const float scale = 1.0f / 32768.0f;
+    for (int i = 0; i < frames; i++) {
+        ch0[i] = (float)uade_ch_buf[0][i] * scale;
+        ch1[i] = (float)uade_ch_buf[1][i] * scale;
+        ch2[i] = (float)uade_ch_buf[2][i] * scale;
+        ch3[i] = (float)uade_ch_buf[3][i] * scale;
+    }
+    /* Reset buffer for next render pass */
+    uade_ch_buf_pos = 0;
+    uade_ch_buf_frames = 0;
+    return frames;
 }
