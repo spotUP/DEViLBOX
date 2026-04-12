@@ -168,11 +168,11 @@ vec3 getColor(vec3 p, float x) {
 }
 
 void main() {
-    // Runtime constants depend on uniforms — set them once per fragment.
     springCoils = springCoilsMin + u_coils * (springCoilsMax - springCoilsMin);
     coilRadius  = coilRadiusMin + u_radius * (coilRadiusMax - coilRadiusMin);
 
-    vec3 color = vec3(0.0);
+    vec3  color = vec3(0.0);
+    float alpha = 0.0;
 
     for (int aax = 0; aax < u_aasubpixels; ++aax) {
         for (int aay = 0; aay < u_aasubpixels; ++aay) {
@@ -192,10 +192,14 @@ void main() {
                 if (delta < 0.001) {
                     p = ro + dist * rd;
                     color += getColor(p, xpos);
+                    alpha += 1.0;
                     break;
                 }
                 if (dist > 6.0) {
-                    vec3 backgroundColor = BACKGROUND_COLOR;
+                    // Background — transparent so the JUCE framebuffer
+                    // underneath shows through. The shadow/shading is
+                    // drawn as semi-transparent darkening instead of an
+                    // opaque background fill.
                     float shade     = 0.02 + u_radius * 0.10 + u_coils * 0.14;
                     float shadeSize = 1.70;
                     float shadeY    = st.y * shadeSize;
@@ -204,39 +208,21 @@ void main() {
                         shadeY = (fract(shadeY) - 0.5) / shadeSize;
                         shadeY = abs(shadeY);
                     }
-                    backgroundColor *=
-                        (1.0 - shade) +
-                        shade * min(1.0, pow(shadeY * 5.9,
-                                             1.5 + 0.5 * (u_coils + u_radius)));
-                    color += backgroundColor;
+                    float shadowAlpha = shade *
+                        (1.0 - min(1.0, pow(shadeY * 5.9,
+                                            1.5 + 0.5 * (u_coils + u_radius))));
+                    alpha += shadowAlpha * 0.4;
                     break;
                 }
             }
         }
     }
-    color /= float(u_aasubpixels) * float(u_aasubpixels);
 
-    float cornerSize = 0.3;
+    float aa2 = float(u_aasubpixels) * float(u_aasubpixels);
+    color /= max(1.0, aa2);
+    alpha /= aa2;
 
-    vec2 st = (2.0 * gl_FragCoord.xy - u_resolution) / u_resolution.xy;
-    color *= pow(1.0 - 0.6 * max(0.0, roundedBox(st + vec2(0.035), vec2(0.85),
-                                                 cornerSize)), 3.0);
-
-    vec3 backgroundColor = BACKGROUND_COLOR;
-    float xyratio        = u_resolution.x / u_resolution.y;
-    st.x *= xyratio;
-    float box = roundedBox(st, vec2(xyratio, 1.0), cornerSize);
-
-    float border      = smoothstep(-0.03, -0.01, box);
-    float borderShade = 0.6;
-    vec3  borderColor = backgroundColor *
-        ((1.0 - borderShade) + borderShade * (2.0 - st.x - st.y) * 0.5);
-    color = mix(color, borderColor, border);
-
-    float background = smoothstep(0.0, 0.02, box);
-    color            = mix(color, backgroundColor, background);
-
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(color, alpha);
 }
 `;
 
@@ -347,6 +333,9 @@ export class AelapseSpringsRenderer {
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.useProgram(this.program);
 
