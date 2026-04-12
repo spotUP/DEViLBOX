@@ -1822,8 +1822,15 @@ export async function tryRouteFormat(
 
   // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
   if (matchesExt(filename, ['core'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['core']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const coreCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['core']) };
+    const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
+    return withNativeThenUADE('coreDesign', coreCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isCoreDesignFormat(ab)) return parseCoreDesignFile(ab, name);
+        return null;
+      },
+      'CoreDesignParser', { injectUADE: true });
   }
 
   // ── Janko Mrsic-Flogel (JMF.* prefix) ────────────────────────────────────

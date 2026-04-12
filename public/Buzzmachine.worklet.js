@@ -240,10 +240,10 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
 
       this.isInitialized = true;
       
-      // Pre-cache views for WASM memory
+      // Pre-cache views for WASM memory (stereo interleaved: bufferSize * 2 floats)
       const wasmMemory = this.getWasmMemory();
       if (wasmMemory) {
-        this.wasmAudioView = new Float32Array(wasmMemory, this.audioBufferPtr, this.bufferSize);
+        this.wasmAudioView = new Float32Array(wasmMemory, this.audioBufferPtr, this.bufferSize * 2);
       }
 
       this.port.postMessage({ type: 'initialized' });
@@ -1262,7 +1262,7 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
 
       // Check if memory grew
       if (this.wasmAudioView.buffer !== wasmMemory) {
-        this.wasmAudioView = new Float32Array(wasmMemory, this.audioBufferPtr, this.bufferSize);
+        this.wasmAudioView = new Float32Array(wasmMemory, this.audioBufferPtr, this.bufferSize * 2);
       }
 
       // Copy input to WASM buffer if present
