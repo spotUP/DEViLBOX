@@ -682,3 +682,32 @@ export interface SF2Config {
   /** Optional column labels from the driver's table descriptor */
   columnLabels?: string[];
 }
+
+/**
+ * Ron Klaren Sound Module instrument configuration.
+ * Parameters extracted from the 32-byte instrument header in the Amiga HUNK binary.
+ */
+export interface RonKlarenConfig {
+  /** true = sample-based, false = synthesis */
+  isSample: boolean;
+  /** Oscillator phase speed (0-255) */
+  phaseSpeed: number;
+  /** Wavetable length in words */
+  phaseLengthInWords: number;
+  /** LFO/vibrato speed (0-255) */
+  vibratoSpeed: number;
+  /** LFO/vibrato depth (0-255) */
+  vibratoDepth: number;
+  /** Ticks before vibrato starts (0-255) */
+  vibratoDelay: number;
+  /** 4-point envelope: each entry has point (target level) and increment (rate) */
+  adsr: Array<{ point: number; increment: number }>;
+  /** Signed phase value (-128..127) */
+  phaseValue: number;
+  /** Phase direction: true = reverse */
+  phaseDirection: boolean;
+  /** Phase position within waveform (0-255) */
+  phasePosition: number;
+  /** Optional: waveform PCM data for display (signed 8-bit) */
+  waveformData?: number[];
+}

@@ -69,6 +69,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { RonKlarenConfig } from '@/types/instrument/exotic';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeRonKlarenCell } from '@/engine/uade/encoders/RonKlarenEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
@@ -623,6 +624,26 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     instr.sampleNumber = sampleOffsetToIndex.get(soff) ?? -1;
   }
 
+  // ── Helper: build RonKlarenConfig from parsed instrument ────────────
+  function buildRonKlarenConfig(instr: RkInstrument, pcm: Int8Array | undefined): RonKlarenConfig {
+    const cfg: RonKlarenConfig = {
+      isSample: instr.isSample,
+      phaseSpeed: instr.phaseSpeed,
+      phaseLengthInWords: instr.phaseLengthInWords,
+      vibratoSpeed: instr.vibratoSpeed,
+      vibratoDepth: instr.vibratoDepth,
+      vibratoDelay: instr.vibratoDelay,
+      adsr: instr.adsr.map(e => ({ point: e.point, increment: e.increment })),
+      phaseValue: instr.phaseValue,
+      phaseDirection: instr.phaseDirection,
+      phasePosition: instr.phasePosition,
+    };
+    if (pcm && pcm.length > 0) {
+      cfg.waveformData = Array.from(pcm);
+    }
+    return cfg;
+  }
+
   // ── Build InstrumentConfig[] ───────────────────────────────────────────
   const instrumentConfigs: InstrumentConfig[] = [];
 
@@ -632,11 +653,13 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     const id = i + 1;
 
     if (instr.sampleNumber < 0 || instr.sampleNumber >= loadedSamples.length) {
+      const rkConfig = buildRonKlarenConfig(instr, undefined);
       instrumentConfigs.push({
         id,
         name: `Instrument ${i + 1}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'RonKlarenSynth' as const,
+        ronKlaren: rkConfig,
         effects: [],
         volume: 0,
         pan: 0,
@@ -654,15 +677,20 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const loopStart = instr.isSample ? 0 : 0;
       const loopEnd = (!instr.isSample && pcmBytes.length > 0) ? pcmBytes.length : 0;
 
-      instrumentConfigs.push(
-        createSamplerInstrument(id, `Sample ${i + 1}`, pcmBytes, 64, sampleRate, loopStart, loopEnd)
-      );
+      const samplerInstr = createSamplerInstrument(id, instr.isSample ? `Sample ${i + 1}` : `Synth ${i + 1}`, pcmBytes, 64, sampleRate, loopStart, loopEnd);
+      // Attach RonKlaren config to all instruments (sample or synthesis)
+      const rkConfig = buildRonKlarenConfig(instr, pcm);
+      samplerInstr.ronKlaren = rkConfig;
+      samplerInstr.synthType = 'RonKlarenSynth' as const;
+      instrumentConfigs.push(samplerInstr);
     } else {
+      const rkConfig = buildRonKlarenConfig(instr, undefined);
       instrumentConfigs.push({
         id,
         name: `Instrument ${i + 1}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'RonKlarenSynth' as const,
+        ronKlaren: rkConfig,
         effects: [],
         volume: 0,
         pan: 0,
@@ -676,7 +704,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       id: 0,
       name: 'Empty',
       type: 'synth' as const,
-      synthType: 'Synth' as const,
+      synthType: 'RonKlarenSynth' as const,
       effects: [],
       volume: 0,
       pan: 0,
