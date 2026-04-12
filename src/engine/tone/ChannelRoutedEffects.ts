@@ -267,14 +267,12 @@ export class ChannelRoutedEffectsManager {
 }
 
 /**
- * Registry of engine resolvers, checked in priority order.
+ * Registry of engine resolvers keyed by editor mode.
  * Each resolver returns an IsolationCapableEngine if that engine is
  * currently active and available, or null otherwise.
- * New engines register here when they implement IsolationCapableEngine.
  */
-const engineResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [
-  // LibopenmptEngine (MOD/XM/IT/S3M)
-  async () => {
+const engineResolversByMode: Record<string, () => Promise<IsolationCapableEngine | null>> = {
+  classic: async () => {
     const { LibopenmptEngine } = await import('../libopenmpt/LibopenmptEngine');
     if (LibopenmptEngine.hasInstance()) {
       const engine = LibopenmptEngine.getInstance();
@@ -282,22 +280,49 @@ const engineResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [
     }
     return null;
   },
-];
+};
 
 /**
- * Register an engine resolver for per-channel isolation.
+ * Register an engine resolver for per-channel isolation, keyed by editor mode.
  * Called by engines that implement IsolationCapableEngine during their module init.
  */
-export function registerIsolationEngineResolver(resolver: () => Promise<IsolationCapableEngine | null>): void {
-  engineResolvers.push(resolver);
+export function registerIsolationEngineResolver(
+  resolver: () => Promise<IsolationCapableEngine | null>,
+  editorMode?: string,
+): void {
+  if (editorMode) {
+    engineResolversByMode[editorMode] = resolver;
+  } else {
+    // Legacy: add as fallback (checked after mode-specific resolver)
+    _fallbackResolvers.push(resolver);
+  }
 }
+const _fallbackResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [];
 
 /**
  * Detect which isolation-capable engine is currently active and available.
- * Checks registered engines in priority order via lazy imports.
+ * Uses the format store's editorMode to pick the right engine directly,
+ * avoiding false positives from stale singleton instances.
  */
 export async function getActiveIsolationEngine(): Promise<IsolationCapableEngine | null> {
-  for (const resolver of engineResolvers) {
+  // Get current editor mode from format store
+  let editorMode = 'classic';
+  try {
+    const { useFormatStore } = await import('../../stores/useFormatStore');
+    editorMode = useFormatStore.getState().editorMode;
+  } catch { /* fallback to classic */ }
+
+  // Try mode-specific resolver first
+  const modeResolver = engineResolversByMode[editorMode];
+  if (modeResolver) {
+    try {
+      const engine = await modeResolver();
+      if (engine) return engine;
+    } catch { /* resolver failed */ }
+  }
+
+  // Fallback: try all registered resolvers
+  for (const resolver of _fallbackResolvers) {
     try {
       const engine = await resolver();
       if (engine) return engine;
