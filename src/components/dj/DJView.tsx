@@ -82,7 +82,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         if (!phaseA || !phaseB) { setSyncDriftMs(null); return; }
         let phaseDiff = Math.abs(phaseA.beatPhase - phaseB.beatPhase);
         if (phaseDiff > 0.5) phaseDiff = 1 - phaseDiff;
-        const beatPeriodMs = (60 / s.decks.A.beatGrid!.bpm) * 1000;
+        const beatPeriodMs = (60 / (s.decks.A.beatGrid?.bpm ?? 120)) * 1000;
         const rawDrift = Math.round(phaseDiff * beatPeriodMs);
 
         // Rolling average of last 10 samples (1 second) for stable display
