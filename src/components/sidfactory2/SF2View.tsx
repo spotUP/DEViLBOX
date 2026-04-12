@@ -15,13 +15,14 @@
  * useSF2FormatData, same approach as JamCrackerView / GTUltraView.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { SF2_COLUMNS } from './sf2Adapter';
 import { useSF2FormatData } from './useSF2FormatData';
 import { useSF2Store, type SF2OrderList } from '@/stores/useSF2Store';
 import { useSF2KeyboardHandler } from './SF2KeyboardHandler';
-import { useSF2LiveSync } from '@/hooks/useSF2Engine';
+import { useSF2LiveSync, useSF2Engine } from '@/hooks/useSF2Engine';
+import { SIDHardwareToggle } from '@/components/common/SIDHardwareToggle';
 
 const TOOLBAR_H = 36;
 const ORDER_MATRIX_W = 150;
@@ -53,6 +54,31 @@ export const SF2View: React.FC = () => {
 
   useSF2KeyboardHandler(loaded);
   useSF2LiveSync();
+
+  // Hardware SID output bridge
+  const { engine: sf2Engine } = useSF2Engine();
+  const c64 = sf2Engine?.engine ?? null;
+  const [hwBridgeEnabled, setHwBridgeEnabled] = useState(false);
+  const [hwWriteCount, setHwWriteCount] = useState(0);
+
+  useEffect(() => {
+    if (!c64) return;
+    const unsub = c64.onHardwareChange(setHwBridgeEnabled);
+    setHwBridgeEnabled(c64.isHardwareOutputEnabled);
+    return unsub;
+  }, [c64]);
+
+  useEffect(() => {
+    if (!hwBridgeEnabled) { setHwWriteCount(0); return; }
+    const interval = setInterval(async () => {
+      const { getSIDHardwareManager } = await import('@/lib/sid/SIDHardwareManager');
+      setHwWriteCount(getSIDHardwareManager().writeCount);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [hwBridgeEnabled]);
+
+  const handleHwEnable = useCallback(() => { c64?.enableHardwareOutput(); }, [c64]);
+  const handleHwDisable = useCallback(() => { c64?.disableHardwareOutput(); }, [c64]);
 
   const maxOlLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
   const seqCount = sequences.size;
@@ -102,6 +128,12 @@ export const SF2View: React.FC = () => {
             </span>
           </>
         )}
+        <SIDHardwareToggle
+          bridgeEnabled={hwBridgeEnabled}
+          onEnable={handleHwEnable}
+          onDisable={handleHwDisable}
+          writeCount={hwWriteCount}
+        />
         <span className="text-dark-border">│</span>
         {/* Play marker slots */}
         <div className="flex gap-px">
