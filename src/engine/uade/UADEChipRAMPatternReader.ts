@@ -45,21 +45,23 @@ export async function populatePatternsFromChipRAM(
 
   // Import TrackerStore dynamically to avoid circular deps
   const { useTrackerStore } = await import('@/stores/useTrackerStore');
-  const { setCellInPattern } = await import('@/stores/tracker/patternEditActions');
   const store = useTrackerStore.getState();
 
   let cellsDecoded = 0;
   let nonEmptyCells = 0;
 
-  for (let pat = 0; pat < layout.numPatterns && pat < store.patterns.length; pat++) {
-    const pattern = store.patterns[pat];
-    if (!pattern) continue;
+  // Build new pattern objects (store state is frozen/immutable)
+  const updatedPatterns = store.patterns.map((pattern, pat) => {
+    if (pat >= layout.numPatterns) return pattern;
 
-    for (let row = 0; row < layout.rowsPerPattern; row++) {
-      for (let ch = 0; ch < layout.numChannels; ch++) {
-        // Calculate offset within the bulk read
+    const newChannels = pattern.channels.map((channel, ch) => {
+      if (ch >= layout.numChannels) return channel;
+
+      const newRows = channel.rows.map((existingRow, row) => {
+        if (row >= layout.rowsPerPattern) return existingRow;
+
         const fileOffset = getCellFileOffset(layout, pat, row, ch) - layout.patternDataFileOffset;
-        if (fileOffset < 0 || fileOffset + layout.bytesPerCell > allBytes.length) continue;
+        if (fileOffset < 0 || fileOffset + layout.bytesPerCell > allBytes.length) return existingRow;
 
         const cellBytes = allBytes.slice(fileOffset, fileOffset + layout.bytesPerCell);
         const cell = decode(cellBytes);
@@ -67,10 +69,20 @@ export async function populatePatternsFromChipRAM(
 
         if (cell.note > 0 || cell.instrument > 0 || cell.effTyp > 0) {
           nonEmptyCells++;
-          setCellInPattern(pattern, ch, row, cell);
+          return { ...existingRow, ...cell };
         }
-      }
-    }
+        return existingRow;
+      });
+
+      return { ...channel, rows: newRows };
+    });
+
+    return { ...pattern, channels: newChannels };
+  });
+
+  // Update store immutably via loadPatterns
+  if (nonEmptyCells > 0) {
+    store.loadPatterns(updatedPatterns);
   }
 
   console.log(`[ChipRAMReader] Read ${layout.numPatterns} patterns, ${cellsDecoded} cells, ${nonEmptyCells} non-empty`);
