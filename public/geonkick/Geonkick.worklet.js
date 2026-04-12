@@ -77,6 +77,33 @@ class GeonkickProcessor extends AudioWorkletProcessor {
       case 'enableGroup':
         w._gk_wasm_enable_group(h, data.groupIndex | 0, data.enabled ? 1 : 0);
         break;
+      case 'setGroupAmplitude':
+        w._gk_wasm_set_group_amplitude(h, data.groupIndex | 0, Number(data.amplitude) || 1);
+        break;
+      case 'setKickAmplitude':
+        w._gk_wasm_set_kick_amplitude(h, Number(data.amplitude) || 1);
+        break;
+      case 'setOscFilterEnabled':
+        w._gk_wasm_set_osc_filter_enabled(h, data.oscIndex | 0, data.enabled ? 1 : 0);
+        break;
+      case 'setOscFilterCutoff':
+        w._gk_wasm_set_osc_filter_cutoff(h, data.oscIndex | 0, Number(data.frequency) || 800);
+        break;
+      case 'setOscFilterFactor':
+        w._gk_wasm_set_osc_filter_factor(h, data.oscIndex | 0, Number(data.q) || 1);
+        break;
+      case 'setOscFilterType':
+        w._gk_wasm_set_osc_filter_type(h, data.oscIndex | 0, data.filterType | 0);
+        break;
+      case 'setOscFm':
+        w._gk_wasm_set_osc_fm(h, data.oscIndex | 0, data.isFm ? 1 : 0);
+        break;
+      case 'setOscPhase':
+        w._gk_wasm_set_osc_phase(h, data.oscIndex | 0, Number(data.phase) || 0);
+        break;
+      case 'setOscSeed':
+        w._gk_wasm_set_osc_seed(h, data.oscIndex | 0, data.seed | 0);
+        break;
       case 'setOscAmplitude':
         w._gk_wasm_set_osc_amplitude(h, data.oscIndex | 0, Number(data.amplitude) || 0);
         break;
