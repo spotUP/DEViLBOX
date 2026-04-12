@@ -41,7 +41,12 @@ class CheeseCutterProcessor extends AudioWorkletProcessor {
           this._writeByte = this.module.cwrap('cc_write_byte', null, ['number', 'number']);
           this._readByte = this.module.cwrap('cc_read_byte', 'number', ['number']);
           this._getRam = this.module.cwrap('cc_get_ram', 'number', []);
+          this._getSidDiffs = this.module.cwrap('cc_get_sid_diffs', 'number', ['number']);
           this._shutdown = this.module.cwrap('cc_shutdown', null, []);
+
+          // Allocate diff buffer (256 entries × 2 bytes = 512 bytes)
+          this._diffBufPtr = this.module._malloc(512);
+          this._asidEnabled = false;
 
           this._init(msg.sampleRate || 44100, msg.sidModel || 0);
 
@@ -113,6 +118,11 @@ class CheeseCutterProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'readBytes', id: msg.id, data: result }, [result.buffer]);
         break;
       }
+
+      case 'enableAsid': {
+        this._asidEnabled = !!msg.enabled;
+        break;
+      }
     }
   }
 
@@ -132,6 +142,16 @@ class CheeseCutterProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < frames; i++) {
       outL[i] = heapF32[lOff + i];
       outR[i] = heapF32[rOff + i];
+    }
+
+    // Forward SID register diffs to main thread for hardware output
+    if (this._asidEnabled && this._diffBufPtr) {
+      const count = this._getSidDiffs(this._diffBufPtr);
+      if (count > 0) {
+        const diffs = new Uint8Array(count * 2);
+        diffs.set(new Uint8Array(this.module.HEAPU8.buffer, this._diffBufPtr, count * 2));
+        this.port.postMessage({ type: 'sidDiffs', diffs }, [diffs.buffer]);
+      }
     }
 
     return true;
