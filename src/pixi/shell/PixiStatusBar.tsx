@@ -21,8 +21,6 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
-import { usePianoRollStore } from '@/stores/usePianoRollStore';
-import { useArrangementStore } from '@/stores/useArrangementStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
@@ -331,50 +329,6 @@ const VJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
         tint={theme.textMuted.color}
         layout={textLayout}
       />
-    </pixiContainer>
-  );
-};
-
-// ─── Piano Roll Status Content ────────────────────────────────────────────────
-
-const PianoRollStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
-  const theme = usePixiTheme();
-  const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
-  const tool = usePianoRollStore(s => s.tool);
-  const view = usePianoRollStore(s => s.view);
-  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 4);
-
-  return (
-    <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
-      <pixiBitmapText text={`Tool: ${tool.toUpperCase()}`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text={`Ch ${view.channelIndex + 1}/${channelCount}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text={`Grid: 1/${view.gridDivision}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text={view.snapToGrid ? 'Snap ON' : 'Snap OFF'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={view.snapToGrid ? theme.success.color : theme.textMuted.color} layout={textLayout} />
-    </pixiContainer>
-  );
-};
-
-// ─── Arrangement Status Content ───────────────────────────────────────────────
-
-const ArrangementStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
-  const theme = usePixiTheme();
-  const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
-  const tool = useArrangementStore(s => s.tool);
-  const trackCount = useArrangementStore(s => s.tracks.length);
-  const view = useArrangementStore(s => s.view);
-
-  return (
-    <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
-      <pixiBitmapText text={`Tool: ${tool.toUpperCase()}`} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text={`${trackCount} track${trackCount !== 1 ? 's' : ''}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text={`Snap: ${view.snapDivision}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text={`Row: ${view.scrollRow}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.textMuted.color} layout={textLayout} />
     </pixiContainer>
   );
 };
@@ -846,12 +800,6 @@ const MainStatusRow: React.FC<MainRowProps> = ({
         </pixiContainer>
         <pixiContainer alpha={activeView === 'vj' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
           <VJStatusContent barHeight={STATUS_BAR_HEIGHT} />
-        </pixiContainer>
-        <pixiContainer alpha={activeView === 'pianoroll' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
-          <PianoRollStatusContent barHeight={STATUS_BAR_HEIGHT} />
-        </pixiContainer>
-        <pixiContainer alpha={activeView === 'arrangement' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
-          <ArrangementStatusContent barHeight={STATUS_BAR_HEIGHT} />
         </pixiContainer>
         <pixiContainer alpha={activeView === 'drumpad' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
           <DrumPadStatusContent barHeight={STATUS_BAR_HEIGHT} />

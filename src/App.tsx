@@ -78,9 +78,7 @@ const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m 
 const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
 const InstrumentEditorPopout = lazy(() => import('./components/instruments/InstrumentEditorPopout').then(m => ({ default: m.InstrumentEditorPopout })));
 const HardwareUIPopout = lazy(() => import('./components/instruments/HardwareUIPopout').then(m => ({ default: m.HardwareUIPopout })));
-const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll })));
 const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
-const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
 const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default: m.DJView })));
 const VJView = lazy(() => import('./components/vj/VJView').then(m => ({ default: m.VJView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
@@ -91,11 +89,9 @@ const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBro
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
 const DJ3DOverlay = lazy(() => import('./components/dj/DJ3DOverlay').then(m => ({ default: m.DJ3DOverlay })));
 const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
-const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
 const MixerPanel = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerPanel })));
 const MixerView  = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerView })));
 const StudioCanvasView = lazy(() => import('./components/studio/StudioCanvasView').then(m => ({ default: m.StudioCanvasView })));
-const SplitView = lazy(() => import('./components/studio/SplitView').then(m => ({ default: m.SplitView })));
 
 // Module-level flag — resets on every page load (sessionStorage persists through reloads)
 let jinglePlayedThisLoad = false;
@@ -192,15 +188,10 @@ function App() {
     hardwareUiPoppedOut, setHardwareUiPoppedOut,
     masterEffectsPoppedOut, setMasterEffectsPoppedOut,
     instrumentEffectsPoppedOut, setInstrumentEffectsPoppedOut,
-    pianoRollPoppedOut, setPianoRollPoppedOut,
     oscilloscopePoppedOut, setOscilloscopePoppedOut,
-    arrangementPoppedOut, setArrangementPoppedOut,
     vjPoppedOut, setVJPoppedOut,
     showFileBrowser, setShowFileBrowser,
   } = useUIStore();
-  const collabStatus = useCollaborationStore((s) => s.status);
-  const collabViewMode = useCollaborationStore((s) => s.viewMode);
-  const isCollabSplit = collabStatus === 'connected' && collabViewMode === 'split';
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
@@ -813,14 +804,6 @@ function App() {
               </Suspense>
             </div>
           )}
-          {/* DOM SplitView overlay — GL mode has no native split view, so we render the DOM version */}
-          {activeView === 'split' && (
-            <div className="fixed inset-0 z-10 bg-dark-bg">
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading split view...</div>}>
-                <SplitView />
-              </Suspense>
-            </div>
-          )}
           {/* Mobile menu overlay for GL mode */}
           {isMobile && (
             <MobileMenu
@@ -970,36 +953,6 @@ function App() {
                 height={800}
               >
                 <InstrumentEffectsModal isOpen={true} onClose={() => setInstrumentEffectsPoppedOut(false)} />
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {pianoRollPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setPianoRollPoppedOut(false)}
-                title="DEViLBOX — Piano Roll"
-                width={1200}
-                height={600}
-              >
-                <div className="h-screen w-screen bg-dark-bgSecondary">
-                  <PianoRoll />
-                </div>
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {arrangementPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setArrangementPoppedOut(false)}
-                title="DEViLBOX — Arrangement"
-                width={1400}
-                height={700}
-              >
-                <div className="h-screen w-screen bg-dark-bg">
-                  <ArrangementView />
-                </div>
               </PopOutWindow>
             </Suspense>
           )}
@@ -1202,25 +1155,7 @@ function App() {
         <div className="flex flex-1 min-h-0 min-w-0 overflow-y-hidden">
           {/* Left side - Pattern Editor or Arrangement View */}
           <div className="flex flex-col min-h-0 min-w-0 flex-1">
-            {/* Collab split view — takes over the tracker view when active */}
-            {isCollabSplit && activeView === 'tracker' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading collab...</div>}>
-                <CollaborationSplitView
-                  onShowPatterns={() => togglePatterns()}
-                  onShowExport={() => openModal('export')}
-                  onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
-                  onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
-                  onShowInstrumentFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
-                  onShowInstruments={() => openModal('instruments')}
-                  onShowDrumpads={() => openModal('drumpads')}
-                  showPatterns={showPatterns}
-                  showMasterFX={modalOpen === 'masterFx'}
-                  showInstrumentFX={modalOpen === 'instrumentFx'}
-                />
-              </Suspense>
-            )}
-
-            {activeView === 'tracker' && !isCollabSplit && (
+            {activeView === 'tracker' && (
               <>
                 {/* Pattern Editor */}
                 <div className="flex-1 min-h-0 min-w-0 flex flex-col">
@@ -1240,12 +1175,6 @@ function App() {
               </>
             )}
 
-            {activeView === 'arrangement' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading arrangement...</div>}>
-                <ArrangementView />
-              </Suspense>
-            )}
-
             {(activeView === 'dj' || (activeView === 'vj' && djModeActive)) && (
               <DJErrorBoundary viewName="DJ">
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
@@ -1254,12 +1183,6 @@ function App() {
                   </div>
                 </Suspense>
               </DJErrorBoundary>
-            )}
-
-            {activeView === 'pianoroll' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading piano roll...</div>}>
-                <PianoRoll />
-              </Suspense>
             )}
 
             {activeView === 'vj' && (
@@ -1288,11 +1211,6 @@ function App() {
               </Suspense>
             )}
 
-            {activeView === 'split' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading split view...</div>}>
-                <SplitView />
-              </Suspense>
-            )}
           </div>
 
         </div>
@@ -1496,40 +1414,6 @@ function App() {
             height={800}
           >
             <InstrumentEffectsModal isOpen={true} onClose={() => setInstrumentEffectsPoppedOut(false)} />
-          </PopOutWindow>
-        </Suspense>
-      )}
-
-      {/* Popped-out Piano Roll */}
-      {pianoRollPoppedOut && (
-        <Suspense fallback={null}>
-          <PopOutWindow
-            isOpen={true}
-            onClose={() => setPianoRollPoppedOut(false)}
-            title="DEViLBOX — Piano Roll"
-            width={1200}
-            height={600}
-          >
-            <div className="h-screen w-screen bg-dark-bgSecondary">
-              <PianoRoll />
-            </div>
-          </PopOutWindow>
-        </Suspense>
-      )}
-
-      {/* Popped-out Arrangement View */}
-      {arrangementPoppedOut && (
-        <Suspense fallback={null}>
-          <PopOutWindow
-            isOpen={true}
-            onClose={() => setArrangementPoppedOut(false)}
-            title="DEViLBOX — Arrangement"
-            width={1400}
-            height={700}
-          >
-            <div className="h-screen w-screen bg-dark-bg">
-              <ArrangementView />
-            </div>
           </PopOutWindow>
         </Suspense>
       )}

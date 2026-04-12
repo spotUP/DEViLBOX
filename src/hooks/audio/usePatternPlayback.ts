@@ -11,12 +11,9 @@ import { useEffect, useMemo, useRef, startTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore , useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
-import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { setFormatPlaybackRow, setFormatPlaybackPlaying } from '@engine/FormatPlaybackState';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
-import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
-import { processArrangementAutomation, hasArrangementAutomation } from '@engine/ArrangementAutomationPlayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
@@ -82,10 +79,6 @@ export const usePatternPlayback = () => {
   })));
   const { instruments, instrumentLoadVersion } = useInstrumentStore(useShallow((s) => ({ instruments: s.instruments, instrumentLoadVersion: s.instrumentLoadVersion })));
   const { masterEffects } = useAudioStore(useShallow((s) => ({ masterEffects: s.masterEffects })));
-  const isArrangementMode = useArrangementStore((state) => state.isArrangementMode);
-  const loopStart = useArrangementStore((state) => state.view.loopStart);
-  const loopEnd = useArrangementStore((state) => state.view.loopEnd);
-
   // Pattern depends on currentPatternIndex and currentPositionIndex.
   // We use refs for these to prevent the main playback loop from restarting 
   // every time the UI position updates.
@@ -134,18 +127,14 @@ export const usePatternPlayback = () => {
   // Structural fingerprint — changes only when the pattern structure changes
   // (add/remove channels, change length, different module format), NOT on cell
   // content edits. This prevents the heavy stop/loadSong/play cycle on every edit.
-  // Also includes arrangement loop bounds so a loop region change triggers a reload.
   // Stable key for pattern order — only changes when the order content changes,
   // not on every unrelated Immer mutation that produces a new array reference.
   const patternOrderKey = useMemo(() => patternOrder.join(','), [patternOrder]);
 
   const patternStructureKey = useMemo(() => {
     if (!pattern) return '';
-    const loopBoundsKey = (isArrangementMode && isLooping && loopStart != null && loopEnd != null)
-      ? `:loop:${loopStart}-${loopEnd}`
-      : '';
-    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}${loopBoundsKey}:v${instrumentLoadVersion}`;
-  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, isArrangementMode, isLooping, loopStart, loopEnd, instrumentLoadVersion]);
+    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}:${patternOrderKey}:v${instrumentLoadVersion}`;
+  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, patternOrderKey, instrumentLoadVersion]);
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
@@ -236,8 +225,6 @@ export const usePatternPlayback = () => {
     // IF we are playing and the song structure changed, we need to RELOAD the song in the replayer
     // otherwise it won't know about the new patterns (like B/D animation helpers)
     if (isPlaying && pattern) {
-      const arrangement = useArrangementStore.getState();
-
       // Determine if we need to reload.
       // Use the replayerAdvancedRef flag to detect natural position advances.
       // The old approach (comparing replayer.getCurrentPosition() with store position)
@@ -446,7 +433,7 @@ export const usePatternPlayback = () => {
         }
         const modData = pattern.importMetadata?.modData;
 
-        if ((window as any).PLAYBACK_DEBUG) console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format}), arrangement=${arrangement.isArrangementMode}`);
+        if ((window as any).PLAYBACK_DEBUG) console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format})`);
 
         let effectivePatterns = patterns;
         let effectiveSongPositions: number[];
@@ -457,28 +444,8 @@ export const usePatternPlayback = () => {
           ? channelTrackTables.length
           : pattern.channels.length;
 
-        if (arrangement.isArrangementMode && arrangement.clips.length > 0) {
-          // --- Arrangement Mode ---
-          // When looping with a loop region set, pass bounds to resolveArrangement
-          // so only the loop region's clips are included and the audio loops within it.
-          const useLoopBounds = isLooping &&
-            arrangement.view.loopStart != null &&
-            arrangement.view.loopEnd != null;
-          const resolved = resolveArrangement(
-            arrangement.clips,
-            arrangement.tracks,
-            patterns,
-            modData?.initialSpeed ?? transportSpeed,
-            useLoopBounds ? arrangement.view.loopStart! : undefined,
-            useLoopBounds ? arrangement.view.loopEnd! : undefined,
-          );
-
-          effectivePatterns = resolved.virtualPatterns;
-          effectiveSongPositions = resolved.songPositions;
-          effectiveSongLength = resolved.songPositions.length;
-          effectiveNumChannels = resolved.virtualPatterns[0]?.channels?.length ?? pattern.channels.length;
-        } else {
-          // --- Legacy Pattern Order Mode ---
+        {
+          // --- Pattern Order Mode ---
           const currentOrder = patternOrderRef.current;
           const loopPatternOrder = isLooping ? [currentPatternIndex] : currentOrder;
           effectiveSongPositions = loopPatternOrder;
@@ -656,13 +623,6 @@ export const usePatternPlayback = () => {
               });
               const globalRow = position * 64 + row;
               useTransportStore.getState().setCurrentGlobalRow(globalRow);
-              if (arrangement.isArrangementMode) {
-                useArrangementStore.getState().setPlaybackRow(globalRow);
-                // Apply arrangement-level timeline automation
-                if (hasArrangementAutomation()) {
-                  processArrangementAutomation(globalRow);
-                }
-              }
             }, 0);
           }
         };
@@ -742,7 +702,7 @@ export const usePatternPlayback = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- store actions are stable refs;
   // patternOrder tracked via patternOrderKey in patternStructureKey + ref
-  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey, isArrangementMode, loopStart, loopEnd]);
+  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey]);
 
   return {
     isPlaying,

@@ -18,7 +18,6 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput, PixiLabel, PixiSelect } from '../../components';
-import { PixiAcidPatternDialog } from '../../dialogs/PixiAcidPatternDialog';
 import { useGridPattern } from '@/hooks/useGridPattern';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -94,9 +93,6 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
   // Scale mode state
   const [scaleKey, setScaleKey] = useState<string>('chromatic');
   const [rootNote, setRootNote] = useState<number>(0);
-
-  // Acid pattern generator dialog state
-  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
   // Focus state for keyboard navigation
   const [focusedCell, setFocusedCell] = useState<{ noteIndex: number; stepIndex: number } | null>({ noteIndex: 11, stepIndex: 0 });
@@ -503,7 +499,6 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
 
-        <PixiButton label="Acid" variant="ghost" size="sm" onClick={() => setShowAcidGenerator(true)} />
         <PixiButton label="Random" variant="ghost" size="sm" onClick={handleRandomize} />
         <PixiButton label="Clear" variant="ghost" size="sm" color="red" onClick={clearAll} />
       </pixiContainer>
@@ -546,14 +541,6 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
         ))}
       </pixiContainer>
 
-      {/* Acid Pattern Generator Dialog */}
-      {showAcidGenerator && (
-        <PixiAcidPatternDialog
-          isOpen={showAcidGenerator}
-          onClose={() => setShowAcidGenerator(false)}
-          channelIndex={channelIndex}
-        />
-      )}
     </pixiContainer>
   );
 };

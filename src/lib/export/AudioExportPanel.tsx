@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
-import { useArrangementStore } from '@/stores/useArrangementStore';
 import { exportPatternAsWav, exportSongAsWav, getUADEInstrument, exportUADEAsWav } from './audioExport';
 
-type AudioExportScope = 'pattern' | 'song' | 'arrangement';
+type AudioExportScope = 'pattern' | 'song';
 
 interface AudioExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
@@ -13,7 +12,7 @@ interface AudioExportPanelProps {
   setIsRendering: (v: boolean) => void;
   renderProgress: number;
   setRenderProgress: (v: number) => void;
-  initialScope?: AudioExportScope;
+  initialScope?: AudioExportScope | 'arrangement';
 }
 
 export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
@@ -31,20 +30,10 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
-  const arrangementClips = useArrangementStore(s => s.clips);
-  const arrangementTotalRows = useArrangementStore(s => {
-    let max = 0;
-    for (const clip of s.clips) {
-      const end = clip.startRow + (clip.clipLengthRows ?? 64);
-      if (end > max) max = end;
-    }
-    return max;
-  });
-
-  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope || 'pattern');
+  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope === 'arrangement' ? 'song' : (initialScope || 'pattern'));
 
   useEffect(() => {
-    if (initialScope) setAudioExportScope(initialScope);
+    if (initialScope) setAudioExportScope(initialScope === 'arrangement' ? 'song' : initialScope);
   }, [initialScope]);
 
   // Register export handler (assigned during render — always has fresh closure)
@@ -76,28 +65,6 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
           sourceFilename,
           `${metadata.name || 'song'}.wav`,
           0,
-          (progress) => setRenderProgress(progress)
-        );
-      } else if (audioExportScope === 'arrangement' && arrangementClips.length > 0) {
-        // Export arrangement: build pattern sequence from clips sorted by startRow
-        const sortedClips = [...arrangementClips]
-          .filter(c => !c.muted)
-          .sort((a, b) => a.startRow - b.startRow);
-        const patternIndexSet: number[] = [];
-        for (const clip of sortedClips) {
-          const idx = patterns.findIndex(p => p.id === clip.patternId);
-          if (idx >= 0) patternIndexSet.push(idx);
-        }
-        if (patternIndexSet.length === 0) {
-          notify.warning('No unmuted clips in arrangement to export');
-          return false;
-        }
-        await exportSongAsWav(
-          patterns,
-          patternIndexSet,
-          instruments,
-          bpm,
-          `${metadata.name || 'arrangement'}.wav`,
           (progress) => setRenderProgress(progress)
         );
       } else if (audioExportScope === 'song') {
@@ -166,21 +133,6 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
           >
             Full Song ({patterns.length} patterns)
           </button>
-          {arrangementClips.length > 0 && (
-            <button
-              onClick={() => setAudioExportScope('arrangement')}
-              disabled={isRendering}
-              className={`
-                flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                ${audioExportScope === 'arrangement'
-                  ? 'bg-accent-primary text-text-inverse'
-                  : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                }
-              `}
-            >
-              Arrangement ({arrangementClips.filter(c => !c.muted).length} clips)
-            </button>
-          )}
         </div>
 
         {/* Pattern selector (only shown for single pattern mode) */}
@@ -207,12 +159,7 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
         <div className="text-sm font-mono text-text-secondary space-y-1">
           <div>Format: <span className="text-accent-primary">WAV (16-bit, 44.1kHz)</span></div>
           <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
-          {audioExportScope === 'arrangement' ? (
-            <>
-              <div>Clips: <span className="text-accent-primary">{arrangementClips.filter(c => !c.muted).length} unmuted</span></div>
-              <div>Total Rows: <span className="text-accent-primary">{arrangementTotalRows}</span></div>
-            </>
-          ) : audioExportScope === 'song' ? (
+          {audioExportScope === 'song' ? (
             <>
               <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
               <div>Total Rows: <span className="text-accent-primary">{patterns.reduce((sum, p) => sum + p.length, 0)}</span></div>

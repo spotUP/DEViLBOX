@@ -22,7 +22,6 @@ import { useDJStore } from '../../stores/useDJStore';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
-import { useArrangementStore } from '../../stores/useArrangementStore';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getTrackerReplayer } from '../../engine/TrackerReplayer';
 import { getToneEngine } from '../../engine/ToneEngine';
@@ -698,51 +697,6 @@ export function getMIDIState(): Record<string, unknown> {
     padBank: midi.padBank,
     isLearning: midi.isLearning,
     ccMappings: midi.ccMappings,
-  };
-}
-
-// ─── Arrangement State ─────────────────────────────────────────────────────────
-
-export function getArrangementState(): Record<string, unknown> {
-  const arr = useArrangementStore.getState();
-  return {
-    isArrangementMode: arr.isArrangementMode,
-    trackCount: arr.tracks.length,
-    clipCount: arr.clips.length,
-    markerCount: arr.markers.length,
-    totalRows: arr.getTotalRows(),
-    tool: arr.tool,
-    playbackRow: arr.playbackRow,
-    canUndo: arr.canUndo(),
-    canRedo: arr.canRedo(),
-    tracks: arr.tracks.map((t) => ({
-      id: t.id,
-      name: t.name,
-      index: t.index,
-      color: t.color,
-      volume: t.volume,
-      pan: t.pan,
-      muted: t.muted,
-      solo: t.solo,
-      instrumentId: t.instrumentId,
-    })),
-    clips: arr.clips.map((c) => ({
-      id: c.id,
-      patternId: c.patternId,
-      trackId: c.trackId,
-      startRow: c.startRow,
-      clipLengthRows: c.clipLengthRows,
-      muted: c.muted,
-      name: c.name,
-      color: c.color,
-    })),
-    markers: arr.markers.map((m) => ({
-      id: m.id,
-      row: m.row,
-      type: m.type,
-      name: m.name,
-    })),
-    selectedClipIds: Array.from(arr.selectedClipIds),
   };
 }
 

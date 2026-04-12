@@ -10,10 +10,8 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, useEditorStore, useFormatStore } from '@stores';
-import { useArrangementStore } from '@stores/useArrangementStore';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
-import type { ArrangementSnapshot } from '@typedefs/arrangement';
 import { needsMigration, migrateProject } from '@/lib/migration';
 import { getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, restoreNativeEngineData } from '@/lib/export/exporters';
 
@@ -128,7 +126,7 @@ interface SavedProject {
   automation?: AutomationCurve[];
   masterEffects?: EffectConfig[];
   grooveTemplateId?: string;
-  arrangement?: ArrangementSnapshot;
+  arrangement?: Record<string, unknown>;
   speed?: number;
   trackerFormat?: string;
   linearPeriods?: boolean;
@@ -306,7 +304,6 @@ function buildSavedProject(): SavedProject {
   const transportState = useTransportStore.getState();
   const automationState = useAutomationStore.getState();
   const audioState = useAudioStore.getState();
-  const arrangementState = useArrangementStore.getState();
   const editorState = useEditorStore.getState();
 
   // Derive trackerFormat from first pattern's importMetadata
@@ -363,7 +360,6 @@ function buildSavedProject(): SavedProject {
     automation: automationState.curves,
     masterEffects: audioState.masterEffects,
     ...(transportState.grooveTemplateId !== 'straight' ? { grooveTemplateId: transportState.grooveTemplateId } : {}),
-    ...(arrangementState.tracks.length > 0 ? { arrangement: arrangementState.getSnapshot() } : {}),
     ...(transportState.speed !== 6 ? { speed: transportState.speed } : {}),
     ...(trackerFormat ? { trackerFormat } : {}),
     ...(editorState.linearPeriods ? { linearPeriods: editorState.linearPeriods } : {}),
@@ -509,10 +505,7 @@ export async function loadProjectFromStorage(): Promise<boolean> {
 
     transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
 
-    if (project.arrangement) {
-      const arrangementStore = useArrangementStore.getState();
-      arrangementStore.loadSnapshot(project.arrangement);
-    }
+    // arrangement data ignored — arrangement view removed
 
     // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
     if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
@@ -632,10 +625,7 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
     if (project.automation) automationStore.loadCurves(project.automation);
     if (project.masterEffects) audioStore.setMasterEffects(project.masterEffects);
     transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
-    if (project.arrangement) {
-      const arrangementStore = useArrangementStore.getState();
-      arrangementStore.loadSnapshot(project.arrangement);
-    }
+    // arrangement data ignored — arrangement view removed
 
     // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
     if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
@@ -728,10 +718,7 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     if (project.automation) automationStore.loadCurves(project.automation);
     if (project.masterEffects) audioStore.setMasterEffects(project.masterEffects);
     transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
-    if (project.arrangement) {
-      const arrangementStore = useArrangementStore.getState();
-      arrangementStore.loadSnapshot(project.arrangement);
-    }
+    // arrangement data ignored — arrangement view removed
 
     // Tag first pattern with sourceFormat so TrackerReplayer gets correct format
     if (project.trackerFormat && project.patterns.length > 0 && !project.patterns[0].importMetadata?.sourceFormat) {
@@ -831,18 +818,6 @@ export function useProjectPersistence() {
   useEffect(() => {
     const unsubscribe = useTransportStore.subscribe((state, prevState) => {
       if (state.bpm !== prevState.bpm || state.grooveTemplateId !== prevState.grooveTemplateId) {
-        markAsModified();
-      }
-    });
-    return unsubscribe;
-  }, [markAsModified]);
-
-  // Subscribe to arrangement store changes (clips, tracks, markers)
-  useEffect(() => {
-    const unsubscribe = useArrangementStore.subscribe((state, prevState) => {
-      if (state.clips !== prevState.clips ||
-          state.tracks !== prevState.tracks ||
-          state.markers !== prevState.markers) {
         markAsModified();
       }
     });
