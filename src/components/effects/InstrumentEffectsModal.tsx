@@ -411,6 +411,15 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
                       }
                       setEditingEffect({ ...current, ...updates });
                     }}
+                    onUpdateParameters={(params) => {
+                      const current = editingEffectRef.current;
+                      if (!current) return;
+                      const updates = { parameters: { ...current.parameters, ...params } };
+                      if (currentInstrumentId !== null) {
+                        updateEffect(currentInstrumentId, current.id, updates);
+                      }
+                      setEditingEffect({ ...current, ...updates });
+                    }}
                     onUpdateWet={(wet) => {
                       const current = editingEffectRef.current;
                       if (!current || currentInstrumentId === null) return;
