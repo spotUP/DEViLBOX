@@ -325,3 +325,69 @@ void gk_wasm_enable_group(gk_instance *kick, int group_index, int enable)
         if (!kick || group_index < 0 || group_index > 2) return;
         geonkick_enable_group(kick, (size_t)group_index, enable ? true : false);
 }
+
+/* ── Missing setters needed for accurate preset loading ────────────────── */
+
+GK_EXPORT
+void gk_wasm_set_group_amplitude(gk_instance *kick, int group_index, double amplitude)
+{
+        if (!kick || group_index < 0 || group_index > 2) return;
+        geonkick_group_set_amplitude(kick, (size_t)group_index, (gkick_real)amplitude);
+}
+
+GK_EXPORT
+void gk_wasm_set_kick_amplitude(gk_instance *kick, double amplitude)
+{
+        if (!kick) return;
+        geonkick_kick_set_amplitude(kick, (gkick_real)amplitude);
+}
+
+/* Per-oscillator filter (not to be confused with the kick-level filter). */
+GK_EXPORT
+void gk_wasm_set_osc_filter_enabled(gk_instance *kick, int osc_index, int enable)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_enbale_osc_filter(kick, (size_t)osc_index, enable);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_filter_cutoff(gk_instance *kick, int osc_index, double freq)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_filter_cutoff_freq(kick, (size_t)osc_index, (gkick_real)freq);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_filter_factor(gk_instance *kick, int osc_index, double q)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_filter_factor(kick, (size_t)osc_index, (gkick_real)q);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_filter_type(gk_instance *kick, int osc_index, int type)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_filter_type(kick, (size_t)osc_index, (enum gkick_filter_type)type);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_fm(gk_instance *kick, int osc_index, int is_fm)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_set_fm(kick, (size_t)osc_index, is_fm ? true : false);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_phase(gk_instance *kick, int osc_index, double phase)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_phase(kick, (size_t)osc_index, (gkick_real)phase);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_seed(gk_instance *kick, int osc_index, int seed)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_seed(kick, (size_t)osc_index, (unsigned int)seed);
+}
