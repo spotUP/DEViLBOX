@@ -173,11 +173,15 @@ export class DeckEngine {
     this.fftAnalyser = new Tone.FFT(1024);
 
     // Wire: deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → limiter → [output + meter + analyser]
-    this.deckGain.connect(this.eq3);
-    this.eq3.connect(this.filterHPF);
-    this.filterHPF.connect(this.filterLPF);
-    this.filterLPF.connect(this.pitchShift);
-    this.pitchShift.connect(this.channelGain);
+    try {
+      this.deckGain.connect(this.eq3);
+      this.eq3.connect(this.filterHPF);
+      this.filterHPF.connect(this.filterLPF);
+      this.filterLPF.connect(this.pitchShift);
+      this.pitchShift.connect(this.channelGain);
+    } catch (err) {
+      console.error('[DeckEngine] audio chain wiring failed:', err);
+    }
 
     // Brick-wall limiter — prevents output from exceeding 0 dBFS regardless of
     // internal gain transients from rapid scratch transitions, PitchShift granular

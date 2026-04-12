@@ -83,18 +83,22 @@ export class DJMixerEngine {
     this.masterMeter = new Tone.Meter({ smoothing: 0.8 });
 
     // Wire: inputs → masterGain → limiter → destination + meter
-    this.inputA.connect(this.masterGain);
-    this.inputB.connect(this.masterGain);
-    this.inputC.connect(this.masterGain);  // thru — no crossfader
+    try {
+      this.inputA.connect(this.masterGain);
+      this.inputB.connect(this.masterGain);
+      this.inputC.connect(this.masterGain);  // thru — no crossfader
 
-    // Connect raw Web Audio sampler input to Tone.js master gain
-    const masterGainRaw = this.masterGain.input as AudioNode;
-    this.samplerInput.connect(masterGainRaw);
+      // Connect raw Web Audio sampler input to Tone.js master gain
+      const masterGainRaw = this.masterGain.input as AudioNode;
+      this.samplerInput.connect(masterGainRaw);
 
-    this.masterGain.connect(this.duckGain);
-    this.duckGain.connect(this.limiter);
-    this.limiter.toDestination();
-    this.limiter.connect(this.masterMeter);
+      this.masterGain.connect(this.duckGain);
+      this.duckGain.connect(this.limiter);
+      this.limiter.toDestination();
+      this.limiter.connect(this.masterMeter);
+    } catch (err) {
+      console.error('[DJMixerEngine] audio graph wiring failed:', err);
+    }
 
     // Apply initial crossfader position
     this.applyCrossfader();
