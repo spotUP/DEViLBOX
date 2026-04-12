@@ -69,6 +69,21 @@ export const EFFECT_TYPE_BUZZMACHINE = 0xf97316; // orange
 export const EFFECT_TYPE_WASM       = 0x10b981; // green
 export const EFFECT_TYPE_WAM        = 0x14b8a6; // teal
 
+// ─── DJ Pad Category Colors ─────────────────────────────────────────────────
+
+export const DJ_STUTTER      = 0xff9900; // orange (same as KNOB_ORANGE)
+export const DJ_DELAY        = 0xffcc00; // gold (same as KNOB_YELLOW)
+export const DJ_FILTER       = 0x14b8a6; // teal (same as EFFECT_TYPE_WAM)
+export const DJ_REVERB       = 0x3b82f6; // blue (same as KNOB_BLUE)
+export const DJ_MODULATION   = 0xa855f7; // purple (same as KNOB_PURPLE)
+export const DJ_DISTORTION   = 0xef4444; // red (same as VU_RED)
+export const DJ_TAPE         = 0x1a1a2e; // dark (same as TOOLTIP_BG)
+export const DJ_ONESHOT      = 0xfbbf24; // amber (same as CELL_INSTRUMENT)
+export const DJ_SCRATCH      = 0x06b6d4; // cyan (same as KNOB_CYAN)
+export const DJ_SCRATCH_ADV  = 0x0891b2; // darker cyan
+export const DJ_SCRATCH_EXP  = 0x0e7490; // deep cyan
+export const DJ_SCRATCH_CTL  = 0xef4444; // red (stop/control)
+
 // ─── UI Element Colors ──────────────────────────────────────────────────────
 
 export const TOOLTIP_BG     = 0x1a1a2e;
@@ -85,6 +100,11 @@ export const ACTION_MOVE     = 0x2dd4bf; // teal
 export const ACTION_BULK     = 0xfb923c; // orange
 
 // ─── Color Utilities ────────────────────────────────────────────────────────
+
+/** Convert 0xRRGGBB to '#rrggbb' for DOM usage */
+export function colorToHex(color: number): string {
+  return '#' + color.toString(16).padStart(6, '0');
+}
 
 /** Darken a color to create a tinted background (e.g., dark red for error states) */
 export function tintBg(color: number, factor = 0.15): number {
