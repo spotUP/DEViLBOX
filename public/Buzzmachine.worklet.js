@@ -1266,16 +1266,17 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       }
 
       // Copy input to WASM buffer if present
-      // Buzz machines use int16-range values (-32768 to 32767) internally,
-      // so scale float input (-1 to 1) up by 32768 before writing.
-      // The output path divides by 32768 to convert back to float.
+      // Buzz machines use stereo interleaved buffers in int16 range (-32768 to 32767).
+      // numSamples = number of STEREO PAIRS, so buffer has numSamples*2 floats.
+      // Scale float input (-1 to 1) up by 32768 before writing.
       if (hasInput && this.audioBufferPtr) {
         const leftIn = input[0];
         const rightIn = input[1] || leftIn;
 
-        // Mix stereo to mono and scale to int16 range
+        // Write stereo interleaved: L0,R0,L1,R1,...
         for (let i = 0; i < numSamples; i++) {
-          this.wasmAudioView[i] = (leftIn[i] + rightIn[i]) * 0.5 * 32768.0;
+          this.wasmAudioView[i * 2] = leftIn[i] * 32768.0;
+          this.wasmAudioView[i * 2 + 1] = rightIn[i] * 32768.0;
         }
       }
 
@@ -1291,18 +1292,15 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       this.errorCount = 0;
 
       // Copy output from WASM buffer (unless muted)
+      // Buzz machines output stereo interleaved in int16 range (-32768 to 32767)
       if (isActive && this.audioBufferPtr && !this.muted) {
         const leftOut = output[0];
         const rightOut = output[1] || leftOut;
 
-        // Copy mono to both channels with normalization
-        // Buzz machines output values in short range (-32768 to 32767)
+        // Read stereo interleaved: L0,R0,L1,R1,...
         for (let i = 0; i < numSamples; i++) {
-          const sample = this.wasmAudioView[i] / 32768.0;
-          // Clamp to prevent clipping artifacts
-          const clamped = Math.max(-1.0, Math.min(1.0, sample));
-          leftOut[i] = clamped;
-          rightOut[i] = clamped;
+          leftOut[i] = Math.max(-1.0, Math.min(1.0, this.wasmAudioView[i * 2] / 32768.0));
+          rightOut[i] = Math.max(-1.0, Math.min(1.0, this.wasmAudioView[i * 2 + 1] / 32768.0));
         }
       } else {
         // Machine returned false = silence
