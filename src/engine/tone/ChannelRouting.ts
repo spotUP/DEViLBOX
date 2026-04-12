@@ -694,7 +694,10 @@ export function updateChannelEnvelopes(ctx: ChannelRoutingContext, channelIndex:
     }
 
     // Calculate final volume multiplier (0.0 to 1.0)
-    const volMult = (envVol / 64) * (voice.fadeout / 65536);
+    // Use ?? 65536 so an undefined/uninitialized fadeout means "no fadeout = full volume"
+    const volMult = (envVol / 64) * ((voice.fadeout ?? 65536) / 65536);
+    // Guard against NaN (e.g. if envVol or fadeout is somehow NaN) — skip rather than corrupt audio graph
+    if (!isFinite(volMult)) return;
     voice.nodes.gain.gain.setValueAtTime(volMult, now);
 
     // 2. Advance panning envelope (0-64)

@@ -36,24 +36,11 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Deep clone effects to avoid Immer proxy revocation issues during async operations
   const effectsCopy = structuredClone(effects) as EffectConfig[];
 
-  // Disconnect masterEffectsInput output (preserves upstream connections from amigaFilter & synthBus)
-  ctx.masterEffectsInput.disconnect();
-  ctx.masterEffectsNodes.forEach((node) => {
-    try {
-      node.disconnect();
-      node.dispose();
-    } catch {
-      // Node may already be disposed
-    }
-  });
-  ctx.masterEffectsNodes = [];
-  ctx.masterEffectConfigs.clear();
-  // Disconnect and clear analyser taps
-  ctx.masterEffectAnalysers.forEach(({ pre, post }) => {
-    try { pre.disconnect(); } catch { /* */ }
-    try { post.disconnect(); } catch { /* */ }
-  });
-  ctx.masterEffectAnalysers.clear();
+  // Snapshot old chain so we can tear it down AFTER the new chain is fully built.
+  // This eliminates the audio gap that occurred when we disconnected before the async
+  // effect-creation work — audio flows through the old chain until the last possible moment.
+  const oldNodes = ctx.masterEffectsNodes.slice();
+  const oldAnalysers = new Map(ctx.masterEffectAnalysers);
 
   // Filter to only enabled effects
   const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
@@ -73,8 +60,24 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     }).catch(() => { /* mixer store not available */ });
   }
 
+  /** Tear down the old chain that was snapshotted before we started async work. */
+  const teardownOldChain = () => {
+    ctx.masterEffectsInput.disconnect();
+    oldNodes.forEach((node) => {
+      try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+    });
+    ctx.masterEffectsNodes = ctx.masterEffectsNodes.filter(n => !oldNodes.includes(n));
+    ctx.masterEffectConfigs.clear();
+    oldAnalysers.forEach(({ pre, post }) => {
+      try { pre.disconnect(); } catch { /* */ }
+      try { post.disconnect(); } catch { /* */ }
+    });
+    oldAnalysers.forEach((_, id) => ctx.masterEffectAnalysers.delete(id));
+  };
+
   if (globalEffects.length === 0) {
-    // No global effects - direct connection to BLEP input
+    // No global effects — tear down old chain and connect directly to BLEP input
+    teardownOldChain();
     ctx.masterEffectsInput.connect(ctx.blepInput);
     return;
   }
@@ -87,9 +90,7 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Check if a newer rebuild superseded us
   if (myVersion !== ctx.masterEffectsRebuildVersion) {
     // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + ctx.masterEffectsRebuildVersion + ')');
-    // Old chain was already torn down above — reconnect input as fallback so audio
-    // isn't left disconnected if the superseding rebuild also aborts.
-    try { ctx.masterEffectsInput.connect(ctx.blepInput); } catch { /* already connected by superseding rebuild */ }
+    // Old chain is still live — leave it connected; the superseding rebuild will swap it out.
     return;
   }
 
@@ -106,6 +107,7 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
         try { node.disconnect(); node.dispose(); } catch { /* */ }
         // Dispose any previously created nodes in this batch
         successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+        // Old chain is still live — leave it for the superseding rebuild to tear down
         return;
       }
       successNodes.push(node);
@@ -121,6 +123,11 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
     return;
   }
+
+  // New chain is fully built — atomically tear down old chain and connect new one.
+  // This is the point where audio is momentarily re-routed; the gap is now a single
+  // synchronous disconnect+connect block rather than the entire async creation period.
+  teardownOldChain();
 
   if (successNodes.length === 0) {
     // All effects failed — direct connection to BLEP input
