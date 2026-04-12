@@ -21,7 +21,6 @@ import { SunVoxImportDialog } from '@components/instruments/SunVoxImportDialog';
 import { ScaleVolumeDialog } from './ScaleVolumeDialog';
 import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
-import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { RandomizeDialog } from '@components/dialogs/RandomizeDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
@@ -35,7 +34,6 @@ import { UndoHistoryPanel } from './UndoHistoryPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { InstrumentKnobPanel } from './InstrumentKnobPanel';
 import { EditorControlsBar } from './EditorControlsBar';
-import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
 import { useMIDIFeedback } from '@hooks/useMIDIFeedback';
@@ -52,7 +50,6 @@ import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
 import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { PatternMinimap } from './PatternMinimap';
-import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
@@ -64,7 +61,6 @@ import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
 import { SF2View } from '@components/sidfactory2/SF2View';
 import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
-import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
 import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
 
@@ -215,9 +211,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showRemapInstrument, setShowRemapInstrument] = useState(false);
   const [volumeOpScope, setVolumeOpScope] = useState<'block' | 'track' | 'pattern'>('block');
   const [remapOpScope, setRemapOpScope] = useState<'block' | 'track' | 'pattern' | 'song'>('block');
-  // Acid generator dialog
-  const [showAcidGenerator, setShowAcidGenerator] = useState(false);
-  const [acidGeneratorChannel, setAcidGeneratorChannel] = useState(0);
   // Randomize dialog
   const [showRandomize, setShowRandomize] = useState(false);
   const [randomizeChannel, setRandomizeChannel] = useState(0);
@@ -383,12 +376,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
 
-  // Acid generator handler
-  const handleAcidGenerator = useCallback((channelIndex: number) => {
-    setAcidGeneratorChannel(channelIndex);
-    setShowAcidGenerator(true);
-  }, []);
-
   // Randomize handler
   const handleRandomize = useCallback((channelIndex: number) => {
     setRandomizeChannel(channelIndex);
@@ -504,12 +491,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             onCancel={() => setShowRemapInstrument(false)}
           />
         )}
-        {showAcidGenerator && (
-          <AcidPatternGeneratorDialog
-            channelIndex={acidGeneratorChannel}
-            onClose={() => setShowAcidGenerator(false)}
-          />
-        )}
         {showRandomize && (
           <RandomizeDialog
             channelIndex={randomizeChannel}
@@ -578,12 +559,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       {/* Main Content Area with Pattern Editor and Instrument Panel - Flexbox Layout */}
       <div className="flex-1 min-h-0 min-w-0 relative z-10 flex overflow-hidden">
 
-        {/* Pattern Order Sidebar - Renoise-style (tracker view only, hidden in fullscreen) */}
-        {!editorFullscreen && viewMode === 'tracker' && (
-          <PatternOrderSidebar />
-        )}
-
-        {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
+        {/* Pattern Editor / Grid Sequencer - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
             (() => {
@@ -691,7 +667,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               ) : (
                 <TrackerEditorWithBg
                   trackerVisualBg={trackerVisualBg}
-                  onAcidGenerator={handleAcidGenerator}
+                  onAcidGenerator={() => {}}
                   onRandomize={handleRandomize}
                   onSwipeLeft={handleSwipeLeft}
                   onSwipeRight={handleSwipeRight}
@@ -791,13 +767,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             })()
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
-          ) : viewMode === 'pianoroll' ? (
-            <PianoRoll channelIndex={gridChannelIndex} />
-          ) : (
-            <div className="flex-1 w-full overflow-y-auto overflow-x-hidden bg-dark-bgPrimary">
-              <TB303View channelIndex={gridChannelIndex} />
-            </div>
-          )}
+          ) : null}
 
           {/* Pattern Bottom Bar — edit step, octave, column toggles (tracker view only) */}
           {!editorFullscreen && viewMode === 'tracker' && (
@@ -984,12 +954,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         />
       )}
       <CleanupDialog isOpen={showCleanup} onClose={() => setShowCleanup(false)} />
-      {showAcidGenerator && (
-        <AcidPatternGeneratorDialog
-          channelIndex={acidGeneratorChannel}
-          onClose={() => setShowAcidGenerator(false)}
-        />
-      )}
       {showRandomize && (
         <RandomizeDialog
           channelIndex={randomizeChannel}

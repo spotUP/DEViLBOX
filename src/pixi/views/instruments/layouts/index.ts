@@ -3,7 +3,6 @@
  */
 
 import type { SynthPanelLayout } from '../synthPanelTypes';
-import { TB303_LAYOUT } from './tb303';
 import { DUB_SIREN_LAYOUT } from './dubSiren';
 import { CHIP_SYNTH_LAYOUT } from './chipSynth';
 import { HARMONIC_SYNTH_LAYOUT } from './harmonicSynth';
@@ -66,10 +65,6 @@ import { V2SPEECH_LAYOUT } from './v2speech';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
-  // TB-303 variants
-  TB303: TB303_LAYOUT,
-  Buzz3o3: TB303_LAYOUT,
-
   // JUCE WASM synths
   Odin2: ODIN2_LAYOUT,
   Surge: SURGE_LAYOUT,
@@ -143,9 +138,6 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   // MAME chip synths with dedicated panels
   CZ101: CZ101_LAYOUT,
   D50: D50_LAYOUT,
-
-  // VSTBridge synths that share existing layouts
-  Open303: TB303_LAYOUT,
 
   // Drum machines
   MAMETR707: TR707_LAYOUT,

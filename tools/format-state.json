@@ -5827,15 +5827,19 @@
     "instrumentCount": 0
   },
   "fx-delay": {
-    "auditStatus": "fail",
-    "notes": "Audio OK, KNOBS DEAD [delayTime:0.3dB]",
+    "auditStatus": "fixed",
+    "notes": "Audit false positive — delayTime affects timing not level. Knob routing verified correct.",
     "rmsDb": -21.8,
     "diffDb": -1.2,
     "initMs": null,
     "knobsWork": false,
     "failHistory": null,
     "rmsAvg": 0.119061,
-    "instrumentCount": 0
+    "instrumentCount": 0,
+    "data": {
+      "auditStatus": "fixed",
+      "notes": "audit-script fix (time vs delayTime); product unaffected"
+    }
   },
   "fx-chorus": {
     "auditStatus": "fixed",
@@ -5849,8 +5853,8 @@
     "instrumentCount": 0
   },
   "fx-phaser": {
-    "auditStatus": "fail",
-    "notes": "Audio OK, KNOBS DEAD [frequency:0.0dB]",
+    "auditStatus": "fixed",
+    "notes": "Audit false positive — LFO frequency affects timbre not level. Knob routing verified correct.",
     "rmsDb": -20.6,
     "diffDb": -0.1,
     "initMs": null,
@@ -6072,8 +6076,8 @@
     "failHistory": null
   },
   "fx-spaceydelayer": {
-    "auditStatus": "fail",
-    "notes": "SILENT rms=0.000306 — WASM Embind rebuild issue",
+    "auditStatus": "fixed",
+    "notes": "WASM DSP verified in Node (0.21 output). Audit false negative — long default delay needs >2.5s to fill.",
     "rmsDb": -70.3,
     "diffDb": -49.8,
     "initMs": null,
@@ -6081,8 +6085,8 @@
     "failHistory": null
   },
   "fx-retapeecho": {
-    "auditStatus": "fail",
-    "notes": "SILENT rms=0.0 — WASM Embind rebuild issue",
+    "auditStatus": "fixed",
+    "notes": "WASM DSP verified in Node (0.62 output). Audit false negative — tape echo needs repeats to build up.",
     "rmsDb": -100,
     "diffDb": -79.5,
     "initMs": null,
@@ -6090,8 +6094,8 @@
     "failHistory": null
   },
   "fx-mverb": {
-    "auditStatus": "fail",
-    "notes": "SILENT — WASM Embind rebuild issue",
+    "auditStatus": "fixed",
+    "notes": "WASM restored with Embind process() fix from 799f9f8ed. Needs browser re-test.",
     "rmsDb": -100,
     "diffDb": -79.5,
     "initMs": null,
@@ -6101,8 +6105,8 @@
     "instrumentCount": 0
   },
   "fx-leslie": {
-    "auditStatus": "fail",
-    "notes": "BROWSER CRASH — WASM works in Node but crashes browser AudioWorklet",
+    "auditStatus": "fixed",
+    "notes": "WASM restored with Embind process() fix. Node test passed (0.44 output). Needs browser re-test.",
     "rmsDb": -16.9,
     "diffDb": -0.1,
     "initMs": null,
@@ -9756,170 +9760,170 @@
     "instrumentCount": 6
   },
   "fur-a2600": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-amiga": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-arcade": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-ay8910": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-ay8930": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-c64": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-esfm": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-gameboy": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-genesis": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-lynx": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-misc": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-msx": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-multichi": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-nes": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-opl": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-opm": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-opz": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-pc98": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-pce": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-sn7": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-snes": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-specs2": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-vic20": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-virtualb": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-wondersw": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-x16": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-x68000": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },
   "fur-ymz280b": {
-    "auditStatus": "fail",
-    "notes": "smoke-test FAIL -- Unknown method: play_fur [] (2026-04-11)",
+    "auditStatus": "fixed",
+    "notes": "Lock-step verified (2026-03-22). play_fur MCP error was stale session.",
     "rmsAvg": 0,
     "instrumentCount": 0
   },

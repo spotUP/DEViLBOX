@@ -37,8 +37,6 @@ import { PixiButton } from '../components/PixiButton';
 import { WorkbenchCameraControls } from './WorkbenchCameraControls';
 import { PixiTrackerView } from '../views/PixiTrackerView';
 import { PixiDJView } from '../views/PixiDJView';
-import { PixiArrangementView } from '../views/PixiArrangementView';
-import { PixiPianoRollView } from '../views/PixiPianoRollView';
 import { PixiInstrumentEditor } from '../views/PixiInstrumentEditor';
 import { PixiMixerView } from '../views/PixiMixerView';
 import { PixiMasterFxView } from '../views/PixiMasterFxView';
@@ -98,8 +96,6 @@ export function useSetSnapLines(): (lines: SnapLine[]) => void {
 
 const WINDOW_CONTENT: Record<string, { title: string; component: React.ComponentType }> = {
   tracker:     { title: 'Tracker',          component: PixiTrackerView },
-  pianoroll:   { title: 'Piano Roll',       component: PixiPianoRollView },
-  arrangement: { title: 'Arrangement',      component: PixiArrangementView },
   dj:          { title: 'DJ',               component: PixiDJView },
   // VJ excluded — creates separate WebGL contexts (ProjectM/butterchurn/Three.js)
   // that interfere with PixiJS when always-mounted. VJ is conditionally mounted

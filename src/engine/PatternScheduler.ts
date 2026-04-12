@@ -13,7 +13,6 @@ import { getTrackerReplayer } from './TrackerReplayer';
 import { createFormatHandler } from './effects';
 import { type FormatHandler, type ModuleFormat, type TickResult, type ChannelState, type ActiveInstrumentMeta } from './effects/types';
 import { getAutomationPlayer } from './AutomationPlayer';
-import { processArrangementAutomation, hasArrangementAutomation } from './ArrangementAutomationPlayer';
 import { getEffectProcessor } from './EffectCommands';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -73,12 +72,6 @@ export class PatternScheduler {
   private automationPlayer = getAutomationPlayer();
   private patternBreakScheduled: boolean = false; // Prevent double pattern breaks
   private currentPatternEndTime: number = 0; // When current pattern ends (transport seconds)
-  private currentPatternStartRow: number = 0; // Global row offset for arrangement automation
-
-  /** Set the global row offset for arrangement timeline automation */
-  public setArrangementRowOffset(globalRow: number): void {
-    this.currentPatternStartRow = globalRow;
-  }
   private nextPatternScheduled: boolean = false; // Track if next pattern is pre-scheduled
   // Deferred pattern control: pattern breaks/jumps execute at END of row, not immediately
   private pendingPatternBreak: { position: number } | null = null;
@@ -723,12 +716,6 @@ export class PatternScheduler {
             // Apply automation curves for this row
             this.automationPlayer.processPatternRow(row);
 
-            // Apply arrangement-level timeline automation (if in arrangement mode)
-            if (hasArrangementAutomation()) {
-              // globalRow = cumulative row position across all patterns in the arrangement
-              const globalRow = (this.currentPatternStartRow ?? 0) + row;
-              processArrangementAutomation(globalRow);
-            }
 
             // Deferred control
             if (this.pendingPositionJump !== null) {

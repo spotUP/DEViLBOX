@@ -10,4 +10,3 @@ export * from './audio';
 export * from './automation';
 export * from './project';
 export * from './pedalboard';
-export * from './arrangement';

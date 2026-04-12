@@ -23,6 +23,5 @@ export { useMIDIStore } from './useMIDIStore';
 export { useVisualizationStore, type ADSRStage, type ActiveNote, type LFOPhase } from './useVisualizationStore';
 export { useLiveModeStore } from './useLiveModeStore';
 export { useOscilloscopeStore } from './useOscilloscopeStore';
-export { usePianoRollStore } from './usePianoRollStore';
 export { usePresetStore, type UserPreset, type PresetCategory } from './usePresetStore';
 export { useSynthErrorStore } from './useSynthErrorStore';

@@ -22,7 +22,6 @@ import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { PixiCollaborationToolbar } from './views/collaboration/PixiCollaborationToolbar';
-import { PixiCollaborationSplitView } from './views/collaboration/PixiCollaborationSplitView';
 import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
 import { PixiGlobalTooltipLayer } from './components/PixiGlobalTooltipLayer';
 import { PixiToast } from './components/PixiToast';
@@ -38,11 +37,8 @@ import { PixiCleanupDialog } from './dialogs/PixiCleanupDialog';
 import { PixiScaleVolumeDialog } from './dialogs/PixiScaleVolumeDialog';
 import { PixiFadeVolumeDialog } from './dialogs/PixiFadeVolumeDialog';
 import { PixiStrumDialog } from './dialogs/PixiStrumDialog';
-import { PixiAcidPatternDialog } from './dialogs/PixiAcidPatternDialog';
 import { PixiPatternLengthDialog } from './dialogs/PixiPatternLengthDialog';
 import { PixiRandomizeDialog } from './dialogs/PixiRandomizeDialog';
-import { PixiClipRenameDialog } from './dialogs/PixiClipRenameDialog';
-import { PixiTrackRenameDialog } from './dialogs/PixiTrackRenameDialog';
 import { PixiDownloadModal } from './dialogs/PixiDownloadModal';
 import { PixiSynthErrorDialog } from './dialogs/PixiSynthErrorDialog';
 import { PixiUndoHistoryPanel } from './dialogs/PixiUndoHistoryPanel';
@@ -58,7 +54,6 @@ import { PixiRevisionBrowserDialog } from './dialogs/PixiRevisionBrowserDialog';
 import { PixiFurnacePresetBrowser } from './dialogs/PixiFurnacePresetBrowser';
 import { PixiSIDInfoModal } from './dialogs/PixiSIDInfoModal';
 import { PixiModuleInfoModal } from './dialogs/PixiModuleInfoModal';
-import { PixiArrangementContextMenu } from './dialogs/PixiArrangementContextMenu';
 import { PixiHelpModal } from './dialogs/PixiHelpModal';
 import { PixiDrumpadEditorModal } from './dialogs/PixiDrumpadEditorModal';
 import { PixiImportTD3Dialog } from './dialogs/PixiImportTD3Dialog';
@@ -367,7 +362,6 @@ export const PixiRoot: React.FC = () => {
           scope={(modalData?.scope as 'block' | 'track' | 'pattern') || 'block'}
         />
         <PixiStrumDialog isOpen={modalOpen === 'strum'} onClose={closeModal} />
-        <PixiAcidPatternDialog isOpen={modalOpen === 'acidPattern'} onClose={closeModal} />
         <PixiPatternLengthDialog isOpen={modalOpen === 'patternLength'} onClose={closeModal} />
         <PixiRandomizeDialog isOpen={modalOpen === 'randomize'} onClose={closeModal} />
         <PixiDownloadModal isOpen={modalOpen === 'download'} onClose={closeModal} />
@@ -495,18 +489,12 @@ export const PixiRoot: React.FC = () => {
           channelIndex={(modalData?.channelIndex as number) ?? 0}
         />
         <PixiInstrumentEffectsModal isOpen={modalOpen === 'instrumentFx'} onClose={closeModal} />
-        <PixiClipRenameDialog />
-        <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
         <PixiNonEditableDialog />
-        <PixiArrangementContextMenu />
         <PixiPatternBarEditor isOpen={modalOpen === 'parameterEditor'} onClose={closeModal} />
         <PixiAddToHomeScreenModal isOpen={modalOpen === 'addToHomeScreen'} onClose={closeModal} />
         <PixiAIPanel />
       </pixiContainer>
-
-      {/* Collaboration split view — overlays tracker area */}
-      <PixiCollaborationSplitView />
 
       {/* Peer cursor overlay — above everything */}
       <pixiContainer
