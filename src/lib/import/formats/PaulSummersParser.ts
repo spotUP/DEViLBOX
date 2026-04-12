@@ -15,6 +15,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
@@ -152,5 +154,16 @@ export function parsePaulSummersFile(buffer: ArrayBuffer, filename: string): Tra
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'paulSummers',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: 4,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+      decodeCell: decodeMODCell,
+    } as UADEPatternLayout,
   };
 }

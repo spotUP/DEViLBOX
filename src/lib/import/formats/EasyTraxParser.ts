@@ -21,6 +21,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -113,5 +115,16 @@ export function parseEasyTraxFile(bytes: Uint8Array, filename: string): TrackerS
     linearPeriods:   false,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'easyTrax',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: NUM_CHANNELS,
+      numPatterns: 1,
+      moduleSize: bytes.byteLength,
+      encodeCell: encodeMODCell,
+      decodeCell: decodeMODCell,
+    } as UADEPatternLayout,
   };
 }
