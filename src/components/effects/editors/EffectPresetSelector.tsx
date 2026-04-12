@@ -6,11 +6,12 @@ import { Save, Trash2, X } from 'lucide-react';
 
 interface Props {
   effect: EffectConfig;
-  onApply: (params: Record<string, number | string>) => void;
+  onApply?: (params: Record<string, number | string>) => void;
+  onUpdateParameter?: (key: string, value: number | string) => void;
   color?: string;
 }
 
-export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, color = '#6366f1' }) => {
+export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdateParameter, color = '#6366f1' }) => {
   const [open, setOpen] = useState(false);
   const [showSave, setShowSave] = useState(false);
   const [saveName, setSaveName] = useState('');
@@ -39,6 +40,16 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, color =
   }, [open]);
 
   const hasPresets = factoryPresets.length > 0 || userPresets.length > 0;
+
+  const applyPreset = (params: Record<string, number | string>) => {
+    if (onApply) {
+      onApply(params);
+    } else if (onUpdateParameter) {
+      for (const [key, value] of Object.entries(params)) {
+        onUpdateParameter(key, value);
+      }
+    }
+  };
 
   const handleSave = () => {
     if (!saveName.trim()) return;
@@ -71,7 +82,7 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, color =
                 Factory
               </div>
               {factoryPresets.map(p => (
-                <button key={p.name} onClick={() => { onApply(p.params); setOpen(false); }}
+                <button key={p.name} onClick={() => { applyPreset(p.params); setOpen(false); }}
                   className="w-full text-left px-3 py-1.5 text-[11px] text-text-primary hover:bg-dark-bgHover transition-colors">
                   {p.name}
                 </button>
@@ -86,7 +97,7 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, color =
               </div>
               {userPresets.map(p => (
                 <div key={p.name} className="flex items-center hover:bg-dark-bgHover group">
-                  <button onClick={() => { onApply(p.params); setOpen(false); }}
+                  <button onClick={() => { applyPreset(p.params); setOpen(false); }}
                     className="flex-1 text-left px-3 py-1.5 text-[11px] text-text-primary">
                     {p.name}
                   </button>
