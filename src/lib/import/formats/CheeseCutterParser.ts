@@ -375,30 +375,29 @@ export async function parseCheeseCutterFile(
   else if (sidModel === 1) flags |= (0x02 << 4); // 8580
   psidView.setUint16(118, flags);
 
-  // PSID v2 free-page hint (offset 0x78-0x79): tell the emulator's PSID
-  // driver to install itself at $C000-$CFFF (page $C0, 16 pages = 4KB).
-  // Without this, loading data up to $BFFF leaves no room and websid
-  // reports "FATAL ERROR: no free memory for driver".
-  psidHeader[0x78] = 0xC0; // startPage = $C000
-  psidHeader[0x79] = 0x10; // pageLength = 16 pages (4KB)
+  // startPage = $00 → websid auto-detects free memory for its 33-byte
+  // PSID driver. With data ending at ~$B689, the driver lands at $CFE0.
+  // Verified: pointer table entries 0-38 all reference $0E00-$B689 range.
+  psidHeader[0x78] = 0x00; // startPage = auto-detect
+  psidHeader[0x79] = 0x00; // pageLength = unused in auto mode
 
-  // Load $0002-$BFFF: player + music data. Leave $C000-$CFFF free for
-  // the PSID driver shim, and $D000+ for I/O and KERNAL.
-  const LOAD_START = 0x0002;
-  const LOAD_END = 0xC000; // exclusive — leave room for PSID driver
-  const loadPrefix = new Uint8Array([LOAD_START & 0xFF, LOAD_START >> 8]);
+  // Load ONLY the player binary + music data ($0DFE-$BFFF). The 2-byte
+  // load address header at $0DFE-$0DFF ($00,$0E → load at $0E00) is
+  // part of the data per PSID spec (loadAddress=$0000 in header means
+  // data starts with a 2-byte LE load address).
+  //
+  // We do NOT load $0002-$0DFD (zero page, stack, screen) — the init
+  // routine at $1000 sets up its own working variables. Loading the
+  // entire low range caused conflicts with websid's IRQ vector setup
+  // at $0314/$0315 and the PSID driver's bank switching.
+  const LOAD_START = 0x0DFE; // includes 2-byte load address header
+  const LOAD_END = 0xC000;   // exclusive — all data ends below $B689
   const memSlice = mem.subarray(LOAD_START, LOAD_END);
 
-  // Assemble PSID file
-  const sidFileData = new Uint8Array(124 + 2 + memSlice.length);
+  // Assemble PSID file (header + data with embedded load address)
+  const sidFileData = new Uint8Array(124 + memSlice.length);
   sidFileData.set(psidHeader, 0);
-  sidFileData.set(loadPrefix, 124);
-  sidFileData.set(memSlice, 126);
-
-  // Post-init RAM patch: the PSID driver installs its shim at $C000-$CFFF,
-  // overwriting any CheeseCutter music data there. Restore it after init.
-  const patchData = mem.slice(0xC000, 0xD000);
-  const c64MemPatches = [{ addr: 0xC000, data: patchData }];
+  sidFileData.set(memSlice, 124);
 
   // ── Build patterns for tracker display ──────────────────────────────
   // Determine order length as max non-end entries across the 3 voices
@@ -568,7 +567,6 @@ export async function parseCheeseCutterFile(
     initialSpeed: speed,
     initialBPM: bpm,
     c64SidFileData: sidFileData,
-    c64MemPatches,
     cheeseCutterStoreData: storeData,
   };
 }
