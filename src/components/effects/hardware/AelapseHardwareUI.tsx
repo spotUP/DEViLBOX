@@ -300,26 +300,22 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
-          // Position the springs overlay exactly on top of the stubbed
-          // SpringsGL component inside the JUCE editor. Cache the bounds
-          // after the first successful read — they're set once in
-          // SpringsSection::resized() and never change at runtime.
+          // Position the springs overlay on the SpringsGL stub region.
+          // Stay hidden until we get valid bounds, then lock them in.
           if (!springsBoundsRef.current) {
             const sprX = modRef._aelapse_ui_get_springs_x();
             const sprY = modRef._aelapse_ui_get_springs_y();
             const sprW = modRef._aelapse_ui_get_springs_w();
             const sprH = modRef._aelapse_ui_get_springs_h();
-            if (sprW > 0 && sprH > 0) {
+            if (sprW > 10 && sprH > 10 && sprW < w && sprH < h) {
               springsBoundsRef.current = { x: sprX, y: sprY, w: sprW, h: sprH };
+              const cssScale = jcanvas.clientWidth / w;
+              overlay.style.left   = `${Math.round(sprX * cssScale)}px`;
+              overlay.style.top    = `${Math.round(sprY * cssScale)}px`;
+              overlay.style.width  = `${Math.round(sprW * cssScale)}px`;
+              overlay.style.height = `${Math.round(sprH * cssScale)}px`;
+              overlay.style.display = 'block';
             }
-          }
-          if (springsBoundsRef.current) {
-            const { x: sprX, y: sprY, w: sprW, h: sprH } = springsBoundsRef.current;
-            const cssScale = jcanvas.clientWidth / w;
-            overlay.style.left   = `${Math.round(sprX * cssScale)}px`;
-            overlay.style.top    = `${Math.round(sprY * cssScale)}px`;
-            overlay.style.width  = `${Math.round(sprW * cssScale)}px`;
-            overlay.style.height = `${Math.round(sprH * cssScale)}px`;
           }
 
           // Springs overlay — pull latest RMS snapshot and a handful of
@@ -400,12 +396,13 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             touchAction: 'none',
           }}
         />
-        {/* Springs overlay disabled for now — positioning is unstable
-            and blocks knob interaction testing. Re-enable once the
-            JUCE editor + DSP audio path are verified working. */}
         <canvas
           ref={overlayRef}
-          style={{ display: 'none' }}
+          style={{
+            display: 'none',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
         />
       </div>
     </div>
