@@ -43,6 +43,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -398,5 +400,15 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'mod',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      numChannels: NUM_CHANNELS,
+      numPatterns: patterns.length,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+    } satisfies UADEPatternLayout,
   };
 }

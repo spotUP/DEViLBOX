@@ -36,6 +36,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -241,5 +243,16 @@ export async function parseAndrewPartonFile(
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'andrewParton',
+      patternDataFileOffset: 0,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: 4,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+      decodeCell: decodeMODCell,
+    } as UADEPatternLayout,
   };
 }

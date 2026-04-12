@@ -36,6 +36,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // We need to read at least 8 bytes of header plus follow the largest offset pointer.
 // Minimum: header 8 bytes + at least one pattern byte + terminator.
@@ -183,5 +185,15 @@ export function parsePierreAdaneFile(buffer: ArrayBuffer, filename: string): Tra
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'mod',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: 4,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+    } satisfies UADEPatternLayout,
   };
 }
