@@ -221,8 +221,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">LAYOUT</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-ft2-text text-xs font-mono">TB-303 Panel:</label>
-                    <Toggle label="" value={!s.tb303Collapsed} onChange={(v) => s.setTB303Collapsed(!v)} size="sm" />
+                    <label className="text-ft2-text text-xs font-mono">Knob Panel:</label>
+                    <Toggle label="" value={!s.knobPanelCollapsed} onChange={(v) => s.setKnobPanelCollapsed(!v)} size="sm" />
                   </div>
                   <div className="flex items-center justify-between">
                     <label className="text-ft2-text text-xs font-mono">Oscilloscope:</label>

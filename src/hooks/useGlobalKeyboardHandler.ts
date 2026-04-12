@@ -1921,7 +1921,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         const noMods = !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
         const isPTTKey =
           (e.code === 'Space' && noMods && (view === 'dj' || view === 'vj')) ||
-          (e.code === 'KeyT' && noMods && view !== 'tracker' && view !== 'arrangement' && view !== 'pianoroll');
+          (e.code === 'KeyT' && noMods && view !== 'tracker');
         if (isPTTKey && !e.repeat) {
           console.log('[GlobalPTT]', e.code, 'keydown in', view, '— activating PTT');
           e.preventDefault();
