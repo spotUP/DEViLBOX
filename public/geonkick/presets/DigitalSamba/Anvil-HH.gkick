@@ -1,0 +1,266 @@
+{
+"osc8": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 120, 
+"ampl_env": {
+"amplitude": 0.82963, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.04516 , 0.64583], [ 0.10065 , 0.50417], [ 0.30968 , 0.52083], [ 0.57419 , 0.62083], [ 0.76645 , 0.74583], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 2595.38086, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 1.75568
+}
+}
+,
+"osc7": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.18519, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.14968 , 0.55417], [ 0.45032 , 0.35000], [ 0.71355 , 0.22500], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 10492.02832, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc6": {
+"enabled": true, 
+"is_fm": true, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.14074, 
+"points": [
+[ 0.00000 , 0.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 1047.06848, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc5": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 720, 
+"ampl_env": {
+"amplitude": 0.86667, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.06452 , 0.66667], [ 0.15742 , 0.42500], [ 0.28774 , 0.27083], [ 0.47613 , 0.15417], [ 0.71613 , 0.07083], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 9817.00195, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 9.50119
+}
+}
+,
+"osc1": {
+"enabled": true, 
+"is_fm": false, 
+"function": 3,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.09806 , 0.68750], [ 0.20645 , 0.43750], [ 0.31871 , 0.24583], [ 0.47613 , 0.11667], [ 0.65419 , 0.05417], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 1581.70764, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": true, 
+"function": 3,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.88222, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.10581 , 0.64583], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 2050.69897, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc2": {
+"enabled": true, 
+"is_fm": false, 
+"function": 6,
+"phase": 0.00000, 
+"seed": 360, 
+"ampl_env": {
+"amplitude": 0.68963, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.02710 , 0.28333], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 4329.35645, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 184.78497
+}
+}
+,
+"osc3": {
+"enabled": true, 
+"is_fm": true, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.40741, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.11484 , 0.53333], [ 0.30323 , 0.28333], [ 0.50452 , 0.15833], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 2658.75073, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc4": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.10370, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 4469.19189, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 131074,
+"id": 8,
+"channel": 6,
+"name": "Anvil-HH",
+"playing_key": 75,
+"layers": [0, 1, 2],
+"layers_amplitude": [1.00000, 1.00000, 1.00000],
+"limiter": 0.68129, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 0.80000, 
+"length": 300.00000, 
+"points": [[ 0.00000 , 1.00000], [ 0.08000 , 1.00000], [ 0.73161 , 0.47500], [ 1.00000 , 0.00000]]}, 
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 200.00, 
+"factor": 10.00, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.00175, 
+"release": 0.01000, 
+"threshold": 0.12589, 
+"ratio": 19.00000, 
+"knee": 0.12589, 
+"makeup": 1.00000
+}, 
+"distortion": {
+"enabled": true, 
+"in_limiter": 0.57544, 
+"volume": 0.28840, 
+"drive": 4.83059, 
+"drive_env": [
+[ 0.00000 , 1.00000], [ 0.03871 , 0.50000], [ 0.30710 , 0.00000], [ 1.00000 , 0.00000]]
+}
+}
+}

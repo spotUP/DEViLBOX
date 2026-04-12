@@ -1,0 +1,390 @@
+{
+"osc8": {
+"enabled": false, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.0000000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 150.0000000, 
+"apply_type": 1, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.0000000, 
+"apply_type": 0, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc7": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc6": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc5": {
+"enabled": false, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.0000000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 150.0000000, 
+"apply_type": 1, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.0000000, 
+"apply_type": 0, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc4": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc3": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc2": {
+"enabled": false, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.0000000, 
+"seed": 100, 
+"ampl_env": {
+"amplitude": 0.2600000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 150.0000000, 
+"apply_type": 1, 
+"points": [
+]
+}
+,
+"pitchshift_env": {
+"amplitude": 0.0000000, 
+"apply_type": 0, 
+"points": [
+]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc1": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 1.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.1916667], [ 0.0503226 , 0.9416667], [ 0.1303226 , 1.0000000], [ 0.3006452 , 0.8250000], [ 0.4619355 , 0.5375000], [ 0.5612903 , 0.0000000], [ 1.0000000 , 0.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 0.5416667], [ 0.0348387 , 0.5458333], [ 0.1238710 , 0.3500000], [ 0.2632258 , 0.2375000], [ 1.0000000 , 0.2458333]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": false, 
+"sample": "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",
+"function": 7,
+"phase": 0.0000000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.6222222, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"freq_env": {
+"amplitude": 800.0000000, 
+"apply_type": 1, 
+"points": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+,
+"pitchshift_env": {
+"amplitude": 12.0000000, 
+"apply_type": 0, 
+"points": [
+[ 0.0000000 , 0.5000000], [ 1.0000000 , 0.5000000]]
+}
+,
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.0000000, 
+"apply_type": 1, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"factor": 10.0000000,
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]] 
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 197120,
+"id": 0,
+"channel": 0,
+"mute": false,
+"solo": false,
+"name": "kick-0",
+"playing_key": -1,
+"layers": [0],
+"layers_amplitude": [1.0000000, 1.0000000, 1.0000000],
+"limiter": 1.4860820, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 0.8000000, 
+"length": 300.0000000, 
+"points": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]}, 
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 200.0000000, 
+"apply_type": 1, 
+"factor": 10.0000000, 
+"cutoff_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]],
+"qfactor_env": [[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.0100000, 
+"release": 0.0100000, 
+"threshold": 0.0000000, 
+"ratio": 1.0000000, 
+"knee": 0.0000000, 
+"makeup": 1.0000000
+}, 
+"distortion": {
+"enabled": false, 
+"in_limiter": 0.0316228, 
+"volume": 0.6165950, 
+"drive": 9.7723722, 
+"drive_env": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]], 
+"volume_env": [
+[ 0.0000000 , 1.0000000], [ 1.0000000 , 1.0000000]]
+}
+}
+}

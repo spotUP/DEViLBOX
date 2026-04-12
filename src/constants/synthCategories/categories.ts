@@ -34,7 +34,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'drums',
     name: 'Drums',
     description: 'Percussion and drum synthesis',
-    synths: [SYNTH_INFO.TR808, SYNTH_INFO.TR909, SYNTH_INFO.MembraneSynth, SYNTH_INFO.MetalSynth, SYNTH_INFO.NoiseSynth, SYNTH_INFO.DrumKit, SYNTH_INFO.Synare, SYNTH_INFO.MAMETR707, SYNTH_INFO.DrumMachine],
+    synths: [SYNTH_INFO.TR808, SYNTH_INFO.TR909, SYNTH_INFO.Geonkick, SYNTH_INFO.MembraneSynth, SYNTH_INFO.MetalSynth, SYNTH_INFO.NoiseSynth, SYNTH_INFO.DrumKit, SYNTH_INFO.Synare, SYNTH_INFO.MAMETR707, SYNTH_INFO.DrumMachine],
   },
   {
     id: 'speech',

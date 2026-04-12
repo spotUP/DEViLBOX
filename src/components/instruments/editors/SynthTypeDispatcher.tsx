@@ -98,6 +98,7 @@ const SAMControls = lazy(() => import('../controls/SAMControls').then(m => ({ de
 const PinkTromboneControls = lazy(() => import('../controls/PinkTromboneControls').then(m => ({ default: m.PinkTromboneControls })));
 const DECtalkControls = lazy(() => import('../controls/DECtalkControls').then(m => ({ default: m.DECtalkControls })));
 const SynareControls = lazy(() => import('../controls/SynareControls').then(m => ({ default: m.SynareControls })));
+const GeonkickControls = lazy(() => import('../controls/GeonkickControls').then(m => ({ default: m.GeonkickControls })));
 const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
 const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls })));
 const CMIControls = lazy(() => import('../controls/CMIControls').then(m => ({ default: m.CMIControls })));
@@ -182,7 +183,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -1967,6 +1968,21 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={synareConfig}
             instrumentId={instrument.id}
             onChange={handleSynareChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+  if (editorMode === 'geonkick') {
+    const geonkickConfig = instrument.geonkick ?? {};
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <Suspense fallback={<LoadingControls />}>
+          <GeonkickControls
+            config={geonkickConfig}
+            onChange={(updates) =>
+              handleChange({ geonkick: { ...geonkickConfig, ...updates } })
+            }
           />
         </Suspense>
       </div>
