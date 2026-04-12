@@ -87,6 +87,9 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Check if a newer rebuild superseded us
   if (myVersion !== ctx.masterEffectsRebuildVersion) {
     // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + ctx.masterEffectsRebuildVersion + ')');
+    // Old chain was already torn down above — reconnect input as fallback so audio
+    // isn't left disconnected if the superseding rebuild also aborts.
+    try { ctx.masterEffectsInput.connect(ctx.blepInput); } catch { /* already connected by superseding rebuild */ }
     return;
   }
 

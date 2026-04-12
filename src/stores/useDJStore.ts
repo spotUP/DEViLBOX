@@ -454,6 +454,17 @@ export const useDJStore = create<DJStore>()(
 
     setDeckState: (deck, partial) =>
       set((state) => {
+        // When loading a new track (fileName changes), explicitly clear old Serato/analysis
+        // arrays first so previous data is dereferenced before new data arrives.
+        // This prevents unbounded memory growth when rapidly loading tracks.
+        if (partial.fileName !== undefined && partial.fileName !== state.decks[deck].fileName) {
+          state.decks[deck].seratoCuePoints = [];
+          state.decks[deck].seratoLoops = [];
+          state.decks[deck].seratoBeatGrid = [];
+          state.decks[deck].beatGrid = null;
+          state.decks[deck].frequencyPeaks = null;
+          state.decks[deck].waveformPeaks = null;
+        }
         Object.assign(state.decks[deck], partial);
       }),
 
