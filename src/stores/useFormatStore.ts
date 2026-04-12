@@ -46,6 +46,7 @@ interface FormatStore {
   c64SidFileData: Uint8Array | null;
   c64MemPatches: Array<{ addr: number; data: Uint8Array }> | null;
   goatTrackerData: Uint8Array | null;
+  cheeseCutterFileData: ArrayBuffer | null;
   jamCrackerFileData: ArrayBuffer | null;
   futurePlayerFileData: ArrayBuffer | null;
   preTrackerFileData: ArrayBuffer | null;
@@ -302,6 +303,7 @@ export const useFormatStore = create<FormatStore>()(
     c64SidFileData: null,
     c64MemPatches: null,
     goatTrackerData: null,
+    cheeseCutterFileData: null,
     jamCrackerFileData: null,
     futurePlayerFileData: null,
     preTrackerFileData: null,
@@ -708,6 +710,7 @@ export const useFormatStore = create<FormatStore>()(
         state.c64SidFileData = song.c64SidFileData ?? null;
         state.c64MemPatches = (song as any).c64MemPatches ?? null;
         state.goatTrackerData = song.goatTrackerData ?? null;
+        state.cheeseCutterFileData = (song as any).cheeseCutterFileData ?? null;
         state.jamCrackerFileData = song.jamCrackerFileData ?? null;
         state.futurePlayerFileData = song.futurePlayerFileData ?? null;
         state.preTrackerFileData = song.preTrackerFileData ?? null;
@@ -956,6 +959,7 @@ export const useFormatStore = create<FormatStore>()(
       state.c64SidFileData = null;
       state.c64MemPatches = null;
       state.goatTrackerData = null;
+      state.cheeseCutterFileData = null;
       state.jamCrackerFileData = null;
       state.futurePlayerFileData = null;
       state.preTrackerFileData = null;
