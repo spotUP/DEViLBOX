@@ -317,8 +317,9 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
-          // Position the springs overlay clipped to the SpringsGL region.
-          // Wait until both bounds are valid AND canvas has layout.
+          // Position the springs overlay at the exact SpringsGL region.
+          // The overlay canvas is sized to the SpringsGL bounds so the
+          // shader fills it correctly (its own viewport = the springs area).
           const jcw = jcanvas.clientWidth;
           if (!springsBoundsRef.current && jcw > 0) {
             const sprX = modRef._aelapse_ui_get_springs_x();
@@ -327,18 +328,11 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             const sprH = modRef._aelapse_ui_get_springs_h();
             if (sprW > 10 && sprH > 10 && sprW < w && sprH < h) {
               springsBoundsRef.current = { x: sprX, y: sprY, w: sprW, h: sprH };
-              overlay.width  = w;
-              overlay.height = h;
-              overlay.style.width  = jcanvas.style.width;
-              overlay.style.height = jcanvas.style.height;
-              overlay.style.left   = '0';
-              overlay.style.top    = '0';
-              // Clip with polygon in percentages (robust against CSS sizing)
-              const l = ((sprX / w) * 100).toFixed(2);
-              const t = ((sprY / h) * 100).toFixed(2);
-              const r = (((sprX + sprW) / w) * 100).toFixed(2);
-              const b = (((sprY + sprH) / h) * 100).toFixed(2);
-              overlay.style.clipPath = `polygon(${l}% ${t}%, ${r}% ${t}%, ${r}% ${b}%, ${l}% ${b}%)`;
+              const cssScale = jcw / w;
+              overlay.style.left   = `${Math.round(sprX * cssScale)}px`;
+              overlay.style.top    = `${Math.round(sprY * cssScale)}px`;
+              overlay.style.width  = `${Math.round(sprW * cssScale)}px`;
+              overlay.style.height = `${Math.round(sprH * cssScale)}px`;
               overlay.style.display = 'block';
             }
           }
