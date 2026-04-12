@@ -32,12 +32,20 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._paused = false;
     this._lastData = null;       // Last loaded file bytes (for subsong re-scan)
     this._lastHint = '';
+    this._currentSubsong = 0;    // Last requested subsong index (preserved across reloads)
+    this._companionFiles = new Map();  // filename → Uint8Array, survives WASM reinit
 
     // Float32 output buffers allocated in WASM heap
     this._outL = null;
     this._outR = null;
     this._outFrames = 256;    // Larger than 128 to handle render calls > quantum size
     this._needsReload = false; // Set after stop so next play() reloads from _lastData
+    this._lastLoadFailed = false; // Set when _uade_wasm_load returns non-zero; forces reinit on next load
+
+    // Live tick capture: drain tick snapshots during playback for pattern reconstruction
+    this._liveTickCapture = false;     // Enabled via 'enableLiveTickCapture' message
+    this._liveTickDrainBuf = null;     // WASM-heap buffer for draining (allocated once)
+    this._lastTickDrain = 0;           // currentTime of last drain
 
     this.port.onmessage = (event) => this._handleMessage(event.data);
   }
@@ -49,7 +57,19 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'load':
-        this._load(data.buffer, data.filenameHint, data.subsong || 0);
+        await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false, data.scanTimeoutSec);
+        break;
+
+      case 'reinit':
+        // Preemptive reinit — called from import dialog to avoid delay during playback
+        if ((this._hasRendered || this._lastLoadFailed) && this._wasmBinary) {
+          console.log('[UADE.worklet] Preemptive reinit requested');
+          this._wasm = null;
+          this._ready = false;
+          this._hasRendered = false;
+          this._lastLoadFailed = false;
+          await this._init(this._sampleRate, this._wasmBinary, null);
+        }
         break;
 
       case 'addCompanionFile':
@@ -67,6 +87,9 @@ class UADEProcessor extends AudioWorkletProcessor {
             console.error('[UADE.worklet] Failed to reload song for play (ret=' + reloadRet + ')');
             this.port.postMessage({ type: 'error', message: 'Failed to reload song for playback' });
             break;
+          }
+          if (this._currentSubsong > 0) {
+            this._wasm._uade_wasm_set_subsong(this._currentSubsong);
           }
           this._needsReload = false;
         }
@@ -89,6 +112,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'setSubsong':
         if (this._wasm && this._ready) {
+          this._currentSubsong = data.index;
           this._wasm._uade_wasm_set_subsong(data.index);
         }
         break;
@@ -218,6 +242,187 @@ class UADEProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'scanMemoryResult', requestId, addr: foundAddr });
         break;
       }
+
+      case 'readMemory': {
+        const { requestId, addr, length } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'readMemoryError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        try {
+          const ptr = this._wasm._malloc(length);
+          if (!ptr) {
+            this.port.postMessage({ type: 'readMemoryError', requestId, error: 'malloc failed' });
+            break;
+          }
+          this._wasm._uade_wasm_read_memory(addr, ptr, length);
+          const result = new Uint8Array(this._wasm.HEAPU8.buffer, ptr, length).slice();
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'readMemoryResult', requestId, data: result.buffer }, [result.buffer]);
+        } catch (e) {
+          this.port.postMessage({ type: 'readMemoryError', requestId, error: String(e) });
+        }
+        break;
+      }
+      case 'writeMemory': {
+        const { requestId, addr, data: writeData } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'writeMemoryError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        try {
+          const bytes = new Uint8Array(writeData);
+          const ptr = this._wasm._malloc(bytes.length);
+          if (!ptr) {
+            this.port.postMessage({ type: 'writeMemoryError', requestId, error: 'malloc failed' });
+            break;
+          }
+          this._wasm.HEAPU8.set(bytes, ptr);
+          this._wasm._uade_wasm_write_memory(addr, ptr, bytes.length);
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'writeMemoryResult', requestId });
+        } catch (e) {
+          this.port.postMessage({ type: 'writeMemoryError', requestId, error: String(e) });
+        }
+        break;
+      }
+
+      case 'enablePaulaLog': {
+        const { enable } = data;
+        if (!this._wasm || !this._ready) {
+          console.warn('[UADE.worklet] enablePaulaLog called before WASM ready — ignoring');
+          break;
+        }
+        if (!this._wasm._uade_wasm_enable_paula_log) {
+          console.warn('[UADE.worklet] _uade_wasm_enable_paula_log not in WASM build — ignoring');
+          break;
+        }
+        this._wasm._uade_wasm_enable_paula_log(enable ? 1 : 0);
+        break;
+      }
+
+      case 'getPaulaLog': {
+        const { requestId } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        if (!this._wasm._uade_wasm_get_paula_log) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: '_uade_wasm_get_paula_log not in WASM build' });
+          break;
+        }
+        try {
+          const maxEntries = 512;
+          const ptr = this._wasm._malloc(maxEntries * 3 * 4); // 3 uint32 per entry
+          if (!ptr) {
+            this.port.postMessage({ type: 'paulaLogError', requestId, error: 'malloc failed' });
+            break;
+          }
+          const count = this._wasm._uade_wasm_get_paula_log(ptr, maxEntries);
+          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 3);
+          const entries = [];
+          for (let i = 0; i < count; i++) {
+            const w0 = raw[i * 3 + 0];
+            entries.push({
+              channel:    (w0 >>> 24) & 0xFF,
+              reg:        (w0 >>> 16) & 0xFF,
+              value:      w0 & 0xFFFF,
+              sourceAddr: raw[i * 3 + 1],
+              tick:       raw[i * 3 + 2],
+            });
+          }
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'paulaLogResult', requestId, entries });
+        } catch (e) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: String(e) });
+        }
+        break;
+      }
+
+      case 'enableTickSnapshots': {
+        const { enable } = data;
+        if (!this._wasm || !this._ready) {
+          console.warn('[UADE.worklet] enableTickSnapshots called before WASM ready — ignoring');
+          break;
+        }
+        if (!this._wasm._uade_wasm_enable_tick_snapshots) {
+          console.warn('[UADE.worklet] _uade_wasm_enable_tick_snapshots not in WASM build — ignoring');
+          break;
+        }
+        this._wasm._uade_wasm_enable_tick_snapshots(enable ? 1 : 0);
+        break;
+      }
+      case 'resetTickSnapshots': {
+        if (!this._wasm || !this._ready) break;
+        this._wasm?._uade_wasm_reset_tick_snapshots?.();
+        break;
+      }
+      case 'getTickSnapshots': {
+        const { requestId } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        if (!this._wasm._uade_wasm_get_tick_snapshots) {
+          this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: '_uade_wasm_get_tick_snapshots not in WASM build' });
+          break;
+        }
+        try {
+          const maxSnaps = 4096;
+          const wordsPerSnap = 13;
+          const ptr = this._wasm._malloc(maxSnaps * wordsPerSnap * 4);
+          if (!ptr) {
+            this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: 'malloc failed' });
+            break;
+          }
+          const count = this._wasm._uade_wasm_get_tick_snapshots(ptr, maxSnaps);
+          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * wordsPerSnap);
+          const snapshots = [];
+          for (let i = 0; i < count; i++) {
+            const base = i * wordsPerSnap;
+            const channels = [];
+            for (let ch = 0; ch < 4; ch++) {
+              const w0 = raw[base + 1 + ch * 3 + 0];
+              const w1 = raw[base + 1 + ch * 3 + 1];
+              const w2 = raw[base + 1 + ch * 3 + 2];
+              channels.push({
+                period:    (w0 >>> 16) & 0xFFFF,
+                volume:    w0 & 0xFFFF,
+                lc:        w1,
+                len:       (w2 >>> 8) & 0xFFFF,
+                dmaEn:     (w2 >>> 1) & 1,
+                triggered: w2 & 1,
+              });
+            }
+            snapshots.push({ tick: raw[base], channels });
+          }
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'tickSnapshotsResult', requestId, snapshots });
+        } catch (e) {
+          this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: String(e) });
+        }
+        break;
+      }
+
+      case 'setMuteMask': {
+        const { mask } = data;
+        if (this._wasm && this._wasm._uade_wasm_mute_channels) {
+          this._wasm._uade_wasm_mute_channels(mask & 0x0F);
+        }
+        break;
+      }
+
+      case 'enableLiveTickCapture': {
+        const { enable } = data;
+        this._liveTickCapture = !!enable;
+        if (this._wasm && this._wasm._uade_wasm_enable_tick_snapshots) {
+          this._wasm._uade_wasm_enable_tick_snapshots(enable ? 1 : 0);
+          if (enable) {
+            this._wasm._uade_wasm_reset_tick_snapshots?.();
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -329,12 +534,21 @@ class UADEProcessor extends AudioWorkletProcessor {
         throw new Error('createUADE factory not available (jsCode=' + (jsCode ? 'present' : 'missing') + ')');
       }
 
-      // Instantiate the WASM module with the provided binary
-      console.log('[UADE.worklet] Calling createUADE() with wasmBinary=' + (wasmBinary ? wasmBinary.byteLength + ' bytes' : 'null'));
+      // Pre-compile the WASM module on first init (slow ~2s).
+      // On reinit, reuse the compiled module (fast ~50ms).
+      if (!this._compiledModule && wasmBinary) {
+        this.port.postMessage({ type: 'initProgress', phase: 'compiling', progress: 10 });
+        console.log('[UADE.worklet] Compiling WASM module (' + wasmBinary.byteLength + ' bytes)...');
+        const t0 = performance.now();
+        this._compiledModule = await WebAssembly.compile(wasmBinary);
+        console.log('[UADE.worklet] WASM compiled in ' + Math.round(performance.now() - t0) + 'ms');
+        this.port.postMessage({ type: 'initProgress', phase: 'compiled', progress: 50 });
+      }
+
+      // Instantiate using pre-compiled module (fast) or raw binary (first time fallback)
       this._lastAbortReason = null;
       const self = this;
-      this._wasm = await globalThis.createUADE({
-        wasmBinary,
+      const emscriptenOpts = {
         onAbort(reason) {
           console.error('[UADE.worklet] WASM aborted:', reason);
           self._lastAbortReason = reason;
@@ -345,8 +559,23 @@ class UADEProcessor extends AudioWorkletProcessor {
         printErr(text) {
           console.error('[UADE-stderr]', text);
         },
-      });
-      console.log('[UADE.worklet] WASM module instantiated');
+      };
+      if (this._compiledModule) {
+        // Fast path: instantiate from pre-compiled module
+        emscriptenOpts.instantiateWasm = (imports, successCallback) => {
+          WebAssembly.instantiate(this._compiledModule, imports).then(instance => {
+            successCallback(instance);
+          });
+          return {};
+        };
+      } else if (wasmBinary) {
+        emscriptenOpts.wasmBinary = wasmBinary;
+      }
+      this.port.postMessage({ type: 'initProgress', phase: 'instantiating', progress: 60 });
+      const t1 = performance.now();
+      this._wasm = await globalThis.createUADE(emscriptenOpts);
+      console.log('[UADE.worklet] WASM instantiated in ' + Math.round(performance.now() - t1) + 'ms');
+      this.port.postMessage({ type: 'initProgress', phase: 'instantiated', progress: 80 });
 
       // Allocate float32 buffers in WASM heap for audio output
       const frameBytes = this._outFrames * 4;  // float32
@@ -354,14 +583,16 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._ptrR = this._wasm._malloc(frameBytes);
 
       // Initialize UADE engine
-      console.log('[UADE.worklet] Calling _uade_wasm_init(' + (sampleRate || 44100) + ')');
       const ret = this._wasm._uade_wasm_init(sampleRate || 44100);
       if (ret !== 0) {
         throw new Error('uade_wasm_init failed with code ' + ret);
       }
 
       console.log('[UADE.worklet] UADE engine initialized successfully');
+      this._wasmBinary = wasmBinary; // Keep for reinit after load failure
+      this._sampleRate = sampleRate || 44100;
       this._ready = true;
+      this.port.postMessage({ type: 'initProgress', phase: 'ready', progress: 100 });
       this.port.postMessage({ type: 'ready' });
     } catch (err) {
       let errMsg;
@@ -380,11 +611,14 @@ class UADEProcessor extends AudioWorkletProcessor {
   }
 
   _addCompanionFile(filename, buffer) {
+    // Always cache companion files so they survive WASM reinit
+    const data = new Uint8Array(buffer);
+    this._companionFiles.set(filename, data.slice(0));
+
     if (!this._wasm || !this._ready) {
-      console.warn('[UADE.worklet] addCompanionFile called before WASM ready — ignoring');
+      console.log('[UADE.worklet] addCompanionFile cached (WASM not ready yet): ' + filename);
       return;
     }
-    const data = new Uint8Array(buffer);
     const ptr = this._wasm._malloc(data.byteLength);
     if (!ptr) {
       console.error('[UADE.worklet] malloc failed for companion file: ' + filename);
@@ -412,15 +646,39 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /** Re-register all cached companion files into a freshly initialized WASM instance */
+  _restoreCompanionFiles() {
+    if (!this._wasm || !this._ready || this._companionFiles.size === 0) return;
+    for (const [filename, data] of this._companionFiles) {
+      const ptr = this._wasm._malloc(data.byteLength);
+      if (!ptr) { console.error('[UADE.worklet] malloc failed restoring companion: ' + filename); continue; }
+      this._wasm.HEAPU8.set(data, ptr);
+      const nameLen = filename.length * 3 + 1;
+      const namePtr = this._wasm._malloc(nameLen);
+      if (!namePtr) { this._wasm._free(ptr); continue; }
+      this._wasm.stringToUTF8(filename, namePtr, nameLen);
+      const ret = this._wasm._uade_wasm_add_extra_file(namePtr, ptr, data.byteLength);
+      this._wasm._free(ptr);
+      this._wasm._free(namePtr);
+      if (ret === 0) {
+        console.log('[UADE.worklet] Restored companion: ' + filename + ' (' + data.byteLength + ' bytes)');
+      }
+    }
+  }
+
   _loadIntoWasm(data, filenameHint) {
+    // Strip directory components — UADE MEMFS only has /uade/ flat dir;
+    // paths like "paranoimia/cust.paranoimia" cause "Cannot write to MEMFS".
+    const basename = filenameHint.includes('/') ? filenameHint.split('/').pop() : filenameHint;
+
     const ptr = this._wasm._malloc(data.byteLength);
     if (!ptr) throw new Error('malloc failed for file data (' + data.byteLength + ' bytes)');
     this._wasm.HEAPU8.set(data, ptr);
 
-    const hintLen = filenameHint.length * 3 + 1;
+    const hintLen = basename.length * 3 + 1;
     const hintPtr = this._wasm._malloc(hintLen);
     if (!hintPtr) throw new Error('malloc failed for filename hint');
-    this._wasm.stringToUTF8(filenameHint, hintPtr, hintLen);
+    this._wasm.stringToUTF8(basename, hintPtr, hintLen);
 
     this._lastAbortReason = null;
     const ret = this._wasm._uade_wasm_load(ptr, data.byteLength, hintPtr);
@@ -430,7 +688,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     return ret;
   }
 
-  _load(buffer, filenameHint, subsongIndex = 0) {
+  async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false, scanTimeoutSec = undefined) {
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -443,10 +701,36 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      const ret = this._loadIntoWasm(data, filenameHint);
+      // Reinit WASM if the engine has rendered audio (played a song) or if the
+      // previous load failed (UADE's internal protocol state machine gets stuck
+      // after "score died" / "module check failed" errors — subsequent loads fail
+      // with "receiving in S state is forbidden" unless we fully reinit).
+      if ((this._hasRendered || this._lastLoadFailed) && this._wasmBinary) {
+        console.log('[UADE.worklet] Reinitializing WASM for clean load...');
+        try {
+          this._wasm = null;
+          this._ready = false;
+          this._hasRendered = false;
+          this._lastLoadFailed = false;
+          await this._init(this._sampleRate, this._wasmBinary, null);
+          if (!this._wasm || !this._ready) {
+            this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+            return;
+          }
+          // Re-register companion files lost during reinit
+          this._restoreCompanionFiles();
+        } catch (reinitErr) {
+          console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
+          this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
+          return;
+        }
+      }
+
+      let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
 
       if (ret !== 0) {
+        this._lastLoadFailed = true;
         const abortInfo = this._lastAbortReason ? ' (abort: ' + this._lastAbortReason + ')' : '';
         console.error('[UADE.worklet] _uade_wasm_load failed with ret=' + ret + abortInfo);
         this.port.postMessage({
@@ -469,23 +753,117 @@ class UADEProcessor extends AudioWorkletProcessor {
       const maxSubsong = this._wasm._uade_wasm_get_subsong_max();
       const subsongCount = this._wasm._uade_wasm_get_subsong_count();
 
-      // Fast-scan the entire song to extract pattern data before playback
-      console.log('[UADE.worklet] Starting song scan...');
-      const scanStart = performance.now();
-      const scanResult = this._scanSong(subsongIndex);
-      const isEnhanced = scanResult && scanResult.isEnhanced;
-      const scanData = isEnhanced ? scanResult.rows : scanResult;
-      const scanDuration = Math.round(performance.now() - scanStart);
-      console.log('[UADE.worklet] Scan complete: ' + (isEnhanced ? 'enhanced' : 'basic') +
-        ', ' + (Array.isArray(scanData) ? scanData.length : 0) + ' rows, ' +
-        (isEnhanced ? Object.keys(scanResult.samples || {}).length + ' samples, ' : '') +
-        scanDuration + 'ms');
+      // Fast-scan the entire song to extract pattern data before playback.
+      // skipScan=true is used for formats (e.g. compiled 68k replayers) where the
+      // scan crashes or corrupts engine state. scanTimeoutSec overrides the default
+      // 600s limit — use 30s for FORCE_CLASSIC formats that loop but don't crash.
+      let scanResult = null;
+      let isEnhanced = false;
+      let scanData = [];
+      if (!skipScan) {
+        const effectiveTimeout = (typeof scanTimeoutSec === 'number') ? scanTimeoutSec : 600;
+        // Enable tick snapshots during short scan so we capture note triggers
+        const isShortScanMode = typeof scanTimeoutSec === 'number' && scanTimeoutSec < 600;
+        if (isShortScanMode && this._wasm._uade_wasm_enable_tick_snapshots) {
+          this._wasm._uade_wasm_enable_tick_snapshots(1);
+        }
+        console.log('[UADE.worklet] Starting song scan (timeout=' + effectiveTimeout + 's)...');
+        const scanStart = performance.now();
+        scanResult = this._scanSong(subsongIndex, effectiveTimeout);
+        isEnhanced = !!(scanResult && scanResult.isEnhanced);
+        scanData = isEnhanced ? scanResult.rows : (scanResult ?? []);
+        const scanDuration = Math.round(performance.now() - scanStart);
+        console.log('[UADE.worklet] Scan complete: ' + (isEnhanced ? 'enhanced' : 'basic') +
+          ', ' + (Array.isArray(scanData) ? scanData.length : 0) + ' rows, ' +
+          (isEnhanced ? Object.keys(scanResult.samples || {}).length + ' samples, ' : '') +
+          scanDuration + 'ms');
+      } else {
+        console.log('[UADE.worklet] Skipping song scan (skipScan=true, compiled replayer)');
+      }
 
-      // Reload the song for playback (scan consumed the song state)
-      this._wasm._uade_wasm_stop();
-      const ret2 = this._loadIntoWasm(data, filenameHint);
-      if (ret2 !== 0) {
-        console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
+      // Reload the song for playback (scan consumed the song state).
+      // Not needed when skipScan=true since the song state is untouched.
+      let shortScanTickData = null;
+      if (!skipScan) {
+        const isShortScan = typeof scanTimeoutSec === 'number' && scanTimeoutSec < 600;
+
+        if (isShortScan) {
+          // Short scan (compiled 68k replayers): the scan consumed the song state and
+          // a simple stop+reload leaves UADE's IPC/state machine corrupted. We need a
+          // full WASM reinit to get a clean playback start.
+          // First, extract tick snapshots before reinit destroys the ring buffer.
+          if (this._wasm._uade_wasm_get_tick_snapshots) {
+            const maxDrain = 32768;
+            const wordsPerSnap = 13;
+            const tickBuf = this._wasm._malloc(maxDrain * wordsPerSnap * 4);
+            if (tickBuf) {
+              const count = this._wasm._uade_wasm_get_tick_snapshots(tickBuf, maxDrain);
+              if (count > 0) {
+                const raw = new Uint32Array(this._wasm.HEAPU8.buffer, tickBuf, count * wordsPerSnap);
+                shortScanTickData = [];
+                for (let i = 0; i < count; i++) {
+                  const base = i * wordsPerSnap;
+                  const channels = [];
+                  for (let ch = 0; ch < 4; ch++) {
+                    const w0 = raw[base + 1 + ch * 3 + 0];
+                    const w1 = raw[base + 1 + ch * 3 + 1];
+                    const w2 = raw[base + 1 + ch * 3 + 2];
+                    channels.push({
+                      period:    (w0 >>> 16) & 0xFFFF,
+                      volume:    w0 & 0xFFFF,
+                      lc:        w1,
+                      len:       (w2 >>> 8) & 0xFFFF,
+                      dmaEn:     (w2 >>> 1) & 1,
+                      triggered: w2 & 1,
+                    });
+                  }
+                  shortScanTickData.push({ tick: raw[base], channels });
+                }
+                console.log('[UADE.worklet] Short scan captured ' + shortScanTickData.length + ' tick snapshots');
+              }
+              this._wasm._free(tickBuf);
+            }
+          }
+
+          // Full WASM reinit for clean playback
+          console.log('[UADE.worklet] Short scan: reinitializing WASM for clean playback...');
+          this._wasm = null;
+          this._ready = false;
+          this._hasRendered = false;
+          this._lastLoadFailed = false;
+          await this._init(this._sampleRate, this._wasmBinary, null);
+          if (!this._wasm || !this._ready) {
+            this.port.postMessage({ type: 'error', message: 'WASM reinit after short scan failed' });
+            return;
+          }
+          this._restoreCompanionFiles();
+
+          const ret2 = this._loadIntoWasm(data, filenameHint);
+          if (ret2 !== 0) {
+            console.warn('[UADE.worklet] Reload after reinit failed (ret=' + ret2 + ')');
+          }
+          this._wasm._uade_wasm_set_looping(1);
+        } else {
+          // Normal scan: simple stop+reload (song completed naturally)
+          this._wasm._uade_wasm_stop();
+          const ret2 = this._loadIntoWasm(data, filenameHint);
+          if (ret2 !== 0) {
+            console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
+          }
+        }
+      } else {
+        // Compiled replayers (skipScan=true) should loop indefinitely.
+        // Explicitly enable looping here because a previous scan (of a different
+        // format) may have called _uade_wasm_set_looping(0), leaving UADE in
+        // non-looping mode. Without this, modules that emit a song-end signal
+        // (e.g. Steve Turner .jpo) stop after one play and produce silence.
+        this._wasm._uade_wasm_set_looping(1);
+      }
+
+      // Apply subsong index (for both normal and skipScan modes).
+      this._currentSubsong = subsongIndex;
+      if (subsongIndex > 0) {
+        this._wasm._uade_wasm_set_subsong(subsongIndex);
       }
 
       this._playing = false;
@@ -508,8 +886,14 @@ class UADEProcessor extends AudioWorkletProcessor {
           tempoChanges: scanResult.tempoChanges,
           bpm: scanResult.bpm,
           speed: scanResult.speed,
+          firstTick: scanResult.firstTick ?? 0,
           warnings: scanResult.warnings || [],
         };
+      }
+
+      // Include tick snapshots from short scan (ring buffer was lost during reinit)
+      if (shortScanTickData && shortScanTickData.length > 0) {
+        msg.shortScanTicks = shortScanTickData;
       }
 
       this.port.postMessage(msg);
@@ -534,22 +918,22 @@ class UADEProcessor extends AudioWorkletProcessor {
    * Captures Paula channel state at regular row intervals (~5292 frames at 125BPM/speed 6).
    * Returns array of rows, each containing 4 channels of {period, volume, samplePtr}.
    */
-  _scanSong(subsongIndex = 0) {
+  _scanSong(subsongIndex = 0, maxSeconds = 600) {
     // Try enhanced scan first; fall back to basic scan if new WASM exports aren't available
     if (typeof this._wasm._uade_wasm_get_channel_extended === 'function') {
-      return this._scanSongEnhanced(subsongIndex);
+      return this._scanSongEnhanced(subsongIndex, maxSeconds);
     }
-    return this._scanSongBasic();
+    return this._scanSongBasic(maxSeconds);
   }
 
   /**
    * Basic scan — original row-based scan for older WASM builds without extended exports.
    */
-  _scanSongBasic() {
+  _scanSongBasic(maxSeconds = 600) {
     const CHUNK = 256;
     const FRAMES_PER_ROW = Math.round((sampleRate || 44100) * 2.5 * 6 / 125); // ~5292
     const MAX_ROWS = 64 * 256; // 256 patterns max
-    const MAX_SECONDS = 600;   // 10 minute safety limit
+    const MAX_SECONDS = maxSeconds;
     const maxFrames = (sampleRate || 44100) * MAX_SECONDS;
 
     // Ensure channel snapshot buffer exists
@@ -622,14 +1006,14 @@ class UADEProcessor extends AudioWorkletProcessor {
    *   samples: { [samplePtr]: { pcm: Uint8Array, length, loopStart, loopLength, typicalPeriod } }
    *   tempoChanges: [{ row, bpm, speed }]
    */
-  _scanSongEnhanced(subsongIndex = 0) {
+  _scanSongEnhanced(subsongIndex = 0, maxSeconds = 600) {
     // Seek to the requested subsong before scanning
     if (subsongIndex > 0) {
       this._wasm._uade_wasm_set_subsong(subsongIndex);
     }
 
     const CHUNK = 128;  // Smaller chunks = higher tick resolution
-    const MAX_SECONDS = 600;
+    const MAX_SECONDS = maxSeconds;
     const sr = sampleRate || 44100;
     const maxFrames = sr * MAX_SECONDS;
     const MAX_ROWS = 64 * 256;
@@ -832,15 +1216,16 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Only estimate speed from period-change triggers when CIA-B was reliable.
-    // For VBlank-based formats (FC2 etc.), macro systems cause period/sample
-    // pointer changes at VBlank rate, producing completely wrong speed estimates.
+    // Estimate speed from sample pointer change intervals when CIA-B drives BPM.
+    // Use sampleChanged (DMA address changed) rather than triggered (period changed):
+    // arpeggio only cycles the period — it never changes the DMA sample address, so
+    // sampleChanged fires only on genuine new note starts regardless of arpeggio.
     if (ciaReliable) {
       const triggerFrames = [];
       let lastTriggerFrame = 0;
       for (let i = 0; i < tickSnapshots.length; i++) {
         const tick = tickSnapshots[i];
-        const anyTrigger = tick.channels.some(ch => ch.triggered);
+        const anyTrigger = tick.channels.some(ch => ch.sampleChanged);
         if (anyTrigger) {
           if (lastTriggerFrame > 0) {
             triggerFrames.push(tick.frame - lastTriggerFrame);
@@ -864,11 +1249,37 @@ class UADEProcessor extends AudioWorkletProcessor {
     if (!ciaReliable) {
       const vblankHz = tickSnapshots[0]?.vblankHz || 50;
       const vblankInterval = Math.round(sr / vblankHz);
+
+      // Method 1: CIA-A tick rate.
+      // CIA-A Timer A fires at the music tick rate for many VBlank-based formats
+      // (the player programs CIA-A as the speed counter, firing N times per VBlank).
+      // Derive speed = CIA-A ticks per VBlank elapsed.
+      const ciaA0 = tickSnapshots[0]?.ciaATick || 0;
+      const ciaALast = tickSnapshots[tickSnapshots.length - 1]?.ciaATick || 0;
+      const ciaARange = ciaALast - ciaA0;
+      const firstFrame = tickSnapshots[0]?.frame || 0;
+      const lastFrame2 = tickSnapshots[tickSnapshots.length - 1]?.frame || firstFrame;
+      const vblanksElapsed = (lastFrame2 - firstFrame) / vblankInterval;
+      let ciaASpeed = 0;
+      if (ciaARange >= 100 && vblanksElapsed >= 100) {
+        const ciaAPerVblank = ciaARange / vblanksElapsed;
+        const rounded = Math.round(ciaAPerVblank);
+        // Accept if close to an integer (< 0.2 fractional error) and within sane range.
+        if (rounded >= 1 && rounded <= 31 && Math.abs(ciaAPerVblank - rounded) < 0.2) {
+          ciaASpeed = rounded;
+        }
+      }
+
+      // Method 2: Sample pointer change intervals.
+      // Use sampleChanged (lc register changes) rather than triggered (period changes).
+      // Arpeggio modulations only change the period — they NEVER change the DMA sample
+      // address. So sampleChanged fires only on genuine new note starts, not on arpeggio
+      // ticks, giving accurate inter-note intervals for speed estimation.
       const triggerFrames = [];
       let lastTriggerFrame = 0;
       for (let i = 0; i < tickSnapshots.length; i++) {
         const tick = tickSnapshots[i];
-        const anyTrigger = tick.channels.some(ch => ch.triggered);
+        const anyTrigger = tick.channels.some(ch => ch.sampleChanged);
         if (anyTrigger) {
           if (lastTriggerFrame > 0) {
             triggerFrames.push(tick.frame - lastTriggerFrame);
@@ -876,20 +1287,28 @@ class UADEProcessor extends AudioWorkletProcessor {
           lastTriggerFrame = tick.frame;
         }
       }
+      let sampleSpeed = 0;
       if (triggerFrames.length > 5) {
         triggerFrames.sort((a, b) => a - b);
         const median = triggerFrames[Math.floor(triggerFrames.length / 2)];
-        const estimatedSpeed = Math.max(1, Math.min(31, Math.round(median / vblankInterval)));
-        if (estimatedSpeed >= 1 && estimatedSpeed <= 31) {
-          detectedSpeed = estimatedSpeed;
-          // BPM back-calculated: standard Amiga formula BPM = vblankHz * 2.5 / speed
-          detectedBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5 / estimatedSpeed)));
-          warnings.push('CIA unreliable — VBlank BPM estimated: ' + detectedBPM + ' BPM / speed ' + detectedSpeed);
-        } else {
-          warnings.push('CIA unreliable — tempo unknown, defaulted to 125 BPM / speed 6');
+        const s = Math.max(1, Math.min(31, Math.round(median / vblankInterval)));
+        if (s >= 1 && s <= 31) {
+          sampleSpeed = s;
         }
+      }
+
+      // Prefer CIA-A derived speed (most accurate), then sample-pointer speed, then default.
+      const finalSpeed = ciaASpeed || sampleSpeed || 6;
+      // BPM = vblankHz * 2.5 (ProTracker formula: tick_rate = BPM * 2/5, so BPM = vblankHz * 5/2).
+      // Speed is a separate parameter; dividing by speed here was incorrect.
+      // PAL 50 Hz → 125 BPM, NTSC 60 Hz → 150 BPM.
+      const finalBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5)));
+      if (ciaASpeed || sampleSpeed) {
+        detectedSpeed = finalSpeed;
+        detectedBPM = finalBPM;
+        warnings.push('CIA unreliable — VBlank BPM estimated: ' + detectedBPM + ' BPM / speed ' + detectedSpeed);
       } else {
-        warnings.push('CIA unreliable — too few note triggers to estimate tempo, defaulted to 125 BPM / speed 6');
+        warnings.push('CIA unreliable — tempo unknown, defaulted to 125 BPM / speed 6');
       }
     }
 
@@ -996,6 +1415,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       tempoChanges,
       bpm: detectedBPM,
       speed: detectedSpeed,
+      firstTick: firstCiaATick,
       warnings,
       isEnhanced: true,
     };
@@ -1275,6 +1695,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           tempoChanges: scanResult.tempoChanges,
           bpm: scanResult.bpm,
           speed: scanResult.speed,
+          firstTick: scanResult.firstTick ?? 0,
           warnings: scanResult.warnings || [],
         },
       });
@@ -1525,6 +1946,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     try {
       // Render audio into WASM-allocated float32 buffers
+      this._hasRendered = true;
       const ret = this._wasm._uade_wasm_render(this._ptrL, this._ptrR, frames);
 
       if (ret === 0) {
@@ -1580,12 +2002,66 @@ class UADEProcessor extends AudioWorkletProcessor {
           this._prevPeriods[i] = period;
         }
 
+        const totalFrames = this._wasm._uade_wasm_get_total_frames();
         this.port.postMessage({
           type: 'channels',
           channels,
-          totalFrames: this._wasm._uade_wasm_get_total_frames()
+          totalFrames
         });
+
+        // Post position update with CIA tick count for audio/visual sync
+        this.port.postMessage({
+          type: 'position',
+          tickCount: this._wasm._uade_wasm_get_tick_count(),
+          totalFrames,
+          audioTime: currentTime
+        });
+
+        // Post per-channel VU levels derived from Paula volume registers
+        const levels = new Float32Array(4);
+        for (let i = 0; i < 4; i++) {
+          levels[i] = channels[i].dma ? channels[i].volume / 64.0 : 0;
+        }
+        this.port.postMessage({ type: 'chLevels', levels });
+
         this._lastChannelPost = currentTime;
+      }
+
+      // Live tick capture: drain tick snapshot ring buffer every ~500ms
+      if (this._liveTickCapture && this._wasm._uade_wasm_get_tick_snapshots &&
+          currentTime - this._lastTickDrain > 0.5) {
+        this._lastTickDrain = currentTime;
+        const maxDrain = 4096;
+        const wordsPerSnap = 13;
+        if (!this._liveTickDrainBuf) {
+          this._liveTickDrainBuf = this._wasm._malloc(maxDrain * wordsPerSnap * 4);
+        }
+        if (this._liveTickDrainBuf) {
+          const count = this._wasm._uade_wasm_get_tick_snapshots(this._liveTickDrainBuf, maxDrain);
+          if (count > 0) {
+            const raw = new Uint32Array(this._wasm.HEAPU8.buffer, this._liveTickDrainBuf, count * wordsPerSnap);
+            const snapshots = [];
+            for (let i = 0; i < count; i++) {
+              const base = i * wordsPerSnap;
+              const channels = [];
+              for (let ch = 0; ch < 4; ch++) {
+                const w0 = raw[base + 1 + ch * 3 + 0];
+                const w1 = raw[base + 1 + ch * 3 + 1];
+                const w2 = raw[base + 1 + ch * 3 + 2];
+                channels.push({
+                  period:    (w0 >>> 16) & 0xFFFF,
+                  volume:    w0 & 0xFFFF,
+                  lc:        w1,
+                  len:       (w2 >>> 8) & 0xFFFF,
+                  dmaEn:     (w2 >>> 1) & 1,
+                  triggered: w2 & 1,
+                });
+              }
+              snapshots.push({ tick: raw[base], channels });
+            }
+            this.port.postMessage({ type: 'liveTickBatch', snapshots });
+          }
+        }
       }
     } catch (err) {
       outL.fill(0);

@@ -1,0 +1,5517 @@
+import { a as reactExports } from "./vendor-ui-AJ7AT9BN.js";
+import { dI as FurnaceChipType, U as useCursorStore, R as useTrackerStore, e as useInstrumentStore } from "./main-BbV5VyEH.js";
+const EFFECT_COMMANDS = [
+  // Main Effects 0-9
+  {
+    code: "0xy",
+    name: "Arpeggio",
+    description: "Cycle between note, note+x, note+y semitones each tick",
+    paramRange: "x,y: 0-F (0-15 semitones)",
+    example: "037 = Major chord (C, D#, G)"
+  },
+  {
+    code: "1xx",
+    name: "Portamento Up",
+    description: "Slide pitch up by xx units per tick",
+    paramRange: "xx: 00-FF (speed)",
+    example: "110 = Slow slide up"
+  },
+  {
+    code: "2xx",
+    name: "Portamento Down",
+    description: "Slide pitch down by xx units per tick",
+    paramRange: "xx: 00-FF (speed)",
+    example: "220 = Slow slide down"
+  },
+  {
+    code: "3xx",
+    name: "Tone Portamento",
+    description: "Slide from current pitch to target note (note not retriggered)",
+    paramRange: "xx: 00-FF (speed)",
+    example: "310 = Smooth glide to new note"
+  },
+  {
+    code: "4xy",
+    name: "Vibrato",
+    description: "Oscillate pitch. x=speed, y=depth",
+    paramRange: "x: 0-F (speed), y: 0-F (depth)",
+    example: "486 = Medium vibrato"
+  },
+  {
+    code: "5xy",
+    name: "Tone Porta + Volume Slide",
+    description: "Continue tone portamento with volume slide",
+    paramRange: "x: Vol up, y: Vol down (0-F)",
+    example: "502 = Porta with fade out"
+  },
+  {
+    code: "6xy",
+    name: "Vibrato + Volume Slide",
+    description: "Continue vibrato with volume slide",
+    paramRange: "x: Vol up, y: Vol down (0-F)",
+    example: "640 = Vibrato with fade in"
+  },
+  {
+    code: "7xy",
+    name: "Tremolo",
+    description: "Oscillate volume. x=speed, y=depth",
+    paramRange: "x: 0-F (speed), y: 0-F (depth)",
+    example: "742 = Volume pulse"
+  },
+  {
+    code: "8xx",
+    name: "Set Panning",
+    description: "Set stereo position for channel",
+    paramRange: "xx: 00=Left, 80=Center, FF=Right",
+    example: "800 = Hard left, 8FF = Hard right"
+  },
+  {
+    code: "9xx",
+    name: "Sample Offset",
+    description: "Start sample playback at offset (xx × 256)",
+    paramRange: "xx: 00-FF (offset in 256-sample units)",
+    example: "980 = Start halfway through"
+  },
+  // Main Effects A-F
+  {
+    code: "Axy",
+    name: "Volume Slide",
+    description: "Slide volume per tick. x=up, y=down (one must be 0)",
+    paramRange: "x/y: 0-F per tick",
+    example: "A0F = Fade out fast, A40 = Fade in"
+  },
+  {
+    code: "Bxx",
+    name: "Position Jump",
+    description: "Jump to song position xx and play pattern from start",
+    paramRange: "xx: 00-FF (pattern index)",
+    example: "B00 = Jump to start"
+  },
+  {
+    code: "Cxx",
+    name: "Set Volume",
+    description: "Set channel volume directly (max 40)",
+    paramRange: "xx: 00-40 (0-64 decimal)",
+    example: "C40 = Full volume, C20 = Half"
+  },
+  {
+    code: "Dxx",
+    name: "Pattern Break",
+    description: "Jump to row xx of next pattern (decimal coded)",
+    paramRange: "xx: Row number (decimal: D32 = row 32)",
+    example: "D00 = Next pattern row 0"
+  },
+  {
+    code: "Fxx",
+    name: "Set Speed/BPM",
+    description: "01-1F sets ticks per row, 20-FF sets BPM",
+    paramRange: "xx: 01-1F=Speed, 20-FF=BPM",
+    example: "F06 = 6 ticks/row, F8C = 140 BPM"
+  },
+  // E-Commands
+  {
+    code: "E1x",
+    name: "Fine Porta Up",
+    description: "Fine pitch slide up (once per row, not per tick)",
+    paramRange: "x: 0-F (amount)",
+    example: "E14 = Small pitch bend up"
+  },
+  {
+    code: "E2x",
+    name: "Fine Porta Down",
+    description: "Fine pitch slide down (once per row)",
+    paramRange: "x: 0-F (amount)",
+    example: "E24 = Small pitch bend down"
+  },
+  {
+    code: "E3x",
+    name: "Glissando Control",
+    description: "Round portamento to nearest semitone",
+    paramRange: "x: 0=Off, 1=On",
+    example: "E31 = Enable glissando"
+  },
+  {
+    code: "E4x",
+    name: "Vibrato Waveform",
+    description: "Set vibrato oscillator shape (+4 to not retrig)",
+    paramRange: "0=Sine, 1=Ramp, 2=Square, 3=Random",
+    example: "E40 = Sine, E42 = Square"
+  },
+  {
+    code: "E5x",
+    name: "Set Finetune",
+    description: "Override sample finetune value",
+    paramRange: "x: 0-F (signed: 8=0, 0-7=+, 9-F=-)",
+    example: "E58 = Normal tuning"
+  },
+  {
+    code: "E6x",
+    name: "Pattern Loop",
+    description: "Set loop start (x=0) or loop x times",
+    paramRange: "x: 0=Set start, 1-F=Loop count",
+    example: "E60 = Mark start, E63 = Loop 3×"
+  },
+  {
+    code: "E7x",
+    name: "Tremolo Waveform",
+    description: "Set tremolo oscillator shape (+4 to not retrig)",
+    paramRange: "0=Sine, 1=Ramp, 2=Square, 3=Random",
+    example: "E70 = Sine tremolo"
+  },
+  {
+    code: "E8x",
+    name: "Set Panning (Coarse)",
+    description: "Set pan position (16 positions)",
+    paramRange: "x: 0-F (0=Left, 8=Center, F=Right)",
+    example: "E80 = Left, E8F = Right"
+  },
+  {
+    code: "E9x",
+    name: "Retrigger Note",
+    description: "Retrigger note every x ticks",
+    paramRange: "x: 1-F (tick interval)",
+    example: "E93 = Retrigger every 3 ticks"
+  },
+  {
+    code: "EAx",
+    name: "Fine Volume Up",
+    description: "Fine volume increase (once per row)",
+    paramRange: "x: 0-F (amount)",
+    example: "EA2 = Small volume boost"
+  },
+  {
+    code: "EBx",
+    name: "Fine Volume Down",
+    description: "Fine volume decrease (once per row)",
+    paramRange: "x: 0-F (amount)",
+    example: "EB2 = Small volume cut"
+  },
+  {
+    code: "ECx",
+    name: "Note Cut",
+    description: "Cut note (set volume to 0) at tick x",
+    paramRange: "x: 0-F (tick number)",
+    example: "EC4 = Cut after 4 ticks"
+  },
+  {
+    code: "EDx",
+    name: "Note Delay",
+    description: "Delay note trigger by x ticks",
+    paramRange: "x: 0-F (delay in ticks)",
+    example: "ED3 = Play note at tick 3"
+  },
+  {
+    code: "EEx",
+    name: "Pattern Delay",
+    description: "Delay pattern by x rows (repeat current row)",
+    paramRange: "x: 0-F (rows to delay)",
+    example: "EE2 = Delay 2 rows"
+  },
+  // Extended Commands G-X
+  {
+    code: "Gxx",
+    name: "Set Global Volume",
+    description: "Set master volume for all channels",
+    paramRange: "xx: 00-40 (0-64 decimal)",
+    example: "G40 = Full global volume"
+  },
+  {
+    code: "Hxy",
+    name: "Global Volume Slide",
+    description: "Slide global volume. x=up, y=down",
+    paramRange: "x/y: 0-F per tick",
+    example: "H01 = Slow global fade out"
+  },
+  {
+    code: "Lxx",
+    name: "Set Envelope Position",
+    description: "Jump to position in volume/pan envelope",
+    paramRange: "xx: 00-FF (envelope tick)",
+    example: "L20 = Jump to tick 32"
+  },
+  {
+    code: "Pxy",
+    name: "Panning Slide",
+    description: "Slide pan position. x=right, y=left",
+    paramRange: "x/y: 0-F per tick",
+    example: "P0F = Pan left fast"
+  },
+  {
+    code: "Rxy",
+    name: "Multi Retrig",
+    description: "Retrig with volume change. x=interval, y=vol change",
+    paramRange: "x: interval, y: 0=none,1-5=-1-16,6=×⅔,7=×½,9-D=+1-16,E=×1.5,F=×2",
+    example: "R31 = Retrig every 3 ticks, vol -1"
+  },
+  {
+    code: "Txy",
+    name: "Tremor",
+    description: "Rapidly toggle volume on/off",
+    paramRange: "x: on-time ticks, y: off-time ticks",
+    example: "T31 = 3 ticks on, 1 tick off"
+  },
+  {
+    code: "X1x",
+    name: "Extra Fine Porta Up",
+    description: "Very fine pitch slide up (speed/4)",
+    paramRange: "x: 0-F (amount)",
+    example: "X14 = Very fine slide up"
+  },
+  {
+    code: "X2x",
+    name: "Extra Fine Porta Down",
+    description: "Very fine pitch slide down (speed/4)",
+    paramRange: "x: 0-F (amount)",
+    example: "X24 = Very fine slide down"
+  }
+];
+const TUTORIAL_STEPS = [
+  {
+    step: 1,
+    title: "Welcome to DEViLBOX",
+    content: [
+      "DEViLBOX is a TB-303 acid tracker with Devil Fish mod for creating acid basslines.",
+      "This tutorial will guide you through creating your first pattern."
+    ]
+  },
+  {
+    step: 2,
+    title: "Understanding the Pattern Editor",
+    content: [
+      "The pattern editor shows rows (0-63) and channels (1-4+).",
+      "Each cell can contain: NOTE, INSTRUMENT, VOLUME, and EFFECT.",
+      "The cyan horizontal bar shows your current edit position."
+    ]
+  },
+  {
+    step: 3,
+    title: "Entering Notes",
+    content: [
+      "1. Enable RECORD mode (press CapsLock or click REC button)",
+      "2. Use QWERTY keys as piano: Q=C, W=C#, E=D, R=D#, T=E, etc.",
+      "3. Press Z/X to change octave",
+      "4. Use arrow keys to navigate"
+    ]
+  },
+  {
+    step: 4,
+    title: "Working with Instruments",
+    content: [
+      "Switch to the INSTRUMENT panel to select and edit sounds.",
+      "The default TB-303 instrument is perfect for acid basslines.",
+      "Try adjusting the CUTOFF and RESONANCE knobs for that squelchy sound!"
+    ]
+  },
+  {
+    step: 5,
+    title: "Using Effects",
+    content: [
+      "Effects add movement to your notes.",
+      "Common effects:",
+      "• 1xx/2xx - Pitch slides",
+      "• Axy - Volume fade",
+      "• Fxx - Change tempo",
+      "See the EFFECT COMMANDS tab for the full list!"
+    ]
+  },
+  {
+    step: 6,
+    title: "Playback Controls",
+    content: [
+      "Press SPACE to play/pause your pattern.",
+      "Press F5 to play from start.",
+      "Press F8 to stop playback.",
+      "The playback position follows the pattern automatically."
+    ]
+  },
+  {
+    step: 7,
+    title: "Saving Your Work",
+    content: [
+      "Use Ctrl+S to save your project.",
+      "Export your song via the Export dialog (File menu).",
+      "Share individual patterns as SFX or instruments as presets!"
+    ]
+  }
+];
+const HELP_TABS = [
+  { id: "manual", label: "MANUAL" },
+  { id: "shortcuts", label: "KEYBOARD SHORTCUTS" },
+  { id: "effects", label: "STANDARD EFFECTS" },
+  { id: "chip-effects", label: "CHIP EFFECTS" },
+  { id: "tutorial", label: "TUTORIAL" }
+];
+const FM_COMMON_EFFECTS = [
+  { command: "11xx", name: "Feedback", desc: "Set feedback level (0-7)." },
+  { command: "12xx", name: "Op1 Level", desc: "Set level of operator 1 (0: max, 7F: min)." },
+  { command: "13xx", name: "Op2 Level", desc: "Set level of operator 2 (0: max, 7F: min)." },
+  { command: "14xx", name: "Op3 Level", desc: "Set level of operator 3 (0: max, 7F: min)." },
+  { command: "15xx", name: "Op4 Level", desc: "Set level of operator 4 (0: max, 7F: min)." },
+  { command: "16xy", name: "Multiplier", desc: "Set op multiplier (x: op 1-4, y: multiplier 0-F)." },
+  { command: "19xx", name: "Attack All", desc: "Set attack rate for all operators (0-1F)." },
+  { command: "1Axx", name: "Attack Op1", desc: "Set attack rate for op 1 (0-1F)." },
+  { command: "1Bxx", name: "Attack Op2", desc: "Set attack rate for op 2 (0-1F)." },
+  { command: "1Cxx", name: "Attack Op3", desc: "Set attack rate for op 3 (0-1F)." },
+  { command: "1Dxx", name: "Attack Op4", desc: "Set attack rate for op 4 (0-1F)." },
+  { command: "30xx", name: "Hard Reset", desc: "Toggle hard envelope reset on new notes." },
+  { command: "50xy", name: "Set AM", desc: "x: op 1-4 (0=all), y: AM on/off." },
+  { command: "51xy", name: "Sustain Level", desc: "x: op 1-4 (0=all), y: sustain level (0-F)." },
+  { command: "52xy", name: "Release Rate", desc: "x: op 1-4 (0=all), y: release rate (0-F)." },
+  { command: "53xy", name: "Detune", desc: "x: op 1-4 (0=all), y: detune (3 is center)." },
+  { command: "54xy", name: "Env Scale", desc: "x: op 1-4 (0=all), y: envelope scale (0-3)." },
+  { command: "56xx", name: "Decay All", desc: "Set decay rate for all operators (0-1F)." },
+  { command: "61xx", name: "Algorithm", desc: "Set FM algorithm (0-7)." },
+  { command: "62xx", name: "LFO FMS", desc: "Set LFO frequency modulation depth (0-7)." },
+  { command: "63xx", name: "LFO AMS", desc: "Set LFO amplitude modulation depth (0-3)." }
+];
+const OPL_COMMON_EFFECTS = [
+  { command: "10xx", name: "AM Depth", desc: "Global AM depth (0: 1dB, 1: 4.8dB)." },
+  { command: "11xx", name: "Feedback", desc: "Set feedback level (0-7)." },
+  { command: "12xx", name: "Op1 Level", desc: "Set level of operator 1 (0: max, 3F: min)." },
+  { command: "13xx", name: "Op2 Level", desc: "Set level of operator 2 (0: max, 3F: min)." },
+  { command: "14xx", name: "Op3 Level", desc: "Set level of operator 3 (0: max, 3F: min, OPL3 only)." },
+  { command: "15xx", name: "Op4 Level", desc: "Set level of operator 4 (0: max, 3F: min, OPL3 only)." },
+  { command: "19xx", name: "Attack All", desc: "Set attack rate for all operators (0-F)." },
+  { command: "2Axy", name: "Waveform", desc: "x: op 1-4 (0=all), y: waveform (0-3 in OPL2, 0-7 in OPL3)." },
+  { command: "30xx", name: "Hard Reset", desc: "Toggle hard envelope reset on new notes." },
+  { command: "50xy", name: "Set AM", desc: "x: op 1-4 (0=all), y: AM on/off." },
+  { command: "51xy", name: "Sustain Level", desc: "x: op 1-4 (0=all), y: sustain level (0-F)." },
+  { command: "52xy", name: "Release Rate", desc: "x: op 1-4 (0=all), y: release rate (0-F)." },
+  { command: "53xy", name: "Set Vibrato", desc: "x: op 1-4 (0=all), y: enabled." },
+  { command: "54xy", name: "Env Scale", desc: "x: op 1-4 (0=all), y: scale (0-3)." },
+  { command: "5Bxy", name: "KSR", desc: "Key scale rate. x: op 1-4 (0=all), y: enabled." }
+];
+const NES_EFFECTS = [
+  { command: "11xx", name: "DMC Counter", desc: "Write to delta modulation counter (00-7F)." },
+  { command: "12xx", name: "Duty/Noise", desc: "Pulse: 0-3 (12.5%, 25%, 50%, 75%). Noise: 0 (long), 1 (short)." },
+  { command: "13xy", name: "Sweep Up", desc: "x: time, y: shift." },
+  { command: "14xy", name: "Sweep Down", desc: "x: time, y: shift." },
+  { command: "15xx", name: "Env Mode", desc: "0: env, 1: length, 2: looping, 3: constant." },
+  { command: "16xx", name: "Length", desc: "Set length counter (see manual table)." },
+  { command: "17xx", name: "Frame Mode", desc: "0: 4-step, 1: 5-step." },
+  { command: "18xx", name: "Sample Mode", desc: "0: PCM, 1: DPCM." },
+  { command: "19xx", name: "Linear Counter", desc: "Triangle linear counter (00-7F), 80+ halts." },
+  { command: "20xx", name: "DPCM Freq", desc: "Set DPCM frequency (0-F)." }
+];
+const SID_EFFECTS = [
+  { command: "10xx", name: "Waveform", desc: "01: Tri, 02: Saw, 04: Pulse, 08: Noise. Combinable." },
+  { command: "11xx", name: "Coarse Cutoff", desc: "00-64. (Discouraged, use 4xxx)." },
+  { command: "12xx", name: "Coarse Duty", desc: "00-64. (Discouraged, use 3xxx)." },
+  { command: "13xx", name: "Resonance", desc: "Set resonance (0-F)." },
+  { command: "14xx", name: "Filter Mode", desc: "0: off, 1: LP, 2: BP, 4: HP. Combinable." },
+  { command: "15xx", name: "Env Reset", desc: "Envelope reset time in ticks." },
+  { command: "1Axx", name: "No Env Reset", desc: "Disable envelope reset for this channel." },
+  { command: "20xy", name: "Set AD", desc: "Attack (x) and Decay (y) (0-F)." },
+  { command: "21xy", name: "Set SR", desc: "Sustain (x) and Release (y) (0-F)." },
+  { command: "22xx", name: "PW Slide Up", desc: "Pulse width slide up speed." },
+  { command: "23xx", name: "PW Slide Dn", desc: "Pulse width slide down speed." },
+  { command: "24xx", name: "Cutoff Up", desc: "Filter cutoff slide up speed." },
+  { command: "25xx", name: "Cutoff Dn", desc: "Filter cutoff slide down speed." },
+  { command: "3xxx", name: "Set Duty", desc: "Set pulse width (000-FFF)." },
+  { command: "4xxx", name: "Set Cutoff", desc: "Set filter cutoff (000-7FF)." }
+];
+const CHIP_EFFECT_REFERENCE = {
+  // === NES Family ===
+  [FurnaceChipType.NES]: NES_EFFECTS,
+  [FurnaceChipType.MMC5]: NES_EFFECTS,
+  [FurnaceChipType.VRC6]: [
+    ...NES_EFFECTS,
+    { command: "12xx", name: "Duty Cycle", desc: "Pulse duty cycle (0-7)." }
+  ],
+  // === GAME BOY ===
+  [FurnaceChipType.GB]: [
+    { command: "10xx", name: "Set Wave", desc: "Set waveform index." },
+    { command: "11xx", name: "Noise Length", desc: "0: long, 1: short." },
+    { command: "12xx", name: "Duty Cycle", desc: "0-3 (12.5%, 25%, 50%, 75%)." },
+    { command: "13xy", name: "Sweep Setup", desc: "x: time, y: shift." },
+    { command: "14xx", name: "Sweep Dir", desc: "0: up, 1: down." }
+  ],
+  // === SID Family ===
+  [FurnaceChipType.SID]: SID_EFFECTS,
+  [FurnaceChipType.SID_6581]: SID_EFFECTS,
+  [FurnaceChipType.SID_8580]: SID_EFFECTS,
+  // === SNES ===
+  [FurnaceChipType.SNES]: [
+    { command: "10xx", name: "Waveform", desc: "Set sample index." },
+    { command: "12xx", name: "Echo Toggle", desc: "Toggle echo for this channel." },
+    { command: "13xx", name: "Pitch Mod", desc: "Toggle pitch modulation for this channel." },
+    { command: "15xx", name: "Env Mode", desc: "0: ADSR, 1: direct, 2: dec, 3: exp, 4: inc, 5: bent." },
+    { command: "16xx", name: "Set Gain", desc: "00-7F (direct) or 00-1F (others)." },
+    { command: "18xx", name: "Echo Buffer", desc: "Enable echo buffer." },
+    { command: "19xx", name: "Echo Delay", desc: "Set echo delay (0-F)." },
+    { command: "1Cxx", name: "Echo FB", desc: "Set echo feedback." },
+    { command: "1Dxx", name: "Noise Freq", desc: "Set noise frequency (00-1F)." },
+    { command: "20xx", name: "Set Attack", desc: "Attack rate (0-F)." },
+    { command: "21xx", name: "Set Decay", desc: "Decay rate (0-7)." },
+    { command: "22xx", name: "Set Sustain", desc: "Sustain level (0-7)." },
+    { command: "23xx", name: "Set Release", desc: "Release rate (00-1F)." }
+  ],
+  // === AMIGA ===
+  [FurnaceChipType.AMIGA]: [
+    { command: "10xx", name: "Filter Toggle", desc: "0: off, 1: on (Amiga LED filter)." },
+    { command: "11xx", name: "Toggle AM", desc: "Toggle amplitude modulation with next channel." },
+    { command: "12xx", name: "Toggle PM", desc: "Toggle period modulation with next channel." },
+    { command: "13xx", name: "Set Wave", desc: "Set waveform index." }
+  ],
+  // === PCE ===
+  [FurnaceChipType.PCE]: [
+    { command: "10xx", name: "Set Wave", desc: "Set waveform index." },
+    { command: "11xx", name: "Noise Toggle", desc: "Toggle noise mode." },
+    { command: "12xx", name: "LFO Setup", desc: "0: off, 1: 1x, 2: 16x, 3: 256x depth." },
+    { command: "13xx", name: "LFO Speed", desc: "Set LFO speed." }
+  ],
+  // === POKEY ===
+  [FurnaceChipType.POKEY]: [
+    { command: "10xx", name: "Waveform", desc: "Set waveform (0-7)." },
+    { command: "11xx", name: "AUDCTL", desc: "Set AUDCTL register bits." },
+    { command: "12xx", name: "Two-Tone", desc: "Toggle two-tone mode." }
+  ],
+  // === FM Systems ===
+  [FurnaceChipType.OPN]: FM_COMMON_EFFECTS,
+  [FurnaceChipType.OPN2]: FM_COMMON_EFFECTS,
+  [FurnaceChipType.OPM]: [
+    ...FM_COMMON_EFFECTS,
+    { command: "10xx", name: "Noise Freq", desc: "Set noise frequency (0: off)." },
+    { command: "17xx", name: "LFO Speed", desc: "Set LFO speed." },
+    { command: "18xx", name: "LFO Wave", desc: "0: saw, 1: sq, 2: tri, 3: noise." },
+    { command: "1Exx", name: "AM Depth", desc: "Set LFO AM depth (00-7F)." },
+    { command: "1Fxx", name: "PM Depth", desc: "Set LFO PM depth (00-7F)." }
+  ],
+  [FurnaceChipType.OPNA]: [
+    ...FM_COMMON_EFFECTS,
+    { command: "1Fxx", name: "ADPCM-A Vol", desc: "Set ADPCM-A global volume (00-3F)." }
+  ],
+  [FurnaceChipType.OPNB]: FM_COMMON_EFFECTS,
+  [FurnaceChipType.OPNB_B]: FM_COMMON_EFFECTS,
+  [FurnaceChipType.OPZ]: [
+    ...FM_COMMON_EFFECTS,
+    { command: "2Fxx", name: "Hard Reset", desc: "Toggle hard envelope reset." },
+    { command: "2Axy", name: "Waveform", desc: "x: op 1-4 (0=all), y: wave 0-7." }
+  ],
+  [FurnaceChipType.OPLL]: [
+    { command: "10xx", name: "Set Patch", desc: "Select preset patch (0-F)." },
+    { command: "11xx", name: "Feedback", desc: "Set feedback level (0-7)." },
+    { command: "12xx", name: "Op1 Level", desc: "Set Op1 level (00-3F)." },
+    { command: "13xx", name: "Op2 Level", desc: "Set Op2 level (0-F)." },
+    { command: "16xy", name: "Multiplier", desc: "x: op 1-2, y: multiplier." }
+  ],
+  // === OPL Systems ===
+  [FurnaceChipType.OPL3]: OPL_COMMON_EFFECTS,
+  [FurnaceChipType.OPL4]: OPL_COMMON_EFFECTS,
+  [FurnaceChipType.Y8950]: OPL_COMMON_EFFECTS,
+  [FurnaceChipType.ESFM]: OPL_COMMON_EFFECTS
+};
+const MANUAL_CHAPTERS = [
+  {
+    "id": "01-installation",
+    "number": 1,
+    "title": "Installation & First Launch",
+    "part": "Getting Started",
+    "partNumber": 1,
+    "content": '# Installation & First Launch\n\nThis chapter walks you through installing DEViLBOX, starting the development servers, and orienting yourself in the interface for the first time.\n\n## System Requirements\n\n| Requirement | Minimum | Recommended |\n|-------------|---------|-------------|\n| Node.js | 18.0+ | 20.x LTS |\n| Browser | Chrome 110+, Firefox 115+, Safari 17+ | Chrome or Edge (best Web Audio support) |\n| RAM | 4 GB | 8 GB+ (some WASM synths are memory-hungry) |\n| Disk space | ~2 GB (after `npm install` and WASM assets) | 4 GB+ if working with large sample libraries |\n| OS | macOS 12+, Windows 10+, Linux (x86_64) | Any of these |\n| Audio | Any audio output device | Low-latency audio interface recommended |\n\nDEViLBOX runs entirely in the browser. There is no Electron wrapper or native app -- you run a local dev server and open a tab.\n\n## Installation\n\n### 1. Clone the repository\n\n```bash\ngit clone https://github.com/yourorg/devilbox.git\ncd devilbox\n```\n\n### 2. Install dependencies\n\n```bash\nnpm install\n```\n\nThis installs all JavaScript/TypeScript dependencies plus pre-built WASM modules for the synth engines (Furnace, UADE, libopenmpt, SID, and many more). The initial install may take a few minutes.\n\n### 3. Start the dev server\n\n```bash\nnpm run dev\n```\n\nThis single command starts **three** services:\n\n| Service | Port | What it does |\n|---------|------|--------------|\n| **Vite dev server** | `:5173` | Serves the React app with hot module replacement. This is what you open in your browser. |\n| **Express API server** | `:3001` | Handles server-side tasks: SuperCollider SynthDef compilation, audio rendering, file export. |\n| **WebSocket relay** | `:4003` | Real-time message bridge between the browser, the Express server, and the MCP automation layer. |\n\nYou do not need to start these separately. `npm run dev` launches all three.\n\n### 4. Open the app\n\nNavigate to **http://localhost:5173** in your browser. You should see the tracker view:\n\n![DEViLBOX first launch -- the pattern editor in its default state](../images/screenshots/first-launch.png)\n\n## Unlocking Audio\n\nModern browsers require a user gesture (a click or keypress) before they will allow audio playback. When you first load DEViLBOX, the AudioContext is in a "suspended" state.\n\n**Simply click anywhere in the app window** to unlock it. You will see the audio state indicator in the status bar change from "Suspended" to "Running". Once unlocked, all playback and synthesis features work normally.\n\nIf you accidentally close the tab and reopen it, you will need to click again to re-unlock. This is a browser security requirement, not a DEViLBOX limitation.\n\n## The Five Main Views\n\nDEViLBOX organizes its interface into distinct views, each focused on a different workflow. You switch between them using the navigation tabs at the top of the screen.\n\n![The view switcher tabs in the navigation bar](../images/screenshots/view-switcher.png)\n\n| View | Tab label | What it is for |\n|------|-----------|----------------|\n| **Tracker** | Tracker | The pattern editor -- rows, channels, notes, effects. This is where you compose music note by note, just like FastTracker 2 or ProTracker. Also includes the Grid and TB-303 sub-modes. |\n| **Arrangement** | Arrange | The song arrangement timeline -- order patterns into a full song, duplicate sections, manage song structure. |\n| **Piano Roll** | Piano | A graphical note editor with a piano keyboard on the left and notes drawn as horizontal bars. Familiar if you have used a DAW. |\n| **Mixer** | Mixer | Channel strips with volume faders, pan knobs, mute/solo buttons, insert effects, and send levels. Also shows the master bus. |\n| **DJ Mixer** | DJ | A dual-deck DJ interface for mixing tracker modules and music files. Includes BPM detection, crossfader, playlist management, and access to the Modland archive. |\n| **Drum Pads** | Pads | A pad-based interface for finger-drumming and programming drum patterns, with per-pad parameter editing for TR-808 and TR-909. |\n| **VJ View** | VJ | Real-time visuals synchronized to the music -- shader effects, 3D scenes, and overlays for live performance. |\n| **Studio** | Studio | Combined instrument editing and pattern view -- a compact workspace for sound design while composing. |\n| **Split View** | Split | Two views side by side. Useful for editing patterns while watching the mixer, or collaborating in real-time. |\n\nThere are also two tracker sub-modes accessible from the Tracker tab:\n- **Grid** -- a step-sequencer-style grid view of the pattern\n- **TB-303** -- a specialized acid bassline sequencer interface\n\n## DOM vs. Pixi/GL Rendering\n\nDEViLBOX has two rendering modes that you can switch between:\n\n- **DOM mode** (the default) -- uses standard HTML elements rendered by React. Clean, accessible, works everywhere. Text is crisp and the interface looks like a modern web app.\n\n- **Pixi/GL mode** -- uses WebGL via PixiJS for the entire interface. The UI is drawn as a GPU-accelerated scene graph, enabling CRT shader effects, scanline overlays, and authentic retro aesthetics. This mode is recommended for VJ performance and for the full visual experience.\n\nBoth modes share the same underlying data stores and logic. They are visually 1:1 -- every feature in the DOM view exists in the Pixi/GL view and vice versa. You are never missing functionality by choosing one over the other; only the rendering technology differs.\n\nYou can toggle between them in the Settings panel (gear icon in the top-right corner of the navigation bar).\n\n## What You See at First Launch\n\nWhen you open DEViLBOX for the first time, you land on the **Tracker** view with an empty song:\n\n- **Navigation bar** (top) -- view tabs, BPM display, master volume, theme selector, settings\n- **Pattern editor** (center) -- the grid where you enter notes. It starts empty with 64 rows and a few channels.\n- **Status bar** (below the pattern editor) -- shows BPM, speed (ticks per row), current pattern/row position, record mode state, and audio status\n- **Instrument panel** (right side or bottom, depending on layout) -- the synth browser and parameter editor for the currently selected instrument\n\nFrom here you can:\n1. Load a music file (drag and drop, or Ctrl+O) -- see [Loading & Playing Music](./04-loading-playing-music.md)\n2. Start composing from scratch -- see [Your First Song](./03-your-first-song.md)\n3. Explore the interface -- see [Interface Overview](./02-interface-overview.md)\n\n## Next Steps\n\nNow that you have DEViLBOX running, head to the [Interface Overview](./02-interface-overview.md) to learn your way around every panel and control.\n',
+    "images": [
+      "screenshots/first-launch.png",
+      "screenshots/view-switcher.png"
+    ]
+  },
+  {
+    "id": "02-interface-overview",
+    "number": 2,
+    "title": "Interface Overview",
+    "part": "Getting Started",
+    "partNumber": 1,
+    "content": '# Interface Overview\n\nThis chapter gives you a guided tour of every major panel in DEViLBOX. By the end, you will know where everything is and what it does.\n\n## The Pattern Editor\n\nThe pattern editor is the heart of DEViLBOX. It is a grid where rows run vertically (top to bottom) and channels run horizontally (left to right). Each intersection of a row and a channel is a **cell** -- the smallest unit of music data.\n\n![The pattern editor showing a 4-channel pattern with notes, instruments, and effects](../images/screenshots/pattern-editor.png)\n\n### Rows\n\nA pattern has a fixed number of rows, typically 64 (but configurable). Each row represents one step in time. When the song plays, a cursor moves down the rows from top to bottom. Row numbers are shown on the far left in hexadecimal (00 to 3F for a 64-row pattern).\n\n### Channels\n\nEach channel is an independent voice that plays one note at a time. DEViLBOX supports up to 64 channels. The channel header at the top shows the channel number and provides mute/solo controls.\n\n### Cell Anatomy\n\nEvery cell has four fields. They are displayed left-to-right within the cell:\n\n| Field | Width | Example | What it means |\n|-------|-------|---------|---------------|\n| **Note** | 3 chars | `C-5` | The musical note and octave. `C-5` is middle C in octave 5. `---` means no note. `===` means note off (release). |\n| **Instrument** | 2 chars | `01` | Which instrument (synth) plays this note. `00`-`FF` (0-255). `..` means use the last instrument. |\n| **Volume** | 2 chars | `40` | Channel volume for this step. `00` (silent) to `40` (full, which is 64 decimal). `..` means unchanged. |\n| **Effect** | 3 chars | `A02` | An effect command. The first character is the effect type, the next two are the parameter. `...` means no effect. |\n\nA fully populated cell looks like this:\n\n```\nC-5 01 40 A02\n```\n\nThis means: play note C in octave 5, using instrument 01, at full volume (40), with effect A02 (volume slide down by 2 per tick).\n\nAn empty cell looks like this:\n\n```\n--- .. .. ...\n```\n\n### Navigation Keys\n\n| Key | Action |\n|-----|--------|\n| Arrow Up / Down | Move one row up or down |\n| Arrow Left / Right | Move between fields within a cell, or to the next/previous channel |\n| Tab | Jump to the next channel |\n| Shift+Tab | Jump to the previous channel |\n| Page Up | Jump 16 rows up |\n| Page Down | Jump 16 rows down |\n| Home | Jump to the first row (row 0) |\n| End | Jump to the last row |\n| Ctrl+Left / Ctrl+Right | Jump to the previous / next channel |\n\n### Entering Data\n\nTo type notes and data into the pattern, you must be in **record mode**. Press **CapsLock** to toggle record mode on and off. When record mode is active, you will see a "REC" indicator in the status bar, and the cursor row is highlighted in red instead of cyan.\n\nIn record mode:\n- **QWERTY keys** act as a piano keyboard (see [Your First Song](./03-your-first-song.md) for the full key map)\n- **Number keys** (in the volume or effect columns) enter hex values\n- **Delete** clears the current cell\n- The cursor advances by the **edit step** amount after each entry (default: 1 row)\n\n## The Status Bar\n\nThe status bar sits below the pattern editor (or at the bottom of the screen in some layouts). It shows at a glance:\n\n![The status bar showing BPM, speed, position, and audio state](../images/screenshots/status-bar.png)\n\n| Element | What it shows |\n|---------|---------------|\n| **BPM** | Beats per minute. Click to edit directly, or use the Fxx effect in the pattern. |\n| **Speed** | Ticks per row. Lower = faster row advancement. Default is 6. |\n| **Position** | Current pattern number and row number (e.g., "Pat 00 Row 1A"). |\n| **Record mode** | Shows "REC" when record mode is active (CapsLock). |\n| **Audio state** | Shows whether the AudioContext is "Running" or "Suspended". |\n| **Octave** | The current input octave for the QWERTY piano keyboard (e.g., "Oct 5"). |\n| **Edit step** | How many rows the cursor advances after entering a note (e.g., "Step 1"). |\n\n## The Instrument Panel\n\nThe instrument panel is where you browse, select, and edit synthesizers. DEViLBOX ships with over 180 synths organized into 18 categories.\n\n![The instrument editor showing a TB-303 with knob controls](../images/screenshots/instrument-editor.png)\n\n### Synth Categories\n\n| Category | What is in it |\n|----------|--------------|\n| **Bass** | TB-303, MonoSynth, WobbleBass |\n| **Lead** | Synth, DuoSynth, FMSynth, SuperSaw, ChipSynth, PWM, Formant, Modular, V2 |\n| **Drums** | TR-808, TR-909, MembraneSynth, MetalSynth, NoiseSynth, DrumKit, Synare, TR-707, DrumMachine |\n| **Speech & Voice** | DECtalk, PinkTrombone, SAM, V2 Speech, and 7 MAME speech chips |\n| **Pads** | Wavetable, Granular, PolySynth, StringMachine, Harmonic, V2 |\n| **Dub & FX** | DubSiren, SpaceLaser, V2, Synare |\n| **Keys** | Organ, UPD-931, OpenWurli, DX7 |\n| **Samples** | Sampler, Player, ChiptuneModule, MusicLine |\n| **Plugins** | WAM 2.0 instruments -- OB-Xd, Synth101, TinySynth, Faust Flute |\n| **Furnace Chips** | 70+ authentic retro chip emulations -- NES, Game Boy, C64, Genesis, SNES, and more |\n| **FM Chips** | Yamaha FM family -- OPN, OPL, OPM, OPZ, ESFM, VRC7 |\n| **Console Chips** | NES, Game Boy, SNES, PCE, Virtual Boy, Lynx, GBA, NDS |\n| **Computer Chips** | C64 SID, AY-3-8910, POKEY, VIC-20, PET, plus 30+ Amiga replayer synths |\n| **Arcade PCM** | Sega PCM, QSound, ES5506, RF5C68, Namco, and more |\n| **MAME Hardware** | VFX, D-50, DOC, CZ-101, CEM3394, and 20+ MAME-emulated chips |\n| **JUCE Synths** | MDA ePiano/JX10/DX10, Raffo, Calf Mono, setBfree organ, ZynAddSubFX, SunVox, Sfizz |\n| **VST Bridge** | Vital, Surge XT, Odin2, Helm, OB-Xf, Amsynth, Monique, VL-1, and more |\n| **Buzzmachines** | Jeskola Buzz machines -- 3o3, M3, M4, 4FM2F, kicks, noise |\n| **Demoscene** | Farbrausch V2, WaveSabre, Oidos, Tunefish |\n| **Retromulator** | OpenWurli, OPL3, DX7 emulations via Gearmulator |\n| **Scripted** | SuperCollider live-coded synthesis |\n\nTo select an instrument, open the instrument panel, browse by category or search by name, and click the synth you want. It becomes the active instrument for note entry.\n\nEach synth has its own parameter editor with knobs, sliders, and controls specific to that engine. For example, the TB-303 shows Cutoff, Resonance, Env Mod, Decay, and Accent knobs, while Surge XT shows a full multi-oscillator interface.\n\n## The Mixer\n\nThe mixer view shows a channel strip for every active channel, plus a master bus.\n\n![The mixer view showing channel strips with volume faders and insert effects](../images/screenshots/mixer.png)\n\n### Channel Strips\n\nEach channel strip has:\n- **Volume fader** -- drag to set the channel volume\n- **Pan knob** -- rotate to position the sound in the stereo field (left/center/right)\n- **Mute button** (M) -- silence this channel without removing its notes\n- **Solo button** (S) -- hear only this channel (mutes all others)\n- **Insert effects** -- a chain of audio effects applied to this channel. Click to add, remove, or reorder effects.\n- **Send levels** -- control how much of this channel\'s audio is routed to send effect buses\n\n### Master Bus\n\nThe master bus strip appears at the far right. It controls the final output volume and hosts master insert effects that process the entire mix (e.g., a compressor or reverb on the master).\n\n### Effects\n\nDEViLBOX includes 84+ audio effects that can be inserted on any channel or the master bus. These range from standard utilities (EQ, compressor, reverb) to creative processors (TapeDegradation, BitCrusher, GranularDelay). See Part IV: Effects for the full catalog.\n\n## The DJ View\n\nThe DJ view is a dual-deck mixing interface for playing and blending music files.\n\n![The DJ view showing two decks with crossfader and playlist](../images/screenshots/dj-view.png)\n\nEach deck can load any supported music format -- tracker modules, SID tunes, chiptunes, or audio files. Features include:\n\n- **Waveform display** for each deck\n- **Crossfader** to blend between decks\n- **BPM detection** and tempo sync\n- **Playlist panel** with drag-and-drop ordering\n- **Modland browser** -- search and stream from 190,000+ tracker modules\n- **HVSC browser** -- search and stream from 80,000+ C64 SID tunes\n- **Auto-DJ** mode for hands-free playback\n\n## The VJ View\n\nThe VJ view provides real-time visuals synchronized to the music for live performance.\n\n![The VJ view showing shader visuals synchronized to music](../images/screenshots/vj-view.png)\n\nFeatures include:\n- Multiple visual scenes (Kraftwerk-inspired heads, geometric patterns, abstract shaders)\n- Audio-reactive parameters -- visuals respond to amplitude, frequency, and beat detection\n- Pattern overlays showing the currently playing tracker data\n- CRT/scanline post-processing effects\n- Scene transitions and crossfades\n\nThe VJ view is designed for projection at live events. It works in both DOM and Pixi/GL rendering modes, though the Pixi/GL mode enables additional GPU shader effects.\n\n## Keyboard Shortcut Quick Reference\n\nThese are the most important shortcuts to memorize. A complete shortcut list is available in the Help dialog (press **F1** or **?**).\n\n| Shortcut | Action |\n|----------|--------|\n| **Space** | Play / Pause |\n| **F5** | Play from beginning of pattern |\n| **Shift+F5** | Play from beginning of song |\n| **F8** | Stop playback |\n| **CapsLock** | Toggle record mode |\n| **Ctrl+S** | Save project |\n| **Ctrl+O** | Open / load file |\n| **Ctrl+Z** | Undo |\n| **Ctrl+Shift+Z** | Redo |\n| **Ctrl+C** | Copy selection |\n| **Ctrl+V** | Paste |\n| **Ctrl+X** | Cut selection |\n| **F1** or **?** | Open help dialog |\n| **Z** / **X** | Decrease / increase current octave |\n| **Numpad +/-** | Increase / decrease edit step |\n| **F2** | Switch to pattern editor |\n| **F3** | Switch to instrument editor |\n| **Ctrl+Left/Right** | Previous / next channel |\n| **Ctrl+Up/Down** | Previous / next pattern |\n\n## Next Steps\n\nNow that you know where everything is, it is time to make some music. Head to [Your First Song](./03-your-first-song.md) for a step-by-step tutorial.\n',
+    "images": [
+      "screenshots/pattern-editor.png",
+      "screenshots/status-bar.png",
+      "screenshots/instrument-editor.png",
+      "screenshots/mixer.png",
+      "screenshots/dj-view.png",
+      "screenshots/vj-view.png"
+    ]
+  },
+  {
+    "id": "03-your-first-song",
+    "number": 3,
+    "title": "Your First Song",
+    "part": "Getting Started",
+    "partNumber": 1,
+    "content": '# Your First Song\n\nIn this tutorial, you will create a short 4-channel pattern from scratch: a bass line, a lead melody, a drum beat, and some effects. By the end, you will have a playable loop and understand the core workflow of composing in a tracker.\n\nNo prior tracker experience is required. We will go step by step.\n\n## Before You Start\n\nMake sure DEViLBOX is running (`npm run dev`) and open in your browser. Click anywhere in the window to unlock audio if you have not already. You should see an empty pattern editor.\n\n## Step 1: Set the Tempo\n\nThe default BPM is 125. Let us set it to 120 for a comfortable working speed.\n\n**Method A -- Click the BPM display** in the status bar or navigation bar. Type `120` and press Enter.\n\n**Method B -- Use the Fxx effect** in the pattern. On row 00 of any channel, enter the effect `F78`. The F effect sets speed/BPM: values from 20 to FF set the BPM directly, and 78 hex = 120 decimal. (We will cover effects in detail in Step 6.)\n\nFor now, use Method A -- just click and type. It is faster for initial setup.\n\n## Step 2: Select a Bass Instrument\n\nOpen the instrument panel (click the instrument area on the right side, or press **F3**). Browse to the **Bass** category. You will see three options:\n\n- **TB-303** -- the classic acid bass. Squelchy, resonant, unmistakable.\n- **MonoSynth** -- a versatile monophonic synthesizer\n- **WobbleBass** -- a dubstep-style modulated bass\n\nClick **TB-303** to select it. It becomes instrument 01 (the first instrument in your song). You will see the TB-303 control panel appear with Cutoff, Resonance, Env Mod, Decay, and other knobs.\n\n![Selecting the TB-303 from the Bass category](../images/screenshots/select-bass.png)\n\nLeave the knobs at their defaults for now. The factory sound is already a solid bass tone.\n\n## Step 3: Enter a Bass Pattern\n\nNow we enter notes into the pattern. This is the core tracker workflow: you type notes one at a time, and the cursor advances down.\n\n### Enable Record Mode\n\nPress **CapsLock** to enable record mode. You will see "REC" appear in the status bar, and the cursor row turns red. Without record mode, your keypresses are just previewing sounds -- they will not be written into the pattern.\n\n### The QWERTY Piano Keyboard\n\nIn DEViLBOX, your computer keyboard acts as a two-octave piano. The lower row plays the lower octave, and the upper row plays the higher octave:\n\n**Lower octave (current octave):**\n\n| Key | Note |\n|-----|------|\n| Z | C |\n| S | C# |\n| X | D |\n| D | D# |\n| C | E |\n| V | F |\n| G | F# |\n| B | G |\n| H | G# |\n| N | A |\n| J | A# |\n| M | B |\n\n**Upper octave (current octave + 1):**\n\n| Key | Note |\n|-----|------|\n| Q | C |\n| 2 | C# |\n| W | D |\n| 3 | D# |\n| E | E |\n| R | F |\n| 5 | F# |\n| T | G |\n| 6 | G# |\n| Y | A |\n| 7 | A# |\n| U | B |\n\nThe current octave is shown in the status bar (e.g., "Oct 4"). Press the standalone **Z** key (lowercase) to decrease the octave, or **X** to increase it. (These only work when you are NOT in a note column -- the note-entry Z/X are the piano keys.)\n\n### Enter the Bass Line\n\nMake sure the cursor is on row 00, channel 1, in the note column. The current octave should be 3 or 4 for bass.\n\nWith record mode on and the edit step set to 4 (press **Numpad +** until the step shows 4, or set it in the status bar), enter these notes:\n\n| Row | Key to press | Note entered |\n|-----|-------------|--------------|\n| 00 | Z | C-4 |\n| 04 | Z | C-4 |\n| 08 | V | F-4 |\n| 0C | V | F-4 |\n| 10 | B | G-4 |\n| 14 | B | G-4 |\n| 18 | V | F-4 |\n| 1C | (leave empty) | --- |\n| 20 | Z | C-4 |\n| 24 | Z | C-4 |\n| 28 | V | F-4 |\n| 2C | V | F-4 |\n| 30 | N | A-4 |\n| 34 | B | G-4 |\n| 38 | V | F-4 |\n| 3C | Z | C-4 |\n\nThis gives you a simple 16-step bass line (each note is 4 rows apart in a 64-row pattern, so the first half of the pattern is filled). The instrument number (01) is automatically inserted because TB-303 is your selected instrument.\n\n![The bass pattern entered in channel 1](../images/screenshots/bass-pattern.png)\n\n## Step 4: Add a Lead Melody\n\nPress **Tab** to move to channel 2. Open the instrument panel again and browse to the **Lead** category. Select **SuperSaw** -- it is a bright, detuned sawtooth lead that cuts through a mix.\n\nThis becomes instrument 02. Make sure the cursor is on row 00 of channel 2.\n\nSet the octave to 5 (press X until the status bar shows "Oct 5") and enter a melody. With edit step still at 4:\n\n| Row | Key to press | Note entered |\n|-----|-------------|--------------|\n| 00 | E | E-5 |\n| 04 | (leave empty) | --- |\n| 08 | R | F-5 |\n| 0C | E | E-5 |\n| 10 | W | D-5 |\n| 14 | (leave empty) | --- |\n| 18 | Q | C-5 |\n| 1C | W | D-5 |\n| 20 | E | E-5 |\n| 24 | (leave empty) | --- |\n| 28 | R | F-5 |\n| 2C | T | G-5 |\n| 30 | Y | A-5 |\n| 34 | (leave empty) | --- |\n| 38 | T | G-5 |\n| 3C | (leave empty) | --- |\n\n## Step 5: Add Drums\n\nPress **Tab** to move to channel 3. Open the instrument panel and go to the **Drums** category. Select **TR-808**. This becomes instrument 03.\n\nThe TR-808 maps different drum sounds to different notes. Here are the most important ones:\n\n| Note | Drum sound |\n|------|-----------|\n| C-4 | Bass Drum (kick) |\n| D-4 | Snare Drum |\n| F#-4 | Closed Hi-Hat |\n| A#-4 | Open Hi-Hat |\n| D#-4 | Rimshot |\n| C#-4 | Low Tom |\n\nSet the octave to 4. Now enter a basic beat with edit step set to 2 (for faster hi-hat resolution):\n\n| Row | Key to press | Sound |\n|-----|-------------|-------|\n| 00 | Z (C-4) | Kick |\n| 02 | G (F#-4) | Closed Hi-Hat |\n| 04 | G (F#-4) | Closed Hi-Hat |\n| 06 | G (F#-4) | Closed Hi-Hat |\n| 08 | X (D-4) | Snare |\n| 0A | G (F#-4) | Closed Hi-Hat |\n| 0C | G (F#-4) | Closed Hi-Hat |\n| 0E | G (F#-4) | Closed Hi-Hat |\n| 10 | Z (C-4) | Kick |\n| 12 | G (F#-4) | Closed Hi-Hat |\n| 14 | Z (C-4) | Kick |\n| 16 | G (F#-4) | Closed Hi-Hat |\n| 18 | X (D-4) | Snare |\n| 1A | G (F#-4) | Closed Hi-Hat |\n| 1C | G (F#-4) | Closed Hi-Hat |\n| 1E | J (A#-4) | Open Hi-Hat |\n\nThen repeat this 16-row block for rows 20-3E to fill the pattern. You can use copy-paste: select rows 00-1F of channel 3 with Shift+arrow keys, press Ctrl+C, move to row 20, and press Ctrl+V.\n\n## Step 6: Add Effects\n\nEffects add movement and expression to your notes. They are entered in the effect column (the rightmost field of each cell). To move the cursor to the effect column, press Right arrow until you reach it.\n\nLet us add two effects:\n\n### Volume Fade on the Lead\n\nMove to channel 2, row 20, effect column. Type `A02`. This means:\n- **A** = Volume Slide effect\n- **02** = slide down by 2 per tick\n\nThe note at row 20 will gradually fade out. This adds a natural, breathing quality to the melody.\n\n### Vibrato on the Lead\n\nMove to channel 2, row 10, effect column. Type `486`. This means:\n- **4** = Vibrato effect\n- **8** = speed 8\n- **6** = depth 6\n\nThe D-5 note at row 10 will wobble in pitch slightly, adding warmth.\n\n### Other Useful Effects to Try\n\n| Effect | Name | What it does |\n|--------|------|-------------|\n| `0xy` | Arpeggio | Rapidly cycles between note, note+x semitones, note+y semitones. `037` = major chord. |\n| `1xx` | Portamento Up | Slides pitch up. `110` = slow slide. |\n| `2xx` | Portamento Down | Slides pitch down. `220` = slow slide. |\n| `3xx` | Tone Portamento | Glides smoothly from the previous note to this note. `310` = smooth glide. |\n| `Cxx` | Set Volume | Sets volume directly. `C40` = full, `C20` = half. |\n| `Fxx` | Set Speed/BPM | `01`-`1F` sets ticks per row, `20`-`FF` sets BPM. |\n\nSee Part X: Reference for the complete effect command table.\n\n## Step 7: Play It\n\nPress **Space** to start playback. You will see the cursor move down through the rows, and hear your bass, lead, and drums playing together.\n\n![The pattern playing back with the play cursor moving through the rows](../images/screenshots/playing.png)\n\n| Key | Action |\n|-----|--------|\n| **Space** | Play / Pause (toggle) |\n| **F5** | Play from the beginning of the current pattern |\n| **Shift+F5** | Play from the beginning of the song |\n| **F8** | Stop playback and reset position |\n\nTry pressing F8 to stop, then F5 to hear it from the top. The pattern loops automatically when it reaches the end.\n\n## Step 8: Add Effects in the Mixer\n\nSwitch to the **Mixer** view (click the Mixer tab or use the keyboard shortcut). You will see three active channel strips (plus the master).\n\n![The mixer view with insert effects on the bass channel](../images/screenshots/mixer-effects.png)\n\n### Add TapeDegradation to the Bass\n\nClick the effects slot on channel 1 (the bass). A list of available effects appears. Scroll to **TapeDegradation** and click it. This effect adds warmth, wow/flutter, and subtle distortion -- it makes the TB-303 sound like it is playing through worn-out tape. Adjust the "Wear" and "Flutter" knobs to taste.\n\n### Add Reverb to the Master\n\nClick the effects slot on the **Master** bus (far right). Add **MVerb** -- a clean algorithmic reverb. Turn the "Size" knob up to about 60% and the "Mix" to around 20%. Now everything has a sense of space without being washed out.\n\n### Adjust the Mix\n\n- Pull the bass (channel 1) fader down slightly so it does not overpower the lead\n- Pan the lead (channel 2) slightly to the right\n- Keep the drums (channel 3) centered\n\nPlay the pattern again with Space. It should sound noticeably better with effects and a balanced mix.\n\n## Step 9: Save Your Work\n\nPress **Ctrl+S** to save your project. DEViLBOX saves to your browser\'s local storage by default. Your song, instruments, and mixer settings are all preserved.\n\nTo export your work as an audio file, use the Export dialog in the File menu. You can render to WAV or other formats.\n\n## Congratulations\n\nYou have just created your first DEViLBOX song: a bass line, a melody, a drum beat, mixer effects, and volume automation -- all in a tracker interface.\n\n## Next Steps\n\nHere are some things to try next:\n\n- **Experiment with instruments** -- try replacing the SuperSaw lead with a DuoSynth, FMSynth, or one of the Furnace chip emulations for a retro flavor\n- **Add more channels** -- add a pad on channel 4 (try the StringMachine or Wavetable synth from the Pads category)\n- **Use the arrangement** -- switch to the Arrangement view to chain multiple patterns into a full song\n- **Load existing music** -- see [Loading & Playing Music](./04-loading-playing-music.md) to explore the 190,000+ modules available from Modland\n- **Try the DJ mode** -- load two songs and mix between them\n- **Explore effects** -- DEViLBOX has 84+ effects. Try adding a BitCrusher to the drums for lo-fi grit, or a PingPongDelay on the lead\n\nThe pattern you just made is the foundation of all tracker music. Everything builds on this: entering notes, choosing instruments, adding effects, and mixing. The more you experiment, the more natural it becomes.\n',
+    "images": [
+      "screenshots/select-bass.png",
+      "screenshots/bass-pattern.png",
+      "screenshots/playing.png",
+      "screenshots/mixer-effects.png"
+    ]
+  },
+  {
+    "id": "04-loading-playing-music",
+    "number": 4,
+    "title": "Loading & Playing Music",
+    "part": "Getting Started",
+    "partNumber": 1,
+    "content": '# Loading & Playing Music\n\nDEViLBOX can load and play over 188 music file formats -- from classic Amiga modules to Furnace chiptunes to C64 SID files. This chapter explains what formats are supported, how to load them, and how to browse two massive online archives of free music.\n\n## Supported Format Overview\n\nDEViLBOX organizes its format support into several families, each handled by a different playback engine.\n\n### Tracker Formats\n\nThese are the classic PC and Amiga tracker formats. DEViLBOX can import their patterns, instruments, and samples for full editing.\n\n| Format | Extension | Channels | Engine | Notes |\n|--------|-----------|----------|--------|-------|\n| ProTracker MOD | `.mod` | 4-32 | Native parser + libopenmpt | The original Amiga tracker format. |\n| FastTracker 2 XM | `.xm` | Up to 32 | Native parser + libopenmpt | Extended module with envelopes and 16-bit samples. |\n| Impulse Tracker IT | `.it` | Up to 64 | Native parser + libopenmpt | Advanced format with NNA, filters, and compression. |\n| Scream Tracker S3M | `.s3m` | Up to 32 | Native parser + libopenmpt | Gravis Ultrasound era format. |\n| Furnace | `.fur` | Varies by chip | Furnace WASM engine | Multi-chip chiptune tracker. 70+ chip emulations. |\n| DefleMask | `.dmf` | Varies by system | Furnace engine | Cross-platform chiptune format. |\n| Renoise | `.xrns` | Up to 64 | Native parser | Renoise XML format with instrument data. |\n| OctaMED | `.med`, `.mmd0`-`.mmd3` | Up to 64 | Native parser + libopenmpt | Amiga multi-channel tracker. |\n| DigiBooster Pro | `.dbm` | Up to 128 | Native parser + libopenmpt | Amiga 16-bit tracker. |\n\nFor MOD, XM, IT, and S3M files, DEViLBOX tries its own native parser first (which extracts full sample and envelope data for editing). If the native parser does not support a particular variant, it transparently falls back to libopenmpt for playback.\n\n### Chiptune Formats\n\nThese are register-dump and music-driver formats from various home computers, consoles, and arcade machines.\n\n| Format | Extension | System | Engine |\n|--------|-----------|--------|--------|\n| C64 SID | `.sid` | Commodore 64 | C64 SID Engine (PSID/RSID) |\n| NSF | `.nsf`, `.nsfe` | NES / Famicom | Chip-dump engine |\n| GBS | `.gbs` | Game Boy | Chip-dump engine |\n| VGM / VGZ | `.vgm`, `.vgz` | Multi-system | Chip-dump engine |\n| HES | `.hes` | PC Engine / TurboGrafx-16 | Chip-dump engine |\n| KSS | `.kss` | MSX | Chip-dump engine |\n| SPC | `.spc` | Super Nintendo | Chip-dump engine |\n| SAP | `.sap` | Atari 8-bit (POKEY) | Chip-dump engine |\n| YM | `.ym` | Atari ST (YM2149) | Chip-dump engine |\n| AY | `.ay` | ZX Spectrum (AY-3-8910) | Chip-dump engine |\n| MDX | `.mdx` | Sharp X68000 (YM2151) | Chip-dump engine |\n| SNDH / SC68 | `.sndh`, `.sc68` | Atari ST | SC68 WASM engine |\n| S98 | `.s98` | PC-88/PC-98/MSX FM | Chip-dump engine |\n| PMD | `.m`, `.m2`, `.pmd` | PC-98 (YM2608) | PMD engine |\n| ZX Spectrum | `.pt3`, `.pt2`, `.stc`, `.vtx`, `.psg`, and 20+ more | ZX Spectrum | ZXTune WASM engine |\n| AdLib/OPL | `.rad`, `.hsc`, `.cmf`, `.d00`, `.dro`, `.imf`, and more | PC AdLib | AdPlug engine |\n| GoatTracker | `.sng` | Commodore 64 | GoatTracker engine |\n\n### Amiga Formats via UADE\n\nUADE (Unix Amiga Delitracker Emulator) gives DEViLBOX access to 100+ Amiga music formats. These cover legendary composers and custom sound drivers from the Amiga demoscene and game industry. Here are some of the notable ones:\n\n| Format | Extension / Prefix | Composer or Driver |\n|--------|-------------------|-------------------|\n| HivelyTracker / AHX | `.hvl`, `.ahx` | Hively synthesis tracker |\n| Future Composer | `.fc`, `.fc14` | Amiga chip music |\n| TFMX | `.tfmx`, `mdat.*` | Jochen Hippel (Turrican, etc.) |\n| SoundMon | `.bp`, `.bp3` | Brian Postma |\n| SidMon | `.sid1`, `.sid2` | Amiga SID emulation |\n| Digital Mugician | `.dmu` | Rob Hubbard |\n| Fred Editor | `.fred` | Software of Sweden |\n| JamCracker Pro | `.jam` | Amiga sound driver |\n| Art of Noise | `.aon` | AON4/AON8 multichannel |\n| Sonic Arranger | `.sa` | Sophisticated synthesis |\n| Symphonie Pro | `.symmod` | Up to 256 channels |\n| Dave Lowe | `dl.*` | Game musician |\n| Richard Joseph | `rjp.*` | Cannon Fodder, Sensible Soccer |\n| Rob Hubbard | `rh.*` | Legendary C64/Amiga composer |\n| David Whittaker | `.dw` | Prolific game composer |\n| Ben Daglish | `bd.*` | Last Ninja, Deflektor |\n| Mark Cooksey | `mc.*` | Ghosts \'n Goblins, Bubble Bobble |\n| Jeroen Tel | `jt.*` | Turbo Outrun, Cybernoid |\n\nMany Amiga formats use a **prefix naming convention** (e.g., `rh.songname` instead of `songname.rh`). DEViLBOX detects both extension-based and prefix-based filenames automatically.\n\nFor most of these formats, DEViLBOX also has a native parser that extracts pattern data for display in the tracker view. The UADE engine handles audio playback, while the parser shows you the notes and effects as they play.\n\n### Other Formats\n\n| Format | Extension | Description |\n|--------|-----------|-------------|\n| SunVox | `.sunvox` | SunVox modular tracker |\n| Organya | `.org` | Cave Story music format |\n| PxTone | `.ptcop`, `.pttune` | Studio Pixel composition format |\n| V2M | `.v2m` | Farbrausch V2 Synthesizer (demoscene) |\n| EUP | `.eup` | FM Towns music |\n| Psycle | `.psy` | Psycle modular tracker |\n| Ixalance | `.ixs` | Impulse Tracker variant |\n| MIDI | `.mid`, `.midi` | Standard MIDI files (imported to tracker format) |\n| Music Assembler | `.ma` | Amiga Music Assembler |\n| PreTracker | `.prt` | Amiga PreTracker |\n| Buzz | `.bmx` (via WASM engines) | Jeskola Buzz machines |\n\n## Loading Methods\n\n### Drag and Drop\n\nThe simplest way to load a file: **drag it from your file manager and drop it on the DEViLBOX window**. The format is detected automatically and playback begins.\n\nThis works for single files and for archives (ZIP files containing modules).\n\n### File Browser (Ctrl+O)\n\nPress **Ctrl+O** or use the File menu to open the file browser dialog. Navigate to the file you want to load and click Open.\n\n![The file browser dialog showing supported formats](../images/screenshots/file-browser.png)\n\n### From Archives\n\nIf you drop a `.zip` file, DEViLBOX will scan it for supported music files. If there is one file inside, it loads automatically. If there are multiple, you get a list to choose from.\n\n## HVSC -- 80,000+ C64 SID Tunes\n\nThe **High Voltage SID Collection** (HVSC) is the definitive archive of Commodore 64 music. It contains over 80,000 SID tunes by thousands of composers, from Rob Hubbard to Jeroen Tel to Martin Galway.\n\nDEViLBOX has a built-in HVSC browser. To use it:\n\n1. Switch to the **DJ** view\n2. Open the **HVSC** browser panel\n3. Type a search query -- a composer name (e.g., "hubbard"), a game title (e.g., "commando"), or a tune name\n4. The results show matching files with their path in the HVSC archive\n5. Click a result to load and play it immediately\n\nThe SID files are streamed from the HVSC archive -- you do not need to download the entire collection.\n\nExample search paths in the HVSC:\n- `MUSICIANS/H/Hubbard_Rob/Commando.sid` -- Rob Hubbard\'s Commando theme\n- `MUSICIANS/G/Galway_Martin/Arkanoid.sid` -- Martin Galway\'s Arkanoid\n- `MUSICIANS/T/Tel_Jeroen/Cybernoid_II.sid` -- Jeroen Tel\'s Cybernoid II\n\nSID files often contain multiple sub-tunes (e.g., a game with title music, in-game music, and a high-score tune all in one file). DEViLBOX shows the sub-tune list and lets you switch between them.\n\n## Modland -- 190,000+ Tracker Modules\n\n**Modland** is the largest online archive of tracker modules, covering every format from 4-channel Amiga MODs to modern XM and IT files. It hosts over 190,000 modules.\n\nThe Modland browser works just like the HVSC browser:\n\n1. Switch to the **DJ** view\n2. Open the **Modland** browser panel\n3. Search for a composer, song, or format\n4. Click to load and play\n\nExample searches:\n- "purple motion" -- find modules by Purple Motion (Future Crew)\n- "skaven" -- modules by Skaven (Future Crew)\n- "unreal" -- music from the Unreal game soundtrack\n- "second reality" -- the legendary Second Reality demo soundtrack\n\nModland files are downloaded on demand and cached locally for future playback.\n\n## Playback Controls\n\n| Key | Action |\n|-----|--------|\n| **Space** | Play / Pause toggle |\n| **F5** | Play from the beginning of the current pattern |\n| **Shift+F5** | Play from the beginning of the song (order position 0, row 0) |\n| **F8** | Stop playback and reset position to the top |\n| **Ctrl+Right** | Next pattern (when stopped) |\n| **Ctrl+Left** | Previous pattern (when stopped) |\n\nDuring playback, the cursor follows the current row position in the pattern editor, so you can see exactly which notes are playing. If you are in the Mixer view, the channel meters animate in real-time.\n\nFor looping chiptune formats (SID, NSF, GBS, HES, KSS, SC68, ZXTune) that have no built-in song-end marker, DEViLBOX includes an automatic **silence detector**. If 5 seconds of silence are detected, the playback fades out over 2 seconds and stops. This prevents infinite silent loops when a tune ends.\n\n## Format Auto-Detection\n\nDEViLBOX uses a multi-layered detection strategy to identify file formats:\n\n1. **File extension** -- most formats are identified by extension (`.mod`, `.xm`, `.sid`, etc.)\n2. **Prefix matching** -- Amiga formats often use prefix naming (`rh.songname`, `mdat.songname`). DEViLBOX checks the start of the filename for known prefixes.\n3. **Magic bytes** -- some formats are identified by their binary header signature. For example:\n   - SID files start with `PSID` or `RSID`\n   - Furnace files start with `-Furnace module-`\n   - IXS files start with `IXS!`\n   - GoatTracker files start with `GTS`\n4. **Heuristic probing** -- when the extension is ambiguous (e.g., `.sng` could be GoatTracker or Zound Monitor, `.dm` could be Delta Music 1 or 2), DEViLBOX reads the file header to disambiguate.\n\nThis means you rarely need to worry about telling DEViLBOX what format a file is. Just drop it in and it figures it out.\n\n### Ambiguous Extensions\n\nA few extensions map to multiple formats. DEViLBOX resolves these automatically, but here are the known cases:\n\n| Extension | Possible formats | How DEViLBOX resolves it |\n|-----------|-----------------|--------------------------|\n| `.sid` | C64 SID (PSID/RSID) or SidMon 1 | Checks for PSID/RSID magic header |\n| `.sng` | GoatTracker or Zound Monitor | Checks for GTS magic header |\n| `.ml` | MusicLine Editor or Medley | Checks for MLEDMODL magic |\n| `.mus` | Karl Morton or UFO/MicroProse | Checks file structure |\n| `.dmf` | DefleMask or X-Tracker | Checks magic bytes |\n\n## Next Steps\n\nYou now know how to load and play any format DEViLBOX supports, and how to browse two of the largest music archives on the internet. From here:\n\n- Try loading a complex XM or IT file and studying how experienced trackers structure their patterns and use effects\n- Explore the Furnace format -- load a `.fur` file to hear authentic chip emulations\n- Use the DJ view to mix between a SID tune and a MOD file in real-time\n- Read on to Part II for deep dives into the pattern editor, effects system, and advanced workflows\n',
+    "images": [
+      "screenshots/file-browser.png"
+    ]
+  },
+  {
+    "id": "67-keyboard-shortcuts",
+    "number": 5,
+    "title": "Complete Keyboard Shortcuts",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": "# Complete Keyboard Shortcuts\n\nDEViLBOX supports multiple keyboard schemes: FastTracker 2, ProTracker, Impulse Tracker, OpenMPT, Renoise, and OctaMED. Schemes are loaded from JSON files in `/keyboard-schemes/` and can be switched in Settings.\n\nThe tables below automatically show shortcuts for your currently active keyboard scheme. When you switch schemes, this page updates to match.\n\n{{keyboard-shortcuts}}\n\n## Note Entry (All Schemes)\n\nThese keys are the same regardless of keyboard scheme:\n\n| Key | Action |\n|-----|--------|\n| Z, S, X, D, C, V, G, B, H, N, J, M | Piano keys, lower row (C, C#, D, D#, E, F, F#, G, G#, A, A#, B) |\n| Q, 2, W, 3, E, R, 5, T, 6, Y, 7, U | Piano keys, upper row (+1 octave) |\n| 0-9, A-F | Hex digit entry (instrument number, volume, effect parameter) |\n| CapsLock | Toggle record mode on/off |\n| . (period) | Enter note-off |\n\n## About Keyboard Schemes\n\nDEViLBOX ships with 6 keyboard schemes modeled after classic trackers:\n\n| Scheme | Based On | Notable Differences |\n|--------|----------|-------------------|\n| **FastTracker 2** | ft2-clone | F1-F8 = octave select, Shift+F1/F2 = transpose |\n| **ProTracker** | ProTracker 2.3 | F1-F5 = octave, F6-F10 = playback |\n| **Impulse Tracker** | IT 2.14 | Alt+F2 = save, F5/F8 = play/stop |\n| **OpenMPT** | OpenMPT 1.30+ | Ctrl+Enter = play row, modern DAW-style |\n| **Renoise** | Renoise 3.x | Enter = play/edit, Ctrl+Space = play from cursor |\n| **OctaMED** | OctaMED SoundStudio | Amiga-style, right-Amiga key mappings |\n\nTo switch schemes: Settings (gear icon) > Keyboard > Scheme dropdown.\n\nCustom key bindings can be created by editing the JSON files directly in `/keyboard-schemes/`.\n",
+    "images": []
+  },
+  {
+    "id": "68-synth-parameters",
+    "number": 6,
+    "title": "All Synth Parameters",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": "# All Synth Parameters\n\nThis chapter provides reference tables for the key synth types in DEViLBOX. All parameters use 0-1 normalized ranges unless otherwise noted. The WASM layer handles conversion to real DSP values internally.\n\n## TB-303 (Acid Bass)\n\n### Main Parameters\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| cutoff | 0-1 | 0.5 | Filter cutoff frequency (WASM: 314-2394 Hz, exponential) |\n| resonance | 0-1 | 0.5 | Filter resonance (WASM: 0-100%) |\n| envMod | 0-1 | 0.5 | Filter envelope modulation depth (WASM: 0-100%) |\n| decay | 0-1 | 0.5 | Filter envelope decay time (WASM: 200-2000 ms, exponential) |\n| accent | 0-1 | 0.5 | Accent amount (WASM: 0-100%) |\n| tuning | 0-1 | 0.5 | Master tuning (WASM: 400-480 Hz) |\n| waveform | 0-1 | 0 | Oscillator waveform (0=Saw, 1=Square) |\n| volume | 0-1 | 0.7 | Master volume (WASM: -60 to 0 dB) |\n| filterSelect | 0 or 5 | 0 | Filter type (0=DiodeLadder, 5=MissThang-20). No other values are valid. |\n\n### DevilFish Parameters\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| normalDecay | 0-1 | 0.164 | Normal note filter envelope decay (WASM: 30-3000 ms) |\n| accentDecay | 0-1 | 0.006 | Accented note filter envelope decay (WASM: 30-3000 ms) |\n| softAttack | 0-1 | 0 | Normal note attack time (WASM: 0.3-3000 ms, exponential) |\n| accentSoftAttack | 0-1 | 0.1 | Accented note attack time |\n| slideTime | 0-1 | 0.5 | Portamento slide time (WASM: 2-360 ms) |\n\n### MOJO (Filter Character)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| passbandCompensation | 0-1 | 0.09 | Bass compensation (inverted: WASM gets 1-value) |\n| resTracking | 0-1 | 0.257 | Resonance tracking (inverted: WASM gets 1-value) |\n| filterInputDrive | 0-1 | 0.169 | Filter input saturation |\n| diodeCharacter | 0-1 | 1 | Diode nonlinearity amount |\n| duffingAmount | 0-1 | 0.03 | Duffing oscillator tension |\n\n## Dexed (DX7 FM)\n\nDexed is a 6-operator FM synthesizer based on the Yamaha DX7. Parameters are organized per-operator.\n\n### Global\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| algorithm | 0-31 | 0 | FM algorithm (1 of 32 operator routing configurations) |\n| feedback | 0-7 | 0 | Operator 6 self-feedback amount |\n| transpose | 0-48 | 24 | Global transpose (semitones, 24 = middle C) |\n| pitchEnvR1-R4 | 0-99 | varies | Pitch envelope rates |\n| pitchEnvL1-L4 | 0-99 | 50 | Pitch envelope levels |\n\n### Per-Operator (x6)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| opLevel | 0-99 | varies | Output level |\n| opRate1-4 | 0-99 | varies | Envelope rates (attack/decay/sustain/release) |\n| opLevel1-4 | 0-99 | varies | Envelope levels |\n| opFreqCoarse | 0-31 | 1 | Frequency ratio (coarse) |\n| opFreqFine | 0-99 | 0 | Frequency ratio (fine) |\n| opDetune | 0-14 | 7 | Detune (7 = center) |\n| opMode | 0-1 | 0 | Frequency mode (0=ratio, 1=fixed Hz) |\n| opVelSens | 0-7 | 0 | Velocity sensitivity |\n| opAmpModSens | 0-3 | 0 | Amplitude modulation sensitivity |\n| opKeyRateScaling | 0-3 | 0 | Key rate scaling |\n\n## OBXd (Oberheim OB-X)\n\n### Oscillators\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| osc1Waveform | 0-3 | 0 | Waveform (Saw/Pulse/Triangle/Noise) |\n| osc1Octave | -2 to +2 | 0 | Octave offset |\n| osc1PulseWidth | 0-1 | 0.5 | Pulse width |\n| osc1Level | 0-1 | 1.0 | Oscillator 1 level |\n| osc2Waveform | 0-3 | 0 | Waveform |\n| osc2Octave | -2 to +2 | 0 | Octave offset |\n| osc2Detune | -1 to +1 | 0.1 | Detune in semitones |\n| osc2Level | 0-1 | 0.7 | Oscillator 2 level |\n| oscSync | 0/1 | 0 | Hard sync (Osc2 synced to Osc1) |\n| oscXor | 0/1 | 0 | Ring modulation |\n\n### Filter\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| filterCutoff | 0-1 | 0.7 | Cutoff frequency |\n| filterResonance | 0-1 | 0.3 | Resonance |\n| filterEnvAmount | 0-1 | 0.5 | Envelope to filter amount |\n| filterKeyTrack | 0-1 | 0 | Keyboard tracking amount |\n| filterAttack | 0-1 | 0.01 | Filter envelope attack |\n| filterDecay | 0-1 | 0.3 | Filter envelope decay |\n| filterSustain | 0-1 | 0.3 | Filter envelope sustain |\n| filterRelease | 0-1 | 0.3 | Filter envelope release |\n\n### Amp Envelope and Global\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| ampAttack | 0-1 | 0.01 | Amplifier attack |\n| ampDecay | 0-1 | 0.2 | Amplifier decay |\n| ampSustain | 0-1 | 0.7 | Amplifier sustain |\n| ampRelease | 0-1 | 0.3 | Amplifier release |\n| masterVolume | 0-1 | 0.7 | Master volume |\n| portamento | 0-1 | 0 | Portamento time |\n| unison | 0/1 | 0 | Unison enable |\n| unisonDetune | 0-1 | 0.1 | Unison detune amount |\n\n### LFO\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| lfoRate | 0-1 | 0.2 | LFO speed |\n| lfoWaveform | 0-4 | 0 | Shape (Sine/Triangle/Saw/Square/S&H) |\n| lfoOscAmount | 0-1 | 0 | LFO to pitch |\n| lfoFilterAmount | 0-1 | 0 | LFO to filter cutoff |\n| lfoAmpAmount | 0-1 | 0 | LFO to amplitude |\n| lfoPwAmount | 0-1 | 0 | LFO to pulse width |\n\n## SuperSaw\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| detune | 0-1 | 0.3 | Detuning spread between oscillators |\n| mix | 0-1 | 0.5 | Balance between center and detuned oscillators |\n| count | 1-7 | 7 | Number of oscillators |\n| filterFrequency | 20-20000 | 2000 | Lowpass filter cutoff (Hz) |\n| filterResonance | 0-1 | 0.3 | Filter resonance |\n| attack | 0-1 | 0.01 | Amp envelope attack |\n| decay | 0-1 | 0.3 | Amp envelope decay |\n| sustain | 0-1 | 0.7 | Amp envelope sustain |\n| release | 0-1 | 0.5 | Amp envelope release |\n\n## FMSynth (Tone.js)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| harmonicity | 0.5-10 | 3 | Ratio of modulator to carrier frequency |\n| modulationIndex | 0-100 | 10 | FM modulation depth |\n| attack | 0-2 | 0.01 | Carrier envelope attack (seconds) |\n| decay | 0-2 | 0.2 | Carrier envelope decay |\n| sustain | 0-1 | 0.5 | Carrier envelope sustain |\n| release | 0-5 | 1.0 | Carrier envelope release |\n| modulationType | - | sine | Modulator waveform (sine/square/saw/triangle) |\n| oscillatorType | - | sine | Carrier waveform |\n\n## Wavetable\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| waveIndex | 0-1 | 0 | Position in wavetable (interpolates between frames) |\n| waveSpread | 0-1 | 0 | Spread across wavetable for unison |\n| filterFrequency | 20-20000 | 5000 | Filter cutoff (Hz) |\n| filterResonance | 0-1 | 0.3 | Filter resonance |\n| lfoRate | 0-20 | 0 | LFO rate for wavetable scanning (Hz) |\n| lfoDepth | 0-1 | 0 | LFO depth for wavetable scanning |\n| attack | 0-2 | 0.01 | Amp envelope attack |\n| decay | 0-2 | 0.3 | Amp envelope decay |\n| sustain | 0-1 | 0.8 | Amp envelope sustain |\n| release | 0-5 | 0.5 | Amp envelope release |\n\n## GranularSynth\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| grainSize | 0.01-1.0 | 0.1 | Grain duration (seconds) |\n| grainOverlap | 0-1 | 0.5 | Overlap between grains |\n| grainSpread | 0-1 | 0 | Random position spread |\n| playbackRate | 0.25-4 | 1.0 | Sample playback rate |\n| position | 0-1 | 0 | Read position in sample buffer |\n| density | 1-32 | 8 | Number of simultaneous grains |\n| attack | 0-1 | 0.1 | Grain envelope attack |\n| release | 0-1 | 0.1 | Grain envelope release |\n\n## TR-808\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| kick.tune | 0-1 | 0.5 | Kick drum pitch |\n| kick.decay | 0-1 | 0.5 | Kick drum decay time |\n| kick.tone | 0-1 | 0.5 | Kick drum tone color |\n| snare.tune | 0-1 | 0.5 | Snare drum pitch |\n| snare.snappy | 0-1 | 0.5 | Snare noise amount |\n| snare.tone | 0-1 | 0.5 | Snare tone color |\n| hat.tune | 0-1 | 0.5 | Hi-hat pitch |\n| hat.decay | 0-1 | 0.5 | Hi-hat decay |\n| clap.tone | 0-1 | 0.5 | Hand clap tone |\n| cowbell.tune | 0-1 | 0.5 | Cowbell pitch |\n| tom.tune | 0-1 | 0.5 | Tom pitch |\n| conga.tune | 0-1 | 0.5 | Conga pitch |\n\n## TR-909\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| kick.tune | 0-1 | 0.5 | Kick drum pitch |\n| kick.attack | 0-1 | 0.5 | Kick attack character |\n| kick.decay | 0-1 | 0.5 | Kick decay time |\n| kick.comp | 0-1 | 0.5 | Kick compression amount |\n| snare.tune | 0-1 | 0.5 | Snare pitch |\n| snare.tone | 0-1 | 0.5 | Snare tone/noise balance |\n| snare.snappy | 0-1 | 0.5 | Snare wire rattle amount |\n| hat.tune | 0-1 | 0.5 | Hi-hat pitch |\n| hat.decay | 0-1 | 0.5 | Hi-hat decay |\n\n## Furnace Chip Families\n\nFurnace chip parameters vary by chip type. Common parameters across FM chip families:\n\n### FM Chips (OPN, OPM, OPL, OPLL, OPZ)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| algorithm | 0-7 | 0 | Operator routing |\n| feedback | 0-7 | 0 | Self-feedback level |\n| op[n].tl | 0-127 | varies | Total level (output volume) |\n| op[n].ar | 0-31 | varies | Attack rate |\n| op[n].dr | 0-31 | varies | Decay rate |\n| op[n].sl | 0-15 | varies | Sustain level |\n| op[n].rr | 0-15 | varies | Release rate |\n| op[n].mul | 0-15 | varies | Frequency multiplier |\n| op[n].dt | 0-7 | varies | Detune |\n| fms | 0-7 | 0 | Frequency modulation sensitivity |\n| ams | 0-3 | 0 | Amplitude modulation sensitivity |\n\n### PSG Chips (AY, SN76489, VIC)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| volume | 0-15 | 15 | Channel volume |\n| duty | 0-3 | 0 | Duty cycle (where supported) |\n| noiseMode | 0-3 | 0 | Noise generator mode |\n\n### Wavetable Chips (GB, PCE, SCC, N163)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wave | 0-N | 0 | Wavetable index |\n| volume | 0-15 | 15 | Channel volume |\n| waveLength | varies | varies | Wavetable length (chip-specific) |\n",
+    "images": []
+  },
+  {
+    "id": "69-effect-parameters",
+    "number": 7,
+    "title": "All Effect Parameters",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": "# All Effect Parameters\n\nComplete parameter tables for every audio effect type in DEViLBOX. Effects are organized by category: Tone.js built-in, WASM native, Tape/Lo-Fi, Delay, Modulation, Dynamics, Buzz (Jeskola Buzz WASM ports), and WAM (Web Audio Modules).\n\nAll `wet` parameters are 0-100 unless otherwise noted. Numeric parameters are 0-100 normalized in the `EffectConfig.parameters` record unless otherwise noted.\n\n## Tone.js Effects\n\n### Distortion\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| distortion | 0-100 | 40 | Distortion amount |\n| oversample | none/2x/4x | 2x | Oversampling quality |\n\n### Reverb\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| decay | 0-100 | 50 | Reverb decay time (maps to 0.1-10s) |\n| preDelay | 0-100 | 1 | Pre-delay time |\n\n### JCReverb\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| roomSize | 0-100 | 50 | Room size |\n\n### Delay\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| delayTime | 0-100 | 25 | Delay time (maps to 0-1s) |\n| feedback | 0-100 | 40 | Feedback amount |\n\n### PingPongDelay\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| delayTime | 0-100 | 25 | Delay time |\n| feedback | 0-100 | 40 | Feedback amount |\n\n### FeedbackDelay\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| delayTime | 0-100 | 25 | Delay time |\n| feedback | 0-100 | 50 | Feedback amount |\n\n### Chorus\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 50 | Wet/dry mix |\n| frequency | 0-100 | 15 | LFO rate |\n| depth | 0-100 | 70 | Modulation depth |\n| delayTime | 0-100 | 35 | Base delay |\n| spread | 0-100 | 100 | Stereo spread |\n\n### Phaser\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 50 | Wet/dry mix |\n| frequency | 0-100 | 15 | LFO rate |\n| octaves | 0-100 | 30 | Sweep range in octaves |\n| baseFrequency | 0-100 | 35 | Base frequency |\n| stages | 1-12 | 4 | Number of allpass stages |\n\n### Tremolo / Vibrato\n\nBoth share the same parameter structure: `wet` (0-100), `frequency` (rate, 0-100), `depth` (amount, 0-100). Tremolo modulates amplitude; Vibrato modulates pitch.\n\n### Compressor\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | 0-100 | 50 | Threshold in dB (maps to -60 to 0) |\n| ratio | 0-100 | 50 | Compression ratio (maps to 1-20) |\n| attack | 0-100 | 10 | Attack time |\n| release | 0-100 | 25 | Release time |\n| knee | 0-100 | 30 | Knee softness |\n\n### SidechainCompressor\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | 0-100 | 50 | Threshold |\n| ratio | 0-100 | 80 | Compression ratio |\n| attack | 0-100 | 5 | Attack time |\n| release | 0-100 | 20 | Release time |\n| sidechainSource | channel index | -1 | Source channel for sidechain input |\n\n### EQ3\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| low | 0-100 | 50 | Low band gain |\n| mid | 0-100 | 50 | Mid band gain |\n| high | 0-100 | 50 | High band gain |\n| lowFrequency | 0-100 | 20 | Low/mid crossover |\n| highFrequency | 0-100 | 80 | Mid/high crossover |\n\n### Filter\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| frequency | 0-100 | 50 | Cutoff frequency |\n| type | lowpass/highpass/bandpass | lowpass | Filter type |\n| rolloff | -12/-24/-48/-96 | -12 | Rolloff slope (dB/octave) |\n| Q | 0-100 | 10 | Quality factor / resonance |\n\n### Other Tone.js Effects (Summary)\n\n| Effect | Key Parameters | Description |\n|--------|---------------|-------------|\n| BitCrusher | bits (1-16, default 8) | Reduce bit depth |\n| Chebyshev | order (1-100) | Waveshaping distortion |\n| FrequencyShifter | frequency (Hz) | Constant frequency offset |\n| PitchShift | pitch (-24 to +24 semitones) | Pitch transposition |\n| AutoFilter | frequency, depth, baseFrequency, octaves | LFO-modulated filter |\n| AutoPanner | frequency, depth | LFO-modulated stereo panning |\n| AutoWah | baseFrequency, octaves, sensitivity, Q | Envelope-following filter |\n| StereoWidener | width (0-100) | Mid/side stereo width control |\n\n## WASM Native Effects\n\n### MoogFilter\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| cutoff | 0-100 | 50 | Cutoff frequency |\n| resonance | 0-100 | 30 | Resonance (self-oscillates at high values) |\n| model | 0-5 | 0 | Filter model (6 analog-modeled Moog ladder variants) |\n\n### MVerb\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| damping | 0-100 | 50 | High-frequency damping |\n| density | 0-100 | 50 | Diffusion density |\n| bandwidth | 0-100 | 70 | Input bandwidth |\n| decay | 0-100 | 50 | Reverb tail length |\n| predelay | 0-100 | 10 | Pre-delay time |\n| size | 0-100 | 70 | Room size |\n| gain | 0-100 | 50 | Output gain |\n| earlyMix | 0-100 | 50 | Early/late reflection balance |\n\n### Leslie (Rotary Speaker)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| speed | slow/fast | slow | Rotor speed |\n| hornRate | 0-100 | 50 | Horn rotation rate |\n| drumRate | 0-100 | 30 | Drum rotation rate |\n| acceleration | 0-100 | 50 | Speed change rate |\n\n### SpringReverb\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| decay | 0-100 | 50 | Spring decay time |\n| damping | 0-100 | 40 | High frequency damping |\n| dripAmount | 0-100 | 20 | Spring drip/splash intensity |\n\n### ShimmerReverb\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| decay | 0-100 | 70 | Reverb decay |\n| shimmer | 0-100 | 50 | Pitch-shifted feedback amount |\n| pitch | -12 to +12 | 12 | Feedback pitch shift (semitones) |\n| damping | 0-100 | 40 | High frequency damping |\n\n### GranularFreeze\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| grainSize | 0-100 | 50 | Grain duration |\n| spread | 0-100 | 30 | Random position spread |\n| feedback | 0-100 | 50 | Grain feedback |\n| freeze | 0/1 | 0 | Freeze captured buffer |\n\n## Tape and Lo-Fi Effects\n\n### TapeSaturation\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| drive | 0-100 | 30 | Tape saturation amount |\n| frequency | 0-100 | 70 | High frequency rolloff |\n\n### TapeSimulator (Kiss of Shame)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| drive | 0-100 | 30 | Record level / saturation |\n| bias | 0-100 | 50 | Tape bias |\n| speed | 0-100 | 75 | Tape speed |\n| wowFlutter | 0-100 | 20 | Wow and flutter amount |\n| hiss | 0-100 | 10 | Tape hiss level |\n\n### Other Tape/Lo-Fi Effects (Summary)\n\n| Effect | Key Parameters | Description |\n|--------|---------------|-------------|\n| TapeDegradation | wow, flutter, hiss, dropouts | Tape wow/flutter/hiss/dropout |\n| VinylNoise | crackle, hiss, rumble | Vinyl surface noise generator |\n| ToneArm | warp, dust, innerGroove | Physics-based vinyl playback |\n\n## Delay Effects\n\n### SpaceEcho (RE-150/201)\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 30 | Wet/dry mix |\n| rate | 0-100 | 50 | Tape speed / delay time |\n| intensity | 0-100 | 40 | Feedback intensity |\n| echoVolume | 0-100 | 50 | Echo level |\n| reverbVolume | 0-100 | 30 | Built-in reverb level |\n| mode | 1-12 | 1 | Head configuration mode |\n\n### Other Delay Effects (Summary)\n\n| Effect | Key Parameters | Description |\n|--------|---------------|-------------|\n| SpaceyDelayer | time, feedback, taps (1-8), spread, filter | Multitap tape delay |\n| RETapeEcho | time, feedback, saturation, wowFlutter | RE-150/201 tape echo |\n| AmbientDelay | time, feedback, modRate, modDepth, filterFreq | Modulated feedback delay |\n\n## Modulation Effects\n\n### BiPhase\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 50 | Wet/dry mix |\n| rateA | 0-100 | 30 | Phase unit A rate |\n| rateB | 0-100 | 40 | Phase unit B rate |\n| feedback | 0-100 | 50 | Feedback amount |\n| routing | serial/parallel | serial | Unit routing mode |\n\n### DubFilter\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wet | 0-100 | 100 | Wet/dry mix |\n| frequency | 0-100 | 50 | Cutoff frequency |\n| resonance | 0-100 | 50 | Resonance |\n| type | lowpass/highpass/bandpass | lowpass | Filter type |\n\n## Buzz Effects (WASM-Emulated Jeskola Buzz)\n\n| Effect | Key Parameters | Description |\n|--------|---------------|-------------|\n| BuzzDistortion | drive, tone | Arguru Distortion |\n| BuzzSVF | cutoff, resonance, mode | Elak State Variable Filter |\n| BuzzDelay | time, feedback, wet | Jeskola Delay |\n| BuzzChorus / BuzzChorus2 | rate, depth, spread | FSM Chorus |\n| BuzzCompressor | threshold, ratio, attack, release | Geonik Compressor |\n| BuzzOverdrive | drive, tone | Geonik Overdrive |\n| BuzzDistortion2 | drive, tone | Jeskola Distortion |\n| BuzzCrossDelay | timeL, timeR, feedback | Jeskola Cross Delay |\n| BuzzPhilta | cutoff, resonance, envAmount | FSM Philta |\n| BuzzDist2 | drive, bias | Elak Dist2 |\n| BuzzFreeverb | roomSize, damping, wet | Jeskola Freeverb |\n| BuzzFreqShift | shift | Bigyo Frequency Shifter |\n| BuzzNotch | frequency, bandwidth | CyanPhase Notch Filter |\n| BuzzStereoGain | gainL, gainR | DedaCode Stereo Gain |\n| BuzzSoftSat | drive | Graue Soft Saturation |\n| BuzzLimiter | threshold, release | Ld Soft Limiter |\n| BuzzExciter | drive, tone | Oomek Exciter |\n| BuzzMasterizer | drive, ceiling | Oomek Masterizer |\n| BuzzStereoDist | drive, spread | WhiteNoise Stereo Distortion |\n| BuzzWhiteChorus | rate, depth | WhiteNoise White Chorus |\n| BuzzZfilter | cutoff, resonance | Q Zfilter |\n| BuzzPanzerDelay | time, feedback, filter | FSM Panzer Delay |\n\n## WAM 2.0 Effects (Web Audio Modules)\n\n| Effect | Key Parameters | Description |\n|--------|---------------|-------------|\n| WAMBigMuff | sustain, tone, volume | Big Muff Pi fuzz pedal |\n| WAMTS9 | drive, tone, level | Ibanez TS-9 Tube Screamer |\n| WAMDistoMachine | distortion, type | Disto Machine |\n| WAMQuadraFuzz | band gains (4), drive | Multiband fuzz |\n| WAMVoxAmp | gain, treble, bass | Vox AC30 amplifier model |\n| WAMStonePhaser | rate, depth, feedback | Stone Phaser (stereo) |\n| WAMPingPongDelay | time, feedback, mix | Stereo ping-pong delay |\n| WAMFaustDelay | time, feedback | Faust-compiled delay |\n| WAMPitchShifter | pitch, quality | Csound pitch shifter |\n| WAMGraphicEQ | band gains (10) | 10-band graphic equalizer |\n| WAMPedalboard | varies | Multi-effect pedalboard chain |\n",
+    "images": []
+  },
+  {
+    "id": "70-tracker-effect-commands",
+    "number": 8,
+    "title": "Tracker Effect Commands",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": '# Tracker Effect Commands\n\nDEViLBOX implements the full FastTracker 2 effect command set, with additional commands from Impulse Tracker, ProTracker, and Furnace. Effect format is `XYZ` where X is the command (hex digit) and YZ is the parameter (two hex digits).\n\n## Main Effects (0-F)\n\n| Code | Name | Parameters | MOD | XM | IT | S3M | FUR |\n|------|------|------------|:---:|:--:|:--:|:---:|:---:|\n| 0xy | Arpeggio | x=semi1, y=semi2 | Y | Y | Y | Y | Y |\n| 1xx | Portamento Up | xx=speed | Y | Y | Y | Y | Y |\n| 2xx | Portamento Down | xx=speed | Y | Y | Y | Y | Y |\n| 3xx | Tone Portamento | xx=speed (slide to note) | Y | Y | Y | Y | Y |\n| 4xy | Vibrato | x=speed, y=depth | Y | Y | Y | Y | Y |\n| 5xy | Tone Porta + Vol Slide | x=vol up, y=vol down | Y | Y | Y | Y | Y |\n| 6xy | Vibrato + Vol Slide | x=vol up, y=vol down | Y | Y | Y | Y | Y |\n| 7xy | Tremolo | x=speed, y=depth | Y | Y | Y | Y | Y |\n| 8xx | Set Panning | xx=pan (00=left, 80=center, FF=right) | - | Y | Y | Y | Y |\n| 9xx | Sample Offset | xx=offset * 256 bytes | Y | Y | Y | Y | Y |\n| Axy | Volume Slide | x=up, y=down (per tick) | Y | Y | Y | Y | Y |\n| Bxx | Jump to Position | xx=song position | Y | Y | Y | Y | Y |\n| Cxx | Set Volume | xx=volume (00-40 hex) | Y | Y | Y | Y | Y |\n| Dxy | Pattern Break | x*10+y=row (decimal coded) | Y | Y | Y | Y | Y |\n| Exx | Extended Commands | See E-commands table below | Y | Y | Y | Y | Y |\n| Fxx | Set Speed/BPM | 01-1F=speed, 20-FF=BPM | Y | Y | Y | Y | Y |\n\n## Extended Commands (E0x-EEx)\n\n| Code | Name | Parameters | MOD | XM | IT | S3M | FUR |\n|------|------|------------|:---:|:--:|:--:|:---:|:---:|\n| E0x | Set Amiga Filter | x=0 off, x=1 on (LED filter) | Y | - | - | - | - |\n| E1x | Fine Porta Up | x=speed (1/4 of normal) | Y | Y | Y | Y | Y |\n| E2x | Fine Porta Down | x=speed (1/4 of normal) | Y | Y | Y | Y | Y |\n| E3x | Glissando Control | x=0 smooth, x=1 stepped | Y | Y | Y | Y | - |\n| E4x | Vibrato Waveform | 0=sine, 1=ramp, 2=square, 3=random | Y | Y | Y | Y | - |\n| E5x | Set Finetune | x=finetune value (0-F) | Y | Y | - | - | - |\n| E6x | Pattern Loop | x=0 set start, x>0 loop x times | Y | Y | Y | Y | Y |\n| E7x | Tremolo Waveform | 0=sine, 1=ramp, 2=square, 3=random | Y | Y | Y | Y | - |\n| E8x | Set Panning (coarse) | x=pan (0-F, rough 16-step panning) | Y | Y | - | - | - |\n| E9x | Retrigger Note | x=interval (retrigger every x ticks) | Y | Y | Y | Y | Y |\n| EAx | Fine Volume Slide Up | x=amount per row | Y | Y | Y | Y | Y |\n| EBx | Fine Volume Slide Down | x=amount per row | Y | Y | Y | Y | Y |\n| ECx | Note Cut | x=tick to cut (set volume to 0) | Y | Y | Y | Y | Y |\n| EDx | Note Delay | x=tick to trigger note | Y | Y | Y | Y | Y |\n| EEx | Pattern Delay | x=rows to delay pattern advance | Y | Y | Y | Y | Y |\n\n## Extended Letter Commands (XM/IT)\n\n| Code | Name | Parameters | XM | IT | Description |\n|------|------|------------|:--:|:--:|-------------|\n| Gxx | Set Global Volume | xx=0-40 | Y | Y | Set global volume (0-64 decimal) |\n| Hxy | Global Volume Slide | x=up, y=down | Y | Y | Slide global volume per tick |\n| Lxx | Set Envelope Position | xx=position | Y | - | Jump to envelope position (FT2) |\n| Pxy | Panning Slide | x=right, y=left | Y | Y | Slide panning per tick |\n| Rxy | Multi Retrig | x=interval, y=vol change | Y | Y | Retrigger with volume modification |\n| Txy | Tremor | x=on ticks, y=off ticks | Y | Y | Rapid volume on/off |\n| X1x | Extra Fine Porta Up | x=speed/4 | Y | Y | Very fine portamento up |\n| X2x | Extra Fine Porta Down | x=speed/4 | Y | Y | Very fine portamento down |\n\n## IT-Specific Commands\n\n| Code | Name | Parameters | Description |\n|------|------|------------|-------------|\n| S70 | NNA Cut | - | New Note Action: cut previous note |\n| S71 | NNA Continue | - | New Note Action: let previous note continue |\n| S72 | NNA Note Off | - | New Note Action: send note-off to previous |\n| S73 | NNA Note Fade | - | New Note Action: fade previous note |\n| S74 | Dup Check Note | - | Duplicate check: same note |\n| S75 | Dup Check Sample | - | Duplicate check: same sample |\n| S76 | Dup Check Instrument | - | Duplicate check: same instrument |\n| S77 | Volume Envelope Off | - | Disable volume envelope |\n| S78 | Volume Envelope On | - | Enable volume envelope |\n| S79 | Panning Envelope Off | - | Disable panning envelope |\n| S7A | Panning Envelope On | - | Enable panning envelope |\n| S7B | Pitch Envelope Off | - | Disable pitch/filter envelope |\n| S7C | Pitch Envelope On | - | Enable pitch/filter envelope |\n| Zxx | MIDI Macro | xx=value | Z00-Z7F: filter cutoff, Z80-Z8F: resonance, Z90-Z9F: filter mode |\n| \\xx | Smooth MIDI Macro | xx=target | Slide filter cutoff to target over the row |\n\n## Volume Column Commands (XM)\n\nThe XM volume column supports a subset of effects using the volume byte:\n\n| Range | Effect | Description |\n|-------|--------|-------------|\n| 00 | (empty) | No volume command |\n| 01-40 | Set Volume | Set channel volume to value |\n| 50-5F | Volume Slide Down | Slide volume down by (value-50) |\n| 60-6F | Volume Slide Up | Slide volume up by (value-60) |\n| 70-7F | Fine Vol Slide Down | Fine slide down by (value-70) |\n| 80-8F | Fine Vol Slide Up | Fine slide up by (value-80) |\n| 90-9F | Vibrato Speed | Set vibrato speed to (value-90)*4 |\n| A0-AF | Vibrato Depth | Set vibrato depth |\n| B0-BF | Set Panning | Set panning to (value-B0)*16 |\n| C0-CF | Pan Slide Left | Slide pan left |\n| D0-DF | Pan Slide Right | Slide pan right |\n| E0-EF | Tone Portamento | Portamento to note |\n| F0-FF | (unused) | Reserved |\n\n## DEViLBOX Custom Commands\n\n| Code | Name | Parameters | Description |\n|------|------|------------|-------------|\n| Wxx | Global Pitch Shift | xx=shift (80=center, 00=down, FF=up) | DJ-style global pitch shifting, centered at 0x80 |\n\n## Retrigger Volume Change Table (Rxy)\n\nThe y parameter of the Rxy (Multi Retrig) command modifies volume on each retrigger:\n\n| y | Effect |\n|---|--------|\n| 0 | No change |\n| 1 | -1 |\n| 2 | -2 |\n| 3 | -4 |\n| 4 | -8 |\n| 5 | -16 |\n| 6 | *2/3 |\n| 7 | *1/2 |\n| 8 | No change |\n| 9 | +1 |\n| A | +2 |\n| B | +4 |\n| C | +8 |\n| D | +16 |\n| E | *3/2 |\n| F | *2 |\n\n## Effect Memory\n\nMost effects use "memory" -- if the parameter is 00, the last non-zero value is reused. This applies to: portamento (1xx, 2xx, 3xx), vibrato (4xy), volume slide (Axy), retrigger (E9x), tremolo (7xy), panning slide (Pxy), and multi retrigger (Rxy).\n\nThe arpeggio effect (0xy) does NOT use memory -- 000 is interpreted as "no effect," not "repeat last arpeggio."\n',
+    "images": []
+  },
+  {
+    "id": "71-supported-formats",
+    "number": 9,
+    "title": "Supported File Formats",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": "# Supported File Formats\n\nDEViLBOX can load 188+ music file formats spanning tracker modules, chiptune dumps, Amiga replayer formats, and more. The table below lists the major formats organized by category.\n\n## Standard Tracker Formats\n\n| Extension | Format Name | System/Origin | Engine | Max Ch | Notes |\n|-----------|-------------|---------------|--------|--------|-------|\n| .mod | ProTracker Module | Amiga | Native + libopenmpt | 4-32 | The original tracker format |\n| .xm | FastTracker 2 Extended Module | PC (DOS) | Native + libopenmpt | 32 | Envelopes, 16-bit samples |\n| .it | Impulse Tracker Module | PC (DOS) | Native + libopenmpt | 64 | NNA, filters, stereo samples |\n| .s3m | Scream Tracker 3 Module | PC (DOS) | Native + libopenmpt | 32 | Adlib FM support |\n| .stm | Scream Tracker 2 Module | PC (DOS) | Native + libopenmpt | 4 | Early PC tracker |\n| .669 | Composer 669 / UNIS 669 | PC (DOS) | Native | 8 | Tempo slides |\n| .far | Farandole Composer | PC (DOS) | Native | 16 | |\n| .mtm | MultiTracker Module | PC (DOS) | Native | 32 | |\n| .ult | Ultra Tracker | PC (DOS) | Native | 32 | |\n| .gdm | General DigiMusic | PC (DOS) | Native | 32 | |\n| .mdl | Digitrakker | PC (DOS) | Native | 32 | |\n| .ptm | PolyTracker | PC (DOS) | Native | 32 | |\n| .ams | Extreme Tracker / Velvet Studio | PC (DOS) | Native | 32 | |\n| .dsm | DSIK Module | PC (DOS) | Native | 16 | |\n| .dtm | Digital Tracker | Amiga/PC | Native | 32 | |\n| .psm | Epic MegaGames MASI | PC (DOS) | Native | 32 | |\n| .plm | Disorder Tracker 2 | PC (DOS) | Native | 32 | |\n| .rtm | Real Tracker | PC (DOS) | Native | 32 | |\n| .stx | Scream Tracker Music Interface Kit | PC (DOS) | Native | 32 | |\n| .mt2 | MadTracker 2 | PC (Win) | Native | 64 | |\n| .xmf | XMPlay File | PC (Win) | Native | 32 | |\n| .unic | Unic Tracker | Amiga | Native | 4 | |\n| .amf | Asylum Music Format | PC (DOS) | Native | 8 | |\n\n## Amiga Native Formats\n\n| Extension/Prefix | Format Name | Engine | Max Ch | Notes |\n|------------------|-------------|--------|--------|-------|\n| .hvl / .ahx | Hively Tracker / AHX | Native + UADE | 4 | Synthesized waveforms |\n| .med / .mmd0-3 | OctaMED | Native + UADE | 8-64 | Amiga + synth mixing |\n| .okt | Oktalyzer | Native + UADE | 8 | 8-channel Amiga |\n| .digi / .dbm | DigiBooster / DigiBooster Pro | Native + UADE | 8-64 | |\n| .fc13 / .fc14 / fc.* | Future Composer | Native + UADE | 4 | Sequence-based |\n| .cust / cust.* | Delitracker Custom | UADE | 4 | Custom replayer |\n| .tfmx | TFMX | Native + UADE | 7 | Chris Huelsbeck format |\n| .sa.* | Sonic Arranger | Native + UADE | 4 | FM + sample hybrid |\n| .sfx | SoundFX | Native + UADE | 4 | |\n| .gmc / gmc.* | Game Music Creator | Native + UADE | 4 | |\n| .bp / .sndmon | SoundMon | Native + UADE | 4 | Brian Postma |\n| .amos | AMOS Music Bank | Native + UADE | 4 | |\n| .stp | Soundtracker Pro | Native + UADE | 4 | |\n| .pt36 | ProTracker 3.6 | Native + UADE | 4 | Extended MOD |\n| .stk | Soundtracker | Native + UADE | 4 | Original Karen |\n| .jam / jc.* | JamCracker | Native (WASM) | 4 | Transpiled 68k engine |\n| .prt | PreTracker | Native (WASM) | 4 | Transpiled 68k engine |\n| .ma | Music-Assembler | Native (WASM) | 4 | Transpiled 68k engine |\n| .puma | PumaTracker | Native (WASM) | 4 | Transpiled 68k engine |\n| hip.* / hipc.* | Hippel | Native (WASM) | 4 | Transpiled 68k engine |\n| .snx / .smus / .tiny | Sonix Music Driver | Native (WASM) | 4 | IFF SMUS |\n\n### UADE Prefix-Based Formats (Selection)\n\nThese formats use Amiga-style `prefix.songname` naming and are handled by UADE:\n\n| Prefix | Composer/Format | Notes |\n|--------|----------------|-------|\n| rh. / rhp. | Rob Hubbard | |\n| dm1. / dm2. | Delta Music 1 / 2 | |\n| dw. | David Whittaker | |\n| bd. | Ben Daglish | |\n| jt. | Jeroen Tel | |\n| fp. | Fred / Future Player | |\n| sm1. / sm2. | SidMon 1 / 2 | |\n| dl. / dln. | Dave Lowe / Dave Lowe New | |\n| cb. | Chuck Biscuits | |\n| gm. | Glue Mon | |\n| mk. | Mark Cooksey | |\n| mm. | Music Maker | |\n| ims. | Images Music System | |\n\n## Chiptune / Chip Dump Formats\n\n| Extension | Format Name | System/Origin | Engine | Notes |\n|-----------|-------------|---------------|--------|-------|\n| .fur | Furnace | Multi-chip | Native (WASM) | 60+ chip types |\n| .dmf | DefleMask | Multi-chip | Native (WASM) | Genesis, SMS, GB, etc. |\n| .sid | C64 SID (PSID/RSID) | Commodore 64 | C64SIDEngine | 3 voices + filters |\n| .nsf / .nsfe | NES Sound Format | NES | Chip dump | 5 channels + expansion |\n| .gbs | Game Boy Sound | Game Boy | Chip dump | 4 channels |\n| .spc | SPC700 | Super Nintendo | Chip dump | 8 DSP voices |\n| .vgm / .vgz | Video Game Music | Various | Chip dump | Register logs |\n| .ym | YM chip dump | Atari ST | Chip dump | YM2149 registers |\n| .sap | SAP (Slight Atari Player) | Atari 8-bit | Chip dump | POKEY |\n| .ay | AY chip dump | ZX Spectrum | Chip dump | AY-3-8910 |\n| .kss | KSS (MSX) | MSX | Chip dump | SCC, PSG, SCC+ |\n| .hes | HES (PC Engine) | TurboGrafx-16 | Chip dump | HuC6280 |\n| .s98 | S98 (PC-98) | NEC PC-98 | Native | YM2608/OPN |\n\n## ZX Spectrum / Eastern European\n\n| Extension | Format Name | Engine | Notes |\n|-----------|-------------|--------|-------|\n| .pt3 | Pro Tracker 3 | ZXTune (WASM) | AY-3-8910 |\n| .pt2 | Pro Tracker 2 | ZXTune (WASM) | AY-3-8910 |\n| .stc | Sound Tracker Compiled | ZXTune (WASM) | AY-3-8910 |\n| .vtx | Vortex Tracker | ZXTune (WASM) | AY-3-8910 |\n| .psg | PSG dump | ZXTune (WASM) | Raw AY registers |\n| .asc | ASC Sound Master | ZXTune (WASM) | |\n| .sqt | SQ Tracker | ZXTune (WASM) | |\n| .ay | AY EMUL format | ZXTune (WASM) | Multiple tunes |\n\n## Atari ST / SC68\n\n| Extension | Format Name | Engine | Notes |\n|-----------|-------------|--------|-------|\n| .sc68 | SC68 container | Sc68Engine (WASM) | 68000 + YM2149 + Paula |\n| .sndh | SNDH (Atari ST) | Sc68Engine (WASM) | Various replayers |\n\n## Japanese Computer Formats\n\n| Extension | Format Name | System | Engine | Notes |\n|-----------|-------------|--------|--------|-------|\n| .mdx | MDX (Sharp X68000) | X68000 | Native (WASM) | OPM FM + ADPCM |\n| .pmd | PMD (PC-98) | NEC PC-98 | Native (WASM) | OPN/OPNA FM |\n| .eup | EUP (FM Towns) | FM Towns | Eupmini (WASM) | FM + PCM |\n\n## Demoscene / Synthesizer Formats\n\n| Extension | Format Name | Engine | Notes |\n|-----------|-------------|--------|-------|\n| .v2m | Farbrausch V2 Synthesizer | V2Engine (WASM) | Procedural synth |\n| .klys | Klystrack | Native | Chiptune synth |\n| .sunvox | SunVox | Native | Modular synth |\n| .xrns | Renoise | Native | XML-based tracker |\n\n## Other Formats\n\n| Extension | Format Name | Engine | Notes |\n|-----------|-------------|--------|-------|\n| .mid / .midi | Standard MIDI File | Native | General MIDI import |\n| .ptcop / .pttune | PxTone | PxtoneEngine (WASM) | Pixel's cave music |\n| .org | Organya | OrganyaEngine (WASM) | Cave Story music |\n| .ixs | Ixalance | IxalanceEngine (WASM) | Magic: `IXS!` |\n| .psy | Psycle | CpsycleEngine (WASM) | `PSY3SONG`/`PSY2SONG` |\n| .aon | Art of Noise | ArtOfNoiseEngine (WASM) | AON4/AON8 |\n\n## Engine Legend\n\n| Engine | Description |\n|--------|-------------|\n| Native | TypeScript parser decodes to TrackerSong, played by Tone.js replayer |\n| Native (WASM) | Dedicated WASM engine handles playback |\n| libopenmpt | Fallback to OpenMPT WASM library for playback |\n| UADE | Unix Amiga Delitracker Emulator (68k Amiga emulation) |\n| Chip dump | WASM chip emulator driven by register dump data |\n| ZXTune (WASM) | AY-3-8910 emulator with format parsers |\n| Sc68Engine (WASM) | Atari ST 68000 + YM2149 emulator |\n",
+    "images": []
+  },
+  {
+    "id": "72-midi-cc-tables",
+    "number": 10,
+    "title": "MIDI CC Mapping Tables",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": `# MIDI CC Mapping Tables
+
+This chapter provides the default MIDI CC assignments used by DEViLBOX, organized by controller type and synth engine.
+
+## Default CC Assignments (Knob Banks)
+
+All knob banks use CC 70-77 for the 8 physical knobs. The mapping changes based on the active knob bank.
+
+### Bank: 303 (TB-303)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | cutoff | Cutoff |
+| 71 | resonance | Resonance |
+| 72 | envMod | Env Mod |
+| 73 | decay | Decay |
+| 74 | accent | Accent |
+| 75 | overdrive | Drive |
+| 76 | slideTime | Slide |
+| 77 | mixer.volume | Volume |
+
+### Bank: Siren (Dub Siren)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | siren.osc.frequency | Osc Freq |
+| 71 | siren.lfo.rate | LFO Rate |
+| 72 | siren.lfo.depth | LFO Depth |
+| 73 | siren.delay.time | Delay Time |
+| 74 | siren.delay.feedback | Feedback |
+| 75 | siren.delay.wet | Delay Mix |
+| 76 | siren.filter.frequency | Filter |
+| 77 | siren.reverb.wet | Reverb |
+
+### Bank: Furnace (Chip Synths)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | furnace.algorithm | Algorithm |
+| 71 | furnace.feedback | Feedback |
+| 72 | furnace.op1TL | Op1 TL |
+| 73 | furnace.op1AR | Op1 AR |
+| 74 | furnace.op1DR | Op1 DR |
+| 75 | furnace.op1SL | Op1 SL |
+| 76 | furnace.op1RR | Op1 RR |
+| 77 | furnace.fms | FM Sens |
+
+### Bank: V2 (Farbrausch V2)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | v2.osc1Level | Osc1 Lvl |
+| 71 | v2.filter1Cutoff | Cutoff |
+| 72 | v2.filter1Reso | Reso |
+| 73 | v2.envAttack | Attack |
+| 74 | v2.envDecay | Decay |
+| 75 | v2.envSustain | Sustain |
+| 76 | v2.envRelease | Release |
+| 77 | v2.lfo1Depth | LFO Dep |
+
+### Bank: Synare (Synare Drum)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | synare.tune | Tune |
+| 71 | synare.osc2Mix | Osc2 Mix |
+| 72 | synare.filterCutoff | Cutoff |
+| 73 | synare.filterReso | Reso |
+| 74 | synare.filterEnvMod | Env Mod |
+| 75 | synare.filterDecay | Flt Dcy |
+| 76 | synare.sweepAmount | Sweep |
+| 77 | synare.sweepTime | Swp Time |
+
+### Bank: SpaceLaser
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | spacelaser.startFreq | Start Hz |
+| 71 | spacelaser.endFreq | End Hz |
+| 72 | spacelaser.sweepTime | Sweep |
+| 73 | spacelaser.fmAmount | FM Amt |
+| 74 | spacelaser.fmRatio | FM Ratio |
+| 75 | spacelaser.filterCutoff | Cutoff |
+| 76 | spacelaser.filterReso | Reso |
+| 77 | spacelaser.delayWet | Delay |
+
+### Bank: SAM (Speech Synth)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | sam.pitch | Pitch |
+| 71 | sam.speed | Speed |
+| 72 | sam.mouth | Mouth |
+| 73 | sam.throat | Throat |
+| 74 | mixer.volume | Volume |
+
+### Bank: Organ
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | organ.drawbar16 | 16' |
+| 71 | organ.drawbar8 | 8' |
+| 72 | organ.drawbar4 | 4' |
+| 73 | organ.percussion | Perc |
+| 74 | organ.vibratoType | Vib Type |
+| 75 | organ.vibratoDepth | Vib Dep |
+| 76 | organ.overdrive | Drive |
+| 77 | organ.volume | Volume |
+
+### Bank: Melodica
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | melodica.breath | Breath |
+| 71 | melodica.brightness | Bright |
+| 72 | melodica.vibratoRate | Vib Rate |
+| 73 | melodica.vibratoDepth | Vib Dep |
+| 74 | melodica.detune | Detune |
+| 75 | melodica.portamento | Porta |
+| 76 | melodica.attack | Attack |
+| 77 | melodica.volume | Volume |
+
+### Bank: FX (Effects)
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | echo.rate | Echo Rate |
+| 71 | echo.intensity | Intensity |
+| 72 | echo.echoVolume | Echo Vol |
+| 73 | echo.reverbVolume | Rev Vol |
+| 74 | echo.mode | Echo Mode |
+| 75 | biphase.rateA | Phase A |
+| 76 | biphase.feedback | Phase FB |
+| 77 | biphase.routing | Routing |
+
+### Bank: Mixer
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | mixer.volume (ch1) | Vol 1 |
+| 71 | mixer.volume (ch2) | Vol 2 |
+| 72 | mixer.volume (ch3) | Vol 3 |
+| 73 | mixer.volume (ch4) | Vol 4 |
+| 74 | mixer.pan (ch1) | Pan 1 |
+| 75 | mixer.pan (ch2) | Pan 2 |
+| 76 | mixer.pan (ch3) | Pan 3 |
+| 77 | mixer.pan (ch4) | Pan 4 |
+
+### Bank: MasterFX
+
+| CC | Parameter | Label |
+|----|-----------|-------|
+| 70 | masterFx.slot0.wet | FX1 Wet |
+| 71 | masterFx.slot0.param0 | FX1 P1 |
+| 72 | masterFx.slot1.wet | FX2 Wet |
+| 73 | masterFx.slot1.param0 | FX2 P1 |
+| 74 | masterFx.slot2.wet | FX3 Wet |
+| 75 | masterFx.slot2.param0 | FX3 P1 |
+| 76 | masterFx.masterVolume | Master |
+| 77 | masterFx.limiterCeiling | Limiter |
+
+## NKS Parameter Pages
+
+The NKS (Native Kontrol Standard) system organizes parameters into pages of 8 for NI hardware (Komplete Kontrol, Maschine). Each page maps to 8 physical knobs/encoders on the hardware.
+
+### TB-303 NKS Pages
+
+**Page 0: Filter and Synthesis**
+
+| Index | Parameter | CC | Section |
+|-------|-----------|-----|---------|
+| 0 | Cutoff | 74 | Filter |
+| 1 | Resonance | 71 | Filter |
+| 2 | Env Mod | 102 | Filter |
+| 3 | Decay | 103 | Envelope |
+| 4 | Accent | 104 | Synthesis |
+| 5 | Tuning | 105 | Synthesis |
+| 6 | Waveform | 106 | Synthesis |
+| 7 | Volume | 7 | Output |
+
+**Page 1: Effects**
+
+| Index | Parameter | CC | Section |
+|-------|-----------|-----|---------|
+| 0 | Distortion | 94 | Effects |
+| 1 | Delay Time | 85 | Effects |
+| 2 | Delay Feedback | 86 | Effects |
+| 3 | Delay Mix | 87 | Effects |
+| 4 | Reverb Size | 91 | Effects |
+| 5 | Reverb Mix | 92 | Effects |
+
+### OBXd NKS Pages
+
+**Page 0: Oscillators**
+
+| Index | Parameter | Section |
+|-------|-----------|---------|
+| 0 | Osc1 Waveform | Synthesis |
+| 1 | Osc1 Octave | Synthesis |
+| 2 | Osc1 Pulse Width | Synthesis |
+| 3 | Osc1 Level | Synthesis |
+| 4 | Osc2 Waveform | Synthesis |
+| 5 | Osc2 Octave | Synthesis |
+| 6 | Osc2 Detune | Synthesis |
+| 7 | Osc2 Level | Synthesis |
+
+**Page 1: Filter**
+
+| Index | Parameter | Section |
+|-------|-----------|---------|
+| 0 | Cutoff | Filter |
+| 1 | Resonance | Filter |
+| 2 | Env Amount | Filter |
+| 3 | Key Track | Filter |
+| 4 | Flt Attack | Envelope |
+| 5 | Flt Decay | Envelope |
+| 6 | Flt Sustain | Envelope |
+| 7 | Flt Release | Envelope |
+
+**Page 2: Amp Envelope and Global**
+
+| Index | Parameter | Section |
+|-------|-----------|---------|
+| 0 | Amp Attack | Envelope |
+| 1 | Amp Decay | Envelope |
+| 2 | Amp Sustain | Envelope |
+| 3 | Amp Release | Envelope |
+| 4 | Volume | Output |
+| 5 | Portamento | Synthesis |
+| 6 | Unison | Synthesis |
+| 7 | Unison Detune | Synthesis |
+
+**Page 3: LFO**
+
+| Index | Parameter | Section |
+|-------|-----------|---------|
+| 0 | LFO Rate | LFO |
+| 1 | LFO Waveform | LFO |
+| 2 | LFO to Pitch | LFO |
+| 3 | LFO to Filter | LFO |
+| 4 | LFO to Amp | LFO |
+| 5 | LFO to PW | LFO |
+| 6 | Osc Sync | Synthesis |
+| 7 | Ring Mod | Synthesis |
+
+## Standard MIDI CC Numbers
+
+For reference, these are the standard MIDI CC numbers used by DEViLBOX:
+
+| CC | Standard Name | DEViLBOX Usage |
+|----|---------------|----------------|
+| 1 | Modulation Wheel | Mod wheel (global) |
+| 7 | Channel Volume | Volume |
+| 10 | Pan | Channel panning |
+| 11 | Expression | Expression pedal |
+| 64 | Sustain Pedal | Sustain on/off |
+| 70-77 | Sound Controller 1-8 | Knob bank mapping |
+| 74 | Cutoff (GM2) | Filter cutoff (NKS) |
+| 71 | Resonance (GM2) | Filter resonance (NKS) |
+| 85-87 | Undefined | Delay time/feedback/mix (NKS) |
+| 91 | Reverb Send | Reverb size (NKS) |
+| 92 | Tremolo Depth | Reverb mix (NKS) |
+| 94 | Celeste Depth | Distortion (NKS) |
+| 102-106 | Undefined | Synth parameters (NKS) |
+
+## TB-303 Sub-Page Navigation
+
+The 303's 7 sub-pages cycle through with a bank-change CC or hardware button. Page names are displayed on the controller LCD:
+
+| Page | LCD Display | Focus Area |
+|------|------------|------------|
+| 0 | "303 Main" | Core filter and amp |
+| 1 | "MOJO" | Filter character shaping |
+| 2 | "DevilFish" | Circuit modification params |
+| 3 | "Korg" | Korg ladder filter params |
+| 4 | "LFO" | Low frequency oscillator |
+| 5 | "FX" | Chorus, phaser, delay |
+| 6 | "Oscillator" | Tuning, waveform, sub-osc |
+`,
+    "images": []
+  },
+  {
+    "id": "73-glossary",
+    "number": 11,
+    "title": "Glossary",
+    "part": "Reference",
+    "partNumber": 10,
+    "content": `# Glossary
+
+## A
+
+**ADPCM** -- Adaptive Differential Pulse Code Modulation. A lossy audio compression scheme used by many arcade and console sound chips (Neo Geo, PC-98, OKI MSM6295). Encodes the difference between samples rather than absolute values.
+
+**ADSR** -- Attack, Decay, Sustain, Release. The four stages of a standard envelope generator. Attack is the time from silence to peak, Decay is the time from peak to sustain level, Sustain is the level held while a key is pressed, and Release is the time from key release to silence.
+
+**Allpass Filter** -- A filter that passes all frequencies equally in magnitude but changes their phase relationships. Used in reverb algorithms (Schroeder, Freeverb) and phaser effects to create constructive/destructive interference patterns.
+
+**Arpeggio** -- Rapid cycling between multiple notes (typically 3) within a single pattern row. In tracker effect notation, the 0xy command cycles between the base note, base+x semitones, and base+y semitones on consecutive ticks.
+
+**AudioWorklet** -- A Web Audio API interface that runs audio processing code in a dedicated real-time thread, separate from the main browser thread. DEViLBOX uses AudioWorklets for all WASM synth engines (DB303, Furnace, UADE, etc.) to avoid audio glitches.
+
+## B
+
+**BLEP** -- Band-Limited Step. An anti-aliasing technique for digital oscillators that adds a pre-computed correction signal at each waveform discontinuity (e.g., the edges of a square wave). Reduces aliasing artifacts without oversampling.
+
+**BPM** -- Beats Per Minute. The tempo of a song. In tracker terms, BPM interacts with the speed (ticks per row) to determine the actual playback rate: rows per second = (2 * BPM) / (5 * speed).
+
+**BRR** -- Bit Rate Reduction. The lossy audio compression format used by the Super Nintendo's SPC700 DSP. Encodes 16 samples into 9 bytes using ADPCM-like delta coding with selectable filter modes.
+
+## C
+
+**CC** -- Continuous Controller. A type of MIDI message (status byte 0xBn) that sends a controller number (0-127) and value (0-127). Used for knobs, sliders, pedals, and other continuous controls. See Chapter 72 for DEViLBOX's CC mapping tables.
+
+**Chip RAM** -- In Amiga architecture, the memory accessible by both the CPU and the custom chip DMA engines (Paula, Agnus, Denise). In DEViLBOX's UADE integration, chip RAM patching allows live editing of module data that the 68k replayer reads during playback.
+
+**Chiptune** -- Music created using the sound chips of vintage computers, consoles, and arcade machines. Characterized by the limitations of the hardware: limited channels, simple waveforms, and low sample rates.
+
+**Comb Filter** -- A filter that creates a series of equally spaced notches or peaks in the frequency spectrum, resembling the teeth of a comb. Created by mixing a signal with a delayed copy of itself. The fundamental building block of flanger and chorus effects.
+
+## D
+
+**DAC** -- Digital-to-Analog Converter. Converts digital sample values to analog audio signals. In chiptune contexts, the DAC resolution determines the dynamic range (e.g., 4-bit = 16 levels, 8-bit = 256 levels).
+
+**Decay** -- The second stage of an ADSR envelope: the time it takes to fall from the peak level (after attack) to the sustain level. In the TB-303, the decay knob controls the filter envelope decay, which shapes the characteristic "squelch."
+
+**Dispatch** -- In Furnace's architecture, a dispatch is the C++ class that drives a specific sound chip emulator. Each dispatch receives commands (note on, frequency set, register write) and translates them to the chip's native interface.
+
+**DMA** -- Direct Memory Access. Hardware-level memory transfer without CPU involvement. The Amiga's Paula chip uses DMA to read sample data directly from chip RAM, which is why UADE chip RAM patching works for live editing.
+
+**Duty Cycle** -- The ratio of high time to total period in a pulse wave. A 50% duty cycle produces a square wave. Classic chip sounds use 12.5%, 25%, 50%, and 75% duty cycles (NES, Game Boy).
+
+## E
+
+**Emscripten** -- A compiler toolchain that compiles C/C++ code to WebAssembly (WASM). DEViLBOX uses Emscripten to compile Furnace, UADE, DB303, and other engines to run in the browser.
+
+**Envelope** -- A time-varying control signal that shapes a parameter (usually volume or filter cutoff) over the duration of a note. See ADSR.
+
+**Effect Column** -- The rightmost columns in a tracker pattern row, containing effect commands (e.g., 1xx for portamento up, 4xy for vibrato). Most formats support 1-2 effect columns per channel.
+
+## F
+
+**FM Synthesis** -- Frequency Modulation synthesis. A technique where one oscillator (modulator) modulates the frequency of another (carrier), creating complex harmonic spectra. Used by Yamaha chips (OPN, OPM, OPL, OPZ) and the DX7.
+
+**Furnace** -- An open-source chiptune tracker that emulates 60+ sound chips. DEViLBOX includes a complete WASM-compiled Furnace engine for .fur file playback and chip synth instruments.
+
+## G
+
+**Grain** -- A short fragment of audio (typically 10-100ms) used in granular synthesis. Multiple overlapping grains create textures, time-stretching, and pitch-shifting effects.
+
+**Glissando** -- A continuous slide between two pitches. In tracker terms, effect E3x toggles between smooth portamento (E30) and stepped/quantized portamento (E31) that snaps to semitones.
+
+## L
+
+**LFO** -- Low Frequency Oscillator. An oscillator running below audible frequencies (typically 0.1-20 Hz) used to modulate other parameters. Common LFO targets: pitch (vibrato), amplitude (tremolo), filter cutoff (wah), and panning (auto-pan).
+
+**libopenmpt** -- An open-source library for playing tracker music formats, compiled from the OpenMPT source. DEViLBOX uses it as a fallback engine for MOD, XM, IT, S3M, and other PC tracker formats.
+
+## M
+
+**Macro** -- In Furnace instruments, a macro is a sequence of values that automatically advance per tick, controlling parameters like volume, arpeggio, duty cycle, or wavetable index. Macros can loop, have release points, and use fractional ADSR curves.
+
+**MIDI** -- Musical Instrument Digital Interface. A protocol for communicating musical performance data (notes, controllers, program changes) between devices. DEViLBOX supports MIDI input for note entry, controller mapping, and hardware integration.
+
+**MOD** -- The original Amiga tracker module format, created by Karsten Obarski for the Ultimate Soundtracker in 1987. 4 channels, 31 instruments, 15-bit sample data, Amiga period-based tuning.
+
+## N
+
+**NKS** -- Native Kontrol Standard. A protocol by Native Instruments for integrating third-party instruments with NI hardware (Komplete Kontrol, Maschine). Defines parameter pages, preset tagging, and browsing taxonomy.
+
+**NNA** -- New Note Action. An Impulse Tracker feature that determines what happens to the currently playing note when a new note is triggered on the same channel. Options: cut, continue, note off, or note fade.
+
+## O
+
+**Operator** -- In FM synthesis, an operator is a single oscillator with its own envelope generator. FM chips combine 2-4 operators in various configurations (algorithms) to create timbres. Each operator has parameters for frequency ratio, output level, and ADSR rates.
+
+**Oscillator** -- A signal generator that produces a periodic waveform. Common types: sine, saw (sawtooth), square/pulse, triangle, and noise.
+
+## P
+
+**Pattern** -- The basic unit of composition in a tracker. A grid of rows (typically 64) and channels, where each cell can contain a note, instrument number, volume, and effect commands. Patterns are arranged in an order list to form a complete song.
+
+**PCM** -- Pulse Code Modulation. The standard method of digitally representing audio as a sequence of amplitude samples at a fixed rate. Uncompressed audio (WAV, AIFF) uses PCM.
+
+**Period** -- In Amiga/MOD terms, the inverse of frequency. Lower period values = higher pitch. The Amiga's Paula chip uses period values to control the DMA sample playback rate. Period = 7093789.2 / (frequency * 2) for PAL systems.
+
+**Phase Distortion** -- A synthesis technique (used by Casio CZ series) where the phase of a waveform is distorted by a second waveform, creating timbral changes similar to FM synthesis but with a different character.
+
+**Portamento** -- A continuous pitch slide between two notes. Effect 1xx slides up, 2xx slides down, and 3xx slides to a target note (tone portamento). The TB-303's slide function is a form of portamento.
+
+## R
+
+**Resonance** -- In a filter, the amount of emphasis at the cutoff frequency. High resonance creates a peak that can self-oscillate (producing a sine wave at the cutoff frequency). The TB-303's resonance is key to its "screaming" sound.
+
+## S
+
+**Sample** -- A recorded audio waveform stored as PCM data. In trackers, instruments are typically based on short looped samples. Sample parameters include loop start/end, finetune, and base note.
+
+**Sidechain** -- A routing technique where one audio signal controls a processor applied to another signal. Most commonly used for sidechain compression, where a kick drum triggers compression on a bass or pad, creating the "pumping" effect in dance music.
+
+**SID** -- Sound Interface Device. The Commodore 64's sound chip (MOS 6581/8580), featuring 3 oscillators with ring modulation, sync, and a multimode filter. One of the most iconic chiptune sound chips.
+
+## T
+
+**Tick** -- The smallest time unit in a tracker's timing system. Each pattern row is divided into a number of ticks (set by the speed command Fxx). The first tick triggers notes; subsequent ticks process per-tick effects like portamento and vibrato.
+
+**Tracker** -- A type of music sequencer where notes are arranged in a vertical scrolling grid, with time flowing downward. Originated on the Amiga with Ultimate Soundtracker (1987). DEViLBOX is a tracker.
+
+## U
+
+**UADE** -- Unix Amiga Delitracker Emulator. An Amiga 68000 emulator that runs original Amiga music replayer code to play hundreds of Amiga module formats. DEViLBOX includes UADE compiled to WASM for browser playback.
+
+## V
+
+**Vibrato** -- A periodic variation in pitch, created by modulating the frequency with an LFO. Effect 4xy sets vibrato speed (x) and depth (y). The waveform can be sine, ramp, square, or random (set by E4x).
+
+## W
+
+**WASM** -- WebAssembly. A binary instruction format that runs at near-native speed in web browsers. DEViLBOX compiles C/C++ engines (Furnace, UADE, DB303, various synths) to WASM for high-performance audio processing.
+
+**WAM** -- Web Audio Module. A standard for audio plugins in the browser (WAM 2.0). DEViLBOX supports WAM effects including Big Muff, TS-9, Stone Phaser, and more.
+
+**Wavetable** -- A table of waveform data (typically 32-256 samples) that a sound chip reads cyclically to produce sound. Wavetable synthesis morphs between different waveforms by changing the table index over time. Used by Game Boy, PC Engine, SCC, and N163 chips.
+
+**Wet/Dry** -- The balance between a processed (wet) signal and the original (dry) signal. A wet value of 0% means fully dry (no effect), 100% means fully wet (only the processed signal).
+
+## X
+
+**XM** -- Extended Module. The FastTracker 2 file format, extending MOD with up to 32 channels, 16-bit samples, instrument envelopes, and additional effect commands. One of the most widely used tracker formats.
+`,
+    "images": []
+  },
+  {
+    "id": "05-pattern-editor",
+    "number": 12,
+    "title": "Pattern Editor",
+    "part": "The Tracker",
+    "partNumber": 2,
+    "content": '# Pattern Editor\n\nThe pattern editor is where you write music in DEViLBOX. It is a grid of rows and channels, inspired by the vertical spreadsheet layout of classic trackers like ProTracker, FastTracker 2, and Impulse Tracker. Music flows downward: row 0 plays first, then row 1, then row 2, and so on. Each row triggers simultaneously across all channels, so row 08 of channel 1 plays at the same time as row 08 of channel 4.\n\nIf you have never used a tracker before, think of it as a piano roll rotated 90 degrees and compressed into a text grid. Instead of dragging rectangles onto a timeline, you type note names, instrument numbers, and effect codes into cells. It is fast, precise, and extremely keyboard-driven.\n\n## The Pattern Grid\n\nA pattern is a rectangular grid of **rows** and **channels**.\n\n- **Rows** run vertically, numbered from `00` at the top to the pattern length minus one at the bottom. The default is 64 rows (00 to 3F in hexadecimal). Pattern length is configurable from 1 to 256 rows depending on the format.\n- **Channels** run horizontally. The number of channels depends on the loaded format: MOD files have 4, XM files support up to 128, IT files up to 64, and Furnace files up to 128 depending on the chip configuration.\n\nThe currently playing row is highlighted by a moving cursor bar. The edit cursor (your position for entering data) is shown as a distinct highlight on the cell you are editing.\n\n![The pattern grid showing rows, channels, and the edit cursor](../images/screenshots/pattern-grid.png)\n\n### Row Numbering\n\nRows are displayed in hexadecimal by default. In a 64-row pattern:\n\n| Hex | Decimal | Position |\n|-----|---------|----------|\n| `00` | 0 | First row |\n| `0F` | 15 | Sixteenth row |\n| `10` | 16 | Seventeenth row |\n| `1F` | 31 | Thirty-second row |\n| `20` | 32 | Halfway point |\n| `3F` | 63 | Last row |\n\nHex numbering is standard in trackers because effect parameters are hex-encoded. Once you get used to it, you will find it natural to think in groups of 16 (0x10) rather than 10.\n\n## Cell Anatomy\n\nEach cell in the pattern grid contains up to four fields:\n\n```\nC-4 01 40 486\n│   │  │  └── Effect: command + parameter\n│   │  └───── Volume: 00-40 (hex)\n│   └──────── Instrument: 00-FF (hex)\n└──────────── Note: C-0 through B-9, or special values\n```\n\n### Note Field\n\nThe note field shows the pitch and octave of the note to play. Valid values:\n\n| Value | Meaning |\n|-------|---------|\n| `C-0` to `B-9` | Musical note and octave (C through B, octaves 0-9) |\n| `---` | Empty -- no note triggered |\n| `===` or `OFF` | Note off -- release the currently playing note |\n| `^^^` or `CUT` | Note cut -- immediately silence the channel (XM/IT) |\n| `~~~` or `FAD` | Note fade -- begin fade-out (IT only) |\n\nNotes use standard Western chromatic notation: C, C#, D, D#, E, F, F#, G, G#, A, A#, B. Sharps are indicated by `#`. There are no flats -- use the enharmonic sharp equivalent (e.g., Bb = A#).\n\nMiddle C is `C-4` in most formats (MOD uses `C-3` as the base octave).\n\n### Instrument Field\n\nA two-digit hex number (`00` to `FF`) identifying which instrument to use for this note. When you enter a note with an instrument selected, the instrument number is automatically inserted. If the instrument field is empty (`--`), the channel continues using whatever instrument was last set.\n\n### Volume Field\n\nA two-digit hex value controlling the volume of the note. The range depends on the format:\n\n| Format | Range | Full Volume |\n|--------|-------|-------------|\n| MOD | Not available (use Cxx effect) | N/A |\n| XM | 00-40 | 40 (64 decimal) |\n| IT | 00-40 | 40 (64 decimal) |\n| S3M | 00-40 | 40 (64 decimal) |\n\nIn XM format, the volume column can also encode mini-effects (volume slide, vibrato, panning, tone portamento). See the [Tracker Effects Reference](./08-tracker-effects-reference.md) for the volume column effect table.\n\nIf the volume field is empty (`--`), the note plays at the instrument\'s default volume.\n\n### Effect Field\n\nA three-character code: one hex digit for the effect command, followed by two hex digits for the parameter. For example, `486` means effect 4 (Vibrato) with speed 8 and depth 6.\n\nSome formats support multiple effect columns per channel (IT supports up to 2, Furnace supports more). DEViLBOX displays all available effect columns.\n\nThe complete effect reference is in the [Tracker Effects Reference](./08-tracker-effects-reference.md).\n\n![Anatomy of a single cell showing note, instrument, volume, and effect fields](../images/screenshots/cell-anatomy.png)\n\n## Cursor Movement\n\nNavigation in the pattern editor is keyboard-driven. The cursor moves between cells and fields:\n\n### Basic Navigation\n\n| Key | Action |\n|-----|--------|\n| **Up / Down** | Move one row up/down |\n| **Left / Right** | Move one field left/right within a channel, then to adjacent channels |\n| **Tab** | Jump to the next channel (note field) |\n| **Shift+Tab** | Jump to the previous channel (note field) |\n| **Page Up** | Jump up 16 rows |\n| **Page Down** | Jump down 16 rows |\n| **Home** | Jump to row 00 |\n| **End** | Jump to the last row |\n| **Ctrl+Home** | Jump to row 00, channel 1 |\n| **Ctrl+End** | Jump to last row, last channel |\n\n### Field Order Within a Channel\n\nWhen pressing Left/Right, the cursor moves through fields in this order:\n\n```\nNote → Instrument → Volume → Effect Command → Effect Parameter\n```\n\nAfter the last field in a channel, Right moves to the note field of the next channel. Before the first field, Left moves to the last field of the previous channel.\n\n## Edit Mode (Record Mode)\n\nThe pattern editor has two states:\n\n- **Navigate mode** (default): Keypresses preview sounds and move the cursor, but nothing is written to the pattern.\n- **Record mode**: Keypresses write notes, instruments, and effects into the pattern.\n\nToggle record mode with **CapsLock**. When active, the status bar shows **REC** and the cursor row is tinted red.\n\nIn record mode:\n- Pressing a piano key (QWERTY layout) inserts a note at the cursor and advances the cursor by the current edit step.\n- Pressing **Delete** clears the current cell.\n- Pressing **Backspace** clears the current cell and moves up one row.\n- Typing hex digits in the instrument, volume, or effect fields writes those values.\n\n### The QWERTY Piano Layout\n\nYour computer keyboard maps to two octaves of piano keys. The lower row plays the current octave, the upper row plays one octave higher:\n\n```\n 2 3   5 6 7   9 0\nQ W E R T Y U I O P\n\n S D   G H J\nZ X C V B N M\n```\n\nThis corresponds to a piano keyboard:\n\n```\nLower octave:  Z=C  S=C# X=D  D=D# C=E  V=F  G=F# B=G  H=G# N=A  J=A# M=B\nUpper octave:  Q=C  2=C# W=D  3=D# E=E  R=F  5=F# T=G  6=G# Y=A  7=A# U=B\n```\n\n## Edit Step\n\nThe edit step controls how many rows the cursor advances after you enter a note. Set it in the status bar or with keyboard shortcuts:\n\n| Edit Step | Behavior |\n|-----------|----------|\n| 0 | Cursor does not advance (useful for chord entry) |\n| 1 | Advance one row per note (every single row filled) |\n| 2 | Every other row (eighth notes at standard speed) |\n| 4 | Every four rows (quarter notes at standard speed) |\n| 8 | Every eight rows (half notes) |\n| 16 | Every sixteen rows (whole notes) |\n\nTo change the edit step:\n\n| Key | Action |\n|-----|--------|\n| **Numpad +** | Increase edit step |\n| **Numpad -** | Decrease edit step |\n\nA common workflow: set edit step to 4 for laying down a basic melody, then switch to 1 for detailed per-row editing, and use 0 when stacking notes vertically for chords.\n\n## Selection and Block Operations\n\n### Selecting a Region\n\nHold **Shift** while pressing movement keys to create a selection:\n\n| Key Combination | Selection Action |\n|----------------|-----------------|\n| **Shift+Up/Down** | Extend selection up/down by one row |\n| **Shift+Left/Right** | Extend selection left/right by one field |\n| **Shift+Page Up/Down** | Extend selection by 16 rows |\n| **Shift+Home/End** | Extend selection to top/bottom of pattern |\n| **Ctrl+Shift+Home/End** | Select entire channel or entire pattern |\n\nThe selected region is shown with a highlight overlay.\n\n![A selected region in the pattern editor](../images/screenshots/selection-highlight.png)\n\n### Copy, Cut, and Paste\n\n| Key | Action |\n|-----|--------|\n| **Ctrl+C** | Copy selection to clipboard |\n| **Ctrl+X** | Cut selection (copy and clear) |\n| **Ctrl+V** | Paste at cursor position (overwrite) |\n| **Ctrl+Shift+V** | Paste-mix: merge with existing data (non-empty cells in the clipboard overwrite; empty cells leave existing data intact) |\n\nPaste always writes from the cursor position downward. If the pasted data extends beyond the pattern length, excess rows are silently discarded.\n\n### Block Operations\n\nThese operate on the current selection:\n\n| Key | Action |\n|-----|--------|\n| **Delete** | Clear selection (set all cells to empty) |\n| **Ctrl+A** | Select entire pattern |\n\n## Interpolation\n\nInterpolation fills a range of cells with evenly spaced values between a start and end point. This is extremely useful for creating smooth fades, filter sweeps, and other gradual changes.\n\n### How to Interpolate\n\n1. Set the start value in the first cell of your range (e.g., volume `40` at row 00).\n2. Set the end value in the last cell of your range (e.g., volume `00` at row 1F).\n3. Select the entire range including both endpoints.\n4. Press **Ctrl+I** to interpolate.\n\nDEViLBOX fills all cells between the endpoints with linearly spaced values.\n\n### Example: Volume Fade Out\n\nBefore interpolation:\n\n```\nRow 00: C-4 01 40 ---    ← Full volume\nRow 01: --- -- -- ---\nRow 02: --- -- -- ---\n...\nRow 0F: --- -- -- ---\nRow 10: C-4 01 00 ---    ← Silent\n```\n\nAfter selecting rows 00-10 in the volume column and pressing Ctrl+I:\n\n```\nRow 00: C-4 01 40 ---    ← Full volume\nRow 01: --- -- 3C ---\nRow 02: --- -- 38 ---\nRow 03: --- -- 34 ---\nRow 04: --- -- 30 ---\n...\nRow 0E: --- -- 08 ---\nRow 0F: --- -- 04 ---\nRow 10: C-4 01 00 ---    ← Silent\n```\n\nInterpolation works on volume values and effect parameters. It operates column-by-column, so you can interpolate just the volume column or just an effect parameter.\n\n## Row Operations\n\n### Insert and Delete Rows\n\n| Key | Action |\n|-----|--------|\n| **Insert** | Insert a blank row at the cursor, pushing all rows below down by one. The last row is lost. |\n| **Ctrl+Backspace** | Delete the row at the cursor, pulling all rows below up by one. A blank row appears at the bottom. |\n\nThese operations affect only the current channel by default. Use **Ctrl+Insert** and **Ctrl+Shift+Backspace** to insert/delete across all channels simultaneously.\n\n### Transpose\n\nTransposition shifts note pitches up or down:\n\n| Key | Action |\n|-----|--------|\n| **Ctrl+Up** | Transpose selection up 1 semitone |\n| **Ctrl+Down** | Transpose selection down 1 semitone |\n| **Ctrl+Shift+Up** | Transpose selection up 1 octave (12 semitones) |\n| **Ctrl+Shift+Down** | Transpose selection down 1 octave (12 semitones) |\n\nTransposition only affects note fields. Instrument, volume, and effect values are unchanged. Notes that would go out of range (below C-0 or above B-9) are clamped.\n\n## Channel Operations\n\n### Mute and Solo\n\nEach channel has a mute button in the channel header. You can also control muting from the keyboard:\n\n| Key | Action |\n|-----|--------|\n| **F9** | Mute/unmute the current channel |\n| **F10** | Solo the current channel (mute all others) |\n| **Ctrl+F10** | Unsolo (unmute all channels) |\n\nMuted channels are visually dimmed in the pattern editor. They are also silenced during playback but their pattern data is still preserved.\n\n### Channel Volume\n\nThe channel header shows a small volume indicator. Each channel has an independent volume level (separate from per-note volume) that acts as a channel-wide multiplier. Adjust it in the Mixer view for precise control, or use the Gxx/Hxy effects for global volume changes within the pattern.\n\n## Pattern Length\n\nThe default pattern length is 64 rows. You can change it in the pattern settings area of the status bar:\n\n- Click the pattern length display and type a new value (1-256).\n- Different patterns in the same song can have different lengths.\n\nCommon pattern lengths:\n\n| Length | Use Case |\n|--------|----------|\n| 32 | Short loops, intros |\n| 64 | Standard (most common) |\n| 128 | Extended sections, detailed arrangements |\n| 256 | Maximum length, rare but useful for ambient/drone pieces |\n\nIn MOD format, pattern length is fixed at 64. XM, IT, S3M, and FUR support variable pattern lengths.\n\n## Practical Workflows\n\n### Laying Down a Drum Beat\n\n1. Select a drum instrument (e.g., TR-808, TR-909, IO808).\n2. Set edit step to 2 or 4.\n3. Enter kick drum notes on strong beats (rows 00, 10, 20, 30 at step 4).\n4. Go back and fill in hi-hats on off-beats at edit step 2.\n5. Add snare hits on rows 08 and 18 (the backbeats).\n\n### Building a Chord Progression\n\n1. Set edit step to 0 (cursor does not advance).\n2. Enter the root note on the current row.\n3. Move up to a higher octave and enter the third.\n4. Enter the fifth.\n5. Set edit step to 16 and move to the next chord position.\n6. Repeat for each chord.\n\n### Copying a Pattern Section\n\n1. Select the region to copy (Shift+arrows or Shift+Page Down).\n2. Ctrl+C to copy.\n3. Navigate to the destination (a different position in the same pattern, or switch to another pattern).\n4. Ctrl+V to paste.\n\nThis is especially useful for duplicating a drum loop from the first half of a pattern to the second half, or for copying a bass line to a new channel and transposing it.\n\n## Tips\n\n- **Use edit step 0 for corrections.** When you need to fix a single note without the cursor jumping away, set step to 0, make your edit, then restore your previous step.\n- **Tab is your friend.** Tab jumps directly to the next channel\'s note column, skipping over instrument/volume/effect fields. This is much faster than pressing Right repeatedly.\n- **Preview before recording.** With record mode off, pressing piano keys plays the selected instrument without writing anything. Use this to find the right note before committing it.\n- **Hex becomes natural.** After a few sessions, you will stop converting hex to decimal in your head. 0x20 is "halfway through a 64-row pattern" and 0x3F is "the last row" -- these become instinctive landmarks.\n',
+    "images": [
+      "screenshots/pattern-grid.png",
+      "screenshots/cell-anatomy.png",
+      "screenshots/selection-highlight.png"
+    ]
+  },
+  {
+    "id": "06-song-structure",
+    "number": 13,
+    "title": "Song Structure",
+    "part": "The Tracker",
+    "partNumber": 2,
+    "content": '# Song Structure\n\nA pattern is a single block of music -- typically 64 rows of notes across several channels. A song is an ordered sequence of patterns played one after another. This chapter covers how patterns are arranged into complete songs, how the order list works, and how to use position jumps and pattern breaks to control the flow of playback.\n\n## Patterns vs. Songs\n\nThink of patterns as paragraphs and the song as the full document. Each pattern is self-contained: it has a fixed number of rows and plays from top to bottom. When it reaches the last row, playback advances to the next entry in the song\'s order list.\n\nA typical song might contain 8 to 30 distinct patterns. Some patterns appear multiple times in the order list (a chorus pattern repeated between verses, for example). This reuse is one of the tracker\'s greatest strengths -- you write a pattern once and reference it as many times as you need.\n\n```\nPattern 00: Intro         (32 rows)\nPattern 01: Verse bass    (64 rows)\nPattern 02: Verse melody  (64 rows)\nPattern 03: Chorus        (64 rows)\nPattern 04: Bridge        (64 rows)\nPattern 05: Outro         (32 rows)\n```\n\n## The Order List (Sequence)\n\nThe order list is the master arrangement of your song. It is a numbered list of pattern indices that determines what plays and in what order.\n\n```\nPosition 00: Pattern 00    ← Intro\nPosition 01: Pattern 01    ← Verse 1 (bass)\nPosition 02: Pattern 02    ← Verse 1 (melody joins)\nPosition 03: Pattern 03    ← Chorus\nPosition 04: Pattern 01    ← Verse 2 (same bass pattern reused)\nPosition 05: Pattern 02    ← Verse 2 (same melody reused)\nPosition 06: Pattern 03    ← Chorus (reused)\nPosition 07: Pattern 04    ← Bridge\nPosition 08: Pattern 03    ← Final chorus (reused again)\nPosition 09: Pattern 05    ← Outro\n```\n\nIn this example, there are only 6 unique patterns, but the song is 10 positions long. Patterns 01, 02, and 03 are each used more than once.\n\n### Editing the Order List\n\nThe order list is displayed in the arrangement area of the interface (visible when you switch to the Arrangement or Song view). You can also see a compact version in the status bar showing the current position.\n\n| Action | How |\n|--------|-----|\n| Add a position | Click the **+** button at the end of the order list, or press **Insert** in the order list |\n| Remove a position | Select the position and press **Delete** |\n| Change the pattern at a position | Click the pattern number and type a new one, or use Up/Down to cycle |\n| Reorder positions | Drag and drop, or use cut/paste within the order list |\n| Insert a position before the current one | Press **Insert** with the position selected |\n\n### Song Position vs. Pattern Position\n\nTwo position indicators are always visible during playback:\n\n- **Song position** (or "order position"): Which entry in the order list is currently playing. Displayed as a number from 0 to the last position.\n- **Pattern row**: Which row within the current pattern is playing. Displayed as a hex number from 00 to the pattern length minus one.\n\nTogether they form the complete playback address. "Position 03, Row 1A" means "the 4th entry in the order list, 26 rows into that pattern."\n\n## Pattern Length\n\nEach pattern has an independent length. While 64 rows is the default and most common, you can set any length from 1 to 256 rows (format permitting).\n\n| Format | Min Length | Max Length | Variable per pattern? |\n|--------|-----------|-----------|----------------------|\n| MOD | 64 | 64 | No (always 64) |\n| XM | 1 | 256 | Yes |\n| IT | 1 | 200 | Yes |\n| S3M | 1 | 64 | No (always 64) |\n| FUR | 1 | 256 | Yes |\n\nVariable pattern lengths are useful for:\n\n- **Short intro/outro patterns** (16 or 32 rows) that do not need a full 64 rows.\n- **Extended patterns** (128 or 256 rows) for sections with gradual builds or long evolving sequences.\n- **Odd time signatures**: a 48-row pattern at 6 ticks per row gives you a natural 3/4 feel.\n\nTo change a pattern\'s length, edit the length value in the pattern settings area. Be aware that shortening a pattern discards data in the removed rows.\n\n## Cloning Patterns\n\nCloning creates a new, independent copy of an existing pattern. This is different from reusing a pattern in the order list:\n\n- **Reusing** a pattern (same pattern number at multiple positions): Changes to the pattern affect all positions where it appears. This is efficient but means you cannot vary the pattern between occurrences.\n- **Cloning** a pattern: Creates a new pattern with a new number, containing an exact copy of the original\'s data. The two patterns are now independent -- editing one does not affect the other.\n\n### When to Clone\n\nClone a pattern when you want a variation. For example:\n\n1. You have a chorus pattern (Pattern 03) that plays three times in your song.\n2. The third time, you want to add a drum fill on the last 4 rows.\n3. Clone Pattern 03 to create Pattern 06 (an identical copy).\n4. Edit Pattern 06 to add the fill.\n5. In the order list, replace the third chorus entry with Pattern 06.\n\nNow positions 03 and 06 in the order list play the original chorus, and position 08 plays the variation with the fill.\n\n### How to Clone\n\nSelect the pattern in the order list or pattern editor and use the clone function (typically in the pattern menu or via a keyboard shortcut). DEViLBOX assigns the next available pattern number to the clone.\n\n## Song Flow Control: Bxx and Dxx\n\nTwo effect commands control the flow of playback beyond simple linear sequencing:\n\n### Bxx -- Position Jump\n\nThe `Bxx` effect jumps to song position `xx` in the order list. Playback continues from row 00 of the pattern at that position.\n\n```\nRow 3F: --- -- -- B00    ← Jump back to position 00 (loop the entire song)\n```\n\nCommon uses:\n\n| Pattern | Effect | Result |\n|---------|--------|--------|\n| Last pattern, last row | `B00` | Loop the entire song from the start |\n| Bridge pattern, last row | `B02` | Jump back to the verse |\n| Any row | `B05` | Jump to position 05 immediately |\n\n**Position jump happens at the end of the row where it appears.** If Bxx is on row 20, rows 00-20 play, then playback jumps to position xx, row 00.\n\n### Dxx -- Pattern Break\n\nThe `Dxx` effect jumps to the next pattern in the order list, starting at row `xx`. The parameter is **decimal-coded in hex digits**: D32 means row 32 (not row 50).\n\n```\nRow 1F: --- -- -- D00    ← Break to next pattern, starting at row 00\nRow 1F: --- -- -- D10    ← Break to next pattern, starting at row 10 (decimal 10)\n```\n\n**Decimal coding note:** Unlike most tracker values which are pure hex, the Dxx parameter treats each hex digit as a decimal digit. D19 means row 19 (decimal). D20 means row 20 (decimal). D1A is not valid in MOD format (but some formats interpret it as hex).\n\n### Combining Bxx and Dxx\n\nWhen both Bxx and Dxx appear on the same row (in different channels), they combine:\n\n- Bxx sets the target song position.\n- Dxx sets the target row within that position\'s pattern.\n\n```\nChannel 1, Row 3F: --- -- -- B02    ← Jump to position 02...\nChannel 2, Row 3F: --- -- -- D10    ← ...starting at row 10\n```\n\nThis combination lets you jump to any specific point in the song: a particular position and a particular row within it.\n\n## Building a Song: Practical Example\n\nHere is a step-by-step example of arranging a complete song from patterns.\n\n### Step 1: Write the Core Patterns\n\n| Pattern | Content | Length |\n|---------|---------|--------|\n| 00 | Intro: sparse drums, ambient pad | 32 rows |\n| 01 | Verse: bass + drums | 64 rows |\n| 02 | Verse: bass + drums + lead melody | 64 rows |\n| 03 | Chorus: full arrangement, all channels | 64 rows |\n| 04 | Bridge: breakdown, half-time drums | 64 rows |\n| 05 | Outro: fade out, drums thin out | 32 rows |\n\n### Step 2: Arrange the Order List\n\n```\nPosition 00: Pattern 00    Intro\nPosition 01: Pattern 01    Verse 1 (bass + drums only)\nPosition 02: Pattern 02    Verse 1 (melody enters)\nPosition 03: Pattern 03    Chorus 1\nPosition 04: Pattern 01    Verse 2 (same bass pattern)\nPosition 05: Pattern 02    Verse 2 (same melody)\nPosition 06: Pattern 03    Chorus 2\nPosition 07: Pattern 04    Bridge\nPosition 08: Pattern 03    Chorus 3 (final)\nPosition 09: Pattern 05    Outro\n```\n\n### Step 3: Add Flow Control\n\nAt the end of Pattern 05 (the outro), add a position jump to loop or stop:\n\n- `B00` on the last row to loop the entire song.\n- Or leave it empty to stop playback after the outro.\n\nIf you want the chorus to repeat twice before the bridge, clone Pattern 03 and add `B06` on the last row of the cloned pattern to jump back to position 06 (itself), then after one repetition, remove the jump and let it continue to the bridge. Or more practically, just add the chorus pattern to the order list twice:\n\n```\nPosition 06: Pattern 03    Chorus 2a\nPosition 07: Pattern 03    Chorus 2b (same pattern, plays again)\nPosition 08: Pattern 04    Bridge\n```\n\n### Step 4: Add Transitions with Pattern Breaks\n\nTo create a smoother transition from the intro to the verse, you might want the intro to be only 24 rows long even though the pattern has 32 rows. Add `D00` on row 17 (decimal 23) of Pattern 00:\n\n```\nPattern 00, Row 17: --- -- -- D00    ← Break after 24 rows, jump to next pattern row 00\n```\n\nRows 18-1F of Pattern 00 never play. This is cleaner than creating a 24-row pattern and is easy to adjust later.\n\n## Loop Points\n\nA "loop point" in song structure means the position where playback returns to after reaching the end. There are two common approaches:\n\n### Explicit Loop with Bxx\n\nPlace `Bxx` on the last row of the last pattern to define where the song loops back to. `B00` loops to the very start. `B03` loops to the first chorus. This is the standard approach for game music and module playback.\n\n### Pattern Loop with E6x\n\nThe `E6x` effect creates a loop within a single pattern:\n\n- `E60` marks the loop start point.\n- `E6x` (where x = 1-F) loops back to the start point x times, then continues.\n\n```\nRow 00: --- -- -- E60    ← Mark loop start\nRow 03: --- -- -- ---\nRow 07: --- -- -- E63    ← Loop back to row 00, three times total\nRow 08: --- -- -- ---    ← Playback continues here after 3 loops\n```\n\nThis is useful for drum fills, repeated riffs, and building tension within a pattern without needing to write out every repetition.\n\n## Tips\n\n- **Start with the order list.** Before writing any pattern data, sketch out your song structure: how many sections, what order, where things repeat. This top-down approach prevents the common beginner mistake of writing one long pattern and getting lost.\n- **Reuse aggressively.** If two sections use the same bass line, use the same pattern. Clone only when you need variation. This keeps your song compact and makes global changes easy (edit the pattern once, all occurrences update).\n- **Use short patterns for transitions.** A 16-row pattern with just a crash cymbal and a rising effect makes a great transition between sections. Variable pattern lengths exist for exactly this purpose.\n- **Bxx on the last row is the standard loop.** Nearly every module file ends with a `B00` or similar position jump on the last row of the last pattern. Without it, playback simply stops after the last pattern.\n- **Test the flow early.** Use Shift+F5 (play from song start) to hear the full arrangement. It is common to realize that a section needs one more repetition or that a transition is too abrupt -- catching this early saves time.\n',
+    "images": []
+  },
+  {
+    "id": "07-tracker-formats",
+    "number": 14,
+    "title": "Tracker Formats Deep Dive",
+    "part": "The Tracker",
+    "partNumber": 2,
+    "content": `# Tracker Formats Deep Dive
+
+DEViLBOX supports over 188 music formats. This chapter covers the five major tracker formats you will encounter most often: MOD, XM, IT, S3M, and FUR. Each has different capabilities, limitations, and a distinct character. Understanding these differences helps you choose the right format for your music and navigate files loaded from archives like Modland and HVSC.
+
+## MOD (ProTracker / Amiga)
+
+**Origin:** Ultimate Soundtracker (1987), perfected by ProTracker (1990) on the Amiga.
+
+MOD is the original tracker format. It is tightly bound to the Amiga hardware, which had four DMA-driven audio channels with 8-bit sample playback and hardware volume/period registers. Every limitation of MOD traces back to the Amiga's Paula chip.
+
+### Key Characteristics
+
+| Property | Value |
+|----------|-------|
+| Channels | 4 (fixed) |
+| Sample depth | 8-bit signed |
+| Sample rate | Variable (derived from period value and PAL/NTSC clock) |
+| Max instruments | 31 (15 in very old formats) |
+| Pattern length | 64 rows (fixed) |
+| Max patterns | 128 |
+| Volume range | 0-64 |
+| Pitch system | Amiga periods (higher period = lower pitch) |
+| Volume column | No (use Cxx effect) |
+| Instrument envelopes | No |
+| File extension | \`.mod\` |
+
+### Pitch: Periods, Not Frequencies
+
+MOD uses Amiga **period values** to set pitch. A period is a hardware timer divider -- higher values produce lower frequencies. Middle C (C-3 in MOD notation) has a period of 428. One octave up (C-4) is period 214. One octave down (C-2) is period 856.
+
+This means pitch slide effects (1xx, 2xx) operate in period space, not linear pitch space. Sliding up by the same amount at different octaves produces different musical intervals. This is part of the characteristic MOD sound.
+
+### The 4-Channel Constraint
+
+Four channels is both MOD's defining limitation and its charm. Composers must be creative:
+
+- Channel 1 and 4 are hard-panned left; channels 2 and 3 are hard-panned right (Amiga hardware stereo).
+- A common allocation: kick on channel 1, snare + hats on channel 2, bass on channel 3, lead on channel 4.
+- "Virtual channels" are simulated by rapidly switching between sounds on the same channel (e.g., alternating hi-hat and snare on the same channel using short samples and high speed).
+
+### When to Use MOD
+
+- Retro Amiga-style music with authentic hardware character.
+- Demoscene productions targeting classic platforms.
+- When you want the creative constraints of 4 channels and 8-bit samples to force economy and invention.
+
+## XM (FastTracker 2)
+
+**Origin:** FastTracker 2 (1994) by Triton/Vogue on MS-DOS.
+
+XM was a quantum leap from MOD. It added a dedicated volume column, instrument envelopes, multi-sample instruments, 16-bit audio, and support for up to 128 channels. It became the dominant tracker format of the mid-to-late 1990s and is still actively used today.
+
+### Key Characteristics
+
+| Property | Value |
+|----------|-------|
+| Channels | 1-128 |
+| Sample depth | 8-bit or 16-bit |
+| Sample rate | Variable (based on relative note + finetune) |
+| Max instruments | 128 |
+| Samples per instrument | Up to 16 (multi-sample via keymap) |
+| Pattern length | 1-256 rows (variable per pattern) |
+| Max patterns | 256 |
+| Volume range | 00-40 hex (0-64 decimal) |
+| Pitch system | Linear frequency table (default) or Amiga periods |
+| Volume column | Yes (with mini-effects) |
+| Instrument envelopes | Volume, Panning (with loop/sustain points) |
+| File extension | \`.xm\` |
+
+### The Volume Column
+
+XM's most distinctive feature is a dedicated volume column in every cell. This frees the effect column for other commands. The volume column supports not only direct volume setting but also several mini-effects:
+
+| Value Range | Meaning |
+|-------------|---------|
+| 00-40 | Set volume (0 to 64) |
+| 50-5F | Volume slide down |
+| 60-6F | Volume slide up |
+| 70-7F | Fine volume slide down |
+| 80-8F | Fine volume slide up |
+| 90-9F | Set vibrato speed |
+| A0-AF | Vibrato (by depth) |
+| B0-BF | Set panning |
+| C0-CF | Panning slide left |
+| D0-DF | Panning slide right |
+| E0-EF | Tone portamento |
+| F0-FF | (Reserved) |
+
+### Instrument Envelopes
+
+XM instruments have volume and panning envelopes with up to 12 points each. Envelopes can have:
+
+- **Sustain point**: The envelope holds at this point while a note is held, then continues after note-off.
+- **Loop start/end**: The envelope loops between two points for cyclic effects (tremolo, pulsing).
+- **Free-form shape**: Each point has an independent X (tick) and Y (value) coordinate, allowing complex curves.
+
+This means a single note can have automatic volume swells, fades, and rhythmic pulsing without any effect commands.
+
+### Linear vs. Amiga Frequency Tables
+
+XM offers two pitch modes:
+
+- **Linear** (default): Each semitone is the same "distance" in frequency terms. Portamento slides sound consistent across all octaves. This is what most people expect.
+- **Amiga**: Uses the traditional Amiga period system for authentic MOD-style pitch behavior. Slides are faster at higher pitches.
+
+The frequency table choice is stored in the file header and affects the entire song.
+
+### When to Use XM
+
+- General-purpose tracker composition with no artificial limitations.
+- Music that needs instrument envelopes (pads, strings, plucked sounds with natural decay).
+- Multi-sample instruments (e.g., a piano sampled at multiple octaves).
+- When you want both a volume column and an effect column per channel.
+
+## IT (Impulse Tracker)
+
+**Origin:** Impulse Tracker (1995) by Jeffrey Lim on MS-DOS.
+
+IT is the most feature-rich of the classic sample-based tracker formats. It introduced New Note Actions (NNA), resonant filters, instrument-level separation from samples, and high-quality mixing with interpolation and ramping. IT files tend to sound "cleaner" than XM files due to the superior mixing engine.
+
+### Key Characteristics
+
+| Property | Value |
+|----------|-------|
+| Channels | 1-64 |
+| Sample depth | 8-bit or 16-bit |
+| Sample rate | Variable |
+| Max instruments | 99 |
+| Max samples | 99 (independent of instruments) |
+| Pattern length | 1-200 rows |
+| Max patterns | 200 |
+| Volume range | 00-40 hex (0-64) |
+| Pitch system | Linear frequency table |
+| Volume column | Yes (shared with panning column in some views) |
+| Instrument envelopes | Volume, Panning, Pitch/Filter (with loop/sustain) |
+| Resonant filters | Yes (low-pass and high-pass) |
+| New Note Actions | Yes (Note Cut, Continue, Off, Fade) |
+| File extension | \`.it\` |
+
+### New Note Actions (NNA)
+
+NNA is IT's killer feature. In MOD, XM, and S3M, playing a new note on a channel immediately cuts the previous note. IT lets you control what happens to the old note when a new one arrives:
+
+| NNA Mode | Behavior |
+|----------|----------|
+| **Cut** | Immediately silence the old note (same as MOD/XM behavior) |
+| **Continue** | The old note keeps playing in the background; the new note plays on top |
+| **Off** | The old note receives a note-off (enters release phase of envelope) |
+| **Fade** | The old note begins fading out |
+
+With NNA set to Continue or Off, a single tracker channel can produce multiple simultaneous voices. A piano part with sustain pedal, a strummed guitar chord, or a pad with long release -- these are trivial in IT but impossible in MOD and awkward in XM.
+
+IT uses "virtual channels" internally to handle the background notes. The 64-channel limit applies to tracker channels, not simultaneous voices.
+
+### Resonant Filters
+
+IT has a per-channel resonant filter with cutoff and resonance parameters, controlled by the Zxx effect command:
+
+- Z00-Z7F: Set filter cutoff (0 = fully closed, 127 = fully open)
+- Z80-ZFF: Set filter resonance (128 = no resonance, 255 = maximum resonance)
+
+The filter is a 2-pole (12dB/octave) low-pass by default. Combined with envelopes (IT has a pitch/filter envelope), you can create filter sweeps, acid bass lines, and wah effects entirely within the tracker.
+
+### Instrument vs. Sample Separation
+
+In MOD and XM, an "instrument" and a "sample" are essentially the same thing (XM adds a keymap layer). In IT, instruments and samples are fully separate entities:
+
+- A **sample** is raw audio data with a loop point and default volume.
+- An **instrument** references one or more samples, applies envelopes, sets NNA behavior, configures filters, and defines key/velocity mapping.
+
+This separation means you can create multiple instruments from the same sample (a pad and a pluck from the same waveform, with different envelopes and filter settings) without duplicating sample data.
+
+### When to Use IT
+
+- Complex arrangements that need long releases, overlapping notes, or polyphonic parts.
+- Music that uses filter sweeps or resonance.
+- When you need precise control over note release and envelope behavior.
+- Orchestral or cinematic tracker compositions.
+
+## S3M (ScreamTracker 3)
+
+**Origin:** ScreamTracker 3 (1994) by Sami Tammilehto (PSI/Future Crew) on MS-DOS.
+
+S3M was the first widely adopted format to break beyond MOD's 4-channel limit. It serves as a bridge between MOD and IT: more capable than MOD, but simpler than IT. Many classic demoscene tracks from 1993-1996 are S3M files.
+
+### Key Characteristics
+
+| Property | Value |
+|----------|-------|
+| Channels | 1-32 |
+| Sample depth | 8-bit or 16-bit |
+| Max instruments | 99 |
+| Pattern length | 64 rows (fixed) |
+| Max patterns | 100 |
+| Volume range | 00-40 hex |
+| Pitch system | Amiga periods |
+| Volume column | No |
+| Instrument envelopes | No |
+| File extension | \`.s3m\` |
+
+### S3M's Place in History
+
+S3M introduced several concepts that XM and IT later expanded upon:
+
+- **More than 4 channels.** Up to 32 channels with configurable left/right panning (not the fixed L/R/R/L of MOD).
+- **Stereo panning.** Arbitrary pan positions per channel, not just hard left or hard right.
+- **OPL FM synthesis.** S3M can address the OPL2/OPL3 FM chip found on Sound Blaster cards, mixing FM-synthesized channels alongside PCM sample channels.
+
+S3M lacks instrument envelopes, NNA, filters, and variable pattern length. It is rarely chosen for new compositions today, but understanding it is important because of the massive existing library of S3M files.
+
+### When to Use S3M
+
+- Compatibility with ScreamTracker 3 and its playback ecosystem.
+- Retro DOS demoscene aesthetic.
+- OPL FM synthesis combined with samples (a unique S3M capability).
+
+## FUR (Furnace Tracker)
+
+**Origin:** Furnace Tracker (2021-present) by tildearrow.
+
+FUR is fundamentally different from the sample-based formats above. While MOD/XM/IT/S3M play back pre-recorded samples, FUR drives **chip emulations** -- accurate software recreations of the actual sound chips from classic hardware. The NES's 2A03, the Game Boy's LR35902, the Genesis's YM2612, the C64's SID -- Furnace emulates over 70 chips, and DEViLBOX includes all of them.
+
+### Key Characteristics
+
+| Property | Value |
+|----------|-------|
+| Channels | 1-128 (depends on chip configuration) |
+| Sound source | Chip emulation (not samples) |
+| Chip emulations | 70+ (NES, Game Boy, Genesis, C64, Amiga, arcade, FM, wavetable, etc.) |
+| Instruments | Chip-specific with macros and wavetables |
+| Pattern length | 1-256 rows |
+| Max patterns | 256 |
+| Effects | Standard tracker effects + chip-specific effects |
+| Multi-chip | Yes (combine multiple chips in one song) |
+| File extension | \`.fur\` |
+
+### Chip-Specific Instruments
+
+FUR instruments are nothing like sample-based instruments. Instead of waveform data, they contain **macros** -- sequences of register values that are applied to the chip on each tick. A macro might sweep through the NES's duty cycles, modulate a Game Boy wave channel's waveform, or step through FM operator levels on a Genesis.
+
+Each chip has its own set of instrument parameters:
+
+| Chip | Example Parameters |
+|------|--------------------|
+| NES 2A03 | Duty cycle, volume envelope, sweep (hardware) |
+| Game Boy | Wave pattern (32 4-bit samples), volume envelope, frequency sweep |
+| Genesis YM2612 | 4 FM operators, algorithm, feedback, detune, multiple, TL, AR/DR/SR/RR |
+| C64 SID | Waveform (triangle/saw/pulse/noise), pulse width, filter cutoff/resonance, ADSR |
+| Amiga Paula | 8-bit sample playback (like MOD, but within the Furnace engine) |
+
+### Multi-Chip Songs
+
+FUR songs can combine multiple chips. A single composition might use:
+
+- NES 2A03 for pulse leads and triangle bass
+- Genesis YM2612 for FM pads
+- Game Boy for chiptune arpeggios
+- C64 SID for filter-swept bass
+
+Each chip contributes its own channels. The channel count is the sum of all chips' channel counts.
+
+### Chip-Specific Effects
+
+Beyond the standard tracker effects (0xx through Fxx), FUR includes chip-specific effect commands in the 10xx-FFxx range. These directly manipulate chip registers:
+
+| Effect Range | Chip |
+|-------------|------|
+| 10xx-1Fxx | Generic chip control |
+| 20xx-2Fxx | FM-specific (operator control, algorithm, feedback) |
+| 30xx-3Fxx | Channel-specific extensions |
+
+The available effects change depending on which chip the channel belongs to. DEViLBOX's effect picker shows only the valid effects for the current channel's chip.
+
+### When to Use FUR
+
+- Chiptune composition targeting specific classic hardware sounds.
+- Music that needs authentic chip character (NES, Game Boy, Genesis, C64, arcade).
+- Multi-chip arrangements blending different hardware eras.
+- When you want macro-driven sound design (duty cycle sweeps, wavetable animation, FM parameter automation).
+
+## Format Comparison Table
+
+| Feature | MOD | S3M | XM | IT | FUR |
+|---------|-----|-----|-----|-----|-----|
+| Max channels | 4 | 32 | 128 | 64 | 128 |
+| Sample depth | 8-bit | 8/16-bit | 8/16-bit | 8/16-bit | N/A (chip) |
+| Volume column | No | No | Yes | Yes | Yes |
+| Instrument envelopes | No | No | Vol, Pan | Vol, Pan, Pitch | Macros |
+| Variable pattern length | No (64) | No (64) | Yes (1-256) | Yes (1-200) | Yes (1-256) |
+| Resonant filters | No | No | No | Yes | Chip-dependent |
+| NNA (overlapping notes) | No | No | No | Yes | Chip-dependent |
+| Pitch system | Amiga periods | Amiga periods | Linear or Amiga | Linear | Linear |
+| Multi-effect columns | No | No | No | Yes (2) | Yes |
+| Sound source | Samples | Samples/OPL | Samples | Samples | Chip emulation |
+| Panning | Fixed L/R | Configurable | Full stereo | Full stereo | Chip-dependent |
+| File size (typical) | 100KB-1MB | 100KB-2MB | 200KB-5MB | 200KB-5MB | 10KB-500KB |
+
+## Choosing the Right Format
+
+| Goal | Recommended Format | Why |
+|------|-------------------|-----|
+| 4-channel Amiga retro | MOD | Authentic hardware constraints |
+| General-purpose modern tracking | XM | Best balance of features and simplicity |
+| Complex orchestral/cinematic | IT | NNA, filters, and envelopes |
+| Chiptune (NES, GB, C64, etc.) | FUR | Real chip emulation with macros |
+| DOS demoscene retro | S3M | Period-correct for early-90s scene |
+| Smallest file size | FUR | No sample data, just chip parameters |
+| Maximum channels | XM or FUR | Both support 128 |
+
+## Format Conversion
+
+DEViLBOX can load all five formats natively. When converting between formats, keep these considerations in mind:
+
+- **MOD to XM/IT**: Straightforward. All MOD features exist in XM and IT. You gain additional channels and features.
+- **XM to IT**: Mostly compatible. IT handles XM's volume column effects, but envelope loop behavior has subtle differences.
+- **IT to XM**: Lossy. NNA behavior, resonant filters, and pitch envelopes have no XM equivalent.
+- **Any to FUR**: Conceptual mismatch. Sample-based instruments do not translate to chip macros. The channel data (notes, effects) can transfer, but the sound design must be recreated from scratch using chip-appropriate instruments.
+- **FUR to MOD/XM/IT**: The chip emulation can be rendered to samples, but you lose the chip character and macro-driven animation. The result is a static snapshot of the sound, not the living instrument.
+
+As a general rule: convert "up" (MOD to XM, XM to IT) when you need more features, and avoid converting "down" unless you are willing to lose capabilities.
+`,
+    "images": []
+  },
+  {
+    "id": "08-tracker-effects-reference",
+    "number": 15,
+    "title": "Tracker Effects Reference",
+    "part": "The Tracker",
+    "partNumber": 2,
+    "content": '# Tracker Effects Reference\n\nThis chapter is a complete reference for all tracker effect commands supported by DEViLBOX. Effects are entered in the effect column of a pattern cell as a three-character hex code: one character for the command, two for the parameter. For example, `486` means effect 4 (Vibrato) with parameter 86 (speed 8, depth 6).\n\nEffects are processed once per row (on "tick 0") or once per tick, depending on the command. A row is divided into ticks: at 6 ticks per row (the default speed), each row has 6 ticks numbered 0 through 5. Tick 0 is when the row first triggers. Ticks 1-5 are subdivisions within that row. Some effects act only on tick 0 (e.g., Set Volume), some act on ticks 1-N (e.g., portamento slides), and some act on all ticks.\n\n## Standard Effects (0xx -- Fxx)\n\nThese effects are shared across MOD, XM, IT, and S3M with minor behavioral differences noted where applicable.\n\n### Pitch Effects\n\n| Code | Name | Description | Parameter | Tick | Example |\n|------|------|-------------|-----------|------|---------|\n| `0xy` | Arpeggio | Cycle between note, note+x, note+y semitones each tick | x,y: 0-F semitones | 1-N | `037` = major chord |\n| `1xx` | Portamento Up | Slide pitch up by xx per tick | xx: 01-FF speed (00 = use last) | 1-N | `110` = slow slide up |\n| `2xx` | Portamento Down | Slide pitch down by xx per tick | xx: 01-FF speed (00 = use last) | 1-N | `220` = slow slide down |\n| `3xx` | Tone Portamento | Slide from current pitch toward the target note | xx: 01-FF speed (00 = use last) | 1-N | `310` = smooth glide |\n| `4xy` | Vibrato | Oscillate pitch; x = speed, y = depth | x: 0-F speed, y: 0-F depth | 1-N | `486` = medium vibrato |\n| `5xy` | Tone Porta + Vol Slide | Continue tone portamento + slide volume | x: vol up, y: vol down | 1-N | `502` = porta + fade out |\n| `6xy` | Vibrato + Vol Slide | Continue vibrato + slide volume | x: vol up, y: vol down | 1-N | `640` = vibrato + fade in |\n\n### Volume Effects\n\n| Code | Name | Description | Parameter | Tick | Example |\n|------|------|-------------|-----------|------|---------|\n| `7xy` | Tremolo | Oscillate volume; x = speed, y = depth | x: 0-F speed, y: 0-F depth | 1-N | `742` = volume pulse |\n| `Axy` | Volume Slide | Slide volume per tick; x = up, y = down (one must be 0) | x/y: 0-F per tick | 1-N | `A0F` = fast fade out |\n| `Cxx` | Set Volume | Set channel volume directly | xx: 00-40 (0-64 decimal) | 0 | `C40` = full, `C20` = half |\n\n### Panning Effects\n\n| Code | Name | Description | Parameter | Tick | Example |\n|------|------|-------------|-----------|------|---------|\n| `8xx` | Set Panning | Set stereo position | xx: 00=left, 80=center, FF=right | 0 | `880` = center |\n\n### Sample Effects\n\n| Code | Name | Description | Parameter | Tick | Example |\n|------|------|-------------|-----------|------|---------|\n| `9xx` | Sample Offset | Start sample playback at offset xx * 256 | xx: 00-FF (in 256-sample units) | 0 | `980` = start halfway |\n\n### Global / Song Flow Effects\n\n| Code | Name | Description | Parameter | Tick | Example |\n|------|------|-------------|-----------|------|---------|\n| `Bxx` | Position Jump | Jump to song position xx at end of this row | xx: 00-FF (order position) | 0 | `B00` = loop to start |\n| `Dxx` | Pattern Break | Jump to next pattern, start at row xx (decimal-coded) | xx: 00-63 decimal | 0 | `D00` = next pattern row 0 |\n| `Fxx` | Set Speed / BPM | 01-1F sets ticks per row; 20-FF sets BPM | xx: 01-1F=speed, 20-FF=BPM | 0 | `F06` = 6 ticks/row, `F8C` = 140 BPM |\n\n**Note on Dxx decimal coding:** The parameter is read as two decimal digits packed in hex. D12 means row 12 (decimal), not row 18 (which 0x12 would be in pure hex). D19 = row 19. D20 = row 20. Values above D63 are invalid in MOD.\n\n**Note on Fxx dual behavior:** The Fxx effect does two different things depending on the parameter value. Values 01-1F set the "speed" (number of ticks per row). Values 20 (32 decimal) through FF (255 decimal) set the BPM (beats per minute). At the default F06 (speed 6) and 125 BPM, each row plays for approximately 48ms.\n\n## Extended Effects (E-Commands)\n\nE-commands use a single hex digit for the subcommand and a single hex digit for the parameter. The format is `Exy` where x is the subcommand and y is the parameter.\n\n| Code | Name | Description | Parameter | Tick | Example |\n|------|------|-------------|-----------|------|---------|\n| `E1x` | Fine Porta Up | Fine pitch slide up (once per row) | x: 0-F amount | 0 | `E14` = small pitch bend up |\n| `E2x` | Fine Porta Down | Fine pitch slide down (once per row) | x: 0-F amount | 0 | `E24` = small pitch bend down |\n| `E3x` | Glissando Control | Round tone portamento to semitones | x: 0=off, 1=on | 0 | `E31` = enable glissando |\n| `E4x` | Vibrato Waveform | Set vibrato oscillator shape | 0=sine, 1=ramp, 2=square, 3=random | 0 | `E40` = sine |\n| `E5x` | Set Finetune | Override sample finetune | x: 0-F (signed: 8=0) | 0 | `E58` = normal tuning |\n| `E6x` | Pattern Loop | Set loop start (x=0) or loop x times | x: 0=set start, 1-F=count | 0 | `E60` then `E63` = loop 3x |\n| `E7x` | Tremolo Waveform | Set tremolo oscillator shape | 0=sine, 1=ramp, 2=square, 3=random | 0 | `E70` = sine tremolo |\n| `E8x` | Set Panning (Coarse) | Set pan position (16 steps) | x: 0=left, 8=center, F=right | 0 | `E88` = center |\n| `E9x` | Retrigger Note | Retrigger the note every x ticks | x: 1-F tick interval | 1-N | `E93` = every 3 ticks |\n| `EAx` | Fine Volume Up | Fine volume increase (once per row) | x: 0-F amount | 0 | `EA2` = small boost |\n| `EBx` | Fine Volume Down | Fine volume decrease (once per row) | x: 0-F amount | 0 | `EB2` = small cut |\n| `ECx` | Note Cut | Set volume to 0 at tick x | x: 0-F tick number | x | `EC4` = cut after 4 ticks |\n| `EDx` | Note Delay | Delay note trigger by x ticks | x: 0-F delay | x | `ED3` = play at tick 3 |\n| `EEx` | Pattern Delay | Repeat current row x extra times | x: 0-F rows to repeat | 0 | `EE2` = delay 2 rows |\n\n### Vibrato and Tremolo Waveforms (E4x / E7x)\n\nThe waveform shapes affect how vibrato and tremolo modulate their target:\n\n| Value | Shape | Character |\n|-------|-------|-----------|\n| 0 | Sine | Smooth, natural oscillation |\n| 1 | Ramp down | Sawtooth-like, sharper sound |\n| 2 | Square | Abrupt on/off toggling |\n| 3 | Random | Unpredictable, glitchy |\n| 4-7 | Same as 0-3 but waveform does not retrigger on new note | Continuous modulation |\n\nValues 4-7 are the same shapes as 0-3, but the oscillator phase continues from where it was instead of resetting when a new note plays. This creates smoother transitions across notes.\n\n## Extended Effects (G-X Commands)\n\nThese commands are available in XM, IT, and S3M (not in MOD).\n\n| Code | Name | Description | Parameter | Tick | Format |\n|------|------|-------------|-----------|------|--------|\n| `Gxx` | Set Global Volume | Set master volume for all channels | xx: 00-40 (0-64) | 0 | XM, IT |\n| `Hxy` | Global Volume Slide | Slide global volume; x=up, y=down | x/y: 0-F per tick | 1-N | XM, IT |\n| `Lxx` | Set Envelope Position | Jump to tick xx in the volume/panning envelope | xx: 00-FF | 0 | XM, IT |\n| `Pxy` | Panning Slide | Slide pan position; x=right, y=left | x/y: 0-F per tick | 1-N | XM, IT |\n| `Rxy` | Multi Retrig | Retrigger with volume change | x=interval (ticks), y=volume modifier | 1-N | XM, IT |\n| `Txy` | Tremor | Rapidly toggle volume on (x ticks) / off (y ticks) | x: on-time, y: off-time | 1-N | XM, IT, S3M |\n| `X1x` | Extra Fine Porta Up | Very fine pitch slide up (1/4 of fine porta) | x: 0-F amount | 0 | XM, IT |\n| `X2x` | Extra Fine Porta Down | Very fine pitch slide down (1/4 of fine porta) | x: 0-F amount | 0 | XM, IT |\n\n### Multi Retrig Volume Modifiers (Rxy)\n\nThe y parameter of the Rxy command applies a volume modification on each retrigger:\n\n| y Value | Volume Change |\n|---------|---------------|\n| 0 | No change |\n| 1 | -1 |\n| 2 | -2 |\n| 3 | -4 |\n| 4 | -8 |\n| 5 | -16 |\n| 6 | Multiply by 2/3 |\n| 7 | Multiply by 1/2 |\n| 8 | No change |\n| 9 | +1 |\n| A | +2 |\n| B | +4 |\n| C | +8 |\n| D | +16 |\n| E | Multiply by 3/2 |\n| F | Multiply by 2 |\n\n## Volume Column Effects (XM / IT)\n\nIn XM and IT formats, the volume column can encode mini-effects in addition to direct volume values. These let you apply two simultaneous effects per channel (one in the volume column, one in the effect column).\n\n### XM Volume Column\n\n| Value (hex) | Effect | Parameter Meaning |\n|-------------|--------|-------------------|\n| 00-40 | Set Volume | Volume 0 to 64 |\n| 50-5F | Volume Slide Down | Speed = value - 50 |\n| 60-6F | Volume Slide Up | Speed = value - 60 |\n| 70-7F | Fine Volume Down | Amount = value - 70 |\n| 80-8F | Fine Volume Up | Amount = value - 80 |\n| 90-9F | Vibrato Speed | Speed = value - 90 |\n| A0-AF | Vibrato Depth | Depth = value - A0 |\n| B0-BF | Set Panning | Pan = (value - B0) * 17 |\n| C0-CF | Panning Slide Left | Speed = value - C0 |\n| D0-DF | Panning Slide Right | Speed = value - D0 |\n| E0-EF | Tone Portamento | Speed = (value - E0) * 16 |\n\n### IT Volume Column\n\nIT uses a similar but not identical scheme. The most commonly used values:\n\n| Value (hex) | Effect |\n|-------------|--------|\n| 00-40 | Set Volume |\n| 41-4F | (Unused) |\n| 50-5F | Fine Volume Up |\n| 60-6F | Fine Volume Down |\n| 70-7F | Volume Slide Up |\n| 80-8F | Volume Slide Down |\n| 90-9F | Portamento Down |\n| A0-AF | Portamento Up |\n| B0-BF | Tone Portamento |\n| C0-CF | Vibrato Depth |\n| D0-DF | Set Panning |\n| E0-EF | (Unused / format-specific) |\n\n## Per-Format Effect Availability\n\nNot all effects are available in every format. This table shows which effect commands are supported:\n\n| Effect | MOD | S3M | XM | IT | FUR |\n|--------|-----|-----|-----|-----|-----|\n| 0xy Arpeggio | Yes | Yes | Yes | Yes | Yes |\n| 1xx Porta Up | Yes | Yes | Yes | Yes | Yes |\n| 2xx Porta Down | Yes | Yes | Yes | Yes | Yes |\n| 3xx Tone Porta | Yes | Yes | Yes | Yes | Yes |\n| 4xy Vibrato | Yes | Yes | Yes | Yes | Yes |\n| 5xy Porta+VolSlide | Yes | Yes | Yes | Yes | Yes |\n| 6xy Vibrato+VolSlide | Yes | Yes | Yes | Yes | Yes |\n| 7xy Tremolo | Yes | Yes | Yes | Yes | Yes |\n| 8xx Set Panning | No | Yes | Yes | Yes | Yes |\n| 9xx Sample Offset | Yes | Yes | Yes | Yes | No* |\n| Axy Volume Slide | Yes | Yes | Yes | Yes | Yes |\n| Bxx Position Jump | Yes | Yes | Yes | Yes | Yes |\n| Cxx Set Volume | Yes | Yes | Yes | Yes | Yes |\n| Dxx Pattern Break | Yes | Yes | Yes | Yes | Yes |\n| E-commands | Yes | Partial | Yes | Yes | Yes |\n| Fxx Set Speed/BPM | Yes | Yes | Yes | Yes | Yes |\n| Gxx Global Volume | No | No | Yes | Yes | Yes |\n| Hxy Global Vol Slide | No | No | Yes | Yes | No |\n| Lxx Envelope Position | No | No | Yes | Yes | No |\n| Pxy Panning Slide | No | No | Yes | Yes | Yes |\n| Rxy Multi Retrig | No | No | Yes | Yes | Yes |\n| Txy Tremor | No | Yes | Yes | Yes | Yes |\n| X1x/X2x Extra Fine Porta | No | No | Yes | Yes | Yes |\n| Volume column effects | No | No | Yes | Yes | Yes |\n| Chip-specific (10xx+) | No | No | No | No | Yes |\n\n\\* FUR uses chip-specific commands instead of sample offset.\n\n## Common Effect Patterns\n\nThese are practical recipes you can use in your own songs. Each example assumes a speed of 6 ticks per row (the default).\n\n### Arpeggio Chord (0xy)\n\nRapidly cycle between three notes to simulate a chord on a single channel. Useful when you are out of channels.\n\n```\nRow 00: C-4 01 -- 037    ← C major chord: C, D# (minor 3rd = 3), G (5th = 7)\nRow 01: --- -- -- 037    ← Continue arpeggio\nRow 02: --- -- -- 037    ← Continue arpeggio\nRow 03: --- -- -- 037    ← Continue arpeggio\nRow 04: C-4 01 -- 047    ← C major chord (alternative: 4 = major 3rd, 7 = 5th)\n```\n\nCommon arpeggio intervals:\n\n| Code | Chord | Intervals |\n|------|-------|-----------|\n| `037` | Minor | Root, minor 3rd, perfect 5th |\n| `047` | Major | Root, major 3rd, perfect 5th |\n| `03A` | Minor 7th | Root, minor 3rd, minor 7th |\n| `048` | Augmented | Root, major 3rd, augmented 5th |\n| `036` | Diminished | Root, minor 3rd, diminished 5th |\n\n### Portamento Slide Between Notes (3xx)\n\nGlide smoothly from one note to another. The 3xx effect slides from the current pitch to the target note at speed xx.\n\n```\nRow 00: C-4 01 -- ---    ← Start on C-4\nRow 04: E-4 01 -- 310    ← Glide to E-4 at speed 10\nRow 08: G-4 01 -- 310    ← Glide to G-4 at speed 10\nRow 0C: C-5 01 -- 308    ← Glide to C-5 at speed 08 (faster)\n```\n\nKey points:\n- The note in the note column is the **target**, not a retriggered note.\n- Speed 00 uses the last portamento speed.\n- Faster speeds (higher xx) reach the target sooner. Slower speeds create longer, more expressive slides.\n\n### Vibrato + Volume Slide Combo (4xy + 6xy)\n\nStart a vibrato, then add a fade while the vibrato continues.\n\n```\nRow 00: C-4 01 40 486    ← Start note with vibrato (speed 8, depth 6)\nRow 04: --- -- -- 486    ← Continue vibrato\nRow 08: --- -- -- 602    ← Continue vibrato + volume slide down by 2/tick\nRow 0C: --- -- -- 602    ← Continue combo\nRow 10: --- -- -- 602    ← Note fading out with vibrato still active\n```\n\nThe 6xy command is a shortcut: it continues the last vibrato settings while simultaneously applying a volume slide. Without it, you would need the vibrato on every row AND a separate channel for the volume slide.\n\n### Tremolo Gating Effect (7xy)\n\nCreate a rhythmic volume stutter (trance gate effect).\n\n```\nRow 00: C-4 01 40 7F3    ← Tremolo: max speed (F), depth 3\nRow 01: --- -- -- 7F3    ← Continue\nRow 02: --- -- -- 7F3    ← Continue\nRow 03: --- -- -- 7F3    ← Continue\n```\n\nFor a harder gate effect, use Tremor (Txy) instead:\n\n```\nRow 00: C-4 01 40 T31    ← On for 3 ticks, off for 1 tick\n```\n\n### Pattern Loop for Drum Fills (E6x)\n\nRepeat a section of a pattern without writing it out multiple times. Ideal for snare rolls and fills.\n\n```\nRow 30: --- -- -- E60    ← Mark loop start\nRow 31: D-4 03 30 ---    ← Snare hit\nRow 32: D-4 03 20 ---    ← Snare (quieter)\nRow 33: D-4 03 10 ---    ← Snare (quieter still)\nRow 34: --- -- -- E63    ← Loop back to row 30, three times\nRow 35: D-4 03 40 ---    ← Final snare hit (after loop completes)\n```\n\nThis plays rows 30-34 four times total (once originally, then three loops), then continues to row 35. Four repetitions of a 4-row snare fill = 16 rows of drum roll in just 5 rows of pattern data.\n\n### Retrigger for Snare Rolls (E9x)\n\nRetrigger a note multiple times within a single row. At speed 6, `E93` retriggers every 3 ticks, giving two hits per row.\n\n```\nRow 00: D-4 03 40 E92    ← Retrigger every 2 ticks (3 hits per row at speed 6)\nRow 01: D-4 03 40 E92    ← Continue roll\nRow 02: D-4 03 40 E93    ← Slow down: every 3 ticks (2 hits per row)\nRow 03: D-4 03 40 ---    ← Single hit (roll ends)\n```\n\nFor retrigger with volume decay (machine-gun snare), use the Rxy command:\n\n```\nRow 00: D-4 03 40 R31    ← Retrigger every 3 ticks, volume -1 each time\nRow 01: D-4 03 40 R21    ← Retrigger every 2 ticks, volume -1 each time\nRow 02: D-4 03 40 R11    ← Every tick, volume -1 (fast roll, fading)\nRow 03: D-4 03 40 ---    ← Final hit\n```\n\n### Filter Sweep (IT only -- Zxx)\n\nSweep the resonant filter from closed to open over 16 rows:\n\n```\nRow 00: C-4 01 40 Z00    ← Filter fully closed\nRow 01: --- -- -- Z08    ← Opening...\nRow 02: --- -- -- Z10\nRow 03: --- -- -- Z18\nRow 04: --- -- -- Z20\nRow 05: --- -- -- Z28\nRow 06: --- -- -- Z30\nRow 07: --- -- -- Z38\nRow 08: --- -- -- Z40\nRow 09: --- -- -- Z48\nRow 0A: --- -- -- Z50\nRow 0B: --- -- -- Z58\nRow 0C: --- -- -- Z60\nRow 0D: --- -- -- Z68\nRow 0E: --- -- -- Z70\nRow 0F: --- -- -- Z7F    ← Filter fully open\n```\n\nThis can be entered faster using interpolation (see [Pattern Editor](./05-pattern-editor.md#interpolation)): set Z00 at row 00 and Z7F at row 0F, select the range, and press Ctrl+I.\n\nTo add resonance to the sweep, set it once at the start:\n\n```\nRow 00: C-4 01 40 ZE0    ← Set resonance to E0 (high)\nRow 00: --- -- -- Z00    ← Start sweep (use a second effect column, or put on a different channel)\n```\n\n### Speed Manipulation for Swing (Fxx)\n\nCreate a swing feel by alternating between two speed values. At speed 6, all rows have equal timing. Alternating between F05 and F07 gives a long-short shuffle:\n\n```\nRow 00: C-4 01 -- F05    ← This row lasts 5 ticks (shorter)\nRow 01: --- -- -- F07    ← This row lasts 7 ticks (longer)\nRow 02: C-4 01 -- F05    ← Short\nRow 03: --- -- -- F07    ← Long\n```\n\nThis creates an approximate 5:7 swing ratio, similar to a triplet shuffle. For tighter swing, try F04/F08 (1:2 ratio). For subtle swing, try F05/F06 (close to straight).\n\n### Note Delay for Humanization (EDx)\n\nShift notes slightly off the grid to create a more human, less robotic feel.\n\n```\nRow 00: C-4 01 40 ---    ← On the beat\nRow 04: E-4 01 40 ED1    ← Delayed by 1 tick (slightly late)\nRow 08: G-4 01 40 ---    ← On the beat\nRow 0C: C-5 01 40 ED2    ← Delayed by 2 ticks (noticeably late, lazy feel)\n```\n\nThis is especially effective on hi-hats and snares. A drummer never hits every note at exactly the same time -- note delay simulates that imperfection.\n\n## Quick Reference Card\n\nFor quick lookup during composition, here is every standard effect on a single page:\n\n```\n0xy  Arpeggio             5xy  Tone Porta+Vol Slide   Axy  Volume Slide\n1xx  Portamento Up        6xy  Vibrato+Vol Slide      Bxx  Position Jump\n2xx  Portamento Down      7xy  Tremolo                Cxx  Set Volume\n3xx  Tone Portamento      8xx  Set Panning            Dxx  Pattern Break\n4xy  Vibrato              9xx  Sample Offset           Fxx  Set Speed/BPM\n\nE1x  Fine Porta Up       E7x  Tremolo Waveform       ECx  Note Cut\nE2x  Fine Porta Down     E8x  Set Panning (Coarse)   EDx  Note Delay\nE3x  Glissando Control   E9x  Retrigger Note         EEx  Pattern Delay\nE4x  Vibrato Waveform    EAx  Fine Volume Up\nE5x  Set Finetune        EBx  Fine Volume Down\nE6x  Pattern Loop\n\nGxx  Set Global Volume   Pxy  Panning Slide          X1x  Extra Fine Porta Up\nHxy  Global Vol Slide    Rxy  Multi Retrig           X2x  Extra Fine Porta Down\nLxx  Set Envelope Pos    Txy  Tremor\n```\n',
+    "images": []
+  },
+  {
+    "id": "09-synth-categories-overview",
+    "number": 16,
+    "title": "Synth Categories Overview",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Synth Categories Overview
+
+DEViLBOX ships with over 180 synthesizers spanning 18 categories -- from classic analog modeling to obscure arcade hardware chips. This chapter explains how the synth browser works, how to switch between synth types, and how the preset system keeps your sounds organized.
+
+## The 18 Synth Categories
+
+Every synthesizer in DEViLBOX belongs to at least one category. Some versatile synths appear in multiple categories where they fit naturally.
+
+| Category | Count | What's Inside |
+|----------|-------|---------------|
+| **Bass** | 3 | TB-303, MonoSynth, WobbleBass |
+| **Lead** | 11 | Basic Synth, DuoSynth, FMSynth, SuperSaw, PWM, Formant, V2, and more |
+| **Drums** | 9 | TR-808, TR-909, MembraneSynth, MetalSynth, DrumKit, Synare, TR-707 |
+| **Speech & Voice** | 11 | DECtalk, SAM, Pink Trombone, V2Speech, plus 7 MAME speech chips |
+| **Pads** | 6 | Wavetable, GranularSynth, PolySynth, StringMachine, HarmonicSynth, V2 |
+| **Dub & FX** | 4 | DubSiren, SpaceLaser, V2, Synare |
+| **Keys** | 4 | Drawbar Organ, NEC uPD931, Wurlitzer, DX7 |
+| **Samples** | 4 | Sampler, Player, ChiptuneModule, MusicLine |
+| **Plugins (WAM)** | 5 | OB-Xd, Synth-101, TinySynth, Faust Flute, generic WAM loader |
+| **Furnace Chips** | 70+ | FM, console, computer, and arcade chips from the Furnace engine |
+| **Buzzmachines** | 13 | Jeskola Buzz generators -- 3o3, M3/M4, 4FM2F, Dynamite6, FSM drums |
+| **MAME Hardware Synths** | 23 | VFX, CMI, CZ-101, PS1 SPU, Roland SA, CEM3394, SCSP, and more |
+| **JUCE Synths** | 15 | Dexed, MDA suite, Raffo, setBfree, TAL-NoiseMaker, ZynAddSubFX |
+| **VST Bridge** | 11 | Vital, Surge XT, Odin2, Helm, OB-Xf, Monique, Amsynth |
+| **Demoscene** | 7 | V2, WaveSabre (Falcon/Slaughter/Adultery), Oidos, Tunefish |
+| **Retromulator** | 3 | Wurlitzer 200A, OPL3 (Nuked), DX7 (VDX7 cycle-accurate) |
+| **Scripted** | 1 | SuperCollider live-coded synthesis |
+| **Computer Chips** | 35+ | Furnace chips plus Amiga synths (UADE, HivelyTracker, SoundMon, etc.) |
+
+Additionally, Furnace chips are broken into focused sub-categories: **FM Chips**, **Console Chips**, **Computer Chips**, **Arcade PCM**, and **Other Chips**.
+
+## Browsing the Synth Browser
+
+The synth browser is the central place to discover, audition, and select instruments. You can open it from any instrument slot in the tracker.
+
+### Opening the Browser
+
+1. Click on an instrument name in the instrument list
+2. Or press the instrument selector button in the instrument editor
+3. The synth browser opens as a panel showing all categories
+
+### Navigating Categories
+
+The left sidebar of the browser lists all 18 categories. Click a category to filter the synth list. Each category shows:
+
+- **Category name** -- the broad grouping
+- **Description** -- a one-line summary of what you will find
+- **Synth count** -- how many synths are in that category
+
+### Synth Cards
+
+Each synth appears as a card showing:
+
+- **Name** -- the full synth name (e.g., "Sega Genesis (YM2612)")
+- **Short name** -- abbreviated for tight spaces (e.g., "Genesis")
+- **Description** -- what it sounds like and where it came from
+- **Best for** -- suggested use cases as tags (e.g., "Genesis bass", "FM leads")
+- **Color indicator** -- a visual cue for quick scanning
+
+### Searching
+
+Type in the search field at the top of the browser to filter by name, description, or "best for" tags. Searching "acid" will surface the TB-303, Buzz 3o3, and other acid-oriented synths. Searching "arcade" brings up Furnace arcade chips and MAME hardware.
+
+## Switching Synth Types
+
+Changing the synth type on an instrument replaces its sound engine entirely. The process is straightforward but worth understanding.
+
+### How to Switch
+
+1. Open the instrument editor for the channel you want to change
+2. Click the synth type selector (shows the current synth name)
+3. Browse or search for the new synth
+4. Click to select it
+
+### What Happens When You Switch
+
+- The old synth engine is disposed (freeing WASM memory, AudioWorklet nodes, etc.)
+- A new engine is instantiated for the selected type
+- Default parameters for the new synth are applied
+- Any channel-specific settings (volume, pan) are preserved
+- The instrument name updates to reflect the new synth
+
+### Engine Types Under the Hood
+
+DEViLBOX uses several different audio engine backends depending on the synth:
+
+| Backend | Used By | How It Works |
+|---------|---------|--------------|
+| **Tone.js** | Basic Synth, FMSynth, MonoSynth, etc. | Web Audio API nodes with JS scheduling |
+| **AudioWorklet** | TB-303, Furnace, MAME chips, Buzz | Custom DSP running in a separate thread |
+| **WASM + Worklet** | JUCE synths, VST Bridge, Demoscene | C/C++ compiled to WebAssembly in a worklet |
+| **UADE** | Amiga tracker synths | 68000 CPU emulation running original Amiga code |
+| **SunVox WASM** | SunVox Modular | Full SunVox engine compiled to WASM |
+| **scsynth WASM** | SuperCollider | SuperCollider server compiled to WASM |
+
+You do not need to think about these backends -- DEViLBOX handles all the plumbing. But it explains why some synths load faster than others: a simple Tone.js synth is instant, while a WASM synth may take a moment to compile and initialize.
+
+## The Preset System
+
+DEViLBOX has a layered preset system: factory presets ship with the app, and user presets let you save your own sounds.
+
+### Factory Presets
+
+Every synth type has factory presets curated to show off its strengths. These are read-only and always available. Factory preset collections include:
+
+- **TB-303 presets** -- classic acid patterns and tones
+- **TR-808 / TR-909 presets** -- drum kit configurations
+- **Furnace chip presets** -- per-chip starter patches
+- **MAME chip presets** -- hardware-specific sounds
+- **Buzzmachine presets** -- classic Buzz patches
+- **Zynthian presets** -- curated patches for JUCE synths
+- **DX7 presets** -- 1,120 patches from 35 original sysex banks
+- **OB-Xd presets** -- Oberheim-style analog patches
+- **V2 presets** -- demoscene synth patches
+- **Dub Siren / Space Laser presets** -- FX sounds
+- **Speech presets** -- DECtalk, SAM, and Pink Trombone voices
+- **Sample pack presets** -- pre-configured sample instruments
+- **Harmonic presets** -- additive synthesis starting points
+
+### Loading a Factory Preset
+
+1. Open the instrument editor
+2. Click the preset selector (dropdown or browser button)
+3. Factory presets are listed by category
+4. Click a preset name to load it immediately
+5. All parameters update to the preset values
+
+### Saving User Presets
+
+After tweaking a sound to your liking:
+
+1. Click the "Save Preset" button in the instrument editor
+2. Enter a name for your preset
+3. Choose a category (or create a new one)
+4. The preset is stored in browser localStorage
+
+### User Preset Storage
+
+User presets persist across sessions via localStorage. They include:
+
+- All synth parameters
+- The synth type
+- The preset name and category
+- Any custom metadata you add
+
+### Preset Portability
+
+User presets are stored as JSON objects. You can:
+
+- Export presets as JSON files for backup
+- Import presets from JSON files
+- Share presets with other DEViLBOX users
+
+### Schema Versioning
+
+When DEViLBOX updates change the default instrument configuration structure, a schema version bump occurs. Old presets are gracefully handled:
+
+- Factory presets always reflect the current version
+- User presets from older schema versions may be migrated automatically
+- If migration is not possible, the preset loads with current defaults for any missing fields
+
+## Quick Reference: Finding the Right Synth
+
+Not sure where to start? Here is a quick guide by musical goal:
+
+| I Want... | Try These |
+|-----------|-----------|
+| Classic acid bass | TB-303, Buzz 3o3, CalfMono |
+| Dubstep wobble | WobbleBass, Monique, V2 |
+| 80s analog pads | StringMachine, OB-Xf, JX-10 |
+| FM electric piano | DX7, Dexed, MDA DX10, FurnaceOPZ |
+| Chiptune / 8-bit | FurnaceNES, FurnaceGB, FurnaceAY, ChipSynth |
+| Arcade game sounds | FurnaceSEGAPCM, FurnaceQSOUND, SCSP |
+| Robotic speech | DECtalk, SAM, Votrax, TMS5220 |
+| Organ / keys | setBfree, Aeolus, Tonewheel, OpenWurli |
+| Modern wavetable | Vital, Wavetable, Sorcer |
+| Sound design | Modular Synth, SunVox Modular, Odin2 |
+| Demoscene / 64k | V2, WaveSabre Slaughter, Oidos, Tunefish |
+| Live coding | SuperCollider |
+
+The following chapters cover each category in depth, with parameter tables, use cases, and practical tips for getting the most out of every synth.
+`,
+    "images": []
+  },
+  {
+    "id": "10-tonejs-synths",
+    "number": 17,
+    "title": "Tone.js Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Tone.js Synths
+
+The Tone.js synths are DEViLBOX's built-in software synthesizers, implemented using the Tone.js Web Audio framework. They load instantly, require no WASM compilation, and provide a solid foundation for everything from simple melodies to complex sound design. These are excellent starting points for new users and remain useful in production for their low CPU overhead and predictable behavior.
+
+## Basic Synth
+
+The simplest polyphonic synthesizer. One oscillator with an amplitude envelope -- nothing more, nothing less.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Waveform | sine, square, saw, triangle | Oscillator waveform |
+| Attack | 0--2000 ms | Envelope attack time |
+| Decay | 0--2000 ms | Envelope decay time |
+| Sustain | 0--100% | Envelope sustain level |
+| Release | 0--5000 ms | Envelope release time |
+
+**Best for:** Simple pads, chord stabs, placeholder sounds while composing.
+
+**Tip:** Use a triangle wave with long attack and release for gentle ambient pads. Switch to sawtooth for a more aggressive lead tone.
+
+## FM Synth
+
+A 2-operator FM synthesizer where a modulator oscillator frequency-modulates a carrier. Capable of a wide range of timbres from glassy bells to gritty bass.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Carrier waveform | sine, square, saw, triangle | Main oscillator shape |
+| Modulator waveform | sine, square, saw, triangle | Modulating oscillator shape |
+| Harmonicity | 0.1--20 | Ratio of modulator to carrier frequency |
+| Modulation index | 0--100 | Depth of frequency modulation |
+| Envelope (ADSR) | standard ranges | Amplitude envelope |
+| Mod envelope (ADSR) | standard ranges | Modulation depth envelope |
+
+**Best for:** Electric pianos, bells, metallic leads, percussive plucks.
+
+**Tip:** A harmonicity of 1 produces harmonic tones (bells). Non-integer values like 1.5 or 3.7 create inharmonic, metallic textures. Automate the modulation index for evolving pads.
+
+## Duo Synth
+
+Two independent voices with their own oscillator, filter, and envelope, mixed together. An internal LFO cross-fades between the two voices for animation.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Voice 0/1 waveform | sine, square, saw, triangle | Per-voice oscillator |
+| Voice 0/1 filter freq | 20--20000 Hz | Per-voice lowpass filter |
+| Voice 0/1 filter Q | 0--100 | Per-voice resonance |
+| Voice 0/1 envelope | ADSR | Per-voice amplitude envelope |
+| Vibrato rate | 0.1--20 Hz | Cross-fade LFO speed |
+| Vibrato depth | 0--1 | Cross-fade LFO amount |
+| Harmonicity | 0.1--4 | Frequency ratio between voices |
+
+**Best for:** Rich, animated leads. Fat detuned basses. Sounds that evolve between two timbral states.
+
+**Tip:** Set one voice bright (sawtooth, high filter) and the other dark (triangle, low filter), then use moderate vibrato depth for a sound that breathes.
+
+## Mono Synth
+
+A single-voice (monophonic) synth with oscillator, filter, filter envelope, and amplitude envelope. Only one note plays at a time -- perfect for bass and lead lines.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Waveform | sine, square, saw, triangle | Oscillator shape |
+| Filter type | lowpass, highpass, bandpass, notch | Filter mode |
+| Filter frequency | 20--20000 Hz | Cutoff frequency |
+| Filter Q | 0--100 | Resonance |
+| Filter envelope | ADSR + octaves | Cutoff modulation envelope |
+| Amplitude envelope | ADSR | Volume envelope |
+
+**Best for:** Bass lines, lead melodies, portamento lines.
+
+**Tip:** A sawtooth waveform with a lowpass filter and fast filter envelope decay creates a classic analog bass tone. Increase resonance for more "pluck."
+
+## Poly Synth
+
+True polyphonic synthesis with configurable voice count and voice management. Essentially multiple Synth instances managed together.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Max voices | 1--32 | Maximum simultaneous notes |
+| Waveform | sine, square, saw, triangle | Oscillator for all voices |
+| Envelope | ADSR | Shared amplitude envelope |
+| Detune | -100 to +100 cents | Voice detuning |
+
+**Best for:** Chords, pads, polyphonic parts where you need multiple simultaneous notes.
+
+## Pluck Synth
+
+Karplus-Strong physical modeling synthesis. Simulates a plucked string by feeding filtered noise through a delay line.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Attack time | 0--2000 ms | Time to peak amplitude |
+| Release | 0--5000 ms | Decay time (string damping) |
+| Resonance | 0--1 | Brightness / feedback amount |
+| Dampening | 20--20000 Hz | Lowpass filter on the delay loop |
+
+**Best for:** Guitar-like plucks, harp, pizzicato strings, kalimba sounds.
+
+**Tip:** Lower dampening values produce warmer, more muted plucks (like nylon guitar). Higher values sound brighter and more metallic.
+
+## Metal Synth
+
+A FM synthesis voice optimized for metallic percussion. Uses a harmonic series of frequency-modulated oscillators to create bell and cymbal tones.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Frequency | 20--2000 Hz | Base frequency |
+| Harmonicity | 0.1--20 | Harmonic spread |
+| Modulation index | 0--100 | FM depth |
+| Resonance | 0--5000 | Ring/body resonance |
+| Octaves | 0--8 | Frequency envelope range |
+| Envelope | ADSR | Amplitude envelope |
+
+**Best for:** Hi-hats, cymbals, bells, metallic percussion, industrial sounds.
+
+## Membrane Synth
+
+Models a struck membrane (drum head) using a pitch envelope and amplitude envelope. The pitch sweeps down from an initial frequency.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Pitch attack | 0--500 ms | Pitch envelope attack |
+| Pitch decay | 0--2000 ms | Pitch sweep-down time |
+| Pitch sustain | 0--1 | Sustained pitch level |
+| Octaves | 0--8 | Range of pitch sweep |
+| Amplitude envelope | ADSR | Volume shape |
+
+**Best for:** Kick drums, toms, bongo, conga, timpani, boomy bass hits.
+
+**Tip:** Short pitch decay with high octaves creates a punchy kick. Longer decay with fewer octaves gives a tom or tribal drum feel.
+
+## Noise Synth
+
+Pure noise through an amplitude envelope. Three noise types for different textures.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Noise type | white, pink, brown | Noise color |
+| Envelope | ADSR | Amplitude shaping |
+
+**Best for:** Hi-hats, snare noise layer, ocean/wind ambience, risers, sweeps.
+
+## SuperSaw
+
+Multiple detuned sawtooth oscillators stacked together for the massive "supersaw" sound iconic in trance and EDM.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Voice count | 2--8 | Number of stacked saws |
+| Detune | 0--100 cents | Spread between voices |
+| Envelope | ADSR | Amplitude envelope |
+| Filter frequency | 20--20000 Hz | Lowpass cutoff |
+| Filter Q | 0--100 | Resonance |
+
+**Best for:** Trance leads, EDM drops, massive chords, anthemic hooks.
+
+**Tip:** 5--7 voices with 20--40 cents detune is the sweet spot for classic trance supersaw. Add a slow filter sweep for movement.
+
+## Granular Synth
+
+A granular synthesis engine that slices audio buffers into tiny "grains" and reassembles them with control over density, size, pitch, and position.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Grain size | 10--500 ms | Duration of each grain |
+| Grain density | 1--100 | Grains per second |
+| Playback rate | 0.1--4 | Pitch/speed of grains |
+| Position | 0--1 | Scrub position in the buffer |
+| Randomness | 0--1 | Random variation in position/pitch |
+
+**Best for:** Evolving textures, ambient pads, time-stretching, glitch effects, soundscapes.
+
+## Wavetable
+
+A wavetable synthesizer that morphs between stored waveforms. Includes a unison spread for richness.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Wavetable position | 0--1 | Morph between wave shapes |
+| Unison voices | 1--8 | Number of detuned copies |
+| Unison detune | 0--100 cents | Spread of unison voices |
+| Filter | lowpass, ADSR | Standard filter section |
+| Envelope | ADSR | Amplitude envelope |
+
+**Best for:** Evolving pads, modern bass, complex timbres that shift over time.
+
+## Formant Synth
+
+Vowel synthesis using parallel bandpass filters tuned to vocal formant frequencies. Morphs between vowel shapes (A, E, I, O, U).
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Vowel | A, E, I, O, U | Target vowel shape |
+| Oscillator type | saw, square, pulse | Source oscillator |
+| Formant shift | -12 to +12 | Shift formant frequencies up/down |
+| Envelope | ADSR | Amplitude envelope |
+
+**Best for:** Vocal pads, talk-box effects, choir textures, robotic voices.
+
+**Tip:** Automate the vowel parameter in the tracker to make the synth "talk." Sequence A-E-I-O-U across rows for rhythmic vocal effects.
+
+## Harmonic Synth
+
+An additive synthesis engine with a 32-harmonic editor. Each harmonic has independent amplitude control, letting you sculpt timbres from the ground up.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Harmonic levels | 0--1 each | Amplitude per harmonic (32 bands) |
+| Envelope | ADSR | Global amplitude envelope |
+| Filter | optional lowpass | Post-additive filtering |
+
+**Best for:** Organ tones, bells, custom timbres, spectral sound design, educational use.
+
+**Tip:** For a classic organ, set harmonics 1, 2, 3, 4, and 8 to high values and leave others low. For bells, emphasize non-adjacent harmonics.
+
+## PWM Synth
+
+Pulse Width Modulation synthesis. A pulse wave whose width is continuously modulated by an LFO, producing the warm, animated character of classic analog synthesizers.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Pulse width | 0--1 | Base pulse width (0.5 = square) |
+| PWM rate | 0.1--20 Hz | LFO modulation speed |
+| PWM depth | 0--1 | LFO modulation amount |
+| Filter | lowpass with ADSR | Filter section |
+| Envelope | ADSR | Amplitude envelope |
+
+**Best for:** Warm analog pads, classic synth leads, string-like sounds, vintage tones.
+
+## String Machine
+
+Emulates vintage string ensemble synthesizers like the Solina String Ensemble. Multiple oscillators with chorus create lush, shimmering pad textures.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Chorus rate | 0.1--10 Hz | Ensemble chorus speed |
+| Chorus depth | 0--1 | Chorus modulation amount |
+| Brightness | 0--1 | Tone brightness |
+| Envelope | ADSR | Amplitude envelope |
+
+**Best for:** Lush pads, disco strings, ambient washes, retro soundtrack textures.
+
+## Wobble Bass
+
+Purpose-built for dubstep, drum and bass, and neurofunk. Features a tempo-synced LFO, Reese-style detuning, and FM growl for that characteristic wobble.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| LFO rate | synced to tempo | Wobble speed (1/4, 1/8, etc.) |
+| LFO depth | 0--1 | Filter modulation amount |
+| Reese detune | 0--100 cents | Detuning for Reese bass effect |
+| FM amount | 0--1 | Growl/distortion via FM |
+| Filter cutoff | 20--20000 Hz | Base filter frequency |
+| Filter Q | 0--100 | Resonance |
+
+**Best for:** Dubstep, DnB, jungle, neurofunk, riddim bass.
+
+**Tip:** Use 1/4 note LFO for classic dubstep wobble. Switch to 1/8 triplet for DnB. Increase FM amount for aggressive neurofunk growl.
+
+## Dub Siren
+
+A classic sound system siren generator. An oscillator modulated by an LFO, fed through a delay line for authentic dub/reggae siren effects.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Waveform | sine, square, saw | Siren oscillator |
+| LFO rate | 0.1--20 Hz | Siren modulation speed |
+| LFO depth | 0--1 | Pitch modulation amount |
+| Delay time | 0--2000 ms | Echo delay time |
+| Delay feedback | 0--0.95 | Echo repeats |
+
+**Best for:** Dub FX, reggae, sound system culture, alerts, transitions.
+
+## Space Laser
+
+An FM-based cosmic effect generator for laser shots, anime-style zaps, and sci-fi sound design.
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| Start frequency | 100--10000 Hz | Initial pitch |
+| End frequency | 20--5000 Hz | Final pitch (sweep target) |
+| Sweep time | 10--2000 ms | Duration of pitch sweep |
+| FM depth | 0--1 | Modulation intensity |
+| Waveform | sine, square, saw | Oscillator type |
+
+**Best for:** Laser shots, sci-fi effects, anime zaps, dub FX, transitions.
+
+## General Tips for Tone.js Synths
+
+1. **Layer for richness:** Combine a Mono Synth bass with a SuperSaw chord layer on different channels for a full mix.
+2. **Use the LFO system:** Most Tone.js synths support the global LFO configuration for filter, pitch, and volume modulation.
+3. **Envelope shapes matter:** Short attack + medium decay + low sustain = percussive. Long attack + high sustain = pad. Experiment with the four ADSR stages.
+4. **Filter is your friend:** Even simple waveforms become interesting with resonant filter sweeps. Automate the filter cutoff using tracker effects.
+5. **CPU efficient:** These synths have the lowest CPU overhead of anything in DEViLBOX. Use them freely without worrying about performance.
+`,
+    "images": []
+  },
+  {
+    "id": "11-tb303-acid",
+    "number": 18,
+    "title": "TB-303 & Acid",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": '# TB-303 & Acid\n\nThe Roland TB-303 Bass Line is arguably the most influential bass synthesizer ever made. Originally a commercial failure designed as an accompaniment for solo guitarists, it was adopted by Chicago house and Detroit techno producers in the mid-1980s who discovered its unique squelchy, screaming sound. DEViLBOX features a cycle-accurate emulation based on the Open303 DSP engine, compiled to WASM, including the legendary Devil Fish modifications.\n\n## The DB303 Engine\n\nDEViLBOX\'s 303 is powered by the DB303 engine -- a WASM binary compiled from the JC303/Open303 codebase. The signal chain is:\n\n```\nTypeScript (0-1 normalized) --> AudioWorklet --> WASM setParameter --> Open303 DSP\n```\n\nAll parameters are sent as 0-1 normalized values from the TypeScript layer. The WASM binary handles all internal conversion to real-world values (Hz, ms, percentages). You never need to think about DSP-level values.\n\n### The Devil Fish Modifications\n\nThe original TB-303 has a fixed internal architecture. The "Devil Fish" modification (by Robin Whittle) adds additional controls that were not accessible on the stock hardware:\n\n- **Independent normal/accent decay** -- the stock 303 has a single decay knob; Devil Fish separates normal and accented note decay times\n- **Extended envelope modulation range** -- deeper filter sweeps than the original\n- **Soft attack control** -- adjustable attack time (the stock 303 has near-zero attack)\n- **Filter input drive** -- saturates the signal entering the filter\n- **Diode character** -- controls the nonlinear behavior of the filter\'s diode ladder\n- **Passband compensation** -- adjusts filter passband response\n- **Resonance tracking** -- controls how resonance tracks the filter cutoff\n\nDEViLBOX exposes all Devil Fish parameters alongside the standard 303 controls.\n\n## Parameters\n\n### Core Parameters\n\n| Parameter | Range (0-1) | Real DSP Value | Description |\n|-----------|-------------|----------------|-------------|\n| cutoff | 0.0--1.0 | 314--2394 Hz (exp) | Filter cutoff frequency |\n| resonance | 0.0--1.0 | 0--100% (linear) | Filter resonance / feedback |\n| envMod | 0.0--1.0 | 0--100% (linear) | Envelope modulation depth to filter |\n| decay | 0.0--1.0 | 200--2000 ms (exp) | Filter envelope decay time |\n| accent | 0.0--1.0 | 0--100% (linear) | Accent intensity |\n| waveform | 0.0--1.0 | saw to square (linear) | Oscillator waveform morph |\n| tuning | 0.0--1.0 | 400--480 Hz (linear) | Master tuning (A4 reference) |\n| volume | 0.0--1.0 | -60 to 0 dB (linear) | Output volume |\n\n### Devil Fish Parameters\n\n| Parameter | Range (0-1) | Real DSP Value | Description |\n|-----------|-------------|----------------|-------------|\n| normalDecay | 0.0--1.0 | 30--3000 ms (linear) | Decay for non-accented notes |\n| accentDecay | 0.0--1.0 | 30--3000 ms (linear) | Decay for accented notes |\n| softAttack | 0.0--1.0 | 0.3--3000 ms (exp) | Attack time for soft notes |\n| accentSoftAttack | 0.0--1.0 | value | Attack for accented notes |\n| filterInputDrive | 0.0--1.0 | value | Pre-filter saturation |\n| diodeCharacter | 0.0--1.0 | value | Diode ladder nonlinearity |\n| duffingAmount | 0.0--1.0 | value | Duffing oscillator chaos amount |\n| passbandCompensation | 0.0--1.0 | inverted to WASM | Filter passband correction |\n| resTracking | 0.0--1.0 | inverted to WASM | Resonance frequency tracking |\n\n### Filter Select\n\nThe filter type is critical to getting the right 303 sound:\n\n| Value | Filter | Description |\n|-------|--------|-------------|\n| **0** | **DiodeLadder** | The authentic 303 filter. This is what produces the characteristic screaming sound. Always use this unless you specifically want an alternative. |\n| 5 | MissThang-20 | Korg-style alternative filter with a different character. |\n\nValues 1--4 are undefined and will produce broken sound. DEViLBOX defaults to filterSelect = 0.\n\n### Inverted Parameters\n\nTwo parameters are inverted before being sent to the WASM engine (matching the reference application\'s behavior):\n\n- **passbandCompensation**: App value 0.09 is sent to WASM as 0.91 (1 - 0.09)\n- **resTracking**: App value 0.257 is sent to WASM as 0.743 (1 - 0.257)\n\nThis inversion is handled automatically -- you interact with the knob values directly.\n\n## Accent and Slide Mechanics\n\nThe 303\'s accent and slide behaviors are what give it that unmistakable character. Understanding them is key to writing convincing acid patterns.\n\n### Accent\n\nAccent is triggered by MIDI velocity:\n\n- **Velocity >= 100** triggers an accented note\n- **Velocity < 100** triggers a normal note\n\nWhen a note is accented, four things happen simultaneously:\n\n1. **Filter decay snaps to minimum** -- the accent overrides the normal decay setting with accentDecay (very fast), creating a sharp filter spike\n2. **The amp envelope gains a multi-segment shape** -- instant attack, fast initial decay, then slow decay, making accented notes louder with a characteristic punch\n3. **A second, slower envelope is added to the filter** -- summed with the fast decay envelope, creating a complex multi-segment shape (fast attack, very fast decay, slower re-attack, slower decay)\n4. **The second filter envelope accumulates** -- if re-triggered before fully decaying, it starts from its current level and climbs higher\n\nThis fourth point is critical: **consecutive accented notes build up progressively**, with the filter peak rising higher each note. This is the "escalating scream" that is unique to the 303 and cannot be replicated with standard ADSR envelopes.\n\n### Slide\n\nSlide (portamento/glide) smoothly transitions the pitch from one note to the next instead of jumping instantly. In the tracker:\n\n- Set the slide flag on a note to enable portamento to the next note\n- The slide time parameter controls how fast the pitch glides\n- Slides work best with legato playing (overlapping notes)\n\n### The Combination\n\nThe magic of acid bass comes from the interplay of accent, slide, and the filter envelope. A pattern with:\n\n- Some notes accented, some not (dynamic variation)\n- Strategic slides between notes (smooth pitch movement)\n- The filter envelope responding differently to each note type\n\n...creates that living, breathing, unpredictable quality that made the 303 a legend.\n\n## What Makes the 303 "Scream"\n\nThe screaming sound on high-pitched accented notes comes from several factors working together:\n\n1. **The DiodeLadder filter (filterSelect = 0)** -- the nonlinear diode ladder circuit resonates in a way that no standard digital filter can replicate\n2. **High resonance (0.85+)** -- pushes the filter toward self-oscillation\n3. **Filter envelope sweep** -- envMod sets the range, decay sets the speed of the filter frequency sweep\n4. **Consecutive accents** -- the accumulating second envelope drives the filter higher and higher with each successive accented note\n5. **Filter input drive** -- saturates the signal entering the filter, adding harmonics\n6. **Diode character** -- the nonlinear behavior of the diode ladder adds further harmonic content\n\nThe 303\'s filter is actually a 4-pole diode ladder (not 2-pole as sometimes stated). Coupling capacitors around the filter core create approximately 6 additional poles that act as a hidden high-pass filter at around 8 Hz. When you increase resonance on the lowpass filter, you also increase resonance on this hidden highpass, creating a resonant bass boost that extends from 8 Hz through 50--100+ Hz. This is why the 303 gets "fatter" at high resonance instead of losing bass like a typical resonant lowpass filter.\n\n## Writing Acid Patterns\n\n### Basic Acid Pattern Structure\n\nA classic acid pattern typically uses these elements:\n\n1. **Root notes** -- the foundation, usually around C2--C3\n2. **Octave jumps** -- sudden leaps up an octave for excitement\n3. **Accented notes** -- placed strategically for filter emphasis\n4. **Slides** -- connecting melodic intervals smoothly\n5. **Rests** -- creating rhythmic space\n\n### Pattern Writing Tips\n\n- **Start simple:** Write a basic 16-step bass pattern first, then add accents and slides\n- **Accent sparingly at first:** 3--5 accented notes per 16 steps is a good starting ratio\n- **Slide into accented notes:** Place a slide on the note before an accented note for maximum impact\n- **Use octave jumps before accents:** Jump up an octave, then accent -- the high pitch plus accent creates the scream\n- **Leave gaps:** Rests let the filter envelope fully decay, making the next note\'s attack more dramatic\n- **Vary velocity:** Even non-accented notes benefit from velocity variation\n\n### Classic Acid Moves\n\n| Technique | How | Effect |\n|-----------|-----|--------|\n| The Scream | High note + accent + high resonance | Classic acid squeal |\n| The Build | 3--4 consecutive accented notes | Escalating filter intensity |\n| The Drop | Accent sequence then rest | Tension and release |\n| The Slide | Slide between a low and high note | Smooth pitch sweep through the filter |\n| The Shuffle | Accent every other note with slides | Rhythmic squelch |\n\n## Factory Presets\n\nDEViLBOX includes curated TB-303 presets that demonstrate different character ranges:\n\n- **Classic Acid** -- traditional acid bass settings with moderate resonance\n- **Screamer** -- high resonance and envMod for maximum squelch\n- **Deep Acid** -- low cutoff, moderate resonance for deeper, rounder tones\n- **Devil Fish** -- Devil Fish modifications active for extended tonal range\n- **Rubber Bass** -- soft attack, low resonance for rubbery bass tones\n- **Acid Rain** -- high accent with fast decay for percussive filter hits\n\nEach preset uses the Devil Fish defaults (normalDecay, accentDecay, filterInputDrive, etc.) tuned for a specific character. Use them as starting points and adjust to taste.\n\n## Troubleshooting\n\n### No Sound\n\n- Check that the WASM module has loaded (the 303 requires public/db303/DB303.wasm)\n- Verify the AudioContext is running (click in the browser window to unlock it)\n- Check volume is not at 0\n\n### Filter Sounds Wrong / No Resonance\n\n- Verify filterSelect is 0 (DiodeLadder). Any other value except 5 produces undefined behavior\n- Check that resonance is above 0\n- If the filter sounds dead, it may have been set to an invalid filterSelect value in a saved preset\n\n### Accents Not Working\n\n- Accent is triggered by velocity >= 100. Check your note velocities in the tracker\n- The accent parameter (0-1) controls the global accent amount -- if this is at 0, accented notes will sound identical to normal notes\n',
+    "images": []
+  },
+  {
+    "id": "12-furnace-chip-synths",
+    "number": 19,
+    "title": "Furnace Chip Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Furnace Chip Synths
+
+Furnace is an open-source chiptune tracker that emulates over 70 retro sound chips with cycle-accurate precision. DEViLBOX integrates the entire Furnace engine as a WASM module, giving you access to every chip from the Sega Genesis to the Atari 2600, the Game Boy to the Commodore 64, and dozens more. Each chip runs as an authentic emulation of the original hardware, complete with its limitations and character.
+
+## How Furnace Chips Work in DEViLBOX
+
+Each Furnace chip runs as a WASM AudioWorklet. When you select a Furnace chip synth, DEViLBOX:
+
+1. Instantiates the chip emulation in the worklet thread
+2. Configures channel count and parameters for that specific chip
+3. Routes MIDI/tracker note data to the chip's dispatch interface
+4. The chip renders audio at its native rate, resampled to your output sample rate
+
+Furnace chips support instrument macros -- automated parameter changes per tick that create the characteristic chiptune timbres. Loading a .fui (Furnace instrument) file applies all macros automatically.
+
+## FM Synthesis Chips
+
+The Yamaha FM chip family powers some of the most iconic game music ever composed. FM synthesis creates complex harmonic timbres by modulating one oscillator's frequency with another.
+
+### YM2612 -- Sega Genesis / Mega Drive (FurnaceOPN)
+
+The defining sound of 16-bit Sega. Six channels of 4-operator FM synthesis.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 6 (one can be split for special effects) |
+| Operators per channel | 4 |
+| Algorithms | 8 |
+| LFO | Global, 8 rates |
+| DAC channel | Channel 6 can play 8-bit PCM |
+
+**Best for:** Slap bass, punchy leads, brass stabs, that quintessential "Genesis sound."
+
+**Tip:** Algorithm 7 (all operators in parallel) creates additive organ-like tones. Algorithm 4 is the classic "paired modulator" layout for electric piano sounds.
+
+### YM2151 -- Arcade / X68000 (FurnaceOPM)
+
+Found in countless arcade machines and the Sharp X68000 computer. Brighter and more aggressive than the YM2612.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 8 |
+| Operators | 4 per channel |
+| Algorithms | 8 |
+| Noise mode | Channel 8 can generate noise |
+| Detune | DT1 (fine) + DT2 (coarse, unique to OPM) |
+
+**Best for:** Arcade game music, bright FM leads, aggressive brass, racing game sounds.
+
+### YM2203 -- PC-88/PC-98 (FurnaceOPN2203)
+
+A simpler version of the OPN family, with 3 FM channels plus 3 SSG (PSG) channels.
+
+| Feature | Value |
+|---------|-------|
+| FM channels | 3 |
+| SSG channels | 3 (AY-compatible) |
+| Operators | 4 per FM channel |
+
+**Best for:** Japanese PC game music, hybrid FM+PSG compositions.
+
+### YM2608 -- PC-98 / Arcade (FurnaceOPNA)
+
+The extended OPN with FM, SSG, rhythm sounds, and ADPCM.
+
+| Feature | Value |
+|---------|-------|
+| FM channels | 6 |
+| SSG channels | 3 |
+| ADPCM channel | 1 |
+| Rhythm channels | 6 preset drum sounds |
+
+**Best for:** PC-98 game music, complex arrangements mixing FM and samples.
+
+### YM2610 / YM2610B -- Neo Geo (FurnaceOPNB / FurnaceOPNBB)
+
+The heart of the Neo Geo arcade and home system. FM synthesis plus ADPCM sample playback.
+
+| Feature | Value |
+|---------|-------|
+| FM channels | 4 (2610) or 6 (2610B) |
+| SSG channels | 3 |
+| ADPCM-A channels | 6 |
+| ADPCM-B channel | 1 |
+
+**Best for:** Neo Geo game music, fighting game sounds, SNK arcade.
+
+### YMF262 -- OPL3 / AdLib / Sound Blaster (FurnaceOPL)
+
+The sound of DOS gaming. 2-operator FM (can pair for 4-op) with 18 channels.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 18 (2-op) or 9 (4-op) |
+| Operators | 2 or 4 per channel |
+| Waveforms | 8 selectable per operator |
+| Stereo | Left/right/both per channel |
+
+**Best for:** DOS game music, AdLib compositions, retro PC sounds, MIDI playback.
+
+### YM2413 -- OPLL / MSX / SMS FM (FurnaceOPLL)
+
+A budget FM chip with 15 preset instruments and 1 custom instrument slot. Found in MSX computers and the Sega Master System FM unit.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 9 melody or 6 melody + 5 rhythm |
+| Preset instruments | 15 |
+| Custom instruments | 1 |
+
+**Best for:** MSX music, SMS FM, budget FM with charming constraints.
+
+### YM2414 -- OPZ / TX81Z (FurnaceOPZ)
+
+Advanced FM with 8 waveforms per operator (not just sine). The TX81Z is famous for the "Lately Bass" preset.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 8 |
+| Operators | 4 with 8 waveform types each |
+| Algorithms | 8 |
+
+**Best for:** "Lately Bass," DX-style bells, complex FM timbres, 80s/90s pop bass.
+
+### Other FM Chips
+
+- **Y8950 (FurnaceY8950)** -- MSX-Audio, OPL with ADPCM
+- **ESFM (FurnaceESFM)** -- Enhanced OPL3 with per-operator detune
+- **VRC7 (FurnaceVRC7)** -- Konami NES expansion, OPLL-based (Lagrange Point)
+- **OPL4 (FurnaceOPL4)** -- FM + wavetable hybrid
+
+## Console Chips
+
+### 2A03 -- Nintendo NES (FurnaceNES)
+
+The iconic 8-bit Nintendo sound. Two pulse waves with variable duty cycle, one triangle wave, one noise channel, and one DPCM sample channel.
+
+| Channel | Type | Notes |
+|---------|------|-------|
+| Pulse 1 | Pulse (4 duty cycles) | 12.5%, 25%, 50%, 75% |
+| Pulse 2 | Pulse (4 duty cycles) | Same as Pulse 1 |
+| Triangle | Triangle (fixed) | No volume control, only on/off |
+| Noise | Noise (2 modes) | 16-step or 93-step loop |
+| DPCM | 1-bit delta PCM | Sample playback |
+
+**Best for:** NES chiptune, 8-bit melodies, retro game music.
+
+### Game Boy (FurnaceGB)
+
+Two pulse channels, one custom wave channel (32-sample 4-bit waveform), and one noise channel.
+
+| Channel | Type | Notes |
+|---------|------|-------|
+| Pulse 1 | Pulse + sweep | Hardware pitch sweep on ch1 only |
+| Pulse 2 | Pulse | 4 duty cycles |
+| Wave | 4-bit wavetable | 32-sample custom waveform |
+| Noise | Noise | 7-bit or 15-bit LFSR |
+
+**Best for:** Game Boy music, LSDJ-style chiptune, lo-fi bleeps.
+
+### SPC700 -- Super Nintendo (FurnaceSNES)
+
+The SNES uses BRR-compressed samples with 8 channels, hardware ADSR envelopes, echo, and noise.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 8 |
+| Sample format | BRR (Bit Rate Reduction) |
+| ADSR | Hardware per-channel |
+| Echo | Up to 8 taps with FIR filter |
+| Noise | 1 channel, configurable rate |
+
+**Best for:** SNES game music, sample-based chiptune, nostalgic 16-bit sounds.
+
+### HuC6280 -- PC Engine / TurboGrafx-16 (FurnacePCE)
+
+Six channels of 5-bit wavetable synthesis with 32-sample waveforms. Channels 5--6 can also do noise and LFO modulation.
+
+**Best for:** PC Engine music, wavetable chiptune, Japanese gaming sounds.
+
+### Other Console Chips
+
+- **SN76489 (FurnacePSG)** -- Sega Master System, Game Gear, BBC Micro -- 3 tone + 1 noise
+- **Virtual Boy (FurnaceVB)** -- Nintendo Virtual Boy -- 6 channels of 6-bit wavetable
+- **Atari Lynx (FurnaceLynx)** -- 4 channels with variable waveform
+- **WonderSwan (FurnaceSWAN)** -- 4 wavetable channels
+- **Nintendo DS (FurnaceNDS)** -- 16 channels, PCM + PSG
+- **GBA DMA (FurnaceGBA)** -- 2 DMA sound channels
+- **Pokemon Mini (FurnacePOKEMINI)** -- 1 channel, minimal
+
+### NES Expansion Audio
+
+- **VRC6 (FurnaceVRC6)** -- Konami expansion: 2 pulse + 1 sawtooth (Castlevania 3 JP)
+- **VRC7 (FurnaceVRC7)** -- Konami expansion: 6 channels of OPLL FM (Lagrange Point)
+- **Namco 163 (FurnaceN163)** -- Namco expansion: up to 8 wavetable channels
+- **FDS (FurnaceFDS)** -- Famicom Disk System: 1 channel, 64-sample 6-bit wavetable
+- **MMC5 (FurnaceMMC5)** -- 2 extra pulse channels + PCM
+
+## Computer Chips
+
+### SID 6581 / 8580 -- Commodore 64 (FurnaceC64 / FurnaceSID6581 / FurnaceSID8580)
+
+The legendary MOS Technology SID chip. Three voices with multiple waveforms, ring modulation, hard sync, and a multimode filter.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 3 |
+| Waveforms | Triangle, saw, pulse (with PWM), noise |
+| Filter | Multimode (LP/HP/BP), 1 global |
+| Ring mod | Voice-to-voice ring modulation |
+| Hard sync | Voice-to-voice oscillator sync |
+
+The 6581 revision has a warmer, grittier character with more pronounced filter resonance. The 8580 is cleaner and more accurate. Both are available as separate synth types.
+
+**Best for:** SID music, demoscene, filter sweeps, arpeggios, classic C64 tunes.
+
+### AY-3-8910 -- ZX Spectrum / MSX / Amstrad (FurnaceAY)
+
+Three square wave channels plus a noise generator and hardware envelope. The definitive sound of 8-bit European computing.
+
+| Feature | Value |
+|---------|-------|
+| Channels | 3 tone + 1 noise (shared) |
+| Volume | 4-bit (16 levels) |
+| Hardware envelope | 1 shared, 8 shapes |
+
+**Best for:** ZX Spectrum music, MSX, Amstrad CPC, AY envelope tricks.
+
+- **AY8930 (FurnaceAY8930)** -- Enhanced AY with extra features
+
+### Other Computer Chips
+
+- **VIC-20 (FurnaceVIC)** -- 3 tone + 1 noise, very limited but charming
+- **Commodore PET (FurnacePET)** -- Single-voice shift register
+- **Philips SAA1099 (FurnaceSAA)** -- 6 channels, used in SAM Coupe
+- **Commodore Plus/4 TED (FurnaceTED)** -- 2 channels
+- **Enterprise DAVE (FurnaceDAVE)** -- 3 channels with special features
+- **Commander X16 VERA (FurnaceVERA)** -- Modern retro: 16 channels of PCM + PSG
+- **Konami SCC (FurnaceSCC)** -- MSX wavetable, 5 channels with 32-sample waves
+- **Atari TIA (FurnaceTIA)** -- Atari 2600, 2 voices with 16 "distortion" modes
+- **Atari POKEY (FurnacePOKEY)** -- Atari 800/5200, 4 channels with poly counters
+- **ZX Spectrum Beeper (FurnaceZXBEEPER)** -- 1-bit output, multiple engine modes
+- **Amiga Paula (FurnaceAMIGA)** -- 4-channel 8-bit PCM
+- **PC Speaker (FurnacePCSPKR)** -- The humble internal beeper
+
+## Arcade PCM Chips
+
+These chips are found in arcade cabinets and use PCM (sample-based) audio with hardware mixing and effects.
+
+| Chip | Channels | Used In |
+|------|----------|---------|
+| **SegaPCM (FurnaceSEGAPCM)** | 16 | Sega System 16/18 (OutRun, After Burner) |
+| **QSound (FurnaceQSOUND)** | 16 | Capcom CPS1/CPS2 (Street Fighter, Marvel vs Capcom) |
+| **ES5506 (FurnaceES5506)** | 32 | Ensoniq OTTO (used in VFX, arcade boards) |
+| **RF5C68 (FurnaceRF5C68)** | 8 | Sega CD |
+| **C140 (FurnaceC140)** | 24 | Namco System 2 |
+| **K007232 (FurnaceK007232)** | 2 | Konami arcade |
+| **K053260 (FurnaceK053260)** | 4 | Konami arcade (TMNT, Simpsons) |
+| **GA20 (FurnaceGA20)** | 4 | Irem arcade (R-Type Leo) |
+| **OKI MSM6295 (FurnaceOKI)** | 4 | Various arcade (4-bit ADPCM) |
+| **YMZ280B (FurnaceYMZ280B)** | 8 | Capcom/Konami arcade |
+| **X1-010 (FurnaceX1_010)** | 16 | Seta/Allumer arcade |
+| **Bubble System (FurnaceBUBBLE)** | 2 | Konami Bubble System |
+| **MultiPCM (FurnaceMULTIPCM)** | 28 | Sega System 32 |
+| **MSM6258 (FurnaceMSM6258)** | 1 | Sharp X68000 ADPCM |
+| **MSM5232 (FurnaceMSM5232)** | 8 | OKI organ/synth chip (arcade) |
+| **Namco WSG (FurnaceNAMCO)** | 3-8 | Pac-Man, Galaga, Rally-X |
+
+## Other / Obscure Chips
+
+| Chip | Description |
+|------|-------------|
+| **SM8521 (FurnaceSM8521)** | Sharp SM8521 -- Game.com handheld |
+| **T6W28 (FurnaceT6W28)** | NEC PC-6001 variant of SN76489 |
+| **Supervision (FurnaceSUPERVISION)** | Watara Supervision handheld |
+| **uPD1771 (FurnaceUPD1771)** | NEC speech/sound chip |
+| **Pong (FurnacePONG)** | AY-3-8500 -- the original Pong chip |
+| **PV-1000 (FurnacePV1000)** | Casio PV-1000 game console |
+| **Sound Unit (FurnaceSU)** | Furnace's own custom chip |
+| **Power Noise (FurnacePOWERNOISE)** | Noise-focused custom chip |
+| **SCV Tone (FurnaceSCVTONE)** | Epoch Super Cassette Vision |
+| **PCM DAC (FurnacePCMDAC)** | Generic PCM output |
+
+## Working with Furnace Instruments
+
+### Loading .fui Files
+
+Furnace instruments (.fui files) contain macro definitions that automate parameters tick-by-tick. To load one:
+
+1. Select a Furnace chip synth on a channel
+2. Use the instrument editor's load function
+3. Browse to a .fui file
+4. The instrument loads with all macros intact
+
+### Instrument Macros
+
+Macros are the heart of chiptune sound design. They automate parameters over time, typically looping, to create complex timbres from simple hardware:
+
+- **Volume macro** -- per-tick volume changes (tremolo, fade-in/out)
+- **Arpeggio macro** -- rapid note changes for chord-like effects
+- **Duty/waveform macro** -- cycle through waveforms or duty cycles
+- **Pitch macro** -- vibrato, portamento, pitch slides
+- **Panning macro** -- stereo movement
+
+### Tips for Chip Synth Sound Design
+
+1. **Embrace constraints:** Each chip has specific limitations. Working within them is part of the art.
+2. **Use arpeggios for chords:** On chips with few channels, rapid arpeggiation creates the illusion of chords.
+3. **Duty cycle animation:** On pulse-wave chips (NES, GB), cycling through duty cycles creates evolving timbres.
+4. **Hardware envelopes:** The AY's hardware envelope is a powerful tool -- learn the 8 shapes.
+5. **Volume column tricks:** Rapid volume changes in the tracker create pseudo-ADSR on chips without envelopes.
+`,
+    "images": []
+  },
+  {
+    "id": "13-mame-hardware-synths",
+    "number": 20,
+    "title": "MAME Hardware Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# MAME Hardware Synths
+
+MAME (Multiple Arcade Machine Emulator) is the gold standard for hardware-accurate chip emulation. DEViLBOX extracts individual sound chips from the MAME codebase and compiles them as standalone WASM synthesizers. These are not approximations -- they are the actual MAME emulation cores running cycle-accurately in your browser, producing audio identical to the original hardware.
+
+## Synthesizer Chips
+
+### Ensoniq VFX (ES5506 OTTO)
+
+The Ensoniq VFX (1989) was a groundbreaking "transwave" synthesizer that could morph between waveform snapshots. Its heart is the ES5506 OTTO chip -- a 32-voice wavetable engine capable of complex, evolving sounds.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 32 |
+| Resolution | 16-bit |
+| Synthesis | Transwave (wavetable morphing) |
+| Filters | Per-voice digital filters |
+
+**Best for:** Evolving digital pads, 90s textures, cinematic layers, complex wavetable morphing.
+
+**History:** The Ensoniq VFX series (VFX, VFX-SD, SD-1) was used extensively in 90s pop, film scoring, and electronic music. Its "transwave" approach -- scanning through stored waveform data -- creates evolving timbres that were difficult to achieve with other synths of the era.
+
+### Ensoniq ESQ-1 (ES5503 DOC)
+
+The ES5503 DOC (Digital Oscillator Chip) is a 32-oscillator wavetable chip that powered the Ensoniq ESQ-1, Mirage sampler, and Apple IIGS computer. Each oscillator reads 8-bit wavetable data from shared RAM.
+
+| Feature | Value |
+|---------|-------|
+| Oscillators | 32 |
+| Resolution | 8-bit |
+| Waveforms | Loaded from RAM (user-defined) |
+| Output | Individual or paired stereo |
+
+**Best for:** Lo-fi digital sounds, gritty 80s bass, 8-bit wavetable, IIGS music.
+
+### Fairlight CMI IIx
+
+The Fairlight CMI (Computer Musical Instrument) was the first practical sampling synthesizer (1979). The CMI IIx (1982) expanded it to 8 voices. It defined the sound of 80s pop -- Peter Gabriel, Kate Bush, Art of Noise, and countless film scores used it.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 8 |
+| Resolution | 8-bit, 16 kHz (expandable) |
+| Sampling | RAM-based with light editing |
+| Interface | Light pen + CRT (original) |
+
+**Best for:** Orchestral hits, 80s pop, vintage sampling, cinematic textures. The famous "orchestra hit" heard in countless 80s records originated on the Fairlight.
+
+### Casio CZ-101 (Phase Distortion)
+
+The Casio CZ-101 (1984) introduced Phase Distortion (PD) synthesis as a DCE (Digital Cosine Emulation) alternative to Yamaha's FM. Instead of modulating frequency, PD distorts the phase of a cosine wave, creating complex harmonics with a more intuitive control scheme.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 8 (4 in dual-oscillator mode) |
+| Oscillators | 2 per voice (DCO) |
+| Waveforms | 8 PD waveforms |
+| Envelopes | 8-stage per DCO, DCW, DCA |
+| Filter | DCW (Digital Controlled Waveshape) |
+
+**Best for:** Metallic leads, digital bass, synth brass, 80s digital sounds. The CZ series has a distinctive "digital but warm" character.
+
+The underlying NEC uPD933 chip is also available separately as a raw chip emulation (MAMEUPD933) for those who want direct register-level access.
+
+### PlayStation 1 SPU (CXD2922BQ)
+
+The PS1 Sound Processing Unit is a 24-voice ADPCM sampler with hardware ADSR envelopes, pitch modulation, and a reverb processor. It defined the sound of an entire generation of games.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 24 |
+| Format | 4-bit ADPCM |
+| ADSR | Hardware per-voice |
+| Reverb | Built-in SPU reverb |
+| CD audio | 2 channels |
+
+**Best for:** PS1-era game music, ADPCM sampling, 90s gaming nostalgia.
+
+### Roland SA (MKS-20 / RD-1000)
+
+Roland's Structured Adaptive Synthesis engine, used in the MKS-20 Digital Piano and RD-1000 stage piano. A sophisticated sample-playback architecture designed primarily for realistic piano and electric piano sounds.
+
+| Feature | Value |
+|---------|-------|
+| Synthesis | Structured Adaptive (SA) |
+| Focus | Piano and keyboard sounds |
+| Architecture | Multi-sample with crossfade |
+
+**Best for:** Electric piano, acoustic piano sounds, 80s keyboard tones.
+
+### Yamaha SWP30 (AWM2)
+
+The Yamaha SWP30 is a 64-voice ROMpler engine using Yamaha's AWM2 (Advanced Wave Memory 2) synthesis. Found in high-end Yamaha workstations and sound modules, it features sophisticated filtering, effects, and high-fidelity sample playback.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 64 |
+| Synthesis | AWM2 (sample-based) |
+| Filters | Multi-mode digital |
+| Effects | Built-in multi-effects |
+
+**Best for:** Realistic instruments, orchestral, 90s workstation sounds, XG compatibility.
+
+Related chips: **SWP00** (32-voice, MU50, Chamberlin filter) and **SWP20** (32-voice, MU50/MU80 family).
+
+### CEM3394 (Curtis Electromusic)
+
+The CEM3394 is a complete analog synthesizer voice on a single chip, designed by Doug Curtis. It combines a VCO, VCF, and VCA with on-chip modulation. Used in the Sequential Prophet VS, Oberheim Matrix-6, Ensoniq ESQ-1, and Sequential Six-Trak.
+
+| Feature | Value |
+|---------|-------|
+| Architecture | VCO + VCF + VCA (single chip) |
+| Filter | 4-pole resonant lowpass |
+| Oscillators | 2 (saw + pulse with PWM) |
+| Modulation | On-chip LFO inputs |
+
+**Best for:** Analog bass, warm pads, classic leads, vintage 80s analog. The CEM3394 has a distinctive smooth, warm character that defined the sound of mid-80s polyphonic analog synths.
+
+### Sega Saturn SCSP (YMF292-F)
+
+The Saturn Custom Sound Processor combines 32-voice PCM playback with FM synthesis capabilities. Used in the Sega Saturn console and Sega Model 2/3 arcade boards.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 32 |
+| Playback | 16-bit PCM |
+| FM | Optional per-voice FM |
+| Effects | Built-in DSP |
+| ADSR | Hardware envelopes |
+
+**Best for:** Saturn game music, arcade sounds, 90s Sega titles, complex multi-voice arrangements.
+
+## PCM / Sampler Chips
+
+### Casio FZ-1 PCM (MAMEFZPCM)
+
+The Casio FZ-1 (1987) was a professional 16-bit sampler with 8 voices and 2MB of wave RAM. It competed with the Akai S900 and E-mu Emulator II.
+
+| Feature | Value |
+|---------|-------|
+| Voices | 8 |
+| Resolution | 16-bit |
+| RAM | Up to 2 MB |
+
+**Best for:** Vintage digital sampling, PCM playback, 80s sampler character.
+
+### Yamaha MultiPCM (YMW258-F)
+
+A 28-channel PCM chip used in Sega Model 1 and Model 2 arcade boards. Supports ROM-based sample playback with per-voice volume envelopes.
+
+**Best for:** Sega arcade sounds, Model 1/2 game music, multi-channel PCM.
+
+### ZOOM ZSG-2 (MAMEZSG2)
+
+A 48-channel ROM sampler from ZOOM, used in guitar effects processors and some arcade boards. Features proprietary ADPCM encoding and IIR filtering.
+
+**Best for:** Multi-channel ROM sampling, effects processing sounds.
+
+### Samsung KS0164 (MAMEKS0164)
+
+A 32-voice wavetable General MIDI synthesizer chip. Found in budget MIDI modules and some karaoke systems.
+
+**Best for:** GM synthesis, basic wavetable, MIDI compatibility.
+
+### Roland GP (TC6116)
+
+Roland's TC6116 PCM chip used in the SC-88, JV series, and other Roland modules. 28 channels with dual volume envelopes and filtering.
+
+**Best for:** Roland GS sounds, SC-88 character, General MIDI.
+
+## Keyboard / Organ Chips
+
+### NEC uPD931 (MAMEUPD931)
+
+A dual-waveform keyboard synthesizer chip from NEC, found in Casio home keyboards. Generates two simultaneous waveforms for organ and keyboard tones.
+
+**Best for:** Casio keyboard sounds, retro organ tones, dual-waveform synthesis.
+
+### NEC uPD933 (MAMEUPD933)
+
+The raw phase distortion chip at the core of the Casio CZ series. Direct register-level access to the CZ-101's synthesis engine without the CZ-101's preset/patch management.
+
+**Best for:** Phase distortion at the hardware level, CZ sound design from scratch.
+
+### Yamaha OPX (YMF271)
+
+A 12-voice FM+PCM hybrid chip found in Jaleco and other arcade hardware. Combines traditional Yamaha FM synthesis with PCM sample playback.
+
+**Best for:** Arcade FM, complex FM+PCM layering.
+
+### Yamaha OPQ (YM3806)
+
+A 4-operator FM chip from Yamaha keyboards. Standard Yamaha FM voice with the refined sound of the keyboard product line.
+
+**Best for:** FM synthesis, Yamaha keyboard sounds, vintage FM.
+
+## Arcade / Retro Chips
+
+### TI SN76477 (MAMESN76477)
+
+The TI SN76477 "Complex Sound Generator" is an analog sound chip from the late 1970s. It combines a VCO, noise generator, envelope generator, and mixer on a single chip. Used in Space Invaders and many other early arcade games.
+
+| Feature | Value |
+|---------|-------|
+| VCO | Voltage-controlled oscillator |
+| SLF | Super Low Frequency oscillator |
+| Noise | On-chip noise generator |
+| Envelope | One-shot or VCO-controlled |
+| Mixer | Selectable combinations |
+
+**Best for:** Sci-fi sound effects, laser sounds, Space Invaders, retro arcade FX.
+
+### Bally Astrocade (MAMEAstrocade)
+
+The Bally Astrocade's custom sound chip has 3 tone voices plus noise, with vibrato modulation capability. A charming early home console sound.
+
+**Best for:** Retro arcade, lo-fi tones, vintage gaming sounds.
+
+### Apple Sound Chip (MAMEASC)
+
+The Apple ASC provides 4-voice wavetable synthesis. Found in the Apple IIGS and early Macintosh computers.
+
+**Best for:** Retro Mac sounds, Apple IIGS music, 80s wavetable.
+
+### Virtual Analog (MAMEVASynth)
+
+A virtual analog modeling synthesizer built on MAME's sound infrastructure. Multi-waveform oscillators with subtractive filtering.
+
+**Best for:** Analog modeling when you want MAME-quality emulation, bass, leads, pads.
+
+### Other Arcade Chips
+
+| Chip | Description |
+|------|-------------|
+| **Namco C352** | 32-voice PCM for System 22/23 (Ridge Racer, Tekken) -- needs ROM |
+| **ICS WaveFront 2115** | 32-voice wavetable with interpolation -- needs ROM |
+| **Konami K054539** | 8-channel PCM for Konami arcade -- needs ROM |
+| **Ricoh RF5C400** | 32-voice PCM with filtering -- needs ROM |
+| **SNK Wave** | Custom wavetable for Neo Geo era |
+| **TI TMS36XX** | Electronic organ chip, 13 chromatic notes |
+
+### ROM Requirements
+
+Some MAME chips require ROM data to produce sound (marked "needs ROM" above). These chips are sample-based and the samples are stored in the original arcade/console ROM. Without the ROM, the chip has no waveform data to play back. DEViLBOX will indicate when a ROM is needed and where to place it.
+
+## Tips for Using MAME Synths
+
+1. **They are authentic:** These are not "inspired by" emulations -- they ARE the MAME emulation cores. The sound is identical to the hardware.
+2. **CPU considerations:** MAME emulations are cycle-accurate, which means they can use more CPU than simplified models. Monitor CPU usage when stacking many MAME synths.
+3. **Parameter ranges vary:** Each chip has its own native parameter set. The controls in the editor map to the chip's actual registers.
+4. **Combine with effects:** MAME chips output raw chip audio. Add DEViLBOX's effect chain (reverb, delay, chorus) to place them in a modern mix context.
+`,
+    "images": []
+  },
+  {
+    "id": "14-juce-wasm-synths",
+    "number": 21,
+    "title": "JUCE/WASM Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# JUCE/WASM Synths
+
+DEViLBOX includes a collection of professional-quality synthesizers compiled from C/C++ source code to WebAssembly using Emscripten. Many of these originated as Linux audio plugins (LV2/LADSPA) or JUCE-based projects. They run in AudioWorklet threads with full parameter automation and deliver sound quality on par with desktop plugin versions.
+
+## MDA ePiano (Rhodes)
+
+A Fender Rhodes electric piano emulation using sample-based synthesis with 32-voice polyphony.
+
+| Parameter | Description |
+|-----------|-------------|
+| Envelope Decay | Note decay time |
+| Envelope Release | Release time after key-up |
+| Hardness | Tine brightness / strike hardness |
+| Treble Boost | High-frequency emphasis |
+| Modulation | Tremolo/autopan depth |
+| Mod Rate | Tremolo/autopan speed |
+| Overdrive | Amp saturation amount |
+| Stereo Width | Output stereo spread |
+| Velocity Sensitivity | How velocity affects volume/brightness |
+
+**Best for:** Electric piano, Rhodes sounds, soul, jazz, lo-fi keys.
+
+**Tip:** Increase Overdrive slightly for a warm, driven Rhodes suitable for neo-soul. Use Modulation with a slow Mod Rate for classic tremolo Rhodes.
+
+## MDA JX-10 (Poly Synth)
+
+Inspired by the Roland JX-8P. A dual-oscillator 8-voice polyphonic synth with a state-variable filter and glide. Ships with 64 factory presets.
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc1/Osc2 Tuning | Oscillator pitch |
+| Osc Mix | Balance between oscillators |
+| Filter Cutoff | State-variable filter frequency |
+| Filter Resonance | Filter emphasis |
+| Env Attack/Decay/Sustain/Release | Amplitude envelope |
+| Filter Envelope | Filter modulation depth |
+| LFO Rate | LFO speed |
+| LFO to Pitch/Filter | LFO modulation targets |
+| Glide | Portamento time |
+
+**Best for:** Pads, analog-style leads, poly strings, sweeping filter sounds.
+
+## MDA DX10 (FM Synth)
+
+A 2-operator FM synth with 8-voice polyphony and 32 factory presets. Simple but effective for classic FM timbres.
+
+| Parameter | Description |
+|-----------|-------------|
+| Carrier Coarse/Fine | Carrier frequency ratio |
+| Modulator Coarse/Fine | Modulator frequency ratio |
+| Mod Envelope Depth | FM modulation amount |
+| Mod Envelope Decay | FM envelope decay |
+| Carrier Envelope Decay | Amplitude decay |
+| Velocity Sensitivity | Response to note velocity |
+
+**Best for:** Electric piano, FM bass, bells, metallic percussion, quick FM patches.
+
+## RaffoSynth (Minimoog Clone)
+
+A faithful Minimoog Model D emulation. Monophonic with legato, featuring 4 oscillators, an IIR filter, glide, and dual ADSR envelopes.
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc 1-4 Waveform | Saw, triangle, square, pulse per osc |
+| Osc 1-4 Tune | Octave and fine tuning per osc |
+| Osc Mix | Level balance of all 4 oscillators |
+| Filter Cutoff | 4-pole lowpass cutoff |
+| Filter Resonance | Feedback / self-oscillation |
+| Filter Envelope Amount | Envelope to cutoff depth |
+| Amp ADSR | Amplitude envelope |
+| Filter ADSR | Filter envelope |
+| Glide | Portamento speed |
+
+**Best for:** Minimoog bass, classic analog leads, monophonic solos. The Minimoog bass tone is one of the most recognizable sounds in music.
+
+**Tip:** Use all 4 oscillators slightly detuned for massive unison bass. Set oscillators to different octaves for a full-range lead sound.
+
+## Calf Monosynth
+
+A 2-oscillator monophonic subtractive synth with 16 waveforms per oscillator, dual ADSR envelopes with adjustable fade, multi-mode filter, 2 LFOs, and unison.
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc 1/2 Waveform | 16 waveform types |
+| Osc 1/2 Detune | Fine pitch adjustment |
+| Filter Type | LP/HP/BP/Notch |
+| Filter Cutoff | Cutoff frequency |
+| Filter Resonance | Emphasis |
+| LFO 1/2 Rate | LFO speed |
+| LFO 1/2 Target | Filter, pitch, or amplitude |
+| Unison Voices | Number of stacked copies |
+| Unison Detune | Spread between copies |
+
+**Best for:** Bass, acid leads, mono synth lines, subtractive sound design.
+
+## setBfree (Hammond B3 + Leslie)
+
+A tonewheel organ emulator modeling the Hammond B3 with a Leslie rotary speaker. Three manuals (Upper, Lower, Pedal) each with 9 drawbars, plus percussion, vibrato/chorus scanner, overdrive, and reverb.
+
+| Parameter | Description |
+|-----------|-------------|
+| Drawbars 1-9 | Harmonic levels (16', 5-1/3', 8', 4', 2-2/3', 2', 1-3/5', 1-1/3', 1') |
+| Percussion | On/off, soft/normal, fast/slow, 2nd/3rd harmonic |
+| Vibrato/Chorus | V1/V2/V3/C1/C2/C3 scanner modes |
+| Leslie Speed | Stop/slow/fast |
+| Overdrive | Preamp gain amount |
+| Reverb | Room amount |
+
+**Best for:** Gospel, jazz organ, rock organ, blues, Hammond grooves, reggae skank.
+
+**Tip:** The Leslie speaker simulation is critical to the Hammond sound. Switch between slow and fast Leslie speeds during performance for dramatic effect. Use C3 (chorus 3) vibrato setting for the classic Jimmy Smith sound.
+
+## SynthV1 (4-Osc Poly)
+
+A dual-page 4-oscillator polyphonic subtractive synthesizer. Each page has its own DCO, DCF, DCA, and LFO, plus a shared effects section with chorus, flanger, phaser, delay, and reverb.
+
+| Parameter | Description |
+|-----------|-------------|
+| DCO 1/2 (per page) | Waveform, tuning, width |
+| DCF (per page) | Filter type, cutoff, resonance, envelope |
+| DCA (per page) | Volume envelope, panning |
+| LFO (per page) | Rate, shape, targets |
+| Effects | Chorus, flanger, phaser, delay, reverb |
+
+**Best for:** Lush pads, poly strings, layered sounds, vintage subtractive. The dual-page architecture lets you layer two independent synth voices.
+
+## TAL-NoiseMaker
+
+A virtual analog synth with 3 oscillators, multi-mode filter, 2 LFOs, built-in chorus/reverb/delay, bitcrusher, and unison mode.
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc 1/2/3 | Waveform, tune, sub oscillator |
+| Filter | LP/HP/BP/Notch, cutoff, resonance |
+| LFO 1/2 | Rate, shape, targets |
+| Chorus | Rate, depth |
+| Reverb | Size, damping, mix |
+| Delay | Time, feedback, mix |
+| Bitcrusher | Bits, sample rate reduction |
+| Unison | Voices, detune |
+
+**Best for:** VA bass, leads, acid, lo-fi, unison stacks. The bitcrusher is excellent for adding grit.
+
+## Aeolus (Pipe Organ)
+
+A physical-modeled pipe organ emulator. Multiple divisions (Great, Swell, Pedal) with independently selectable stops, tremulant, inter-manual couplers, and reverb.
+
+| Parameter | Description |
+|-----------|-------------|
+| Division stops | Select individual organ stops per division |
+| Tremulant | Vibrato per division |
+| Couplers | Link divisions together |
+| Reverb | Room simulation |
+
+**Best for:** Church organ, classical music, baroque, pipe organ sounds. Aeolus models the physical behavior of air columns in pipes.
+
+## ZynAddSubFX
+
+A "mega-synth" with three independent synthesis engines that can be layered:
+
+- **ADDsynth** -- Additive synthesis with up to 128 harmonics per voice, each with independent amplitude/frequency envelopes
+- **SUBsynth** -- Subtractive synthesis with noise filtered through a harmonic band filter
+- **PADsynth** -- Wavetable synthesis using Paul Nasca's PADsynth algorithm for ultra-smooth pad sounds
+
+| Parameter | Description |
+|-----------|-------------|
+| Engine selection | ADD, SUB, PAD, or any combination |
+| Per-engine controls | Waveform, harmonics, filter, envelope |
+| Effects (8 slots) | Reverb, chorus, distortion, EQ, etc. |
+| System effects | Master reverb and chorus |
+
+**Best for:** Everything. Pads (PADsynth is extraordinary), bass, leads, experimental, additive sound design, soundscapes.
+
+**Tip:** PADsynth is the star feature -- it creates incredibly smooth, evolving pad sounds by building wavetables from harmonic profiles with controlled bandwidth spreading.
+
+## FluidSynth (SF2)
+
+A SoundFont (SF2) sample player. Load any SF2 soundfont file for instant access to its instrument patches. Supports General MIDI, GS, and custom soundfonts.
+
+| Parameter | Description |
+|-----------|-------------|
+| Soundfont | SF2 file to load |
+| Bank/Program | MIDI bank and program number |
+| Reverb | Built-in reverb level |
+| Chorus | Built-in chorus level |
+| Gain | Output volume |
+
+**Best for:** General MIDI, piano, strings, orchestral, any sound available as SF2.
+
+## Sfizz (SFZ)
+
+An SFZ format sample player for high-fidelity multi-sample instruments. SFZ is a text-based format that supports velocity layers, round-robins, key splits, and complex mapping.
+
+| Parameter | Description |
+|-----------|-------------|
+| SFZ file | The instrument definition file |
+| Volume | Output gain |
+| Polyphony | Maximum voices |
+
+**Best for:** Realistic instruments (sampled pianos, drums, orchestral), any SFZ library.
+
+**Tip:** The SFZ ecosystem has thousands of free instrument libraries. Pair Sfizz with quality SFZ files for studio-grade sample instruments.
+
+## SunVox Synth
+
+Plays SunVox patch files (.sunsynth) -- pre-built modular synth configurations from the SunVox ecosystem. See the SunVox Modular chapter for the full modular editor.
+
+**Best for:** Loading pre-made SunVox patches, quick access to SunVox sounds without building from scratch.
+
+## SunVox Modular
+
+The full SunVox modular editor with 41 module types and visual patch cable routing. Covered in detail in its own chapter.
+
+## General Tips
+
+1. **WASM load time:** These synths compile WASM on first use. There may be a brief delay when first selecting one. After that, instantiation is fast.
+2. **CPU usage:** Professional synths like ZynAddSubFX and Surge XT use more CPU than simple Tone.js synths. Monitor your audio performance if stacking many.
+3. **Presets:** Most JUCE synths ship with factory presets. Browse them to discover the full range of each synth.
+4. **Parameter automation:** All WASM synth parameters can be automated via tracker effects, just like Tone.js synths.
+`,
+    "images": []
+  },
+  {
+    "id": "15-buzzmachine-synths",
+    "number": 22,
+    "title": "Buzzmachine Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Buzzmachine Synths
+
+Jeskola Buzz was a legendary modular tracker environment from the late 1990s that spawned a massive ecosystem of community-created "machines" -- synthesizers and effects built as DLLs. DEViLBOX ports a curated selection of these classic Buzz generators to WASM, preserving the exact character of these tracker-era instruments.
+
+## History
+
+Jeskola Buzz (1997) was created by Oskari Tammelin as a modular music production environment for Windows. Its plugin API was simple enough that hobbyist programmers could create synthesizers and effects, leading to thousands of community "machines." Many of these had a raw, distinctive character that remains musically relevant. The machines ported to DEViLBOX are compiled from the original C/C++ source code to WASM.
+
+## Acid Synths
+
+### Oomek Aggressor 3o3 (Buzz3o3)
+
+A TB-303 clone that recreates the classic acid bass sound within the Buzz ecosystem. Simpler parameter set than the DB303 engine but with authentic acid character.
+
+| Parameter | Description |
+|-----------|-------------|
+| Cutoff | Filter cutoff frequency |
+| Resonance | Filter resonance/feedback |
+| EnvMod | Envelope modulation depth |
+| Decay | Filter envelope decay time |
+| Accent | Accent intensity |
+| Waveform | Saw or square |
+
+**Best for:** Acid bass, squelchy lines, techno, house.
+
+**Tip:** If you want the full Devil Fish parameter set, use the DB303 (TB-303) synth instead. The 3o3 is ideal when you want a quick, no-fuss acid bass without the extra parameters.
+
+### Aggressor Devil Fish (Buzz3o3DF)
+
+The enhanced version of the 3o3 with Devil Fish-style modifications. Adds accent decay control, VEG (volume envelope generator), filter tracking, and a "muffler" parameter.
+
+| Parameter | Description |
+|-----------|-------------|
+| All 3o3 params | Same as Buzz3o3 above |
+| Accent Decay | Separate decay for accented notes |
+| VEG | Volume envelope generator shape |
+| Filter Tracking | How resonance follows cutoff |
+| Muffler | Post-filter tone dampening |
+
+**Best for:** Deeper acid tones, experimental acid, extended bass textures.
+
+## Synthesis Machines
+
+### Makk M3 (BuzzM3)
+
+A dual-oscillator monophonic synth. Simple but effective for bass and lead sounds.
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc 1 Waveform | First oscillator shape |
+| Osc 2 Waveform | Second oscillator shape |
+| Osc 2 Detune | Detuning between oscillators |
+| Filter Cutoff | Lowpass filter frequency |
+| Filter Resonance | Filter emphasis |
+| Envelope | ADSR amplitude shape |
+
+**Best for:** Bass, leads, classic mono synth lines. A workhorse synth that does the basics well.
+
+### Makk M4 (BuzzM4)
+
+A wavetable synthesizer with over 100 built-in waveforms, dual oscillators, sub-oscillator, and dual LFOs. The M4 is one of the most versatile Buzz generators.
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc 1/2 Wavetable | Select from 100+ waveforms |
+| Osc 1/2 Tune | Pitch per oscillator |
+| Sub Osc | Sub-oscillator level |
+| Filter | Cutoff, resonance, type |
+| LFO 1/2 | Rate, depth, target |
+| Envelope | ADSR |
+
+**Best for:** Wavetable leads, evolving pads, bass, anything requiring timbral variety.
+
+**Tip:** Sweep through the 100+ wavetables to discover unexpected timbres. Many of the waveforms have a raw, digital quality that works well for retro electronic music.
+
+### MadBrain 4FM2F (Buzz4FM2F)
+
+A 4-operator FM synthesizer with 2 filters. Brings DX-style FM synthesis into the Buzz tracker paradigm.
+
+| Parameter | Description |
+|-----------|-------------|
+| Op 1-4 Ratio | Frequency ratio per operator |
+| Op 1-4 Level | Output level per operator |
+| Op 1-4 Envelope | ADSR per operator |
+| Algorithm | Operator routing (modulation topology) |
+| Filter 1/2 | Post-FM filtering |
+
+**Best for:** FM sounds, complex timbres, DX-style patches, metallic tones.
+
+**Tip:** Start with algorithm 1 (simple carrier-modulator chain) and increase modulator levels gradually. Small ratio changes create dramatic timbral shifts.
+
+### MadBrain Dynamite6 (BuzzDynamite6)
+
+A 6-voice additive synthesizer. Each voice generates a sine wave at a configurable harmonic ratio, and their sum creates the final timbre.
+
+| Parameter | Description |
+|-----------|-------------|
+| Voice 1-6 Ratio | Harmonic frequency ratio |
+| Voice 1-6 Level | Volume per voice |
+| Voice 1-6 Detune | Fine detuning |
+| Master Envelope | ADSR for the combined output |
+
+**Best for:** Organ tones, additive sound design, bell-like timbres, custom harmonic spectra.
+
+**Tip:** Set voices to integer ratios (1, 2, 3, 4, 5, 6) for a classic organ sound. Use non-integer ratios for inharmonic, bell-like tones.
+
+## Drum Machines
+
+### FSM Kick (BuzzKick)
+
+A dedicated kick drum synthesizer. Uses a pitch-sweeping oscillator with amplitude envelope for punchy kick sounds.
+
+| Parameter | Description |
+|-----------|-------------|
+| Start Frequency | Initial pitch of the kick |
+| End Frequency | Target pitch (body of the kick) |
+| Sweep Time | How fast the pitch drops |
+| Click Level | Transient click amount |
+| Distortion | Saturation/overdrive |
+| Amplitude Decay | Overall volume decay |
+
+**Best for:** Kick drums, bass drops, boomy percussion.
+
+**Tip:** For a classic 909-style kick: start frequency around 300 Hz, end frequency around 50 Hz, short sweep time. For a deep 808-style sub kick: lower start frequency, longer sweep, minimal click.
+
+### FSM KickXP (BuzzKickXP)
+
+Extended version of the FSM Kick with additional parameters for finer control over the kick sound.
+
+| Parameter | Description |
+|-----------|-------------|
+| All Kick params | Same as FSM Kick |
+| Noise Level | White noise layer for attack |
+| Noise Decay | Noise layer decay time |
+| Tone Shape | Waveform shaping |
+| EQ | Post-synthesis tone control |
+
+**Best for:** EDM kicks, deep bass, tailored kick sounds that cut through a mix.
+
+### Jeskola Trilok (BuzzTrilok)
+
+A bass drum / tom synthesizer named after percussionist Trilok Gurtu. Generates round, warm drum tones.
+
+| Parameter | Description |
+|-----------|-------------|
+| Frequency | Base drum pitch |
+| Pitch Sweep | Pitch envelope amount |
+| Decay | Volume decay time |
+| Tone | Brightness/body balance |
+
+**Best for:** Bass drums, toms, tribal percussion, warm drum sounds.
+
+## Noise and Effects Generators
+
+### Jeskola Noise (BuzzNoise)
+
+A noise generator with amplitude envelope shaping. Simple but essential for percussive and textural sounds.
+
+| Parameter | Description |
+|-----------|-------------|
+| Volume | Output level |
+| Attack | Envelope attack |
+| Decay | Envelope decay |
+| Sustain | Envelope sustain level |
+| Release | Envelope release |
+
+**Best for:** Hi-hats, snare layers, white noise textures, risers.
+
+### Elenzil Frequency Bomb (BuzzFreqBomb)
+
+A chaotic frequency modulation generator that creates explosive, unpredictable tones. The "bomb" metaphor is accurate -- it generates sonic chaos.
+
+| Parameter | Description |
+|-----------|-------------|
+| Frequency | Base frequency |
+| Modulation | FM depth |
+| Feedback | Self-modulation amount |
+| Decay | Sound duration |
+
+**Best for:** Noise bursts, chaos, experimental sounds, glitch, explosions.
+
+**Tip:** Use sparingly. A single Frequency Bomb hit layered with a kick drum adds an aggressive transient. Automate the modulation parameter for evolving noise textures.
+
+### CyanPhase DTMF (BuzzDTMF)
+
+Generates dual-tone multi-frequency signals -- the tones produced by telephone keypads. Each note triggers a specific DTMF pair.
+
+| Parameter | Description |
+|-----------|-------------|
+| Digit | Which phone digit/tone to generate (0-9, *, #, A-D) |
+| Duration | Tone length |
+| Volume | Output level |
+
+**Best for:** Phone dial tones, retro telecom sounds, experimental sound art, conceptual pieces.
+
+**Tip:** Sequence a phone number in the tracker pattern for a literal "dialing a number" sound effect.
+
+## Working with Buzzmachines
+
+### Loading Presets
+
+Buzzmachine factory presets capture classic Buzz community patches. Browse the preset list for each machine to find starting points.
+
+### In the Tracker
+
+Buzzmachines respond to standard tracker note and effect commands. They work just like any other synth in DEViLBOX -- select one on a channel, write notes, and add effects.
+
+### Combining Machines
+
+A classic Buzz workflow is to layer machines: use a Kick for the body, Noise for the snare top, and 3o3 for the bass. Each on its own channel, each with its own effects chain. This modular approach carries over directly to DEViLBOX's multi-channel tracker.
+
+### Tips
+
+1. **The raw character is the point:** Buzzmachines often sound raw and "digital" compared to modern plugins. This is a feature, not a bug -- it is the authentic sound of late-90s tracker music.
+2. **Parameter automation:** Use tracker effects to automate Buzzmachine parameters per row for dynamic, evolving sounds.
+3. **Layer for complexity:** Individual Buzzmachines are simple by design. Combine multiple machines across channels for complex arrangements.
+4. **Experiment:** Many Buzzmachines have sweet spots that reward exploration. Twist parameters to extremes -- the most interesting sounds often come from unexpected settings.
+`,
+    "images": []
+  },
+  {
+    "id": "16-demoscene-synths",
+    "number": 23,
+    "title": "Demoscene Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Demoscene Synths
+
+The demoscene is a computer art subculture focused on creating audiovisual demonstrations ("demos") that push hardware to its limits. A critical constraint in many demo competitions is executable size -- 4 kilobytes (4K) or 64 kilobytes (64K) for everything: graphics, music, and code. This constraint spawned a unique breed of synthesizers designed to generate complex, full-production music from minimal code and data. DEViLBOX includes several of these legendary engines.
+
+## The 4K/64K Size Constraint
+
+In a 4K intro, the entire program -- visuals, music, synth engine, and all data -- must fit in 4,096 bytes. In a 64K intro, the limit is 65,536 bytes. For context, a single MP3 file of a 3-minute song is typically 3-5 megabytes. These synths generate equivalent musical complexity from a few hundred bytes of patch data and a compact synthesis engine.
+
+This constraint drives unique design decisions:
+
+- **No samples:** Everything is generated mathematically
+- **Compact patch format:** Instrument definitions are as small as possible
+- **Efficient algorithms:** Synthesis code must be tiny
+- **Offline rendering:** Music is often pre-rendered at startup (not real-time)
+
+## Farbrausch V2 Synth
+
+The V2 synthesizer by Tammo "kb" Hinrichs of Farbrausch is perhaps the most famous demoscene synth. It powered the music in legendary demos like "fr-08: .the" and "fr-041: debris." Open-sourced in 2015 after 15+ years of closed development.
+
+### Architecture
+
+The V2 is a multi-voice subtractive synthesizer with:
+
+| Feature | Description |
+|---------|-------------|
+| Oscillators | 3 per voice (saw, pulse, sine, noise, triangle + special modes) |
+| Filters | 2 multimode filters (LP/HP/BP/Notch) with serial/parallel routing |
+| Envelopes | 3 ADSR envelopes (amp, filter 1, filter 2) |
+| LFOs | 2 per voice with multiple waveform types |
+| Distortion | Pre- and post-filter distortion |
+| Effects | Chorus, flanger, delay, reverb, compressor |
+| Voices | Polyphonic with configurable voice count |
+| Modulation | Velocity, LFO, and envelope routing |
+
+### Parameters
+
+| Group | Key Parameters |
+|-------|---------------|
+| Oscillators | Waveform, tune, detune, pulse width, FM amount, sync |
+| Filter 1/2 | Type, cutoff, resonance, envelope depth |
+| Amp | Volume, panning, envelope |
+| LFO 1/2 | Rate, waveform, targets, sync |
+| Distortion | Amount, type |
+| Effects | Per-channel chorus/flanger/delay/reverb/compressor |
+
+**Best for:** Trance, techno, leads, bass, pads -- the V2 is remarkably versatile for a demoscene synth. Its sound has a distinctive aggressive-yet-clean character.
+
+**Tip:** The V2 excels at trance-style supersaw leads and punchy bass. Start with a sawtooth oscillator pair, add slight detune, and use the filter envelope for movement.
+
+## V2 Speech
+
+The speech synthesis module built into the V2 engine. Generates robotic, vocoder-style voices using formant synthesis controlled by text input.
+
+| Parameter | Description |
+|-----------|-------------|
+| Text | Input text string to vocalize |
+| Speed | Speech rate |
+| Pitch | Base voice pitch |
+| Formant Shift | Shift vocal formants up/down |
+
+**Best for:** Robotic voices, vocoder effects, demoscene aesthetics, spoken word in electronic tracks.
+
+## WaveSabre
+
+WaveSabre is a 64K intro synth framework created by the Logicoma and Conspiracy demoscene groups. It includes multiple synth "devices" that can be combined in a modular signal chain.
+
+### WaveSabre Slaughter
+
+The main synthesizer in WaveSabre. A 3-oscillator subtractive synth with multimode filter, distortion, and chorus.
+
+| Feature | Description |
+|---------|-------------|
+| Oscillators | 3 with saw, sine, square, noise, and combined modes |
+| Filter | Multimode (LP/HP/BP) with resonance |
+| Distortion | Waveshaping distortion |
+| Chorus | Stereo chorus effect |
+| Voices | Polyphonic |
+
+**Best for:** Aggressive leads, bass, pads, the backbone of 64K intro music.
+
+### WaveSabre Falcon
+
+A lightweight FM/subtractive hybrid synth. Designed for situations where Slaughter's full feature set is not needed and code size must be minimized.
+
+| Feature | Description |
+|---------|-------------|
+| Oscillator | FM carrier + modulator |
+| Filter | Simple lowpass |
+| Envelope | Amp and filter |
+
+**Best for:** FM sounds, simple bass and lead tones, when you want a lighter-weight demoscene synth.
+
+### WaveSabre Adultery
+
+A General MIDI sampler that plays samples from the system DLS (Downloadable Sounds) bank. This is the "cheat code" of 64K intro music -- it uses the operating system's built-in GM sound set, which is technically free (already on the user's computer).
+
+| Feature | Description |
+|---------|-------------|
+| MIDI program | GM instrument selection |
+| Velocity | Volume response |
+| Tuning | Pitch adjustment |
+
+**Best for:** Quick orchestral sounds, General MIDI instruments, adding acoustic textures to demoscene productions.
+
+## Oidos
+
+Oidos is an additive synthesizer by Aske Simon Christensen of the Loonies demoscene group. It generates sound by summing up to 256 sine wave partials with independent frequency and amplitude control. Designed for 4K and 8K intros where even the V2 engine would be too large.
+
+| Feature | Description |
+|---------|-------------|
+| Partials | Up to 256 sine wave components |
+| Frequency | Per-partial frequency (ratio to fundamental) |
+| Amplitude | Per-partial amplitude and envelope |
+| FM | Frequency modulation between partials |
+| Distortion | Post-synthesis waveshaping |
+| Noise | Noise component blending |
+
+### What Makes Oidos Special
+
+Unlike most additive synths that use harmonic series, Oidos allows arbitrary frequency relationships between partials. This means it can create:
+
+- Pure harmonic tones (organ, flute)
+- Inharmonic tones (bells, metallic percussion)
+- Noise-like textures (by spreading partials densely)
+- Evolving pads (by modulating partial amplitudes over time)
+
+**Best for:** Rich pads, complex timbres, additive sound design, 4K intro music.
+
+**Tip:** Start with a harmonic series (partials at 1x, 2x, 3x, etc.) and gradually shift individual partial frequencies to explore inharmonic territory. Small deviations from harmonic ratios create "beating" effects that add life to sustained tones.
+
+## Tunefish 4
+
+Tunefish 4 is an additive/subtractive hybrid synth by Brain Control, used in numerous demoscene productions. It combines a bandpass filter array (additive component) with traditional subtractive elements.
+
+| Feature | Description |
+|---------|-------------|
+| Oscillator | Multi-waveform with bandpass array |
+| Bandpass Array | Multiple narrow bandpass filters create additive-like harmonics |
+| Noise | Noise generator with filtering |
+| Filter | Subtractive lowpass/highpass |
+| Modulation Matrix | Flexible parameter routing |
+| Effects | Distortion, chorus, delay, reverb |
+
+| Parameter Group | Key Controls |
+|----------------|-------------|
+| Oscillator | Waveform, unison, detune |
+| Bandpass Array | Number of bands, spread, bandwidth |
+| Noise | Amount, bandwidth, frequency |
+| Filter | Type, cutoff, resonance |
+| Envelopes | Multiple ADSR envelopes |
+| LFOs | Rate, shape, targets |
+
+**Best for:** Versatile synthesis -- pads, leads, bass, demoscene productions. The bandpass array gives Tunefish a unique character that sits between additive and subtractive.
+
+## Using Demoscene Synths in DEViLBOX
+
+### Sound Character
+
+Demoscene synths have a distinctive sound aesthetic. They tend to be:
+
+- **Clean and precise** -- designed for mathematical synthesis, not analog warmth
+- **Aggressive when pushed** -- distortion and filter resonance are designed for impact
+- **Efficient** -- they do a lot with minimal parameters
+- **Unique** -- their design constraints produce sounds you will not get from conventional synths
+
+### Practical Tips
+
+1. **Pair with effects:** Demoscene synths output relatively clean signals. Add DEViLBOX's reverb, delay, and chorus to place them in a spatial context.
+
+2. **Layer across channels:** Use a V2 bass on one channel, Oidos pads on another, and WaveSabre Slaughter for leads. The combination covers a full arrangement.
+
+3. **Automate aggressively:** These synths are designed for tracked music where every parameter can change on every row. Use tracker effects to modulate filter cutoff, oscillator mix, and other parameters.
+
+4. **Explore presets first:** The V2 ships with factory presets from actual demoscene productions. These are excellent starting points.
+
+5. **Embrace the aesthetic:** Demoscene music has its own sound. Do not try to make these synths sound like analog hardware -- appreciate their digital character.
+
+### Notable Demoscene Productions Using These Synths
+
+- **fr-08: .the product** (2000) -- Farbrausch, V2 synth -- one of the most famous demos ever
+- **fr-041: debris.** (2007) -- Farbrausch, V2 synth -- stunning real-time 3D with procedural music
+- **Elysian** (2017) -- Logicoma, WaveSabre -- 64K intro with full-production electronic music
+- **Zetsubo** (2016) -- Conspiracy, WaveSabre -- atmospheric 64K intro
+
+These synths are living history -- the same engines that powered award-winning demoscene productions are now available in your browser.
+`,
+    "images": []
+  },
+  {
+    "id": "17-retromulator-synths",
+    "number": 24,
+    "title": "Retromulator Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Retromulator Synths
+
+Retromulator (originally Gearmulator) is a project that creates cycle-accurate emulations of classic hardware synthesizers, compiling them to run as software plugins. DEViLBOX integrates three Retromulator engines as WASM modules: the Wurlitzer 200A electric piano, Nuked OPL3 FM synthesis, and VDX7 -- a cycle-accurate Yamaha DX7 emulation.
+
+## What is Gearmulator/Retromulator?
+
+Gearmulator was created to emulate the actual silicon of classic synthesizer chips at the transistor or gate level. Rather than modeling the behavior of a synth (virtual analog), Retromulator models the hardware itself -- the CPU, the custom chips, and the signal path. This produces audio identical to the original hardware because the code is, functionally, the same circuit running in software.
+
+The three synths in DEViLBOX represent different eras and synthesis philosophies:
+
+- **Wurlitzer 200A** -- electromechanical reed-based piano (1970s)
+- **OPL3** -- digital FM synthesis chip (1990s PC era)
+- **DX7** -- the synth that defined the 1980s
+
+## OpenWurli (Wurlitzer 200A)
+
+The Wurlitzer 200A (1969) is an electromechanical piano that generates sound via metal reeds struck by felt hammers. A magnetic pickup converts the reed vibrations to an electrical signal, which passes through a built-in amplifier and speaker. The Wurlitzer has a warmer, more aggressive character than the Fender Rhodes, with more pronounced harmonics and a distinctive "bark" on hard-struck notes.
+
+### How It Sounds
+
+The Wurlitzer sits between a piano and an organ tonally. Soft playing produces bell-like, almost vibraphone-like tones. Hard playing activates harmonics that give it a barking, growling quality. It is the sound of Supertramp's "Dreamer," Ray Charles's later recordings, and countless Motown sessions.
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| Volume | Master output level |
+| Tremolo Depth | Built-in tremolo LFO amount |
+| Tremolo Rate | Tremolo speed |
+| Brightness | Tone brightness (simulates pickup position) |
+| Drive | Amplifier saturation |
+
+### Character
+
+The OpenWurli model captures:
+
+- **Reed vibration physics** -- the asymmetric vibration pattern of the steel reeds
+- **Pickup character** -- the magnetic pickup's frequency response
+- **Speaker coloration** -- the built-in speaker's resonance and distortion
+- **Tremolo circuit** -- the analog tremolo with its slightly uneven modulation
+
+**Best for:** Electric piano, soul, vintage keys, Wurlitzer-specific songs, lo-fi warmth.
+
+**Tip:** Add a touch of Drive for the classic overdriven Wurli sound heard on many 70s recordings. The tremolo is essential to the Wurlitzer character -- even a subtle setting adds life.
+
+## OPL3 (Nuked YMF262)
+
+The Yamaha YMF262 (OPL3) is the FM synthesis chip found in Sound Blaster 16 and compatible sound cards. It defined the sound of DOS gaming from the early 1990s. The Nuked OPL3 emulation is cycle-accurate, reproducing every quirk of the original silicon.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Channels | 18 (2-operator) or 9 (4-operator) |
+| Operators per channel | 2 or 4 (paired mode) |
+| Waveforms | 8 per operator (sine, half-sine, abs-sine, pulse-sine, sine-even, abs-sine-even, square, derived-square) |
+| Output | Stereo (left, right, or both per channel) |
+| Rhythm mode | 5 preset percussion voices (using 3 channels) |
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| Algorithm | Operator connection topology |
+| Feedback | Operator self-modulation amount |
+| Op 1/2 Waveform | 1 of 8 waveform types per operator |
+| Op 1/2 Level | Output level (0-63) |
+| Op 1/2 Attack | Envelope attack rate |
+| Op 1/2 Decay | Envelope decay rate |
+| Op 1/2 Sustain | Envelope sustain level |
+| Op 1/2 Release | Envelope release rate |
+| Op 1/2 Key Scale | Keyboard scaling (higher notes = faster envelope) |
+| Op 1/2 Multiplier | Frequency multiplier (0.5x to 15x) |
+| Tremolo | Hardware amplitude vibrato |
+| Vibrato | Hardware frequency vibrato |
+
+### 2-Operator vs 4-Operator Mode
+
+In standard 2-operator mode, you get 18 channels. In 4-operator mode, channels are paired (1+4, 2+5, 3+6) to create 9 channels with 4 operators each. 4-operator mode enables more complex FM algorithms similar to the DX7 (though with fewer operators).
+
+### The 8 OPL3 Waveforms
+
+The OPL3's 8 waveforms are a significant upgrade over the original OPL's sine-only operators:
+
+| # | Waveform | Character |
+|---|----------|-----------|
+| 0 | Sine | Pure, clean |
+| 1 | Half-sine | Rectified, brighter |
+| 2 | Absolute sine | Full-wave rectified, octave up |
+| 3 | Pulse sine | Staccato, quarter-wave pulse |
+| 4 | Sine (even) | Only even harmonics |
+| 5 | Absolute sine (even) | Even harmonics, rectified |
+| 6 | Square | Hard, digital |
+| 7 | Derived square | Logarithmic square |
+
+**Best for:** DOS game music, retro PC sounds, AdLib compositions, Sound Blaster nostalgia.
+
+**Tip:** The OPL3 is surprisingly versatile beyond retro gaming. Its 8 waveforms per operator open up tonal possibilities that the original OPL never had. Try 4-operator mode for more complex timbres.
+
+### Nuked OPL3 Accuracy
+
+"Nuked" emulations are reverse-engineered at the silicon level using chip decapping and die photography. The Nuked OPL3 emulation reproduces:
+
+- Exact envelope timing (including the infamous OPL "dip" at sustain transitions)
+- Precise waveform generation including quantization artifacts
+- Channel mixing behavior including the DC offset
+- All undocumented behaviors that games may depend on
+
+## DX7 (VDX7 Cycle-Accurate)
+
+The Yamaha DX7 (1983) is the best-selling synthesizer of all time and defined the sound of the 1980s. DEViLBOX includes VDX7, a cycle-accurate emulation that models the DX7's actual processors: the HD6303R CPU, the EGS (Envelope Generator + pitch Shifter), and the OPS (Operator + phaS shifter) custom chips.
+
+### Why Cycle-Accurate Matters
+
+Most DX7 emulations model the behavior of the DX7's FM synthesis. VDX7 models the hardware itself. This means it reproduces:
+
+- The exact quantization of the EGS envelope generators (which have a unique non-linear curve)
+- The OPS chip's sine table lookup (which has deliberate asymmetry)
+- The HD6303R CPU's timing as it processes voice allocation, key scaling, and modulation
+- Every quirk and imperfection of the original hardware
+
+The result is audio that is sample-for-sample identical to a real DX7.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Voices | 16 (polyphonic) |
+| Operators | 6 per voice |
+| Algorithms | 32 |
+| Envelopes | Per-operator, 4-rate/4-level |
+| LFO | 1 global, 6 waveforms |
+| Key scaling | Per-operator level and rate |
+| Modulation | Pitch bend, aftertouch, mod wheel, breath |
+
+### The 32 Algorithms
+
+The DX7's 32 algorithms define how the 6 operators are connected:
+
+- **Algorithms 1-4:** Classic stacks (serial modulation chains)
+- **Algorithms 5-8:** Branching topologies
+- **Algorithms 9-16:** Parallel carriers with shared modulators
+- **Algorithms 17-28:** Mixed topologies
+- **Algorithms 29-32:** All parallel (additive synthesis)
+
+Algorithm 32 (all 6 operators as independent carriers) is pure additive synthesis. Algorithm 1 (a single modulation chain of all 6 operators) creates the most complex FM spectra.
+
+### Parameters
+
+| Group | Parameters |
+|-------|-----------|
+| Global | Algorithm, feedback, LFO speed/delay/PMD/AMD/wave/sync |
+| Per-operator (x6) | Level, rate 1-4, level 1-4, detune, rate scaling, amplitude mod, key velocity |
+| Per-operator (x6) | Frequency mode (ratio/fixed), coarse ratio, fine ratio |
+| Pitch | Pitch envelope (rate 1-4, level 1-4) |
+
+### Factory Presets
+
+VDX7 ships with 1,120 factory patches loaded from 35 original DX7 sysex banks. These include:
+
+- The original Yamaha ROM cartridges (ROM1A, ROM1B, etc.)
+- Classic third-party banks
+- Historical patches used in famous recordings
+
+Notable patches:
+- **E.PIANO 1** -- the most-used DX7 patch in history (countless 80s pop records)
+- **BASS 1** -- the slap bass sound heard in Sade, Luther Vandross, etc.
+- **MARIMBA** -- a remarkably realistic mallet percussion
+- **STRINGS** -- lush FM string pads
+
+**Best for:** 80s electric piano, FM bass, bells, brass, classic DX7 sounds. The DX7 is equally suited to realistic instrument emulation and abstract FM sound design.
+
+### Working with DX7 Patches
+
+#### Loading Sysex Banks
+
+The DX7 uses the SysEx (System Exclusive) format for patch storage. A single SysEx bank contains 32 patches. You can load third-party DX7 sysex banks -- thousands are available online from the global DX7 community.
+
+#### Sound Design Tips
+
+1. **Start from an existing patch:** The DX7's 6-operator FM is complex. Modifying existing patches is more productive than starting from scratch.
+2. **Operator output levels are critical:** Small changes in operator level (especially modulators) create dramatic timbral changes.
+3. **Feedback is powerful:** Operator feedback (algorithm-dependent) can add anything from warmth to noise.
+4. **Rate scaling:** Use rate scaling to make high notes decay faster than low notes, mimicking natural instrument behavior.
+5. **Velocity sensitivity:** Route velocity to modulator levels for expressive, touch-responsive sounds.
+
+## General Tips for Retromulator Synths
+
+1. **These are the real thing:** Cycle-accurate emulation means the sound IS the original hardware. Trust the emulation.
+2. **Historical context helps:** Understanding the original hardware context (a 70s electric piano, a 90s sound card, an 80s FM synth) helps you use these instruments in their natural musical territory.
+3. **Combine eras:** Using a Wurlitzer 200A alongside a DX7 and OPL3 is a combination that could never have existed in hardware. Mix eras freely.
+4. **Presets are starting points:** The DX7's 1,120 presets alone represent decades of patch design wisdom. Browse them.
+`,
+    "images": []
+  },
+  {
+    "id": "18-vst-bridge-synths",
+    "number": 25,
+    "title": "VST Bridge Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# VST Bridge Synths
+
+The VST Bridge is DEViLBOX's framework for running open-source desktop synthesizers in the browser. These are full-featured professional synths -- Vital, Surge XT, Helm, and more -- compiled from their original C/C++ source to WebAssembly. Each runs in an AudioWorklet with all parameters exposed for tracker automation. No plugins to install, no DAW required.
+
+## How the VST Bridge Works
+
+Each VST Bridge synth is registered with a descriptor that specifies its WASM files, parameter mappings, and configuration. The bridge:
+
+1. Loads the WASM module and creates an AudioWorklet node
+2. Exposes all synth parameters via a normalized interface
+3. Translates DEViLBOX instrument config changes into \`setParameter()\` calls
+4. Routes MIDI note/CC data to the synth engine
+
+This means every VST Bridge synth works identically from the tracker's perspective -- same note input, same automation, same effects chain.
+
+## Vital (Spectral Warping Wavetable)
+
+Vital by Matt Tytel is a modern wavetable synthesizer with spectral morphing capabilities. It competes with commercial synths like Serum and has a massive preset community.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Oscillators | 3 wavetable oscillators |
+| Morph types | 13 spectral morphing algorithms |
+| Filters | 2 (serial/parallel) with multiple types |
+| LFOs | 8 |
+| Envelopes | 6 |
+| Effects | Built-in FX chain |
+
+### Key Features
+
+- **Spectral morphing:** Morph between wavetables using algorithms like spectral warp, vocode, sync, formant, and more
+- **Phase distortion:** Apply phase distortion to wavetable playback
+- **Modulation matrix:** Any modulation source can target any parameter
+- **Wavetable import:** Load custom wavetable files
+
+**Best for:** Modern wavetable synthesis, EDM bass, cinematic pads, complex sound design, spectral textures.
+
+**Tip:** Vital's spectral morphing is its standout feature. Automate the wavetable position and morph type for sounds that evolve dramatically over time.
+
+## Surge XT (Hybrid)
+
+Surge XT by the Surge Synth Team is a professional hybrid synthesizer with dual scenes, 12 oscillator types, and 32 effect types. Originally a commercial synth by Vember Audio, it was open-sourced in 2018 and has been actively developed by the community.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Scenes | 2 (can layer or split) |
+| Oscillator types | 12 (classic, wavetable, FM, sample, alias, string, twist, etc.) |
+| Filters | 2 per scene, multiple types |
+| Effects | 32 types across 4 slots per scene + 4 global slots |
+| Parameters | ~765 total |
+| Modulation | Comprehensive routing matrix |
+
+### Oscillator Types
+
+| Type | Description |
+|------|-------------|
+| Classic | Traditional waveforms (saw, pulse, sine, etc.) |
+| Modern | Extended waveform set |
+| Wavetable | Wavetable morphing |
+| Window | Windowed sync oscillator |
+| Sine | Multi-partial sine |
+| FM2/FM3 | 2 or 3 operator FM |
+| String | Karplus-Strong physical model |
+| Twist | West Coast-inspired complex oscillator |
+| Alias | Digital aliasing generator |
+| S&H Noise | Sample and hold noise |
+| Audio Input | Process external audio |
+
+**Best for:** Professional sound design, any genre, hybrid synthesis. Surge XT is one of the most capable free synths in existence.
+
+**Tip:** Surge XT's dual-scene architecture lets you layer two completely independent synth patches. Use Scene A for a bass tone and Scene B for a pad, controlled by a single instrument slot.
+
+## Odin2 (Semi-Modular Hybrid)
+
+Odin2 by The Wave Warden is a semi-modular hybrid synth with 11 oscillator types, 9 filter types, and a 5-slot FX chain.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Oscillators | 3 (11 types each) |
+| Filters | 2 + 1 (9 types) |
+| FX chain | 5 slots |
+| Modulation | Matrix with multiple sources |
+
+### Oscillator Types
+
+| Type | Description |
+|------|-------------|
+| Analog | Classic analog waveforms |
+| Wavetable | Wavetable morphing |
+| Multi | Multi-voice unison |
+| Vector | Vector synthesis (2D morphing) |
+| Chiptune | 8-bit style waveforms |
+| FM | Frequency modulation |
+| PM | Phase modulation |
+| Noise | Noise generator |
+| WaveDraw | Draw your own waveform |
+| ChipDraw | Draw chiptune waveform |
+| Spectra | Spectral additive |
+
+**Best for:** Hybrid synthesis, analog+digital combinations, wavetable, FM, vector, chiptune -- all in one synth.
+
+## Helm (Polyphonic)
+
+Helm by Matt Tytel (who later created Vital) is a polyphonic synthesizer with a clean, focused feature set.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Oscillators | 2 + sub oscillator |
+| Filters | 2 (serial) |
+| LFOs | 2 |
+| Step sequencers | 2 |
+| Effects | Delay, distortion, stutter |
+
+**Best for:** Modern leads, bass, pads, EDM. Helm has a cleaner, more focused interface than Vital or Surge XT, making it easier to learn.
+
+**Tip:** Helm's two built-in step sequencers are powerful modulation sources. Route them to filter cutoff or oscillator pitch for rhythmic, evolving patterns.
+
+## amsynth (Analog Modeling)
+
+amsynth by Nick Dowell is a classic analog modeling synthesizer. Two oscillators, a filter, two envelopes, LFO, Freeverb reverb, and distortion. Simple and effective.
+
+### Parameters
+
+| Group | Parameters |
+|-------|-----------|
+| Oscillators | 2, with waveform, tune, sync |
+| Filter | LP/HP/BP/Notch, cutoff, resonance, envelope |
+| Envelopes | 2 ADSR (amp + filter) |
+| LFO | Rate, waveform, targets |
+| Effects | Reverb (Freeverb), distortion |
+
+**Best for:** Analog bass, vintage leads, pads, retro sounds. amsynth does one thing well: clean analog modeling.
+
+## OB-Xf (Oberheim Analog)
+
+OB-Xf by the Surge Synth Team is a detailed model of the Oberheim OB-X and OB-Xa. These polysynths defined the brass and string sounds of the early 1980s.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Oscillators | 2 (saw, pulse with PWM) |
+| Filter | Multimode (LP/HP/BP) |
+| LFOs | 2 |
+| Envelopes | 2 ADSR |
+| Voice variation | Analog drift modeling |
+
+### Key Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| Osc 1/2 Waveform | Saw or pulse per oscillator |
+| Pulse Width | Variable pulse width + LFO modulation |
+| Filter Cutoff | 4-pole resonant filter |
+| Filter Resonance | Self-oscillation capable |
+| Voice Spread | Analog voice variation (drift) |
+
+**Best for:** Oberheim brass, vintage strings, analog bass, classic 80s pads. The voice variation parameter adds the subtle tuning instability of real analog hardware.
+
+**Tip:** The OB-Xf is THE synth for "Jump" by Van Halen-style brass stabs. Use both oscillators in saw mode, add filter envelope, and dial in voice spread for analog warmth.
+
+## Sorcer (Wavetable)
+
+Sorcer by OpenAV is a FAUST-based wavetable synth with a Butterworth filter, compressor, and LFO.
+
+| Parameter | Description |
+|-----------|-------------|
+| Wavetable Position | Morph through wavetable |
+| Filter Cutoff | Butterworth lowpass |
+| Filter Resonance | Filter emphasis |
+| LFO Rate | Modulation speed |
+| LFO Depth | Modulation amount |
+| Compressor | Output dynamics control |
+
+**Best for:** Wavetable pads, EDM, basic wavetable sound design.
+
+## Tonewheel Organ
+
+A Hammond-style tonewheel organ with 9 drawbars, key click, percussion, vibrato/chorus scanner, and overdrive. Built on the VSTBridge framework.
+
+| Parameter | Description |
+|-----------|-------------|
+| Drawbars 1-9 | Harmonic levels |
+| Key Click | Transient click amount |
+| Percussion | On/off, level, harmonic, decay |
+| Vibrato/Chorus | Scanner type and depth |
+| Overdrive | Tube-style saturation |
+
+**Best for:** Reggae organ, gospel, jazz, blues, rock organ, ska.
+
+## Melodica
+
+A physical model of a monophonic reed instrument. The melodica (also called melodion or pianica) is a free-reed instrument played by blowing air through a keyboard. Iconic in reggae and dub music thanks to Augustus Pablo.
+
+| Parameter | Description |
+|-----------|-------------|
+| Breath Dynamics | Air pressure response |
+| Body Resonance | Acoustic body character |
+| Vibrato | Rate and depth |
+| Portamento | Glide between notes |
+| Brightness | Harmonic content |
+
+**Best for:** Reggae melodica, dub, ska, Augustus Pablo-style leads, world music.
+
+## Monique (Monosynth)
+
+Monique by the Surge Synth Team is a morphing monosynth with an unusually deep architecture for a mono synth.
+
+### Architecture
+
+| Feature | Value |
+|---------|-------|
+| Oscillators | 3 (morphable waveforms) |
+| Filters | 3 (cross-routed) |
+| Envelopes | 4 |
+| MFOs | 4 (Morphing Frequency Oscillators, tempo-synced) |
+| Arpeggiator | Built-in |
+| EQ | 7-band |
+
+### Key Features
+
+- **Morphable oscillators:** Smoothly blend between waveform shapes
+- **Cross-routed filters:** 3 filters that can be routed into each other for complex filtering
+- **Tempo-synced MFOs:** 4 modulation oscillators locked to tempo for rhythmic effects
+- **120 parameters** across oscillators, filters, envelopes, LFOs, MFOs, effects, morph groups, arpeggiator, and EQ
+
+**Best for:** Mono bass, acid, leads, sound design, morphing textures. Monique's depth makes it capable of sounds far beyond typical monosynths.
+
+## Casio VL-Tone (VL1)
+
+An emulation of the Casio VL-1 (1981), the first mass-market portable synthesizer. Famous for the "Da Da Da" by Trio and its endearingly lo-fi character.
+
+| Parameter | Description |
+|-----------|-------------|
+| Waveform | 10 preset wavetable sounds (piano, violin, flute, guitar, etc.) |
+| ADSR | Authentic envelope shaping |
+| Vibrato | Rate and depth |
+| Tremolo | Rate and depth |
+| Rhythm | 10 built-in rhythm patterns |
+
+**Best for:** Lo-fi, retro, chiptune, novelty sounds, 80s nostalgia. The VL-1 has a charm that no modern synth can replicate.
+
+## Tips for VST Bridge Synths
+
+1. **Loading time:** These synths compile WASM on first use. Give them a moment to initialize.
+2. **Full parameter access:** All parameters are automatable via tracker effects, even on complex synths like Surge XT with 765 parameters.
+3. **Presets transfer:** Many of these synths can load patches from their desktop versions (sysex, preset files, etc.).
+4. **CPU scaling:** Complex synths (Surge XT, Vital) use more CPU than simpler ones (amsynth, Sorcer). Choose based on your needs and system capability.
+5. **Community patches:** Vital, Surge XT, and Helm all have active communities sharing thousands of free patches online.
+`,
+    "images": []
+  },
+  {
+    "id": "19-speech-synths",
+    "number": 26,
+    "title": "Speech Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Speech Synths
+
+DEViLBOX includes 11 speech synthesis engines spanning 40 years of technology -- from the 1980 Votrax SC-01 arcade speech chip to the physics-based Pink Trombone vocal tract model. These range from intelligible text-to-speech to lo-fi robotic vocalization, useful for everything from spoken-word elements in tracks to creative sound design.
+
+## Software Speech Synths
+
+### DECtalk
+
+The DECtalk formant speech synthesizer is the voice of Stephen Hawking. Originally developed by Dennis Klatt at MIT and commercialized by Digital Equipment Corporation in 1984, it generates speech by modeling vocal tract formants (resonant frequencies). The DECtalk sound is instantly recognizable -- precise, robotic, yet remarkably intelligible.
+
+| Parameter | Description |
+|-----------|-------------|
+| Text | Input text to speak |
+| Voice | 9 voices: Paul, Betty, Harry, Frank, Dennis, Kit, Ursula, Rita, Wendy |
+| Rate | Speaking speed (words per minute) |
+| Pitch | Base pitch of the voice |
+
+### Voices
+
+| Voice | Character |
+|-------|-----------|
+| Paul | Default male, Stephen Hawking voice |
+| Betty | Female, higher pitch |
+| Harry | Deep male, gruff |
+| Frank | Elderly male |
+| Dennis | Young male |
+| Kit | Child |
+| Ursula | Elderly female |
+| Rita | Female, mid-range |
+| Wendy | Female, breathy |
+
+**Best for:** Robotic speech, sci-fi voices, spoken-word elements, accessibility demonstrations, the iconic Hawking voice.
+
+**Tip:** DECtalk supports phoneme-level control using its markup language. Instead of plain text, you can specify exact phoneme sequences for precise control over pronunciation and timing. Use the rate parameter to create rhythmic speech patterns synced to your track's BPM.
+
+### SAM (Software Automatic Mouth)
+
+SAM was released in 1982 for the Commodore 64, Apple II, and Atari 8-bit computers. Created by Mark Barton at Don't Ask Software, it was one of the first commercially available software speech synthesizers for home computers. The sound is characteristically 8-bit -- crunchy, lo-fi, and endearing.
+
+| Parameter | Description |
+|-----------|-------------|
+| Text | Input text (phonetic spelling helps) |
+| Speed | Speech rate |
+| Pitch | Voice pitch |
+| Mouth | Mouth opening parameter (affects formants) |
+| Throat | Throat size parameter (affects timbre) |
+
+**Best for:** 8-bit speech, Commodore 64 nostalgia, lo-fi robotic voices, retro computing aesthetics.
+
+**Tip:** SAM responds well to phonetic spelling. If a word does not sound right, try spelling it as it sounds rather than as it is written. "Hello" might work better as "HEHLOH."
+
+### Pink Trombone
+
+Pink Trombone is a real-time physics-based vocal tract synthesizer by Neil Thapen. It models the actual physical geometry of the human vocal tract -- tongue, lips, nasal cavity, and glottis. You control it by adjusting the shape of the vocal tract, producing vowels, consonants, singing, and alien vocalizations.
+
+| Parameter | Description |
+|-----------|-------------|
+| Tongue position | Front/back and high/low tongue placement |
+| Tongue diameter | Tongue width affecting resonance |
+| Lip opening | Lip aperture size |
+| Constriction | Narrowing at specific tract positions |
+| Voicing | Glottal source on/off (voiced/unvoiced) |
+| Pitch | Fundamental frequency of the glottis |
+| Velum | Nasal cavity opening |
+| Tenseness | Vocal fold tension |
+
+### How It Works
+
+The vocal tract is modeled as a series of cylindrical tube sections. Sound is generated at the glottis (vocal folds) and shaped by the tract geometry:
+
+- **Vowels** are produced by tongue position (front/back, high/low)
+- **Consonants** are produced by constrictions at specific positions
+- **Nasal sounds** (m, n, ng) open the velum
+- **Voiced sounds** use the glottal source; unvoiced (s, f) use turbulence
+
+**Best for:** Vocal synthesis, singing, formant effects, alien voices, ambient vocal textures, sound art.
+
+**Tip:** Automate the tongue position and lip opening parameters in the tracker to make Pink Trombone "sing" melodies. The physics model produces natural-sounding vowel transitions that no formant filter can match.
+
+### V2 Speech
+
+The speech synthesis module of the Farbrausch V2 demoscene synth engine. Generates robotic, vocoder-style voices. See the Demoscene Synths chapter for the full V2 architecture.
+
+| Parameter | Description |
+|-----------|-------------|
+| Text | Input text |
+| Speed | Speech rate |
+| Pitch | Base voice pitch |
+| Formant | Formant frequency shift |
+
+**Best for:** Robotic voices, vocoder effects, demoscene aesthetics.
+
+## MAME Speech Chips
+
+These are hardware speech synthesis chips emulated from MAME's arcade machine cores. Each represents a different era and technology of hardware speech.
+
+### TI TMS5220 -- Speak & Spell (MAMETMS5220)
+
+The Texas Instruments TMS5220 (1980) is a Linear Predictive Coding (LPC) speech chip most famous for the Speak & Spell educational toy. It generates speech by modeling the vocal tract as a time-varying digital filter excited by either a periodic pulse (voiced) or white noise (unvoiced).
+
+| Feature | Value |
+|---------|-------|
+| Technology | 10th-order LPC |
+| Sample rate | 8 kHz |
+| Frame rate | 25 ms frames |
+| ROM | Vocabulary stored in external ROM |
+
+**Used in:** Speak & Spell (1978), Speak & Math, various arcade games, sampling keyboards.
+
+**Best for:** Speak & Spell voice, LPC speech, lo-fi vocoder, classic TI speech character.
+
+**Historical note:** The TMS5220 was one of the first ICs to bring speech to consumer products. Its distinctive robotic quality became iconic in pop culture.
+
+### Votrax SC-01 (MAMEVotrax)
+
+The Votrax SC-01 (1980) is a phoneme-based speech chip. It generates 64 allophones (speech sound fragments) that are concatenated to form words. The sound is distinctly robotic with a "buzzy" quality.
+
+| Feature | Value |
+|---------|-------|
+| Technology | Formant synthesis |
+| Phonemes | 64 allophones |
+| Control | Phoneme code + inflection bits |
+| Sample rate | Variable |
+
+**Used in:** Q*bert arcade ("@!#?@!"), Berzerk ("Intruder alert!"), many early 80s arcade games.
+
+**Best for:** Classic arcade speech, Q*bert sounds, extremely robotic voice, retro gaming nostalgia.
+
+**Tip:** The Votrax has a particular buzzy, nasal quality that is unmistakable. It is more useful as a creative sound design element than for intelligible speech.
+
+### GI SP0250 (MAMESP0250)
+
+The General Instrument SP0250 is an LPC speech chip used primarily in arcade machines. Similar concept to the TMS5220 but with GI's own LPC implementation.
+
+| Feature | Value |
+|---------|-------|
+| Technology | LPC-10 |
+| Application | Arcade speech |
+| Character | Clear, slightly metallic |
+
+**Used in:** Various early 80s arcade machines.
+
+**Best for:** Arcade-style speech, LPC voice synthesis.
+
+### Philips MEA8000 (MAMEMEA8000)
+
+The Philips MEA8000 is an LPC speech chip with formant modeling. Used in European computers and some arcade machines.
+
+| Feature | Value |
+|---------|-------|
+| Technology | LPC with formant modeling |
+| Formants | 4 formant filters |
+| Frame rate | Configurable |
+
+**Used in:** Various European computers and arcade hardware.
+
+**Best for:** European retro computing speech, formant voice, lo-fi talking.
+
+### SSi TSI S14001A (MAMES14001A)
+
+The S14001A is a delta modulation speech IC from 1979. Its most famous use is in the Berzerk arcade game ("Chicken! Fight like a robot!"). Delta modulation stores speech as a series of 1-bit up/down steps, producing extremely lo-fi but recognizable speech.
+
+| Feature | Value |
+|---------|-------|
+| Technology | Delta modulation (1-bit CVSD-like) |
+| Resolution | 1-bit delta codes |
+| ROM | External speech ROM |
+
+**Used in:** Berzerk arcade (1980), Frenzy.
+
+**Best for:** Extremely lo-fi speech, Berzerk sounds, delta modulation artifacts.
+
+### Sanyo VLM5030 (MAMEVLM5030)
+
+The Sanyo VLM5030 is an LPC speech chip used extensively by Konami in their arcade games.
+
+| Feature | Value |
+|---------|-------|
+| Technology | 10th-order LPC |
+| Application | Konami arcade games |
+| Character | Clear, slightly reverberant |
+
+**Used in:** Track & Field ("Hyper Olympic!"), Yie Ar Kung-Fu, Konami arcade games.
+
+**Best for:** Konami arcade speech, LPC voice, retro gaming voice-overs.
+
+### Harris HC55516 (MAMEHC55516)
+
+The Harris HC55516 is a CVSD (Continuously Variable Slope Delta modulation) speech codec. CVSD encodes audio as a 1-bit stream with adaptive step size, producing a characteristic gritty, compressed speech quality.
+
+| Feature | Value |
+|---------|-------|
+| Technology | CVSD (delta modulation) |
+| Data rate | 16-32 kbps |
+| Quality | Telephone-grade (gritty) |
+
+**Used in:** Williams/Bally arcade games (Sinistar "I am Sinistar!", Defender, Joust), pinball machines.
+
+**Best for:** Williams arcade speech, Sinistar voice, CVSD artifacts, gritty lo-fi speech, pinball callouts.
+
+**Historical note:** The HC55516 CVSD encoding gives speech a characteristic gritty, compressed quality that became the voice of Williams arcade games in the early 1980s. Sinistar's "Beware, I live!" and "Run, coward!" are among the most iconic sounds in gaming history.
+
+## Choosing a Speech Synth
+
+| Need | Best Choice |
+|------|-------------|
+| Intelligible text-to-speech | DECtalk |
+| Physics-based vocal modeling | Pink Trombone |
+| 8-bit retro speech | SAM |
+| Arcade game speech | Votrax, TMS5220, VLM5030 |
+| Robotic/vocoder effect | V2 Speech |
+| Extreme lo-fi speech | S14001A, HC55516 |
+| Creative sound design | Pink Trombone, MEA8000 |
+
+## Tips for Using Speech Synths
+
+1. **Rhythm and tempo:** Speech synths can be synced to your track by adjusting rate/speed parameters. Place spoken phrases on specific rows for rhythmic speech.
+
+2. **Layer with processing:** Run speech through DEViLBOX's effect chain -- reverb, delay, distortion, bitcrusher -- for processed vocal textures.
+
+3. **Melodic speech:** DECtalk and Pink Trombone support pitch control. Write melodies using the pitch parameter for singing/tonal speech.
+
+4. **Combine synths:** Layer a DECtalk voice with a V2 Speech vocoder and a Pink Trombone formant for complex vocal textures.
+
+5. **MAME chips for texture:** The MAME speech chips produce lo-fi artifacts that are excellent as textural elements, even when the speech itself is not intelligible. Use them as sound design tools.
+
+6. **Phonetic input:** For SAM and the hardware speech chips, phonetic spelling often produces better results than standard English spelling.
+`,
+    "images": []
+  },
+  {
+    "id": "20-amiga-tracker-synths",
+    "number": 27,
+    "title": "Amiga/Tracker Synths",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": "# Amiga/Tracker Synths\n\nThe Commodore Amiga (1985-1994) was the most important computer in the history of tracked music. Its custom Paula chip provided 4 channels of 8-bit PCM audio at a time when most computers could barely beep. This hardware inspired an explosion of tracker software and custom sound formats, each with its own synthesis engine. DEViLBOX runs these original engines via UADE (Unix Amiga Demod Emulator) and native WASM ports, playing back over 130 exotic Amiga music formats with authentic sound.\n\n## UADE Engine\n\nUADE emulates the Amiga's Motorola 68000 CPU, custom chipset, and Paula audio hardware. When DEViLBOX loads an Amiga module file, UADE runs the original 68000 machine code of the music replayer in emulation, producing sample-accurate output. This means the music sounds exactly as it did on real Amiga hardware.\n\n### How It Works\n\n```\nModule file --> UADE (68k emulation + Paula) --> PCM audio --> DEViLBOX mixer\n```\n\nThe UADE engine handles:\n- 68000 CPU instruction emulation\n- Amiga chip RAM with DMA timing\n- Paula audio chip (4-channel 8-bit PCM with period-based pitch)\n- CIA timer interrupts for tempo control\n- All format-specific replayer code\n\n### Chip RAM Editing\n\nDEViLBOX supports live editing of UADE-based formats via chip RAM patching. Edits are written directly to the emulated Amiga's chip RAM, taking effect on the next DMA tick. This means you can modify patterns in real-time for any of the 130+ UADE formats.\n\n## Format-Specific Synth Engines\n\nBeyond basic sample playback, many Amiga formats include their own synthesis engines. DEViLBOX ports these as native WASM synths with full parameter access.\n\n### SoundMon (SoundMonSynth)\n\nSoundMon II by Brian Postma is a wavetable synthesizer for the Amiga. Each instrument defines a waveform that can be modified in real-time using parameter commands.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | Wavetable with real-time modulation |\n| Waveforms | User-defined 32-sample waveforms |\n| Modulation | ADSR envelope, arpeggio, vibrato |\n| Channels | 4 (Amiga Paula hardware) |\n\n**Best for:** Amiga chiptune, wavetable synthesis, Brian Postma compositions.\n\n### SidMon / SidMon 1.0 (SidMonSynth / SidMon1Synth)\n\nSidMon by Rune Christensen emulates the Commodore 64 SID chip's synthesis style on the Amiga. SidMon instruments use wavetable synthesis with ADSR envelopes, arpeggios, and filter-like effects.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | SID-like wavetable |\n| Envelopes | ADSR per instrument |\n| Arpeggio | 16-step arpeggio tables |\n| Waveforms | Configurable wavetable sequences |\n\nSidMon 1.0 adds phase LFO modulation to the base feature set.\n\n**Best for:** SID-style sounds on Amiga hardware, arpeggiated chiptune.\n\n### Future Composer (FCSynth)\n\nFuture Composer 1.3/1.4 by SuperSero is one of the most popular Amiga chiptune formats. It includes 47 built-in waveforms and a macro system for instrument programming.\n\n| Feature | Description |\n|---------|-------------|\n| Waveforms | 47 built-in waveforms |\n| Macro system | Synth macro sequences for timbre automation |\n| Modulation | Vibrato, portamento, arpeggio |\n| Output | 4 channels via Paula |\n\n**Best for:** Amiga chiptune, demoscene, the classic \"Future Composer sound.\"\n\n### TFMX (TFMXSynth)\n\nTFMX (The Final Musicsystem eXtended) by Jochen Hippel is one of the most sophisticated Amiga music systems. Used in many professional Amiga games (Turrican, Apidya, Jim Power), it features SndMod and VolMod command sequences for complex instrument automation.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | Sample-based with SndMod/VolMod sequences |\n| Modulation | Frequency, volume, and panning automation tables |\n| Features | Multiple pattern offsets, macros |\n| Notable games | Turrican series, Apidya, Jim Power |\n\n**Best for:** Professional Amiga game music, complex multi-channel arrangements.\n\n### Digital Mugician (DigMugSynth)\n\nDigital Mugician by Michael B. Hartmann uses a 4-wave blending wavetable synthesizer. Each instrument blends between 4 waveforms based on envelope position.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | 4-wave blending wavetable |\n| Waveforms | 4 per instrument, cross-faded |\n| Envelopes | Volume envelope drives wave blending |\n\n**Best for:** Evolving wavetable sounds, unique Amiga timbres.\n\n### Fred Editor (FredSynth)\n\nFred Editor uses a macro-driven wavetable system. Instruments are defined by command sequences that modify waveform, volume, and pitch over time.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | Macro-driven wavetable |\n| Commands | Waveform select, volume, pitch, arpeggio |\n| Automation | Per-tick command execution |\n\n**Best for:** Macro-based chiptune, automated wavetable sequences.\n\n### OctaMED SynthInstr (OctaMEDSynth)\n\nOctaMED by Teijo Kinnunen extended the Amiga tracker paradigm to 8+ channels using software mixing. Its SynthInstr feature provides wavetable oscillators with volume and waveform command tables supporting up to 10 waveforms per instrument.\n\n| Feature | Description |\n|---------|-------------|\n| Waveforms | Up to 10 per instrument |\n| Command tables | Volume and waveform sequence tables |\n| Features | Vibrato, arpeggio, waveform cycling |\n\n**Best for:** OctaMED compositions, multi-waveform chiptune.\n\n## Composer-Specific Engines\n\nSeveral Amiga composers created their own custom replay routines, each with a unique sound character. DEViLBOX ports these as individual synth engines.\n\n### Rob Hubbard (RobHubbardSynth)\n\nRob Hubbard is legendary for his C64 SID music but also composed for the Amiga. His Amiga engine uses PCM samples with period-based vibrato, a wobble oscillator, and portamento.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | PCM sample with vibrato/wobble |\n| Vibrato | Period-based oscillation |\n| Wobble | Secondary pitch modulation |\n| Portamento | Smooth pitch glide |\n\n**Best for:** Rob Hubbard Amiga compositions, game music with distinctive vibrato character.\n\n### Steve Turner (SteveTurnerSynth)\n\nSteve Turner's engine features multi-phase envelopes, vibrato tables, and pitch slides. Used in games like Off Road Racer.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | PCM with multi-phase envelope |\n| Vibrato | Table-driven vibrato |\n| Pitch | Pitch slide effects |\n\n**Best for:** Amiga game music with complex envelope shapes.\n\n### David Whittaker (DavidWhittakerSynth)\n\nDavid Whittaker composed music for hundreds of Amiga and ST games. His engine uses period-based frequency and volume sequences with vibrato.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | Period-based synthesis |\n| Sequences | Frequency and volume automation |\n| Vibrato | Pitch modulation |\n\n**Best for:** Classic Amiga game music, David Whittaker compositions.\n\n### Jochen Hippel CoSo (HippelCoSoSynth)\n\nA pure synthesis engine from Jochen Hippel (also creator of TFMX). Uses frequency and volume sequences with vibrato and portamento -- no PCM samples.\n\n| Feature | Description |\n|---------|-------------|\n| Synthesis | Pure synthesis (no samples) |\n| Sequences | Frequency and volume automation |\n| Modulation | Vibrato, portamento |\n\n**Best for:** Pure Amiga synthesis, game music, Hippel compositions.\n\n## Other Amiga Synth Engines\n\n### Sonic Arranger (SonicArrangerSynth)\n\nSupports 18 real-time waveform effect modes with ADSR/AMF tables. One of the most flexible Amiga wavetable formats.\n\n### Delta Music 1.0 / 2.0 (DeltaMusic1Synth / DeltaMusic2Synth)\n\n4-channel wavetable synths with ADSR envelopes (v1) and volume/vibrato tables (v2).\n\n### InStereo! 1.0 / 2.0 (InStereo1Synth / InStereo2Synth)\n\nWavetable synthesis with ADSR, LFO, EG tables, and arpeggios. InStereo! 2.0 adds dual waveform support.\n\n### JamCracker (JamCrackerSynth)\n\nAM synthesis combined with PCM samples. Runs as a transpiled 68k replayer with Paula emulation in WASM.\n\n### Future Player (FuturePlayerSynth)\n\nWavetable synthesis with modulation and envelope effects. Also a transpiled 68k WASM replayer.\n\n### StarTrekker AM (StartrekkerAMSynth)\n\nStarTrekker's AM synthesis mode uses 4 waveforms (sine, saw, square, noise) with ADSR envelopes, vibrato, and period shifting.\n\n### Symphonie Pro (SymphonieSynth)\n\nA more advanced Amiga tracker engine with DSP echo/delay effects using a ring buffer.\n\n### HivelyTracker (HivelySynth)\n\nHivelyTracker / AHX is a chip-synth tracker that generates sound using 4 basic waveforms, hardware-style filter sweeps, and \"performance lists\" (per-tick command sequences). It produces a distinctive buzzy, aggressive chiptune sound.\n\n| Feature | Description |\n|---------|-------------|\n| Waveforms | 4 (triangle, sawtooth, square, noise) |\n| Filter | Hardware-style resonant filter sweeps |\n| Performance lists | Per-tick command automation |\n| Channels | 4-16 |\n\n**Best for:** Chiptune, AHX music, demoscene, aggressive chip sounds.\n\n### Klystrack (KlysSynth)\n\nKlystrack is a chiptune tracker with wavetable synthesis, FM, filters, and effects. It runs as a WASM engine in DEViLBOX.\n\n**Best for:** Chiptune, wavetable tracker music.\n\n### SC68 (Sc68Synth)\n\nPlays Atari ST .sc68 and .sndh music files using YM2149 PSG + 68000 CPU emulation. The Atari ST demoscene produced legendary chiptune music using the YM2149 chip.\n\n**Best for:** Atari ST chiptune, YM2149 music, SNDH archive playback.\n\n### C64 SID (C64SID)\n\nPlays Commodore 64 SID music files using a dedicated SID engine. The SID chip's 3-voice architecture with ring modulation, sync, and multimode filter creates one of the most distinctive sounds in computing history.\n\n**Best for:** C64 SID tunes, HVSC (High Voltage SID Collection) playback.\n\n## Tips for Amiga/Tracker Synths\n\n1. **Format detection is automatic:** Drop any supported Amiga module file into DEViLBOX and it will detect the format and load the appropriate replayer.\n\n2. **130+ formats supported:** UADE handles the vast majority of Amiga music formats. If a format exists, UADE probably plays it.\n\n3. **Chip RAM editing works:** You can edit patterns in real-time for UADE formats via the chip RAM patching system.\n\n4. **Export native format:** After editing, export the module in its original native format -- edits are captured from chip RAM.\n\n5. **The Amiga sound:** The Amiga Paula chip's 8-bit 4-channel audio has a characteristic warmth and crunch. This is authentic, not a limitation.\n\n6. **Explore the archives:** The Amiga Music Preservation project and Modland archive contain hundreds of thousands of Amiga modules. Use DEViLBOX's Modland search to discover music.\n",
+    "images": []
+  },
+  {
+    "id": "21-sample-players",
+    "number": 28,
+    "title": "Sample Players",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": `# Sample Players
+
+While DEViLBOX is packed with synthesis engines, sometimes you need the real thing -- a recorded piano, a drum kit, an orchestral section, or a tracker module. The sample player instruments handle all forms of sample-based sound, from industry-standard SoundFont and SFZ formats to the ChiptuneModule player that runs libopenmpt for tracker module playback.
+
+## FluidSynth (SF2 SoundFonts)
+
+FluidSynth is an open-source software synthesizer that plays SoundFont 2 (.sf2) files. SoundFont is one of the most widely used sample-based instrument formats, with thousands of free soundfonts available covering every instrument category.
+
+### What is a SoundFont?
+
+A SoundFont (.sf2) file contains:
+
+- **Samples** -- recorded audio of real instruments at various pitches and velocities
+- **Instruments** -- mappings of samples to keyboard ranges and velocity layers
+- **Presets** -- organized collections of instruments (organized by MIDI bank/program numbers)
+- **Modulators** -- real-time parameter modifications (filter, envelope, LFO)
+
+A single SF2 file can contain an entire General MIDI instrument set (128+ instruments) or focus on a single instrument with extensive multi-sampling.
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| SoundFont file | Which .sf2 file to load |
+| Bank | MIDI bank number (0-128) |
+| Program | MIDI program/preset number (0-127) |
+| Reverb level | Built-in reverb amount |
+| Reverb room size | Reverb space size |
+| Chorus level | Built-in chorus amount |
+| Chorus speed | Chorus modulation rate |
+| Gain | Output volume adjustment |
+| Interpolation | Sample interpolation quality |
+
+### Loading a SoundFont
+
+1. Select FluidSynth as the instrument type on a channel
+2. Use the file browser to select a .sf2 file
+3. Choose a bank and program number to select the instrument
+4. The samples load and the instrument is ready to play
+
+### General MIDI Compatibility
+
+FluidSynth supports the General MIDI (GM) standard. If you load a GM-compliant soundfont:
+
+- Program 0 = Acoustic Grand Piano
+- Program 24 = Nylon Guitar
+- Program 33 = Electric Bass (finger)
+- Program 48 = String Ensemble
+- Programs 0-127 cover all standard GM instruments
+- Bank 128 = Percussion (drum kit on channel 10)
+
+### Tips
+
+- **Quality varies wildly:** Free SoundFonts range from excellent to terrible. Look for soundfonts with multiple velocity layers and round-robins for realistic results.
+- **GM soundfonts for quick arranging:** Load a GM soundfont for instant access to 128+ instruments. Great for sketching arrangements.
+- **Specialized soundfonts for quality:** For production, use instrument-specific soundfonts (e.g., a dedicated piano SF2 with deep multi-sampling).
+- **Memory usage:** Large soundfonts can consume significant memory. A full GM set might be 100-500 MB.
+
+**Best for:** General MIDI, piano, strings, orchestral, any instrument available as SF2.
+
+## Sfizz (SFZ Format)
+
+Sfizz plays SFZ format instruments -- a text-based open standard for multi-sample instruments. SFZ is more flexible than SoundFont and has become the preferred format for high-quality free sample libraries.
+
+### What is SFZ?
+
+An SFZ instrument consists of:
+
+- **A .sfz text file** -- defines how samples are mapped and played
+- **Audio samples** -- WAV or FLAC files referenced by the .sfz file
+- **Regions** -- sample mappings with key range, velocity range, round-robin groups, etc.
+
+The text-based nature makes SFZ easy to create, edit, and debug. You can open an .sfz file in any text editor.
+
+### SFZ Features Supported
+
+| Feature | Description |
+|---------|-------------|
+| Key mapping | Samples mapped to specific note ranges |
+| Velocity layers | Different samples for soft vs hard playing |
+| Round-robins | Multiple samples per note for variation |
+| Loop modes | One-shot, loop, loop-sustain |
+| Filters | Per-region filtering |
+| Envelopes | Amplitude, filter, pitch envelopes |
+| LFOs | Modulation per region |
+| Effects | Reverb, delay, chorus (SFZ v2) |
+| Scripting | Advanced behavior control |
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| SFZ file | The .sfz instrument definition |
+| Volume | Master output gain |
+| Polyphony | Maximum simultaneous voices |
+
+### Loading an SFZ Instrument
+
+1. Select Sfizz as the instrument type
+2. Browse to a .sfz file
+3. Sfizz loads the .sfz definition and all referenced samples
+4. The instrument is ready to play
+
+### SFZ vs SF2
+
+| Aspect | SF2 (FluidSynth) | SFZ (Sfizz) |
+|--------|-------------------|-------------|
+| Format | Binary, self-contained | Text + separate audio files |
+| Editing | Requires specialized editor | Text editor |
+| Flexibility | Moderate | Very high |
+| Standard | SoundFont 2.x | SFZ 1.0 / 2.0 |
+| Ecosystem | Large, established | Growing, modern |
+| Quality ceiling | Good | Excellent |
+
+**Best for:** High-fidelity sampled instruments, orchestral, drums, any SFZ library.
+
+**Tip:** The SFZ ecosystem includes outstanding free libraries. Search for "free SFZ instruments" to find pianos, strings, brass, woodwinds, and drums that rival commercial products.
+
+## DrumKit
+
+The DrumKit instrument maps individual audio samples to MIDI notes/pads, creating a multi-sample drum kit. Each pad can have its own sample, volume, panning, and tuning.
+
+### Parameters
+
+| Parameter | Per-pad | Description |
+|-----------|---------|-------------|
+| Sample | Yes | Audio file for this pad |
+| Volume | Yes | Pad output level |
+| Pan | Yes | Stereo position |
+| Tune | Yes | Pitch adjustment |
+| Decay | Yes | Amplitude decay time |
+| Group | Yes | Choke/mute group (e.g., open/closed hi-hat) |
+| Output | Yes | Individual or bus output |
+
+### Building a Kit
+
+1. Select DrumKit as the instrument type
+2. Assign samples to pads (notes)
+3. Adjust per-pad volume, pan, and tuning
+4. Set choke groups (assign open and closed hi-hat to the same group so they mute each other)
+5. Play via note input in the tracker
+
+### Choke Groups
+
+Choke groups model real drum behavior where certain hits silence others:
+
+- Open hi-hat and closed hi-hat share a group (closing the hat chokes the open ring)
+- Snare variations (rim, center, ghost) may share or separate
+- Cymbal chokes
+
+**Best for:** Custom drum kits, layered percussion, sample-based beats.
+
+## Sampler
+
+The Sampler instrument plays a single audio sample with pitch tracking across the keyboard. It maps one sample across all notes using pitch-shifting.
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| Sample | Audio file to play |
+| Root note | The note at which the sample plays at original pitch |
+| Loop start | Loop region start point |
+| Loop end | Loop region end point |
+| Loop mode | Off, forward, ping-pong |
+| Attack | Amplitude attack time |
+| Release | Amplitude release time |
+| Tune | Fine pitch adjustment |
+
+**Best for:** Single-sample instruments, one-shot sounds, simple sample mapping.
+
+## Player
+
+The Player instrument is designed for one-shot playback of audio files. Unlike the Sampler, it does not pitch-track -- it plays the sample at its original pitch regardless of which note triggers it.
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| Sample | Audio file to play |
+| Volume | Playback volume |
+| Start position | Where in the sample to begin playback |
+| Loop | Enable/disable looping |
+
+**Best for:** Vocal samples, one-shot FX, DJ drops, ambient textures, field recordings.
+
+## ChiptuneModule (libopenmpt)
+
+The ChiptuneModule instrument uses libopenmpt (the playback library from OpenMPT, the gold-standard tracker) to play back tracker module files. This supports MOD, XM, S3M, IT, MPTM, and many other tracker formats.
+
+### Supported Formats
+
+| Format | Extension | Tracker |
+|--------|-----------|---------|
+| ProTracker | .mod | ProTracker, NoiseTracker |
+| FastTracker 2 | .xm | FastTracker 2 |
+| Scream Tracker 3 | .s3m | Scream Tracker 3 |
+| Impulse Tracker | .it | Impulse Tracker |
+| OpenMPT | .mptm | OpenMPT |
+| And many more | various | Various trackers |
+
+### How It Works
+
+When you load a tracker module as a ChiptuneModule instrument:
+
+1. libopenmpt parses the module file
+2. The module plays back through DEViLBOX's audio system
+3. All internal pattern/instrument/sample data is handled by libopenmpt
+4. The module appears as a single instrument in DEViLBOX
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| Module file | The tracker module to play |
+| Volume | Playback volume |
+| Interpolation | Sample interpolation quality |
+| Stereo separation | Stereo width |
+| Tempo factor | Speed multiplier |
+
+**Best for:** Playing tracker modules, MOD/XM/S3M/IT playback, using classic tracker music as backing tracks.
+
+**Tip:** Load a classic .mod or .xm file as a ChiptuneModule on one channel, then add your own synth layers on other channels. This is an easy way to remix or extend classic tracker music.
+
+## MusicLine (MusicLineSynth)
+
+MusicLine is an Amiga tracker engine with wavetable synthesis. It runs as a WASM replayer in DEViLBOX.
+
+**Best for:** MusicLine format files, Amiga wavetable tracker music.
+
+## General Tips for Sample Players
+
+1. **Sample quality matters:** The output quality of sample-based instruments depends entirely on the input samples. Invest time finding high-quality sample libraries.
+
+2. **Memory management:** Large sample libraries consume browser memory. Monitor memory usage when loading multiple large SoundFonts or SFZ instruments simultaneously.
+
+3. **Latency:** Sample-based instruments have effectively zero synthesis latency -- they just play back pre-recorded audio. This makes them feel very responsive.
+
+4. **Mixing with synths:** Sample players sit naturally alongside synthesizers in a mix. Use a sampled piano on one channel and a V2 synth bass on another.
+
+5. **Format conversion:** If you have samples in one format and need another, many free tools convert between SF2, SFZ, and raw sample formats.
+
+6. **DIY instruments:** Record your own samples, map them in a DrumKit or Sampler, and create custom instruments from any sound source.
+`,
+    "images": []
+  },
+  {
+    "id": "22-supercollider",
+    "number": 29,
+    "title": "SuperCollider",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": "# SuperCollider\n\nSuperCollider is an environment for algorithmic music composition and audio synthesis, created by James McCartney in 1996. It combines a powerful programming language (sclang) with a real-time audio synthesis server (scsynth). DEViLBOX integrates SuperCollider via a WASM-compiled scsynth engine and a server-side sclang compiler, letting you write custom synthesis code directly in the tracker.\n\n## Overview\n\nSuperCollider in DEViLBOX gives you the ability to write arbitrary synthesis algorithms in code. If you can describe a sound mathematically, you can build it in SuperCollider. This is the most powerful and flexible instrument type in DEViLBOX -- but also the most demanding, as it requires programming knowledge.\n\n### Architecture\n\n```\nCodeMirror editor (sclang code)\n    |\n    v\nServer-side sclang (/Applications/SuperCollider.app)\n    |\n    v\nCompiled .scsyndef binary\n    |\n    v\nscsynth WASM engine (AudioWorklet)\n    |\n    v\nReal-time audio output\n```\n\nThe workflow is:\n\n1. Write a SynthDef in sclang (SuperCollider's language) using the in-app code editor\n2. DEViLBOX sends the code to the server for compilation\n3. sclang compiles the SynthDef to a binary .scsyndef format\n4. The .scsyndef is loaded into the WASM scsynth engine\n5. Notes from the tracker trigger synth instances in real-time\n\n## The Code Editor\n\nDEViLBOX embeds a CodeMirror 6 editor with SuperCollider syntax highlighting. You write SynthDefs directly in the instrument editor panel.\n\n### Editor Features\n\n- **Syntax highlighting** for sclang keywords, UGens, and comments\n- **Auto-indentation** for blocks\n- **Error display** when compilation fails\n- **Compile button** to send code to the server\n\n## Writing SynthDefs\n\nA SynthDef (Synth Definition) describes a synthesis algorithm. It specifies signal flow using Unit Generators (UGens) -- building blocks like oscillators, filters, envelopes, and effects.\n\n### Basic Structure\n\n```supercollider\nSynthDef(\\mysynth, {\n    |freq = 440, amp = 0.5, gate = 1|\n    var sig, env;\n    env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.5, 0.5), gate, doneAction: 2);\n    sig = SinOsc.ar(freq) * env * amp;\n    Out.ar(0, sig ! 2);  // Stereo output\n}).store;\n```\n\n### Key Concepts\n\n| Concept | Description |\n|---------|-------------|\n| `SynthDef` | Defines a synthesis algorithm |\n| Arguments (`\\|...\\|`) | Parameters controllable from the tracker |\n| `freq` | Note frequency (set automatically by DEViLBOX from tracker notes) |\n| `amp` | Volume (set from tracker velocity) |\n| `gate` | Note on/off (1 = pressed, 0 = released) |\n| `EnvGen` | Envelope generator |\n| `doneAction: 2` | Free the synth when the envelope completes |\n| `Out.ar` | Route audio to output bus |\n| `.ar` | Audio rate (sample-by-sample) |\n| `.kr` | Control rate (block-by-block, more efficient) |\n\n### Common UGens\n\n#### Oscillators\n\n| UGen | Description | Example |\n|------|-------------|---------|\n| `SinOsc` | Sine wave | `SinOsc.ar(440)` |\n| `Saw` | Sawtooth wave | `Saw.ar(440)` |\n| `Pulse` | Pulse/square wave | `Pulse.ar(440, 0.5)` |\n| `LFTri` | Triangle wave | `LFTri.ar(440)` |\n| `WhiteNoise` | White noise | `WhiteNoise.ar` |\n| `PinkNoise` | Pink noise | `PinkNoise.ar` |\n| `BrownNoise` | Brown noise | `BrownNoise.ar` |\n| `Blip` | Band-limited impulse | `Blip.ar(440, 20)` |\n\n#### Filters\n\n| UGen | Description | Example |\n|------|-------------|---------|\n| `LPF` | Lowpass filter | `LPF.ar(sig, 1000)` |\n| `HPF` | Highpass filter | `HPF.ar(sig, 200)` |\n| `BPF` | Bandpass filter | `BPF.ar(sig, 1000, 0.5)` |\n| `RLPF` | Resonant lowpass | `RLPF.ar(sig, 1000, 0.1)` |\n| `Moog` | Moog ladder filter | `MoogFF.ar(sig, 1000, 3)` |\n\n#### Envelopes\n\n| UGen | Description | Example |\n|------|-------------|---------|\n| `EnvGen` | Envelope generator | `EnvGen.kr(Env.adsr, gate)` |\n| `Env.perc` | Percussive envelope | `Env.perc(0.01, 0.5)` |\n| `Env.adsr` | ADSR envelope | `Env.adsr(0.1, 0.3, 0.5, 1)` |\n| `Env.linen` | Linear envelope | `Env.linen(0.1, 1, 0.5)` |\n\n#### Effects\n\n| UGen | Description | Example |\n|------|-------------|---------|\n| `FreeVerb` | Reverb | `FreeVerb.ar(sig, 0.5, 0.8)` |\n| `DelayC` | Delay line | `DelayC.ar(sig, 0.5, 0.25)` |\n| `CombC` | Comb delay | `CombC.ar(sig, 0.2, 0.1, 3)` |\n| `AllpassC` | Allpass delay | `AllpassC.ar(sig, 0.05, 0.02, 1)` |\n\n## Example SynthDefs\n\n### Analog Bass\n\n```supercollider\nSynthDef(\\analogbass, {\n    |freq = 110, amp = 0.5, gate = 1,\n     cutoff = 800, res = 0.3, envmod = 2000|\n    var sig, env, fenv;\n    env = EnvGen.kr(Env.adsr(0.005, 0.2, 0.6, 0.3), gate, doneAction: 2);\n    fenv = EnvGen.kr(Env.perc(0.005, 0.3), gate) * envmod;\n    sig = Saw.ar(freq) + Pulse.ar(freq * 0.998, 0.4);\n    sig = RLPF.ar(sig, cutoff + fenv, res);\n    sig = sig * env * amp;\n    Out.ar(0, sig ! 2);\n}).store;\n```\n\n### Pad with Reverb\n\n```supercollider\nSynthDef(\\lushpad, {\n    |freq = 440, amp = 0.3, gate = 1,\n     detune = 0.02, cutoff = 2000|\n    var sig, env;\n    env = EnvGen.kr(Env.adsr(1, 0.5, 0.8, 2), gate, doneAction: 2);\n    sig = Mix.fill(5, { |i|\n        Saw.ar(freq * (1 + (detune * (i - 2))))\n    });\n    sig = LPF.ar(sig, cutoff);\n    sig = sig * env * amp * 0.2;\n    sig = FreeVerb.ar(sig, 0.6, 0.9, 0.3);\n    Out.ar(0, sig ! 2);\n}).store;\n```\n\n### Percussive FM\n\n```supercollider\nSynthDef(\\fmperc, {\n    |freq = 440, amp = 0.5,\n     modRatio = 3, modDepth = 200|\n    var sig, env, mod;\n    env = EnvGen.kr(Env.perc(0.001, 0.5), doneAction: 2);\n    mod = SinOsc.ar(freq * modRatio) * modDepth * env;\n    sig = SinOsc.ar(freq + mod) * env * amp;\n    Out.ar(0, sig ! 2);\n}).store;\n```\n\n### Karplus-Strong String\n\n```supercollider\nSynthDef(\\karplusstrong, {\n    |freq = 440, amp = 0.5, decay = 3|\n    var sig, env;\n    env = EnvGen.kr(Env.linen(0, decay, 0.01), doneAction: 2);\n    sig = Pluck.ar(WhiteNoise.ar, 1, 0.1, freq.reciprocal, decay, 0.3);\n    sig = sig * amp * env;\n    Out.ar(0, sig ! 2);\n}).store;\n```\n\n## Real-Time Parameters\n\nCustom arguments in your SynthDef become real-time parameters in DEViLBOX. The standard parameters are:\n\n| Parameter | Automatic | Description |\n|-----------|-----------|-------------|\n| `freq` | Yes | Set from tracker note |\n| `amp` | Yes | Set from tracker velocity |\n| `gate` | Yes | 1 on note-on, 0 on note-off |\n| Custom args | Manual | Controllable via tracker effects |\n\nAdditional custom arguments (like `cutoff`, `res`, `modDepth` in the examples above) appear as automatable parameters in the instrument editor.\n\n## Prerequisites\n\nSuperCollider synthesis requires:\n\n1. **SuperCollider installed** -- sclang must be available on the system (macOS: `/Applications/SuperCollider.app`)\n2. **DEViLBOX server running** -- the Express server compiles SynthDefs server-side\n3. **WASM scsynth loaded** -- the scsynth WASM module runs in the browser\n\nThe first two are only needed for compilation. Once a SynthDef is compiled, playback works without the server.\n\n## Tips\n\n1. **Start from examples:** Modify the example SynthDefs above rather than starting from scratch. SuperCollider's syntax can be surprising if you are new to it.\n\n2. **Use `doneAction: 2`:** Always include `doneAction: 2` on at least one envelope generator. Without it, synth instances will never free, causing CPU usage to climb.\n\n3. **Control rate for modulation:** Use `.kr` (control rate) for envelopes, LFOs, and anything that does not need sample-level precision. It is much more CPU efficient than `.ar`.\n\n4. **Test incrementally:** Compile and test after each change. SuperCollider error messages can be cryptic -- small changes make debugging easier.\n\n5. **The SuperCollider community:** SuperCollider has an active community with extensive documentation, tutorials, and code sharing. The SuperCollider Book and sccode.org are excellent resources.\n\n6. **CPU budget:** Complex SuperCollider SynthDefs can use significant CPU, especially with many simultaneous voices. Monitor performance when using polyphonic SC instruments.\n\n7. **Explore UGens:** SuperCollider has hundreds of UGens beyond what is listed here. Physical models, spectral processing, granular synthesis, neural networks -- the possibilities are vast.\n",
+    "images": []
+  },
+  {
+    "id": "23-sunvox-modular",
+    "number": 30,
+    "title": "SunVox Modular",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": "# SunVox Modular\n\nSunVox by Alexander Zolotov (NightRadio) is a modular synthesizer and tracker that runs on nearly every platform -- from smartphones to desktop computers. DEViLBOX integrates the full SunVox engine as a WASM module with a visual modular editor, giving you access to 41 module types connected by virtual patch cables. Build custom synth patches from scratch or load .sunsynth/.sunvox files from the SunVox community.\n\n## Overview\n\nThe SunVox Modular instrument presents a visual canvas where you place modules (oscillators, filters, effects) and connect them with cables. Sound flows from source modules through processing modules to the output. This is the same paradigm as hardware modular synthesizers, but with the convenience of software.\n\n### Two Modes\n\nDEViLBOX offers SunVox in two ways:\n\n| Mode | Synth Type | Description |\n|------|-----------|-------------|\n| **SunVox Synth** | `SunVoxSynth` | Load and play pre-built .sunsynth patches |\n| **SunVox Modular** | `SunVoxModular` | Full visual modular editor -- build patches from scratch |\n\nThe SunVox Synth mode is for loading existing patches. The SunVox Modular mode is for building your own.\n\n## The Visual Editor\n\nThe modular editor shows a 2D canvas with modules as boxes and connections as lines between them.\n\n### Interface Elements\n\n- **Module palette** -- list of all 41 available module types\n- **Canvas** -- drag-and-drop workspace for placing modules\n- **Connections** -- click and drag between module ports to create patch cables\n- **Module inspector** -- click a module to see and edit its parameters\n- **Output module** -- the final destination; all audio must reach the Output module to be heard\n\n### Basic Workflow\n\n1. Select SunVox Modular as the instrument type\n2. The editor opens with an Output module already placed\n3. Add source modules (Generator, Sampler, etc.) from the palette\n4. Add processing modules (Filter, Distortion, etc.)\n5. Connect modules by dragging between their ports\n6. Adjust module parameters in the inspector\n7. Play notes from the tracker -- they trigger the source modules\n\n## Module Types\n\nSunVox provides 41 module types organized into categories.\n\n### Sound Sources\n\n| Module | Description |\n|--------|-------------|\n| **Generator** | Multi-waveform oscillator (sine, triangle, saw, square, noise, drawn) with duty cycle, phase modulation, frequency modulation inputs |\n| **Sampler** | Sample player with loop, reverse, interpolation, multi-sample support |\n| **SpectraVoice** | Harmonic/spectral synthesis with up to 16 harmonics, each with independent frequency, volume, and bandwidth |\n| **Input** | Audio input from the host (for processing external audio) |\n\n### Synthesis\n\n| Module | Description |\n|--------|-------------|\n| **FM** | Frequency modulation synthesis (modulator + carrier) |\n| **Analog Generator** | Virtual analog oscillator with anti-aliasing, soft/hard sync, PWM |\n| **Kicker** | Kick drum / bass drum generator with pitch envelope |\n| **DrumSynth** | Multi-mode drum synthesizer |\n| **Noise** | Configurable noise generator (white, pink, etc.) |\n\n### Filters\n\n| Module | Description |\n|--------|-------------|\n| **Filter** | Multi-mode filter (lowpass, highpass, bandpass, notch, all-pass) with resonance, envelope follower, LFO |\n| **Filter Pro** | Enhanced filter with more modes and steeper rolloff options |\n| **EQ** | Equalizer module |\n\n### Envelopes and Modulation\n\n| Module | Description |\n|--------|-------------|\n| **ADSR** | Attack-Decay-Sustain-Release envelope generator |\n| **LFO** | Low Frequency Oscillator with multiple waveforms and sync |\n| **Envelope** | Custom multi-point envelope with loop and sustain points |\n| **Ctl2Note** | Converts control signals to note frequency (for modular control voltage-style patching) |\n| **MultiCtl** | Splits one controller into multiple outputs with independent ranges |\n| **Velocity2Ctl** | Converts note velocity to a control signal |\n| **Pitch2Ctl** | Converts note pitch to a control signal |\n\n### Effects\n\n| Module | Description |\n|--------|-------------|\n| **Delay** | Stereo delay with feedback, tempo sync |\n| **Reverb** | Reverb effect with size, damp, wet/dry |\n| **Chorus** | Stereo chorus/flanger |\n| **Distortion** | Waveshaping distortion with multiple types |\n| **BitCrusher** | Sample rate and bit depth reduction |\n| **WaveShaper** | Custom waveshaping transfer function |\n| **Compressor** | Dynamic range compression |\n| **DC Blocker** | Removes DC offset from signal |\n| **Vibrato** | Pitch vibrato effect |\n| **Echo** | Simple echo effect |\n| **Flanger** | Flanging effect with feedback |\n| **Phaser** | Phase-shifting effect |\n\n### Utility\n\n| Module | Description |\n|--------|-------------|\n| **Amplifier** | Volume/gain control, panning, DC offset |\n| **Mixer** | Multi-input audio mixer |\n| **Modulator** | Ring modulation / amplitude modulation |\n| **Sound2Ctl** | Converts audio amplitude to a control signal (envelope follower) |\n| **MultiSynth** | Splits MIDI notes to multiple destinations (for layering) |\n| **Pitch Shifter** | Real-time pitch shifting |\n| **Loop** | Audio loop buffer |\n| **Glide** | Portamento / pitch smoothing |\n| **GPIO** | General Purpose I/O for external hardware |\n| **MetaModule** | Contains a sub-patch (patch within a patch) |\n\n### The Output Module\n\nEvery patch must route audio to the **Output** module. If a module is not connected (directly or indirectly) to Output, it will not produce audible sound.\n\n## Building Patches\n\n### Example: Basic Subtractive Synth\n\nA classic subtractive synth requires three modules:\n\n1. **Generator** -- set to sawtooth waveform (the raw sound source)\n2. **Filter** -- set to lowpass mode (shapes the harmonic content)\n3. **Output** -- final destination\n\nConnect: Generator --> Filter --> Output\n\nAdd an **ADSR** module to control the filter cutoff over time:\n\n- Connect ADSR to Filter's control input\n- Set ADSR attack, decay, sustain, release\n- Now the filter opens and closes with each note\n\nAdd an **LFO** to modulate the filter for wobble:\n\n- Connect LFO to Filter's control input (additive with ADSR)\n- Set LFO rate and depth\n\n### Example: FM Synthesis\n\n1. Place an **FM** module\n2. Connect FM --> Output\n3. Adjust carrier frequency, modulator frequency ratio, and modulation depth\n4. Add an ADSR to modulate the FM depth for evolving timbres\n\n### Example: Drum Machine\n\n1. Place a **Kicker** module (for kick drum body)\n2. Place a **Noise** module (for hi-hat/snare)\n3. Place individual **ADSR** modules for each sound\n4. Route everything through a **Mixer** to **Output**\n5. Use **MultiSynth** to split different note ranges to different sound sources\n\n### Layering with MultiSynth\n\nThe **MultiSynth** module is essential for complex patches. It receives MIDI notes and distributes them to multiple destinations:\n\n- Split by note range (bass notes to one generator, high notes to another)\n- Layer multiple generators playing the same notes\n- Create velocity splits (soft hits to one sound, hard hits to another)\n\n## Loading and Saving Patches\n\n### .sunsynth Format\n\nSunVox synth patches are saved as .sunsynth files. These contain the complete module layout, connections, and parameters.\n\n- **Loading:** Use the file browser in the instrument editor to load a .sunsynth file\n- **Saving:** Save your custom patch as a .sunsynth for later use\n\n### .sunvox Format\n\nFull SunVox project files (.sunvox) contain both the modular patch and tracker pattern data. DEViLBOX can load these for playback.\n\n### Community Patches\n\nThe SunVox community has created thousands of patches. Resources:\n\n- SunVox forum (warmplace.ru)\n- SunVox subreddit\n- Various SunVox patch sharing sites\n\n## Real-Time Modulation\n\nSunVox modules respond to real-time control:\n\n| Source | What It Does |\n|--------|-------------|\n| Note frequency | Sets Generator/FM pitch |\n| Note velocity | Triggers ADSR, controls Velocity2Ctl |\n| Tracker effects | Modulate any module parameter |\n| LFO modules | Continuous parameter modulation |\n| Sound2Ctl | Audio-rate to control-rate conversion |\n| Ctl2Note | Control-rate to note frequency conversion |\n\n### Control Routing\n\nOne of SunVox's strengths is its control signal routing. You can:\n\n- Use an LFO to modulate a filter cutoff\n- Use an envelope follower (Sound2Ctl) to make one sound react to another\n- Use Velocity2Ctl to make velocity control any parameter\n- Chain multiple control modules for complex modulation\n\n## MetaModules\n\nThe **MetaModule** is SunVox's equivalent of a sub-patch or macro. It contains an entire modular patch inside a single module. This lets you:\n\n- Organize complex patches into manageable sections\n- Reuse sub-patches across different instruments\n- Create hierarchical patch structures\n\nMetaModules can be nested, allowing deep modular architectures.\n\n## Tips\n\n1. **Start simple:** Begin with Generator --> Filter --> Output and add complexity gradually.\n\n2. **ADSR on everything:** Most interesting sounds come from envelope-modulated parameters. Add ADSR modules to filter cutoff, FM depth, amplifier gain.\n\n3. **Use MultiSynth for layering:** The MultiSynth module is the key to complex, layered instruments.\n\n4. **Monitor CPU:** Complex modular patches with many modules can use significant CPU. SunVox is efficient, but dozens of modules with audio-rate modulation add up.\n\n5. **Explore the community:** Thousands of .sunsynth patches exist. Loading and deconstructing community patches is an excellent way to learn modular synthesis.\n\n6. **The MetaModule is your friend:** Once you build a useful sub-patch (e.g., a filtered oscillator with envelope), save it as a MetaModule and reuse it.\n\n7. **Control signals are powerful:** SunVox's Ctl2Note, Sound2Ctl, Velocity2Ctl, and Pitch2Ctl modules enable modular-style control voltage routing that goes far beyond what traditional synths offer.\n",
+    "images": []
+  },
+  {
+    "id": "24-modular-synth",
+    "number": 31,
+    "title": "Modular Synth",
+    "part": "Instruments",
+    "partNumber": 3,
+    "content": "# Modular Synth\n\nDEViLBOX includes its own built-in modular synthesizer with a visual patch editor. Unlike the SunVox Modular (which runs SunVox's WASM engine), the native Modular Synth is implemented directly in Web Audio and TypeScript, integrating tightly with DEViLBOX's audio engine. It provides classic modular building blocks -- oscillators, filters, envelopes, LFOs, and mixers -- connected through a visual patching interface.\n\n## Overview\n\nThe Modular Synth is a virtual recreation of a hardware modular synthesizer. Sound is generated by oscillator modules, shaped by filter and amplifier modules, modulated by envelope and LFO modules, and mixed to the output. You design your own signal flow by connecting modules with virtual patch cables.\n\n### Why Use the Native Modular?\n\n| Feature | Native Modular | SunVox Modular |\n|---------|---------------|----------------|\n| Engine | Web Audio API | SunVox WASM |\n| Latency | Minimal (native Web Audio) | Slightly higher (WASM bridge) |\n| Module types | Core set (VCO, VCF, VCA, etc.) | 41 SunVox module types |\n| Integration | Direct access to DEViLBOX audio graph | Separate engine |\n| Patch format | DEViLBOX native | .sunsynth / .sunvox |\n| Best for | Quick patches, tight integration | Complex modular, SunVox compatibility |\n\nChoose the native Modular Synth for straightforward patches with low latency. Choose SunVox Modular for complex modular architectures with more module variety.\n\n## The Patch Editor\n\nThe patch editor is a visual canvas where you build your synthesizer.\n\n### Interface\n\n- **Module rack** -- available modules listed on the left\n- **Patch canvas** -- central workspace where modules are placed\n- **Patch cables** -- lines connecting module outputs to inputs\n- **Module panels** -- each placed module shows its parameters as knobs and selectors\n- **Output node** -- the final audio destination (always present)\n\n### Placing Modules\n\n1. Click a module type in the rack to add it to the canvas\n2. Drag the module to position it\n3. Click the module to open its parameter panel\n\n### Connecting Modules\n\n1. Click on a module's output jack\n2. Drag to another module's input jack\n3. A cable appears connecting the two\n4. To disconnect, click the cable and press delete\n\n### Signal Flow\n\nAudio flows from left to right (by convention):\n\n```\nVCO (sound source) --> VCF (filter) --> VCA (amplifier) --> Output\n         ^                  ^                ^\n         |                  |                |\n      Keyboard           ADSR 1           ADSR 2\n      (pitch)          (filter env)      (amp env)\n```\n\n## Module Types\n\n### VCO (Voltage Controlled Oscillator)\n\nThe sound source. Generates audio-rate waveforms.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Waveform | Sine, Saw, Square, Triangle, Noise | Oscillator waveform |\n| Octave | -2 to +2 | Coarse tuning in octaves |\n| Detune | -100 to +100 cents | Fine tuning |\n| Pulse Width | 0--1 | Width of pulse wave (square = 0.5) |\n| FM Input | modulation | Frequency modulation input |\n| PWM Input | modulation | Pulse width modulation input |\n\nYou can place multiple VCOs and mix them for richer sounds:\n\n- **Detuned unison:** Two saws slightly detuned for fatness\n- **Octave stacking:** One VCO at the root, another an octave up\n- **Sync:** Hard-sync one VCO to another for harmonic-rich tones\n\n### VCF (Voltage Controlled Filter)\n\nShapes the harmonic content of the signal.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Type | Lowpass, Highpass, Bandpass, Notch | Filter mode |\n| Cutoff | 20--20000 Hz | Cutoff frequency |\n| Resonance | 0--100 | Feedback / emphasis at cutoff |\n| Rolloff | -12, -24 dB/oct | Filter steepness |\n| Key tracking | 0--100% | Cutoff follows note pitch |\n| CV Input | modulation | External cutoff modulation |\n\n**Tip:** Set key tracking to 100% to make the filter cutoff follow the keyboard. This keeps the timbral character consistent across the note range.\n\n### VCA (Voltage Controlled Amplifier)\n\nControls the volume of the signal. Usually modulated by an ADSR envelope.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Gain | 0--1 | Base amplitude |\n| CV Input | modulation | Volume control input (connect ADSR here) |\n\nThe VCA is what gives notes their shape -- the attack, sustain, and release of the sound. Without a VCA+ADSR, the oscillator drones continuously.\n\n### ADSR (Envelope Generator)\n\nGenerates a control signal that changes over time in four stages.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Attack | 0--5000 ms | Time to reach peak |\n| Decay | 0--5000 ms | Time to fall to sustain level |\n| Sustain | 0--100% | Level held while note is on |\n| Release | 0--5000 ms | Time to fade after note off |\n\nADSR modules output a control signal (not audio). Connect them to:\n\n- **VCA CV input** -- for amplitude envelope (most common)\n- **VCF CV input** -- for filter envelope (second most common)\n- **VCO FM input** -- for pitch envelope (kick drums, FX)\n\n**Tip:** Use two ADSR modules -- one for the amplifier and one for the filter. Give the filter envelope a faster decay than the amp envelope for a plucky, percussive character.\n\n### LFO (Low Frequency Oscillator)\n\nGenerates slow, repeating control signals for modulation effects.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Waveform | Sine, Triangle, Saw, Square | LFO shape |\n| Rate | 0.1--20 Hz | Modulation speed |\n| Depth | 0--100% | Modulation amount |\n| Sync | On/Off | Sync to tracker tempo |\n| Sync Division | 1/1 to 1/32 (with triplets/dotted) | Tempo-synced rate |\n| Phase | 0--360 degrees | Starting phase |\n| Retrigger | On/Off | Reset phase on note-on |\n\nConnect LFOs to:\n\n| Target | Effect |\n|--------|--------|\n| VCO frequency | Vibrato |\n| VCF cutoff | Wah / wobble |\n| VCA gain | Tremolo |\n| VCO pulse width | PWM (animated tone) |\n\n### Mixer\n\nCombines multiple audio signals into one output.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Input 1-4 Level | 0--1 | Per-input volume |\n| Input 1-4 Pan | -1 to +1 | Per-input stereo position |\n| Master Level | 0--1 | Overall output level |\n\nUse the mixer to blend multiple oscillators before filtering, or to combine separate signal chains at the output.\n\n### Noise\n\nA dedicated noise generator module.\n\n| Parameter | Range | Description |\n|-----------|-------|-------------|\n| Type | White, Pink, Brown | Noise color |\n| Level | 0--1 | Output level |\n\nMix noise with oscillators for breathy or noisy textures, or use it as a modulation source.\n\n## Building Classic Patches\n\n### Subtractive Bass\n\nThe fundamental synthesizer patch:\n\n```\nVCO (saw) --> VCF (lowpass) --> VCA --> Output\n                  ^               ^\n                  |               |\n               ADSR 1          ADSR 2\n           (fast decay)     (medium decay)\n```\n\n1. VCO: Sawtooth, 0 octave\n2. VCF: Lowpass, cutoff ~500 Hz, resonance ~30%\n3. ADSR 1 (filter): Attack 5ms, Decay 200ms, Sustain 20%, Release 100ms\n4. ADSR 2 (amp): Attack 5ms, Decay 300ms, Sustain 70%, Release 200ms\n5. Connect VCO --> VCF --> VCA --> Output\n6. Connect ADSR 1 --> VCF CV, ADSR 2 --> VCA CV\n\n### Fat Lead\n\nTwo detuned oscillators for a rich lead:\n\n```\nVCO 1 (saw, +5 cents) --\\\n                          Mixer --> VCF --> VCA --> Output\nVCO 2 (saw, -5 cents) --/\n```\n\nAdd vibrato:\n- LFO (sine, 5 Hz, depth 10%) --> VCO 1 & 2 FM input\n\n### Kick Drum\n\nPitch envelope creates the characteristic kick sweep:\n\n```\nVCO (sine) --> VCA --> Output\n  ^              ^\n  |              |\nADSR 1         ADSR 2\n(pitch:        (amp:\n fast decay)    medium decay)\n```\n\n1. VCO: Sine wave\n2. ADSR 1 (pitch): Attack 0, Decay 50ms, Sustain 0%, Release 0 -- connect to VCO FM\n3. ADSR 2 (amp): Attack 1ms, Decay 300ms, Sustain 0%, Release 50ms\n4. Set ADSR 1 modulation depth high (the pitch starts high and sweeps down)\n\n### Evolving Pad\n\nMultiple oscillators with slow LFO modulation:\n\n```\nVCO 1 (saw) ---\\\nVCO 2 (pulse) --Mixer --> VCF --> VCA --> Output\nVCO 3 (tri) ---/            ^       ^\n                             |       |\n                           LFO    ADSR\n                        (slow     (long\n                         filter    attack)\n                         sweep)\n```\n\n1. Three VCOs at different waveforms, slightly detuned\n2. VCF: Lowpass, cutoff ~2000 Hz\n3. LFO: Sine, 0.3 Hz, moderate depth --> VCF cutoff\n4. ADSR: Attack 1s, Decay 500ms, Sustain 80%, Release 2s\n\n## Saving and Loading Patches\n\nModular patches are saved as part of the instrument configuration in DEViLBOX's project format. The patch includes:\n\n- All module types and positions\n- All module parameter values\n- All cable connections\n- Module layout on the canvas\n\nPatches persist with your project and are restored when loading.\n\n## Tips\n\n1. **Always connect to Output:** Sound only comes out of the Output module. Unconnected modules are silent.\n\n2. **ADSR is essential:** Without an ADSR on the VCA, your oscillator will drone continuously. Always envelope-shape the amplitude.\n\n3. **Filter envelope makes the sound interesting:** The amp envelope gives notes their shape, but the filter envelope gives them their character. A fast filter decay with high resonance creates the classic \"pluck\" sound.\n\n4. **Modulation is everything:** Static patches are boring. LFOs on filter cutoff, PWM on oscillators, and envelope-modulated pitch add life and movement.\n\n5. **Start with templates:** Build a basic subtractive patch (VCO+VCF+VCA+ADSR), save it, and modify copies. Do not start from scratch every time.\n\n6. **Key tracking on the filter:** Without key tracking, low notes sound bright and high notes sound dull (the cutoff is fixed). Set key tracking to 50-100% for consistent timbre.\n\n7. **Gain staging:** Watch your levels. Multiple oscillators mixed together can clip. Use the mixer module to balance levels before the filter.\n\n8. **Compare with other synths:** The Modular Synth can recreate what many fixed-architecture synths do. Build a 303-style acid bass or a supersaw pad to understand how those synths work internally.\n",
+    "images": []
+  },
+  {
+    "id": "25-effects-architecture",
+    "number": 32,
+    "title": "Effects Architecture",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": "# Effects Architecture\n\nDEViLBOX provides 84+ audio effects spanning five technology tiers: Tone.js native, custom JavaScript DSP, WASM (C++ via AudioWorklet), Buzzmachine emulations, WAM 2.0 plugins, and Neural/AI amp models. Effects can be placed at three points in the signal chain: instrument inserts, channel inserts, and the master chain. Additionally, four auxiliary send/return buses allow parallel effects processing.\n\n## Signal Flow\n\nThe complete signal path from instrument to speakers follows this routing:\n\n```\nInstrument Output\n    |\n    v\nChannel Gain --> Channel Pan\n    |\n    v\nChannel Insert Effects (up to 4 slots)\n    [Effect 1] --> [Effect 2] --> [Effect 3] --> [Effect 4]\n    |\n    +---> Send Taps (A, B, C, D) ---> Send Buses\n    |\n    v\nMaster Effects Input\n    |\n    v\nMaster Effects Chain\n    |\n    v\nMaster Output --> Speakers\n```\n\nSend buses operate in parallel. Each channel has independent send levels for each of the four buses. The return buses have their own effect chains and volume controls, mixing back into the master input.\n\n## Three Insertion Points\n\n### Instrument Inserts\n\nEffects placed directly on an instrument. These are stored as part of the instrument configuration and travel with it when the instrument is assigned to a different channel. Instrument inserts process the raw synth output before it reaches the channel strip.\n\n### Channel Inserts\n\nEach mixer channel has four insert effect slots. These process audio after the channel gain and pan controls. Channel inserts are independent of which instrument is assigned to the channel. The `ChannelEffectsManager` handles creation, routing, and disposal of per-channel effect chains.\n\nWhen all four slots are empty, the channel signal passes through a direct connection from input to output with no processing overhead.\n\n### Master Chain\n\nThe master effects chain processes the summed output of all channels (plus send bus returns) before the final output. Common uses include master bus compression, EQ, stereo widening, and limiting.\n\n## Send/Return Buses\n\nFour auxiliary send/return buses (labeled A through D) provide parallel effects processing. Unlike insert effects that process the channel signal in series, sends tap a copy of the channel signal at a controllable level.\n\n| Bus | Typical Use | Description |\n|-----|-------------|-------------|\n| A | Shared Reverb | All channels send varying amounts to a common reverb |\n| B | Shared Delay | Shared delay with BPM sync |\n| C | Parallel Compression | New York-style parallel compression |\n| D | Special FX | Creative effects (freeze, shimmer, pitch shift) |\n\nEach send bus has:\n- An input gain node that sums all channel send contributions\n- Its own effect chain (add any effects to the return)\n- A return volume control\n- A mute toggle\n- Output routed to the master effects input\n\nThe send level for each channel-to-bus pair is controlled by a dedicated gain node. Setting a channel's send level to 0 disconnects it from that bus entirely.\n\n## Effect Creation: EffectRegistry and EffectFactory\n\nAll effects are registered through the `EffectRegistry`, a central registry that maps effect IDs to their descriptors. Each descriptor contains:\n\n- **id**: Unique string identifier (e.g., `'Reverb'`, `'MVerb'`, `'BuzzFreeverb'`)\n- **name**: Human-readable display name\n- **category**: Technology tier (`'tonejs'`, `'wasm'`, `'buzzmachine'`, `'wam'`, `'neural'`)\n- **group**: Functional group (`'Distortion'`, `'Filter'`, `'Reverb & Delay'`, `'Modulation'`, etc.)\n- **loadMode**: `'eager'` (loaded at startup) or `'lazy'` (loaded on first use)\n- **create**: Async factory function that instantiates the effect\n- **getDefaultParameters**: Returns default parameter values\n\n### Eager vs. Lazy Loading\n\nEffects are loaded in two phases:\n\n**Eager (loaded at startup):** Tone.js effects, WASM effects, Tumult, and TapeSimulator. These are lightweight or commonly used, so they register immediately when the app starts.\n\n**Lazy (loaded on first use):** Buzzmachine effects (23 effects), WAM 2.0 effects (11 effects), and Neural effects. These are loaded as a group when any effect from that group is first requested. The `EffectRegistry.ensure(id)` method triggers lazy loading and deduplicates concurrent load requests.\n\n### Creating an Effect\n\nThe `EffectFactory.createEffect()` function is the primary entry point:\n\n1. Calls `EffectRegistry.ensure(id)` to load the descriptor (triggers lazy loading if needed)\n2. Invokes the descriptor's `create()` function with the effect configuration\n3. Returns a `Tone.ToneAudioNode`-compatible instance\n\nAll effects extend `Tone.ToneAudioNode` and expose `input` and `output` gain nodes, making them compatible with Tone.js signal routing.\n\n## Wet/Dry Mixing\n\nEvery effect supports wet/dry mixing. The wet value is stored as a percentage (0-100) in the effect configuration and converted to 0-1 internally. The signal routing for wet/dry is:\n\n```\ninput --> dryGain (1 - wet) --> output\n      \\-> effect --> wetGain (wet) --/\n```\n\nAt 0% wet, the effect is completely bypassed. At 100% wet, only the processed signal passes through. Values in between blend the dry and wet signals.\n\n## BPM Sync for Time-Based Effects\n\nTime-based effects (delays, choruses, phasers) can synchronize their timing parameters to the current BPM. Each effect descriptor can declare `bpmSyncParams` -- an array of parameter names that support BPM synchronization.\n\nWhen BPM sync is enabled for an effect, the sync system:\n\n1. Reads the current BPM from the transport\n2. Calculates the note duration based on the selected sync division (e.g., 1/4, 1/8, 1/8T, 1/16)\n3. Replaces the raw parameter value with the computed synced value\n\nAvailable sync divisions include straight notes (1/1 through 1/32), dotted notes, and triplets. The `computeSyncedValue()` function handles the conversion from sync division to milliseconds or seconds depending on the parameter.\n\nEffects with BPM sync support:\n\n| Effect | Synced Parameter |\n|--------|-----------------|\n| Delay | time |\n| FeedbackDelay | time |\n| PingPongDelay | time |\n| Chorus | frequency |\n| SpaceEcho | rate |\n| SpaceyDelayer | firstTap |\n| RETapeEcho | repeatRate |\n| AmbientDelay | time |\n| BiPhase | rateA |\n\n## Async Loading and Fallbacks\n\nWASM effects require loading binary modules and registering AudioWorklet processors. This is inherently asynchronous. The architecture handles this gracefully:\n\n1. **Static binary caching**: WASM binaries and JavaScript worklet code are cached after the first load. Subsequent instances of the same effect type reuse the cached resources.\n\n2. **Worklet registration**: Each WASM effect registers its AudioWorklet processor once per AudioContext. A static set tracks which contexts have been initialized.\n\n3. **JavaScript fallbacks**: Every WASM effect includes a pure JavaScript fallback that activates if WASM loading fails. For example:\n   - MVerb falls back to a Schroeder reverb\n   - Leslie falls back to a ScriptProcessorNode-based simulation\n   - SpringReverb falls back to a comb filter network\n   - MoogFilter falls back to a JS Krajeski implementation\n\n4. **Pending parameter queue**: Parameters set before the WASM worklet is ready are queued in a `pendingParams` array and flushed once the worklet signals readiness.\n\nThis design ensures that effects always produce audio, even if the preferred WASM implementation cannot load. The fallbacks are sonically simpler but functionally equivalent.\n",
+    "images": []
+  },
+  {
+    "id": "26-tonejs-effects",
+    "number": 33,
+    "title": "Tone.js Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": '# Tone.js Effects\n\nDEViLBOX includes 23 effects built on the Tone.js audio framework. These are eagerly loaded at startup and available immediately. They cover the core effect categories: distortion, filtering, reverb, delay, modulation, dynamics, EQ, and pitch shifting.\n\nAll Tone.js effects support wet/dry mixing (0-100%) and integrate directly into instrument, channel, or master effect chains.\n\n## Distortion\n\n### Distortion\n\nBasic waveshaping distortion with variable drive and optional oversampling for reduced aliasing.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| drive | 0 - 1 | 0.4 | Distortion amount |\n| oversample | none, 2x, 4x | none | Anti-aliasing oversampling factor |\n\n### Tape Saturation\n\nAnalog tape warmth simulation with asymmetric soft clipping and harmonic saturation characteristic of magnetic tape recording. Uses a custom WaveShaper curve.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| drive | 0 - 100 | 50 | Saturation amount (mapped internally to 0-1) |\n| tone | 2000 - 20000 Hz | 12000 | Treble roll-off frequency |\n\n### BitCrusher\n\nSample-rate and bit-depth reduction for retro digital artifacts. Implemented using a staircase WaveShaper curve rather than Tone.BitCrusher (which has AudioWorklet compatibility issues).\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| bits | 1 - 16 | 4 | Bit depth (lower = more crushed) |\n\n### Chebyshev\n\nChebyshev polynomial waveshaping that generates specific harmonic overtones. The order determines which harmonics are emphasized.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| order | 1 - 100 | 2 | Polynomial order (2 = 2nd harmonic, 3 = 3rd, etc.) |\n| oversample | none, 2x, 4x | none | Anti-aliasing oversampling |\n\n## Filter\n\n### Filter\n\nStandard biquad filter with multiple types and variable rolloff slope.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| type | lowpass, highpass, bandpass, notch, allpass, peaking, lowshelf, highshelf | lowpass | Filter type |\n| frequency | 20 - 20000 Hz | 5000 | Cutoff/center frequency |\n| rolloff | -12, -24, -48, -96 | -12 | Slope in dB/octave |\n| Q | 0.1 - 20 | 1 | Resonance / Q factor |\n| gain | -40 - 40 dB | 0 | Gain (peaking/shelf types only) |\n\n### Auto Filter\n\nLFO-modulated filter that sweeps the cutoff frequency automatically.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.01 - 20 Hz | 1 | LFO rate |\n| baseFrequency | 20 - 20000 Hz | 200 | Minimum filter frequency |\n| octaves | 0 - 8 | 2.6 | Sweep range in octaves above base |\n| filterType | lowpass, highpass, bandpass | lowpass | Filter type |\n\n### Auto Wah\n\nEnvelope-follower filter that responds to input dynamics. Louder signals open the filter wider.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| baseFrequency | 20 - 20000 Hz | 100 | Minimum filter frequency |\n| octaves | 0 - 8 | 6 | Sweep range in octaves |\n| sensitivity | -40 - 0 dB | 0 | Input sensitivity threshold |\n| Q | 0.1 - 20 | 2 | Filter resonance |\n| gain | 0 - 10 | 2 | Follower gain |\n| follower | 0.01 - 1 | 0.1 | Envelope follower smoothing time |\n\n### Dub Filter\n\nKing Tubby "Big Knob" filter emulation. A performance-oriented high-pass filter with high resonance and subtle saturation, modeled after the Altec/MCI console filters used in classic Jamaican dub mixing. Uses a -24 dB/octave slope for a steep, aggressive cut.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| cutoff | 20 - 10000 Hz | 20 | Filter cutoff frequency |\n| resonance | 0 - 100 | 30 | Filter resonance |\n| gain | 0 - 2 | 1 | Output gain/drive |\n\n## Reverb & Delay\n\n### Reverb\n\nConvolution-based algorithmic reverb. Generates an impulse response internally based on the decay time. The `ready` promise resolves when the IR is generated.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| decay | 0.1 - 30 s | 8.6 | Reverb tail length |\n| preDelay | 0 - 0.5 s | 0.4 | Time before reverb onset |\n\n### JC Reverb\n\nJohn Chowning-style Schroeder reverb using comb and allpass filters. Lightweight and musical, suitable for instrument inserts.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| roomSize | 0 - 0.9 | 0.5 | Room size (clamped to 0.9 max for stability) |\n\n### Delay\n\nBasic feedback delay with tempo sync support.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| time | 0.01 - 2 s | 0.25 | Delay time (BPM-syncable) |\n| feedback | 0 - 0.95 | 0.5 | Feedback amount |\n\n### Feedback Delay\n\nIdentical to Delay. Provided as a separate entry for compatibility with projects that reference the Tone.js class name directly.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| time | 0.01 - 2 s | 0.25 | Delay time (BPM-syncable) |\n| feedback | 0 - 0.95 | 0.5 | Feedback amount |\n\n### Ping Pong Delay\n\nStereo delay that alternates echoes between left and right channels.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| time | 0.01 - 2 s | 0.25 | Delay time per side (BPM-syncable) |\n| feedback | 0 - 0.95 | 0.5 | Feedback amount |\n\n## Modulation\n\n### Chorus\n\nClassic ensemble chorus with LFO-modulated delay line.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.1 - 20 Hz | 1.5 | LFO rate (BPM-syncable) |\n| delayTime | 0.5 - 20 ms | 3.5 | Base delay time |\n| depth | 0 - 1 | 0.7 | Modulation depth |\n\n### Phaser\n\nMulti-stage allpass phaser with LFO sweep.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.01 - 10 Hz | 0.5 | LFO rate |\n| octaves | 0 - 8 | 3 | Sweep range |\n| baseFrequency | 100 - 8000 Hz | 1000 | Center frequency |\n| Q | 0.1 - 20 | 10 | Phase stage resonance |\n\n### Tremolo\n\nAmplitude modulation via LFO.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.1 - 50 Hz | 10 | Tremolo rate |\n| depth | 0 - 1 | 0.5 | Modulation depth |\n\n### Vibrato\n\nPitch modulation via LFO-controlled delay line.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.1 - 50 Hz | 5 | Vibrato rate |\n| depth | 0 - 1 | 0.1 | Pitch deviation amount |\n\n### Auto Panner\n\nLFO-driven stereo panning that moves the signal between left and right.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.01 - 20 Hz | 1 | Pan rate |\n| depth | 0 - 1 | 1 | Pan width (1 = full L-R sweep) |\n\n### Bi-Phase\n\nMu-Tron Bi-Phase emulation with dual phaser circuits. Supports series routing (deep, complex swooshing) and parallel routing (stereo width).\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| rateA | 0.1 - 10 Hz | 0.5 | Phaser A LFO rate (BPM-syncable) |\n| depthA | 0 - 1 | 0.6 | Phaser A modulation depth |\n| rateB | 0.1 - 10 Hz | 4.0 | Phaser B LFO rate |\n| depthB | 0 - 1 | 0.4 | Phaser B modulation depth |\n| feedback | 0 - 1 | 0.3 | Internal feedback |\n| routing | 0 (parallel), 1 (series) | 0 | Dual phaser routing mode |\n\n## Dynamics\n\n### Compressor\n\nStandard dynamics compressor for controlling dynamic range.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | -60 - 0 dB | -24 | Level above which compression begins |\n| ratio | 1 - 20 | 12 | Compression ratio |\n| attack | 0.001 - 0.5 s | 0.003 | Attack time |\n| release | 0.01 - 1 s | 0.25 | Release time |\n\n### Sidechain Compressor\n\nCompressor with external sidechain input for pumping effects. See the Dynamics & EQ chapter for detailed sidechain routing instructions.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | -60 - 0 dB | -24 | Compression threshold |\n| ratio | 1 - 20 | 4 | Compression ratio |\n| attack | 0.001 - 0.5 s | 0.003 | Attack time |\n| release | 0.01 - 1 s | 0.25 | Release time |\n| knee | 0 - 40 dB | 6 | Soft knee width |\n| sidechainGain | 0 - 200 | 100 | Sidechain sensitivity (percentage) |\n\n## EQ & Stereo\n\n### 3-Band EQ\n\nThree-band equalizer with adjustable crossover frequencies.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| low | -24 - 24 dB | 0 | Low band gain |\n| mid | -24 - 24 dB | 0 | Mid band gain |\n| high | -24 - 24 dB | 0 | High band gain |\n| lowFrequency | 100 - 1000 Hz | 400 | Low/mid crossover |\n| highFrequency | 1000 - 8000 Hz | 2500 | Mid/high crossover |\n\n### Stereo Widener\n\nMid/side stereo width enhancement.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| width | 0 - 0.85 | 0.5 | Stereo width (0 = mono, 0.85 = max, clamped for stability) |\n\n## Pitch\n\n### Frequency Shifter\n\nShifts all frequencies by a fixed amount in Hz (unlike pitch shifting which preserves harmonic ratios). Creates inharmonic, metallic, or ring-modulator-like timbres.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | -1000 - 1000 Hz | 0 | Shift amount (negative = down) |\n\n### Pitch Shift\n\nGranular pitch shifting that preserves timing. Shifts pitch by semitones while maintaining the original tempo.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| pitch | -24 - 24 | 0 | Pitch shift in semitones |\n| windowSize | 0.01 - 1 s | 0.1 | Granular window size |\n| delayTime | 0 - 1 s | 0 | Additional delay |\n| feedback | 0 - 1 | 0 | Feedback for cascading pitch shifts |\n',
+    "images": []
+  },
+  {
+    "id": "27-wasm-effects",
+    "number": 34,
+    "title": "WASM Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": '# WASM Effects\n\nDEViLBOX includes eight high-quality DSP effects implemented in C++ and compiled to WebAssembly via Emscripten. These run in AudioWorklet threads for real-time performance and fall back to pure JavaScript implementations if WASM loading fails.\n\n## Architecture\n\nWASM effects follow a consistent architecture:\n\n```\nC++ DSP Engine\n    |\n    v (Emscripten compilation)\nWebAssembly Module (.wasm) + JavaScript Loader (.js)\n    |\n    v (loaded into AudioWorklet)\nAudioWorkletProcessor (runs on audio thread)\n    |\n    v (wrapped by)\nTypeScript Effect Class (extends Tone.ToneAudioNode)\n    |\n    v (if WASM fails)\nJavaScript Fallback (Schroeder reverb, basic filter, etc.)\n```\n\nEach WASM effect:\n1. Loads the `.wasm` binary and `.js` loader from the `public/` directory\n2. Registers an AudioWorklet processor (once per AudioContext)\n3. Creates an AudioWorkletNode connected to Tone.js input/output gains\n4. Sends parameter changes via `postMessage` to the worklet thread\n5. Falls back to a JS implementation if any step fails\n\nStatic caching ensures the WASM binary is fetched only once, even when multiple instances of the same effect type are created. Parameters set before the worklet signals readiness are queued and applied automatically once initialization completes.\n\n## MVerb (Plate Reverb)\n\nA port of Martin Eastwood\'s MVerb, a studio-quality plate reverb algorithm. Provides lush, smooth reverb tails with independent control over early reflections and late reverberation. The fallback is a 4-comb + 2-allpass Schroeder reverb network.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| damping | 0 - 1 | 0.5 | High-frequency absorption in the reverb tail |\n| density | 0 - 1 | 0.5 | Echo density (sparse to dense reflections) |\n| bandwidth | 0 - 1 | 0.5 | Input signal bandwidth (low = darker input) |\n| decay | 0 - 1 | 0.7 | Reverb tail length |\n| predelay | 0 - 1 | 0.0 | Time before reverb onset |\n| size | 0 - 1 | 0.8 | Room/plate size |\n| gain | 0 - 1 | 1.0 | Output level |\n| mix | 0 - 1 | 0.4 | Internal wet/dry mix |\n| earlyMix | 0 - 1 | 0.5 | Early vs. late reflection balance |\n\n**Tips:** For a tight drum room, set size low (0.2-0.3), density high (0.8), and decay short (0.3). For ambient pads, push size and decay toward 1.0 with moderate damping.\n\n## Leslie (Rotary Speaker)\n\nA from-scratch Leslie rotary speaker simulation with crossover splitting, amplitude modulation, Doppler pitch shifting, and speed ramping. Models the two-rotor Leslie cabinet where a horn (high frequencies) and drum (low frequencies) rotate at different speeds.\n\nThe fallback uses a ScriptProcessorNode with simplified AM modulation.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| speed | 0 - 1 | 0.0 | Speed mode: 0 = slow (chorale), 0.5 = brake, 1 = fast (tremolo) |\n| hornRate | 0.1 - 10 Hz | 6.8 | Horn rotor rotation speed |\n| drumRate | 0.1 - 8 Hz | 5.9 | Drum rotor rotation speed |\n| hornDepth | 0 - 1 | 0.7 | Horn modulation depth |\n| drumDepth | 0 - 1 | 0.5 | Drum modulation depth |\n| doppler | 0 - 1 | 0.5 | Doppler pitch shift amount |\n| width | 0 - 1 | 0.8 | Stereo width of the rotating field |\n| acceleration | 0 - 1 | 0.5 | Speed ramp-up/down time (inertia) |\n\n**Tips:** The speed parameter is typically automated: switching between 0 (slow) and 1 (fast) with the acceleration parameter controlling how quickly the rotors spin up. This ramp-up effect is a signature Leslie sound. Set doppler high for dramatic pitch wobble on organs.\n\n## Spring Reverb\n\nA from-scratch dub spring tank reverb with the metallic "drip" character of physical spring reverb units. Essential for dub, surf rock, and lo-fi aesthetics. The fallback is a comb filter network.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| decay | 0 - 1 | 0.6 | Spring resonance tail length |\n| damping | 0 - 1 | 0.4 | High-frequency damping in the spring |\n| tension | 0 - 1 | 0.5 | Spring tension (affects pitch of resonance) |\n| mix | 0 - 1 | 0.35 | Internal wet/dry balance |\n| drip | 0 - 1 | 0.5 | Metallic drip character intensity |\n| diffusion | 0 - 1 | 0.7 | Echo diffusion (smooth to grainy) |\n\n**Tips:** For classic dub, set drip high (0.7-0.9) and damping low (0.2). Send a snare hit or vocal phrase to the spring reverb via a send bus for the classic dub throw effect. Automating the mix parameter creates dramatic dub drops.\n\n## Moog Filter\n\nSix analog Moog ladder filter models compiled to WASM, each with different sonic characteristics and CPU costs. The Hyperion model supports seven filter modes. Falls back to a pure JavaScript Krajeski implementation.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| cutoff | 20 - 20000 Hz | 1000 | Filter cutoff frequency |\n| resonance | 0 - 100 | 10 | Resonance (percentage, mapped to 0-1 internally) |\n| drive | 0.1 - 4.0 | 1.0 | Input drive/saturation |\n| model | 0 - 5 | 0 (Hyperion) | Ladder filter model |\n| filterMode | 0 - 6 | 0 (LP4) | Filter mode (Hyperion model only) |\n\n### Filter Models\n\n| Value | Name | Description |\n|-------|------|-------------|\n| 0 | Hyperion | ZDF/TPT with ADAA, multi-mode. Best quality, highest CPU |\n| 1 | Krajeski | Enhanced Stilson with drive and saturation |\n| 2 | Stilson | Classic cascade model. Fast and efficient |\n| 3 | Microtracker | Minimal, clean implementation. Lowest CPU cost |\n| 4 | Improved | Circuit-accurate D\'Angelo/Valimaki model with self-oscillation |\n| 5 | Oberheim | Virtual analog one-pole cascade (Oberheim-style) |\n\n### Filter Modes (Hyperion Only)\n\n| Value | Name | Description |\n|-------|------|-------------|\n| 0 | LP2 | 2-pole low-pass (-12 dB/oct) |\n| 1 | LP4 | 4-pole low-pass (-24 dB/oct) |\n| 2 | BP2 | 2-pole band-pass |\n| 3 | BP4 | 4-pole band-pass |\n| 4 | HP2 | 2-pole high-pass |\n| 5 | HP4 | 4-pole high-pass |\n| 6 | NOTCH | Notch (band-reject) |\n\n**Tips:** The Improved model at high resonance (80%+) will self-oscillate, producing a pure sine wave at the cutoff frequency. This can be used as an oscillator in its own right. For classic acid bass, use Krajeski or Stilson with high resonance and envelope modulation of the cutoff.\n\n## Shimmer Reverb\n\nA pitch-shifted feedback reverb that creates ethereal, evolving textures. Each cycle through the reverb tail is pitch-shifted (typically by an octave), producing a shimmering, crystalline quality. Falls back to a Schroeder reverb (without shimmer).\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| decay | 0 - 100 | 70 | Reverb tail length (percentage) |\n| shimmer | 0 - 100 | 50 | Pitch-shifted feedback amount (percentage) |\n| pitch | -24 - 24 | 12 | Pitch shift in semitones (12 = octave up) |\n| damping | 0 - 100 | 50 | High-frequency absorption (percentage) |\n| size | 0 - 100 | 70 | Virtual room size (percentage) |\n| predelay | 0 - 1000 ms | 40 | Pre-delay time |\n| modRate | 0 - 100 | 30 | Internal modulation rate (percentage) |\n| modDepth | 0 - 100 | 20 | Internal modulation depth (percentage) |\n\n**Tips:** Set pitch to 12 (octave up) and shimmer to 60-80% for the classic "cathedral" shimmer sound. Try pitch at 7 (perfect fifth) for a different harmonic texture. Very long decays with high shimmer create infinite, evolving pads from a single note.\n\n## Granular Freeze\n\nA live-capture granular processor that can freeze incoming audio and manipulate it with granular synthesis parameters. When frozen, the effect captures a buffer of audio and repeatedly plays back tiny grains from it. Falls back to a simple ring-buffer looper.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| freeze | 0 or 1 | 0 | Freeze toggle (0 = pass-through, 1 = frozen) |\n| grainSize | 10 - 500 ms | 80 | Individual grain duration |\n| density | 1 - 50 grains/s | 12 | Grain trigger rate |\n| scatter | 0 - 100 | 30 | Randomization of grain read position (percentage) |\n| pitch | -24 - 24 | 0 | Pitch shift in semitones |\n| spray | 0 - 100 | 20 | Random grain timing jitter (percentage) |\n| shimmer | 0 - 100 | 0 | Octave-up grain probability (percentage) |\n| stereoWidth | 0 - 100 | 70 | Random stereo placement of grains (percentage) |\n| feedback | 0 - 100 | 0 | Grain output fed back to input (percentage) |\n| captureLen | 50 - 2000 ms | 500 | Length of the capture buffer |\n| attack | 1 - 50 ms | 5 | Grain attack/fade-in time |\n| release | 1 - 200 ms | 40 | Grain release/fade-out time |\n| thru | 0 or 1 | 0 | Pass dry signal while frozen |\n\n**Tips:** Freeze a sustained chord and modulate scatter and pitch for evolving ambient textures. Short grain sizes (10-30ms) with high density create a buzzy, granular cloud. Long grain sizes (200-500ms) with low density create a more rhythmic, chopped effect. The shimmer parameter adds octave-up grains randomly, creating sparkle over the frozen texture.\n\n## Tape Simulator\n\nA port of The Kiss of Shame tape deck emulator by Hollance. Emulates a complete analog tape path: input saturation with harmonic character control, tape bias filtering, wow and flutter pitch modulation, and pink noise hiss.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| drive | 0 - 100 | 30 | Input saturation amount (percentage) |\n| character | 0 - 100 | 40 | Odd/even harmonic blend (0 = even-dominant, 100 = 50/50) |\n| bias | 0 - 100 | 40 | Tape bias LP cutoff (0 = 22kHz bright, 100 = 2kHz dark) |\n| shame | 0 - 100 | 20 | Wow and flutter amount (percentage) |\n| hiss | 0 - 100 | 20 | Pink noise floor level (percentage) |\n| speed | 0 or 1 | 0 | Tape speed (0 = S-111/15 IPS, 1 = A-456/30 IPS) |\n\n**Tips:** The two speed modes emulate different tape formulations. Speed 0 (15 IPS, Scotch S-111) has more high-end saturation character. Speed 1 (30 IPS, Ampex 456) is cleaner with more headroom. Subtle drive (20-40%) adds warmth without obvious distortion. Push drive above 70% for obvious tape compression.\n\n## Tumult\n\nA 1:1 port of the Tumult HISE noise/ambience generator plugin. Generates textured noise and ambient layers with envelope following, ducking, filtering, and sample playback from a library of 95 field recordings (hum, machine, static, vinyl, world sounds, and NoisePlethora synthesizer textures).\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| noiseGain | -60 - 0 dB | -10 | Noise generator output level |\n| mix | 0 - 1 | 0.5 | Noise vs. sample blend |\n| noiseMode | 0 - 2 | 0 | Noise color (white/pink/brown) |\n| sourceMode | 0 - 1 | 0 | Source mode |\n| switchBranch | 0 - 1 | 0 | Processing branch selector |\n| duckThreshold | -60 - 0 dB | -20 | Ducking threshold |\n| duckAttack | 0 - 100 ms | 0 | Ducking attack time |\n| duckRelease | 0 - 100 ms | 15 | Ducking release time |\n| followThreshold | -60 - 0 dB | -20 | Envelope follower threshold |\n| followAttack | 0 - 100 ms | 0 | Envelope follower attack |\n| followRelease | 0 - 100 ms | 15 | Envelope follower release |\n| followAmount | 0 - 1 | 0.7 | Envelope follower depth |\n| clipAmount | 0 - 1 | 0.497 | Hard/soft clipper amount |\n| hpEnable | 0 or 1 | 0 | High-pass filter enable |\n| hpFreq | 20 - 20000 Hz | 888.5 | High-pass frequency |\n| hpQ | 0.1 - 10 | 0.7 | High-pass Q |\n| peak1Enable | 0 or 1 | 0 | Parametric EQ band 1 enable |\n| peak1Freq | 20 - 20000 Hz | 20 | Band 1 frequency |\n| peak1Gain | -24 - 24 dB | -0.19 | Band 1 gain |\n| peak1Q | 0.1 - 10 | 0.7 | Band 1 Q |\n| peak2Enable | 0 or 1 | 0 | Parametric EQ band 2 enable |\n| peak2Freq | 20 - 20000 Hz | 600 | Band 2 frequency |\n| peak2Gain | -24 - 24 dB | 1.0 | Band 2 gain |\n| peak2Q | 0.1 - 10 | 1.0 | Band 2 Q |\n| peak3Enable | 0 or 1 | 0 | Parametric EQ band 3 enable |\n| peak3Freq | 20 - 20000 Hz | 2500 | Band 3 frequency |\n| peak3Gain | -24 - 24 dB | 1.0 | Band 3 gain |\n| peak3Q | 0.1 - 10 | 1.0 | Band 3 Q |\n| lpEnable | 0 or 1 | 0 | Low-pass filter enable |\n| lpFreq | 20 - 20000 Hz | 8500 | Low-pass frequency |\n| lpQ | 0.1 - 10 | 0.7 | Low-pass Q |\n| sampleIndex | 0 - 94 | 0 | Field recording sample index |\n| playerStart | 0 - 1 | 0 | Sample playback start position |\n| playerEnd | 0 - 1 | 1 | Sample playback end position |\n| playerFade | 0 - 1 | 0.01 | Sample crossfade length |\n| playerGain | -60 - 0 dB | 0 | Sample playback gain |\n\nThe 95 field recordings are grouped into categories: hum (5), machine (11), static (6), vinyl (5), world (18), and NoisePlethora synthesizer textures (A: 17, B: 10, C: 23).\n\n**Tips:** Tumult excels at adding environmental texture to tracks. Use the envelope follower to make noise swell with the music, or use ducking so the noise recedes when audio is playing and rises during silences. The field recording library provides realistic environmental sounds that can be shaped with the 3-band parametric EQ.\n',
+    "images": []
+  },
+  {
+    "id": "28-tape-lofi-effects",
+    "number": 35,
+    "title": "Tape & Lo-Fi Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": "# Tape & Lo-Fi Effects\n\nDEViLBOX provides a suite of degradation and texture effects for creating lo-fi, analog, and worn-media aesthetics. These range from subtle tape warmth to extreme vinyl destruction.\n\n## Tape Saturation\n\nThe simplest tape effect -- asymmetric soft clipping that adds harmonic warmth characteristic of magnetic tape recording. Uses a custom WaveShaper curve that generates even and odd harmonics differently on positive and negative signal swings, unlike symmetric digital distortion.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| drive | 0 - 100 | 50 | Saturation intensity |\n| tone | 2000 - 20000 Hz | 12000 | Treble roll-off frequency (lower = darker) |\n\n**Signal path:** Input gain stage, asymmetric waveshaper, tone filter (lowpass), output with makeup gain.\n\n**When to use:** As a subtle warming effect on individual channels or the master bus. At low drive (10-30%), it adds gentle harmonic content without obvious distortion. At high drive (70-100%), it produces obvious compression and saturation.\n\n## Tape Degradation\n\nA comprehensive worn-cassette emulation that simulates the time-domain artifacts of degraded magnetic tape. Includes wow (slow pitch drift from capstan irregularities), flutter (fast pitch wobble from motor vibration), tape hiss, random signal dropouts, saturation, and tone darkening.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wow | 0 - 100 | 30 | Slow pitch drift amount (LFO 0.5-2 Hz sine, +/-5ms) |\n| flutter | 0 - 100 | 20 | Fast pitch wobble (LFO 4-12 Hz triangle, +/-2ms) |\n| hiss | 0 - 100 | 15 | White noise floor level (bandpass filtered at 5kHz) |\n| dropouts | 0 - 100 | 0 | Random volume dip frequency (0 = none) |\n| saturation | 0 - 100 | 30 | Asymmetric tape-style soft clipping |\n| toneShift | 0 - 100 | 50 | Lowpass cutoff (0 = 3kHz dark, 100 = 18kHz bright) |\n\n**Signal path:** Input, modulated delay line (driven by wow + flutter LFOs), saturation waveshaper, tone filter, hiss noise mix, dropout gate, output.\n\nThe wow and flutter are implemented as LFO-modulated delay lines. Wow uses a slow sine LFO (0.5-2 Hz) with up to 5ms of delay modulation. Flutter uses a faster triangle LFO (4-12 Hz) with up to 2ms modulation. Together they create the characteristic pitch instability of worn tape.\n\n## Tape Simulator\n\nA WASM-powered port of The Kiss of Shame tape deck emulator. More sophisticated than Tape Saturation and Tape Degradation, this models a complete analog tape recording path including input saturation with harmonic character selection, tape bias filtering, wow/flutter, and pink noise hiss. See the WASM Effects chapter for the full parameter table.\n\nKey differences from Tape Degradation:\n- **Character control**: Adjusts the ratio of odd to even harmonics in the saturation\n- **Bias control**: Models the tape bias adjustment that real tape engineers use to trade off frequency response vs. distortion\n- **Speed selection**: Two tape formulations (15 IPS and 30 IPS) with different saturation characteristics\n- **WASM processing**: Runs the DSP in C++ for higher quality and lower latency\n\n## Vinyl Noise\n\nA pure JavaScript AudioWorklet vinyl crackle synthesizer ported from viator-rust, expanded with Patina-inspired vinyl emulation. Generates realistic vinyl surface noise (crackle, hiss, pops) and applies vinyl-specific audio degradation (RIAA curve, stylus effects, warp, echo).\n\nThis effect operates in two modes simultaneously: it generates vinyl noise that mixes with the input signal, and it applies vinyl degradation processing to the input signal itself.\n\n### Noise Generation Parameters\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| hiss | 0 - 1 | 0.3 | Continuous surface hiss level |\n| dust | 0 - 1 | 0.3 | Click/crackle density |\n| age | 0 - 1 | 0.3 | Overall wear and degradation |\n| speed | 0 - 1 | 0.5 | Playback speed scaling |\n\n### Vinyl Emulation Parameters\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| riaa | 0 - 1 | 0 | RIAA de-emphasis EQ blend |\n| stylusResonance | 0 - 1 | 0 | 14kHz peaking EQ (stylus cantilever resonance) |\n| wornStylus | 0 - 1 | 0 | HF shelf reduction + allpass phase smear |\n| pinch | 0 - 1 | 0 | Even-harmonic distortion (inner groove effect) |\n| innerGroove | 0 - 1 | 0 | Asymmetric waveshaping (groove geometry distortion) |\n| ghostEcho | 0 - 1 | 0 | 3-tap BPF-colored delay (pre/post echo from adjacent grooves) |\n| dropout | 0 - 1 | 0 | Probabilistic amplitude dips |\n| warp | 0 - 1 | 0 | Multi-LFO pitch wobble (warped record) |\n| eccentricity | 0 - 1 | 0 | Rotation-rate pitch drift (off-center spindle) |\n\n**Tips:** For subtle vinyl warmth, use only hiss (0.1) and dust (0.1) with a touch of riaa (0.2). For a destroyed, dug-from-a-crate aesthetic, push age, wornStylus, innerGroove, and warp above 0.6. The ghostEcho parameter recreates the pre-echo artifact where loud passages bleed into adjacent grooves.\n\n## Tone Arm\n\nA physics-based vinyl record simulation via AudioWorklet, ported from the Python ToneArm library. Unlike Vinyl Noise which generates noise and applies processing, Tone Arm models the physical behavior of a turntable: cartridge coil induction, stylus tracking, RIAA equalization, and mechanical vibrations.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| wow | 0 - 1 | 0.3 | Slow pitch wobble (one cycle per revolution) |\n| coil | 0 - 1 | 0.2 | Cartridge coil non-linearity (Faraday induction distortion) |\n| flutter | 0 - 1 | 0.1 | Fast AM wobble (~10 Hz at 33 RPM) |\n| riaa | 0 - 1 | 0.5 | RIAA playback equalization blend |\n| stylus | 0 - 1 | 0.3 | Stylus HF rolloff (0 = 4.5kHz cutoff, 1 = 1kHz cutoff) |\n| hiss | 0 - 1 | 0.2 | Surface hiss level |\n| pops | 0 - 1 | 0.1 | Pop/click density |\n| rpm | 33.333, 45, 78 | 33.333 | Turntable speed in RPM |\n\nThe RPM setting affects the wow and flutter rates (faster RPM = faster modulation cycles). The coil parameter is unique to Tone Arm -- it models the electromagnetic non-linearity of the phono cartridge, adding a specific type of even-harmonic distortion that is characteristic of vinyl playback.\n\n## BitCrusher\n\nReduces the effective bit depth of the audio signal, creating the staircase quantization noise of early digital samplers. Implemented as a staircase WaveShaper curve.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| bits | 1 - 16 | 4 | Effective bit depth |\n\nAt 16 bits, the effect is transparent. At 8 bits, you get Amiga/NES-era grit. At 4 bits, extreme digital destruction. At 1 bit, pure square wave.\n\n## Building Lo-Fi Chains\n\nThe lo-fi effects can be stacked to create complex degradation aesthetics. Here are some recommended chains:\n\n### Warm Tape (Subtle)\n\nA gentle analog warmth suitable for master bus or individual tracks:\n\n1. **Tape Saturation** -- drive: 25, tone: 14000\n2. **EQ3** -- low: +2, high: -1 (compensate for brightness)\n\n### Worn Cassette\n\nVHS/cassette tape aesthetic:\n\n1. **Tape Degradation** -- wow: 40, flutter: 30, hiss: 20, saturation: 40, toneShift: 35\n2. **Filter** -- lowpass at 8000 Hz, -24 dB/oct\n\n### Dusty Vinyl\n\nRecord store crate-dig vibe:\n\n1. **Vinyl Noise** -- hiss: 0.2, dust: 0.3, age: 0.4, riaa: 0.3, wornStylus: 0.2\n2. **Tape Saturation** -- drive: 20, tone: 10000\n\n### Crystal Castles Aesthetic\n\nExtreme digital/analog destruction:\n\n1. **BitCrusher** -- bits: 6\n2. **Tape Degradation** -- wow: 50, flutter: 40, hiss: 30, saturation: 60, toneShift: 25\n3. **Distortion** -- drive: 0.3\n4. **Filter** -- lowpass at 6000 Hz, -48 dB/oct\n\n### Full Vinyl Simulation\n\nComplete turntable chain using Tone Arm for physics and Vinyl Noise for surface noise:\n\n1. **Tone Arm** -- wow: 0.3, coil: 0.3, riaa: 0.6, stylus: 0.4, rpm: 33.333\n2. **Vinyl Noise** -- hiss: 0.15, dust: 0.2, ghostEcho: 0.1\n3. **EQ3** -- low: +3 (compensate for RIAA roll-off at low end)\n\n**General principle:** Stack effects from most subtle to most extreme. Put frequency-shaping effects (filters, EQ) last to tame any artifacts introduced by the degradation effects. Use the wet/dry mix on each effect to dial back intensity without removing the effect entirely.\n",
+    "images": []
+  },
+  {
+    "id": "29-delay-echo-effects",
+    "number": 36,
+    "title": "Delay & Echo Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": "# Delay & Echo Effects\n\nDEViLBOX provides six delay and echo effects ranging from basic feedback delays to detailed hardware emulations. All time-based delays support BPM synchronization for tempo-locked echoes.\n\n## Ambient Delay\n\nA modulated multi-tap delay with a filter and allpass diffusion in the feedback path. Inspired by the Valhalla Delay and Strymon Timeline. Delays evolve and decay into washed-out ambience rather than repeating as clean copies.\n\n**Signal flow:**\n```\ninput --> tap1 (time x 1.0) --> sum --> feedback filter --> allpass diffusion --> feedback gain --> back to taps\n      --> tap2 (time x 1.5) --/\n      --> tap3 (time x 2.0) --/\ntap sum --> stereo panning per tap --> wet output\n```\n\nEach tap is panned to a different stereo position for width. The feedback filter darkens or brightens successive repeats, and the allpass diffusion smears them into ambient wash.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| time | 10 - 2000 ms | 375 | Base delay time (BPM-syncable) |\n| feedback | 0 - 95 | 55 | Feedback amount (percentage) |\n| taps | 1 - 3 | 2 | Number of delay taps |\n| filterType | lowpass, highpass, bandpass | lowpass | Feedback filter type |\n| filterFreq | 200 - 8000 Hz | 2500 | Feedback filter frequency |\n| filterQ | 0.5 - 8 | 1.5 | Feedback filter resonance |\n| modRate | 0 - 100 | 30 | Modulation rate (percentage) |\n| modDepth | 0 - 100 | 15 | Modulation depth (percentage) |\n| stereoSpread | 0 - 100 | 50 | Stereo spread of taps (percentage) |\n| diffusion | 0 - 100 | 20 | Allpass diffusion amount (percentage) |\n\n**Tips:** For shoegaze-style wash, use all 3 taps with high feedback (75%), lowpass filter at 2000 Hz, and high diffusion (60%). The repeats will darken and smear into a dense ambient cloud. For rhythmic delay, use 1 tap with low feedback and diffusion.\n\n## Space Echo\n\nA Roland RE-201 Space Echo emulation with three tape heads at fixed ratios, a spring reverb, and 12-mode selector logic. The RE-201 is one of the most iconic delay units in music history, used extensively in dub, electronic, and experimental music.\n\n### Architecture\n\nThree delay lines represent the three tape heads of the RE-201. Each head reads at a fixed multiple of the base delay time:\n- **Head 1**: 1x the rate setting\n- **Head 2**: 2x the rate setting\n- **Head 3**: 3x the rate setting\n\nA 12-mode selector enables different combinations of heads and reverb, matching the original hardware's rotary switch.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| mode | 1 - 12 | 8 | Head/reverb combination mode |\n| rate | 10 - 2000 ms | 300 | Base delay time (BPM-syncable) |\n| intensity | 0 - 1.2 | 0.74 | Feedback amount (>1.0 = self-oscillation) |\n| echoVolume | 0 - 1 | 0.8 | Echo output level |\n| reverbVolume | 0 - 1 | 0.4 | Spring reverb output level |\n| bass | -20 - +20 dB | 4 | Bass EQ |\n| treble | -20 - +20 dB | 4 | Treble EQ |\n\n### Mode Selector\n\n| Mode | Head 1 | Head 2 | Head 3 | Reverb | Character |\n|------|--------|--------|--------|--------|-----------|\n| 1 | On | Off | Off | Off | Single short echo |\n| 2 | Off | On | Off | Off | Single medium echo |\n| 3 | Off | Off | On | Off | Single long echo |\n| 4 | On | On | Off | Off | Two-tap rhythm |\n| 5 | On | Off | On | Off | Short + long echo |\n| 6 | Off | On | On | Off | Medium + long echo |\n| 7 | On | On | On | Off | Three-tap pattern |\n| 8 | On | On | On | On | Full echo + reverb |\n| 9 | On | Off | Off | On | Short echo + reverb |\n| 10 | Off | On | Off | On | Medium echo + reverb |\n| 11 | Off | Off | On | On | Long echo + reverb |\n| 12 | Off | Off | Off | On | Reverb only |\n\nThe feedback path includes tape saturation and EQ filtering. Each cycle through the feedback loop degrades slightly, simulating the progressive quality loss of magnetic tape.\n\n**Tips:** Mode 7 (all three heads, no reverb) creates rhythmic triplet patterns. Push intensity above 1.0 for the classic RE-201 self-oscillation effect -- the echoes build up into a howling, saturated wash. Pull intensity back below 1.0 to tame the oscillation. Automating the rate parameter while feedback is high creates dramatic pitch-shifting tape effects.\n\n## Spacey Delayer\n\nA WASM-backed multi-tap tape delay effect ported from the RackAFX SpaceyDelayer plugin. Offers up to three taps with tape-style bandpass filtering in the feedback path.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| firstTap | 10 - 2000 ms | 250 | Delay time before first echo (BPM-syncable) |\n| tapSize | 10 - 1000 ms | 150 | Spacing between subsequent taps |\n| feedback | 0 - 95 | 40 | Feedback amount (percentage) |\n| multiTap | 0 or 1 | 1 | Enable 3-tap mode (0 = single tap) |\n| tapeFilter | 0 or 1 | 0 | Enable tape-style bandpass in feedback loop |\n\n**Tips:** With tapeFilter enabled, each feedback cycle loses high and low frequencies, simulating tape head degradation. This creates a natural, warm decay. With multiTap enabled, the three taps create a rhythmic echo pattern where tap spacing is controlled by tapSize independently of the initial delay time.\n\n## RE Tape Echo\n\nA WASM-backed emulation of the Roland RE-150 and RE-201 tape echo units. More detailed than the Space Echo effect, with physical modeling of tape transport artifacts: wow, flutter, motor noise (dirt), record/play head crosstalk (input bleed), and tape loop ghosting.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| mode | 0 - 5 | 3 | Echo mode (head/feedback combinations) |\n| repeatRate | 0 - 1 | 0.5 | Tape speed, controls delay time (BPM-syncable) |\n| intensity | 0 - 1 | 0.5 | Feedback amount |\n| echoVolume | 0 - 1 | 0.8 | Wet echo level |\n| wow | 0 - 1 | 0 | Low-frequency speed modulation |\n| flutter | 0 - 1 | 0 | Mid-frequency speed modulation |\n| dirt | 0 - 1 | 0 | High-frequency speed noise (motor grit) |\n| inputBleed | 0 or 1 | 0 | Record/play head crosstalk simulation |\n| loopAmount | 0 - 1 | 0 | Tape loop ghost echo |\n| playheadFilter | 0 or 1 | 1 | Speed-dependent EQ (darker at slower speeds) |\n\n### Modes\n\n| Mode | Description |\n|------|-------------|\n| 0 | Head 1 only |\n| 1 | Head 2 only |\n| 2 | Head 3 only |\n| 3 | Heads 1 + 2 |\n| 4 | Heads 1 + 3 |\n| 5 | All three heads |\n\n**Tips:** The wow, flutter, and dirt parameters model the mechanical imperfections of the tape transport. Subtle values (0.1-0.2) add realistic analog character. Higher values create obvious pitch instability. The loopAmount parameter adds a faint ghost echo that simulates the tape loop passing over the play head a second time -- a subtle detail that adds depth. InputBleed simulates the crosstalk between the record and play heads that occurs in real tape echo units.\n\n## Ping Pong Delay\n\nA stereo delay where echoes alternate between left and right channels. Each echo crosses to the opposite channel, creating a bouncing stereo pattern.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| time | 0.01 - 2 s | 0.25 | Delay time per side (BPM-syncable) |\n| feedback | 0 - 0.95 | 0.5 | Feedback amount |\n\n**Tips:** At BPM-synced 1/8 notes with 50% feedback, ping pong delay creates the classic bouncing echo pattern heard in countless electronic tracks. For a wider stereo image on a mono source, use short delay times (30-50ms) with low feedback.\n\n## Feedback Delay\n\nA basic mono feedback delay. Each echo is fed back into the delay input, creating a decaying series of repeats.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| time | 0.01 - 2 s | 0.25 | Delay time (BPM-syncable) |\n| feedback | 0 - 0.95 | 0.5 | Feedback amount |\n\n**Tips:** The simplest delay in the collection, useful when you want clean, uncolored repeats. For dub-style echo throws, place on a send bus and automate the send level -- turn it up briefly to capture a phrase, then turn it down to let the echoes decay.\n\n## BPM Sync\n\nAll delay effects with BPM-syncable parameters can lock their timing to the current tempo. When BPM sync is enabled on an effect:\n\n1. Select a sync division from the available note values\n2. The delay time is automatically calculated from the current BPM\n\n### Available Sync Divisions\n\n| Division | Multiplier | At 120 BPM |\n|----------|-----------|------------|\n| 1/1 | 4 beats | 2000 ms |\n| 1/2 | 2 beats | 1000 ms |\n| 1/2T | 1.33 beats | 667 ms |\n| 1/4 | 1 beat | 500 ms |\n| 1/4T | 0.67 beats | 333 ms |\n| 1/8 | 0.5 beats | 250 ms |\n| 1/8T | 0.33 beats | 167 ms |\n| 1/16 | 0.25 beats | 125 ms |\n| 1/16T | 0.167 beats | 83 ms |\n| 1/32 | 0.125 beats | 63 ms |\n| 1/4D | 1.5 beats | 750 ms |\n| 1/8D | 0.75 beats | 375 ms |\n\n(T = triplet, D = dotted)\n\nWhen the BPM changes during playback, synced delay times update automatically. This keeps echoes rhythmically aligned even during tempo changes.\n\n## Creative Techniques\n\n### Dub Echo Throws\n\nPlace a Space Echo or RE Tape Echo on send bus B. During mixing, automate the send level from a vocal or instrument channel: bring the send up briefly to capture a phrase, then cut it. The captured phrase echoes and decays through the tape delay. This is the fundamental dub mixing technique.\n\n### Feedback Spirals\n\nSet Space Echo intensity above 1.0 or push feedback near the maximum on any delay. The echoes build up into a wall of sound. Automate the feedback down before it gets out of control. This technique creates dramatic tension-and-release moments.\n\n### Multi-Delay Textures\n\nStack two delays at different sync divisions (e.g., 1/8 and 1/4T) on separate send buses with different feedback amounts. The polyrhythmic echo pattern creates complex, evolving textures that stay rhythmically coherent.\n",
+    "images": []
+  },
+  {
+    "id": "30-modulation-effects",
+    "number": 37,
+    "title": "Modulation Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": '# Modulation Effects\n\nModulation effects use low-frequency oscillators (LFOs) to periodically vary one or more parameters of the audio signal -- pitch, amplitude, filter cutoff, or phase. DEViLBOX provides eight modulation effects covering chorus, phasing, tremolo, vibrato, auto-panning, and rotary speaker simulation.\n\n## Chorus\n\nClassic ensemble chorus that creates a thickened, detuned copy of the input signal. An LFO modulates the delay time of a short delay line, producing slight pitch variations that simulate multiple instruments playing the same part.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.1 - 20 Hz | 1.5 | LFO rate (BPM-syncable) |\n| delayTime | 0.5 - 20 ms | 3.5 | Base delay time |\n| depth | 0 - 1 | 0.7 | Modulation depth |\n\n**How it works:** The delay time oscillates around the base value. Longer delay times and higher depth create a more pronounced detuning effect. The perceived "width" comes from the slight pitch difference between the dry and delayed signals.\n\n**Tips:** Subtle chorus (frequency: 0.8, depth: 0.3, delayTime: 2) adds gentle movement to pads and clean guitars. For the classic 1980s chorus sound (Roland Juno, Dimension D), use frequency: 0.5, depth: 0.5, delayTime: 5 at 50% wet. Very slow rates (0.1 Hz) create gradual detuning that is felt more than heard.\n\n## Phaser\n\nMulti-stage allpass phaser that creates moving notches in the frequency spectrum. An LFO sweeps the phaser stages through the frequency range, producing the characteristic swooshing sound.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.01 - 10 Hz | 0.5 | LFO sweep rate |\n| octaves | 0 - 8 | 3 | Sweep range in octaves |\n| baseFrequency | 100 - 8000 Hz | 1000 | Center frequency of the sweep |\n| Q | 0.1 - 20 | 10 | Phase stage resonance (notch depth) |\n\n**How it works:** Each allpass stage shifts the phase of the signal at different frequencies. When the phase-shifted signal is mixed with the original, frequencies where the phase difference is 180 degrees cancel out, creating notches. The LFO moves these notches through the spectrum.\n\n**Tips:** High Q values create deeper, more pronounced notches -- good for dramatic sweeps. Low Q values create a gentler, more subtle effect. For guitar, try frequency: 0.3, octaves: 4, Q: 8. For synth pads, slower rates (0.05-0.1 Hz) create glacial sweeps.\n\n## Bi-Phase\n\nA Mu-Tron Bi-Phase emulation featuring dual phaser circuits that can be routed in series or parallel. The two phasers run at independent rates, creating complex interference patterns that a single phaser cannot achieve.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| rateA | 0.1 - 10 Hz | 0.5 | Phaser A LFO rate (BPM-syncable) |\n| depthA | 0 - 1 | 0.6 | Phaser A modulation depth |\n| rateB | 0.1 - 10 Hz | 4.0 | Phaser B LFO rate |\n| depthB | 0 - 1 | 0.4 | Phaser B modulation depth |\n| feedback | 0 - 1 | 0.3 | Internal feedback |\n| routing | 0 (parallel), 1 (series) | 0 | Dual phaser routing mode |\n\n### Routing Modes\n\n**Series (routing = 1):** Input flows through Phaser A, then Phaser B. Creates deep, complex swooshing with intricate notch patterns. The two sweep rates interact multiplicatively, producing harmonic relationships between the sweeps.\n\n**Parallel (routing = 0):** Input splits to both phasers simultaneously, and their outputs are mixed. Creates wider stereo image and more subtle, spread-out phasing.\n\n**Tips:** Set rateA slow (0.2 Hz) and rateB fast (3-5 Hz) for a fast shimmer riding on a slow sweep. In series mode with feedback at 0.5, this creates the lush, complex phasing heard on classic Stereolab and Can records. The Bi-Phase excels on organs, electric pianos, and synth pads.\n\n## Tremolo\n\nAmplitude modulation -- the LFO directly varies the signal volume. One of the oldest and simplest modulation effects, built into most guitar amplifiers.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.1 - 50 Hz | 10 | Tremolo rate |\n| depth | 0 - 1 | 0.5 | Volume modulation depth (1 = full on/off) |\n\n**How it works:** The signal amplitude is multiplied by the LFO output. At depth 1, the signal alternates between full volume and silence. At depth 0.5, it alternates between full volume and half volume.\n\n**Tips:** Slow tremolo (2-4 Hz, depth 0.3) adds gentle movement to clean guitars and organs. Fast tremolo (10-15 Hz) at moderate depth creates the classic surf/spaghetti western guitar sound. Very fast tremolo (20-50 Hz) enters ring modulation territory, creating metallic sidebands.\n\n## Vibrato\n\nPitch modulation via LFO. Unlike chorus (which mixes dry and modulated signals), vibrato processes the entire signal through the modulated delay, producing pure pitch variation.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.1 - 50 Hz | 5 | Vibrato rate |\n| depth | 0 - 1 | 0.1 | Pitch deviation amount |\n\n**How it works:** An LFO modulates a short delay line. Since changing delay time changes the apparent pitch of the signal, this creates pitch wobble. The depth parameter controls how much the delay time varies, and therefore how wide the pitch deviation is.\n\n**Tips:** Natural-sounding vibrato uses rates of 4-7 Hz with subtle depth (0.05-0.15). Extreme settings (high rate + high depth) create a warbling, underwater effect. For vocal-like expressiveness on synth leads, try frequency: 5.5, depth: 0.08.\n\n## Auto Filter\n\nAn LFO-modulated filter that automatically sweeps the cutoff frequency. Creates wah-wah and filter sweep effects without manual control.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| frequency | 0.01 - 20 Hz | 1 | LFO sweep rate |\n| baseFrequency | 20 - 20000 Hz | 200 | Minimum filter frequency |\n| octaves | 0 - 8 | 2.6 | Sweep range in octaves above base |\n| filterType | lowpass, highpass, bandpass | lowpass | Filter type |\n\n**How it works:** The filter cutoff oscillates between `baseFrequency` and `baseFrequency * 2^octaves`. A lowpass filter sweeping up reveals more harmonics, sweeping down removes them. A bandpass filter creates a resonant peak that moves through the spectrum.\n\n**Tips:** For classic auto-wah on bass, use bandpass with baseFrequency: 200, octaves: 3, frequency: 0.5. For techno filter sweeps, use lowpass with baseFrequency: 100, octaves: 6, and automate the frequency for build-ups. Highpass mode creates rhythmic thinning effects.\n\n## Auto Wah\n\nAn envelope-follower filter that responds to input dynamics. Unlike Auto Filter which sweeps at a fixed rate, Auto Wah opens the filter wider when the input is louder. Playing harder opens the filter; playing softer closes it.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| baseFrequency | 20 - 20000 Hz | 100 | Minimum filter frequency |\n| octaves | 0 - 8 | 6 | Maximum sweep range |\n| sensitivity | -40 - 0 dB | 0 | Input sensitivity threshold |\n| Q | 0.1 - 20 | 2 | Filter resonance |\n| gain | 0 - 10 | 2 | Follower gain (amplifies the envelope) |\n| follower | 0.01 - 1 | 0.1 | Envelope smoothing time (lower = faster response) |\n\n**Tips:** On bass guitar or synth bass, Auto Wah with high Q (8-12) and sensitivity: -10 creates funky quacks that respond to playing dynamics. Lower the follower value for snappier response, raise it for smoother sweeps. The gain parameter can push the envelope to open the filter wider than the raw input dynamics would allow.\n\n## Leslie (Rotary Speaker)\n\nA WASM-powered rotary speaker simulation modeling the Leslie cabinet. The Leslie uses a crossover to split the signal, with a horn (high frequencies) and drum (low frequencies) rotating at different speeds. The rotation creates amplitude modulation, frequency modulation (Doppler effect), and spatial movement.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| speed | 0 - 1 | 0.0 | Speed mode: 0 = slow (chorale), 0.5 = brake, 1 = fast (tremolo) |\n| hornRate | 0.1 - 10 Hz | 6.8 | Horn rotor speed |\n| drumRate | 0.1 - 8 Hz | 5.9 | Drum rotor speed |\n| hornDepth | 0 - 1 | 0.7 | Horn modulation depth |\n| drumDepth | 0 - 1 | 0.5 | Drum modulation depth |\n| doppler | 0 - 1 | 0.5 | Doppler pitch shift amount |\n| width | 0 - 1 | 0.8 | Stereo width |\n| acceleration | 0 - 1 | 0.5 | Speed ramp time (rotor inertia) |\n\n**How it works:** The signal is split by a crossover. High frequencies go through the horn simulation (faster rotation, more Doppler), low frequencies through the drum simulation (slower rotation, more amplitude modulation). The combined result has complex timbral movement with stereo motion.\n\n**Tips:** The signature Leslie effect comes from switching between slow and fast speeds. Automate the speed parameter between 0 and 1 -- the acceleration parameter controls how long the rotors take to speed up or slow down, creating the characteristic Leslie "ramp." Essential on Hammond organ, but also excellent on electric piano, guitar, and synthesizers. High doppler settings create dramatic pitch wobble; set to 0 for pure amplitude modulation.\n\n## Stacking Modulation\n\nModulation effects can be combined for richer textures:\n\n- **Chorus into Phaser**: Thickened signal with animated notches -- classic 1970s prog rock tone\n- **Tremolo into Chorus**: Rhythmic volume modulation with pitch thickening -- dreamy, hypnotic\n- **Leslie into Reverb**: Rotating speaker in a large space -- massive organ sounds\n- **Bi-Phase into Delay**: Complex phasing patterns echoed in time -- psychedelic textures\n- **Vibrato into Auto Filter**: Pitch wobble with moving filter -- vocal, expressive quality\n\nWhen stacking, put the effect with the slower rate first in the chain so it modulates the output of the faster effect. This creates a more musical result than the reverse order.\n',
+    "images": []
+  },
+  {
+    "id": "31-dynamics-eq-effects",
+    "number": 38,
+    "title": "Dynamics & EQ",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": '# Dynamics & EQ\n\nDynamics processors and equalizers shape the volume envelope and frequency balance of audio. DEViLBOX provides compressors, sidechain compression, 3-band EQ, multitype filtering, and a performance-oriented dub filter.\n\n## Compressor\n\nA standard dynamics compressor that reduces the volume of loud signals above a threshold. Compression reduces dynamic range, making quiet parts louder relative to loud parts. Essential for controlling transient-heavy sources (drums, vocals) and gluing mixes together.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | -60 - 0 dB | -24 | Level above which compression begins |\n| ratio | 1 - 20 | 12 | Compression ratio (2:1 = gentle, 20:1 = limiting) |\n| attack | 0.001 - 0.5 s | 0.003 | Time to reach full compression |\n| release | 0.01 - 1 s | 0.25 | Time to return to unity gain |\n\n### How Compression Works\n\nWhen the input signal exceeds the threshold, the compressor reduces the gain by the compression ratio. At 4:1 ratio with a -24 dB threshold:\n- A signal at -24 dB passes through unchanged\n- A signal at -20 dB (4 dB over threshold) is reduced to -23 dB (1 dB over threshold)\n- A signal at -12 dB (12 dB over threshold) is reduced to -21 dB (3 dB over threshold)\n\n**Attack** controls how quickly the compressor responds. Fast attack (0.001-0.01s) catches transients, making drums punchier but potentially dulling the initial snap. Slow attack (0.05-0.2s) lets transients through, preserving impact.\n\n**Release** controls how quickly the gain returns to normal. Fast release (0.01-0.05s) creates a pumping effect as the gain rapidly bounces back. Slow release (0.2-0.5s) provides smoother, more transparent compression.\n\n### Compression Recipes\n\n| Use Case | Threshold | Ratio | Attack | Release |\n|----------|-----------|-------|--------|---------|\n| Gentle bus glue | -18 dB | 2:1 | 0.03 | 0.25 |\n| Drum punch | -24 dB | 4:1 | 0.01 | 0.1 |\n| Vocal control | -20 dB | 3:1 | 0.005 | 0.15 |\n| Hard limiting | -6 dB | 20:1 | 0.001 | 0.05 |\n| Parallel crush | -30 dB | 10:1 | 0.001 | 0.05 |\n\n## Sidechain Compressor\n\nA compressor with an external sidechain input that triggers compression based on a different audio source. The classic use case is routing a kick drum to the sidechain to create the "pumping" effect on bass, pads, or the entire mix -- a fundamental technique in electronic music.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | -60 - 0 dB | -24 | Compression threshold |\n| ratio | 1 - 20 | 4 | Compression ratio |\n| attack | 0.001 - 0.5 s | 0.003 | Attack time |\n| release | 0.01 - 1 s | 0.25 | Release time |\n| knee | 0 - 40 dB | 6 | Soft knee width (0 = hard knee) |\n| sidechainGain | 0 - 200 | 100 | Sidechain sensitivity (percentage) |\n\n### How Sidechain Compression Works\n\nUnlike a normal compressor that responds to its own input level, the sidechain compressor uses a separate audio source (the "sidechain") to determine when to compress. When the sidechain signal is loud, the compressor reduces the main signal. When the sidechain signal is quiet, the main signal passes through at full volume.\n\n### Setting Up Sidechain Compression\n\n1. Add a SidechainCompressor to the target channel (e.g., the bass channel)\n2. Set the `sidechainSource` to the channel number of the trigger source (e.g., the kick drum channel)\n3. The compressor monitors the kick channel\'s output and ducks the bass whenever the kick hits\n\nThe sidechain source is set in the effect configuration. When the effect is created, the `ChannelEffectsManager` automatically wires the source channel\'s output to the compressor\'s sidechain input.\n\n### Sidechain Recipes\n\n| Use Case | Threshold | Ratio | Attack | Release | Knee |\n|----------|-----------|-------|--------|---------|------|\n| Subtle kick/bass ducking | -20 dB | 3:1 | 0.003 | 0.15 | 6 |\n| Heavy EDM pump | -30 dB | 8:1 | 0.001 | 0.25 | 0 |\n| Gentle pad ducking | -18 dB | 2:1 | 0.01 | 0.3 | 10 |\n\n**Tips:** The **sidechainGain** parameter controls how sensitive the compressor is to the sidechain source. At 100 (default), the sidechain signal is used at unity. Increase to 150-200 for more aggressive ducking from a quiet source, or decrease to 50-80 for gentler response.\n\nThe **knee** parameter smooths the transition around the threshold. A hard knee (0 dB) creates an abrupt onset of compression -- useful for dramatic pumping. A soft knee (10-40 dB) creates a gradual transition that sounds more natural.\n\n## 3-Band EQ\n\nA three-band equalizer with adjustable crossover frequencies. Boosts or cuts the low, mid, and high frequency ranges independently.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| low | -24 - +24 dB | 0 | Low band gain |\n| mid | -24 - +24 dB | 0 | Mid band gain |\n| high | -24 - +24 dB | 0 | High band gain |\n| lowFrequency | 100 - 1000 Hz | 400 | Low/mid crossover frequency |\n| highFrequency | 1000 - 8000 Hz | 2500 | Mid/high crossover frequency |\n\n### EQ Ranges\n\nThe three bands are separated by the crossover frequencies:\n- **Low band**: Frequencies below `lowFrequency` (default: below 400 Hz)\n- **Mid band**: Frequencies between `lowFrequency` and `highFrequency` (default: 400-2500 Hz)\n- **High band**: Frequencies above `highFrequency` (default: above 2500 Hz)\n\n### Common EQ Moves\n\n| Goal | Low | Mid | High | Notes |\n|------|-----|-----|------|-------|\n| Add warmth | +3 | 0 | 0 | Boost lows gently |\n| Add presence | 0 | +2 | +1 | Bring out the midrange |\n| Add brightness | 0 | 0 | +3 | Boost highs (can increase noise) |\n| Remove mud | -3 | 0 | 0 | Cut low-mid buildup |\n| Telephone effect | -24 | +6 | -24 | Extreme band-pass via EQ |\n| Scoop | 0 | -4 | 0 | "Smiley face" EQ, popular for metal |\n\n## Filter\n\nA versatile biquad filter with eight types and four rolloff slopes. More precise than EQ3 for targeted frequency shaping.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| type | lowpass, highpass, bandpass, notch, allpass, peaking, lowshelf, highshelf | lowpass | Filter type |\n| frequency | 20 - 20000 Hz | 5000 | Cutoff or center frequency |\n| rolloff | -12, -24, -48, -96 dB/oct | -12 | Filter slope steepness |\n| Q | 0.1 - 20 | 1 | Resonance / quality factor |\n| gain | -40 - +40 dB | 0 | Gain (for peaking, lowshelf, highshelf only) |\n\n### Filter Types\n\n| Type | Description | Use |\n|------|-------------|-----|\n| lowpass | Passes low frequencies, attenuates highs | Remove harshness, tame brightness |\n| highpass | Passes high frequencies, attenuates lows | Remove rumble, clean up low end |\n| bandpass | Passes a frequency band, attenuates both sides | Isolate specific frequency ranges |\n| notch | Removes a narrow frequency band | Eliminate problem resonances |\n| allpass | Passes all frequencies, shifts phase | Creative phase effects |\n| peaking | Boosts or cuts a frequency band | Precise surgical EQ |\n| lowshelf | Boosts or cuts all frequencies below a point | Broad low-end shaping |\n| highshelf | Boosts or cuts all frequencies above a point | Broad high-end shaping |\n\n### Rolloff Slopes\n\n| Slope | Character |\n|-------|-----------|\n| -12 dB/oct | Gentle, musical. Good for subtle shaping |\n| -24 dB/oct | Standard. Balances precision and musicality |\n| -48 dB/oct | Steep. Precise frequency separation |\n| -96 dB/oct | Brick wall. Near-total cutoff beyond the frequency |\n\n**Tips:** For DJ-style filter sweeps, automate a lowpass filter frequency from 20000 Hz down to 200 Hz. The Q parameter at values above 5 creates a resonant peak at the cutoff frequency -- the signature "acid" sound when swept. For surgical notch removal of problem frequencies, use a narrow Q (10-20) with the notch type.\n\n## Dub Filter\n\nA performance-oriented high-pass filter modeled after the Altec/MCI console filters used by King Tubby in classic Jamaican dub mixing. Features a steep -24 dB/octave slope and built-in subtle saturation for the warm, aggressive character of hardware console filters.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| cutoff | 20 - 10000 Hz | 20 | Filter cutoff frequency |\n| resonance | 0 - 100 | 30 | Filter resonance |\n| gain | 0 - 2 | 1 | Output gain/drive |\n\n**How it works:** The signal passes through a steep high-pass filter, then through a subtle distortion stage, and finally through an output gain. The resonance creates a peak at the cutoff frequency, and the gain can push the signal into saturation for additional harmonic content.\n\n**Tips:** This is a performance effect designed for live manipulation. Sweep the cutoff from 20 Hz (full signal) up to 2000+ Hz to thin out the mix dramatically, then bring it back down for impact. High resonance (70-100) with the cutoff around 200-500 Hz creates the characteristic dub filter "honk." The gain parameter at values above 1.0 adds drive that works well with the resonance.\n\nPair the Dub Filter with a send bus echo (Space Echo or Spring Reverb) for authentic dub mixing: sweep the filter up while sending the signal to the delay, creating filtered echo tails that decay while the filter sweeps back down.\n',
+    "images": []
+  },
+  {
+    "id": "32-buzzmachine-effects",
+    "number": 39,
+    "title": "Buzzmachine Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": `# Buzzmachine Effects
+
+DEViLBOX includes 23 effects emulated from Jeskola Buzz, a legendary modular music production environment from the late 1990s. Buzz had a vibrant community of "machine" developers who created hundreds of DSP plugins. These emulations run via WASM and are lazy-loaded on first use.
+
+## Overview
+
+All Buzzmachine effects share a common architecture: they use the \`BuzzmachineSynth\` engine with a specific machine type. Parameters are set by index (matching the original Buzz machine parameter numbering). The effects are grouped by function:
+
+| Category | Count | Effects |
+|----------|-------|---------|
+| Distortion | 6 | BuzzDistortion, BuzzOverdrive, BuzzDistortion2, BuzzDist2, BuzzSoftSat, BuzzStereoDist |
+| Filter | 4 | BuzzSVF, BuzzPhilta, BuzzNotch, BuzzZfilter |
+| Reverb & Delay | 4 | BuzzDelay, BuzzCrossDelay, BuzzFreeverb, BuzzPanzerDelay |
+| Modulation | 3 | BuzzChorus, BuzzChorus2, BuzzWhiteChorus |
+| Dynamics | 4 | BuzzCompressor, BuzzLimiter, BuzzExciter, BuzzMasterizer |
+| EQ & Stereo | 1 | BuzzStereoGain |
+| Pitch | 1 | BuzzFreqShift |
+
+## Distortion Effects
+
+### BuzzDistortion (Arguru Distortion)
+
+The Arguru distortion machine, originally by Juan Antonio Arguelles Rius (Arguru). A straightforward, aggressive distortion with sharp clipping character. One of the earliest and most popular Buzz effect machines.
+
+### BuzzOverdrive (Geonik Overdrive)
+
+Geonik's overdrive emulation. Warmer than the Arguru distortion, with softer clipping that simulates tube amplifier saturation. Better suited for instruments where you want to add grit without destroying the original timbre.
+
+### BuzzDistortion2 (Jeskola Distortion)
+
+The built-in Jeskola distortion from the Buzz framework itself. A general-purpose distortion with a different waveshaping curve from Arguru's machine.
+
+### BuzzDist2 (Elak Dist2)
+
+Elak's second distortion machine. Features a more complex waveshaping algorithm with additional harmonic content compared to the simpler machines.
+
+### BuzzSoftSat (Graue Soft Saturation)
+
+A subtle soft-clipping saturation by Graue. Designed for gentle warming rather than obvious distortion. Good for adding harmonics to clean signals without the aggressive character of the harder distortion machines.
+
+### BuzzStereoDist (WhiteNoise Stereo Distortion)
+
+A stereo-aware distortion by WhiteNoise that processes left and right channels independently. Preserves the stereo image while adding distortion, unlike mono distortion effects that can collapse the stereo field.
+
+## Filter Effects
+
+### BuzzSVF (Elak State Variable Filter)
+
+Elak's state variable filter implementation. A versatile filter that simultaneously provides lowpass, highpass, bandpass, and notch outputs. The state variable topology allows smooth transitions between filter types and is known for musical resonance behavior.
+
+### BuzzPhilta (FSM Philta)
+
+FSM's (Fuzzpilz Sound Machines) performance filter. A resonant filter designed for real-time manipulation -- sweeping the cutoff during playback. Popular in the Buzz community for acid and trance filter effects.
+
+### BuzzNotch (CyanPhase Notch)
+
+A dedicated notch filter by CyanPhase. Removes a narrow band of frequencies with adjustable width and center frequency. Useful for eliminating specific resonances or creating phaser-like effects when the notch frequency is swept.
+
+### BuzzZfilter (Q Zfilter)
+
+Q's zero-delay feedback filter. Uses a more advanced topology than the standard SVF, providing better behavior at high resonance settings and near-Nyquist frequencies. Known for its tight, precise resonance peak.
+
+## Reverb & Delay Effects
+
+### BuzzFreeverb (Jeskola Freeverb)
+
+Jeskola's implementation of the Freeverb algorithm by Jezar at Dreampoint. A Schroeder/Moorer reverb that provides smooth, natural-sounding reverberation. One of the most widely used open-source reverb algorithms, known for its efficient computation and pleasant sound.
+
+### BuzzDelay (Jeskola Delay)
+
+The built-in Jeskola delay effect. A clean digital delay with feedback control. Simple and efficient, suitable for basic echo effects.
+
+### BuzzCrossDelay (Jeskola Cross Delay)
+
+Jeskola's cross-feedback stereo delay. Unlike a standard stereo delay, the feedback path crosses channels: the left echo feeds back to the right delay, and vice versa. This creates a complex, wide stereo echo pattern.
+
+### BuzzPanzerDelay (FSM Panzer Delay)
+
+FSM's feature-rich delay machine. One of the most complex delay effects in the Buzz ecosystem. Supports multiple delay modes, filtering in the feedback path, and advanced modulation. The name "Panzer" (German for "tank/armor") reflects its heavy, dense character.
+
+## Modulation Effects
+
+### BuzzChorus (FSM Chorus)
+
+FSM's chorus effect. A clean, musical chorus that adds subtle thickening and detuning. Based on modulated delay lines with careful attention to avoiding audible artifacts.
+
+### BuzzChorus2 (FSM Chorus 2)
+
+The second iteration of FSM's chorus with an improved algorithm. Features enhanced stereo widening and smoother modulation compared to the original.
+
+### BuzzWhiteChorus (WhiteNoise White Chorus)
+
+WhiteNoise's chorus variant with a brighter, more present character. The "White" in the name refers to its tonal quality rather than white noise -- it emphasizes higher harmonics in the chorus effect.
+
+## Dynamics Effects
+
+### BuzzCompressor (Geonik Compressor)
+
+Geonik's dynamics compressor. A straightforward compressor with the essential controls for taming dynamic range. Well-regarded in the Buzz community for transparent compression at moderate settings.
+
+### BuzzLimiter (Ld Soft Limiter)
+
+A soft limiter by Ld. Prevents signals from exceeding a ceiling level using soft-knee limiting rather than hard clipping. The soft limiting curve preserves more of the signal's transient character compared to a brick-wall limiter.
+
+### BuzzExciter (Oomek Exciter)
+
+Oomek's psychoacoustic exciter. Generates upper harmonics from the input signal and mixes them back in, adding perceived brightness and presence without simply boosting existing high frequencies. Based on the Aphex Aural Exciter concept.
+
+### BuzzMasterizer (Oomek Masterizer)
+
+Oomek's mastering-oriented dynamics processor. Combines multiple stages of processing (typically multiband compression, limiting, and gain makeup) into a single effect designed for the master bus. Provides loudness maximization with control over the processing intensity.
+
+## EQ & Stereo
+
+### BuzzStereoGain (DedaCode Stereo Gain)
+
+DedaCode's stereo gain utility. Provides independent gain control for left and right channels, plus stereo width adjustment. Useful as a utility effect for level matching, balance correction, and stereo image control.
+
+## Pitch
+
+### BuzzFreqShift (Bigyo Frequency Shifter)
+
+Bigyo's frequency shifter. Shifts all frequencies in the signal by a fixed amount in Hz (unlike pitch shifting which preserves harmonic ratios). Creates metallic, inharmonic, ring-modulation-like timbres. Small shift amounts (1-5 Hz) create subtle detuning; larger amounts create alien, robotic textures.
+
+## Working with Buzzmachine Parameters
+
+Buzzmachine effects use indexed parameters (0, 1, 2, ...) that map to the original Buzz machine parameter order. When you add a Buzzmachine effect, the parameters are displayed with their original names from the Buzz machine definition.
+
+The default parameters for Buzzmachine effects are intentionally empty -- the WASM machine initializes with its own built-in defaults, matching the original Buzz behavior where machines started in their default state.
+
+## Historical Context
+
+Jeskola Buzz, created by Oskari Tammelin, was one of the first modular music production environments (released 1997). Its plugin architecture (called "machines") spawned a community of hundreds of developers creating generators (synths) and effects. Many concepts pioneered in Buzz -- modular routing, machine-based architecture, pattern-based sequencing -- influenced later DAWs.
+
+The machines emulated in DEViLBOX represent some of the most popular and sonically distinctive effects from the Buzz ecosystem. Names like Arguru, FSM, Geonik, Elak, WhiteNoise, and Oomek are legendary in the Buzz community. Juan Antonio "Arguru" Arguelles Rius, who created the Arguru distortion and many other machines, later went on to work on Arturia's synthesizer products.
+`,
+    "images": []
+  },
+  {
+    "id": "33-wam-effects",
+    "number": 40,
+    "title": "WAM 2.0 Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": `# WAM 2.0 Effects
+
+DEViLBOX supports 11 effects built on the Web Audio Modules 2.0 (WAM) standard. WAM is an open plugin format for browser-based audio, analogous to VST/AU for desktop DAWs. WAM plugins run in their own AudioWorklet context and expose standardized parameter discovery and manipulation interfaces.
+
+WAM effects are lazy-loaded -- the plugin code is fetched from external URLs on first use. This keeps the initial app load fast while providing access to a rich library of third-party effects.
+
+## What is WAM 2.0?
+
+Web Audio Modules 2.0 is a community-driven standard for audio plugins in the browser. Key features:
+
+- **AudioWorklet-based**: All DSP runs on the audio thread for low-latency, glitch-free processing
+- **Standardized API**: Common interface for parameter discovery, state save/restore, and MIDI
+- **Multiple DSP backends**: Plugins can be written in JavaScript, Faust, Csound, SOUL, or compiled C/C++
+- **Self-contained**: Each plugin bundles its own DSP code and optional GUI
+
+In DEViLBOX, WAM effects are wrapped by the \`WAMEffectNode\` class, which provides Tone.js-compatible input/output routing and wet/dry mixing. Parameters discovered from the WAM plugin are exposed through the standard effect parameter interface.
+
+## Distortion Effects
+
+### WAMBigMuff (Big Muff Pi)
+
+An emulation of the Electro-Harmonix Big Muff Pi fuzz pedal, one of the most iconic fuzz circuits in rock history. Used by Jimi Hendrix, David Gilmour, Billy Corgan, and countless others. The Big Muff produces a thick, sustained fuzz tone with a characteristic mid-scoop.
+
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| Sustain | 0 - 1 | 0.4 | Fuzz/distortion amount (drives the clipping stages) |
+| Tone | 0 - 1 | 0.5 | Tone control (0 = dark, 1 = bright) |
+| Volume | 0 - 1 | 0.7 | Output level |
+
+**Tips:** The Big Muff's tone circuit has a distinctive mid-scoop character. At Tone 0.5, the midrange is scooped, creating the classic "wall of fuzz" sound. For more cutting fuzz that sits better in a mix, push Tone above 0.7. For doom/stoner bass tones, keep Tone below 0.3 with high Sustain.
+
+### WAMTS9 (TS-9 Overdrive)
+
+An emulation of the Ibanez Tube Screamer TS-9, arguably the most famous overdrive pedal ever made. The Tube Screamer is known for its mid-hump character that pushes guitars through a mix and its ability to tighten up an already-distorted amplifier.
+
+Parameters are discovered dynamically from the WAM plugin and typically include drive, tone, and level controls.
+
+**Tips:** The TS-9's mid-frequency boost makes it pair well with scooped amp tones. Use it before a distortion or amp model to tighten the low end and add midrange focus.
+
+### WAMDistoMachine (Disto Machine)
+
+A multi-mode distortion processor offering several distortion algorithms in a single plugin. Provides a range of tones from subtle tube-like saturation to extreme digital destruction.
+
+### WAMQuadraFuzz (QuadraFuzz)
+
+A multiband fuzz effect that splits the input into four frequency bands and applies independent fuzz processing to each. This prevents the intermodulation distortion that occurs when a full-range signal hits a single fuzz circuit, resulting in cleaner, more defined distortion even on complex material like full mixes or polyphonic instruments.
+
+### WAMVoxAmp (Vox Amp 30)
+
+An emulation of the Vox AC30 amplifier, one of the defining sounds of British rock and pop. The AC30 is known for its chimey clean tones and smooth, musical breakup at higher volumes. Used by The Beatles, Brian May, Radiohead, and many others.
+
+**Tips:** At low gain, the Vox model produces the characteristic "jangly" clean tone. Push the gain for the AC30's creamy overdrive. The AC30 responds dynamically to input level -- play softer for cleans, harder for breakup.
+
+## Modulation Effects
+
+### WAMStonePhaser (Stone Phaser)
+
+A phaser effect modeled on classic analog phaser pedals. Provides the swooshing, jet-plane phase-shifting sound through a chain of analog-modeled allpass stages.
+
+Parameters are discovered dynamically and typically include rate, depth, feedback, and stage count controls.
+
+**Tips:** For the classic Stone phaser sound, use moderate rate with high feedback. The analog modeling produces a warmer, more organic sweep than digital phaser implementations.
+
+## Reverb & Delay Effects
+
+### WAMPingPongDelay (Ping Pong Delay)
+
+A stereo ping-pong delay implemented as a WAM plugin. Echoes alternate between left and right channels with independent control over delay time, feedback, and filtering.
+
+### WAMFaustDelay (Faust Delay)
+
+A delay effect written in the Faust DSP language and compiled to WebAssembly. Faust (Functional Audio Stream) is a domain-specific language for audio DSP that compiles to highly optimized code. This delay provides clean, precise echoes with the computational efficiency of compiled Faust code.
+
+## Pitch Effects
+
+### WAMPitchShifter (Csound Pitch Shifter)
+
+A pitch shifter powered by Csound, the venerable computer music language (first released 1986). Csound's pitch-shifting opcodes are mature and well-tested, providing high-quality pitch transposition with minimal artifacts.
+
+Parameters typically include pitch shift amount (in semitones or cents), window size, and feedback for cascading shifts.
+
+## EQ & Stereo
+
+### WAMGraphicEQ (Graphic Equalizer)
+
+A multi-band graphic equalizer with individual slider controls per frequency band. Provides more detailed frequency shaping than the 3-band EQ, with bands typically spanning from 60 Hz to 16 kHz.
+
+**Tips:** Graphic EQs are useful for broad tonal shaping and compensating for room acoustics. For mixing, a parametric EQ is usually more surgical, but the graphic EQ's visual representation makes it intuitive for quick adjustments.
+
+## Multi-FX
+
+### WAMPedalboard (Pedalboard)
+
+A virtual pedalboard that chains multiple WAM effects into a single configurable signal path. The Pedalboard acts as a container -- you can add, remove, reorder, and configure individual pedal effects within it.
+
+This is a meta-effect: rather than providing a single DSP algorithm, it provides a framework for combining other WAM effects. The pedalboard state (which pedals are loaded and their parameter settings) is saved and restored with the project.
+
+**Tips:** The Pedalboard is useful for creating complex effect chains that you want to treat as a single unit. Build a guitar rig (TS-9 into Vox Amp into delay into reverb), save it, and recall it on any channel.
+
+## Working with WAM Effects
+
+### Parameter Discovery
+
+WAM plugins expose their parameters through a standardized API. When a WAM effect is loaded, DEViLBOX queries the plugin for its parameter list, including names, ranges, default values, and units. These parameters are then displayed in the effect editor.
+
+Because parameters are discovered dynamically, different versions of a WAM plugin may expose different parameters. The stored parameter values in your project are matched by name when the effect is reloaded.
+
+### Initialization
+
+WAM effects require asynchronous initialization:
+
+1. The WAM module JavaScript is loaded from the plugin URL
+2. An AudioWorklet processor is registered for the plugin
+3. The plugin instance is created and connected to the audio graph
+4. Stored parameters are applied
+
+During initialization, the effect passes audio through unchanged (dry signal only). Once initialization completes, the wet/dry mix is applied and the effect begins processing.
+
+### Fallback Behavior
+
+If a WAM plugin fails to load (network error, incompatible browser, etc.), the effect slot falls back to a unity gain node -- the signal passes through unprocessed. A warning is logged to the console. The effect configuration is preserved in the project so the effect can be restored when the plugin becomes available.
+
+### Technology Backends
+
+The WAM effects in DEViLBOX use several DSP backends:
+
+| Backend | Effects | Description |
+|---------|---------|-------------|
+| Faust | BigMuff, FaustDelay, several others | Functional Audio Stream DSP language compiled to WASM |
+| Csound | PitchShifter | Classic computer music language compiled to WASM |
+| JavaScript | StonePhaser, PingPongDelay | Pure JS AudioWorklet implementations |
+| C/C++ | VoxAmp, DistoMachine | Compiled to WASM via Emscripten |
+
+The DSP backend is transparent to the user -- all WAM effects present the same interface regardless of their implementation language.
+`,
+    "images": []
+  },
+  {
+    "id": "34-neural-effects",
+    "number": 41,
+    "title": "Neural Effects",
+    "part": "Effects",
+    "partNumber": 4,
+    "content": "# Neural Effects\n\nDEViLBOX includes AI-powered amp and pedal modeling via GuitarML, a machine learning framework that captures the sonic character of real guitar amplifiers and effects pedals using neural networks. The 37 built-in models cover overdrives, distortion pedals, fuzz boxes, and amplifier tones trained from real hardware.\n\n## How Neural Amp Modeling Works\n\nTraditional amp modeling uses circuit simulation -- analyzing the schematic of an amplifier and building a mathematical model of each component (tubes, transformers, capacitors). Neural amp modeling takes a fundamentally different approach:\n\n1. **Training**: A real amplifier or pedal is connected to a measurement system. Test signals (swept sines, noise, music) are sent through the hardware, and the input and output are recorded simultaneously.\n\n2. **Learning**: A neural network (typically an LSTM or WaveNet architecture) is trained to predict the output signal from the input signal. The network learns the nonlinear transfer function of the hardware, including distortion characteristics, frequency response, dynamic response, and interaction effects.\n\n3. **Inference**: The trained model runs in real-time, processing audio sample-by-sample. Each input sample passes through the neural network, producing an output that matches what the real hardware would produce.\n\nThe result is a compact model (typically a few hundred KB of weights) that reproduces the sonic character of specific hardware with remarkable accuracy -- including the subtle nonlinear behaviors that circuit simulation struggles to capture.\n\n## Architecture in DEViLBOX\n\nNeural effects use the following signal chain:\n\n```\nInput --> GuitarML Engine (AudioWorklet + WASM)\n              |\n              v\n         Neural Output --> EQ3 (bass/mid/treble) --> Presence Filter --> Wet Gain --> Output\n              |\nInput --> Dry Gain --------------------------------------------------> Output\n```\n\nThe `NeuralEffectWrapper` wraps the `GuitarMLEngine` AudioWorklet and adds:\n- **Dry/wet mixing** for blending the neural-processed signal with the original\n- **3-band EQ** (bass, mid, treble) for post-processing tone shaping\n- **Presence filter** (high-shelf at 4 kHz) for air and presence control\n- **Drive mapping** to the GuitarML condition input (for models with a conditioned knob)\n\n### Conditioned vs. Unconditioned Models\n\nSome models are trained with a \"condition\" parameter -- typically the hardware's gain or drive knob position. These conditioned models allow you to adjust the virtual knob in real-time, and the neural network interpolates the response. The drive parameter in DEViLBOX maps to this condition input.\n\nUnconditioned models capture the hardware at a single fixed setting. The drive parameter still affects them through the input gain stage, but the neural network itself does not adapt.\n\n## Parameters\n\nAll neural effects share a common parameter set. Some parameters control the neural model directly (drive, dryWet), while others shape the output via the post-processing EQ chain.\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| drive | 0 - 1 | varies | Gain/drive amount (maps to neural condition input) |\n| tone | 0 - 1 | varies | Overall tone brightness |\n| bass | -12 - +12 dB | 0 | Low-frequency EQ (below 400 Hz) |\n| mid | -12 - +12 dB | 0 | Mid-frequency EQ (400-2500 Hz) |\n| treble | -12 - +12 dB | 0 | High-frequency EQ (above 2500 Hz) |\n| presence | -12 - +12 dB | 0 | High-shelf presence EQ (4 kHz) |\n| level | 0 - 1 | varies | Output level |\n| dryWet | 0 - 1 | 1.0 | Neural/dry blend (labeled \"Neural\" in UI) |\n\nDefault values for drive, tone, and level are set per-model based on the hardware's characteristics (see the model registry below).\n\n## Available Models\n\nThe 37 built-in models are organized by category:\n\n### Overdrive Pedals\n\n| Index | Name | Full Name | Character |\n|-------|------|-----------|-----------|\n| 0 | Ibanez TS9 | Ibanez TS9 Tube Screamer | Warm, smooth, mid-focused |\n| 4 | Mesa DriveLab | Mesa Boogie Drive V2 | Tight, focused, aggressive |\n| 7 | Blues Jr. Fender | Fender Blues Junior | Warm, vintage, clean |\n| 8 | Blues Breaker | Blues Breaker Overdrive | Dynamic, touch-sensitive |\n| 11 | Matchless SC30 | Matchless SC30 DI | Chimey, responsive, open |\n| 14 | FunMaster | FunMaster Overdrive | Fun, musical, balanced |\n| 18 | Bonsai TS | JHS Bonsai (TS mode) | Classic Tube Screamer variant |\n| 23 | American Clean | American Clean Tone | Crystal, headroom, dynamic |\n| 24 | Roland Jazz Chorus | Roland JC-120 | Pristine, wide, chorus-ready |\n\n### Distortion Pedals\n\n| Index | Name | Full Name | Character |\n|-------|------|-----------|-----------|\n| 1 | Mostortion | Ibanez Mostortion Clone | Heavy, saturated, aggressive |\n| 5 | Boss HM2 | Boss HM-2 Heavy Metal | Chainsaw, Swedish death metal |\n| 6 | DS1 | Boss DS-1 | Classic rock distortion |\n| 10 | RAT Turbo | ProCo RAT (Turbo mode) | Thick, grinding, versatile |\n| 15 | Metal Zone | Boss MT-2 Metal Zone | Scooped, high-gain, shredding |\n| 16 | Heavy Metal | Heavy Metal Distortion | Extreme, saturated |\n| 17 | HM2 1987 | Boss HM-2 (1987 original) | Vintage chainsaw |\n| 22 | EHX Glove | EHX OD Glove | Transparent, dynamic |\n\n### Fuzz Pedals\n\n| Index | Name | Full Name | Character |\n|-------|------|-----------|-----------|\n| 9 | Tone Bender | Sola Sound Tone Bender | Vintage, sputtery, classic |\n| 12 | Big Muff Ram's Head | EHX Big Muff (Ram's Head) | Thick, sustaining, creamy |\n| 13 | Big Muff Triangle | EHX Big Muff (Triangle) | Smooth, woolly, warm |\n\n### Amplifiers\n\n| Index | Name | Full Name | Character |\n|-------|------|-----------|-----------|\n| 2 | Mooer Cali | Mooer Cali MkIV | Mesa-style high gain |\n| 3 | Mesa Dual Rectifier | Mesa Boogie Dual Rectifier | Tight, aggressive, metal |\n| 19 | Fender Princeton | Fender Princeton Reverb | Classic American clean |\n| 20 | Marshall Plexi | Marshall Plexi 1959 | British crunch, iconic |\n| 21 | Matchless DC30 | Matchless DC30 | Boutique, chimey, open |\n| 25 | Friedman BE | Friedman BE-100 | Modern high-gain |\n| 26 | Engl Savage | Engl Savage 120 | Tight, precise, metal |\n| 27 | Orange Rockerverb | Orange Rockerverb 50 | Thick, British, heavy |\n| 28 | Bogner Ecstasy | Bogner Ecstasy 101B | Versatile, touch-sensitive |\n| 29 | Dumble ODS | Dumble Overdrive Special | Legendary, liquid, smooth |\n| 30 | Morgan AC20 | Morgan AC20 Deluxe | Vox-inspired, chimey |\n| 31 | Hiwatt DR103 | Hiwatt DR103 | Clean, powerful headroom |\n\n### Bass Amplifiers\n\n| Index | Name | Full Name | Character |\n|-------|------|-----------|-----------|\n| 32 | Ampeg SVT | Ampeg SVT Classic | Thunderous, tubey, rock |\n| 33 | Darkglass B7K | Darkglass B7K Ultra | Modern, aggressive, defined |\n| 34 | Aguilar DB751 | Aguilar DB 751 | Warm, round, smooth |\n| 35 | SansAmp BDDI | Tech 21 SansAmp BDDI | Classic DI tone, gritty |\n| 36 | Mesa D-800 | Mesa Subway D-800 | Punchy, clean, versatile |\n\n## Using Neural Effects\n\n### Adding a Neural Effect\n\nWhen you add a Neural effect, you select a model from the browser. The model's characteristic defaults (drive, tone, level) are automatically applied based on the hardware being emulated. For example, a clean amp model starts with low drive, while a fuzz pedal starts with high drive.\n\n### Model Selection Tips\n\nFor the best results, match the model to your use case:\n\n- **Clean guitar/keys**: American Clean (23), Roland Jazz Chorus (24), Fender Princeton (19)\n- **Blues/classic rock**: Blues Breaker (8), Matchless SC30 (11), Marshall Plexi (20)\n- **Modern rock**: RAT Turbo (10), DS1 (6), Friedman BE (25)\n- **Metal**: Boss HM2 (5), Metal Zone (15), Mesa Dual Rectifier (3), Engl Savage (26)\n- **Fuzz**: Big Muff Ram's Head (12), Tone Bender (9), Big Muff Triangle (13)\n- **Bass**: Ampeg SVT (32), Darkglass B7K (33), SansAmp BDDI (35)\n\n### Stacking with Other Effects\n\nNeural amp models work well in combination with other DEViLBOX effects:\n\n1. **Overdrive into amp model**: Use Ibanez TS9 (neural) into Mesa Dual Rectifier (neural) -- the TS9 tightens the low end before the amp model, just like the real pedal/amp combination\n2. **Amp model into cabinet IR**: While the neural model captures amp character, adding a Filter (lowpass at 5-8 kHz) after simulates speaker cabinet roll-off\n3. **Amp model into reverb**: Add Spring Reverb or MVerb after the neural model for room ambience\n4. **Amp model into delay**: Place a delay (BPM-synced) after the amp model for rhythmic echoes with the amp's distortion character\n\n### Performance Considerations\n\nNeural effects are computationally heavier than simple DSP effects. Each model runs a neural network inference per audio sample. On modern hardware, a single neural effect uses approximately 5-10% of one CPU core. Stacking multiple neural effects on different channels is possible but monitor CPU usage.\n\nThe GuitarML engine runs in an AudioWorklet for guaranteed real-time performance. Model loading is asynchronous -- there is a brief moment after adding a neural effect where dry signal passes through while the model weights are loaded and the worklet is initialized.\n",
+    "images": []
+  },
+  {
+    "id": "35-channel-mixer",
+    "number": 42,
+    "title": "Channel Mixer",
+    "part": "Mixer & Routing",
+    "partNumber": 5,
+    "content": "# Channel Mixer\n\nDEViLBOX provides a 16-channel mixer that mirrors the workflow of a hardware mixing console. Every channel in the tracker has a corresponding mixer strip with volume, pan, mute, solo, and real-time metering. The mixer works identically whether you are playing back a ProTracker module, a Furnace chipsong, a SunVox modular patch, or any of the 188+ supported formats.\n\n## Mixer Architecture\n\nThe mixer sits between the per-channel instrument output and the master bus. Each of the 16 channels has its own `Tone.Channel` node that provides independent volume and pan control before the signal reaches the master effects chain.\n\n```\nVoice → gain → filter → panner → channelInput → Tone.Channel (volume/pan) → masterInput\n                                                        |\n                                                        ├── meter (VU)\n                                                        └── send gains (A-D)\n```\n\nThe mixer state lives in `useMixerStore`, a Zustand store that both the DOM and Pixi/GL mixer views consume as their single source of truth. Changing a fader in either view updates the same store and the same audio nodes.\n\n## Channel Volume\n\nEach channel fader controls a linear gain value from 0 to 1, where 1.0 equals unity gain (0 dB). The store converts this to decibels before applying it to the audio engine:\n\n| Fader Position | Linear Value | dB Value |\n|----------------|-------------|----------|\n| Maximum        | 1.0         | 0 dB     |\n| 75%            | 0.75        | -2.5 dB  |\n| 50%            | 0.5         | -6.0 dB  |\n| 25%            | 0.25        | -12.0 dB |\n| Minimum        | 0.0         | -60 dB (silence) |\n\nThe conversion uses the standard formula: `dB = 20 * log10(linearValue)`. A fader at zero is treated as -60 dB (effectively silent).\n\nVolume changes are applied immediately to the `Tone.Channel` node on the audio thread. There is no interpolation on the fader itself -- the `Tone.Channel` volume property handles smooth transitions internally to avoid clicks.\n\n## Pan Knobs\n\nEach channel has a pan knob ranging from -1 (hard left) to +1 (hard right), with 0 at center. The pan value is applied to the channel's `Tone.Channel` node, which uses equal-power panning to maintain consistent perceived loudness across the stereo field.\n\nPan is independent of any per-note panning set by tracker effects (e.g., effect 8xx in IT/XM format). The mixer pan is applied at the channel level and stacks with voice-level panning.\n\n## Mute and Solo\n\n**Mute** silences a channel completely. The channel's `Tone.Channel` node is set to `mute = true`, which cuts the signal path without disposing any audio nodes. Muted channels still process notes internally -- they just produce no audible output. When you unmute, playback continues seamlessly.\n\n**Solo** uses exclusive logic: when one or more channels are soloed, every non-soloed channel is effectively muted. The store tracks the `isSoloing` flag globally:\n\n- If any channel has `soloed = true`, then `isSoloing = true`\n- For each channel, `effectiveMute = isSoloing ? !channel.soloed : channel.muted`\n- Multiple channels can be soloed simultaneously to hear a specific combination\n\nSolo state is recomputed whenever any channel's solo flag changes, and the effective mute state is applied to all 16 channels at once.\n\n## WASM Engine Forwarding\n\nMany playback engines in DEViLBOX are WASM-based and output a single mixed audio stream rather than per-channel audio. The mixer handles this transparently by forwarding mute and volume state to the active engine:\n\n| Engine Type | Forwarding Method |\n|------------|-------------------|\n| Furnace    | Binary mute via `furnace_dispatch_mute()` -- channels are either on or off |\n| SunVox     | Module-level mute/unmute via the WASM graph walker -- respects shared modules |\n| Hively, Klystrack, JamCracker, PreTracker, Hippel, and 10+ others | Per-channel gain API (0.0 to 1.0) |\n| UADE       | Paula hardware mute mask (4-bit, channels 0-3) |\n| libopenmpt | Per-channel mute mask (up to 64 channels) |\n\nFor WASM engines that only support binary mute (Furnace), the volume fader at zero is treated as muted. For engines that support gain (Hively and others), the effective gain combines the fader volume with the mute/solo state: `gain = effectiveMute ? 0 : channel.volume`.\n\nThe replayer's `channelMuteMask` is also updated so that the note-triggering layer respects mute/solo state. This is essential for WASM engines whose audio bypasses per-channel Tone.Channel nodes and routes through a shared `synthBus`.\n\n## Per-Channel Metering\n\nEach channel strip displays a VU meter driven by a `Tone.Meter` node connected to the channel output. The meter provides smoothed RMS levels (smoothing factor 0.15) that are polled via a `requestAnimationFrame` loop in both DOM and Pixi views.\n\nMeter levels are normalized to 0-1 range from the dB value: `normalized = (dB + 60) / 60`. A noise floor threshold of 0.02 prevents meters from getting stuck at residual low values.\n\nFor WASM engines that output a single stream, metering uses one of two approaches:\n\n- **Trigger-based**: Note velocity triggers set a VU level per channel (`velocity * 1.2`, clamped to 1.0). This gives a visual approximation of activity even when there is no per-channel audio separation.\n- **Realtime polling**: For SunVox, the mixer polls module scope data at approximately 15 Hz and maps module levels back to per-channel VU values.\n\nThe VU meter color changes with level:\n\n| Level Range | Color  |\n|-------------|--------|\n| 0 - 70%    | Green  |\n| 70 - 90%   | Yellow |\n| 90 - 100%  | Red    |\n\n## Master Section\n\nThe master fader controls the final output volume of the entire mix. Like channel faders, it ranges from 0 to 1 linear (0 dB at maximum). The master volume is applied to the `masterChannel` node, which is the last gain stage before the Web Audio destination.\n\nA master-level meter is available, tapped from the `masterEffectsInput` node where all channel outputs and send returns converge.\n\n## Mixer Panel UI\n\nThe mixer is available in two forms:\n\n- **DOM Panel**: A floating HTML panel toggled from the toolbar. Renders 16 channel strips plus a master strip using standard HTML elements and Tailwind CSS. Channel strips include the channel name, VU meter, volume slider, pan knob, mute button (M), and solo button (S). On mobile, strips use larger touch targets with a compact layout (72px wide instead of 60px).\n\n- **Pixi/GL View**: The full-screen GL mixer view, accessible from the view switcher. Uses WebGL rendering with the same store data. Includes the same controls plus send level knobs and insert effect indicators per channel.\n\nBoth views read from `useMixerStore` and write to the same actions, ensuring that changes in one view are immediately reflected in the other.\n\n## Keyboard Shortcuts\n\nChannel mute and solo can be toggled from the keyboard without opening the mixer panel. The global keyboard handler routes these commands through the same store actions, so the audio engine state always matches the visual state.\n\n## Tips for Mixing\n\n- **Start with everything at unity (1.0)** and pull down channels that are too loud, rather than boosting quiet channels. This preserves headroom on the master bus.\n- **Use solo to isolate problems**: Solo a channel to hear it in isolation, then adjust its volume relative to the rest of the mix.\n- **Pan complementary sounds apart**: If two channels compete for the same frequency range (e.g., two lead synths), pan them to opposite sides to create space.\n- **Watch the master meter**: If it consistently hits red, reduce individual channel volumes rather than turning down the master fader. This keeps the mix balanced.\n",
+    "images": []
+  },
+  {
+    "id": "36-channel-insert-effects",
+    "number": 43,
+    "title": "Channel Insert Effects",
+    "part": "Mixer & Routing",
+    "partNumber": 5,
+    "content": "# Channel Insert Effects\n\nEach of the 16 mixer channels can host up to 4 insert effects in series. Insert effects process the channel's audio directly -- the entire signal passes through the effect chain before reaching the master bus. This is the standard approach for effects that need to alter 100% of a channel's sound, such as compression, EQ, distortion, or filtering.\n\n## Signal Flow\n\nThe insert effect chain sits between the channel's gain/pan stage and the master input:\n\n```\ninstrument → channelGain → channelPan → [effect1 → effect2 → effect3 → effect4] → masterInput\n```\n\nWhen no effects are loaded, the chain is a direct passthrough -- the input gain node connects straight to the output gain node with zero overhead. As effects are added, the `ChannelEffectsManager` rebuilds the internal routing to thread the signal through each enabled effect in order.\n\n## The ChannelEffectsManager\n\nAll channel insert effects are managed by a singleton `ChannelEffectsManager` class. It maintains one `ChannelFXChain` per channel, each containing:\n\n- **Input node** (`Tone.Gain`): Where the channel's audio enters the effect chain\n- **Output node** (`Tone.Gain`): Where processed audio exits toward the master bus\n- **Effects array**: Up to 4 effect slots, each holding the effect config, the instantiated audio node, and an enabled/bypass flag\n\nThe manager exposes these operations:\n\n| Operation | What It Does |\n|-----------|-------------|\n| `addEffect(ch, config)` | Creates an effect node and appends it to the channel's chain (up to 4 slots) |\n| `removeEffect(ch, index)` | Disconnects, disposes, and removes the effect at the given slot index |\n| `toggleEffect(ch, index)` | Bypasses or re-enables an effect without removing it from the chain |\n| `moveEffect(ch, from, to)` | Reorders effects within the chain (e.g., move compressor before filter) |\n\nEvery operation triggers `rebuildChainRouting()`, which disconnects all nodes and reconnects only the enabled effects in order. Bypassed effects are skipped -- the signal jumps from the previous enabled effect to the next.\n\n## Adding an Effect\n\nTo add a channel insert effect from the mixer UI:\n\n1. Select the channel strip you want to process\n2. Open the channel's effect panel (the FX button on the strip)\n3. Choose an effect from the available categories\n4. Adjust the effect parameters using the knob panel\n\nThe effect is created asynchronously using the same `EffectFactory` that creates master effects. This means every effect type available on the master bus -- including WASM-based effects like MoogFilter, MVerb, and Leslie -- can also be used as a channel insert.\n\nThe 4-slot limit (`MAX_CHANNEL_FX_SLOTS = 4`) keeps CPU usage manageable. Four well-chosen effects cover most channel processing needs. If you need more complex processing, consider using send effects for shared processing (see Chapter 37).\n\n## Bypassing Effects\n\nToggling an effect's bypass does not destroy the audio node. The node stays allocated but is excluded from the signal path. This means:\n\n- Bypassing is instant -- no async loading when you re-enable\n- A/B comparison is easy: toggle the bypass to hear the difference\n- CPU is still used by bypassed effects (they remain instantiated), but they do not process audio\n\nTo bypass an effect, click the power/enable button on its slot in the channel effect panel.\n\n## Reordering Effects\n\nEffect order matters significantly. The same set of effects in different orders produces different results. The manager supports drag-to-reorder, which calls `moveEffect()` internally and rebuilds the chain.\n\nConsider these two orderings for a bass channel:\n\n**Order A: Compressor first, then Filter**\n```\nBass → Compressor → Filter → master\n```\nThe compressor evens out the dynamics, then the filter shapes the tone of the already-compressed signal. The filter's response is consistent because the input level is stable.\n\n**Order B: Filter first, then Compressor**\n```\nBass → Filter → Compressor → master\n```\nThe filter shapes the raw bass tone (which may have dynamic peaks), then the compressor reacts to the filtered signal. Filter resonance peaks can trigger more aggressive compression.\n\nNeither order is \"correct\" -- they are creative choices. But be aware that reordering can dramatically change the sound.\n\n## Sidechain on Channel Inserts\n\nThe `SidechainCompressor` effect can be used as a channel insert with an external sidechain source. When you add a SidechainCompressor to a channel, you can set its `sidechainSource` to another channel's index. The manager automatically wires the source channel's output to the compressor's sidechain input:\n\n```\nKick (ch 0) output ──────── → SidechainCompressor.sidechainInput\nBass (ch 1) → [SidechainCompressor] → master\n```\n\nSee Chapter 39 for a full walkthrough of sidechain routing.\n\n## Which Effects Work Well as Channel Inserts\n\n**Ideal for inserts** -- effects that should process 100% of the channel:\n\n| Effect | Use Case |\n|--------|----------|\n| Compressor | Tame dynamics on a bass or lead channel |\n| EQ3 | Shape the tonal balance of a single instrument |\n| Filter / AutoFilter | Frequency sculpting, filter sweeps |\n| Distortion / TapeSaturation | Add grit or warmth to a specific sound |\n| MoogFilter | Analog-modeled resonant filter for synth channels |\n| BitCrusher | Lo-fi processing on drums or pads |\n| SidechainCompressor | Ducking effect triggered by another channel |\n\n**Better as sends** -- effects where multiple channels should share the same instance:\n\n| Effect | Why Send Is Better |\n|--------|-------------------|\n| Reverb (MVerb, ShimmerReverb, JCReverb) | One shared reverb space sounds more cohesive than separate reverbs per channel |\n| Delay (AmbientDelay, PingPongDelay) | Shared delay creates a unified rhythmic echo |\n| GranularFreeze | Typically applied to the full mix or a subgroup |\n\nYou can use any effect as either an insert or a send effect. The distinction is about workflow and CPU efficiency, not technical limitation.\n\n## Practical Examples\n\n### Bass Channel: Tight and Punchy\n\nA common bass channel setup that tames dynamics and adds harmonic warmth:\n\n| Slot | Effect | Key Parameters |\n|------|--------|---------------|\n| 1 | Compressor | threshold: -18 dB, ratio: 4:1, attack: 0.01s, release: 0.15s |\n| 2 | MoogFilter | cutoff: 800 Hz, resonance: 0.3, type: LowPass |\n| 3 | TapeSaturation | drive: 30%, tone: 60%, wet: 70% |\n\nThe compressor locks the bass level, the filter removes unnecessary highs, and the saturation adds subtle harmonics that help the bass cut through on small speakers.\n\n### Drum Channel: Crispy and Controlled\n\nProcessing for a drum pattern channel:\n\n| Slot | Effect | Key Parameters |\n|------|--------|---------------|\n| 1 | EQ3 | low: +2 dB, mid: -1 dB, high: +1.5 dB |\n| 2 | Compressor | threshold: -12 dB, ratio: 3:1, attack: 0.005s, release: 0.1s |\n| 3 | Distortion | distortion: 15%, wet: 40% |\n\nThe EQ scoops out muddy mids, the compressor adds punch with a fast attack, and light distortion adds crunch to the transients.\n\n### Pad Channel: Spacious and Filtered\n\nFor ambient pads or strings:\n\n| Slot | Effect | Key Parameters |\n|------|--------|---------------|\n| 1 | AutoFilter | frequency: 0.25 Hz, depth: 40%, baseFrequency: 400 Hz |\n| 2 | Chorus | frequency: 1.5 Hz, depth: 0.4, wet: 50% |\n\nThe auto-filter creates slow movement, and the chorus adds width. Note that reverb is intentionally not used as an insert here -- send it to a shared reverb bus instead (Chapter 37).\n\n## CPU Considerations\n\nEach effect node consumes CPU whether it is processing silence or a loud signal. To keep performance smooth:\n\n- Remove effects you are not using rather than just bypassing them\n- Use send effects for reverb and delay instead of putting separate instances on multiple channels\n- WASM effects (MoogFilter, MVerb, Leslie, SpringReverb) run in AudioWorklet threads and have minimal impact on the main thread, but they still consume audio thread CPU\n- The `disposeChannel()` method cleans up all effect nodes for a channel when the song changes or the channel is no longer needed\n",
+    "images": []
+  },
+  {
+    "id": "37-send-return-buses",
+    "number": 44,
+    "title": "Send/Return Buses",
+    "part": "Mixer & Routing",
+    "partNumber": 5,
+    "content": "# Send/Return Buses\n\nDEViLBOX provides 4 auxiliary send/return buses (Send A through Send D) for parallel effects processing. Send buses let multiple channels share a single effect instance -- the classic mixing technique for reverb, delay, and parallel compression. Instead of placing a separate reverb on every channel (which wastes CPU and sounds incoherent), you route varying amounts of each channel to one shared reverb bus.\n\n## How Send/Return Works\n\nEach channel has 4 send level knobs (one per bus), each ranging from 0 to 1. The send level controls how much of the channel's post-fader signal reaches the bus. The bus collects all incoming signals, processes them through its own effect chain, and feeds the result back into the master effects input.\n\n```\nChannel 0 ──── sendGain[A] ────┐\nChannel 1 ──── sendGain[A] ────┤\nChannel 2 ──── sendGain[A] ────┼──→ Bus A input → [effects] → volume → output → masterEffectsInput\n  ...                           │\nChannel 15 ─── sendGain[A] ────┘\n```\n\nThis happens in parallel for all 4 buses. Each bus operates independently with its own effect chain and return volume.\n\n## Signal Flow in Detail\n\nThe complete send/return signal flow from a single channel's perspective:\n\n```\nchannel output (post-fader, post-pan)\n    │\n    ├──→ direct to masterInput (normal channel path)\n    │\n    ├──→ sendGain[A] ──→ Bus A input ──→ [Bus A effects] ──→ Bus A volume ──→ masterEffectsInput\n    ├──→ sendGain[B] ──→ Bus B input ──→ [Bus B effects] ──→ Bus B volume ──→ masterEffectsInput\n    ├──→ sendGain[C] ──→ Bus C input ──→ [Bus C effects] ──→ Bus C volume ──→ masterEffectsInput\n    └──→ sendGain[D] ──→ Bus D input ──→ [Bus D effects] ──→ Bus D volume ──→ masterEffectsInput\n```\n\nKey details:\n\n- **Post-fader sends**: The send tap comes after the channel's volume and pan. If you pull the channel fader down, the amount of signal going to the send bus decreases proportionally. This is the standard behavior for reverb and delay sends -- when you fade a channel out, its reverb tail fades out too.\n- **Send gain nodes are created on demand**: The first time you set a non-zero send level on a channel, a `Tone.Gain` node is created and connected between the channel output and the bus input. This avoids wasting resources on unused sends.\n- **Bus outputs feed masterEffectsInput**: Return bus audio enters the same merge point as direct channel audio, so it passes through the master effects chain (Chapter 38) and BLEP processing (Chapter 40) before reaching the final output.\n\n## The 4 Buses\n\nThe `SendBusManager` initializes 4 buses on startup, each with a descriptive name:\n\n| Bus Index | Name | Suggested Use |\n|-----------|------|---------------|\n| 0 | Send A | Shared reverb |\n| 1 | Send B | Shared delay |\n| 2 | Send C | Parallel compression |\n| 3 | Send D | Special FX |\n\nThese names are conventions, not restrictions. You can put any effect on any bus.\n\n## Setting Send Levels\n\n### From the Mixer UI\n\nEach channel strip in the mixer has 4 small send knobs (labeled A through D). Turn a knob clockwise to increase the amount of signal sent to that bus.\n\n### From the Store\n\nProgrammatically, send levels are set via `useMixerStore`:\n\n```\nsetChannelSendLevel(channelIndex, sendIndex, level)\n```\n\nWhere `level` is clamped to 0-1. The store action both updates the state and wires the audio graph: it creates the send gain node (if needed), connects it between the channel output and the bus input, and ramps the gain to the target level over 50ms to avoid clicks.\n\n## Return Bus Effects\n\nEach bus has its own effect chain. You can add any effect to a bus using the bus effect panel. The bus routing rebuilds automatically when effects are added or removed:\n\n**No effects loaded:**\n```\nBus input → volume → output → masterEffectsInput\n```\n\n**With effects:**\n```\nBus input → [effect1 → effect2 → ...] → volume → output → masterEffectsInput\n```\n\n### Return Volume and Mute\n\nEach bus has a return volume control (`setBusVolume`) that scales the overall level of the processed return signal. There is also a mute toggle (`setBusMute`) that fades the bus output to zero over 50ms.\n\nMuting a return bus silences the effect return without affecting the direct channel signals. This is useful for quickly A/B-ing the effect contribution: mute Send A to hear the mix without reverb.\n\n## Practical Setups\n\n### Send A: Shared Reverb\n\nThe most common use of a send bus. Load a reverb effect (ShimmerReverb, MVerb, or JCReverb) onto Send A, then dial in send levels per channel to control how much reverb each instrument gets.\n\n**Setup:**\n\n| Step | Action |\n|------|--------|\n| 1 | Open the Send A bus effect panel |\n| 2 | Add ShimmerReverb (or MVerb for a more neutral plate sound) |\n| 3 | Set the reverb wet/dry to 100% wet (the send level controls the blend) |\n| 4 | Set Send A level on lead channels to 0.3-0.5 |\n| 5 | Set Send A level on drum channels to 0.1-0.2 (less reverb on drums) |\n| 6 | Leave bass channel Send A at 0 (reverb on bass muddies the low end) |\n\n**Why 100% wet on the bus effect?** Because the dry signal already reaches the master bus through the direct channel path. The send bus should contribute only the wet/effected signal. If you set the bus reverb to 50% wet, you would be adding a copy of the dry signal to the mix, effectively raising the channel volume.\n\n### Send B: Shared Delay\n\nLoad AmbientDelay or PingPongDelay onto Send B. A shared delay bus keeps all echoes in the same rhythmic space and avoids the CPU cost of separate delay instances per channel.\n\n**Recommended delay parameters for a cohesive mix:**\n\n| Parameter | Value | Why |\n|-----------|-------|-----|\n| delayTime | Sync to BPM (1/8 or 1/4 note) | Rhythmic echoes lock to the song tempo |\n| feedback | 30-50% | Enough repetitions to create space without washing out |\n| wet | 100% | Same reason as reverb -- dry signal comes through the direct path |\n| filter | Gentle low-pass on feedback (if available) | Echoes get darker over time, like analog tape delay |\n\nSet Send B levels higher on melodic channels (0.2-0.4) and lower or zero on bass and kick.\n\n### Send C: Parallel Compression\n\nParallel compression (also called \"New York compression\") blends a heavily compressed copy of the signal with the original. This adds punch and sustain without squashing the transients.\n\n**Setup:**\n\n1. Add a Compressor to Send C with aggressive settings:\n   - threshold: -30 dB\n   - ratio: 10:1 or higher\n   - attack: 0.001s (fast -- catch everything)\n   - release: 0.1s\n\n2. Set Send C levels on drum channels to 0.3-0.5\n\n3. Set the Send C return volume to taste -- start low and bring it up until you hear the added body\n\nThe direct drum signal retains its transients, while the compressed return fills in the sustain and body. The blend is controlled by two factors: the per-channel send level and the bus return volume.\n\n### Send D: Special FX\n\nUse Send D for creative effects that you want to apply selectively:\n\n- **GranularFreeze**: Send a pad or ambient channel to the freeze bus to capture and sustain a texture\n- **BitCrusher**: Add lo-fi character to select channels without processing the whole mix\n- **AutoFilter + Distortion**: Create a filtered, distorted parallel layer for synth channels\n\nKeep the Send D level low (0.1-0.2) for most channels -- special effects are potent and a little goes a long way.\n\n## Send Levels and Automation\n\nSend levels are stored in the mixer state and persist with the project. They can be adjusted in real time during playback -- the gain ramps smoothly over 50ms to avoid clicks.\n\nFor MIDI controller integration, send levels are mappable knobs. If your controller has 4 auxiliary knobs per channel strip, they map naturally to the 4 send levels.\n\n## CPU Efficiency\n\nSend buses are inherently efficient because:\n\n- One reverb instance serves all 16 channels (instead of 16 separate reverbs)\n- Send gain nodes are only created when a channel actually sends to a bus\n- Buses with no effects are a simple gain passthrough (near-zero CPU)\n- Muting a bus stops processing its effects (the output gain goes to zero, and the effect still processes -- but the bus can be fully disposed if needed)\n\nFor a typical mix, two active send buses (reverb + delay) use less CPU than putting those same effects as inserts on even two channels.\n",
+    "images": []
+  },
+  {
+    "id": "38-master-effects-chain",
+    "number": 45,
+    "title": "Master Effects Chain",
+    "part": "Mixer & Routing",
+    "partNumber": 5,
+    "content": "# Master Effects Chain\n\nThe master effects chain processes the entire mix -- all 16 channel outputs and all send/return buses converge at the `masterEffectsInput` node, pass through the master effects, then through BLEP processing (Chapter 40), and finally out to the speakers. This is where you apply mastering-style processing: bus compression, EQ, saturation, limiting, and creative full-mix effects.\n\n## Signal Flow\n\nThe complete master bus signal path:\n\n```\nTracker instruments → masterInput → AmigaFilter → masterEffectsInput\n                                                          │\nSynth engines → synthBus ─────────────────────────────────┤\n                                                          │\nSend bus returns (A-D) ───────────────────────────────────┤\n                                                          │\n                                                          ▼\n                                               [Master Effect 1]\n                                                          │\n                                               [Master Effect 2]\n                                                          │\n                                               [Master Effect N]\n                                                          │\n                                                          ▼\n                                                     blepInput\n                                                          │\n                                                    [BLEP Worklet?]\n                                                          │\n                                                          ▼\n                                                   masterChannel (volume)\n                                                          │\n                                                          ▼\n                                                     destination (speakers)\n```\n\nThere are two input paths that merge at `masterEffectsInput`:\n\n- **Tracker path**: Sample-based instruments (MOD/XM/IT/S3M) route through `masterInput`, then through the Amiga hardware filter emulation, before reaching the master effects\n- **Synth path**: Native synth engines (Furnace, UADE, SunVox, chip synths, DB303) route through `synthBus` directly to `masterEffectsInput`, bypassing the Amiga filter\n\nBoth paths and all send returns feed the same `masterEffectsInput`, so the master effects chain processes the complete mixed audio.\n\n## Unlimited Effect Slots\n\nUnlike channel inserts (limited to 4), the master bus has no slot limit. You can chain as many effects as your CPU allows. In practice, 2-4 master effects cover most scenarios. Common mastering chains are intentionally minimal to preserve the mix character.\n\n## Adding and Managing Master Effects\n\nMaster effects are managed through the Master Effects panel, accessible from the toolbar or the effects modal. The panel shows the current effect chain with drag-to-reorder, bypass toggles, and per-effect parameter knobs.\n\nAvailable operations:\n\n| Action | Description |\n|--------|-------------|\n| Add effect | Choose from the full effect catalog (Tone.js, WASM, Buzzmachine, WAM, Neural) |\n| Remove effect | Disposes the audio node and removes it from the chain |\n| Reorder | Drag effects to change their position in the chain |\n| Bypass | Toggle individual effects on/off without removing them |\n| Adjust parameters | Per-effect knob panels for real-time parameter tweaking |\n| Load preset | Apply a complete master effects chain from the preset library |\n\n## Async Rebuild with Version Guarding\n\nRebuilding the master effects chain is an asynchronous operation because some effects (WASM-based, AudioWorklet-based) require async initialization. To prevent audio glitches during rapid changes, the rebuild uses a version guard:\n\n1. Each rebuild increments a `masterEffectsRebuildVersion` counter\n2. After each async operation (effect creation, module loading), the rebuild checks if its version is still current\n3. If a newer rebuild has started, the current rebuild aborts and disposes any nodes it created\n4. Only the most recent rebuild completes and connects to the audio graph\n\nThis means you can rapidly add, remove, or reorder effects without worrying about race conditions. Intermediate states are discarded, and only the final intended chain is connected.\n\n## Fast Parameter Update Path\n\nWhen only effect parameters change (no effects added, removed, or reordered), the chain skips the full rebuild entirely. The `canUseParameterUpdatePath()` check verifies that:\n\n- The number of enabled effects has not changed\n- The effect IDs and order match the current chain\n- Only parameter values differ\n\nIf these conditions are met, `updateEffectParameters()` updates the existing audio nodes in place. This is much faster than a full rebuild and avoids any audio interruption.\n\nParameter updates handle Tone.js Signal types (ramped smoothly) and plain numeric properties (set directly). The wet/dry mix is updated independently from effect-specific parameters.\n\n## Pre/Post Analyser Taps\n\nEach master effect gets a pair of AnalyserNode taps for visualization:\n\n- **Pre-analyser**: Taps the signal feeding into the effect (before processing)\n- **Post-analyser**: Taps the signal coming out of the effect (after processing)\n\nThese analysers are non-destructive side branches -- they observe the signal without modifying it. The Master Effects panel uses them to display frequency spectrum visualizations showing exactly what each effect is doing to the audio.\n\nBoth analysers use an FFT size of 2048 with 0.8 smoothing, providing a good balance between frequency resolution and temporal responsiveness.\n\n## BPM Sync\n\nMaster effects that support BPM sync (delays, tempo-synced filters, modulation effects) automatically receive tempo updates when the BPM changes. The `updateBpmSyncedEffects()` method is called whenever:\n\n- The transport BPM changes\n- A `bpmSync` or `syncDivision` parameter is modified on any master effect\n\nThis keeps delay times, modulation rates, and filter sweeps locked to the song tempo without manual adjustment.\n\n## Master Effects Presets\n\nDEViLBOX ships with a library of master effects presets organized by category:\n\n| Category | Description | Examples |\n|----------|-------------|---------|\n| Clean | Transparent mastering, minimal coloration | Clean Master (EQ + gentle compression), Transparent (barely-there bus comp), Balanced (EQ sculpting + light comp) |\n| Warm | Analog warmth and saturation | Tape warmth, tube saturation chains |\n| Loud | Aggressive compression and limiting | Maximizer, brick-wall limiter chains |\n| Wide | Stereo enhancement | Stereo widener + subtle reverb |\n| Vinyl | Lo-fi character | VinylNoise + TapeSaturation + gentle roll-off |\n| Genre | Genre-specific processing | Tailored chains for electronic, chiptune, ambient |\n| DJ | Processing for DJ mode | Sidechain-ready chains with aggressive limiting |\n| Neural | AI-powered amp/cab modeling | GuitarML neural network effects |\n\n### Example: Clean Master Preset\n\nA transparent finishing chain that glues the mix together:\n\n| Slot | Effect | Parameters |\n|------|--------|-----------|\n| 1 | EQ3 | low: +1 dB, mid: 0 dB, high: +0.5 dB |\n| 2 | Compressor | threshold: -18 dB, ratio: 2.5:1, attack: 0.01s, release: 0.2s |\n\nThis adds a subtle bass and treble lift to the overall tonality, then applies gentle bus compression (2.5:1 ratio is transparent enough to not squash dynamics while adding cohesion).\n\n### Example: Warm Tape Chain\n\nFor a vintage, analog-inspired master:\n\n| Slot | Effect | Purpose |\n|------|--------|---------|\n| 1 | TapeSaturation | Soft clipping and harmonic generation |\n| 2 | EQ3 | Compensate for saturation (slight high-frequency boost) |\n| 3 | Compressor | Gentle glue compression |\n\n## Interaction with Channel Inserts and Send Buses\n\nThe master effects chain sees the combined result of all channel processing:\n\n```\nIndividual channels (with their insert effects)\n    + Send bus returns (with their bus effects)\n    = Combined signal at masterEffectsInput\n    → Master effects process this combined signal\n```\n\nThis means:\n\n- A compressor on the master bus reacts to the total mix level, not individual channels\n- EQ on the master bus shapes the overall tonal balance\n- Reverb on the master bus affects everything (usually not desirable -- use send buses for reverb)\n- If a channel insert is clipping, the distorted signal reaches the master bus already clipped -- fix it at the channel level\n\n## Tips for Master Effects\n\n- **Less is more**: Master processing should enhance, not transform. If you need drastic processing on one sound, use a channel insert instead.\n- **Order matters**: A typical mastering chain goes EQ (tonal correction) then compression (dynamic control) then limiter (peak protection). Putting compression before EQ can cause the compressor to react to frequency imbalances.\n- **Check in mono**: Use a StereoWidener at the end of the chain with width set to 0 to check mono compatibility. If the mix collapses, you have phase issues.\n- **Use presets as starting points**: Load a Clean Master preset, then tweak parameters to taste rather than building from scratch.\n- **A/B regularly**: Bypass the entire master chain to compare processed vs. unprocessed. If the unprocessed version sounds better, simplify.\n",
+    "images": []
+  },
+  {
+    "id": "39-sidechain-routing",
+    "number": 46,
+    "title": "Sidechain Routing",
+    "part": "Mixer & Routing",
+    "partNumber": 5,
+    "content": "# Sidechain Routing\n\nSidechain compression is a technique where one channel's audio signal controls the compression applied to a different channel. The classic example: a kick drum triggers a compressor on the bass channel, causing the bass to momentarily duck in volume each time the kick hits. This creates the rhythmic \"pumping\" effect heard in electronic dance music, and it also solves a practical mixing problem -- keeping the kick and bass from competing for the same frequency space.\n\n## How Sidechain Compression Works\n\nA standard compressor reduces the volume of its input signal when that signal exceeds a threshold. A sidechain compressor does the same thing, but it listens to a *different* signal (the sidechain source) to decide when to compress. The compressor's input (the signal that gets compressed) and its detector (the signal that triggers compression) are decoupled.\n\n```\nKick (channel 0) ─── audio output ──→ SidechainCompressor.sidechainInput (detector)\n                                              │\nBass (channel 1) ─── audio output ──→ SidechainCompressor.input ──→ compressed output\n```\n\nWhen the kick plays, the sidechain detector sees a loud transient. This causes the compressor to engage, reducing the bass channel's volume. When the kick fades, the compressor releases and the bass volume returns to normal. The result: the bass ducks out of the way on every kick hit, then swells back.\n\n## The SidechainCompressor Effect\n\nDEViLBOX includes a purpose-built `SidechainCompressor` effect with these parameters:\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| threshold | -60 to 0 dB | -24 dB | Level at which compression begins. Lower = more compression. |\n| ratio | 1:1 to 20:1 | 4:1 | How much the signal is reduced above the threshold. Higher = more aggressive ducking. |\n| attack | 0.001 to 0.5 s | 0.003 s | How quickly compression engages when the sidechain signal arrives. Fast attack = instant duck. |\n| release | 0.01 to 1.0 s | 0.25 s | How quickly the volume returns after the sidechain signal drops. Longer release = slower pump. |\n| knee | 0 to 40 dB | 6 dB | Transition curve around the threshold. Higher knee = gentler onset. |\n| sidechainGain | 0 to 2.0 | 1.0 | Sensitivity of the sidechain detector. Higher = more responsive to quieter sidechain signals. |\n| wet | 0 to 1.0 | 1.0 | Dry/wet blend. At 0.5, half the original signal is blended with the compressed signal. |\n\n### Internal Architecture\n\nThe SidechainCompressor has two signal paths:\n\n**Main path** (the audio being compressed):\n```\ninput → Compressor → wetGain → output\ninput → dryGain → output         (parallel dry path for wet/dry blend)\n```\n\n**Sidechain detection path** (the trigger signal):\n```\nsidechainInput → sidechainGainNode → Meter (level detection)\n```\n\nThe sidechain meter is polled at the display refresh rate. When the sidechain level exceeds the noise floor (-60 dB), the compressor threshold is dynamically modulated based on the sidechain level, creating up to 24 dB of additional gain reduction. When the sidechain is quiet, the threshold returns to its base value.\n\n## Step-by-Step Setup\n\nHere is a complete walkthrough for setting up kick-triggered sidechain compression on a bass channel.\n\n### Step 1: Identify Your Channels\n\nDetermine which channel carries the kick drum (the trigger) and which channel carries the bass (the target). For this example:\n\n- Channel 0: Kick drum\n- Channel 1: Bass\n\n### Step 2: Add the SidechainCompressor\n\nAdd a SidechainCompressor as an insert effect on the bass channel (Channel 1):\n\n1. Open the mixer and select Channel 1\n2. Open the channel effects panel\n3. Add \"SidechainCompressor\" from the effect list\n\n### Step 3: Set the Sidechain Source\n\nIn the SidechainCompressor parameters, set `sidechainSource` to 0 (the kick channel index). The `ChannelEffectsManager` automatically wires Channel 0's audio output to the compressor's sidechain input.\n\n### Step 4: Configure the Compressor\n\nStart with these settings for a pronounced pumping effect:\n\n| Parameter | Value | Why |\n|-----------|-------|-----|\n| threshold | -24 dB | Moderate threshold -- the kick only needs to be moderately loud to trigger ducking |\n| ratio | 6:1 | Strong but not brick-wall -- allows some bass through during kicks |\n| attack | 0.003 s | Very fast -- catch the kick transient immediately |\n| release | 0.25 s | Quarter-second release creates a smooth pump that resolves before the next kick |\n| knee | 6 dB | Soft knee for a musical, gradual onset |\n| sidechainGain | 1.0 | Unity -- adjust upward if the kick is quiet |\n| wet | 1.0 | Full wet for maximum effect; reduce for subtler ducking |\n\n### Step 5: Fine-Tune by Ear\n\nPlay the pattern and listen for the pumping effect. Adjust these parameters to taste:\n\n- **More aggressive pump**: Lower the threshold (-30 dB), increase the ratio (10:1), shorten the attack (0.001 s)\n- **Subtler ducking**: Raise the threshold (-12 dB), lower the ratio (3:1), increase the knee (20 dB)\n- **Longer pump tail**: Increase release to 0.4-0.6 s -- the bass swells back slowly\n- **Shorter pump**: Decrease release to 0.05-0.1 s -- the bass returns quickly\n- **Blend with original**: Set wet to 0.5-0.7 to mix compressed and uncompressed bass\n\n## The Pump Shape\n\nThe release time is the primary control over the pump's rhythmic feel:\n\n| Release Time | BPM 120 | Character |\n|-------------|---------|-----------|\n| 0.05 s | Very short | Tight, percussive duck -- bass barely notices |\n| 0.15 s | Short | Punchy -- bass ducks and returns quickly |\n| 0.25 s | Medium | Classic dance pump -- smooth and musical |\n| 0.4 s | Long | Exaggerated pump -- bass swells like breathing |\n| 0.8 s | Very long | Extreme -- bass barely recovers before next kick |\n\nAt 120 BPM, eighth notes are 0.25 seconds apart and quarter notes are 0.5 seconds apart. A release of 0.25 s means the bass fully recovers just as the next eighth-note kick would hit. This is the \"sweet spot\" for four-on-the-floor dance music.\n\n## Attack Time and Transients\n\nThe attack parameter controls how fast the compressor reacts:\n\n- **Fast attack (0.001-0.005 s)**: The compressor clamps down instantly. The bass ducks the moment the kick plays. This is the standard sidechain sound -- clean and precise.\n- **Slow attack (0.01-0.05 s)**: The compressor lets the initial transient of the bass through before ducking. This preserves the bass's attack character while still creating space for the kick's sustain. Useful when you want the bass note's pluck to be heard.\n\n## Creative Uses Beyond Pumping\n\n### Ducking Delay Sends\n\nInstead of sidechaining the bass, sidechain the delay send bus. Every time the kick hits, the delay return ducks, keeping echoes from cluttering the rhythm:\n\n- Add SidechainCompressor to Send B (delay bus)\n- Set sidechainSource to the kick channel\n- Use gentle settings: threshold -12 dB, ratio 3:1, release 0.15 s\n\n### Rhythmic Filtering\n\nThe SidechainCompressor's wet/dry blend can create a pseudo-rhythmic filter effect. With the wet at 0.4, the bass alternates between its full sound and a compressed (quieter, less dynamic) version, creating subtle rhythmic variation even on sustained notes.\n\n### Pad Ducking for Vocal Clarity\n\nIn a mix with vocal samples and pads, sidechain the pad channel to the vocal channel. Whenever the vocal plays, the pad ducks slightly, creating space for the vocal without permanently lowering the pad level.\n\n- threshold: -18 dB\n- ratio: 3:1\n- attack: 0.01 s\n- release: 0.3 s\n- wet: 0.6\n\n### Multiband Sidechain (Advanced)\n\nFor more surgical sidechain work, combine a channel insert filter with the sidechain compressor:\n\n1. Slot 1: Filter (high-pass at 200 Hz) -- remove bass frequencies that would conflict\n2. Slot 2: SidechainCompressor -- duck the filtered signal based on kick\n\nThis lets the sub-bass of the pad play uninterrupted while only the mid/high content ducks. The result is a pump effect that affects the perceived loudness without the sub-bass disappearing.\n\n## Monitoring Gain Reduction\n\nThe SidechainCompressor exposes a `getReduction()` method that returns the current gain reduction in dB. The channel effects panel displays this as a gain reduction meter -- a visual indicator of how much the compressor is currently ducking the signal. When the meter shows -6 dB of reduction on each kick hit, you know the sidechain is working as intended.\n\n## Troubleshooting\n\n| Problem | Cause | Fix |\n|---------|-------|-----|\n| No ducking effect | sidechainSource not set or set to wrong channel | Verify the source channel index matches the kick channel |\n| Ducking is too subtle | Threshold too high or sidechainGain too low | Lower threshold to -30 dB or increase sidechainGain to 1.5 |\n| Bass disappears completely | Ratio too high with low threshold | Raise threshold or lower ratio; or reduce wet to blend in dry signal |\n| Pumping sounds unmusical | Release time does not match tempo | Calculate: release = (60 / BPM) * subdivision. For 1/8 notes at 120 BPM: 0.25 s |\n| Clicks on duck onset | Attack too fast with high ratio | Increase attack to 0.005 s or increase knee to 10+ dB |\n",
+    "images": []
+  },
+  {
+    "id": "40-amiga-filter-blep",
+    "number": 47,
+    "title": "Amiga Filter & BLEP",
+    "part": "Mixer & Routing",
+    "partNumber": 5,
+    "content": "# Amiga Filter & BLEP\n\nDEViLBOX includes two hardware-accurate audio processing stages that are essential for authentic playback of Amiga tracker modules and chip music: the Amiga hardware filter emulation and the BLEP (Band-Limited Step) anti-aliasing processor. Both sit in the master signal path and can be enabled or disabled in the settings.\n\n## The Amiga Hardware Filter\n\n### What It Is\n\nEvery Amiga 500 had an analog RC filter circuit between the Paula sound chip's DAC output and the audio output jacks. This filter was not optional -- it was part of the hardware, and every piece of Amiga music ever heard through real hardware was colored by it. The filter has two stages:\n\n1. **Fixed low-pass filter (~4.4 kHz)**: A simple 6 dB/octave RC filter that rolls off high frequencies. This gave all Amiga audio a warm, slightly muffled character compared to raw digital playback.\n\n2. **Switchable \"LED\" low-pass filter (~3.1 kHz)**: A steeper 12 dB/octave Sallen-Key filter (Q approximately 0.66) that could be toggled on and off by the Amiga's power LED brightness. Many tracker modules used the `E00`/`E01` effects to toggle this filter during playback for tonal variation. When enabled, it adds a more pronounced high-frequency rolloff.\n\nThere is also a fixed high-pass filter at approximately 5 Hz that removes DC offset -- inaudible but important for preventing speaker cone drift.\n\n### Why It Matters\n\nIf you play an Amiga module without the hardware filter, the high frequencies are noticeably brighter and harsher than what the original composer heard. Many classic MOD/XM compositions were mixed with the filter's rolloff in mind -- the composer expected the filter to tame harsh sample edges. Playing without it can make the music sound thin or overly bright.\n\nConversely, some composers working on Amiga 1200 (which had a different, flatter filter) or on PC trackers did not design for this filter. For those modules, the filter may sound unnecessarily dark.\n\n### DEViLBOX Implementation\n\nThe `AmigaFilter` class is a 1:1 DSP emulation based on the ProTracker 2.3D clone source code (`pt2_rcfilters.c`) and Amiga 500 hardware schematics. It runs as an AudioWorklet processor for sample-accurate filtering on the audio thread.\n\nThe filter computes its coefficients at initialization based on the system sample rate:\n\n| Filter Stage | Cutoff Frequency | Slope | Type |\n|-------------|-----------------|-------|------|\n| High-pass (DC removal) | 5.128 Hz | 6 dB/oct | RC high-pass |\n| Fixed low-pass (A500) | 4420.971 Hz | 6 dB/oct | RC low-pass |\n| LED low-pass (switchable) | 3090.533 Hz | 12 dB/oct | Sallen-Key (Q = 0.66) |\n\nThe LED filter can be toggled independently. When a tracker module sends the `E00` effect (filter off) or `E01` effect (filter on), DEViLBOX forwards this to the AmigaFilter's `ledFilterEnabled` property, which sends a message to the worklet processor.\n\n### Where It Sits in the Signal Chain\n\nThe Amiga filter is inserted on the tracker instrument path only:\n\n```\nTracker instruments → masterInput → AmigaFilter → masterEffectsInput → [master effects] → ...\n```\n\nSynth engines (Furnace, UADE, DB303, chip synths) bypass the Amiga filter:\n\n```\nSynth engines → synthBus → masterEffectsInput → [master effects] → ...\n```\n\nThis is deliberate. WASM chip engines like Furnace and UADE already emulate their own hardware filters internally. Applying the Amiga filter on top would double-filter the audio. The AmigaFilter only processes sample-based tracker playback (MOD, XM, IT, S3M) where the audio path emulates Amiga Paula DMA playback.\n\n### Enable/Disable\n\nThe Amiga filter is enabled by default (matching real Amiga behavior). To toggle it:\n\n- Open Settings from the toolbar\n- Find the \"Amiga Filter\" toggle in the Audio section\n- Disable to hear raw, unfiltered sample playback\n\nThe filter state is stored in the settings store and persists across sessions.\n\n**When to disable:**\n- Playing PC tracker modules (IT, S3M) that were not composed for Amiga hardware\n- When you want the brightest possible playback\n- When the module sounds too muffled or dark\n\n**When to keep enabled:**\n- Playing classic Amiga MOD files (ProTracker, NoiseTracker, SoundTracker)\n- When you want authentic period-correct playback\n- When high frequencies sound harsh or aliased without it\n\n### Worklet Initialization\n\nThe filter initializes lazily -- it starts in bypass mode (direct passthrough from input to output) and loads the AudioWorklet when the audio context is running. If the context is suspended (waiting for user interaction), the filter defers initialization until the context becomes active.\n\nOnce the worklet is loaded, the bypass connection is removed and audio routes through the worklet processor. This happens transparently -- there is no audible transition because the filter is silent until playback starts.\n\n## BLEP (Band-Limited Step)\n\n### What Aliasing Sounds Like\n\nDigital audio has a fundamental limitation: it can only represent frequencies up to half the sample rate (the Nyquist frequency). When a digital synthesizer or sampler produces a waveform with sharp discontinuities -- like a square wave's instant transition from positive to negative -- those sharp edges generate harmonics that extend beyond the Nyquist limit. These harmonics \"fold back\" into the audible range as inharmonic, metallic-sounding artifacts called aliasing.\n\nAliasing sounds like a harsh, buzzy, inharmonic overlay on the sound. It is most noticeable on:\n\n- Square waves and pulse waves at high pitches\n- Sawtooth waves (the reset at each cycle is a discontinuity)\n- Sample playback when the playback rate does not evenly divide the sample rate\n- Chip music with hard-clipped or quantized waveforms\n\nOn real Amiga hardware, the Paula chip's DAC and the analog output filter naturally suppressed some aliasing. On a modern digital system playing back samples at 44.1/48 kHz without hardware filtering, aliasing can be prominent.\n\n### What BLEP Does\n\nBLEP (Band-Limited Step) is an anti-aliasing technique that replaces sharp discontinuities in the audio signal with smooth, band-limited transitions. Instead of an instant step from one sample value to the next, BLEP inserts a pre-computed correction curve that smooths the transition over several samples while preserving the perceived sharpness of the sound.\n\nThe algorithm:\n\n1. Detect a discontinuity (a significant change between consecutive samples)\n2. Compute the amplitude of the step (the delta)\n3. Add a pre-computed band-limited correction to the output buffer\n4. The correction is shaped so that the resulting waveform has no energy above the Nyquist frequency\n\nThe result: waveforms sound sharp and punchy but without the metallic aliasing artifacts.\n\n### DEViLBOX Implementation\n\nDEViLBOX uses a WASM-compiled BLEP implementation based on the PT2-clone's C code. The BLEP processor runs as an AudioWorklet (`blep-processor.worklet.js`) to ensure sample-accurate processing on the audio thread.\n\nThe core data structure is a 272-byte buffer containing:\n\n| Field | Size | Purpose |\n|-------|------|---------|\n| index | 4 bytes | Current position in the circular buffer |\n| samplesLeft | 4 bytes | Number of correction samples remaining |\n| dBuffer[32] | 256 bytes | Ring buffer of 32 double-precision correction values |\n| dLastValue | 8 bytes | Previous sample value for discontinuity detection |\n\nThree operations drive the BLEP processor:\n\n- **`blepInit(buffer)`**: Zero the buffer and reset state\n- **`blepAdd(buffer, offset, amplitude)`**: Add a band-limited step correction at a fractional sample offset with a given amplitude delta\n- **`blepRun(buffer, input)`**: Process one input sample through the BLEP correction buffer, returning the corrected output\n\n### Per-Voice BLEP\n\nFor the most accurate processing, DEViLBOX supports per-voice BLEP via the `VoiceBlepProcessor` class. Each active voice (instrument on a channel) gets its own BLEP state. This prevents discontinuities in one voice's waveform from affecting the correction applied to another voice.\n\nThe per-voice processor tracks the previous sample value and only applies BLEP correction when the delta exceeds a threshold of 0.0001 (to avoid adding corrections for noise-level changes). It resets when a new note triggers on the voice.\n\n### Where BLEP Sits in the Signal Chain\n\nBLEP processing is the last stage before the master volume:\n\n```\nmasterEffectsInput → [master effects] → blepInput → [BLEP worklet] → masterChannel → destination\n```\n\nThe `blepInput` node is deliberately separate from the master effects chain. When master effects are rebuilt (an async operation that disconnects and reconnects nodes), the BLEP connection remains stable. The `BlepManager.connect()` method handles the routing:\n\n- **BLEP enabled**: Unwraps Tone.js nodes to native AudioNodes and connects `blepInput → workletNode → masterChannel`\n- **BLEP disabled**: Connects `blepInput` directly to `masterChannel` via Tone.js (simple passthrough)\n\n### Enable/Disable\n\nBLEP processing is toggled in the Settings panel alongside the Amiga filter. The BlepManager sends an enable/disable message to the worklet processor:\n\n```\nworkletNode.port.postMessage({ type: 'setEnabled', value: true/false })\n```\n\nWhen disabled, the worklet passes audio through unchanged (zero processing overhead).\n\n**When to enable:**\n- Playing back chip music or sample-based tracker modules\n- When you hear metallic or buzzy artifacts on high-pitched notes\n- For authentic ProTracker-quality playback\n\n**When to disable:**\n- Playing back high-quality audio or pre-rendered samples that do not need anti-aliasing\n- If BLEP processing introduces audible artifacts on your specific content (rare)\n- To reduce CPU usage on resource-constrained systems\n\n### Reset\n\nThe BLEP buffer can be reset via `BlepManager.reset()`, which clears the correction buffer. This is called automatically when playback stops to prevent stale correction data from affecting the next playback session.\n\n## Combined Operation\n\nWhen both the Amiga filter and BLEP are enabled, the signal passes through both stages:\n\n```\nsamples → AmigaFilter (RC low-pass + LED filter) → master effects → BLEP (anti-aliasing) → output\n```\n\nThis combination provides the most authentic Amiga playback:\n\n1. The Amiga filter colors the frequency response to match real hardware\n2. The master effects apply any user-selected processing\n3. BLEP removes aliasing artifacts that would not have been present on real hardware (where the analog filter and DAC characteristics naturally suppressed them)\n\nFor modern tracker compositions or non-Amiga formats, both can be disabled for clean, unprocessed output.\n\n## Comparison: Filter On vs. Off\n\n| Characteristic | Filter On | Filter Off |\n|---------------|-----------|------------|\n| High frequencies | Rolled off above ~4.4 kHz (gentle) or ~3.1 kHz (with LED) | Full bandwidth to Nyquist |\n| Character | Warm, rounded, \"vintage Amiga\" | Bright, crisp, modern |\n| Aliasing artifacts | Suppressed by analog rolloff | More audible (mitigated by BLEP) |\n| Bass response | Unchanged (DC high-pass only removes sub-5 Hz) | Unchanged |\n| CPU cost | Minimal (AudioWorklet) | Zero |\n| Best for | Classic MOD/XM files, ProTracker compositions | IT/S3M files, modern compositions, hi-fi playback |\n",
+    "images": []
+  },
+  {
+    "id": "41-wave-darkwave-coldwave",
+    "number": 48,
+    "title": "*Wave / Crystal Castles Production Guide",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": `# *Wave / Crystal Castles Production Guide
+
+How to create modern synthwave, darkwave, coldwave, and Crystal Castles-style music with deep echoed landscapes in DEViLBOX.
+
+---
+
+## Send Bus Setup (Do This First)
+
+The foundation of *wave production is **shared space** -- multiple instruments feeding into the same reverbs and delays at different levels. This creates cohesion.
+
+### Recommended Bus Configuration
+
+| Bus | Effect | Purpose |
+|-----|--------|---------|
+| **Send A** | ShimmerReverb | Main ethereal wash (decay 0.8, shimmer 0.6, pitch +12, damping 0.4) |
+| **Send B** | AmbientDelay | Darkening repeats (1/8 dotted, feedback 0.6, LP 2kHz, diffusion 0.4) |
+| **Send C** | MVerb or SpringReverb | Short tight room for drums |
+| **Send D** | GranularFreeze | Ready to freeze any moment |
+
+### Send Level Guidelines
+
+| Source | Send A (Shimmer) | Send B (Delay) | Send C (Room) | Send D (Freeze) |
+|--------|-----------------|----------------|---------------|-----------------|
+| Pads | 0.7 | 0.3 | 0.0 | 0.0 |
+| Leads | 0.3 | 0.6 | 0.0 | 0.0 |
+| Bass | 0.1 | 0.2 | 0.0 | 0.0 |
+| Drums | 0.1 | 0.1 | 0.4 | 0.0 |
+| Vocals/Samples | 0.4 | 0.5 | 0.0 | as needed |
+
+The key: **everything gets a touch of Send A** for cohesion. It's the "room" that ties the mix together.
+
+---
+
+## Channel Insert Chain Recipes
+
+### Dark Pad (Surge XT or OBXd, detuned saw)
+
+1. TapeDegradation (wow 0.2, flutter 0.15, saturation 0.4, toneShift 0.3)
+2. Send A cranked to 0.7, Send B at 0.3
+
+The tape degradation adds pitch drift and warmth before the signal hits the shimmer reverb. The low toneShift darkens the pad further.
+
+### Crystal Castles Vocal/Lead (bitcrushed, lo-fi)
+
+1. BitCrusher (bits 8)
+2. TapeDegradation (wow 0.4, flutter 0.3, hiss 0.2, toneShift 0.2)
+3. Send A at 0.5, Send B at 0.6
+
+The BitCrusher creates the digital aliasing artifacts. The heavy tape degradation makes it sound like it's being played through a broken cassette player. High delay send creates the "lost in echo" effect.
+
+### Pumping Bass (Sidechain Compression)
+
+1. SidechainCompressor with \`sidechainSource\` set to your kick channel
+2. Threshold -24, ratio 8, attack 0.01, release 0.2
+
+The bass ducks on every kick hit -- classic 4-on-the-floor pump. Essential for driving *wave tracks.
+
+### Frozen Texture (Any Synth -> Granular)
+
+1. Route audio to Send D (GranularFreeze)
+2. Play a chord or texture, then set freeze=1
+3. Tweak scatter, grainSize, and shimmer while frozen to evolve the cloud
+4. Set thru=1 to keep playing over the frozen texture
+
+This creates ambient interludes, transitions, and textural beds.
+
+---
+
+## The Crystal Castles Sound
+
+The key is **stacking degradation**:
+
+1. Start with a digital synth (Dexed DX7, or BitCrusher on anything)
+2. TapeDegradation on the channel (heavy -- wow 0.5, saturation 0.5, toneShift 0.25)
+3. Send to ShimmerReverb bus at 0.6+
+4. Send to AmbientDelay bus at 0.4
+5. On the **master chain**: another TapeDegradation (subtle -- wow 0.1, hiss 0.1) for the "whole mix through a cassette deck" vibe
+
+### Why It Works
+
+Crystal Castles' sound comes from multiple layers of signal degradation. Each stage adds different artifacts:
+- BitCrusher: digital aliasing, quantization noise
+- TapeDegradation: analog pitch drift, flutter, hiss
+- ShimmerReverb: infinite ascending harmonics
+- AmbientDelay: filtered echoes that darken over time
+- Master TapeDegradation: cassette deck cohesion across the full mix
+
+---
+
+## The Shimmer Landscape
+
+For ambient interludes or breakdowns:
+
+1. Play a sustained chord through ShimmerReverb (shimmer 0.7, decay 0.9, pitch +12)
+2. While the reverb tail builds, hit freeze on GranularFreeze on the same bus
+3. The frozen shimmer tail becomes an evolving granular cloud
+4. Slowly bring in drums underneath
+
+### Evolving the Frozen Texture
+
+While frozen, automate these GranularFreeze parameters:
+- **scatter**: 0.2 -> 0.8 (grains spread across the buffer)
+- **grainSize**: 80ms -> 200ms (longer grains = smoother)
+- **pitch**: 0 -> +7 (slowly transpose up a fifth)
+- **shimmer**: 0 -> 0.5 (add octave-up sparkle to grains)
+
+---
+
+## Quick Reference
+
+| Want this sound | Use this |
+|----------------|----------|
+| Worn cassette | TapeDegradation (wow + flutter + hiss) |
+| Infinite ascending wash | ShimmerReverb (shimmer 0.6+, decay 0.8+) |
+| Darkening echoes | AmbientDelay (LP filter 2kHz, diffusion 0.4) |
+| Frozen moment -> texture | GranularFreeze (freeze on, scatter 0.5) |
+| Rhythmic pumping | SidechainCompressor (source = kick ch) |
+| Everything in same space | Shared reverb on Send A, all channels send to it |
+| Digital lo-fi | BitCrusher (bits 6-8) + TapeDegradation |
+| Cassette deck master | TapeDegradation on master chain (subtle) |
+| Dub echo throws | AmbientDelay (feedback 0.8, diffusion 0.6) on send |
+| Ethereal vocal | PitchShift (+12) -> ShimmerReverb on send |
+
+---
+
+## Suggested Synths for *Wave
+
+| Role | Best Synths | Why |
+|------|-------------|-----|
+| Dark pads | Surge XT, OBXd, Vital | Detuned saws, deep modulation |
+| Cold digital leads | Dexed (DX7), CZ101 | FM/PD synthesis = cold and metallic |
+| Acid bass | TB303 | The original acid bass |
+| Analog bass | Helm, Amsynth, CalfMono | Warm, fat, analog-modeled |
+| Chiptune textures | FurnaceAY, FurnaceC64 | Lo-fi chip sounds + degradation = gold |
+| Noise/texture | NoiseSynth, GranularSynth | Raw material for granular processing |
+| Vintage keys | MdaEPiano, OpenWurli | Rhodes and Wurlitzer through tape = instant nostalgia |
+
+---
+
+## Effect Parameter Cheat Sheet
+
+### TapeDegradation
+| Parameter | Range | Sweet Spot | What It Does |
+|-----------|-------|------------|--------------|
+| wow | 0-100 | 20-40 | Slow pitch drift (worn tape) |
+| flutter | 0-100 | 15-30 | Fast pitch wobble (tape mechanism) |
+| hiss | 0-100 | 10-20 | Tape hiss level |
+| dropouts | 0-100 | 0-10 | Random volume dips (damaged tape) |
+| saturation | 0-100 | 20-50 | Tape compression/warmth |
+| toneShift | 0-100 | 25-50 | High-freq roll-off (0=very dark, 100=bright) |
+
+### ShimmerReverb
+| Parameter | Range | Sweet Spot | What It Does |
+|-----------|-------|------------|--------------|
+| decay | 0-100 | 60-90 | Reverb tail length |
+| shimmer | 0-100 | 40-70 | Pitch-shifted feedback amount |
+| pitch | -24 to +24 | +12 | Pitch shift in semitones (+12 = octave up) |
+| damping | 0-100 | 30-60 | High-frequency absorption |
+| size | 0-100 | 50-80 | Room/plate size |
+| predelay | 0-500ms | 20-60 | Gap before reverb onset |
+| modRate | 0-100 | 20-40 | Chorus modulation speed |
+| modDepth | 0-100 | 10-30 | Chorus modulation depth |
+
+### GranularFreeze
+| Parameter | Range | Sweet Spot | What It Does |
+|-----------|-------|------------|--------------|
+| freeze | 0/1 | -- | Toggle freeze on/off |
+| grainSize | 10-500ms | 60-120 | Individual grain length |
+| density | 1-50 | 8-20 | Grains per second |
+| scatter | 0-100 | 20-60 | Random position in buffer |
+| pitch | -24 to +24 | 0-7 | Grain pitch shift |
+| spray | 0-100 | 10-30 | Random start variation |
+| shimmer | 0-100 | 0-40 | Octave-up probability per grain |
+| stereoWidth | 0-100 | 50-80 | Grain pan spread |
+| feedback | 0-100 | 0-30 | Output fed back into buffer |
+| captureLen | 50-2000ms | 300-800 | Audio buffer size |
+
+### AmbientDelay
+| Parameter | Range | Sweet Spot | What It Does |
+|-----------|-------|------------|--------------|
+| time | 10-2000ms | 250-500 | Base delay time (BPM-syncable) |
+| feedback | 0-95 | 45-65 | Repeat amount |
+| taps | 1-3 | 2 | Number of delay taps |
+| filterFreq | 200-8000Hz | 1500-3000 | Filter cutoff in feedback |
+| filterQ | 0.5-8 | 1-2 | Filter resonance |
+| modRate | 0-100 | 20-40 | Delay time wobble speed |
+| modDepth | 0-100 | 10-20 | Delay time wobble amount |
+| stereoSpread | 0-100 | 40-70 | Tap panning width |
+| diffusion | 0-100 | 15-35 | Allpass smearing of repeats |
+`,
+    "images": []
+  },
+  {
+    "id": "42-crystal-castles-noise-pop",
+    "number": 49,
+    "title": "Crystal Castles & Noise Pop",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Crystal Castles & Noise Pop\n\nHow to create bitcrushed, degraded, lo-fi digital music in the style of Crystal Castles, Health, Sleigh Bells, and noise pop in DEViLBOX.\n\n---\n\n## Overview\n\nCrystal Castles and noise pop share a defining aesthetic: digital signals pushed through layers of destruction until they become something beautiful. The sound is built on bitcrushed vocals, distorted chip synths, tape-warped pads, and aggressive reverb tails that swallow the mix. Nothing sounds clean. Everything sounds like it was recorded onto a broken Game Boy, dubbed to cassette, then played back through a busted PA.\n\nThe key production principle is **stacked degradation** -- each processing stage adds a different flavor of destruction, and the cumulative effect creates the signature lo-fi digital wall of sound.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **Bitcrushed lead** | FurnaceNES or FurnaceGB | Pulse wave, duty cycle 25% or 50% |\n| **Distorted pad** | Surge or Vital | Detuned saws, 4-voice unison |\n| **Noise texture** | NoiseSynth | White noise, filter sweep |\n| **Glitchy bass** | FurnaceC64 (SID) | Pulse wave with PWM, filter resonance high |\n| **FM stabs** | DX7 | Algorithm 5, high feedback on op 6 |\n| **Atari textures** | FurnaceTIA | Raw square/noise, embrace the grit |\n| **Vocal simulation** | V2Speech or DECtalk | Processed through full degradation chain |\n| **Drum machine** | TR808 or TR909 | Kick and snare heavily processed |\n\n---\n\n## Send Bus Setup\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | ShimmerReverb | decay 0.85, shimmer 0.7, pitch +12, damping 0.25, size 0.75 |\n| **Send B** | AmbientDelay | time 375ms, feedback 0.7, filterFreq 1800, diffusion 0.5 |\n| **Send C** | GranularFreeze | grainSize 60ms, density 15, scatter 0.5, feedback 0.2 |\n| **Send D** | SpringReverb | Short room for drums (decay 0.3, tone 0.4) |\n\n### Send Level Guidelines\n\n| Source | Send A (Shimmer) | Send B (Delay) | Send C (Freeze) | Send D (Room) |\n|--------|-----------------|----------------|-----------------|---------------|\n| Bitcrushed lead | 0.5 | 0.6 | 0.0 | 0.0 |\n| Distorted pad | 0.6 | 0.2 | 0.0 | 0.0 |\n| Noise texture | 0.3 | 0.4 | 0.4 | 0.0 |\n| Bass | 0.1 | 0.1 | 0.0 | 0.0 |\n| Drums | 0.0 | 0.1 | 0.0 | 0.3 |\n| Vocals/Speech | 0.4 | 0.5 | 0.0 | 0.0 |\n\n---\n\n## Channel Insert Chain Recipes\n\n### The Crystal Castles Vocal\n\nThe signature sound: a human voice reduced to a digital ghost.\n\n1. **BitCrusher** -- bits 6, wet 100\n2. **TapeDegradation** -- wow 0.5, flutter 0.4, hiss 0.15, saturation 0.5, toneShift 0.2\n3. **ShimmerReverb** via Send A at 0.5\n\nThe BitCrusher at 6 bits creates aggressive quantization artifacts and aliasing. The TapeDegradation adds pitch instability and analog warmth on top of the digital destruction. The shimmer reverb smears the result into an ethereal wash.\n\n### Stacked Degradation Lead (the signature chain)\n\n1. **BitCrusher** -- bits 8, wet 85\n2. **TapeDegradation** -- wow 0.4, flutter 0.3, saturation 0.45, toneShift 0.25\n3. **Chebyshev** -- order 3, wet 40 (adds odd harmonics)\n4. Send A at 0.5, Send B at 0.6\n\nUse on FurnaceNES or FurnaceGB pulse waves. The BitCrusher degrades the already lo-fi chip sound further. TapeDegradation warps the pitch. Chebyshev distortion thickens the upper harmonics. The delay echoes at 0.6 create the "lost in a warehouse" effect.\n\n### Noise Wall Pad\n\n1. **BuzzDistortion** -- gain 70, wet 60\n2. **TapeDegradation** -- wow 0.3, flutter 0.2, saturation 0.6, toneShift 0.15\n3. Send A at 0.7\n\nStart with Surge or Vital playing detuned saw chords. The BuzzDistortion pushes the signal into saturation. TapeDegradation darkens and warps the result. Heavy shimmer send creates the infinite ascending wash.\n\n### Glitch Bass\n\n1. **BitCrusher** -- bits 10, wet 70\n2. **BuzzOverdrive** -- gain 50, wet 50\n3. **Compressor** -- threshold -18, ratio 6, attack 0.005, release 0.15\n4. Send A at 0.1 (just a touch for cohesion)\n\nThe BitCrusher adds grit without destroying the fundamental. Overdrive thickens the low end. Compressor keeps it controlled so it sits under the noise wall.\n\n### Destroyed Drums\n\n1. **BitCrusher** -- bits 12, wet 50\n2. **BuzzDistortion** -- gain 40, wet 35\n3. Send D at 0.3\n\nLight bitcrushing on drums adds crunch without losing transients. The room reverb keeps them present but not washed out.\n\n---\n\n## Pattern Writing Tips\n\n- **Use short patterns** (16-32 rows). Crystal Castles tracks are built from repetitive loops with subtle variation.\n- **Keep melodies simple** -- 3-5 note phrases that loop. The processing IS the interest, not the notes.\n- **Layer chip arpeggios** using the 0xy effect (e.g., `037` for minor chord arpeggio) on FurnaceNES channels.\n- **Use note cuts** (ECx) aggressively to create stuttering, glitchy rhythms.\n- **Velocity matters** -- lower velocity (40-60) on background parts, full velocity (127) on lead stabs to create dynamics through the degradation chain.\n- **Leave space** -- noise pop works because not everything plays at once. Drop channels in and out.\n- **Drum patterns**: simple 4/4 kick (every beat), snare on 2 and 4, hi-hat 8ths with some 16th ghost notes. The processing makes simple patterns interesting.\n\n### Example Noise Pop Pattern (16 rows)\n\n```\nRow  Ch1 (NES Lead)   Ch2 (Noise Pad)  Ch3 (Kick)   Ch4 (Snare/Hat)\n00   C-4  80  ---      E-3  50  ---     C-2  90  ---  C#5  40  ---\n01   ---  --  ---      |    --  ---     ---  --  ---  ---  --  ---\n02   E-4  70  EC2      |    --  ---     ---  --  ---  C#5  30  ---\n03   ---  --  ---      |    --  ---     ---  --  ---  ---  --  ---\n04   G-4  80  ---      ---  --  EC1     ---  --  ---  E-2  75  ---\n05   ---  --  ---      ---  --  ---     ---  --  ---  C#5  25  ---\n06   C-5  60  EC3      E-3  50  ---     ---  --  ---  C#5  35  ---\n07   ---  --  ---      |    --  ---     ---  --  ---  ---  --  ---\n08   C-4  80  ---      |    --  ---     C-2  90  ---  C#5  40  ---\n09   ---  --  ---      |    --  ---     ---  --  ---  ---  --  ---\n10   E-4  70  037      ---  --  EC1     ---  --  ---  C#5  30  ---\n11   ---  --  037      ---  --  ---     ---  --  ---  ---  --  ---\n12   G-4  80  ---      E-3  50  ---     ---  --  ---  E-2  75  ---\n13   ---  --  ---      |    --  ---     ---  --  ---  C#5  20  ---\n14   C-4  60  EC2      |    --  ---     C-2  70  ---  C#5  35  ---\n15   ---  --  ---      ---  --  EC1     ---  --  ---  ---  --  ---\n```\n\nNotice: note cuts (EC2, EC3) create the stuttering rhythm. The arpeggio effect (037) on row 10-11 adds a momentary chord swirl. The noise pad fades in and out with note cuts. Ghost hi-hats at velocity 20-30 add subtle texture.\n\n### Arrangement Tips\n\n- **Build through addition** -- start with just the chip lead and kick. Add the noise pad after 8 bars. Add the full drum pattern after 16 bars.\n- **Strip down for tension** -- drop everything except the reverb/delay tails for 4 bars. The degradation effects ring out and create a haunting void.\n- **Double the lead** -- copy the lead melody to a second channel with different BitCrusher settings (bits 6 vs bits 10) and pan them slightly left/right. The different aliasing artifacts create stereo width.\n- **BPM range**: 120-145 for Crystal Castles style, 100-120 for slower noise pop.\n\n---\n\n## Master Chain\n\n1. **TapeDegradation** -- wow 0.1, flutter 0.08, hiss 0.08, saturation 0.2, toneShift 0.35\n2. **Compressor** -- threshold -12, ratio 3, attack 0.01, release 0.2\n3. **EQ3** -- low +2, mid 0, high -1\n\nThe subtle master TapeDegradation is the "cassette deck" glue that ties the whole mix together. The compressor tames peaks from all the distortion. Slight high-cut on the EQ prevents digital harshness from the bitcrushing.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup to get the Crystal Castles sound in 5 minutes:**\n>\n> 1. Load a **FurnaceNES** synth on channel 1 (pulse wave, duty 25%)\n> 2. Add **BitCrusher** insert (bits 8) and **TapeDegradation** insert (wow 0.4, flutter 0.3, saturation 0.4)\n> 3. Set up **Send A** with ShimmerReverb (decay 0.85, shimmer 0.7)\n> 4. Set Send A level on channel 1 to 0.5\n> 5. Write a simple 4-note loop: C-4, E-4, G-4, C-5 in 16th notes\n> 6. Add a **TR808** on channel 2 with a basic 4/4 kick pattern\n> 7. Add BitCrusher (bits 12) to channel 2\n> 8. Play -- you have the aesthetic. Layer from here.\n\n---\n\n## Reference Tracks\n\n- Crystal Castles -- "Crimewave" (the stacked degradation vocal)\n- Crystal Castles -- "Baptism" (aggressive shimmer + bitcrush)\n- Health -- "Die Slow" (noise wall + driving beat)\n- Sleigh Bells -- "Crown on the Ground" (distorted everything)\n- Salem -- "King Night" (slowed, degraded, reverb-soaked)\n',
+    "images": []
+  },
+  {
+    "id": "43-acid-techno-tb303",
+    "number": 50,
+    "title": "Acid Techno & TB-303",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Acid Techno & TB-303\n\nHow to create classic acid techno, acid house, and TB-303-driven tracks in DEViLBOX -- from squelchy basslines to screaming resonance sweeps.\n\n---\n\n## Overview\n\nAcid techno is defined by the Roland TB-303 Bass Line synthesizer. The 303\'s unique filter, envelope, and accent circuitry produce a sound no other synth can replicate: squelchy, rubbery basslines that scream at high notes and growl at low ones. The genre pairs these acid lines with driving four-on-the-floor kicks, sparse percussion, and delay throws that create hypnotic, repetitive grooves.\n\nDEViLBOX includes a cycle-accurate DB303 WASM emulation with the DiodeLadder filter and Devil Fish modifications. This is a real 303, not an approximation.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **Acid bass** | TB303 | filterSelect 0 (DiodeLadder), cutoff 0.35, resonance 0.75, envMod 0.65, decay 0.5 |\n| **Screaming lead** | TB303 | filterSelect 0, cutoff 0.5, resonance 0.9, envMod 0.8, decay 0.3, accent 0.8 |\n| **Kick** | TR808 or TR909 | Long decay kick, slight drive |\n| **Hi-hat** | TR909 | Closed hats on 16ths, open hat on offbeats |\n| **Clap** | TR909 | On beat 2 and 4 |\n| **Pad (optional)** | Surge or Helm | Detuned saw pad, low-pass filtered, very quiet -- just for atmosphere |\n| **Stab** | DX7 | Short FM stab, algorithm 1, high op ratio for metallic edge |\n\n### TB-303 Parameter Deep Dive\n\nThe 303 sends all parameters as 0-1 normalized values to WASM. Here are the key parameters and their musical effect:\n\n| Parameter | Value | Musical Effect |\n|-----------|-------|----------------|\n| cutoff | 0.2-0.5 | Lower = darker/muddier, higher = brighter/more open |\n| resonance | 0.6-0.95 | Higher = more squelch, 0.9+ = near self-oscillation screams |\n| envMod | 0.4-0.8 | Filter envelope depth -- higher = more pronounced sweep per note |\n| decay | 0.3-0.7 | Filter envelope time -- shorter = snappier, longer = rounder |\n| accent | 0.5-0.9 | How much accented notes spike the filter -- the "scream" amount |\n| waveform | 0.0 or 1.0 | 0 = sawtooth (classic acid), 1 = square (hollower, punchier) |\n| normalDecay | 0.164 | Amp decay for non-accented notes |\n| accentDecay | 0.006 | Very fast amp decay on accented notes (sharp spike) |\n| diodeCharacter | 1.0 | Nonlinear diode harmonics -- keep at 1.0 for authentic sound |\n| filterInputDrive | 0.169 | Filter saturation -- increase for dirtier acid |\n\n---\n\n## Send Bus Setup\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | SpaceEcho | time 3/16 dotted, feedback 0.55, tone 0.4, saturation 0.3, wow 0.15 |\n| **Send B** | BuzzDelay | Simple delay for short slapback on percussion |\n| **Send C** | MVerb | Tight room (decay 0.25, size 0.3, damping 0.5) |\n| **Send D** | DubFilter | For live filter sweeps on delay throws |\n\n### Send Level Guidelines\n\n| Source | Send A (Echo) | Send B (Slap) | Send C (Room) | Send D (DubFilter) |\n|--------|--------------|---------------|---------------|-------------------|\n| TB303 acid | 0.3 | 0.0 | 0.0 | 0.0 |\n| TB303 lead | 0.5 | 0.0 | 0.0 | 0.0 |\n| Kick | 0.0 | 0.0 | 0.1 | 0.0 |\n| Hi-hat | 0.0 | 0.15 | 0.15 | 0.0 |\n| Clap | 0.0 | 0.1 | 0.2 | 0.0 |\n| Pad | 0.2 | 0.0 | 0.1 | 0.0 |\n\n---\n\n## Channel Insert Chain Recipes\n\n### Classic Acid Bass\n\n1. **SidechainCompressor** -- sidechainSource = kick channel, threshold -20, ratio 6, attack 0.005, release 0.18\n2. Send A at 0.3 (SpaceEcho for rhythmic delay tails)\n\nThe sidechain ducking creates the pumping bass that breathes with the kick. The SpaceEcho adds rhythmic repeats that weave between beats. No additional insert effects needed -- the 303 provides all the character.\n\n### Screaming Acid Lead\n\n1. **BuzzOverdrive** -- gain 35, wet 40 (thickens the resonance peaks)\n2. Send A at 0.5, Send D at 0.3\n\nHigher resonance (0.85-0.95) on the TB303 itself makes the filter self-oscillate on high notes. The overdrive catches the resonance peaks and adds harmonics. SpaceEcho at 0.5 creates the classic acid delay throw.\n\n### Delay Throw Technique\n\nThis is the signature acid techno production move:\n\n1. Set SpaceEcho feedback to 0.55 on Send A\n2. During a fill or breakdown, **temporarily boost** Send A on the 303 channel to 0.8\n3. The echoes build up and cascade\n4. Bring Send A back to 0.3 -- the tail fades naturally\n5. For extra chaos, route Send A output through Send D (DubFilter) and sweep the filter\n\n### Pumping Kick\n\n1. **BuzzDistortion** -- gain 25, wet 20 (subtle saturation on the transient)\n2. **Compressor** -- threshold -6, ratio 4, attack 0.03, release 0.15\n3. Send C at 0.1\n\nThe kick needs to be the loudest, punchiest element. Light distortion adds presence. Compression evens the dynamics. Very little reverb -- keep it dry and upfront.\n\n### Crispy Hi-Hats\n\n1. **EQ3** -- low -6, mid 0, high +3 (remove low mud, brighten)\n2. Send B at 0.15, Send C at 0.15\n\nClean and crispy. The slapback delay adds width, the room verb adds a touch of space.\n\n---\n\n## Pattern Writing Tips\n\n### TB-303 Acid Sequence Fundamentals\n\n- **Accent is everything.** Accented notes (velocity >= 100) trigger the fast filter spike that creates the squelch. Place accents on upbeats and syncopated positions.\n- **Slides** connect notes smoothly. Use slide (portamento) on adjacent notes to create the rubbing, bending characteristic.\n- **Mix waveforms** -- sawtooth for the main line, switch to square for punchier sections.\n- **Octave jumps** are key. A note jumping from C-2 to C-4 through the resonant filter creates the "scream."\n- **Keep it repetitive** -- 16-step patterns with 1-2 note variations per repeat. Acid is hypnotic.\n\n### Example Acid Pattern (16 rows)\n\n```\nRow  Note   Vol  Effect\n00   C-3    80   ---\n01   ---    --   ---\n02   C-3    64   ---\n03   C-3   127   ---  (accented -- velocity 127)\n04   D#3    80   03F  (slide up)\n05   ---    --   ---\n06   C-3    64   ---\n07   G-3   127   ---  (accented)\n08   C-3    80   ---\n09   ---    --   ---\n10   C-4   127   ---  (accented octave jump -- SCREAM)\n11   C-3    64   03F  (slide back down)\n12   D#3    80   ---\n13   ---    --   ---\n14   C-3   127   ---  (accented)\n15   ---    --   ---\n```\n\n### Drum Pattern Tips\n\n- **Kick**: every beat (rows 0, 4, 8, 12 in a 16-row pattern at speed 3)\n- **Hi-hat**: every other row for 8ths, add ghost 16ths at low velocity for drive\n- **Clap/Snare**: beats 2 and 4 only\n- **Open hi-hat**: on the "and" of beat 2 or 4 for groove\n- **Keep it sparse** -- the 303 is the star. Drums are the skeleton.\n\n---\n\n## Master Chain\n\n1. **Compressor** -- threshold -8, ratio 3.5, attack 0.01, release 0.15\n2. **EQ3** -- low +1, mid -1, high 0\n3. **BuzzLimiter** -- threshold -2\n\nAcid techno should be LOUD. The compressor glues the pumping bass and kick together. The limiter catches peaks from resonance spikes. Slight low boost for sub weight, slight mid cut to keep the 303 from dominating the midrange.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for acid techno in 5 minutes:**\n>\n> 1. Load **TB303** on channel 1 -- set cutoff 0.35, resonance 0.8, envMod 0.7, decay 0.4, waveform 0 (saw)\n> 2. Load **TR909** on channel 2 for kick (4-on-the-floor), channel 3 for closed hat (8ths), channel 4 for clap (beats 2+4)\n> 3. Set up **Send A** with SpaceEcho (time 3/16, feedback 0.55)\n> 4. Add **SidechainCompressor** on channel 1 (source = channel 2/kick)\n> 5. Set Send A on channel 1 to 0.3\n> 6. Write a 16-step bass pattern: mostly C-3 with occasional octave jumps to C-4 at velocity 127 (accent)\n> 7. Set BPM to 135-145\n> 8. Play -- adjust resonance and envMod in real time for instant acid.\n\n---\n\n## Reference Tracks\n\n- Phuture -- "Acid Tracks" (the original, DJ Pierre\'s 303 jams)\n- Hardfloor -- "Acperience 1" (cascading 303 lines with delay)\n- Plastikman -- "Spastik" (minimal acid, one 303 line and drums)\n- Josh Wink -- "Higher State of Consciousness" (screaming resonance)\n- Ceephax Acid Crew -- "Acid Cask Trilogy" (unhinged acid with chip influences)\n',
+    "images": []
+  },
+  {
+    "id": "44-chiptune-retro-game",
+    "number": 51,
+    "title": "Chiptune & Retro Game Music",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Chiptune & Retro Game Music\n\nHow to create authentic chiptune music using Furnace chip emulations in DEViLBOX -- from pure 8-bit NES to enhanced chip+effects hybrid production.\n\n---\n\n## Overview\n\nChiptune is music made with (or in the style of) vintage sound chips from game consoles and home computers. The charm comes from severe limitations: 3-5 channels, simple waveforms, no built-in effects. Every note matters because there is nowhere to hide.\n\nDEViLBOX emulates dozens of real sound chips via Furnace WASM -- these are cycle-accurate emulations of the actual hardware, not approximations. You can write authentic NES music that sounds exactly like a Famicom, or mix chip sounds with modern effects for a hybrid aesthetic.\n\n---\n\n## Recommended Synths by Platform\n\n### NES / Famicom (FurnaceNES -- 2A03)\n\n5 channels: 2 pulse, 1 triangle, 1 noise, 1 DPCM sample.\n\n| Channel | Use | Notes |\n|---------|-----|-------|\n| Pulse 1 | Lead melody | Duty cycle 12.5%, 25%, or 50% for different timbres |\n| Pulse 2 | Harmony/countermelody | Detune slightly from Pulse 1 for thickness |\n| Triangle | Bass | No volume control -- always full volume. Use for bass and kick |\n| Noise | Drums | Short noise = hi-hat, long noise = snare, triangle + noise = kick |\n| DPCM | Samples | Low-quality samples for kicks, vocal hits |\n\n### Game Boy (FurnaceGB)\n\n4 channels: 2 pulse, 1 programmable wave, 1 noise.\n\n| Channel | Use | Notes |\n|---------|-----|-------|\n| Pulse 1 | Lead (with sweep) | Hardware pitch sweep for SFX-style bends |\n| Pulse 2 | Harmony | Same duty options as Pulse 1 |\n| Wave | Bass/pad | 32-sample wavetable -- custom waveforms for unique timbres |\n| Noise | Drums | 7-bit mode for metallic tones, 15-bit for hiss |\n\n### C64 SID (FurnaceC64 / FurnaceSID6581 / FurnaceSID8580)\n\n3 channels with ring modulation, sync, and the legendary multimode filter.\n\n| Channel | Use | Notes |\n|---------|-----|-------|\n| Voice 1 | Bass | Pulse wave + filter sweep = fat SID bass |\n| Voice 2 | Lead | Sync or ring mod with Voice 1 for metallic leads |\n| Voice 3 | Arpeggio/drums | Fast arpeggio chords, noise for percussion |\n\nUse FurnaceSID6581 for the warm, gritty analog sound. FurnaceSID8580 for cleaner output.\n\n### AY-3-8910 (FurnaceAY -- ZX Spectrum, MSX, Atari ST)\n\n3 square wave channels + 1 noise generator (shared) + hardware envelope.\n\n| Channel | Use | Notes |\n|---------|-----|-------|\n| A | Lead | Use hardware envelope for buzzy bass |\n| B | Harmony/arpeggio | |\n| C | Bass/drums | Mix tone+noise for snare drums |\n\n### Additional Chips\n\n| Chip | Synth | Channels | Best For |\n|------|-------|----------|----------|\n| PC Engine | FurnacePCE | 6 wavetable | Rich wavetable chords, PCM drums |\n| Virtual Boy | FurnaceVB | 6 wavetable | Stereo wavetable, unique 5-bit waves |\n| Master System | FurnacePSG (SN76489) | 4 (3 tone + noise) | Simple square melodies |\n| VIC-20 | FurnaceVIC | 4 | Ultra-lo-fi, limited pitch range |\n| Atari 2600 | FurnaceTIA | 2 | Extremely limited, lo-fi aesthetic |\n| POKEY | FurnacePOKEY | 4 | Atari 800 style, linked channel modes |\n\n---\n\n## Send Bus Setup\n\n### Authentic (No Effects)\n\nFor purist chiptune, use NO send buses. The chip sound is the sound. Skip to Pattern Writing Tips.\n\n### Enhanced (Chip + Modern FX)\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | MVerb | Small room (decay 0.2, size 0.25, damping 0.6) |\n| **Send B** | BuzzChorus | rate 0.3, depth 0.4, wet 40 |\n| **Send C** | AmbientDelay | time 250ms (1/8 at 120 BPM), feedback 0.4, filterFreq 4000 |\n\n### Send Levels (Enhanced Mode)\n\n| Source | Send A (Room) | Send B (Chorus) | Send C (Delay) |\n|--------|--------------|-----------------|----------------|\n| Lead | 0.15 | 0.2 | 0.25 |\n| Harmony | 0.15 | 0.15 | 0.1 |\n| Bass | 0.05 | 0.0 | 0.0 |\n| Drums | 0.1 | 0.0 | 0.0 |\n\nKeep effects subtle. The chip character should dominate. Effects add space and polish, not transformation.\n\n---\n\n## Channel Insert Chain Recipes\n\n### NES Lead (Authentic)\n\nNo inserts. The sound comes from the chip and tracker effects:\n- Duty cycle switching via instrument macros (12.5% -> 25% -> 50%)\n- Vibrato via effect 04xy (speed x, depth y)\n- Volume envelope via instrument macro (fast attack, medium decay)\n\n### NES Lead (Enhanced)\n\n1. **EQ3** -- low -2, mid 0, high +2 (brighten the thin pulse wave)\n2. Send A at 0.15, Send C at 0.25\n\nMinimal processing. The EQ lifts the highs that chip audio lacks. Light room and delay add space without masking the chip character.\n\n### SID Bass (The Fat One)\n\nNo inserts needed on the channel -- the SID filter does the work:\n- Pulse wave, pulse width 0.3\n- Filter type: low-pass, cutoff sweeping via macro\n- Resonance 0.6-0.8\n- Filter envelope: fast attack, medium decay\n\nFor enhanced mode, add:\n1. **Compressor** -- threshold -12, ratio 4, attack 0.005, release 0.15\n2. Send A at 0.05 (barely there)\n\n### Chiptune Drums (NES/GB)\n\nNo inserts for authentic mode. For enhanced:\n1. **Compressor** -- threshold -10, ratio 3, attack 0.002, release 0.1 (tighten transients)\n2. Send A at 0.1\n\n---\n\n## Chip-Specific Effects (Tracker Column)\n\nThese tracker effects are essential for authentic chiptune:\n\n| Effect | Name | Use |\n|--------|------|-----|\n| **0xy** | Arpeggio | Fast chord simulation -- `037` = minor, `047` = major, `057` = power chord |\n| **1xx** | Portamento up | Pitch slide up, speed xx |\n| **2xx** | Portamento down | Pitch slide down, speed xx |\n| **3xx** | Tone portamento | Slide to target note at speed xx |\n| **4xy** | Vibrato | Speed x, depth y -- essential for sustained notes |\n| **Cxx** | Volume | Fine volume control (00-40 hex) |\n| **ECx** | Note cut | Cut note after x ticks -- creates staccato |\n| **EDx** | Note delay | Delay note by x ticks -- creates groove |\n| **12xx** | Duty cycle | Set pulse width (NES: 0/1/2/3 = 12.5/25/50/75%) |\n\n### The Arpeggio Trick\n\nWith only 3-4 channels, you cannot play full chords. Arpeggio (0xy) rapidly cycles between 3 notes within a single channel, simulating a chord. At high speeds (BPM 150+), the human ear blends the notes together.\n\n```\nRow  Ch1 Note  Ch1 Fx\n00   C-4       047    (C major arpeggio: C-E-G cycling at tick speed)\n01   |         047\n02   |         047\n03   |         047\n```\n\nThis single channel now sounds like a C major chord.\n\n---\n\n## Pattern Writing Tips\n\n- **Economy is everything.** With 3-5 channels, every note must serve a purpose. No filler.\n- **Drums share channels** -- on NES, the triangle does bass AND kick (alternate rows). Noise does hi-hat AND snare.\n- **Echo effect** via repeated notes at lower volume: play C-4 at vol 40, next row play C-4 at vol 20. Simulates delay with zero channels.\n- **Arpeggios for chords** -- never waste a channel on a single chord tone when 0xy can simulate the chord on one channel.\n- **Duty cycle as timbre** -- switching duty cycle mid-phrase (via instrument macros or the 12xx effect) creates timbral movement that substitutes for filter sweeps.\n- **Speed changes** for groove -- alternate speed 6/speed 5 creates a swing feel (use Fxx effect).\n- **Keep bass lines simple** -- root notes and fifths. The limited pitch resolution of some chips (NES triangle has no volume control) means complex bass lines get muddy.\n- **Use silence** -- rests are powerful when you only have 4 channels. A bar of just bass + noise drums creates tension before the lead re-enters.\n\n---\n\n## Master Chain\n\n### Authentic\n\nNo master effects. Export raw chip output.\n\n### Enhanced\n\n1. **EQ3** -- low +1, mid 0, high +1 (compensate for chip audio\'s thin frequency response)\n2. **Compressor** -- threshold -10, ratio 2.5, attack 0.01, release 0.2\n3. **BuzzLimiter** -- threshold -1\n\nLight mastering that preserves the chip character while adding fullness.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for NES chiptune in 5 minutes:**\n>\n> 1. Load **FurnaceNES** on channels 1-4 (Pulse 1, Pulse 2, Triangle, Noise)\n> 2. Set BPM to 150, speed 6\n> 3. Channel 1: write a melody using C major pentatonic, add vibrato (4xy) on held notes\n> 4. Channel 2: write harmony a 3rd above, use arpeggio (047) on sustained chords\n> 5. Channel 3 (triangle): bass line on root notes, use for kick on beat 1 (short C-1 note)\n> 6. Channel 4 (noise): hi-hat on every other row, snare on beats 2+4\n> 7. No effects needed -- this IS the sound\n> 8. For enhanced mode: add MVerb on Send A (decay 0.2), send all channels at 0.1-0.15\n\n---\n\n## Reference Tracks\n\n- Koji Kondo -- Super Mario Bros. theme (NES, the gold standard)\n- Tim Follin -- Silver Surfer (NES, pushing the hardware to its limits)\n- Jeroen Tel -- Cybernoid II (C64 SID, legendary bass)\n- Martin Galway -- Ocean Loader (C64 SID, hardware filter mastery)\n- Chipzel -- "Courtesy" (modern Game Boy, LSDJ)\n- Bit Shifter -- "Reformat the Planet" (Game Boy, clean melodic chiptune)\n- Sabrepulse -- "Close to Me" (enhanced chip + effects hybrid)\n',
+    "images": []
+  },
+  {
+    "id": "45-dub-dub-techno",
+    "number": 52,
+    "title": "Dub & Dub Techno",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": `# Dub & Dub Techno
+
+How to create deep dub, dub techno, and echo-drenched music in DEViLBOX -- from classic Jamaican dub production techniques to Basic Channel-style infinite delay washes.
+
+---
+
+## Overview
+
+Dub is the art of the mixing desk as an instrument. Pioneered by King Tubby and Lee "Scratch" Perry in 1970s Jamaica, dub production strips a reggae track to its bones -- bass and drums -- then sends individual elements through spring reverbs and tape echoes, muting and unmuting channels in real time to create dramatic tension.
+
+Dub techno (Basic Channel, Chain Reaction, Deepchord) applies these same principles to minimal techno: repetitive chord stabs fed through long delay chains, hazy reverb washes, and sub-bass that you feel more than hear. The result is hypnotic, meditative, and physically immersive.
+
+---
+
+## Recommended Synths
+
+| Role | Synth | Settings |
+|------|-------|----------|
+| **Sub bass** | TB303 or CalfMono | TB303: cutoff 0.2, resonance 0.3, envMod 0.2, waveform 0 (saw). CalfMono: saw, filter LP 200Hz |
+| **Dub stab chord** | Helm or Surge | Minor 7th chords, short amp decay, band-pass filter |
+| **Pad wash** | Vital or Surge | Detuned saws, LP filter at 2kHz, slow attack 400ms |
+| **Melodica/keys** | Melodica or MdaEPiano | The classic dub melodica over everything |
+| **Dub siren** | DubSiren | LFO rate 0.3, depth 0.8, delay feedback 0.6 |
+| **Kick** | TR808 | Long decay, slight pitch envelope |
+| **Rimshot** | TR808 | Classic dub rimshot on beats 2 and 4 (or 3) |
+| **Hi-hat** | TR909 | Light, crispy closed hats |
+| **Snare (occasional)** | TR808 or TR909 | Only for fills -- dub relies on rimshot, not snare |
+
+---
+
+## Send Bus Setup
+
+The send bus is where dub LIVES. This is your mixing desk.
+
+| Bus | Effect | Key Parameters |
+|-----|--------|----------------|
+| **Send A** | SpringReverb | decay 0.7, tone 0.5, drip 0.3, wet 80 |
+| **Send B** | SpaceEcho | time 3/8 dotted, feedback 0.65, tone 0.35, saturation 0.25, wow 0.2 |
+| **Send C** | DubFilter | frequency 800Hz, resonance 0.6, type LP, lfoRate 0.1, lfoDepth 0.3 |
+| **Send D** | AmbientDelay | time 500ms, feedback 0.5, filterFreq 1200, diffusion 0.4 |
+
+### Send Level Guidelines (Starting Position)
+
+| Source | Send A (Spring) | Send B (Echo) | Send C (DubFilter) | Send D (Ambient) |
+|--------|----------------|---------------|-------------------|-----------------|
+| Sub bass | 0.0 | 0.0 | 0.0 | 0.0 |
+| Stab chord | 0.3 | 0.4 | 0.0 | 0.2 |
+| Pad | 0.2 | 0.1 | 0.0 | 0.3 |
+| Melodica | 0.4 | 0.5 | 0.0 | 0.0 |
+| Dub siren | 0.3 | 0.6 | 0.3 | 0.0 |
+| Kick | 0.0 | 0.0 | 0.0 | 0.0 |
+| Rimshot | 0.3 | 0.3 | 0.0 | 0.0 |
+| Hi-hat | 0.1 | 0.1 | 0.0 | 0.0 |
+
+**Critical:** These are STARTING positions. Dub production is about moving these levels in real time. See "The Dub Mix" below.
+
+---
+
+## Channel Insert Chain Recipes
+
+### Sub Bass (The Foundation)
+
+1. **Compressor** -- threshold -15, ratio 6, attack 0.01, release 0.2
+2. **EQ3** -- low +2, mid -3, high -6
+
+The bass in dub is HEAVY but controlled. No reverb, no delay -- the bass stays completely dry and upfront. The compressor keeps it even. The EQ removes mids and highs so it lives purely in the sub region.
+
+### Dub Chord Stab
+
+1. **TapeSaturation** -- saturation 0.3, wet 50
+2. Send A at 0.3, Send B at 0.4
+
+Short chord hits (minor 7ths are classic) with tape warmth. The spring reverb and tape echo on the sends create the space. The stab itself is dry and short -- the effects do the work.
+
+### Melodica Lead
+
+1. **EQ3** -- low -4, mid +1, high +2 (thin out the low end)
+2. Send A at 0.4, Send B at 0.5
+
+Augustus Pablo's melodica through spring reverb and tape echo is THE dub sound. The EQ prevents the melodica from competing with the bass. Heavy send levels create long, trailing echoes that fill the space between phrases.
+
+### Dub Siren
+
+1. **BuzzDistortion** -- gain 20, wet 25 (slight edge)
+2. Send A at 0.3, Send B at 0.6, Send C at 0.3
+
+The siren weaves through the mix, its echoes cascading and filtering. The DubFilter on Send C adds movement to the delayed signal.
+
+### Rimshot
+
+1. **EQ3** -- low -6, mid +2, high +1
+2. Send A at 0.3, Send B at 0.3
+
+The rimshot is a key rhythmic element in dub. Spring reverb gives it a splashy, metallic tail. The echo creates ghost rimshots between beats.
+
+---
+
+## The Dub Mix (Performance Technique)
+
+This is where dub becomes dub. The mixing desk is the instrument.
+
+### Mute/Unmute Throws
+
+The core technique: **mute a channel while its send effects are still active.** The dry signal disappears but the reverb and delay tails continue to ring out and decay naturally.
+
+1. Play the full arrangement for 4-8 bars
+2. **Mute the chord stab channel** -- the spring reverb and echo tails fade out over 2-3 bars
+3. Leave just bass and drums for 2-4 bars (tension builds)
+4. **Unmute the stab** -- it re-enters dramatically against the silence
+5. Mute drums, leaving just bass and stab echoes (the "drop out")
+6. Bring drums back -- the impact is huge
+
+### Delay Throw Technique
+
+1. Set SpaceEcho feedback to 0.65 on Send B
+2. During a melodica phrase, **boost Send B to 0.8** for one bar
+3. The echoes build up, cascading and self-reinforcing
+4. Drop Send B back to 0.5 -- the cascade fades naturally
+5. For extra texture, sweep Send C (DubFilter) frequency from 800Hz to 3000Hz while the echoes decay
+
+### Filter Sweep
+
+Route the delay return through the DubFilter (Send C):
+1. Start with LP filter at 400Hz (dark, muffled echoes)
+2. Slowly sweep to 4000Hz over 4 bars (echoes brighten, emerge from the mix)
+3. Sweep back down (echoes recede into darkness)
+
+---
+
+## Dub Techno Specifics
+
+Dub techno is more restrained and repetitive than Jamaican dub. The key differences:
+
+### The Dub Techno Chord
+
+Use Helm or Surge with:
+- Minor 7th or minor 9th chord voicing
+- Band-pass filter (center 600-1200Hz, Q 0.8)
+- Short amp envelope (attack 5ms, decay 200ms, sustain 0, release 100ms)
+- Detune: +3 cents on one oscillator, -3 on another
+
+Route through **both** SpringReverb (Send A at 0.4) and AmbientDelay (Send D at 0.5). The short stab dissolves into a hazy wash of reverb and delay that never fully decays before the next stab hits.
+
+### Dub Techno Kick
+
+TR808 kick with:
+- Long decay (0.7)
+- Pitch envelope: start at 80Hz, end at 45Hz
+- No sends -- completely dry
+- **SidechainCompressor** on the pad/chord channels, sourced from the kick
+
+### Crackle Layer (Optional)
+
+Add VinylNoise on a dedicated channel:
+- crackleRate 0.3, hissLevel 0.1, surfaceNoise 0.2
+- Volume low (channel fader at -18dB equivalent)
+- This sits underneath everything and adds analog warmth
+
+---
+
+## Pattern Writing Tips
+
+- **Half-time feel** -- dub grooves are relaxed. Rimshot on beat 3 (not 2 and 4) for the classic one-drop rhythm.
+- **Space between bass notes** -- the bass plays fewer notes than you think. Root, fifth, octave. Let notes ring.
+- **Chord stabs on offbeats** -- the classic skank rhythm: mute beats, play offbeats. Use note delay (EDx) for slight push/pull.
+- **Melodica phrases are sparse** -- 4-8 notes per 4 bars. Let the echoes fill the space.
+- **Leave empty bars** -- a bar of just kick and bass with decaying reverb tails is more powerful than a bar of everything playing.
+- **Use note cut (ECx)** on stabs for precise length control -- the stab length determines how much reverb tail you get.
+
+---
+
+## Master Chain
+
+1. **Compressor** -- threshold -10, ratio 2.5, attack 0.015, release 0.25
+2. **EQ3** -- low +2, mid -1, high 0
+3. **TapeSaturation** -- saturation 0.15, wet 30
+
+Gentle mastering. The bass should dominate. The tape saturation on the master adds analog warmth to the entire mix. Do not over-compress -- dub needs dynamics for the mute/unmute throws to have impact.
+
+---
+
+## Quick Start Recipe
+
+> **Minimum setup for dub in 5 minutes:**
+>
+> 1. Load **TB303** on channel 1 (cutoff 0.2, resonance 0.3, envMod 0.2) for sub bass
+> 2. Load **Helm** on channel 2, play Cm7 stab (short decay)
+> 3. Load **TR808** on channel 3 (kick on beats 1+3), channel 4 (rimshot on beat 3)
+> 4. Set up **Send A** with SpringReverb (decay 0.7, drip 0.3)
+> 5. Set up **Send B** with SpaceEcho (time 3/8 dotted, feedback 0.65)
+> 6. Channel 2 sends: A at 0.3, B at 0.4
+> 7. Channel 4 sends: A at 0.3, B at 0.3
+> 8. BPM 130-140 for dub techno, 70-80 for roots dub
+> 9. Play -- then start muting/unmuting channel 2 to create dub throws.
+
+---
+
+## Reference Tracks
+
+- King Tubby -- "Dub Fi Gwan" (the blueprint for all dub mixing)
+- Lee "Scratch" Perry -- "Blackboard Jungle Dub" (spring reverb chaos)
+- Augustus Pablo -- "King Tubby Meets Rockers Uptown" (melodica + echo)
+- Basic Channel -- "Quadrant Dub" (dub techno, infinite delay wash)
+- Deepchord -- "Vantage Isle" (hazy dub techno)
+- Rhythm & Sound -- "Mango Walk" (bass weight + minimal dub)
+- Pole -- "1" (crackle + sub bass + dub techno)
+`,
+    "images": []
+  },
+  {
+    "id": "46-ambient-drone",
+    "number": 53,
+    "title": "Ambient & Drone",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Ambient & Drone\n\nHow to create ambient soundscapes, drone music, and slowly evolving textures in DEViLBOX -- from Brian Eno-style generative ambience to dense Sunn O)))-style drone walls.\n\n---\n\n## Overview\n\nAmbient music is defined by atmosphere over rhythm, texture over melody, and patience over urgency. The genre spans from the floating calm of Brian Eno\'s "Music for Airports" to the crushing weight of drone metal. What unites it all is the focus on sustained, slowly evolving sound that creates an immersive sonic environment.\n\nIn DEViLBOX, the key tools are ShimmerReverb (for infinite ascending washes), GranularFreeze (for capturing and evolving moments in time), and slow modulation effects that transform static sounds into living textures. The tracker format actually suits ambient well -- you write sparse notes and let the effects do the heavy lifting.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **Evolving pad** | Vital or Surge | Slow-attack saw pad, LP filter with slow LFO modulation |\n| **Drone fundamental** | CalfMono or Amsynth | Single sustained note, saw + sub oscillator, no filter envelope |\n| **Harmonic shimmer** | StringMachine | Slow attack, full sustain, chorus built in |\n| **FM bell/chime** | DX7 | Algorithm 4, low feedback, long release -- bell-like FM tones |\n| **Granular source** | GranularSynth | Grain size 120ms, scatter 0.4, density 8 |\n| **Noise bed** | NoiseSynth | Pink noise, very low volume -- acts as a soft floor |\n| **Organ drone** | Aeolus or SetBfree | Sustained organ tones with natural beating between pipes |\n| **Wavetable evolution** | Vital or Wavetable | Slowly morphing wavetable position |\n| **Chip texture** | FurnaceGB or FurnacePCE | Slow wavetable cycling for lo-fi ambient |\n\n---\n\n## Send Bus Setup\n\nAmbient production lives entirely in the effects. The sends are more important than the source sounds.\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | ShimmerReverb | decay 0.95, shimmer 0.75, pitch +12, damping 0.3, size 0.85, modRate 0.2, modDepth 0.15 |\n| **Send B** | GranularFreeze | grainSize 120ms, density 12, scatter 0.4, pitch 0, shimmer 0.3, stereoWidth 0.7, captureLen 800ms |\n| **Send C** | AmbientDelay | time 750ms, feedback 0.6, filterFreq 2500, diffusion 0.6, modRate 0.15, modDepth 0.1, stereoSpread 0.6 |\n| **Send D** | ShimmerReverb | decay 0.9, shimmer 0.0, pitch 0, damping 0.5, size 0.6 (second reverb, no shimmer -- pure long hall) |\n\n### Send Level Guidelines\n\n| Source | Send A (Shimmer) | Send B (Freeze) | Send C (Delay) | Send D (Hall) |\n|--------|-----------------|-----------------|----------------|---------------|\n| Evolving pad | 0.6 | 0.0 | 0.3 | 0.3 |\n| Drone fundamental | 0.3 | 0.0 | 0.1 | 0.5 |\n| FM bell/chime | 0.5 | 0.3 | 0.5 | 0.2 |\n| Granular source | 0.4 | 0.0 | 0.2 | 0.3 |\n| Noise bed | 0.2 | 0.0 | 0.0 | 0.2 |\n| StringMachine | 0.5 | 0.0 | 0.2 | 0.4 |\n\n---\n\n## Channel Insert Chain Recipes\n\n### Infinite Shimmer Pad\n\n1. **AutoFilter** -- frequency 2000Hz, type LP, lfoRate 0.05 (very slow), depth 0.4\n2. **Tremolo** -- frequency 0.08, depth 0.15 (barely perceptible volume undulation)\n3. Send A at 0.6, Send D at 0.3\n\nThe AutoFilter creates a slowly breathing brightness. The Tremolo adds organic volume movement. The ShimmerReverb at 0.95 decay means the reverb tail almost never dies -- each new note adds to the existing wash, and the octave-up shimmer creates ascending harmonic layers.\n\n### Frozen Moment Texture\n\n1. Route any synth through Send B (GranularFreeze)\n2. Play a chord or melodic phrase\n3. Set **freeze = 1** on the GranularFreeze\n4. The moment is captured and loops as overlapping grains\n\nWhile frozen, evolve the texture by slowly adjusting:\n- **scatter**: 0.2 to 0.8 over 30 seconds (grains spread across the buffer)\n- **grainSize**: 80ms to 250ms (longer = smoother, shorter = more granular)\n- **pitch**: 0 to +5 over 60 seconds (slowly transpose up)\n- **shimmer**: 0 to 0.5 (add octave sparkle to individual grains)\n- **density**: 8 to 20 (thicken the cloud)\n\nSet **thru = 1** to continue playing live notes over the frozen texture.\n\n### Drone Bed\n\n1. **Compressor** -- threshold -18, ratio 8, attack 0.05, release 0.5 (heavy compression for sustain)\n2. **AutoFilter** -- frequency 800Hz, type LP, lfoRate 0.02 (glacial sweep), depth 0.6\n3. Send D at 0.5\n\nA single sustained note through heavy compression becomes an infinite drone. The very slow filter sweep (one cycle every 50 seconds) creates glacial timbral movement. The long hall reverb (Send D, no shimmer) adds natural space without the ascending harmonics.\n\n### Bell/Chime Layer\n\n1. **PitchShift** -- pitch +12, wet 30 (add octave-up ghost)\n2. Send A at 0.5, Send C at 0.5\n\nSparse FM bell tones (one note every 4-8 bars) that ring out through shimmer reverb and delay. The PitchShift adds a high octave ghost that blends into the shimmer. Each bell strike should feel like a single event, not a pattern.\n\n### Noise Floor\n\nNo inserts. Route NoiseSynth (pink noise) at very low channel volume (-24dB) through:\n- Send D at 0.2\n\nThis creates a soft, constant bed of air that fills the silence between events. It also masks any digital artifacts from the granular and reverb processes.\n\n---\n\n## Generative Techniques in the Tracker\n\nAmbient does not require traditional composition. These techniques create music that evolves on its own:\n\n### Polyrhythmic Layering\n\nSet different pattern lengths on different channels:\n- Channel 1: 64-row pattern (pad, 1 chord change)\n- Channel 2: 48-row pattern (bell, 3 notes)\n- Channel 3: 56-row pattern (another bell, 2 notes)\n\nThe patterns cycle at different rates, creating ever-shifting combinations that do not repeat for hundreds of bars.\n\n### Sparse Note Placement\n\nWrite notes with large gaps between them:\n```\nRow  Note   Vol  Effect\n00   E-3    50   ---\n01   ---    --   ---\n...  (16 empty rows)\n16   B-3    40   ---\n...  (24 empty rows)\n40   G#3    45   ---\n...  (24 empty rows)\n```\n\nThree notes in 64 rows. The reverb and delay fill the space between them. Each note is an event, not a beat.\n\n### Volume Fades\n\nUse the Cxx (volume) effect to create slow fades:\n```\nRow  Note   Vol  Effect\n00   E-3    50   C00  (start silent)\n01   ---    --   C04\n02   ---    --   C08\n03   ---    --   C0C\n04   ---    --   C10  (fade in over 4 rows)\n...\n28   ---    --   C10  (sustain)\n29   ---    --   C0C\n30   ---    --   C08\n31   ---    --   C04  (fade out)\n```\n\n### Pitch Drift\n\nUse portamento (1xx/2xx) with very small values for slow pitch drift:\n```\nRow  Note   Vol  Effect\n00   E-3    50   ---\n01   ---    --   101  (pitch drift up, speed 1 -- barely perceptible)\n02   ---    --   101\n...\n16   ---    --   201  (drift back down)\n```\n\n---\n\n## Pattern Writing Tips\n\n- **Slow BPM** -- 60-80 BPM for ambient, 40-60 for drone. Or use higher BPM with higher speed values for finer timing resolution.\n- **Long patterns** -- 64 or 128 rows. Ambient needs time to breathe.\n- **One event at a time** -- avoid multiple channels triggering simultaneously. Stagger note entries by 2-4 rows.\n- **Chord voicings** -- open voicings work best. E-2, B-3, G#4 rather than E-3, G#3, B-3. Spread notes across octaves.\n- **Avoid rhythm** -- if your piece has a discernible beat, you are writing something else. Let notes fall where they feel natural, not on grid divisions.\n- **Note-off matters** -- use note-off or ECx to control how long a note rings before the reverb takes over. Short notes into long reverb = event-based ambient. Long notes = drone.\n- **Less is more** -- a single well-placed note with the right effects can sustain interest for 30 seconds.\n\n---\n\n## Master Chain\n\n1. **AutoFilter** -- frequency 6000Hz, type LP, lfoRate 0.03, depth 0.2 (gentle master brightness movement)\n2. **Compressor** -- threshold -14, ratio 2, attack 0.03, release 0.4\n3. **EQ3** -- low +1, mid 0, high -1\n\nVery gentle mastering. The master AutoFilter adds an almost imperceptible slow brightness sweep across the entire mix. Low compression ratio preserves dynamics. Slight high-cut prevents shimmer harmonics from becoming harsh.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for ambient in 5 minutes:**\n>\n> 1. Load **Vital** or **Surge** on channel 1 -- slow-attack saw pad, LP filter at 2kHz\n> 2. Load **DX7** on channel 2 -- bell/chime patch, long release\n> 3. Set up **Send A** with ShimmerReverb (decay 0.95, shimmer 0.75, pitch +12)\n> 4. Set up **Send B** with GranularFreeze (grainSize 120ms, density 12)\n> 5. Channel 1: Send A at 0.6 -- play one chord (E minor) sustained for 32 rows\n> 6. Channel 2: Send A at 0.5 -- play one bell note (B-4) on row 16\n> 7. Set BPM to 70\n> 8. Play -- the shimmer reverb builds the wash. Freeze Send B when it sounds good.\n> 9. Layer from here: add a second chord on row 32, another bell on row 48.\n\n---\n\n## Quick Start Recipe -- Drone\n\n> **Minimum setup for drone in 3 minutes:**\n>\n> 1. Load **CalfMono** on channel 1 -- saw + sub osc, no filter envelope, full sustain\n> 2. Add **Compressor** insert (threshold -18, ratio 8) and **AutoFilter** insert (LP, lfoRate 0.02, depth 0.6)\n> 3. Set up **Send D** with ShimmerReverb (decay 0.9, shimmer 0, damping 0.5) -- pure hall, no shimmer\n> 4. Send D at 0.5\n> 5. Play a single note: **A-1**. Let it sustain indefinitely.\n> 6. The filter sweep and reverb create all the movement you need.\n\n---\n\n## Reference Tracks\n\n- Brian Eno -- "Music for Airports 1/1" (the definition of ambient)\n- Stars of the Lid -- "Requiem for Dying Mothers Pt. 2" (orchestral drone)\n- Tim Hecker -- "Virginal II" (processed drone, granular textures)\n- William Basinski -- "The Disintegration Loops" (tape decay as composition)\n- Sunn O))) -- "Aghartha" (crushing guitar drone)\n- Grouper -- "Holding" (lo-fi ambient, voice + reverb)\n- Gas -- "Pop" (forest ambient, loops + reverb)\n',
+    "images": []
+  },
+  {
+    "id": "47-lofi-hip-hop",
+    "number": 54,
+    "title": "Lo-Fi Hip Hop & Beats",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Lo-Fi Hip Hop & Beats\n\nHow to create lo-fi hip hop, boom bap, and chill beats in DEViLBOX -- dusty samples, tape warmth, vinyl crackle, and that relaxed head-nod groove.\n\n---\n\n## Overview\n\nLo-fi hip hop is built on imperfection. Where most production aims for clarity, lo-fi deliberately introduces tape hiss, vinyl crackle, pitch drift, and bit reduction to create a warm, nostalgic, slightly broken sound. The beats are simple -- kick, snare, hat -- but the swing and timing imperfections give them a human, lived-in quality.\n\nThe genre draws from 90s boom bap production (J Dilla, Pete Rock, DJ Premier) filtered through the lo-fi aesthetic of Nujabes and the modern "beats to study to" wave. In DEViLBOX, TapeDegradation and VinylNoise are your primary tools, and the note delay effect (EDx) is essential for creating the loose, swung feel.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **Rhodes/EP** | MdaEPiano | The classic Fender Rhodes -- warm, bell-like, perfect through tape |\n| **Wurlitzer** | OpenWurli | Brighter than Rhodes, more bark -- great for melodic hooks |\n| **Mellow pad** | Helm or Amsynth | Saw pad, LP filter at 1500Hz, slow attack 200ms |\n| **Bass** | CalfMono or TB303 | CalfMono: sine + saw, LP 400Hz. TB303: cutoff 0.25, resonance 0.2 |\n| **Pluck/guitar sim** | PluckSynth | Decay 0.6, resonance 0.3 -- simulates muted guitar |\n| **Vinyl layer** | VinylNoise (effect) | On a dedicated bus or channel for constant crackle bed |\n| **Kick** | TR808 | Punchy, medium decay, slight pitch envelope |\n| **Snare** | TR808 or TR909 | Snappy, short decay -- or layer with NoiseSynth for texture |\n| **Hi-hat** | TR909 | Closed hats, some with low velocity for ghost notes |\n| **Shaker/perc** | TR808 or Sampler | Maracas, tambourine, or sampled shaker for groove |\n\n---\n\n## Send Bus Setup\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | MVerb | Plate reverb -- decay 0.4, size 0.45, damping 0.5, mix 0.6 |\n| **Send B** | AmbientDelay | time 375ms (dotted 8th at 80 BPM), feedback 0.35, filterFreq 2000, diffusion 0.3 |\n| **Send C** | TapeDegradation | wow 0.25, flutter 0.2, hiss 0.12, saturation 0.35, toneShift 0.3 -- shared "tape deck" bus |\n| **Send D** | SpringReverb | Short spring for snare (decay 0.25, tone 0.4) |\n\n### Send Level Guidelines\n\n| Source | Send A (Plate) | Send B (Delay) | Send C (Tape) | Send D (Spring) |\n|--------|---------------|----------------|---------------|-----------------|\n| Rhodes/EP | 0.25 | 0.2 | 0.4 | 0.0 |\n| Wurlitzer | 0.2 | 0.15 | 0.35 | 0.0 |\n| Pad | 0.3 | 0.1 | 0.3 | 0.0 |\n| Bass | 0.0 | 0.0 | 0.15 | 0.0 |\n| Pluck | 0.15 | 0.25 | 0.3 | 0.0 |\n| Kick | 0.0 | 0.0 | 0.0 | 0.0 |\n| Snare | 0.1 | 0.0 | 0.2 | 0.15 |\n| Hi-hat | 0.05 | 0.1 | 0.15 | 0.0 |\n\n**Key principle:** Send C (TapeDegradation) is the glue bus. Almost everything goes through it at some level. This is what creates the "recorded to cassette" cohesion.\n\n---\n\n## Channel Insert Chain Recipes\n\n### The Lo-Fi Rhodes (The Signature Sound)\n\n1. **TapeDegradation** -- wow 0.3, flutter 0.2, saturation 0.4, toneShift 0.3, hiss 0.1\n2. **Tremolo** -- frequency 2.5, depth 0.12 (subtle electric piano tremolo)\n3. Send A at 0.25, Send B at 0.2\n\nMdaEPiano through TapeDegradation is instant lo-fi hip hop. The wow and flutter create the pitch drift that makes it sound like a dusty record. The tremolo simulates the built-in Rhodes tremolo. Light plate reverb and delay add depth.\n\n### Vinyl Crackle Layer\n\nDedicated channel with VinylNoise effect:\n1. **VinylNoise** -- crackleRate 0.35, hissLevel 0.08, surfaceNoise 0.25\n2. Channel volume at -20dB\n\nThis sits underneath the entire mix as a constant vinyl surface noise. It should be quiet enough that you only notice it when you solo the channel, but it adds warmth and nostalgia to the overall feel.\n\n### Boom Bap Kick\n\n1. **TapeSaturation** -- saturation 0.2, wet 35 (warm analog punch)\n2. **EQ3** -- low +2, mid -1, high -3\n\nNo reverb on the kick. Keep it dry, warm, and punchy. The tape saturation adds analog weight. The EQ emphasizes the low-end thump and removes high-frequency click.\n\n### Dusty Snare\n\n1. **BitCrusher** -- bits 14, wet 30 (very subtle -- just enough grit)\n2. **TapeSaturation** -- saturation 0.25, wet 30\n3. Send C at 0.2, Send D at 0.15\n\nThe light bitcrushing adds that "sampled from vinyl" quality. Tape saturation warms the transient. The spring reverb on Send D gives it a short, splashy tail.\n\n### Side-Chained Pad\n\n1. **TapeDegradation** -- wow 0.2, flutter 0.15, saturation 0.3, toneShift 0.25\n2. **SidechainCompressor** -- sidechainSource = kick channel, threshold -22, ratio 6, attack 0.005, release 0.25\n3. Send A at 0.3, Send C at 0.3\n\nThe pad pumps with the kick, creating breathing space. Longer release (0.25) creates a lazy, slow pump that fits the relaxed tempo.\n\n### Plucky Guitar Sim\n\n1. **TapeDegradation** -- wow 0.15, flutter 0.1, saturation 0.25, toneShift 0.35\n2. **Chorus** -- rate 0.8, depth 0.3, wet 25\n3. Send A at 0.15, Send B at 0.25\n\nPluckSynth through tape and chorus simulates a sampled guitar riff. The delay adds rhythmic interest to picked patterns.\n\n---\n\n## Swing and Groove via Note Delay\n\nThe **EDx effect** (note delay) is the secret weapon for lo-fi hip hop groove. Instead of perfect quantization, delay certain hits by 1-3 ticks to create a loose, swung feel.\n\n### Basic Swing Pattern (Hi-hat Example)\n\nAt speed 6 (6 ticks per row):\n\n```\nRow  Note   Vol  Effect\n00   C#5    60   ---     (on the beat)\n01   ---    --   ---\n02   C#5    35   ED2     (delayed 2 ticks -- pushes offbeat late)\n03   ---    --   ---\n04   C#5    60   ---     (on the beat)\n05   ---    --   ---\n06   C#5    30   ED3     (delayed 3 ticks -- even lazier)\n07   ---    --   ---\n```\n\nThe delayed offbeat hats create the "dragging" feel essential to lo-fi hip hop. Vary the delay amount (ED1 to ED3) for a more human, inconsistent groove.\n\n### J Dilla-Style Drunk Drums\n\nApply note delay to EVERY drum element, inconsistently:\n\n```\nRow  Kick         Snare        Hat\n00   C-2  ---     ---  ---     C#5  ---\n01   ---  ---     ---  ---     C#5  ED1\n02   ---  ---     ---  ---     C#5  ED2\n03   ---  ---     ---  ---     C#5  ---\n04   ---  ---     E-2  ED1     C#5  ---     (snare slightly late)\n05   ---  ---     ---  ---     C#5  ED2\n06   C-2  ED1     ---  ---     C#5  ---     (kick slightly late)\n07   ---  ---     ---  ---     C#5  ED3\n```\n\nNothing lands exactly on the grid. The kick, snare, and hat all drift independently. This creates the organic, "played by a human" feel.\n\n### Ghost Notes\n\nLow-velocity hits between main beats:\n\n```\nRow  Hat Note  Vol  Effect\n00   C#5       60   ---     (main hit)\n01   C#5       20   ---     (ghost note -- barely audible)\n02   C#5       55   ED2     (offbeat, slightly late)\n03   C#5       15   ED1     (ghost, slightly late)\n```\n\nGhost notes at velocity 15-25 fill the space between main hits and add groove density without loudness.\n\n---\n\n## Pattern Writing Tips\n\n- **BPM 70-90** -- lo-fi hip hop lives in the slow lane. 80 BPM is the sweet spot.\n- **2-bar loops** -- most lo-fi beats are 2-bar (32-row) loops with subtle variation.\n- **Rhodes chords: simple jazz voicings** -- Cmaj7, Am7, Dm7, G7. Two or three chords max.\n- **Bass follows the root** -- whole notes or half notes on the chord root. Simple and deep.\n- **Leave bar 2 sparser** -- play the full chord progression in bar 1, drop some elements in bar 2. The slight variation keeps it from being pure loop.\n- **Velocity variation on everything** -- nothing at full velocity. Rhodes 50-70, bass 60-80, kick 70-90, snare 65-85, hat 30-60.\n- **Use note cut (ECx) on Rhodes** -- short, staccato chord stabs (EC3 or EC4) let the tape degradation and reverb fill the space.\n\n---\n\n## Master Chain\n\n1. **TapeDegradation** -- wow 0.12, flutter 0.08, hiss 0.06, saturation 0.2, toneShift 0.3\n2. **Compressor** -- threshold -10, ratio 2.5, attack 0.015, release 0.2\n3. **EQ3** -- low +1, mid 0, high -2\n\nThe master tape degradation is essential -- it is the "cassette deck" that the whole mix was recorded to. Keep it subtle so it does not compete with per-channel TapeDeg. The high-cut on EQ removes any digital brightness that survived the processing.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for lo-fi hip hop in 5 minutes:**\n>\n> 1. Load **MdaEPiano** on channel 1, add **TapeDegradation** insert (wow 0.3, flutter 0.2, saturation 0.4)\n> 2. Load **TR808** on channel 2 (kick), channel 3 (snare), channel 4 (closed hat)\n> 3. Set up **Send A** with MVerb (decay 0.4, plate)\n> 4. Channel 1: Send A at 0.25\n> 5. Write Cmaj7 chord on row 0, Am7 on row 8 (channel 1). Use EC4 for short stabs.\n> 6. Kick on rows 0, 6, 8, 14. Snare on rows 4, 12 with ED1. Hat on every even row.\n> 7. Add **VinylNoise** on a dedicated channel (crackle 0.35, low volume)\n> 8. Set BPM to 80\n> 9. Play -- add note delays (ED1-ED3) to hat offbeats for swing.\n\n---\n\n## Reference Tracks\n\n- J Dilla -- "Donuts" (the bible of loose, swung beats)\n- Nujabes -- "Feather" (jazz samples + lo-fi beats)\n- MF DOOM / Madlib -- "Madvillainy" (dusty, chopped, lo-fi)\n- Knxwledge -- "Hud Dreems" (wobbly tape, heavy pitch drift)\n- Pete Rock -- "T.R.O.Y." (boom bap, jazz sample, SP-1200 grit)\n- Tomppabeats -- "Monday Loop" (modern lo-fi, vinyl crackle aesthetic)\n',
+    "images": []
+  },
+  {
+    "id": "48-industrial-ebm",
+    "number": 55,
+    "title": "Industrial & EBM",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Industrial & EBM\n\nHow to create industrial, EBM (Electronic Body Music), and aggressive electronic music in DEViLBOX -- from Nitzer Ebb-style sequencer-driven body music to Nine Inch Nails-style layered destruction.\n\n---\n\n## Overview\n\nIndustrial and EBM are built on aggression, repetition, and the deliberate abuse of electronics. EBM is the more disciplined sibling: driving sequencer patterns, pounding kick drums, distorted bass sequences, and barked vocals over minimal arrangements. Industrial proper is more chaotic -- layered noise, metallic percussion, dense distortion, and a sense that the machines are breaking down.\n\nThe common thread is distortion stacking. Where other genres use distortion as seasoning, industrial uses it as a structural element. Multiple distortion types in series create complexity: waveshaping adds odd harmonics, overdrive adds even harmonics, bitcrushing adds aliasing, and fuzz adds sustain. The result is dense, aggressive, and physically impactful.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **EBM bass sequence** | TB303 or Buzz3o3 | TB303: cutoff 0.4, resonance 0.6, envMod 0.5, waveform 0 (saw) |\n| **Dark FM lead** | DX7 | Algorithm 5 or 7, high feedback on carrier, op ratios 1:3:7 for metallic harmonics |\n| **Noise texture** | NoiseSynth | White or pink noise, gated with short decay |\n| **Metal percussion** | MetalSynth | Harmonicity 5-12, modulationIndex 20-40, short envelope |\n| **Industrial kick** | TR909 or BuzzKick | Hard, distorted, punchy |\n| **Pad (dark)** | Surge or Helm | Detuned saws, LP filter at 800Hz, slow attack |\n| **Harsh digital** | FurnaceOPL or FurnaceOPM | FM chips driven hard -- raw, metallic tones |\n| **Analog stab** | Monique or CalfMono | Short, aggressive mono stabs |\n| **Speech/vocal** | V2Speech or DECtalk | Robotic speech processed through distortion chain |\n\n---\n\n## Send Bus Setup\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | MVerb | Dark plate -- decay 0.5, size 0.55, damping 0.7 (high damping = dark) |\n| **Send B** | BuzzDelay | Short slapback -- time 120ms, feedback 0.3 |\n| **Send C** | SpringReverb | Metallic spring for percussion -- decay 0.35, tone 0.3, drip 0.4 |\n| **Send D** | DubFilter | Aggressive sweep -- resonance 0.8, type BP, for live filter automation |\n\n### Send Level Guidelines\n\n| Source | Send A (Dark Plate) | Send B (Slap) | Send C (Spring) | Send D (Filter) |\n|--------|-------------------|---------------|-----------------|-----------------|\n| EBM bass | 0.0 | 0.1 | 0.0 | 0.0 |\n| FM lead | 0.3 | 0.2 | 0.0 | 0.0 |\n| Noise texture | 0.2 | 0.0 | 0.0 | 0.3 |\n| Metal perc | 0.1 | 0.0 | 0.4 | 0.0 |\n| Kick | 0.0 | 0.0 | 0.0 | 0.0 |\n| Dark pad | 0.4 | 0.0 | 0.0 | 0.0 |\n| Speech | 0.2 | 0.15 | 0.0 | 0.2 |\n\nIndustrial mixes are relatively dry compared to ambient or dub. Effects add space and character, but the distorted sources should stay upfront and aggressive.\n\n---\n\n## Channel Insert Chain Recipes\n\n### EBM Bass Sequence (The Signature Chain)\n\n1. **BuzzDistortion** -- gain 55, wet 50\n2. **Chebyshev** -- order 5, wet 35 (adds dense odd harmonics)\n3. **Compressor** -- threshold -15, ratio 8, attack 0.003, release 0.12\n4. Send B at 0.1\n\nThis is the stacked distortion approach. BuzzDistortion provides the raw aggression. Chebyshev waveshaping adds a second layer of harmonics (odd-order Chebyshev creates a different harmonic series than simple clipping). The compressor tames the output -- distortion increases dynamic range, so compression brings it back under control.\n\n### Dark FM Lead\n\n1. **BuzzOverdrive** -- gain 40, wet 45\n2. **BuzzPhilta** -- frequency 3000Hz, resonance 0.5, type LP\n3. Send A at 0.3, Send B at 0.2\n\nDX7 with high feedback already produces metallic, aggressive tones. The overdrive thickens them. The filter shapes the harshness -- sweep it live during performance for expression.\n\n### MetalSynth Percussion\n\n1. **BuzzDistortion** -- gain 30, wet 35\n2. **EQ3** -- low -4, mid +2, high +1\n3. Send C at 0.4\n\nMetalSynth produces inharmonic metallic strikes. Light distortion adds sustain to the transient. EQ removes low-end mud (the metallics do not need bass). Spring reverb on Send C gives the classic industrial metallic ring.\n\n### Noise Burst\n\n1. **BuzzDistortion** -- gain 70, wet 60\n2. **AutoFilter** -- frequency 2000Hz, type BP, lfoRate 3.0, depth 0.6\n3. Send A at 0.2\n\nNoiseSynth through heavy distortion and a rhythmically modulated band-pass filter creates the signature industrial noise stab. The fast LFO rate (3Hz) creates a pulsing effect in time with the music.\n\n### Industrial Kick\n\n1. **BuzzDistortion** -- gain 35, wet 30\n2. **Compressor** -- threshold -6, ratio 5, attack 0.001, release 0.1\n3. **EQ3** -- low +3, mid -2, high -2\n\nThe kick needs to be a weapon. Distortion adds aggression to the transient. Compression ensures every hit is at maximum impact. EQ focuses the energy in the sub range.\n\n### Dark Pad\n\n1. **TapeDegradation** -- wow 0.15, flutter 0.1, saturation 0.5, toneShift 0.15\n2. **BuzzDistortion** -- gain 20, wet 25\n3. Send A at 0.4\n\nThe pad sits behind the aggressive foreground elements. Tape degradation darkens it. Light distortion adds texture. The dark plate reverb (high damping) creates a cavernous but non-bright space.\n\n### Distorted Speech\n\n1. **BitCrusher** -- bits 8, wet 80\n2. **BuzzDistortion** -- gain 50, wet 45\n3. **Compressor** -- threshold -12, ratio 6, attack 0.005, release 0.15\n4. Send A at 0.2, Send B at 0.15\n\nV2Speech or DECtalk through bitcrushing and distortion creates the robotic industrial vocal. The slapback delay adds presence without washing out the words.\n\n---\n\n## Pattern Writing Tips\n\n### EBM Sequencer Patterns\n\nEBM is driven by relentless, repetitive 16th-note bass sequences:\n\n```\nRow  Bass Note  Vol  Effect\n00   C-2        90   ---\n01   C-2        75   ---\n02   C-2        90   ---\n03   ---        --   ---\n04   D#2        90   ---\n05   D#2        75   ---\n06   C-2        90   ---\n07   C-2        60   ---\n08   C-2        90   ---\n09   C-2        75   ---\n10   F-2        90   ---\n11   ---        --   ---\n12   C-2        90   ---\n13   D#2        75   ---\n14   C-2        90   ---\n15   C-2        60   EC2    (note cut for staccato)\n```\n\n- **Minor keys only** -- C minor, D# minor, F minor. EBM lives in dark tonalities.\n- **Velocity patterns** create accent -- alternate 90/75 for a driving, mechanical feel.\n- **Note cuts (ECx)** create rhythmic gaps in the sequence.\n- **Transpose the whole pattern** via the Bxx effect for different sections.\n\n### Drum Patterns\n\n- **Kick: every beat** (rows 0, 4, 8, 12) -- unrelenting 4/4\n- **Snare/clap: beats 2 and 4** -- use both TR909 clap and MetalSynth layered\n- **Hi-hat: constant 16ths** at varying velocity for machine-gun drive\n- **Metal hits** on off-beat positions for industrial flavor\n- **Double-kick sections**: rows 0, 2, 4, 6, 8, 10, 12, 14 for intensity builds\n\n### Industrial Chaos Sections\n\nFor breakdown/bridge sections:\n- Mute the drums and bass\n- Bring in noise bursts (NoiseSynth with fast filter LFO)\n- MetalSynth hits at irregular intervals\n- Gradually reintroduce the kick, then the bass sequence\n- Full arrangement returns at maximum intensity\n\n---\n\n## Master Chain\n\n1. **Compressor** -- threshold -8, ratio 4, attack 0.005, release 0.12\n2. **BuzzDistortion** -- gain 15, wet 15 (very subtle -- just bus saturation)\n3. **EQ3** -- low +1, mid 0, high -1\n4. **BuzzLimiter** -- threshold -1.5\n\nIndustrial should be LOUD and dense. The master compressor glues the aggressive elements. A touch of bus distortion adds cohesion and grit across the full mix. The limiter catches peaks from all the per-channel distortion. Keep the high-cut subtle -- industrial needs brightness for the metallic elements, but control it so it does not become fatiguing.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for EBM in 5 minutes:**\n>\n> 1. Load **TB303** on channel 1 (cutoff 0.4, resonance 0.6, envMod 0.5, waveform 0)\n> 2. Add **BuzzDistortion** (gain 55, wet 50) and **Chebyshev** (order 5, wet 35) inserts on channel 1\n> 3. Add **Compressor** (threshold -15, ratio 8) on channel 1\n> 4. Load **TR909** on channel 2 (kick), channel 3 (clap), channel 4 (closed hat)\n> 5. Add **BuzzDistortion** (gain 35, wet 30) on channel 2 (kick)\n> 6. Write a 16th-note C minor bass sequence on channel 1 with velocity accents\n> 7. Kick on every beat, clap on 2+4, hat on 16ths\n> 8. Set BPM to 125-135\n> 9. Play -- the stacked distortion does all the work.\n\n---\n\n## Reference Tracks\n\n- Nitzer Ebb -- "Join in the Chant" (the EBM blueprint: sequencer + kick + aggression)\n- DAF -- "Der Mussolini" (proto-EBM, relentless sequencer)\n- Front 242 -- "Headhunter" (iconic EBM production)\n- Nine Inch Nails -- "Wish" (layered industrial, distortion stacking)\n- Ministry -- "Thieves" (guitar + industrial electronics)\n- Skinny Puppy -- "Assimilate" (dark industrial, noise textures)\n- Author & Punisher -- "Nihil Strength" (doom + industrial, physical machines)\n',
+    "images": []
+  },
+  {
+    "id": "49-italo-disco-synthpop",
+    "number": 56,
+    "title": "Italo Disco & Synthpop",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Italo Disco & Synthpop\n\nHow to create Italo disco, synthpop, and 80s-style electronic pop in DEViLBOX -- DX7 electric pianos, gated reverb, punchy drum machines, and bright arpeggiated synths.\n\n---\n\n## Overview\n\nItalo disco and synthpop share a love of melody, bright synthesizers, and drum machines. Italo disco (Giorgio Moroder, Kano, Den Harrow) is the more danceable sibling -- pulsing bass, arpeggiated sequences, and lush pads at 118-130 BPM. Synthpop (Depeche Mode, New Order, OMD) is more song-oriented -- verse-chorus structures, melodic leads, and a cleaner mix aesthetic.\n\nBoth genres emerged in the early 80s when affordable polyphonic synths (DX7, Juno-106, Jupiter-8) and drum machines (TR-909, LinnDrum) became available. The production aesthetic is bright, punchy, and polished -- the opposite of lo-fi. Chorused pads, gated reverb snares, and arpeggiated sequences define the sound.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **DX7 electric piano** | DX7 | Classic EP patch -- algorithm 4, low modulation index, bell-like harmonics |\n| **Bass** | Helm or CalfMono | Saw + square, LP filter at 600Hz, short decay, punchy amp envelope |\n| **Arpeggiated synth** | Surge or Vital | Bright saw, LP filter at 4000Hz, short decay for plucky arps |\n| **Lush pad** | SuperSaw or OBXf | Detuned saws, chorus, LP filter at 3000Hz, slow attack 300ms |\n| **Lead** | Helm or Vital | Pulse wave, slight PWM, filter envelope for brightness sweep |\n| **Strings** | StringMachine | Classic ensemble strings -- built-in chorus and slow attack |\n| **Brass stab** | DX7 or FMSynth | Short, bright FM stab -- algorithm 1, high modulation for metallic bite |\n| **Kick** | TR909 | Punchy, short decay, slight attack click |\n| **Snare** | TR909 | The gated reverb snare -- see insert chain below |\n| **Hi-hat** | TR909 | Crispy 16ths, open hat on offbeats |\n| **Clap** | TR909 | Layered with snare on beats 2 and 4 |\n| **Tom fills** | TR909 | Concert toms for fills between sections |\n\n---\n\n## Send Bus Setup\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | BuzzChorus | rate 0.6, depth 0.5, wet 45 -- the classic 80s ensemble chorus |\n| **Send B** | AmbientDelay | time 250ms (dotted 8th), feedback 0.35, filterFreq 5000, diffusion 0.2 |\n| **Send C** | MVerb | Bright plate -- decay 0.45, size 0.5, damping 0.3 (low damping = bright) |\n| **Send D** | MVerb | Gated reverb -- decay 0.6, size 0.7, damping 0.4 -- with Compressor after it (threshold -20, ratio 20, attack 0.001, release 0.08) to create the gate effect |\n\n### Send Level Guidelines\n\n| Source | Send A (Chorus) | Send B (Delay) | Send C (Plate) | Send D (Gated) |\n|--------|----------------|----------------|----------------|----------------|\n| DX7 EP | 0.3 | 0.2 | 0.2 | 0.0 |\n| Bass | 0.0 | 0.0 | 0.0 | 0.0 |\n| Arp synth | 0.15 | 0.3 | 0.15 | 0.0 |\n| Pad | 0.4 | 0.1 | 0.2 | 0.0 |\n| Lead | 0.2 | 0.25 | 0.15 | 0.0 |\n| Strings | 0.35 | 0.0 | 0.25 | 0.0 |\n| Kick | 0.0 | 0.0 | 0.0 | 0.0 |\n| Snare | 0.0 | 0.0 | 0.0 | 0.6 |\n| Hi-hat | 0.0 | 0.1 | 0.1 | 0.0 |\n| Clap | 0.0 | 0.0 | 0.1 | 0.3 |\n\n**Key insight:** The gated reverb on Send D is ONLY for the snare and clap. This is the iconic 80s drum sound -- a large reverb tail abruptly cut short by heavy compression, creating a powerful "PSSH" that defined the decade.\n\n---\n\n## Channel Insert Chain Recipes\n\n### DX7 Electric Piano\n\n1. **BuzzChorus** -- rate 0.5, depth 0.35, wet 35 (gentle chorus for shimmer)\n2. **Compressor** -- threshold -12, ratio 3, attack 0.01, release 0.2\n3. Send A at 0.3, Send B at 0.2, Send C at 0.2\n\nThe DX7 EP is bright and bell-like. The chorus adds the classic 80s width. Light compression evens the dynamics. Three send effects at moderate levels create a polished, spacious sound.\n\n### Italo Bass (Punchy Sequenced Bass)\n\n1. **Compressor** -- threshold -10, ratio 5, attack 0.003, release 0.1\n2. **EQ3** -- low +2, mid 0, high -2\n3. **SidechainCompressor** -- sidechainSource = kick channel, threshold -18, ratio 4, attack 0.005, release 0.15\n\nCompletely dry -- no sends. The bass in Italo disco is tight, punchy, and locked to the kick. The sidechain creates a subtle pump that glues bass and kick together. EQ focuses the low end.\n\n### Arpeggiated Synth\n\n1. **BuzzChorus** -- rate 0.8, depth 0.4, wet 30\n2. Send B at 0.3, Send C at 0.15\n\nBright, plucky arpeggios with chorus and dotted-eighth delay. The delay creates rhythmic complexity from simple patterns. Keep the arp synth filter open (LP at 4000Hz+) for maximum brightness -- this genre loves treble.\n\n### Lush Pad (SuperSaw or OBXf)\n\n1. **Chorus** -- rate 0.4, depth 0.5, wet 40 (or use BuzzChorus)\n2. **AutoFilter** -- frequency 3000Hz, type LP, lfoRate 0.15, depth 0.2 (slow brightness movement)\n3. Send A at 0.4, Send C at 0.2\n\nThe pad should be wide and lush but not muddy. Chorus provides stereo width. The slow AutoFilter adds gentle movement. Heavy chorus send (A at 0.4) doubles the chorus effect for maximum 80s width.\n\n### Gated Reverb Snare\n\nThe snare itself needs no channel inserts. The gated effect happens on Send D:\n\nOn Send D bus:\n1. **MVerb** -- decay 0.6, size 0.7, damping 0.4\n2. **Compressor** (after the reverb) -- threshold -20, ratio 20, attack 0.001, release 0.08\n\nThe compressor with extreme ratio (20:1) and very fast release (80ms) creates the "gate" effect: the loud initial reverb burst passes through, but as the tail drops below -20dB, the compressor slams it shut. The result is a big, explosive reverb burst that cuts off abruptly.\n\nSet the snare channel Send D to 0.6 for the full Phil Collins effect.\n\n### Lead Synth\n\n1. **BuzzChorus** -- rate 0.6, depth 0.3, wet 25\n2. **Phaser** -- rate 0.3, depth 0.4, wet 30\n3. Send B at 0.25, Send C at 0.15\n\nPulse wave lead with chorus and phaser for movement. The delay on Send B creates counter-rhythms. Keep it bright -- synthpop leads cut through the mix.\n\n---\n\n## Pattern Writing Tips\n\n### Arpeggiated Sequences\n\nArpeggios are the heartbeat of Italo disco. Write them manually for full control:\n\n```\nRow  Note   Vol  Effect\n00   C-4    70   ---\n01   E-4    65   ---\n02   G-4    60   ---\n03   C-5    55   ---\n04   G-4    60   ---\n05   E-4    65   ---\n06   C-4    70   ---\n07   G-3    65   ---\n```\n\nAscending-descending pattern in 16ths. Slight velocity ramp (louder at bottom, softer at top) creates a natural accent pattern. Change the chord every 2 bars.\n\n### Bass Patterns\n\nItalo bass is syncopated and melodic (not just root notes):\n\n```\nRow  Note   Vol  Effect\n00   C-2    85   ---\n01   ---    --   ---\n02   C-2    70   ---\n03   ---    --   ---\n04   G-2    80   ---\n05   ---    --   ---\n06   C-3    75   EC3    (octave stab, cut short)\n07   ---    --   ---\n```\n\nUse octave jumps, fifths, and chromatic approach notes. Keep it moving but locked to the grid -- no swing in Italo, everything is tight.\n\n### Drum Patterns\n\n- **Kick**: every beat (4-on-the-floor is mandatory)\n- **Snare + Clap**: layered on beats 2 and 4 (same row, different channels)\n- **Hi-hat**: 16ths with open hat on "and" of beat 2 or 4\n- **Tom fills**: every 4 or 8 bars, descending tom roll (concert toms)\n- **No swing** -- everything quantized tight. This is machine music.\n\n### Song Structure\n\nItalo disco follows a specific structure:\n1. **Intro** (8-16 bars): drums + arp, building\n2. **Verse** (16 bars): add bass + pad, drop arp to background\n3. **Chorus** (8-16 bars): full arrangement, lead melody, strings\n4. **Breakdown** (8 bars): drop to just bass + kick, or arp + pad\n5. **Chorus repeat**\n6. **Outro** (8-16 bars): gradual strip-down\n\n---\n\n## Master Chain\n\n1. **BuzzChorus** -- rate 0.3, depth 0.2, wet 15 (very subtle master chorus for width)\n2. **Compressor** -- threshold -8, ratio 3, attack 0.01, release 0.15\n3. **EQ3** -- low +1, mid 0, high +1\n4. **BuzzLimiter** -- threshold -1\n\nBright and polished. The subtle master chorus adds final width. Compression is moderate -- the mix should be punchy but not crushed. Slight high boost because this genre loves brightness. The limiter ensures loudness.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for Italo disco/synthpop in 5 minutes:**\n>\n> 1. Load **DX7** on channel 1 (electric piano patch)\n> 2. Load **Helm** on channel 2 (saw bass, LP 600Hz, short decay) -- add SidechainCompressor (source = ch 5)\n> 3. Load **Surge** on channel 3 (bright saw, LP 4000Hz) for arpeggios -- add BuzzChorus (rate 0.8, wet 30)\n> 4. Load **SuperSaw** on channel 4 (pad, slow attack) -- add Chorus (rate 0.4, wet 40)\n> 5. Load **TR909** on channel 5 (kick), channel 6 (snare), channel 7 (hat)\n> 6. Set up **Send B** with AmbientDelay (time 250ms dotted 8th, feedback 0.35)\n> 7. Set up **Send D** with MVerb (decay 0.6) + Compressor (ratio 20, release 0.08) for gated snare\n> 8. Channel 3 Send B at 0.3. Channel 6 Send D at 0.6.\n> 9. Write a 16th-note arp (C-E-G-C ascending/descending), 4/4 kick, snare on 2+4\n> 10. Set BPM to 120-128\n> 11. Play -- instant 1983.\n\n---\n\n## Reference Tracks\n\n- Giorgio Moroder -- "Chase" (the Italo disco template)\n- Kano -- "Another Life" (arpeggiated Italo perfection)\n- Klein & MBO -- "Dirty Talk" (sequenced bass + machine drums)\n- Depeche Mode -- "Just Can\'t Get Enough" (bright synthpop)\n- New Order -- "Blue Monday" (drum machine + sequencer + bass)\n- OMD -- "Enola Gay" (melodic synthpop, DX7 tones)\n- Pet Shop Boys -- "West End Girls" (polished synthpop production)\n- Soft Cell -- "Tainted Love" (minimal synthpop arrangement)\n',
+    "images": []
+  },
+  {
+    "id": "50-demoscene-keygen",
+    "number": 57,
+    "title": "Demoscene & Keygen Music",
+    "part": "Production Recipes",
+    "partNumber": 6,
+    "content": '# Demoscene & Keygen Music\n\nHow to create demoscene intros, keygen music, and size-constrained electronic music in DEViLBOX -- V2 synth, Oidos additive textures, Tunefish, fast arpeggios, and the 4K/64K mindset.\n\n---\n\n## Overview\n\nDemoscene music is electronic music created within extreme technical constraints. In the demo scene, entire audiovisual productions must fit in 4 kilobytes (4K intro) or 64 kilobytes (64K intro). This means no samples -- every sound must be synthesized in real time from code. The result is a distinctive aesthetic: precise, bright, energetic, and unmistakably synthetic.\n\nKeygen music -- the short loops bundled with software crackers -- inherits this aesthetic. Fast arpeggios, chip-like leads, punchy synthetic drums, and compact arrangements that loop seamlessly in under 60 seconds.\n\nDEViLBOX includes three demoscene synth engines: **V2** (Farbrausch\'s legendary synth from .kkrieger and fr-08), **Oidos** (Loonies\' additive synth), and **Tunefish** (Brain Control\'s 64K synth). These are the actual engines used in award-winning demos, compiled to WASM.\n\n---\n\n## Recommended Synths\n\n| Role | Synth | Settings |\n|------|-------|----------|\n| **Lead** | V2 | Saw oscillator, filter LP at 3500Hz, resonance 0.4, short filter envelope |\n| **Bass** | V2 | Square + saw, LP filter 800Hz, short decay, distortion on |\n| **Pad** | Oidos | Additive harmonics, slow attack, dense partial spread |\n| **Arp synth** | V2 or TunefishSynth | Bright saw, very short decay, no sustain |\n| **Chip lead** | FurnaceAY or FurnaceNES | Square wave for authentic chiptune flavor |\n| **Pluck** | TunefishSynth | Short amplitude envelope, filter sweep |\n| **Kick** | V2 or BuzzKick | Sine with pitch envelope, short decay |\n| **Snare** | V2 or MetalSynth | Noise burst + body (sine transient), short |\n| **Hi-hat** | V2 or NoiseSynth | Filtered noise, very short decay |\n| **Speech/vocoder** | V2Speech | Demoscene credits roll speech |\n\n### The V2 Synth\n\nV2 (Farbrausch V2 Synthesizer) is the flagship demoscene synth. It has:\n- 3 oscillators (saw, pulse, sine, noise, FM, wavetable)\n- 2 filters (LP, HP, BP, notch, serial or parallel)\n- 2 LFOs, 2 envelopes\n- Built-in distortion, chorus, compressor\n- All parameters automatable\n\nV2 is designed for maximum sound design flexibility in minimum code size. It can produce everything from fat bass to screaming leads to synthetic drums.\n\n### The Oidos Synth\n\nOidos uses additive synthesis -- building sounds from hundreds of sine wave partials. This produces:\n- Dense, evolving pads with complex harmonic structure\n- Metallic, bell-like tones\n- Textures impossible with subtractive synthesis\n- The characteristic "Oidos shimmer" from slightly detuned partials\n\n### The Tunefish Synth\n\nTunefish 4 is a compact wavetable/subtractive synth optimized for 64K intros:\n- 2 oscillators with wavetable morphing\n- Subtractive filter with envelope\n- Built-in effects (chorus, delay, reverb, distortion)\n- Efficient -- designed to produce big sounds from small parameter sets\n\n---\n\n## Send Bus Setup\n\nDemoscene music typically uses fewer effects than other genres -- the synths do most of the work. Keep it clean and precise.\n\n| Bus | Effect | Key Parameters |\n|-----|--------|----------------|\n| **Send A** | BuzzDelay | time 3/16, feedback 0.4 -- rhythmic delay for arps |\n| **Send B** | MVerb | Medium plate -- decay 0.35, size 0.4, damping 0.4 |\n| **Send C** | BuzzChorus | rate 0.7, depth 0.35, wet 40 -- width for pads |\n\n### Send Level Guidelines\n\n| Source | Send A (Delay) | Send B (Plate) | Send C (Chorus) |\n|--------|---------------|----------------|-----------------|\n| Lead | 0.2 | 0.15 | 0.0 |\n| Bass | 0.0 | 0.0 | 0.0 |\n| Pad | 0.0 | 0.2 | 0.35 |\n| Arp | 0.35 | 0.1 | 0.0 |\n| Chip lead | 0.25 | 0.1 | 0.0 |\n| Pluck | 0.3 | 0.1 | 0.0 |\n| Kick | 0.0 | 0.0 | 0.0 |\n| Snare | 0.0 | 0.1 | 0.0 |\n| Hi-hat | 0.0 | 0.05 | 0.0 |\n\nDelay is the primary effect. Demoscene tracks love rhythmic delay on arpeggios and leads -- it creates complexity from simple patterns.\n\n---\n\n## Channel Insert Chain Recipes\n\n### V2 Screaming Lead\n\n1. **BuzzOverdrive** -- gain 30, wet 35\n2. Send A at 0.2, Send B at 0.15\n\nV2\'s built-in distortion handles most of the aggression. The external overdrive adds a second harmonic layer. Delay and plate reverb add space. The lead should be bright, aggressive, and upfront.\n\n### V2 Punchy Bass\n\n1. **Compressor** -- threshold -10, ratio 5, attack 0.003, release 0.1\n2. **EQ3** -- low +2, mid 0, high -3\n\nCompletely dry. The bass in demoscene music is tight and precise. No effects that blur the timing. Compression ensures every note hits with equal impact.\n\n### Oidos Evolving Pad\n\n1. **AutoFilter** -- frequency 4000Hz, type LP, lfoRate 0.1, depth 0.3\n2. Send B at 0.2, Send C at 0.35\n\nOidos pads are already harmonically rich. The slow AutoFilter adds movement to the spectral content. Chorus (Send C) widens the stereo image. Light plate reverb adds depth.\n\n### Tunefish Pluck Arp\n\n1. **EQ3** -- low -2, mid 0, high +2 (brighten the pluck)\n2. Send A at 0.35\n\nThe dotted-16th delay on Send A is essential. A simple 8th-note arp pattern through this delay creates a cascade of interlocking rhythms -- the signature demoscene arp sound. Brighten with EQ so the plucks cut through the mix.\n\n### Chip Lead Layer\n\nNo inserts. Use raw FurnaceAY or FurnaceNES square wave:\n- Send A at 0.25 (delay for rhythmic echo)\n- Send B at 0.1 (touch of reverb)\n\nLayering a chip lead over a V2 lead (one octave up, lower volume) creates the hybrid chiptune-demoscene sound common in keygen music.\n\n### Synthetic Kick (V2)\n\n1. **Compressor** -- threshold -6, ratio 6, attack 0.001, release 0.08\n2. **EQ3** -- low +3, mid -2, high -4\n\nV2 can synthesize kicks from a sine oscillator with pitch envelope (high start frequency sweeping to low in <50ms). Compression and EQ shape the result into a punchy, subby kick. No samples needed.\n\n### Synthetic Snare (V2)\n\n1. **EQ3** -- low -3, mid +1, high +2\n2. Send B at 0.1\n\nNoise burst (attack 0ms, decay 80ms) layered with a short sine body (attack 0ms, decay 30ms). EQ removes low-end rumble and brightens the snap.\n\n---\n\n## The 4K/64K Mindset\n\nEven though DEViLBOX has no size constraint, the demoscene mindset produces better music:\n\n### Constraints as Creativity\n\n- **No samples** -- synthesize everything. Every kick, snare, hat, and sound effect.\n- **Few channels** -- 6-8 channels maximum. Each channel earns its place.\n- **Short patterns** -- 16-32 rows. Repetition with variation.\n- **Parameter automation over new sounds** -- change filter cutoff, resonance, and envelope over time rather than introducing new instruments.\n\n### Efficient Arrangement\n\nDemoscene tracks typically follow a tight structure:\n1. **Intro** (4-8 bars): arp or lead solo, building\n2. **Build** (4-8 bars): add bass, drums enter\n3. **Main** (8-16 bars): full arrangement\n4. **Break** (4-8 bars): strip to pad + filtered arp\n5. **Main variation** (8-16 bars): transposed or with lead variation\n6. **Outro** (4-8 bars): reverse of intro\n\nTotal: 32-64 bars. Compact and complete.\n\n---\n\n## Pattern Writing Tips\n\n### Fast Arpeggios (The Signature Sound)\n\nThe 0xy arpeggio effect is the demoscene\'s most characteristic technique:\n\n```\nRow  Note   Vol  Effect\n00   C-4    80   037    (C minor arpeggio: C-Eb-G cycling per tick)\n01   |      80   037\n02   |      80   037\n03   |      80   037\n04   D#4    80   037    (Eb minor: Eb-Gb-Bb)\n05   |      80   037\n06   |      80   037\n07   |      80   037\n```\n\nAt speed 3-4, the arpeggio cycles fast enough to sound like a chord. At speed 6+, individual notes become audible -- choose based on desired effect.\n\n### Portamento Leads\n\nSmooth pitch slides between notes using 3xx (tone portamento):\n\n```\nRow  Note   Vol  Effect\n00   C-5    80   ---\n01   ---    --   ---\n02   E-5    --   310    (slide to E at speed 10)\n03   ---    --   310\n04   G-5    --   310    (slide to G)\n05   ---    --   310\n06   C-6    --   320    (slide to C, faster)\n07   ---    --   ---\n```\n\nThis creates the swooping, liquid lead lines characteristic of demoscene music.\n\n### Drum Patterns\n\nDemoscene drums are tight and minimal:\n\n```\nRow  Kick  Snare  Hat   Effect\n00   C-2   ---    C#5   ---\n01   ---   ---    C#5   ---\n02   ---   ---    C#5   ---\n03   ---   ---    C#5   ---\n04   ---   E-2    C#5   ---\n05   ---   ---    C#5   ---\n06   C-2   ---    C#5   ---     (ghost kick)\n07   ---   ---    C#5   ---\n08   C-2   ---    C#5   ---\n09   ---   ---    C#5   ---\n10   ---   ---    C#5   ---\n11   C-2   ---    C#5   ---     (syncopated kick)\n12   ---   E-2    C#5   ---\n13   ---   ---    C#5   ---\n14   ---   ---    C#5   ---\n15   ---   ---    C#5   ---\n```\n\nStraight 16th hi-hats, kick on 1 with syncopation variations, snare on beats 2 and 4. Clean and mechanical.\n\n### High BPM\n\nDemoscene music runs fast:\n- **Keygen music**: 140-170 BPM\n- **Demo soundtracks**: 130-160 BPM\n- **Ambient demos**: 100-120 BPM (rare)\n\nHigher BPM with lower speed values (speed 3-4) gives finer resolution for fast arpeggios and leads.\n\n### Tracker Effects for Demoscene\n\n| Effect | Use | Example |\n|--------|-----|---------|\n| **0xy** | Fast arpeggio chords | `047` = major, `037` = minor |\n| **1xx/2xx** | Pitch slides | Speed 01-10 for slow, 20+ for fast |\n| **3xx** | Portamento | Smooth lead transitions |\n| **4xy** | Vibrato | Add expression to sustained leads |\n| **9xx** | Sample offset | Jump into different parts of a wavetable |\n| **ECx** | Note cut | Staccato rhythmic patterns |\n| **EDx** | Note delay | Subtle groove (use sparingly -- demos are tight) |\n\n---\n\n## Master Chain\n\n1. **Compressor** -- threshold -8, ratio 3.5, attack 0.008, release 0.12\n2. **EQ3** -- low +1, mid 0, high +2\n3. **BuzzLimiter** -- threshold -1\n\nBright, punchy, and loud. Demoscene music should sparkle in the highs and punch in the lows. The +2 high boost is intentional -- this genre loves treble presence. The limiter ensures maximum loudness without clipping from the fast arpeggios.\n\n---\n\n## Quick Start Recipe\n\n> **Minimum setup for demoscene/keygen music in 5 minutes:**\n>\n> 1. Load **V2** on channel 1 (saw lead, LP filter 3500Hz)\n> 2. Load **V2** on channel 2 (square + saw bass, LP 800Hz, short decay)\n> 3. Load **V2** on channel 3 (arp synth: bright saw, very short decay, no sustain)\n> 4. Load **V2** on channel 4 (kick: sine with pitch env), channel 5 (snare: noise burst), channel 6 (hat: filtered noise)\n> 5. Set up **Send A** with BuzzDelay (3/16 time, feedback 0.4)\n> 6. Channel 3: Send A at 0.35\n> 7. Write a 16th-note arpeggio on channel 3 using 0xy effects (`047` for major chords)\n> 8. Add portamento lead melody on channel 1 (3xx effect)\n> 9. 16th-note bass sequence on channel 2 in C minor\n> 10. Basic 4/4 drums: kick on beats, snare 2+4, hat on 16ths\n> 11. Set BPM to 150, speed 3\n> 12. Play -- pure demoscene energy.\n\n---\n\n## Quick Start Recipe -- Keygen Loop\n\n> **30-second seamless keygen loop:**\n>\n> 1. Same channel setup as above, but use only 32 rows (2 bars)\n> 2. Write the arp sequence for the full 32 rows with one chord change at row 16\n> 3. Bass follows the arp root note\n> 4. Lead plays a 4-note phrase in rows 0-15, variation in rows 16-31\n> 5. Ensure row 31 transitions cleanly back to row 0 (no hanging notes, no portamento mid-slide)\n> 6. Set the pattern to loop -- it should be seamless and hypnotic\n\n---\n\n## Reference Tracks & Demos\n\n- Farbrausch -- fr-08 "The Product" soundtrack (V2 synth showcase, 64K intro)\n- Farbrausch -- ".kkrieger" (V2 synth, full FPS game in 96K)\n- Conspiracy -- "Chaos Theory" (64K intro, lush V2 soundtrack)\n- Loonies -- demos using Oidos (additive synthesis, dense textures)\n- Brain Control -- demos using Tunefish (compact wavetable sounds)\n- Purple Motion -- "Second Reality" (Future Crew, classic demo soundtrack)\n- Virgill -- "Lifeforce" (modern demo music excellence)\n- Various -- pouet.net top-rated 4K/64K intros (browse for sonic inspiration)\n',
+    "images": []
+  },
+  {
+    "id": "51-dj-interface",
+    "number": 58,
+    "title": "DJ Interface",
+    "part": "DJ Mode",
+    "partNumber": 7,
+    "content": "# DJ Interface\n\nDEViLBOX includes a full DJ mixing environment designed for performing with tracker modules, chiptunes, and standard audio files. The interface takes visual inspiration from the Pioneer DJM-900 hardware mixer, adapted for a screen-based workflow.\n\n## Entering DJ Mode\n\nSwitch to DJ mode from the main view selector. When DJ mode activates, the tracker playback engine stops and all notes are released. The DJ engine takes over audio output with its own signal chain. On exit, the DJ engine disposes and cached audio data is freed.\n\n## Layout Overview\n\nThe DJ view uses a three-column layout:\n\n| Section | Position | Purpose |\n|---------|----------|---------|\n| **Deck A** | Left | First playback deck with transport, waveform, FX, and pitch controls |\n| **Mixer** | Center | Crossfader, EQ, filters, volume faders, VU meters, and master section |\n| **Deck B** | Right | Second playback deck, mirrored layout from Deck A |\n\nA third deck (Deck C) can be activated for three-deck mixing. Deck C bypasses the crossfader entirely and is always audible at its channel volume.\n\n## Deck Components\n\nEach deck contains several sub-panels stacked vertically.\n\n### Track Info\n\nThe top of each deck shows the loaded track name, format, detected BPM, and duration. When no track is loaded, the deck displays a placeholder prompting you to load music.\n\n### Waveform Display\n\nBelow the track info sits a scrolling waveform display. For tracker modules, the waveform is generated from pre-rendered peak data. For audio files (WAV, MP3, FLAC), the waveform is extracted directly from the decoded audio buffer. The playback position is shown as a vertical line moving across the waveform.\n\nAn overview bar above the main waveform shows the entire track at a glance, with the currently visible region highlighted.\n\n### Turntable View\n\nThe deck can display a virtual turntable (vinyl view) that rotates in sync with playback. Three display modes are available:\n\n- **Waveform** -- scrolling waveform display (default)\n- **Turntable** -- CSS-rendered spinning vinyl record\n- **3D Turntable** -- Three.js rendered turntable with depth and lighting\n\nThe turntable responds to scratching input and slows/stops when playback pauses.\n\n### Transport Controls\n\nStandard transport buttons sit below the waveform:\n\n- **Play/Pause** -- toggle playback on the deck\n- **Cue** -- set and return to cue point (CDJ-style behavior)\n- **Sync** -- match this deck's BPM to the other deck\n\n### Pitch Slider\n\nA vertical pitch fader adjusts the playback speed of the deck. The range is configurable. Moving the pitch slider changes the effective BPM without affecting pitch when time-stretching is available, or changes both speed and pitch for tracker module playback.\n\n### Nudge Buttons\n\nTwo nudge buttons (+ and -) provide momentary speed bumps for manual beat alignment. Hold a nudge button to temporarily speed up or slow down the deck, then release to return to the set pitch.\n\n### Beat Grid\n\nThe beat grid shows detected beat positions overlaid on the waveform. Beats are detected by scanning tracker pattern data for Fxx (BPM) commands, or by audio analysis for standard audio files. The grid helps visually confirm beat alignment between decks.\n\n### Cue Points\n\nUp to eight cue points can be set per deck. Each cue point stores a position in the track that you can jump to instantly. Cue points are displayed as colored markers on the waveform overview.\n\n### Loop Controls\n\nLoop controls allow setting loop-in and loop-out points, or selecting from quantized loop lengths (1, 2, 4, 8, 16, 32 beats). An active loop repeats the selected region indefinitely until deactivated.\n\n### FX Pads and Beat Jump\n\nTwo pages of performance pads are available per deck:\n\n**FX Pads** (8 pads) -- HPF sweep, LPF sweep, filter reset, echo out, kill low, kill mid, kill high, and brake. Pads operate in momentary (hold) or toggle mode depending on the effect.\n\n**Beat Jump** (8 pads) -- jump backward or forward by 1/2, 1, 4, or 16 beats. Jumps are instant and quantized to beat boundaries.\n\n### Channel Scopes\n\nPer-channel oscilloscope views show real-time audio output for individual tracker channels on the active deck. This is useful for identifying which channels carry bass, melody, or drums.\n\n## The Mixer\n\nThe center mixer panel mirrors a hardware DJ mixer with these sections from top to bottom.\n\n### Filter and EQ Knobs\n\nEach deck has four knobs: a resonant filter sweep (low-pass/high-pass) and a three-band EQ (HI, MID, LO). Each EQ band has a kill button that instantly cuts that frequency range to silence.\n\n### Channel Faders and VU Meters\n\nVertical volume faders control the output level of each deck. VU meters between the faders show real-time signal levels. When Deck C is active, a third fader and meter appear.\n\n### Crossfader\n\nA horizontal crossfader blends between Deck A and Deck B. Three curve modes are available:\n\n- **Linear** -- straight proportional blend\n- **Cut** -- hard cut near each end (battle/scratch style)\n- **Smooth** -- constant-power (cosine/sine) crossfade for seamless blending\n\nDeck C bypasses the crossfader and is always audible at its channel fader level.\n\n### Transition Controls\n\nAutomated transition settings let you configure beat-matched crossfades. Set the number of bars for the transition (4, 8, 16, or 32) and whether to apply a filter sweep during the mix.\n\n### Master Section\n\nThe master section provides overall output gain, a master limiter, and a VU meter for the final output. Master effects (reverb, delay, chorus) can be applied to the combined output.\n\n### Cue/Headphone Section\n\nA pre-fader listen (PFL) system lets you monitor either deck in headphones before bringing it into the mix, just like a hardware DJ mixer.\n\n### Additional Controls\n\nThe mixer area also hosts buttons for DJ set recording, microphone input with ducking, video export, and live streaming.\n\n## Keyboard Shortcuts\n\nDJ mode has its own keyboard handler for quick access to common operations. Keyboard shortcuts cover play/pause per deck, crossfader movement, nudge, cue, and sync. The DJ keyboard handler is active only while the DJ view is focused.\n\n## Health Monitor\n\nA DJ health monitor runs in the background, tracking audio buffer underruns and engine state. If the audio pipeline encounters issues, a status indicator appears in the DJ view.\n",
+    "images": []
+  },
+  {
+    "id": "52-loading-tracks",
+    "number": 59,
+    "title": "Loading Tracks",
+    "part": "DJ Mode",
+    "partNumber": 7,
+    "content": "# Loading Tracks\n\nDEViLBOX's DJ mode can play tracker modules, chiptunes, and standard audio files. This chapter covers every method for getting music onto a deck.\n\n## Supported Formats\n\nThe DJ engine inherits DEViLBOX's full format support -- over 188 tracker and audio formats. This includes:\n\n- **Tracker modules** -- MOD, XM, IT, S3M, Furnace (.fur), and dozens of classic Amiga and DOS formats\n- **Chiptune containers** -- SID (C64), NSF (NES), GBS (Game Boy), HES (PC Engine), VGM, and more\n- **Amiga replayer formats** -- all UADE-supported formats (500+ Amiga music formats)\n- **Standard audio** -- WAV, MP3, FLAC, OGG, and other Web Audio API supported formats\n\nTracker modules and chiptune formats are rendered through their respective engines (Furnace WASM, UADE WASM, etc.) and the output is routed to the deck's audio chain. Standard audio files are decoded and played back directly.\n\n## Loading from the File Browser\n\nClick the file browser button in the DJ view to open a file picker. You can select one or more files from your local filesystem. Each file is parsed and analyzed:\n\n1. The file is identified by extension and magic bytes to determine its format\n2. For tracker modules, the file is parsed into a TrackerSong structure and BPM is detected by scanning Fxx effect commands\n3. Song duration is estimated from pattern data\n4. The file appears in the browser list with name, format, BPM, and duration\n\nClick a file in the browser list to load it onto the currently selected deck. A loading indicator appears on the deck while the track is being prepared.\n\n## Drag and Drop\n\nYou can drag files directly from your operating system's file manager and drop them onto either deck. The deck highlights when a valid file is dragged over it. Multiple files dropped at once are queued -- the first loads immediately and the rest can be added to a playlist.\n\nThe drop handler automatically detects the file format and routes it through the appropriate loading pipeline (direct parse for tracker modules, UADE pre-render for Amiga formats, or audio decode for standard files).\n\n## Searching Modland (190,000+ Modules)\n\nThe online browser provides access to the Modland archive -- one of the largest collections of tracker music on the internet, with over 190,000 modules spanning every tracker format ever created.\n\n### How to Search\n\nOpen the online browser panel and type your search query. The search covers filenames, authors, and format names. Results appear as a scrollable list showing:\n\n- Filename\n- Format (ProTracker, FastTracker 2, Impulse Tracker, etc.)\n- Author/composer name\n- Community ratings (if available)\n\n### Loading a Modland Track\n\nClick any search result to download it from the Modland mirror and load it onto the selected deck. The download is proxied through the DEViLBOX server to handle CORS restrictions. Once downloaded, the module is cached locally so reloading the same track is instant.\n\n### Format Filtering\n\nThe Modland browser can filter results by format. This is useful when you want to browse only a specific type of tracker music (for example, only Amiga ProTracker modules or only FastTracker 2 files).\n\n## Searching HVSC (80,000+ SID Tunes)\n\nThe High Voltage SID Collection contains over 80,000 Commodore 64 SID music files. The same online browser panel provides access to HVSC alongside Modland.\n\n### Unified Search\n\nThe search bar queries both Modland and HVSC simultaneously by default. Results are tagged with their source (Modland or HVSC) so you can identify the origin. You can also filter to search only one source.\n\n### SID Playback\n\nSID files are loaded and played through DEViLBOX's SID emulation engine. The characteristic Commodore 64 sound chip is emulated in WASM, providing authentic playback of all three SID voices plus filters.\n\n## The Serato Browser\n\nFor DJs who use Serato DJ software, the Serato browser can read your existing Serato crate and playlist structure. This lets you access your organized Serato library directly within DEViLBOX without re-importing.\n\n## UADE Format Handling\n\nAmiga formats that require the UADE (Unix Amiga Delitracker Emulator) engine follow a special loading path. Because UADE runs a full Amiga 68000 CPU emulation, these formats are pre-rendered to audio before being loaded onto a deck. The pre-rendering happens in the background, and a progress indicator shows on the deck during this process.\n\nOnce pre-rendered, the audio is cached so the same track loads instantly on subsequent plays.\n\n## Deck Assignment\n\nWhen loading a track, it goes to the deck determined by context:\n\n- **File browser / online browser** -- loads to the deck that is currently selected (indicated by the active deck highlight)\n- **Drag and drop** -- loads to whichever deck you drop the file onto\n- **Auto DJ** -- automatically manages deck assignment, alternating between A and B\n\n## Song Caching\n\nThe DJ engine maintains a song cache to avoid re-parsing and re-rendering tracks that have been loaded before in the current session. When you switch between tracks or reload a previously played module, the cached version is used immediately. The cache is cleared when you exit DJ mode.\n\n## Adding Tracks to Playlists\n\nAny track in the file browser or online search results can be added to a playlist instead of loading it directly. Click the playlist add button next to a search result to append it to the active playlist. Playlist management is covered in the Playlist Analyzer chapter.\n\n## Format Auto-Detection\n\nDEViLBOX uses a multi-layered format detection strategy:\n\n1. **File extension** -- the most common way formats are identified\n2. **Magic bytes** -- binary signature at the start of the file (e.g., `IXS!` for Ixalance, `PSY3SONG` for Psycle)\n3. **Heuristic probing** -- for formats without clear signatures, the parser examines byte patterns to determine the format\n\nThis means you can load files even if they have incorrect or missing extensions. The format auto-detection system handles the identification transparently.\n",
+    "images": []
+  },
+  {
+    "id": "53-beat-matching-sync",
+    "number": 60,
+    "title": "Beat Matching & Sync",
+    "part": "DJ Mode",
+    "partNumber": 7,
+    "content": `# Beat Matching & Sync
+
+Mixing two tracks together so their beats align is the core skill of DJing. DEViLBOX provides both automatic sync and manual tools for beat matching.
+
+## BPM Detection
+
+When a track is loaded onto a deck, DEViLBOX detects its tempo automatically.
+
+### Tracker Module Detection
+
+For tracker modules, BPM detection works by scanning the pattern data for Fxx effect commands:
+
+- **F01 to F1F** -- these set the "speed" (ticks per row), which affects the effective BPM
+- **F20 to FFF** -- these set the BPM directly
+
+The detector scans the first eight patterns in the song order and identifies the most frequently used BPM value. The detection result includes a confidence level:
+
+| Confidence | Meaning |
+|------------|---------|
+| **Exact** | One or more explicit Fxx BPM commands were found in the pattern data |
+| **Estimated** | BPM was calculated from the initial speed and tick rate |
+| **Default** | No BPM information found; using the format default (typically 125 BPM) |
+
+### Audio File Detection
+
+For standard audio files (WAV, MP3, FLAC), BPM is detected through audio analysis. The rendered audio is examined for periodic transient peaks that indicate beat positions.
+
+### BPM Display
+
+The detected BPM is shown in the deck's track info area. When the pitch slider is moved, the effective BPM updates in real time to reflect the adjusted tempo.
+
+## The Pitch Slider
+
+Each deck has a vertical pitch fader that adjusts playback speed. Moving the slider up increases speed (higher BPM), moving it down decreases speed (lower BPM).
+
+The pitch range determines how far the slider can adjust. A typical range of plus or minus 8% covers most mixing scenarios, while wider ranges are available for more extreme adjustments.
+
+### Pitch and BPM Relationship
+
+For tracker modules, pitch adjustment directly changes the playback rate. A 5% pitch increase on a 120 BPM track results in 126 BPM. Both tempo and pitch shift together -- there is no independent time-stretching for tracker modules, because the audio is generated from pattern data in real time.
+
+For pre-rendered audio (standard audio files and UADE pre-renders), the same rate-based approach applies.
+
+## Manual Beat Matching
+
+Manual beat matching is the traditional DJ technique of adjusting one deck's speed by ear until the beats of both tracks align.
+
+### Technique
+
+1. Start both decks playing
+2. Listen to the beats -- if Deck B is slower than Deck A, push the pitch slider up slightly
+3. Use the nudge buttons for fine temporary adjustments:
+   - **Nudge +** -- momentarily speeds up the deck while held
+   - **Nudge -** -- momentarily slows down the deck while held
+4. Release the nudge button and the deck returns to its set pitch
+5. Once the beats are aligned, lock in the pitch position
+
+### Visual Aids
+
+The beat grid overlay on the waveform display helps you see beat alignment visually. When two tracks are in sync, their beat markers will line up. The beat phase indicator shows the phase offset between the two decks -- when it sits at zero, the beats are perfectly aligned.
+
+## Sync Mode
+
+The sync button provides automatic beat matching. Press sync on a deck to match its BPM to the other deck.
+
+### How Sync Works
+
+When you press sync on Deck B:
+
+1. The engine reads Deck A's current effective BPM
+2. It calculates the pitch offset needed to match Deck B's native BPM to that target
+3. The pitch slider on Deck B moves to the calculated position
+4. The effective BPM display updates to show the matched tempo
+
+Sync adjusts the pitch slider position, so you can see exactly what adjustment was made and fine-tune from there.
+
+### Beat Phase Alignment
+
+BPM matching alone is not enough -- the beats also need to land at the same time. After syncing BPM, you may need to nudge the deck slightly so the downbeats align. The beat phase display helps you see the phase relationship.
+
+## Auto Sync
+
+The DJ engine includes an auto-sync system that continuously monitors the phase relationship between decks and applies micro-corrections to maintain alignment. When enabled, auto-sync prevents gradual drift that can occur even when BPMs are matched.
+
+Auto-sync is separate from the one-shot sync button. It runs as a background process that makes small, imperceptible adjustments to keep the decks locked together.
+
+## Tempo Range Considerations
+
+Tracker modules have some unique characteristics compared to standard audio:
+
+- **Fixed tempo changes** -- many tracker songs change BPM mid-song via Fxx commands. The pitch slider adjusts the base rate, but embedded tempo changes still occur relative to that base.
+- **Speed vs BPM** -- tracker modules have two tempo controls: speed (ticks per row) and BPM. Both affect the effective playback rate. The pitch slider operates on top of these.
+- **Integer constraints** -- some very old tracker formats (MOD) have coarse tempo steps. Small pitch adjustments might not produce audible changes on extremely simple patterns.
+
+## Matching Different Formats
+
+Mixing a FastTracker 2 module with a Commodore 64 SID tune, or a Furnace chiptune with a WAV file, works the same as mixing two tracks of the same format. The BPM detection and pitch adjustment operate on the final audio output regardless of the source format.
+
+The key is that the detected BPM must be reasonably accurate for sync to work well. If a track has no clear tempo (ambient or arrhythmic music), manual mixing by ear is the better approach.
+
+## Keyboard Shortcuts for Beat Matching
+
+Common beat matching operations have keyboard shortcuts in DJ mode:
+
+- Nudge faster / slower per deck
+- Sync toggle
+- Pitch reset (return to 0% adjustment)
+
+These shortcuts are active when the DJ view has focus. Check the keyboard shortcut reference for the current bindings.
+`,
+    "images": []
+  },
+  {
+    "id": "54-playlist-analyzer",
+    "number": 61,
+    "title": "Playlist Analyzer",
+    "part": "DJ Mode",
+    "partNumber": 7,
+    "content": "# Playlist Analyzer\n\nThe Playlist Analyzer prepares your track collection for seamless Auto DJ playback by batch-analyzing every track for BPM, musical key, and energy level.\n\n## Playlists in DJ Mode\n\nDEViLBOX maintains playlists specifically for DJ mode. A playlist is an ordered list of tracks, each with metadata:\n\n| Field | Description |\n|-------|-------------|\n| **Track name** | Display name of the file |\n| **Source path** | Local file path or Modland/HVSC remote path |\n| **BPM** | Detected beats per minute (0 if not yet analyzed) |\n| **Musical key** | Detected key signature (e.g., Am, C, F#m) |\n| **Energy** | Overall energy level (low, medium, high) |\n| **Duration** | Estimated track length in seconds |\n| **Analysis status** | Whether the track has been analyzed, skipped, or is pending |\n\n### Creating and Managing Playlists\n\nYou can create multiple playlists and switch between them. The active playlist is the one that Auto DJ will use. Tracks can be added from the file browser, Modland search results, or HVSC search results using the playlist add button next to each result.\n\nTracks within a playlist can be reordered by dragging, and individual tracks can be removed.\n\n## Running the Analyzer\n\nWhen a playlist contains tracks that have not been analyzed (BPM is 0 or key is missing), the analyzer panel shows a notification. Click the analyze button to start batch analysis.\n\n### Analysis Process\n\nFor each unanalyzed track in the playlist:\n\n1. **Download** -- if the track is from Modland or HVSC, it is downloaded from the server\n2. **Render** -- the track is rendered through the DJ pipeline to produce audio data\n3. **BPM detection** -- the audio or pattern data is scanned for tempo information\n4. **Key detection** -- the audio is analyzed for its musical key signature\n5. **Energy analysis** -- overall energy level is computed from frequency distribution\n6. **Duration estimation** -- total track length is calculated\n7. **Cache eviction** -- the rendered audio is discarded after metadata extraction to save disk space\n\n### Progress Tracking\n\nDuring analysis, a progress indicator shows:\n\n- Current track number out of total\n- Name of the track being analyzed\n- Count of successfully analyzed tracks\n- Count of failed analyses\n- Current status (analyzing, done, skipped, error)\n\nAnalysis can take several seconds per track depending on the format and track length. For large playlists, the process runs in the background and you can continue using other parts of the DJ interface.\n\n### Handling Failures\n\nSome tracks may fail to analyze. Common reasons include:\n\n- **404 errors** -- Modland tracks that have been moved or renamed. The analyzer can search for alternative paths and present candidates for manual resolution.\n- **Unsupported sub-format** -- the track uses a format variant that cannot be rendered\n- **Corrupt files** -- damaged or incomplete module data\n\nFailed tracks are marked in the playlist and can be retried or removed.\n\n## Smart Sort\n\nOnce tracks have BPM, key, and energy metadata, the playlist can be sorted intelligently for optimal mixing flow.\n\n### Sort Criteria\n\nThe smart sort algorithm considers:\n\n- **BPM proximity** -- adjacent tracks should have similar tempos to minimize large pitch adjustments\n- **Key compatibility** -- tracks in harmonically compatible keys sound better when mixed together (using the Camelot wheel / circle of fifths relationships)\n- **Energy progression** -- building energy gradually through a set creates better momentum than random jumps\n\n### Sort Options\n\n- **By BPM** -- simple ascending or descending BPM order\n- **By key** -- group tracks by key signature\n- **Smart sort** -- combined BPM + key + energy optimization\n- **Shuffle** -- random order for variety\n\n## Auto DJ Mode\n\nAuto DJ plays through the active playlist automatically, handling all transitions between tracks.\n\n### Enabling Auto DJ\n\nPress the Auto DJ toggle to start automatic playback. Auto DJ requires a playlist with at least two tracks. If you start Auto DJ while a deck is already playing, it picks up from that point.\n\n### State Machine\n\nAuto DJ operates as a state machine with these states:\n\n| Status | Meaning |\n|--------|---------|\n| **Idle** | Auto DJ is off |\n| **Playing** | Current track is playing normally |\n| **Preloading** | Next track is being loaded and prepared on the idle deck |\n| **Preload failed** | Next track failed to load; will skip to the one after |\n| **Transition pending** | Next track is ready; waiting for the right moment to begin the mix |\n| **Transitioning** | Crossfade is in progress between the two decks |\n\n### Preloading\n\nAbout 60 seconds before the current track ends, Auto DJ begins preloading the next track onto the idle deck. This ensures the next track is ready for a seamless transition without any gap.\n\n### Transition Configuration\n\nYou can configure how Auto DJ transitions between tracks:\n\n- **Transition bars** -- the length of the crossfade in bars (4, 8, 16, or 32 bars). Longer transitions create smoother blends.\n- **Filter sweep** -- when enabled, a low-pass filter sweep is applied during the transition for a more dramatic effect.\n- **Shuffle** -- randomize playlist order instead of playing sequentially.\n\n### Skipping Tracks\n\nPress the skip button during Auto DJ to immediately begin transitioning to the next track. The skip uses a shorter transition (4 bars) for quick cuts.\n\n### How Transitions Work\n\nWhen it is time to transition:\n\n1. The next track starts playing on the idle deck, BPM-matched to the current track\n2. The crossfader begins moving from the current deck toward the incoming deck\n3. If filter sweep is enabled, a low-pass filter gradually closes on the outgoing deck while opening on the incoming deck\n4. After the transition completes, the old deck stops and becomes the new idle deck\n5. The active and idle decks swap roles, and preloading begins for the next track\n\n## Playlist Persistence\n\nPlaylists are stored in the DJ playlist store and persist across DJ mode sessions within the same browser session. The active playlist and its analysis results are preserved so you do not need to re-analyze tracks each time you enter DJ mode.\n",
+    "images": []
+  },
+  {
+    "id": "55-dj-effects-performance",
+    "number": 62,
+    "title": "DJ Effects & Performance",
+    "part": "DJ Mode",
+    "partNumber": 7,
+    "content": `# DJ Effects & Performance
+
+This chapter covers the real-time effects, scratch techniques, and performance tools available in DJ mode.
+
+## Per-Deck Effects
+
+Each deck has an independent effects chain. Effects are applied to the deck's audio output before it reaches the mixer, so each deck can have different effects active simultaneously.
+
+### Filter Sweep
+
+The resonant filter knob at the top of each mixer channel provides a sweepable filter:
+
+- **Center position** -- filter is bypassed (flat response)
+- **Turn clockwise** -- high-pass filter with increasing cutoff frequency, removing bass first
+- **Turn counter-clockwise** -- low-pass filter with decreasing cutoff frequency, removing treble first
+
+The filter has resonance at the cutoff point, creating the characteristic sweep sound familiar from DJ mixers. The filter sweep is one of the most commonly used DJ effects for building tension and creating transitions.
+
+### Three-Band EQ
+
+Each deck has dedicated EQ knobs for three frequency bands:
+
+- **HI** (high frequencies) -- controls treble content (cymbals, hi-hats, high synth harmonics)
+- **MID** (mid frequencies) -- controls the body of the sound (vocals, leads, snares)
+- **LO** (low frequencies) -- controls bass content (kick drums, bass lines)
+
+Each band can be boosted or cut. The center position is unity (no change). Turn clockwise to boost, counter-clockwise to cut.
+
+### EQ Kill Buttons
+
+Each EQ band has a kill button that instantly removes that frequency range. Kill buttons are toggle-style -- press once to kill, press again to restore. EQ kills are a powerful performance tool:
+
+- Kill the bass on one track while keeping the other's bass -- a clean way to swap bass lines during a transition
+- Kill the highs to remove hi-hats and create a muffled, underwater effect
+- Rapid kill toggling creates rhythmic chop effects
+
+## FX Pads
+
+The FX pad grid provides eight performance effects per deck, triggered by clicking or by MIDI controller pads.
+
+### HPF Sweep (Momentary)
+
+Hold to sweep a high-pass filter from low to high. The filter opens progressively while the pad is held, removing bass frequencies. Release to snap back to flat response.
+
+### LPF Sweep (Momentary)
+
+Hold to sweep a low-pass filter from high to low. The filter closes progressively while held, removing treble. Release to snap back.
+
+### Filter Reset (Momentary)
+
+Instantly resets any active filter sweep to the flat (bypassed) position. Useful as a panic button if you lose track of where the filter is set.
+
+### Echo Out (Toggle)
+
+Activates a delay effect on the deck. When toggled on, the audio feeds into a tempo-synced echo that continues ringing out even as you fade the deck. This creates a smooth "echo out" effect -- the track dissolves into repeating echoes rather than cutting off abruptly.
+
+### Kill LO / Kill MID / Kill HI (Toggle)
+
+Same as the EQ kill buttons, but accessible from the pad grid. These toggle the respective EQ band on and off.
+
+### Brake (Momentary)
+
+Simulates a turntable brake -- the audio slows down and stops as if you put your hand on the platter. Release to resume playback. The brake effect uses pitch deceleration to create an authentic vinyl-stop sound.
+
+## Beat Jump Pads
+
+The second pad page provides instant beat jumps:
+
+| Pad | Jump |
+|-----|------|
+| Backward 16 | Jump back 16 beats |
+| Backward 4 | Jump back 4 beats |
+| Backward 1 | Jump back 1 beat |
+| Backward 1/2 | Jump back half a beat |
+| Forward 1/2 | Jump forward half a beat |
+| Forward 1 | Jump forward 1 beat |
+| Forward 4 | Jump forward 4 beats |
+| Forward 16 | Jump forward 16 beats |
+
+Beat jumps are quantized to beat boundaries so the rhythm is preserved after the jump. They are useful for skipping intros, jumping to a breakdown, or creating stutter effects by rapidly tapping the 1-beat jump.
+
+## Scratching
+
+DEViLBOX includes a scratch engine with 19 built-in scratch patterns sourced from classic DJ scratch techniques.
+
+### How Scratching Works
+
+The scratch engine modifies the playback rate and applies fader chops to simulate turntable scratching:
+
+- **Rate changes** -- the playback speed is modulated to simulate forward and backward vinyl movement, applied every 10ms via JavaScript timers
+- **Fader chops** -- the channel gain is switched on and off with sub-millisecond accuracy using Web Audio API's AudioParam scheduling, independent of JavaScript timer jitter
+
+### Scratch Patterns
+
+Built-in patterns include:
+
+- **Baby Scratch** -- smooth forward-backward motion, BPM-synced with velocity interpolation for a human feel
+- **Scribble** -- rapid back-and-forth scratch
+- **Transformer** -- rhythmic fader cuts over a held scratch motion (128-chop lookahead for seamless looping)
+- **Crab** -- ultra-fast fader flicks
+- **Chirp** -- fader opens as the record moves forward, cuts on reverse
+- **Flare** -- fader clicks during forward motion to create rhythmic pops
+- And more variations and combinations
+
+Each pattern defines keyframes with velocity (direction and speed) and fader gain (open/closed). Patterns can be BPM-synced (tied to beat divisions) or fixed-duration.
+
+### Scratch Controls
+
+The deck's scratch section provides controls for triggering patterns and adjusting scratch behavior. Scratching can be triggered from the UI or mapped to MIDI controller inputs.
+
+## Crossfader Techniques
+
+The crossfader is a versatile performance tool beyond simple blending.
+
+### Crossfader Curves
+
+The curve setting dramatically changes how the crossfader behaves:
+
+- **Linear** -- proportional volume change. Good for smooth fades but not ideal for scratching.
+- **Cut** -- sharp transition near each end. The outgoing deck cuts to silence within the first/last 5% of crossfader travel. Essential for scratch DJing where you need crisp cuts.
+- **Smooth** -- constant-power (cosine/sine) curve. Both decks maintain consistent combined volume throughout the fade. Best for long, smooth transitions.
+
+### Transform Scratching
+
+With the crossfader in cut mode, rapid back-and-forth crossfader movements create the "transform" effect -- rhythmic volume chops that turn a sustained sound into a stuttering rhythmic pattern.
+
+## Master Effects
+
+The master section supports effects applied to the combined output of all decks after the crossfader. Available master effects include reverb, delay, and chorus. These are configured through the master effects preset system.
+
+## Vocoder
+
+A vocoder effect is available for robot-voice processing. The vocoder takes microphone input as the modulator and the deck audio as the carrier, producing the classic "robot talking" effect. This is controlled from a dedicated vocoder panel in the mixer area.
+
+## Microphone Input
+
+The DJ mixer supports live microphone input with automatic ducking -- when the mic is active, the deck volumes are reduced to make room for the voice. The ducking amount is controlled by a separate gain node in the audio chain.
+
+## Live Performance Tips
+
+- **Prepare cue points** before your set so you can jump to the best parts of each track instantly
+- **Use the filter sweep** as your primary transition tool -- it sounds more musical than abrupt fader cuts
+- **Kill the bass** on the incoming track during transitions, then swap bass lines at a musically appropriate moment
+- **Set loop points** on sections you want to extend while preparing the next track
+- **Use echo out** when ending a track -- it creates a natural fadeout even on tracks with abrupt endings
+- **Match energy levels** between tracks -- jumping from a calm ambient piece to an aggressive bass track works better with a buildup in between
+- **Practice with sync off** occasionally to develop your ear for beat matching -- the skill transfers to any DJ setup
+`,
+    "images": []
+  },
+  {
+    "id": "56-vj-interface",
+    "number": 63,
+    "title": "VJ Interface",
+    "part": "VJ Mode",
+    "partNumber": 8,
+    "content": "# VJ Interface\n\nDEViLBOX includes a visual performance (VJ) mode that generates real-time audio-reactive visuals. The VJ view can run alongside tracker playback or DJ mode, and supports pop-out to a second screen for live projection.\n\n## Entering VJ Mode\n\nSwitch to VJ mode from the main view selector. The VJ view can also be opened as a pop-out window while keeping the tracker or DJ interface in the main window -- ideal for live performance where you want visuals on a projector and controls on your laptop screen.\n\n## Layout Overview\n\nThe VJ view fills the available space with layered visual components:\n\n| Layer | Z-Order | Description |\n|-------|---------|-------------|\n| **Visualizer canvas** | Bottom | Milkdrop presets (butterchurn or projectM) filling the entire area |\n| **Pattern overlay** | Middle | Holographic tracker data display that dances with the music |\n| **Kraftwerk head** | Top | 3D wireframe head with bloom, rendered on a transparent canvas |\n| **Controls** | Floating | Toolbar with preset browser, scene controls, and settings |\n\nAll layers composite together -- the Kraftwerk head and pattern overlay render on transparent backgrounds so the Milkdrop visualizer shows through behind them.\n\n## Audio Input\n\nThe VJ engine receives audio data from the master output via an AudioDataBus. This bus connects to Web Audio API AnalyserNodes and extracts per-frame audio features:\n\n- **Sub energy** -- lowest frequencies (sub-bass rumble)\n- **Bass energy** -- bass frequency band\n- **Mid energy** -- midrange frequencies\n- **High energy** -- treble frequencies\n- **Beat detection** -- transient detection for triggering visual events\n- **Overall level** -- RMS volume\n\nThese audio features drive every visual element in the VJ view. The AudioDataBus is a shared singleton -- multiple visual components can subscribe to the same analysis data without duplicating the audio processing.\n\n## Visualizer Engines\n\nDEViLBOX supports two Milkdrop-compatible visualizer engines:\n\n### Butterchurn\n\nButterchurn is a JavaScript/WebGL port of the Milkdrop visualizer. It renders audio-reactive presets originally created for Winamp's Milkdrop plugin. DEViLBOX includes presets from multiple butterchurn preset packs:\n\n- Main presets\n- Extra presets\n- Extra 2 presets\n- MD1 presets\n- Non-minimal presets\n\nAll preset packs are merged and deduplicated, giving you access to thousands of Milkdrop presets.\n\n### projectM\n\nprojectM is a native C++ Milkdrop implementation compiled to WASM via Emscripten with SDL2 and WebGL2. It provides higher fidelity preset rendering than butterchurn (approximately 95% preset compatibility versus 80%). projectM is lazy-loaded since it includes a substantial WASM binary.\n\nprojectM ships with built-in presets and also loads from a curated manifest of 9,795 Milkdrop presets that are fetched on demand.\n\nYou can switch between butterchurn and projectM from the VJ controls.\n\n## Preset Browser\n\nThe preset browser panel lists all available Milkdrop presets. You can:\n\n- **Browse** -- scroll through the alphabetical preset list\n- **Search** -- type to filter presets by name\n- **Preview** -- click a preset to load it with a smooth blend transition\n- **Randomize** -- jump to a random preset\n- **Auto-advance** -- set a timer to automatically cycle through presets\n\n### Preset Transitions\n\nWhen switching between presets, a configurable blend time controls how smoothly one visual transitions to the next. Short blend times create sharp cuts; longer blend times create dreamy cross-dissolves between visual patterns.\n\n## Pop-Out Window\n\nFor live performance, the VJ view can be popped out into a separate browser window. This is essential for dual-screen setups where the audience sees fullscreen visuals on a projector while you control the music on your primary screen.\n\nThe pop-out window shares the same JavaScript context as the main window, so all Zustand store state is synchronized automatically. Changing a preset in the main window updates the pop-out instantly.\n\n### Fullscreen\n\nThe pop-out window (or the inline VJ view) can be toggled to fullscreen mode for maximum visual impact.\n\n## Controls Toolbar\n\nA floating toolbar provides quick access to:\n\n- **Next/Previous preset** -- step through the preset list\n- **Random preset** -- jump to a random visual\n- **Shuffle toggle** -- enable automatic random preset cycling\n- **Play/Pause** -- control playback (when in DJ mode)\n- **Skip** -- skip to next track (when in DJ mode)\n- **Playlist** -- open the playlist panel\n- **Maximize/Minimize** -- toggle fullscreen\n- **Pop-out** -- open in a separate window\n- **Engine toggle** -- switch between butterchurn and projectM\n\n## Video Capture\n\nThe VJ canvas can be captured for video recording and streaming. The video capture system registers the VJ canvas as a capture source, which the DJ set recorder and live streaming features use to create video output of the visuals synchronized with the audio.\n",
+    "images": []
+  },
+  {
+    "id": "57-kraftwerk-head",
+    "number": 64,
+    "title": "Kraftwerk Head Overlay",
+    "part": "VJ Mode",
+    "partNumber": 8,
+    "content": '# Kraftwerk Head Overlay\n\nThe Kraftwerk Head is a 3D wireframe head rendered as a transparent overlay on top of the VJ visualizer. It evokes the iconic aesthetic of Kraftwerk\'s visual performances -- a glowing cyan wireframe face that speaks and emotes in sync with the music.\n\n## How It Works\n\nThe head is rendered using React Three Fiber (R3F), which wraps Three.js in React components. It occupies its own WebGL canvas with `alpha: true`, making the background transparent so the Milkdrop visualizer shows through. The head sits at z-index 5, above the visualizer but below floating UI controls.\n\n### 3D Model\n\nThe head uses `facecap.glb`, a model with 52 ARKit blend shapes for detailed facial animation. These blend shapes include:\n\n- **Jaw** -- jawOpen, jawForward, jawLeft, jawRight\n- **Mouth** -- mouthSmile, mouthFunnel, mouthPucker, mouthClose, mouthStretch, and more\n- **Eyes** -- eyeBlink, eyeLookUp, eyeLookDown, eyeSquint, eyeWide\n- **Brows** -- browInnerUp, browDown, browOuterUp\n- **Cheeks** -- cheekPuff, cheekSquint\n- **Nose** -- noseSneer\n- **Tongue** -- tongueOut\n\nIf the facecap model fails to load, a fallback model (LeePerrySmith.glb with a jaw split) is used instead.\n\n### Wireframe Rendering\n\nThe head is rendered as a wireframe mesh with a cyan color (`#00ccff`), giving it the characteristic Kraftwerk look -- a glowing geometric face floating in space. The wireframe material is rendered on top of the solid geometry.\n\n## Audio-Driven Animation\n\nThe head receives audio data from the same AudioDataBus that powers the rest of the VJ system.\n\n### Mouth Animation\n\nThe jaw and mouth blend shapes respond to audio energy:\n\n- **Bass and sub frequencies** drive jaw opening -- heavier bass means a wider open mouth\n- **Mid frequencies** modulate mouth shape variations (smile, funnel, pucker)\n- **Speech synth activity** triggers more pronounced mouth animation when text-to-speech is active\n\nThe result is a face that appears to "speak" or "sing" along with the music. During bass-heavy passages, the jaw opens wide. During quieter sections, the mouth is more relaxed.\n\n### Speech Synth Integration\n\nWhen DEViLBOX\'s speech synthesizer is active (for track announcements or text-to-speech features), the head animates more dramatically to match the speech output. The speech activity store tracks when speech synthesis is running, and the head responds with appropriate mouth shapes.\n\n### Vocoder Integration\n\nWhen the vocoder effect is active in DJ mode (robot voice processing), the head also animates in response to the vocoder output. This creates the effect of a robot head speaking with a processed voice -- fitting the Kraftwerk aesthetic perfectly.\n\n### Eye Animation\n\nThe eyes blink periodically with natural timing variation. Eye direction can shift slightly in response to audio transients, creating a subtle sense of awareness.\n\n### Brow and Expression\n\nStrong beats or sudden changes in audio energy trigger brow movements -- raised eyebrows on sharp transients, furrowed brows during sustained bass. These subtle expressions give the head a sense of personality.\n\n## Post-Processing\n\nThe head is rendered with a bloom post-processing effect applied via React Three Fiber\'s EffectComposer:\n\n| Parameter | Value | Purpose |\n|-----------|-------|---------|\n| **Intensity** | 1.2 | Strength of the glow effect |\n| **Luminance threshold** | 0.15 | Brightness level above which glow appears |\n| **Luminance smoothing** | 0.6 | How gradually the glow fades at the threshold |\n| **Mipmap blur** | Enabled | Multi-resolution blur for natural glow falloff |\n\nThe bloom effect makes the wireframe lines glow as if they are emitting light, enhancing the holographic appearance.\n\n## Lighting\n\nThe scene uses minimal lighting to keep the wireframe aesthetic clean:\n\n- **Ambient light** at 0.15 intensity provides a subtle base illumination\n- The wireframe material (MeshBasicMaterial) is unaffected by lights by design, ensuring consistent cyan glow\n- The bloom post-processing creates the apparent self-illumination\n\n## Camera\n\nThe camera is positioned at `[0, 0, 4]` with a 45-degree field of view, placing the head at a comfortable viewing distance centered in the frame.\n\n## WebGL Context Recovery\n\nThe Kraftwerk head overlay handles WebGL context loss gracefully. Modern browsers may reclaim WebGL contexts under memory pressure. When this happens:\n\n1. The `webglcontextlost` event is caught and `preventDefault()` is called to request restoration\n2. When `webglcontextrestored` fires, the entire R3F Canvas is remounted by incrementing a React key\n3. This forces R3F to rebuild its renderer, scene, and effects from scratch\n4. The head reappears automatically without user intervention\n\nThis is important for long DJ sets where GPU memory management may cause context losses on some systems.\n\n## Customization\n\nThe head is always visible when the VJ view is active. Its appearance is primarily defined by:\n\n- The wireframe color (cyan)\n- The bloom intensity and threshold\n- The audio reactivity curves that map frequency bands to blend shape weights\n\nThe head composites cleanly over any Milkdrop preset because it renders on a transparent background. Dark presets make the cyan wireframe stand out dramatically, while bright presets create an interesting layered effect.\n',
+    "images": []
+  },
+  {
+    "id": "58-pattern-overlays",
+    "number": 65,
+    "title": "Pattern Overlays & Visualizers",
+    "part": "VJ Mode",
+    "partNumber": 8,
+    "content": "# Pattern Overlays & Visualizers\n\nBeyond the Milkdrop presets, DEViLBOX offers audio-reactive overlays that display musical data as part of the visual performance. The pattern overlay transforms tracker data into a living, dancing holographic display.\n\n## VJ Pattern Overlay\n\nThe pattern overlay renders the currently playing tracker pattern data as a stylized, music-reactive text display. It is not a static data readout -- it is a visual performance element that dances, glitches, and pulses with the music.\n\n### What It Shows\n\nThe overlay displays rows from the active pattern, formatted in classic tracker notation:\n\n```\n00 | C-5 01 40 A02 | D#4 03 38 ... | ... .. .. ... | G-5 02 40 100\n01 | ... .. .. ...  | ... .. .. ...  | E-4 05 30 ... | ... .. .. ...\n```\n\nEach cell shows note, instrument number, volume, and effect command. Empty fields are displayed as dots. The currently playing row is highlighted, with rows above and below providing context.\n\n### 3D Perspective\n\nThe pattern data is rendered with CSS 3D perspective transforms. The text panel orbits in a Lissajous pattern (smooth figure-eight motion) and tilts in response to audio energy. This creates the illusion of a holographic data display floating in 3D space.\n\n### Audio Reactivity\n\nEvery visual aspect of the overlay responds to the music:\n\n- **Bass-driven scale pulse** -- the entire display scales up slightly on bass hits, creating a breathing effect\n- **Beat-triggered glitch** -- on strong beats, rows may displace randomly and chromatic aberration (RGB color splitting) appears briefly\n- **Frequency-mapped note colors** -- notes are colored by their frequency range:\n  - Sub-bass notes glow red\n  - Bass notes glow orange\n  - Mid-range notes glow cyan\n  - High notes glow white\n- **Per-channel glow** -- active channels emit a colored glow column\n- **Depth fade** -- rows further from the playhead fade with a shimmer wave\n- **Character spacing** -- bass energy modulates letter spacing for a pulsing text effect\n- **Trailing ghost rows** -- recently played rows fade behind the playhead like afterimages\n\n### VU Meters\n\nLED-segment VU meters extrude from the highlight bar, showing per-channel audio levels. These 26-segment meters decay smoothly (0.92 decay rate), providing a visual representation of which channels are currently active and how loud they are.\n\n### Smooth Scrolling\n\nThe overlay uses sub-row scroll interpolation from the TrackerReplayer for smooth movement between rows, rather than jumping row-by-row. This creates fluid motion even at slow tempos.\n\n## Three.js Scenes\n\nDEViLBOX includes built-in 3D scenes rendered with Three.js via React Three Fiber. These are full 3D environments driven entirely by audio analysis.\n\n### Reactive Particles\n\nA cloud of 3,000 particles orbits and pulses in 3D space. The particles are distributed on a sphere and drift with individual velocities. Audio drives the scene through shader uniforms:\n\n- **Bass** -- expands the particle cloud outward\n- **Mid** -- modulates particle brightness and color\n- **High** -- adds shimmer and sparkle to individual particles\n- **Beat** -- triggers expansion bursts where all particles push outward simultaneously\n\nThe shader applies time-based animation and audio modulation to particle positions and colors, creating an organic, breathing visual field.\n\n### Audio Terrain\n\nA grid plane mesh where vertex heights respond to audio frequencies, creating a landscape that undulates with the music:\n\n- **Bass** creates large rolling waves across the terrain\n- **Mid** adds medium-scale detail and texture\n- **High** produces fine shimmer on the surface\n- **Beat** triggers terrain displacement pulses\n\nThe camera flies forward continuously over the terrain, creating an infinite-landscape effect. Colors shift between two configurable hues based on height, giving the terrain a neon gradient appearance.\n\n### Wireframe Sphere\n\nA pulsing wireframe icosphere that responds to audio with:\n\n- Size oscillation tied to bass energy\n- Surface displacement driven by mid frequencies\n- Color cycling based on overall audio energy\n- Beat-triggered flash effects\n\n### Post-Processing\n\nAll Three.js scenes share a post-processing pipeline:\n\n- **Bloom** -- intensity 0.8, threshold 0.3, smoothing 0.9. Creates glowing edges and bright spots.\n- **Chromatic aberration** -- subtle RGB offset (0.001) that adds a cinematic quality and slight color fringing at edges.\n\n## ISF Shaders\n\nInteractive Shader Format (ISF) shaders provide another layer of visual content. ISF is a standardized format for interactive GLSL shaders with defined inputs for time, resolution, and custom parameters.\n\nThe ISF canvas runs its own WebGL context and receives audio data as uniforms:\n\n- Bass, mid, and high energy levels\n- Beat trigger flags\n- Time and resolution\n\nISF presets can be browsed and switched in real time, similar to Milkdrop presets.\n\n## Combining Layers\n\nThe VJ view composites all active layers together:\n\n1. The Milkdrop visualizer (butterchurn or projectM) fills the background\n2. The pattern overlay renders on top with its 3D transforms and transparency\n3. The Kraftwerk head floats above everything with bloom glow\n4. Three.js scenes can replace or supplement the Milkdrop layer\n\nYou can enable or disable individual layers to create the combination that works best for your performance. A minimal setup might use only Milkdrop presets, while a maximal setup layers everything together for an intense visual experience.\n\n## Audio Data Flow\n\nAll visual components receive the same audio analysis data from the AudioDataBus singleton. The data flow is:\n\n```\nToneEngine master output\n    |\n    v\nWeb Audio AnalyserNode (shared)\n    |\n    v\nAudioDataBus (extracts per-frame features)\n    |\n    +---> Milkdrop visualizer\n    +---> Pattern overlay\n    +---> Kraftwerk head\n    +---> Three.js scenes\n    +---> ISF shaders\n```\n\nThis architecture ensures all visual elements are synchronized to the same audio analysis, so beats trigger events across all layers simultaneously.\n",
+    "images": []
+  },
+  {
+    "id": "59-crt-shaders",
+    "number": 66,
+    "title": "CRT Shaders & Post-Processing",
+    "part": "VJ Mode",
+    "partNumber": 8,
+    "content": "# CRT Shaders & Post-Processing\n\nDEViLBOX can apply a CRT (cathode ray tube) simulation to the entire application interface, recreating the look of vintage computer monitors. This post-processing effect is implemented as a PixiJS v8 Filter and applies to the GL rendering mode.\n\n## What the CRT Effect Does\n\nThe CRT shader simulates several physical characteristics of old CRT displays:\n\n### Scanlines\n\nHorizontal dark lines that appear between pixel rows, mimicking the gap between phosphor lines on a real CRT. The scanline intensity controls how dark these lines are -- subtle scanlines add texture without obscuring content, while heavy scanlines create an unmistakably retro look.\n\nThe scanline count parameter sets how many scanlines appear across the screen height. Higher counts produce finer lines (like a high-resolution monitor), while lower counts produce thick, chunky lines (like an old television).\n\n### Screen Curvature\n\nReal CRT screens were not flat -- they had a slight convex curve. The curvature parameter bends the rendered image to simulate this effect. At low values, the curve is barely noticeable. At higher values, the edges of the screen visibly warp inward, and content near the corners appears slightly distorted.\n\n### Chromatic Aberration (RGB Shift)\n\nOn real CRTs, the red, green, and blue electron beams did not always converge perfectly, causing color fringing at edges. The RGB shift parameter separates the color channels slightly, producing colored halos around high-contrast edges. This is particularly effective on bright text against dark backgrounds.\n\n### Vignette\n\nThe edges of a CRT screen were darker than the center because the electron beam had to travel farther to reach the corners. The vignette parameter darkens the edges and corners of the screen, drawing the eye toward the center.\n\n### Phosphor Glow (Bloom)\n\nCRT phosphors glow when struck by the electron beam, and this glow bleeds into surrounding areas. The bloom effect simulates this by making bright areas bleed light into darker surrounding pixels. Two parameters control this:\n\n- **Bloom intensity** -- how strong the glow is\n- **Bloom threshold** -- how bright a pixel must be before it starts glowing\n\n### Flicker\n\nCRT displays had a subtle brightness fluctuation as the electron beam scanned the screen. The flicker parameter adds a slight random brightness variation over time, simulating this instability. Keep this subtle -- heavy flicker is distracting.\n\n### Brightness, Contrast, and Saturation\n\nGlobal image adjustments that simulate the limited dynamic range of CRT displays:\n\n- **Brightness** -- overall light level\n- **Contrast** -- difference between darks and lights\n- **Saturation** -- color intensity (CRTs often had slightly oversaturated colors)\n\n## CRT Parameters\n\nThe full set of adjustable CRT parameters:\n\n| Parameter | Range | Default | Description |\n|-----------|-------|---------|-------------|\n| Scanline intensity | 0.0 - 1.0 | -- | Darkness of scanlines |\n| Scanline count | 100 - 1000 | -- | Number of horizontal scanlines |\n| Curvature | 0.0 - 1.0 | -- | Screen barrel distortion amount |\n| RGB shift | 0.0 - 0.01 | -- | Chromatic aberration distance |\n| Vignette strength | 0.0 - 1.0 | -- | Edge darkening amount |\n| Bloom intensity | 0.0 - 2.0 | -- | Phosphor glow strength |\n| Bloom threshold | 0.0 - 1.0 | -- | Brightness threshold for glow |\n| Brightness | 0.5 - 2.0 | -- | Overall brightness multiplier |\n| Contrast | 0.5 - 2.0 | -- | Contrast adjustment |\n| Saturation | 0.0 - 2.0 | -- | Color saturation |\n| Flicker strength | 0.0 - 0.1 | -- | Random brightness variation |\n| Adaptive intensity | 0.0 - 1.0 | -- | How much the effect adapts to content brightness |\n\nParameters are stored in the settings store and persist across sessions.\n\n## Enabling the CRT Effect\n\nThe CRT effect is available in the GL (PixiJS) rendering mode. To enable it:\n\n1. Switch to GL rendering mode in the settings\n2. Open the CRT settings panel\n3. Toggle the CRT effect on\n4. Adjust parameters to taste\n\nThe effect can be toggled on and off without reloading -- it simply adds or removes the filter from the PixiJS stage container.\n\n## Architecture\n\nThe CRT shader is implemented as `CRTRenderer`, a class extending PixiJS v8's `Filter`. This approach lets PixiJS handle the render texture management internally:\n\n1. PixiJS renders the target container to a temporary render texture\n2. The CRT fragment shader samples that texture and applies all CRT effects\n3. PixiJS composites the result to the screen\n\nThis avoids the need for manual render-to-texture calls, which could conflict with PixiJS's Yoga layout system.\n\n### GLSL Shader\n\nThe fragment shader performs all CRT effects in a single pass for efficiency. The operations in order:\n\n1. Apply screen curvature to UV coordinates\n2. Sample the scene texture with chromatic aberration (three separate samples for R, G, B with offset UVs)\n3. Apply scanlines based on vertical position and time\n4. Apply bloom by sampling and blurring bright areas\n5. Adjust brightness, contrast, and saturation\n6. Apply vignette\n7. Add flicker\n\n### Uniform Updates\n\nCRT parameters are passed to the shader as uniforms, updated each frame via the `updateParams()` method. The time uniform advances continuously for animated effects (scanline movement, flicker).\n\n## Performance Considerations\n\nThe CRT shader runs a fragment shader for every pixel on screen every frame. On modern GPUs this is fast, but on integrated graphics or older hardware, heavy CRT settings can reduce frame rate.\n\nTips for maintaining good performance:\n\n- **Bloom is the most expensive effect** -- it requires additional texture samples for the blur. Reduce bloom intensity or disable it if performance is a concern.\n- **Scanlines and vignette are cheap** -- they are simple mathematical operations per pixel.\n- **Curvature is moderate** -- it requires UV coordinate warping but no extra texture samples.\n- **Resolution matters** -- the CRT shader cost scales with pixel count. On a 4K display, consider reducing the PixiJS renderer resolution.\n\n## CRT and VJ Mode\n\nThe CRT effect can be combined with VJ mode visuals. When both are active, the Milkdrop presets and overlays render first, then the CRT filter is applied to the entire composited result. This creates an effect of watching the VJ visuals on a vintage CRT monitor -- a compelling aesthetic for retro-themed performances.\n\nNote that the CRT effect only applies in GL mode. The DOM rendering mode does not support post-processing filters.\n",
+    "images": []
+  },
+  {
+    "id": "60-custom-scenes",
+    "number": 67,
+    "title": "Custom Scenes",
+    "part": "VJ Mode",
+    "partNumber": 8,
+    "content": "# Custom Scenes\n\nDEViLBOX's VJ system is built on standard web technologies -- Three.js for 3D, WebGL for shaders, and React for composition. This chapter explains how the scene system works and how custom scenes integrate with the audio-reactive framework.\n\n## Scene Architecture\n\nEvery VJ scene in DEViLBOX follows the same pattern:\n\n1. A React component receives an `audioRef` prop containing real-time audio analysis data\n2. The component renders 3D geometry, particles, or shader meshes using React Three Fiber\n3. A `useFrame` hook runs every animation frame, reading audio data and updating visual parameters\n4. Post-processing effects (bloom, chromatic aberration) are applied automatically by the scene container\n\n### The VJSceneProps Interface\n\nAll scenes implement the same props interface:\n\n```typescript\ninterface VJSceneProps {\n  audioRef: React.RefObject<VJAudioFrame | null>;\n}\n```\n\nThe `audioRef` provides access to the current audio analysis frame, which is updated every animation frame by the AudioDataBus.\n\n### Audio Data Available to Scenes\n\nEach `VJAudioFrame` contains:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `subEnergy` | number (0-1) | Sub-bass frequency energy |\n| `bassEnergy` | number (0-1) | Bass frequency energy |\n| `midEnergy` | number (0-1) | Mid frequency energy |\n| `highEnergy` | number (0-1) | High frequency energy |\n| `beat` | boolean | True on detected beat transients |\n| `rms` | number (0-1) | Overall RMS volume level |\n\nThese values are normalized to the 0-1 range and smoothed to avoid jitter. The `beat` flag is true for exactly one frame when a beat is detected, making it ideal for triggering one-shot visual events.\n\n## Built-In Scene Registry\n\nThe Three.js scene system maintains a registry of available scenes:\n\n| Scene | Category | Description |\n|-------|----------|-------------|\n| Reactive Particles | Particles | 3,000-particle audio-reactive cloud |\n| Audio Terrain | Landscape | Frequency-driven scrolling terrain mesh |\n| Wireframe Sphere | Geometry | Pulsing wireframe icosphere |\n\nScenes can be browsed and switched at runtime. The ThreeCanvas component manages scene selection and provides an imperative API for navigation (next, previous, random, load by index).\n\n## Creating a Custom Scene\n\nA custom VJ scene is a React component that renders Three.js content inside the existing R3F Canvas context. The scene does not need to create its own Canvas -- it renders as a child of the shared ThreeCanvas.\n\n### Basic Structure\n\nA minimal custom scene:\n\n```typescript\nimport React, { useRef, useMemo } from 'react';\nimport * as THREE from 'three';\nimport { useFrame } from '@react-three/fiber';\nimport type { VJSceneProps } from './types';\n\nexport const MyScene: React.FC<VJSceneProps> = ({ audioRef }) => {\n  const meshRef = useRef<THREE.Mesh>(null);\n\n  // Create geometry and material once\n  const geometry = useMemo(() => new THREE.IcosahedronGeometry(1, 3), []);\n\n  // Update every frame based on audio\n  useFrame((state) => {\n    const mesh = meshRef.current;\n    const audio = audioRef.current;\n    if (!mesh || !audio) return;\n\n    // Scale with bass\n    const scale = 1 + audio.bassEnergy * 0.5;\n    mesh.scale.setScalar(scale);\n\n    // Rotate over time\n    mesh.rotation.y = state.clock.elapsedTime * 0.5;\n    mesh.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.2;\n\n    // Flash on beat\n    if (audio.beat) {\n      (mesh.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);\n    } else {\n      (mesh.material as THREE.MeshBasicMaterial).color.lerp(\n        new THREE.Color(0x00ccff), 0.1\n      );\n    }\n  });\n\n  return (\n    <mesh ref={meshRef} geometry={geometry}>\n      <meshBasicMaterial color={0x00ccff} wireframe />\n    </mesh>\n  );\n};\n```\n\n### Key Patterns\n\n**Smoothing audio values** -- raw audio energy values can be jumpy. Use exponential smoothing in the useFrame callback:\n\n```typescript\nsmoothedBass += (audio.bassEnergy - smoothedBass) * 0.3;\n```\n\nA smoothing factor of 0.1 to 0.3 gives good results for most visual parameters.\n\n**Beat triggers** -- use the `beat` boolean for one-shot events (flash, burst, color change). Store state in a ref to manage decay:\n\n```typescript\nif (audio.beat) beatIntensity.current = 1.0;\nelse beatIntensity.current *= 0.92; // decay\n```\n\n**Shader uniforms** -- for custom GLSL shaders, pass audio data as uniforms. Create a `useMemo` object with `uTime`, `uBass`, `uMid`, `uHigh`, and `uBeat` uniform entries, then update them in `useFrame` with exponential smoothing (factor 0.3) and beat decay (factor 0.88). This pattern is used by all built-in scenes.\n\n## ISF Shader Integration\n\nInteractive Shader Format (ISF) provides a standardized way to write audio-reactive fragment shaders. The ISFCanvas component manages its own WebGL context and runs ISF-format GLSL shaders with audio uniforms injected automatically. ISF presets are self-describing -- each shader declares its inputs in a JSON header block, and the ISF engine wires them to the audio data bus.\n\n## Combining Overlays\n\nMultiple visual layers can be active simultaneously in the VJ view. The layering system composites them in order:\n\n1. **Background layer** -- Milkdrop preset (butterchurn or projectM) or Three.js scene\n2. **Pattern overlay** -- tracker data display with 3D transforms\n3. **Kraftwerk head** -- wireframe head with bloom\n4. **ISF shaders** -- can be used as an additional overlay layer\n\nEach layer renders independently and composites via CSS layering (for DOM mode) or render texture composition (for GL mode). Transparency in upper layers reveals lower layers.\n\n### Performance with Multiple Layers\n\nEach active layer adds GPU load:\n\n- Milkdrop presets: moderate (single WebGL context)\n- Three.js scenes: moderate to heavy depending on particle count and shader complexity\n- Pattern overlay: light (canvas 2D rendering)\n- Kraftwerk head: moderate (separate WebGL context with bloom post-processing)\n- ISF shaders: light to moderate depending on shader complexity\n\nOn capable hardware, all layers can run simultaneously at 60fps. On less powerful systems, disabling the most expensive layers (Three.js particles, Kraftwerk head bloom) will improve frame rate.\n\n## DJ Mode Integration\n\nWhen the VJ view is used alongside DJ mode, the audio data comes from the DJ mixer's master output. This means the visuals respond to the mixed output of both decks, crossfader position, and any effects applied. Transitions between tracks naturally produce visual transitions as the audio characteristics change.\n\nThe VJ view in DJ mode adds transport controls (play/pause, skip, shuffle) to the toolbar for convenience, so you can control DJ playback without switching back to the DJ view.\n",
+    "images": []
+  },
+  {
+    "id": "61-midi-mapping",
+    "number": 68,
+    "title": "MIDI Mapping",
+    "part": "Advanced",
+    "partNumber": 9,
+    "content": "# MIDI Mapping\n\nDEViLBOX has a comprehensive MIDI integration layer that auto-detects controllers, routes CC messages to synth parameters, and supports multiple knob bank configurations for different instruments.\n\n## Controller Detection\n\nWhen a MIDI controller is connected, DEViLBOX detects it through the Web MIDI API. The `MIDIManager` monitors device connections and disconnections, maintaining a live registry of available inputs and outputs. Each detected device is described by a `MIDIDeviceInfo` record containing its name, manufacturer, connection state, and whether it is a known controller type (such as the Behringer TD-3).\n\nBluetooth MIDI devices are also supported through the `BluetoothMIDIManager`, which handles the pairing and connection handshake required by BLE MIDI peripherals.\n\n## Knob Banks\n\nThe core of the hardware control system is the knob bank architecture. Each bank maps 8 physical knobs (CC 70-77) to a specific set of synth parameters. Banks are defined in `src/midi/knobBanks.ts`.\n\n### Available Banks\n\n| Bank | Target | Knob 1 | Knob 2 | Knob 3 | Knob 4 | Knob 5 | Knob 6 | Knob 7 | Knob 8 |\n|------|--------|--------|--------|--------|--------|--------|--------|--------|--------|\n| 303 | TB-303 | Cutoff | Resonance | Env Mod | Decay | Accent | Drive | Slide | Volume |\n| Siren | Dub Siren | Osc Freq | LFO Rate | LFO Depth | Delay Time | Feedback | Delay Mix | Filter | Reverb |\n| Furnace | Furnace chips | Algorithm | Feedback | Op1 TL | Op1 AR | Op1 DR | Op1 SL | Op1 RR | FM Sens |\n| V2 | V2 Synth | Osc1 Lvl | Cutoff | Reso | Attack | Decay | Sustain | Release | LFO Dep |\n| Synare | Synare drum | Tune | Osc2 Mix | Cutoff | Reso | Env Mod | Flt Dcy | Sweep | Swp Time |\n| SpaceLaser | Space Laser | Start Hz | End Hz | Sweep | FM Amt | FM Ratio | Cutoff | Reso | Delay |\n| SAM | SAM speech | Pitch | Speed | Mouth | Throat | Volume | - | - | - |\n| Organ | Organ | 16' | 8' | 4' | Perc | Vib Type | Vib Dep | Drive | Volume |\n| Melodica | Melodica | Breath | Bright | Vib Rate | Vib Dep | Detune | Porta | Attack | Volume |\n| FX | Effects | Echo Rate | Intensity | Echo Vol | Rev Vol | Echo Mode | Phase A | Phase FB | Routing |\n| Mixer | Mixer | Vol 1 | Vol 2 | Vol 3 | Vol 4 | Pan 1 | Pan 2 | Pan 3 | Pan 4 |\n| MasterFX | Master FX | FX1 Wet | FX1 P1 | FX2 Wet | FX2 P1 | FX3 Wet | FX3 P1 | Master | Limiter |\n\n### Auto-Switching\n\nWhen you select a different instrument in the tracker, the knob bank switches automatically based on the synth type. The `getKnobBankForSynth()` function maps each `SynthType` to the appropriate bank. TB-303 variants (including Buzz3o3 and Buzz3o3DF) map to the 303 bank, DubSiren maps to Siren, all Furnace chip types map to Furnace, and so on.\n\n### Sub-Pages (TB-303)\n\nThe TB-303 has 7 sub-pages, providing access to all parameters across its complex architecture:\n\n| Page | Name | Parameters |\n|------|------|------------|\n| 0 | 303 Main | Cutoff, Resonance, Env Mod, Decay, Accent, Drive, Slide, Volume |\n| 1 | MOJO | Bass, Rez, Satur, Bite, Tensn, F.FM, LP/BP, K.Trk |\n| 2 | DevilFish | N.Dec, A.Dec, S.Atk, A.Atk, Slide, StgNL, Ensem, Drive |\n| 3 | Korg | Bite, Clip, XMod, Q.Sag, Sharp, -, -, - |\n| 4 | LFO | Rate, Contour, Pitch, PWM, Filter, Stiff, -, - |\n| 5 | FX | Chorus, Ph.Rate, Ph.FB, Ph.Mix, Dly.T, Dly.FB, Dly.Mix, Spread |\n| 6 | Oscillator | Tune, Wave, PWM, SubG, SubB, P-to-PW, -, Volume |\n\nPage names appear on the controller LCD display (for controllers that support it, such as the Akai MPK Mini MkIII via `MPKMiniDisplay`).\n\n## Joystick Mapping\n\nControllers with XY joysticks or touchpads have axis mappings per bank. The X and Y axes each map to a parameter with configurable min, max, and curve (linear or logarithmic).\n\n| Bank | X Axis | Y Axis |\n|------|--------|--------|\n| 303 | Cutoff (0-1) | Resonance (0-1) |\n| Siren | Osc Frequency (60-1500 Hz) | LFO Rate (0.1-20 Hz) |\n| Furnace | FM Sensitivity (0-7) | Op1 Sustain (0-15) |\n| V2 | Filter Cutoff (0-127) | Filter Resonance (0-127) |\n| SpaceLaser | FM Amount (0-100) | Cutoff (20-20000 Hz, log) |\n\n## NKS Taxonomy\n\nDEViLBOX implements the Native Instruments NKS (Native Kontrol Standard) taxonomy for preset browsing and categorization. This enables compatibility with NI hardware such as Komplete Kontrol keyboards and Maschine.\n\n### Instrument Types\n\nThe taxonomy defines 18 top-level instrument types: Bass, Bowed Strings, Brass, Drums, Flute, Guitar, Mallet Instruments, Organ, Percussion, Piano / Keys, Plucked Strings, Reed Instruments, Sound Effects, Soundscapes, Synth Lead, Synth Misc, Synth Pad, and Vocal.\n\nEach type has sub-types. For example, Drums includes: Clap, China Cymbal, Clash Cymbal, Crash Cymbal, Drum Pattern, Finger Cymbal, Hi-Hat (open/closed/pedal), Kick, Ride (bell/cymbal), Shaker, Sliced Drum Loop, Snare (brush/rimshot/roll/side stick), Sizzle Cymbal, Splash Cymbal, and Tom.\n\n### Preset Integration\n\nThe `presetIntegration.ts` module converts between DEViLBOX instrument presets and the NKS `.nksf` file format. This allows:\n\n- Saving DEViLBOX presets as `.nksf` files for browsing on NI hardware\n- Loading `.nksf` files as DEViLBOX instruments\n- Bidirectional category mapping between DEViLBOX preset categories (Bass, Lead, Pad, Drum, FX, User) and NKS instrument types\n\n## Performance Parameter Maps\n\nEvery synth type in DEViLBOX has a full NKS parameter map that organizes its parameters into pages of 8. Each parameter definition includes:\n\n- Unique ID, display name, and NKS section (Synthesis, Filter, Envelope, LFO, Effects, Output)\n- Value range (min/max), default, unit, and format string\n- Optional CC number for direct MIDI CC mapping\n- Automation flag and accessibility name\n\nFor example, the TB-303 maps 14 parameters across 2 pages (Filter/Synthesis on page 0, Effects on page 1), while the OBXd maps 28 parameters across 4 pages (Oscillators, Filter, Amp Envelope, and LFO).\n\n## MIDI Learn\n\nMIDI learn mode allows you to map any incoming CC to any parameter. The workflow is:\n\n1. Open the instrument editor or effect panel for the parameter you want to control\n2. Activate MIDI Learn mode (right-click a knob or use the MIDI Learn button)\n3. Move a physical knob or fader on your MIDI controller\n4. The CC number is captured and bound to that parameter\n5. The mapping is saved and persists across sessions\n\nCustom mappings are managed by the `CCMapManager` and stored alongside the project. You can view, edit, and delete all custom mappings from the MIDI settings panel (Ctrl+4 in the FT2 scheme).\n\nMultiple parameters can share the same CC number (useful for linked controls), and a single knob can be remapped at any time by repeating the learn process.\n\n## Context Routing\n\nThe `MIDIContextRouter` determines where incoming MIDI messages are sent based on the current UI context:\n\n- **Tracker view**: Note messages enter the pattern editor at the cursor position. CC messages route to the active knob bank.\n- **DJ mode**: CC messages route to deck controls (crossfader, EQ, volume). Note messages can trigger cue points.\n- **Instrument editor**: CC messages control the focused instrument's parameters via the knob bank.\n- **Mixer view**: CC messages map to channel volumes and pans via the Mixer knob bank.\n\nThe router ensures that MIDI input always reaches the most relevant destination without conflicts. When multiple views are visible (split mode), the focused panel receives priority.\n\n## Controller Profiles\n\nDEViLBOX includes built-in profiles for common controllers in `src/midi/controllerProfiles.ts`. Profiles configure:\n\n- Default knob bank assignments matching the controller's physical layout\n- Button mappings for transport controls (play, stop, record)\n- Pad mappings for drum pad controllers\n- Display configuration for controllers with LCD screens (e.g., MPK Mini MkIII)\n\nThe `DJControllerMapper` provides specialized profiles for DJ controllers with jog wheels, crossfaders, and deck selectors.\n",
+    "images": []
+  },
+  {
+    "id": "62-hardware-ui-modules",
+    "number": 69,
+    "title": "Hardware UI Modules",
+    "part": "Advanced",
+    "partNumber": 9,
+    "content": '# Hardware UI Modules\n\nDEViLBOX includes WASM-compiled reference UI editors that faithfully reproduce the original interfaces of classic music software. These modules compile the actual C source code of the reference applications to WebAssembly via Emscripten, then blit the resulting framebuffer to a React canvas each frame.\n\n## Architecture\n\nThe pipeline for all hardware UI modules follows the same pattern:\n\n```\nReference C source code\n    |\n    v\nWASM bridge (C wrapper exposing init/tick/mouse/key functions)\n    |\n    v\nEmscripten MODULARIZE build (cmake + emmake)\n    |\n    v\nFactory function createXXX({}) injected via <script> tag\n    |\n    v\nReact component with requestAnimationFrame loop:\n  1. Call _tick() to process C-side updates\n  2. Read framebuffer from WASM heap\n  3. BGRA-to-RGBA byte swap\n  4. Blit to canvas via putImageData\n```\n\n### Framebuffer Byte Swap\n\nWASM stores pixels in little-endian ARGB format (`0xAARRGGBB`), which means the byte order in memory is `[BB, GG, RR, AA]`. HTML Canvas `ImageData` expects `[RR, GG, BB, AA]`. The blit loop swaps bytes:\n\n```typescript\ndst[off]     = src[off + 2]; // R <- offset+2\ndst[off + 1] = src[off + 1]; // G <- offset+1\ndst[off + 2] = src[off];     // B <- offset+0\ndst[off + 3] = 255;          // A <- fully opaque\n```\n\n### Event Forwarding\n\nMouse events from the React canvas are translated to C-side coordinates and forwarded to the WASM module. `mousedown` events fire on the canvas element, but `mouseup` and `mousemove` are registered on `document` to handle drag-outside-canvas scenarios (where the user drags a knob and releases the mouse outside the canvas bounds).\n\nKeyboard events are forwarded when the canvas has focus, allowing the reference UI\'s own keyboard shortcuts to work within the embedded editor.\n\n## PT2 Sampler Editor\n\nThe ProTracker 2 sampler editor is extracted from the pt2-clone source code (`third-party/pt2-clone-master/`).\n\n| Property | Value |\n|----------|-------|\n| Framebuffer size | 320 x 255 pixels |\n| Sampler region | Rows 121-254 (SAMPLER_Y=121, SAMPLER_H=134) |\n| Output files | `public/pt2/PT2SampEd.js` + `PT2SampEd.wasm` |\n| Source directory | `pt2-sampled-wasm/src/` |\n\n### Config Buffer\n\nThe PT2 module communicates sample parameters via an 11-byte config buffer:\n\n| Offset | Size | Field |\n|--------|------|-------|\n| 0 | 1 byte | Volume (0-64) |\n| 1 | 1 byte | Finetune (-8 to +7) |\n| 2 | 4 bytes | Loop start (little-endian uint32) |\n| 6 | 4 bytes | Loop length (little-endian uint32) |\n| 10 | 1 byte | Loop type (0=off, 1=forward) |\n\n### Build\n\n```bash\ncd pt2-sampled-wasm/build\nemcmake cmake ..\nemmake make\n```\n\n## FT2 Sample Editor\n\nThe FastTracker 2 sample editor is extracted from the ft2-clone source code.\n\n| Property | Value |\n|----------|-------|\n| Framebuffer size | 632 x 400 pixels |\n| Output files | `public/ft2/FT2SampEd.js` + `FT2SampEd.wasm` |\n| Source directory | `ft2-sampled-wasm/src/` |\n\nThe FT2 editor provides a full sample editing environment including waveform display, loop point editing, and the FT2-native sample manipulation tools (cut, copy, paste, mix, volume adjust).\n\n### Build\n\n```bash\ncd ft2-sampled-wasm/build\nemcmake cmake ..\nemmake make\n```\n\n## Helm Hardware UI\n\nThe Helm synthesizer hardware UI compiles the JUCE-based Helm editor to WASM using the JUCE-to-WASM bridge.\n\n| Property | Value |\n|----------|-------|\n| Source | `third-party/helm-master/` |\n| Output | `public/helm/` |\n| Type | JUCE editor compiled to WASM |\n\nThe Helm UI provides the full synthesizer interface with oscillators, filters, envelopes, LFOs, and modulation matrix, all rendered through the compiled JUCE framework.\n\n## Surge XT Hardware UI\n\nSurge XT provides a full-featured hardware UI compiled from its JUCE editor.\n\n| Property | Value |\n|----------|-------|\n| Source | `third-party/surge-xt/` |\n| Output | `public/surge/` |\n| Type | JUCE editor compiled to WASM |\n\nThe Surge XT interface exposes its complete synthesis architecture including multiple oscillator types (Classic, Modern, Wavetable, Window, Sine, FM2, FM3, String, Twist, Alias), dual filters, three LFOs per voice, and the full effects rack.\n\n## OBXf Hardware UI\n\nThe Oberheim OB-X emulation uses a dedicated hardware UI component (`OBXfHardwareUI`) that renders the classic Oberheim panel layout with its characteristic knob and switch arrangement.\n\n## Critical Rules for Hardware UI Development\n\n1. **Never generate binary data arrays** (font bitmaps, sprite data) via code generation. Always copy from the reference source:\n   ```bash\n   cp "third-party/pt2-clone-master/src/gfx/pt2_gfx_font.c" pt2-sampled-wasm/src/\n   ```\n   Agent-generated binary data renders garbled text (e.g., "FWk RACHT" instead of "ALL RIGHT").\n\n2. **`EM_JS` and `EMSCRIPTEN_KEEPALIVE` macros** produce false IDE errors. These are Emscripten-specific macros that the C compiler handles correctly during the WASM build.\n\n3. **Call `_tick()` before blit** each frame so C-side update flags are processed before rendering.\n\n4. **Null guard the module tick function**: `if (m._module_tick)` to handle browser cache serving an old WASM binary that lacks the export.\n\n5. **Timing matters**: always start the rAF loop only after the WASM module has fully initialized and the canvas element is mounted in the DOM.\n',
+    "images": []
+  },
+  {
+    "id": "63-furnace-deep-dive",
+    "number": 70,
+    "title": "Furnace Format Deep Dive",
+    "part": "Advanced",
+    "partNumber": 9,
+    "content": '# Furnace Format Deep Dive\n\nFurnace is an open-source chiptune tracker that emulates dozens of sound chips from classic consoles, computers, and arcade hardware. DEViLBOX includes a complete WASM-compiled Furnace engine that achieves 100% command-level accuracy on 15 out of 19 chip categories tested.\n\n## .fur File Structure\n\nA `.fur` file is a binary container with the following high-level structure:\n\n1. **Header** -- magic bytes, format version, system definitions, song metadata (title, author, BPM, speeds, timeBase)\n2. **Chip definitions** -- which sound chips are present (a song can use multiple chips simultaneously, forming compound systems)\n3. **Instruments** -- FM operator configurations, wavetable data, macro definitions, sample references\n4. **Wavetables** -- raw waveform data for wavetable-capable chips\n5. **Samples** -- PCM sample data in various formats (8-bit, 16-bit, BRR, ADPCM-A/B, etc.)\n6. **Patterns** -- per-channel note/effect data organized by pattern index\n7. **Order list** -- sequence of pattern indices defining the song arrangement\n\nThe parser (`FurnaceSongParser.ts`) handles both modern and legacy format versions, including differences in how speeds, system volumes, and effect masks are encoded.\n\n### Key Parsing Details\n\n- **systemVol**: Parsed as float32 values (not skipped bytes). Older code incorrectly skipped 12 bytes instead of reading the volume values.\n- **Speed patterns**: Use `set_speed_pattern([speed], len)` rather than `set_speed(s1, s2)`, because the latter incorrectly sets `speeds.len=2`.\n- **timeBase**: In old format files, speeds are multiplied by `(timeBase + 1)`. Missing this multiplier causes songs to play 2x-16x too fast.\n- **PATN effect mask**: Unified parsing matching reference behavior, reading bits 0-1 from both the command byte and the mask byte.\n\n## Chip Dispatch System\n\nEach sound chip is implemented as a "dispatch" -- a C++ class that receives commands (note on, note off, set frequency, set volume, set register, etc.) and drives the chip emulator accordingly. The WASM wrapper (`FurnaceDispatchWrapper.cpp`) exposes these dispatches to JavaScript.\n\n### Supported Chip Families\n\n**FM Synthesis**: YM2612 (Genesis/Mega Drive), OPM (X68000/arcade), OPL3 (AdLib/Sound Blaster), OPLL (MSX/SMS FM), ESFM, OPZ (TX81Z), OPNA (PC-98), OPNB (Neo Geo), OPL4, Y8950 (MSX-Audio), YM2203 (PC-88/98), YM2610B\n\n**Console PSG**: NES 2A03, Game Boy, SN76489 (Master System), PC Engine, SNES SPC700, Virtual Boy, Atari Lynx, WonderSwan\n\n**NES Expansion**: VRC6, VRC7, Namco 163, FDS, MMC5\n\n**Computer Chips**: SID 6581/8580 (C64), AY-3-8910 (ZX Spectrum/MSX), VIC-20, SAA1099, TED (Plus/4), VERA (X16), POKEY (Atari 800), PET\n\n**Arcade PCM**: Sega PCM, QSound (CPS1/CPS2), ES5506, RF5C68 (Sega CD), C140 (Namco System 2), K007232, K053260, GA20 (Irem), OKI MSM6295, YMZ280B\n\n**Wavetable**: SCC (Konami MSX), X1-010 (Seta), Bubble System\n\n**Other**: TIA (Atari 2600), SM8521, T6W28, Supervision, uPD1771, Namco WSG, PC Speaker, Pong, and more\n\n## Instrument Types\n\nFurnace instruments vary by chip family:\n\n### FM Instruments\nDefine per-operator parameters: TL (total level), AR (attack rate), DR (decay rate), SR (sustain rate), RR (release rate), MUL (frequency multiplier), DT (detune), plus algorithm and feedback. The number of operators depends on the chip (2-op for OPLL, 4-op for OPN/OPM/OPL3).\n\n### Wavetable Instruments\nContain raw waveform data (typically 32 or 64 samples) that the chip reads cyclically. Used by Game Boy, PC Engine, SCC, Namco WSG, and similar chips.\n\n### Macro Instruments\nSequence-based parameter automation. Each macro is a list of values that advance per tick, controlling volume, arpeggio, duty cycle, waveform index, pitch, and chip-specific registers. Macros can loop, have release points, and use various interpolation modes.\n\n### Sample Instruments\nReference PCM sample data. The sample format varies by chip -- 8-bit signed for NES DPCM, BRR for SNES, ADPCM-A/B for Neo Geo and PC-98, QSound compressed for CPS2, and so on. Inline format converters in the WASM wrapper handle 8/12-bit to 16-bit, 16-bit to BRR/ADPCM/MuLaw/C219 conversions.\n\n## The WASM Sequencer\n\nThe heart of .fur playback is the WASM sequencer (`FurnaceSequencer.cpp`, 3000+ lines). This handles ALL effect processing for .fur file playback, including:\n\n- Tick-based timing with configurable speeds and timeBase\n- All standard tracker effects (portamento, vibrato, arpeggio, volume slides, etc.)\n- Chip-specific effects (FM operator control, wavetable changes, duty cycle)\n- Macro processing with the upstream 16-bit fractional ADSR and direction-tracking LFO\n- Pattern flow control (jumps, breaks, loops)\n- Per-platform post-amplification (NES=2x, Genesis=2x, SMS=1.5x, OPLL=1.5x, etc.)\n- DC high-pass filtering via `blip_set_dc(bb, 1)`\n\nThe TypeScript `FurnaceEffectRouter` exists for live/real-time effects only and is NOT part of the primary .fur playback path.\n\n### Tick-Render Interleaving\n\nThe renderer achieves sample-accurate output by interleaving tick processing with audio rendering at tick boundaries. This matches the upstream Furnace `nextBuf` behavior, ensuring that register changes take effect at the exact sample position within the audio buffer.\n\n## Lock-Step Command Debugging\n\nDEViLBOX verifies playback accuracy using lock-step command comparison, NOT WAV file comparison. WAV comparison is unreliable because blip_buf resampling phase artifacts (a 1-sample offset can produce 0.89 envelope correlation at 10ms windows).\n\n### The Process\n\n**Step 1 -- Generate reference command log** using the upstream Furnace CLI:\n```bash\n"/path/to/furnace" -output /dev/null -loops 0 -view commands "song.fur" \\\n  2>/dev/null | grep "^[[:space:]]*[0-9]" > /tmp/ref-cmds.txt\n```\n\n**Step 2 -- Generate DEViLBOX command log** using the headless WASM renderer:\n```bash\nnpx tsx tools/furnace-audit/render-devilbox.ts "song.fur" /dev/null --cmdlog\n```\n\n**Step 3 -- Compare tick-by-tick** to find the first divergence:\n```bash\nnpx tsx tools/furnace-audit/compare-cmds.ts --song "song.fur"\n```\n\nAny command mismatch is a real bug in the sequencer or instrument loading. This method is deterministic and finds issues that would take hours to locate via audio comparison.\n\n## Accuracy Results\n\nLock-step testing across 19 chip categories (as of the last audit):\n\n| Result | Chip Categories |\n|--------|----------------|\n| 100% match | A2600, Amiga, Arcade, AY, C64, GB, Lynx, NES, OPL, OPM, OPZ, PCE, SN76489, VIC-20, VBoy |\n| 99.7-99.9% | X68K, ESFM, SM8521 (loop boundary +/-1 tick only) |\n| 93.9% | Genesis ExtCH (operator macros not in sequencer volume path) |\n\n### Key Fixes That Achieved This Accuracy\n\n- Synced all 14 differing platform files with upstream reference\n- Restored upstream 16-bit fractional ADSR and direction-tracking LFO in macro processing\n- Fixed panning effect 0x08 to correctly split nibbles\n- Fixed duplicate chip dedup (was using Map keyed by chipId, now uses array)\n- Fixed negative note clamping (was clamping to 0, causing wrong OPL pitches)\n- Fixed compound system CHIP_CHANNELS for 8 additional system IDs\n- Added uninitialized bool fixes for NES, Arcade, FDS, Genesis, POKEY, and C140\n',
+    "images": []
+  },
+  {
+    "id": "64-uade-hybrid-editing",
+    "number": 71,
+    "title": "UADE Hybrid Editing",
+    "part": "Advanced",
+    "partNumber": 9,
+    "content": "# UADE Hybrid Editing\n\nDEViLBOX supports live pattern editing for all UADE-hosted Amiga module formats through a chip RAM patching architecture. Edits are written directly to the emulated Amiga chip RAM and take effect on the next DMA tick, giving you real-time feedback as you modify patterns in formats that were never designed for interactive editing.\n\n## Architecture\n\nThe editing pipeline works as follows:\n\n```\nUser edits a cell in the tracker UI\n    |\n    v\nencodeCell(cell) converts the tracker cell to binary bytes\n    |\n    v\nCompute chip RAM address:\n  moduleBase + patternDataFileOffset + cellOffset\n    |\n    v\nUADEChipEditor.writeBytes(addr, bytes)\n    |\n    v\n68k replayer reads modified data from chip RAM on next DMA tick\n    |\n    v\nexportModule() captures all edits automatically\n  (reads the full module back from chip RAM)\n```\n\nThis approach works because UADE emulates a real Amiga, including its chip RAM. The 68k replayer code running inside the emulator reads pattern data from memory addresses, so writing new values to those addresses changes what the replayer plays.\n\n## Key Components\n\n### UADEPatternEncoder\n\nDefined in `src/engine/uade/UADEPatternEncoder.ts`, this module provides the `UADEPatternLayout` interface that describes how a particular format stores its pattern data in memory:\n\n- **cellSize**: Number of bytes per cell (typically 3-5 bytes)\n- **rowsPerPattern**: Number of rows in each pattern\n- **channelsPerPattern**: Number of channels\n- **patternDataOffset**: Byte offset from the module base address to the start of pattern data\n- **layout**: Whether cells are stored contiguously (channel-major or row-major) or in a non-contiguous arrangement\n\nThe encoder registry maps format names to their layout definitions, and the offset calculator computes the exact chip RAM address for any given pattern, row, and channel.\n\n### UADEChipEditor\n\nThe `UADEChipEditor` in `src/engine/uade/UADEChipEditor.ts` provides low-level chip RAM read/write access:\n\n- **`writeBytes(addr, bytes)`**: Write arbitrary bytes to chip RAM at the given address\n- **`patchPatternCell(pattern, row, channel, cellBytes)`**: High-level function that computes the address from the pattern layout and writes the cell data\n- **`exportEditedModule()`**: Reads the entire module from chip RAM, capturing all edits made during the session. This produces a native-format binary that can be saved to disk.\n\n### Store Integration\n\nThe tracker store (`useTrackerStore.ts`) hooks into the chip editor when `setCell` or `clearCell` is called on a UADE-hosted format. If the loaded `TrackerSong` has a `uadePatternLayout` field, the store calls `patchPatternCell()` after updating the in-memory pattern data, keeping the chip RAM in sync with the UI.\n\n## Per-Format Cell Encoders\n\nEach Amiga format encodes cells differently. DEViLBOX has 32 encoder files covering 39 formats, each implementing the reverse of the parser's decode logic. Encoders live in `src/engine/uade/encoders/`.\n\n### Contiguous Layout Formats\n\nThese formats store pattern data in a single contiguous block where cells can be addressed by simple arithmetic:\n\n| Format | Cell Size | Encoder | Notes |\n|--------|-----------|---------|-------|\n| ChuckBiscuits | 5 bytes | ChuckBiscuitsEncoder | |\n| IMS | 3 bytes | IMSEncoder | |\n| DSS | 4 bytes | DSMDynEncoder | Digital Sound Studio |\n| AMF | 4 bytes | AMFEncoder | |\n| Composer 669 | 3 bytes | Format669Encoder | |\n| Art of Noise | 4 bytes | ArtOfNoiseEncoder | AON4/AON8 |\n| STM | 4 bytes | STMEncoder | Scream Tracker Module |\n| STK | 4 bytes | (MOD encoder) | Soundtracker |\n| GMC | 4 bytes | GameMusicCreatorEncoder | MOD + 4B native |\n| SoundFX | 4 bytes | SoundFXEncoder | |\n| PT36 | 4 bytes | (MOD encoder) | ProTracker 3.6 |\n| QuadraComposer | 4 bytes | QuadraComposerEncoder | |\n| STP | 4 bytes | STPEncoder | Soundtracker Pro |\n| NRU | 4 bytes | NRUEncoder | |\n\n### Non-Contiguous Layout Formats\n\nSome formats scatter pattern data across non-contiguous memory regions, requiring more complex address calculations. Examples include formats that store each channel's data in separate blocks, or formats with variable-length pattern encodings.\n\n### PC Tracker Formats\n\nPC tracker formats (S3M, IT, XM, MOD) also have encoders for chip RAM editing when loaded through the UADE pathway:\n\n| Format | Encoder | Cell Size |\n|--------|---------|-----------|\n| MOD | (Standard 4-byte MOD) | 4 bytes |\n| S3M | S3MEncoder | Variable |\n| IT | ITEncoder | Variable |\n| XM | XMEncoder | Variable |\n\n## Native Format Export\n\nWhen you save a module that was edited via chip RAM patching, DEViLBOX reads the entire module back from the emulated chip RAM using `exportEditedModule()`. This captures all your edits in the original native format binary, which can then be written to disk.\n\nThe export happens in `src/engine/keyboard/commands/file.ts` via the `saveModule()` function. The resulting file is byte-compatible with the original format and can be loaded in the original tracker software or any other player that supports the format.\n\n## Limitations\n\n- Structural changes (adding patterns, changing song length, adding instruments) are not supported through chip RAM patching. Only cell-level edits within existing patterns work.\n- Some formats have compressed or tokenized pattern storage that cannot be patched in place. These formats fall back to read-only mode.\n- The edit takes effect on the next DMA tick, which means there can be a very brief delay (typically less than 1 tick) before you hear the change during playback.\n",
+    "images": []
+  },
+  {
+    "id": "65-format-import-export",
+    "number": 72,
+    "title": "Format Import/Export",
+    "part": "Advanced",
+    "partNumber": 9,
+    "content": "# Format Import/Export\n\nDEViLBOX supports importing 188+ music file formats and exporting to MOD, XM, IT, WAV, and MIDI. All format handling is centralized in a single registry that drives detection, parsing, routing, and UI display.\n\n## The Format Registry\n\nThe `FormatRegistry` (`src/lib/import/FormatRegistry.ts`) is the single source of truth for all supported formats. Every format DEViLBOX can load is defined here once. Adding a new format means adding one entry to this registry -- no other file needs format lists.\n\nEach format definition includes:\n\n| Field | Purpose |\n|-------|---------|\n| `key` | Unique identifier (e.g., `'fur'`, `'mod'`, `'hvl'`) |\n| `label` | Human-readable name |\n| `description` | Short description for the import dialog |\n| `family` | Routing family: midi, furnace, amiga-native, c64-chip, chip-dump, pc-tracker, libopenmpt, uade-only |\n| `matchMode` | How filenames are matched: extension, prefix, or both |\n| `extRegex` | Regular expression for extension matching |\n| `prefixes` | Amiga-style prefix strings (e.g., `['rh.', 'rhp.']`) |\n| `nativeParser` | Reference to the native TypeScript parser module |\n| `uadeFallback` | Whether UADE can handle this format as a fallback |\n| `libopenmptFallback` | Whether libopenmpt can handle this format |\n\n### Format Families\n\n| Family | Description | Examples |\n|--------|-------------|----------|\n| `midi` | Standard MIDI files | .mid, .midi |\n| `furnace` | Furnace tracker modules | .fur, .dmf |\n| `amiga-native` | Amiga formats with native parser + UADE fallback | .hvl, .ahx, .fc, .med |\n| `c64-chip` | Commodore 64 SID tunes | .sid (PSID/RSID) |\n| `chip-dump` | Chip register dumps | .vgm, .ym, .nsf, .sap, .ay |\n| `pc-tracker` | PC tracker formats with native parser + libopenmpt fallback | .669, .far, .mtm, .ult |\n| `libopenmpt` | Standard tracker formats -- native first, then libopenmpt | .mod, .xm, .it, .s3m |\n| `uade-only` | UADE prefix-based formats with no native parser | Various Amiga replayer formats |\n\n## The TrackerSong Data Model\n\nAll imported formats are converted to a `TrackerSong` -- the universal internal representation. This model captures:\n\n- **Metadata**: title, author, BPM, speed, number of channels\n- **Patterns**: arrays of rows, each containing note, instrument, volume, and effect columns\n- **Instruments**: synth configurations mapped to instrument indices\n- **Samples**: audio data with loop points, finetune, and volume\n- **Order list**: sequence of pattern indices defining song arrangement\n- **Format-specific data**: optional fields for format-specific playback (e.g., `furFileData`, `uadeFileData`, `v2mFileData` for WASM engine passthrough)\n\n## Import Pipeline\n\n### 1. Format Detection\n\nWhen a file is loaded, the format registry is queried in order:\n\n1. **Extension match**: The filename is tested against each format's `extRegex`\n2. **Prefix match**: For Amiga formats, the basename is tested against `prefixes` (e.g., `rh.song` matches the Rob Hubbard format)\n3. **Magic byte detection**: Some formats use a `detectFn` that examines the file header bytes (e.g., IXS checks for the `IXS!` magic, PSY checks for `PSY3SONG`)\n\n### 2. Parser Routing\n\nBased on the matched format's family, the file is routed to the appropriate parser:\n\n- **Native parser**: TypeScript parsers in `src/lib/import/formats/` that decode the binary format and produce a `TrackerSong`. There are 180+ parser files totaling ~94,000 lines of code.\n- **UADE fallback**: For Amiga formats where the native parser fails or is incomplete, the file is passed to the UADE engine which loads and plays it via 68k emulation.\n- **libopenmpt fallback**: For PC tracker formats, libopenmpt (compiled to WASM) provides a reference-quality fallback.\n- **WASM engine passthrough**: Some formats (Furnace, V2M, PxTone, Organya, etc.) pass the raw file data to a dedicated WASM engine that handles playback natively.\n\n### 3. User Preferences\n\nFor formats with multiple engine options, users can choose their preferred engine in Settings. The `FormatEnginePreferences` store tracks these per-format choices.\n\n## Native Parsers\n\nEach native parser is a standalone TypeScript module that exports:\n\n- **`is<Format>Format(data: ArrayBuffer): boolean`** -- Detect whether a file is this format (optional)\n- **`parse<Format>File(data: ArrayBuffer, filename?: string): TrackerSong`** -- Parse the file and return a TrackerSong\n\nParsers handle binary decoding, including:\n- Reading headers and chunk structures\n- Decoding instrument definitions (FM operators, sample parameters, macros)\n- Unpacking pattern data (which may be compressed or use variable-length encoding)\n- Converting format-specific note representations to standard note names\n- Mapping format-specific effects to the universal effect command set\n\n## Export\n\n### MOD Export\n\nExports to the 4-channel ProTracker MOD format. Constraints: 31 instruments max, 4 channels, 64 rows per pattern, 128 positions max, Amiga period-based tuning.\n\n### XM Export\n\nExports to FastTracker 2 XM format. Supports up to 32 channels, 256 rows per pattern, instrument envelopes, and the full XM effect command set.\n\n### IT Export\n\nExports to Impulse Tracker IT format. Supports up to 64 channels, NNA (New Note Actions), instrument envelopes with loop points, and IT-specific effects including filter control (Zxx).\n\n### WAV Rendering\n\nServer-side WAV rendering is handled by the Express backend (`server/src/routes/render.ts`). The render endpoint accepts a song configuration and produces a WAV file by running the audio engine headlessly. This allows offline rendering at any sample rate without real-time constraints.\n\n### MIDI Export\n\nConverts the tracker pattern data to Standard MIDI File format. Each channel maps to a MIDI track, notes are converted to MIDI note numbers, volume column values map to velocity, and tempo changes are encoded as MIDI tempo events.\n\n## Format-Specific Playback Data\n\nSome formats cannot be fully decoded into the universal TrackerSong representation because their playback depends on format-specific engine behavior. For these, the raw file data is stored alongside the parsed pattern data:\n\n| Field | Format | Engine |\n|-------|--------|--------|\n| `furFileData` | Furnace .fur | FurnaceDispatchEngine (WASM) |\n| `uadeFileData` | UADE Amiga formats | UADEEngine (68k emulation) |\n| `v2mFileData` | Farbrausch V2M | V2Engine (WASM) |\n| `pxtoneFileData` | PxTone .ptcop/.pttune | PxtoneEngine (WASM) |\n| `organyaFileData` | Organya .org | OrganyaEngine (WASM) |\n| `sc68FileData` | SC68/SNDH .sc68/.sndh | Sc68Engine (WASM) |\n\nWhen these fields are present, the corresponding WASM engine is used for playback instead of the generic Tone.js tracker replayer.\n",
+    "images": []
+  },
+  {
+    "id": "66-pixigl-renderer",
+    "number": 73,
+    "title": "Pixi/GL Renderer",
+    "part": "Advanced",
+    "partNumber": 9,
+    "content": '# Pixi/GL Renderer\n\nDEViLBOX has a full WebGL rendering mode built on PixiJS v8. The GL view provides the same functionality as the DOM (React HTML) view but renders entirely through the GPU, enabling CRT post-processing shaders and a retro aesthetic that cannot be achieved with HTML/CSS.\n\n## Architecture\n\nThe rendering system follows a strict separation of concerns:\n\n```\nStores + Hooks (shared data layer)\n    |\n    +--> DOM Components (React HTML/canvas)\n    |\n    +--> Pixi Components (WebGL scene graph)\n```\n\nBoth renderers consume the same Zustand stores and shared hooks. Neither renderer contains business logic -- they are pure presentation layers. This "shared data, separate renderers" pattern ensures that every feature works identically in both modes.\n\n### Key Rules\n\n1. **Share stores and hooks**: `useTrackerStore`, `useInstrumentStore`, `useTransportStore`, etc. are the single source of truth. Both DOM and Pixi views consume them.\n2. **Never duplicate logic**: Data transforms, cell change handlers, and adapter functions live in shared hooks/utils. Renderers only handle presentation.\n3. **Never use DOM overlays in the Pixi/GL UI**: `PixiDOMOverlay` breaks CRT shaders and post-processing effects. All Pixi views must render natively using Pixi components.\n4. **DOM/GL visual parity**: Every UI feature must exist in both DOM and Pixi/GL views, visually 1:1, with a single source of truth via stores.\n\n## The Pixi Root\n\n`PixiRoot` (`src/pixi/PixiRoot.tsx`) initializes the PixiJS v8 application, sets up the stage, and manages the view routing. It creates the `Application` instance, attaches it to the DOM, and handles resize events to keep the canvas matched to the viewport.\n\nThe stage has `sortableChildren = true` (PixiJS v8 default), allowing z-index based layering of views, overlays, and post-processing effects.\n\n## CRT Post-Processing\n\nThe CRT renderer (`src/pixi/CRTRenderer.ts`) applies a full-screen post-processing shader that simulates a cathode ray tube display. It is implemented as a PixiJS v8 `Filter`, so the framework handles RenderTexture management internally.\n\n### Pipeline\n\n1. PixiJS renders the target container to a temporary RenderTexture\n2. The CRT fragment shader samples that texture and applies effects\n3. PixiJS composites the result to screen\n\n### Shader Effects\n\nThe CRT shader applies these effects (all configurable via `CRTParams` in settings):\n\n| Effect | Uniform | Description |\n|--------|---------|-------------|\n| Scanlines | `uScanlineIntensity`, `uScanlineCount` | Horizontal darkening lines simulating CRT phosphor rows |\n| RGB shift | `uRgbShift` | Chromatic aberration separating R/G/B channels |\n| Bloom | `uBloomIntensity`, `uBloomThreshold` | Bright areas bleed light into surrounding pixels |\n| Curvature | `uCurvature` | Barrel distortion simulating curved CRT glass |\n| Vignette | `uVignetteStrength` | Darkened corners mimicking CRT edge falloff |\n| Flicker | `uFlickerStrength` | Subtle brightness variation over time |\n| Brightness/Contrast | `uBrightness`, `uContrast` | Overall image adjustment |\n| Saturation | `uSaturation` | Color intensity control |\n\n### Usage\n\n```typescript\nconst crt = new CRTRenderer();\ncontainer.filters = [crt];          // enable\ncrt.updateParams(time, crtParams);  // call each tick\ncontainer.filters = [];             // disable\n```\n\n## Pointer Events\n\nPixiJS v8\'s hit testing checks BOTH `visible` AND `renderable` flags. This creates a subtlety when rendering to RenderTextures:\n\n- **`renderable = false`** kills pointer events entirely. The container becomes invisible to hit testing.\n- **`alpha = 0`** makes the container invisible on screen but still hit-testable. This is the correct approach when you need a container to be interactable but not directly visible (because it is rendered via a post-processing filter).\n\nThe CRT pipeline uses this pattern: set `alpha = 0` for the scene container (invisible in normal render), restore `alpha = 1` before capturing to the RenderTexture, then render the CRT mesh on top with `zIndex = 10000`.\n\nThe CRT mesh itself has `eventMode = \'none\'` so it is transparent to pointer events, allowing clicks to reach the scene behind it.\n\n## Icon System\n\nThe GL view uses FontAudio flat icons exclusively -- never emoji characters. The `PixiIcon` component renders from the FontAudio icon map (`src/pixi/fontaudioIcons.ts`, 155 icons).\n\n```typescript\n<PixiIcon name="close" size={14} color={0xffffff} layout={{}} />\n<PixiButton icon="play" label="Play" variant="ghost" />\n```\n\nCommon mappings: `close` for dismiss, `prev`/`next` for arrows, `play`/`stop` for transport, `save`/`open` for files, `lock`/`unlock` for state, `thunderbolt` for tips, `undo`/`redo` for history.\n\n## Performance Optimization\n\n### Batching\n\nPixiJS v8 batches draw calls for sprites and text that share the same texture atlas. To maximize batching:\n\n- Use bitmap fonts (loaded once, rendered as sprite quads)\n- Avoid mixing different blend modes within the same container\n- Keep the texture atlas count low\n\n### Culling\n\nOff-screen elements should not be added to the display list. The pattern editor, for example, only creates Pixi objects for visible rows and channels, recycling them as the view scrolls.\n\n### RenderTexture Reuse\n\nAvoid creating new RenderTextures per frame. The CRT renderer reuses its textures across frames, only recreating them on resize.\n\n## View Components\n\nThe Pixi view system mirrors the DOM view structure:\n\n| Pixi Component | DOM Equivalent | Purpose |\n|----------------|---------------|---------|\n| `PixiPatternEditor` | `PatternEditorCanvas` | Pattern grid display and editing |\n| `PixiDJMixer` | `DJMixer` | DJ deck layout with waveforms |\n| `PixiDrumPadManager` | `DrumPad` | Drum pad grid |\n| `PixiChannelHeaders` | `ChannelHeaders` | Channel mute/solo/name display |\n| `PixiSettingsModal` | `SettingsModal` | Settings dialog |\n\nEach Pixi component reads from the same store as its DOM counterpart and dispatches the same actions, ensuring behavioral parity.\n',
+    "images": []
+  }
+];
+const MANUAL_PARTS = [
+  { number: 1, name: "Getting Started", chapters: [1, 2, 3, 4] },
+  { number: 2, name: "The Tracker", chapters: [12, 13, 14, 15] },
+  { number: 3, name: "Instruments", chapters: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] },
+  { number: 4, name: "Effects", chapters: [32, 33, 34, 35, 36, 37, 38, 39, 40, 41] },
+  { number: 5, name: "Mixer & Routing", chapters: [42, 43, 44, 45, 46, 47] },
+  { number: 6, name: "Production Recipes", chapters: [48, 49, 50, 51, 52, 53, 54, 55, 56, 57] },
+  { number: 7, name: "DJ Mode", chapters: [58, 59, 60, 61, 62] },
+  { number: 8, name: "VJ Mode", chapters: [63, 64, 65, 66, 67] },
+  { number: 9, name: "Advanced", chapters: [68, 69, 70, 71, 72, 73] },
+  { number: 10, name: "Reference", chapters: [5, 6, 7, 8, 9, 10, 11] }
+];
+const SYNTH_TYPE_MAP = {
+  "FurnaceNES": FurnaceChipType.NES,
+  "FurnaceGB": FurnaceChipType.GB,
+  "FurnaceC64": FurnaceChipType.SID,
+  "FurnaceSID6581": FurnaceChipType.SID_6581,
+  "FurnaceSID8580": FurnaceChipType.SID_8580,
+  "FurnaceOPL": FurnaceChipType.OPL3,
+  "FurnaceOPL3": FurnaceChipType.OPL3,
+  "FurnaceOPLL": FurnaceChipType.OPLL,
+  "FurnaceOPN": FurnaceChipType.OPN,
+  "FurnaceOPN2": FurnaceChipType.OPN2,
+  "FurnaceOPM": FurnaceChipType.OPM,
+  "FurnacePCE": FurnaceChipType.PCE,
+  "FurnaceAY": FurnaceChipType.AY,
+  "FurnaceSNES": FurnaceChipType.SNES,
+  "FurnaceAmiga": FurnaceChipType.AMIGA
+};
+function useHelpDialog({ isOpen, initialTab = "shortcuts" }) {
+  const [activeTab, setActiveTab] = reactExports.useState(initialTab);
+  const [tutorialStep, setTutorialStep] = reactExports.useState(0);
+  const [manualChapterIndex, setManualChapterIndex] = reactExports.useState(0);
+  const [manualSearchQuery, setManualSearchQuery] = reactExports.useState("");
+  reactExports.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
+  const cursor = useCursorStore((s) => s.cursor);
+  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { instruments } = useInstrumentStore();
+  const currentChip = reactExports.useMemo(() => {
+    var _a, _b;
+    const pattern = patterns[currentPatternIndex];
+    if (!pattern) return null;
+    const cell = (_a = pattern.channels[cursor.channelIndex]) == null ? void 0 : _a.rows[cursor.rowIndex];
+    if (!(cell == null ? void 0 : cell.instrument)) return null;
+    const inst = instruments.find((i) => i.id === cell.instrument);
+    if (!inst || !inst.synthType.startsWith("Furnace")) return null;
+    if (((_b = inst.furnace) == null ? void 0 : _b.chipType) !== void 0) {
+      return inst.furnace.chipType;
+    }
+    return SYNTH_TYPE_MAP[inst.synthType] ?? null;
+  }, [cursor, patterns, currentPatternIndex, instruments]);
+  const chipEffects = reactExports.useMemo(() => {
+    if (currentChip === null) return [];
+    return CHIP_EFFECT_REFERENCE[currentChip] || [];
+  }, [currentChip]);
+  const chipName = reactExports.useMemo(() => {
+    if (currentChip === null) return "Selected Chip";
+    const entry = Object.entries(FurnaceChipType).find(([, val]) => val === currentChip);
+    return entry ? entry[0] : "Selected Chip";
+  }, [currentChip]);
+  const filteredChapters = reactExports.useMemo(() => {
+    if (!manualSearchQuery.trim()) return MANUAL_CHAPTERS;
+    const q = manualSearchQuery.toLowerCase();
+    return MANUAL_CHAPTERS.filter(
+      (ch) => ch.title.toLowerCase().includes(q) || ch.content.toLowerCase().includes(q)
+    );
+  }, [manualSearchQuery]);
+  const prevTutorialStep = () => setTutorialStep((s) => Math.max(0, s - 1));
+  const nextTutorialStep = () => setTutorialStep((s) => Math.min(TUTORIAL_STEPS.length - 1, s + 1));
+  const tutorialProgress = Math.round(tutorialStep / (TUTORIAL_STEPS.length - 1) * 100);
+  return {
+    activeTab,
+    setActiveTab,
+    tutorialStep,
+    setTutorialStep,
+    prevTutorialStep,
+    nextTutorialStep,
+    tutorialProgress,
+    currentChip,
+    chipEffects,
+    chipName,
+    manualChapterIndex,
+    setManualChapterIndex,
+    manualSearchQuery,
+    setManualSearchQuery,
+    filteredChapters,
+    manualParts: MANUAL_PARTS
+  };
+}
+export {
+  EFFECT_COMMANDS as E,
+  HELP_TABS as H,
+  TUTORIAL_STEPS as T,
+  useHelpDialog as u
+};

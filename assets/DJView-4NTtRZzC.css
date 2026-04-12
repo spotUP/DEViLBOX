@@ -1,0 +1,310 @@
+/**
+ * CSS Turntable — Technics SL-1200 photorealistic turntable styles.
+ * Based on the CSS turntable by dmsr / Scott Schiller.
+ *
+ * All classes prefixed with `tt-` to avoid collisions.
+ * Image assets served from /turntable/ (public directory).
+ */
+
+/* Outer wrapper — fills the parent and acts as a size container so we can use
+   cqw / cqh units for true "object-fit: contain" behaviour on the turntable div.
+   Fallback for browsers without container queries (Chrome <105): use vw/vh. */
+.turntable-css-container {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+@supports (container-type: size) {
+  .turntable-css-container {
+    container-type: size;
+  }
+}
+
+/* The turntable itself: sized to the largest 1256×1010 rect that fits the
+   container, exactly like object-fit: contain for a replaced element. */
+.turntable-css {
+  /* Fallback for browsers without cqw/cqh: use percentage of parent */
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1256 / 1010;
+  max-width: 628px;
+  max-height: calc(628px * 1010 / 1256);
+}
+
+@supports (width: 1cqw) {
+  .turntable-css {
+    /* contain horizontally: full container width, derive height */
+    --w-from-cqw: 100cqw;
+    --h-from-cqw: calc(100cqw * 1010 / 1256);
+    /* contain vertically: full container height, derive width */
+    --w-from-cqh: calc(100cqh * 1256 / 1010);
+    --h-from-cqh: 100cqh;
+
+    width:  min(var(--w-from-cqw), var(--w-from-cqh));
+    height: min(var(--h-from-cqw), var(--h-from-cqh));
+    aspect-ratio: auto;
+  }
+}
+
+.turntable-css img {
+  width: 100%;
+  max-width: 628px;
+}
+
+.tt-table-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent url('/turntable/landscape/tt_table.png') no-repeat 0 0;
+  background-size: contain;
+}
+
+.tt-frame,
+.tt-bd {
+  position: absolute;
+  top: 9.7%;
+  left: 5.4936%;
+  height: 82.25%;
+  width: 88.15%;
+  padding: 0.054936% 0 0 0.099%;
+  border-radius: 5px;
+  background-clip: padding-box;
+  overflow: hidden;
+}
+
+.tt-frame {
+  background: #262626;
+  padding: 1px;
+  margin-left: -1px;
+}
+
+/* ── Platter ────────────────────────────────────────────────────────────── */
+
+.tt-platter {
+  position: absolute;
+  top: 1.85%;
+  left: 5.025%;
+  width: 72.75%;
+  height: 96.96%;
+  background: transparent url('/turntable/platter.png') no-repeat 50% 50%;
+  background-size: contain;
+  border-radius: 100%;
+  overflow: hidden;
+  will-change: transform;
+}
+
+/* ── Slipmat / Record shared positioning ────────────────────────────────── */
+
+.tt-slipmat,
+.tt-record,
+.tt-record-grooves {
+  position: absolute;
+  top: 6.19%;
+  left: 8.35%;
+  width: 66.2%;
+  height: 88.23%;
+  border-radius: 100%;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.tt-label {
+  position: absolute;
+  top: 37.17%;
+  left: 31.45%;
+  width: 20%;
+  height: 26.66%;
+  background: #fff;
+  border-radius: 100%;
+}
+
+.tt-slipmat {
+  background: transparent url('/turntable/slipmat.jpg') no-repeat 50% 50%;
+  background-size: contain;
+}
+
+/* ── Record / Slipmat holders ───────────────────────────────────────────── */
+
+.tt-record-holder,
+.tt-slipmat-holder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: all 0.35s;
+  transform: scale3d(1.15, 1.15, 1.15);
+  transform-origin: 42% 50%;
+}
+
+.tt-record-holder.tt-visible,
+.tt-slipmat-holder.tt-visible {
+  opacity: 1;
+  transform: scale3d(1, 1, 1);
+}
+
+.tt-record {
+  background-color: #000;
+  background-size: cover;
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+}
+
+.tt-record-grooves {
+  background: transparent url('/turntable/record-grooves-1440x1440-white.png') no-repeat 50% 50%;
+  background-size: contain;
+  opacity: 0.15;
+}
+
+/* ── Spindle ────────────────────────────────────────────────────────────── */
+
+.tt-spindle {
+  position: absolute;
+  left: 40.78%;
+  top: 49.45%;
+  width: 1.17%;
+  height: 1.56%;
+  background-color: rgba(0, 0, 0, 0.65);
+  border-radius: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background-image: radial-gradient(ellipse at center, rgba(255, 255, 255, 1) 0%, rgba(128, 128, 128, 0) 100%);
+  background-clip: padding-box;
+  will-change: transform;
+}
+
+/* ── Tonearm ────────────────────────────────────────────────────────────── */
+
+.tt-tonearm-holder,
+.tt-tonearm {
+  transform-origin: 54% 27%;
+}
+
+.tt-tonearm-holder {
+  position: absolute;
+  right: 0;
+  top: 0;
+  margin-top: -4%;
+  margin-right: 2.75%;
+  width: 28.55%;
+  height: 99.75%;
+}
+
+.tt-tonearm {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent url('/turntable/landscape/tt_arm.png') no-repeat 0 0;
+  background-size: contain;
+  will-change: transform;
+}
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.tt-start-stop {
+  position: absolute;
+  top: 85.85%;
+  left: 2%;
+  width: 10.58983%;
+  height: 10.65%;
+  background: transparent url('/turntable/landscape/tt_startstop.png') no-repeat 0 0;
+  background-size: contain;
+  margin: 0.175% 0 0 -0.175%;
+  border-radius: 5px;
+}
+
+.tt-power-light {
+  position: absolute;
+  bottom: 18.5%;
+  left: 5.75%;
+  width: 15.95%;
+  height: 17.9%;
+  background: transparent url('/turntable/landscape/power-light.png') no-repeat 0 0;
+  background-size: contain;
+  transform: rotate(12.5deg);
+  transform-origin: 50% 50%;
+  transition: opacity 0.25s;
+  opacity: 0;
+}
+
+.tt-power-light.tt-power-on {
+  opacity: 1;
+}
+
+.tt-power-dial {
+  position: absolute;
+  bottom: 17.5%;
+  left: 2.75%;
+  width: 5.95%;
+  height: 7.9%;
+  transform: rotate(0deg);
+  transform-origin: 50% 50%;
+  transition: transform 0.2s ease-out;
+  background: transparent url('/turntable/landscape/tt_powerdial.png') no-repeat 0 0;
+  background-size: contain;
+}
+
+.tt-power-dial.tt-power-on {
+  transform: rotate(22.5deg);
+}
+
+.tt-speed-33 {
+  position: absolute;
+  bottom: 4%;
+  left: 13.4%;
+  width: 5.12%;
+  height: 1.85%;
+  background: transparent url('/turntable/landscape/tt_33.png') no-repeat 0 0;
+  background-size: contain;
+}
+
+.tt-speed-33.tt-speed-on {
+  background-image: url('/turntable/landscape/tt_33_on.png');
+}
+
+.tt-speed-45 {
+  position: absolute;
+  bottom: 4%;
+  left: 19.05%;
+  width: 5.12%;
+  height: 1.85%;
+  background: transparent url('/turntable/landscape/tt_45.png') no-repeat 0 0;
+  background-size: contain;
+}
+
+.tt-speed-45.tt-speed-on {
+  background-image: url('/turntable/landscape/tt_45_on.png');
+}
+
+.tt-light {
+  position: absolute;
+  bottom: 2%;
+  left: 48.25%;
+  width: 21.7%;
+  height: 24.9%;
+  background: transparent url('/turntable/landscape/tt_lightoff.png') no-repeat 0 0;
+  background-size: contain;
+}
+
+.tt-light-on {
+  position: absolute;
+  bottom: 3.15%;
+  left: 52.25%;
+  width: 18.7%;
+  height: 19.9%;
+  background: transparent url('/turntable/landscape/tt_lighton.png') no-repeat 0 0;
+  background-size: contain;
+  transform: rotate(12deg);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.tt-light-on.tt-power-on {
+  opacity: 1;
+}

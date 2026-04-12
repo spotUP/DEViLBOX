@@ -23,6 +23,7 @@ class FredProcessor extends AudioWorkletProcessor {
     this._module   = null;
     this._players  = new Map();   // handle → { ctx: ptr, outPtrL, outPtrR }
     this._ready    = false;
+    this.muteMask  = 0xFFFFFFFF;
     this._initQueue = [];
 
     this.port.onmessage = (event) => this._onMessage(event.data);
@@ -59,6 +60,9 @@ class FredProcessor extends AudioWorkletProcessor {
         if (!this._ready) break;
         this._module._fred_set_param(data.handle, data.paramId, data.value);
         break;
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        break;
       case 'dispose':
         if (this._module) this._module._fred_dispose();
         break;
@@ -66,12 +70,13 @@ class FredProcessor extends AudioWorkletProcessor {
   }
 
   async _initWasm({ sampleRate, wasmBinary, jsCode }) {
-    const workerSelf = self;
-
-    // Polyfill browser globals expected by Emscripten
-    workerSelf.document    = workerSelf.document    || {};
-    workerSelf.performance = workerSelf.performance || { now: () => Date.now() };
-    workerSelf.location    = workerSelf.location    || { href: './' };
+    // Polyfill browser globals expected by Emscripten on globalThis
+    // AudioWorkletGlobalScope doesn't have 'self' or 'window' but has 'globalThis'
+    globalThis.document    = globalThis.document    || {};
+    globalThis.performance = globalThis.performance || { now: () => Date.now() };
+    globalThis.location    = globalThis.location    || { href: './' };
+    // Emscripten checks: if (!(globalThis.window || globalThis.WorkerGlobalScope))
+    globalThis.window      = globalThis.window      || {};
 
     // Execute the Emscripten factory via Function() to stay in AudioWorklet scope
     const factory = new Function(`${jsCode}; return createFred;`)();
@@ -146,6 +151,7 @@ class FredProcessor extends AudioWorkletProcessor {
     const mixR = new Float32Array(frames);
 
     for (const [handle, p] of this._players) {
+      if (!(this.muteMask & (1 << handle))) continue;
       m._fred_render(handle, p.outPtrL, p.outPtrR, frames);
 
       const srcL = m.HEAPF32.subarray(p.outPtrL >> 2, (p.outPtrL >> 2) + frames);

@@ -25,7 +25,10 @@ class BlepProcessor extends AudioWorkletProcessor {
 
     // Listen for parameter changes
     this.port.onmessage = (event) => {
-      if (event.data.type === 'setEnabled') {
+      if (event.data.type === 'init') {
+        // BLEP is a pure JS effect processor, no WASM needed
+        this.port.postMessage({ type: 'ready' });
+      } else if (event.data.type === 'setEnabled') {
         this.enabled = event.data.value;
       } else if (event.data.type === 'reset') {
         this.reset();

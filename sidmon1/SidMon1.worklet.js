@@ -20,6 +20,7 @@ class SidMon1Processor extends AudioWorkletProcessor {
 
     // Per-player state: { outPtrL, outPtrR }
     this.players = {};
+    this.muteMask = 0xFFFFFFFF;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -90,6 +91,10 @@ class SidMon1Processor extends AudioWorkletProcessor {
         if (this.wasm && this.ctx) {
           this.wasm._sm1_set_param(this.ctx, data.handle, data.paramId, data.value);
         }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
         break;
 
       case 'dispose':
@@ -187,6 +192,7 @@ class SidMon1Processor extends AudioWorkletProcessor {
 
     for (const h of Object.keys(this.players)) {
       const hi = parseInt(h);
+      if (!(this.muteMask & (1 << hi))) continue;
       const ptrs = this.players[hi];
       if (!ptrs) continue;
 

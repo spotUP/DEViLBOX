@@ -15,7 +15,7 @@
 
     <!-- PWA / Mobile Web App Meta Tags -->
     <meta name="description" content="DEViLBOX - TB-303 Acid Tracker with Devil Fish Mod" />
-    <meta name="theme-color" content="#ef4444" />
+    <meta name="theme-color" content="#00d4aa" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="DEViLBOX" />
@@ -41,14 +41,14 @@
         align-items: center;
         justify-content: center;
         background-color: #0a0a0b;
-        color: #ef4444;
+        color: var(--loader-accent, #00d4aa);
         font-family: system-ui, -apple-system, sans-serif;
       }
       .loading-spinner {
         width: 40px;
         height: 40px;
         border: 3px solid #1a1a1d;
-        border-top-color: #ef4444;
+        border-top-color: var(--loader-accent, #00d4aa);
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
@@ -62,12 +62,21 @@
         to { transform: rotate(360deg); }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-zx6LJBPK.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-react-DkDaD07v.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-utils-XMmR-oGw.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-tone-CADp_hfL.js">
-    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-uomqNFY-.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-Cnoi0D0R.css">
+    <script>
+      // Read persisted accent color for loading spinner (set by applyTheme in useThemeStore)
+      try {
+        var c = localStorage.getItem('devilbox-accent') || '#00d4aa';
+        document.documentElement.style.setProperty('--loader-accent', c);
+        document.querySelector('meta[name="theme-color"]').content = c;
+      } catch(e) {}
+    </script>
+    <script type="module" crossorigin src="/assets/main-BbV5VyEH.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-AJ7AT9BN.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-Dgd_wxYf.js">
+    <link rel="modulepreload" crossorigin href="/assets/client-DHYdgbIN.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-utils-a-Usm5Xm.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-tone-48TQc1H3.js">
+    <link rel="stylesheet" crossorigin href="/assets/main-c6CPs1E0.css">
   </head>
   <body>
     <div id="root">

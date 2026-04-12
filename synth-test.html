@@ -120,7 +120,16 @@
   <button id="runVolumeTests">Run Volume Level Tests</button>
   <button id="runInteractiveTest">🎧 Interactive Volume Test</button>
   <button id="runBehaviorTests">Run Sustain/Release Tests</button>
+  <button id="runEffectTests">🎛️ Run Effect Tests</button>
   <button id="runSamplePackTests">Run Sample Pack Tests</button>
+
+  <div style="margin: 12px 0; padding: 10px; background: #16213e; border-radius: 6px;">
+    <label style="color: #888; font-size: 13px;">🔍 Test specific synths (comma-separated, or regex like <code>/Furnace.*/</code>):</label><br>
+    <input id="synthFilter" type="text" placeholder="e.g. TB303, Dexed, OBXd  or  /^MAME.*/"
+      style="width: 60%; background: #0d1117; border: 1px solid #555; color: #eee; padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 14px; margin: 6px 0;" />
+    <button id="runFilteredVolume" style="background: #ff8800;">🎯 Test Selected (Volume)</button>
+    <button id="runFilteredCreation" style="background: #0088ff; color: #fff;">🎯 Test Selected (Creation)</button>
+  </div>
 
   <div id="results"></div>
   <div id="judgment-panel"></div>

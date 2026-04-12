@@ -1,23 +1,23 @@
 [
   {
     "name": "scratch_001.wav",
-    "duration": 0.911
+    "duration": 0.926
   },
   {
     "name": "scratch_002.wav",
-    "duration": 0.485
+    "duration": 0.498
   },
   {
     "name": "scratch_003.wav",
-    "duration": 0.898
+    "duration": 0.956
   },
   {
     "name": "scratch_004.wav",
-    "duration": 0.239
+    "duration": 0.24
   },
   {
     "name": "scratch_005.wav",
-    "duration": 0.887
+    "duration": 0.949
   },
   {
     "name": "scratch_006.wav",
@@ -25,11 +25,11 @@
   },
   {
     "name": "scratch_007.wav",
-    "duration": 0.846
+    "duration": 0.911
   },
   {
     "name": "scratch_008.wav",
-    "duration": 0.852
+    "duration": 0.853
   },
   {
     "name": "scratch_009.wav",
@@ -37,7 +37,7 @@
   },
   {
     "name": "scratch_010.wav",
-    "duration": 1.795
+    "duration": 1.804
   },
   {
     "name": "scratch_011.wav",
@@ -49,15 +49,15 @@
   },
   {
     "name": "scratch_013.wav",
-    "duration": 0.597
+    "duration": 0.609
   },
   {
     "name": "scratch_014.wav",
-    "duration": 1.865
+    "duration": 1.938
   },
   {
     "name": "scratch_015.wav",
-    "duration": 0.588
+    "duration": 0.591
   },
   {
     "name": "scratch_016.wav",
@@ -65,7 +65,7 @@
   },
   {
     "name": "scratch_017.wav",
-    "duration": 0.885
+    "duration": 0.887
   },
   {
     "name": "scratch_018.wav",
@@ -73,138 +73,154 @@
   },
   {
     "name": "scratch_019.wav",
-    "duration": 0.393
+    "duration": 0.396
   },
   {
     "name": "scratch_020.wav",
-    "duration": 1.502
+    "duration": 0.659
   },
   {
     "name": "scratch_021.wav",
-    "duration": 0.952
+    "duration": 0.797
   },
   {
     "name": "scratch_022.wav",
-    "duration": 0.537
+    "duration": 0.966
   },
   {
     "name": "scratch_023.wav",
-    "duration": 0.416
+    "duration": 0.539
   },
   {
     "name": "scratch_024.wav",
-    "duration": 1.434
+    "duration": 0.423
   },
   {
     "name": "scratch_025.wav",
-    "duration": 1.016
+    "duration": 0.71
   },
   {
     "name": "scratch_026.wav",
-    "duration": 0.62
+    "duration": 0.685
   },
   {
     "name": "scratch_027.wav",
-    "duration": 1.244
+    "duration": 1.131
   },
   {
     "name": "scratch_028.wav",
-    "duration": 0.795
+    "duration": 0.62
   },
   {
     "name": "scratch_029.wav",
-    "duration": 0.724
+    "duration": 1.265
   },
   {
     "name": "scratch_030.wav",
-    "duration": 0.286
+    "duration": 0.797
   },
   {
     "name": "scratch_031.wav",
-    "duration": 0.433
+    "duration": 0.724
   },
   {
     "name": "scratch_032.wav",
-    "duration": 0.769
+    "duration": 0.286
   },
   {
     "name": "scratch_033.wav",
-    "duration": 0.892
+    "duration": 0.438
   },
   {
     "name": "scratch_034.wav",
-    "duration": 2.273
+    "duration": 0.777
   },
   {
     "name": "scratch_035.wav",
-    "duration": 0.864
+    "duration": 0.919
   },
   {
     "name": "scratch_036.wav",
-    "duration": 0.998
+    "duration": 2.273
   },
   {
     "name": "scratch_037.wav",
-    "duration": 0.74
+    "duration": 0.865
   },
   {
     "name": "scratch_038.wav",
-    "duration": 0.432
+    "duration": 0.999
   },
   {
     "name": "scratch_039.wav",
-    "duration": 1.705
+    "duration": 0.742
   },
   {
     "name": "scratch_040.wav",
-    "duration": 0.879
+    "duration": 0.434
   },
   {
     "name": "scratch_041.wav",
-    "duration": 0.615
+    "duration": 1.729
   },
   {
     "name": "scratch_042.wav",
-    "duration": 2.194
+    "duration": 0.88
   },
   {
     "name": "scratch_043.wav",
-    "duration": 1.225
+    "duration": 0.616
   },
   {
     "name": "scratch_044.wav",
-    "duration": 0.395
+    "duration": 2.195
   },
   {
     "name": "scratch_045.wav",
-    "duration": 1.987
+    "duration": 0.55
   },
   {
     "name": "scratch_046.wav",
-    "duration": 0.44
+    "duration": 0.635
   },
   {
     "name": "scratch_047.wav",
-    "duration": 0.91
+    "duration": 0.402
   },
   {
     "name": "scratch_048.wav",
-    "duration": 0.262
+    "duration": 1.988
   },
   {
     "name": "scratch_049.wav",
-    "duration": 0.879
+    "duration": 0.44
   },
   {
     "name": "scratch_050.wav",
-    "duration": 4.081
+    "duration": 0.91
   },
   {
     "name": "scratch_051.wav",
-    "duration": 0.398
+    "duration": 0.267
   },
-{
+  {
+    "name": "scratch_052.wav",
+    "duration": 0.88
+  },
+  {
     "name": "scratch_053.wav",
-    "duration": 4.939
+    "duration": 4.081
+  },
+  {
+    "name": "scratch_054.wav",
+    "duration": 0.4
+  },
+  {
+    "name": "scratch_055.wav",
+    "duration": 0.047
+  },
+  {
+    "name": "scratch_056.wav",
+    "duration": 4.94
   }
 ]

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SunVox Test</title>
+</head>
+<body>
+  <h1>SunVox WASM Test</h1>
+  <button id="load">Load & Play</button>
+  <button id="stop">Stop</button>
+  <pre id="log"></pre>
+  
+  <script>
+    const log = (msg) => {
+      console.log(msg);
+      document.getElementById('log').textContent += msg + '\n';
+    };
+
+    let audioContext = null;
+    let workletNode = null;
+    let handle = -1;
+
+    document.getElementById('load').onclick = async () => {
+      try {
+        log('Creating AudioContext...');
+        audioContext = new AudioContext({ sampleRate: 44100 });
+        log('AudioContext state: ' + audioContext.state);
+        
+        // Resume if suspended
+        if (audioContext.state === 'suspended') {
+          log('Resuming AudioContext...');
+          await audioContext.resume();
+          log('AudioContext state after resume: ' + audioContext.state);
+        }
+        
+        log('Loading worklet module...');
+        await audioContext.audioWorklet.addModule('/sunvox/SunVox.worklet.js');
+        
+        log('Fetching WASM + JS...');
+        const [wasmResp, jsResp] = await Promise.all([
+          fetch('/sunvox/SunVox.wasm'),
+          fetch('/sunvox/SunVox.js')
+        ]);
+        
+        const wasmBinary = await wasmResp.arrayBuffer();
+        let jsCode = await jsResp.text();
+        jsCode = jsCode
+          .replace(/import\.meta\.url/g, "'.'")
+          .replace(/export\s+default\s+\w+;?/g, '')
+          .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+          .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
+          .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
+        
+        log('Creating worklet node...');
+        workletNode = new AudioWorkletNode(audioContext, 'sunvox-processor', {
+          outputChannelCount: [2],
+          numberOfOutputs: 1
+        });
+        
+        // Connect BEFORE sending init
+        log('Connecting to destination...');
+        workletNode.connect(audioContext.destination);
+        
+        workletNode.port.onmessage = async (e) => {
+          const data = e.data;
+          log(`Worklet message: ${data.type}`);
+          
+          if (data.type === 'ready') {
+            log('WASM ready! Creating handle...');
+            workletNode.port.postMessage({ type: 'create', sampleRate: audioContext.sampleRate });
+          }
+          else if (data.type === 'handle') {
+            handle = data.handle;
+            log(`Got handle: ${handle}. Fetching tune.sunvox...`);
+            const songResp = await fetch('/sunvox/test-tune.sunvox');
+            const songBuffer = await songResp.arrayBuffer();
+            log(`Loaded ${songBuffer.byteLength} bytes. Loading into engine...`);
+            workletNode.port.postMessage({ type: 'loadSong', handle, buffer: songBuffer });
+          }
+          else if (data.type === 'songLoaded') {
+            log('Song loaded! Starting playback...');
+            workletNode.port.postMessage({ type: 'play', handle });
+            // Check if audio is rendering after a short delay
+            setTimeout(() => {
+              log('Checking audio state...');
+              log('AudioContext.state: ' + audioContext.state);
+              log('AudioContext.currentTime: ' + audioContext.currentTime);
+            }, 500);
+          }
+          else if (data.type === 'error') {
+            log('ERROR: ' + data.message);
+          }
+        };
+        
+        log('Sending init message...');
+        workletNode.port.postMessage({ type: 'init', sampleRate: audioContext.sampleRate, wasmBinary, jsCode });
+        
+      } catch (err) {
+        log('Error: ' + err.message);
+        console.error(err);
+      }
+    };
+    
+    document.getElementById('stop').onclick = () => {
+      if (workletNode && handle >= 0) {
+        log('Stopping...');
+        workletNode.port.postMessage({ type: 'stop', handle });
+      }
+    };
+  </script>
+</body>
+</html>

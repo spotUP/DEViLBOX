@@ -1,0 +1,367 @@
+{
+  "bundles": [
+    {
+      "name": "DSoS",
+      "presets": [
+        {
+          "file": "DSoS/Chiptune.gkick",
+          "name": "Chiptune"
+        },
+        {
+          "file": "DSoS/Hi-Hat.gkick",
+          "name": "Hi Hat"
+        },
+        {
+          "file": "DSoS/Kick.gkick",
+          "name": "Kick"
+        },
+        {
+          "file": "DSoS/Snare.gkick",
+          "name": "Snare"
+        },
+        {
+          "file": "DSoS/Squilchy.gkick",
+          "name": "Squilchy"
+        }
+      ]
+    },
+    {
+      "name": "DigitalSamba",
+      "presets": [
+        {
+          "file": "DigitalSamba/Anvil-HH.gkick",
+          "name": "Anvil HH"
+        },
+        {
+          "file": "DigitalSamba/Cowbell.gkick",
+          "name": "Cowbell"
+        },
+        {
+          "file": "DigitalSamba/GunShotSnare.gkick",
+          "name": "GunShotSnare"
+        },
+        {
+          "file": "DigitalSamba/HiSurdo.gkick",
+          "name": "HiSurdo"
+        },
+        {
+          "file": "DigitalSamba/Kick1.gkick",
+          "name": "Kick1"
+        },
+        {
+          "file": "DigitalSamba/Kick1Double.gkick",
+          "name": "Kick1Double"
+        },
+        {
+          "file": "DigitalSamba/Kick2.gkick",
+          "name": "Kick2"
+        },
+        {
+          "file": "DigitalSamba/LowSurdo.gkick",
+          "name": "LowSurdo"
+        },
+        {
+          "file": "DigitalSamba/LowSurdoDouble.gkick",
+          "name": "LowSurdoDouble"
+        },
+        {
+          "file": "DigitalSamba/MetalicSnare.gkick",
+          "name": "MetalicSnare"
+        },
+        {
+          "file": "DigitalSamba/OpenHH.gkick",
+          "name": "OpenHH"
+        },
+        {
+          "file": "DigitalSamba/Ride.gkick",
+          "name": "Ride"
+        },
+        {
+          "file": "DigitalSamba/SoftSnareHi.gkick",
+          "name": "SoftSnareHi"
+        },
+        {
+          "file": "DigitalSamba/SoftSnareLow.gkick",
+          "name": "SoftSnareLow"
+        },
+        {
+          "file": "DigitalSamba/ThumpSnareL.gkick",
+          "name": "ThumpSnareL"
+        },
+        {
+          "file": "DigitalSamba/ThumpSnareR.gkick",
+          "name": "ThumpSnareR"
+        }
+      ]
+    },
+    {
+      "name": "GeonkickBells",
+      "presets": [
+        {
+          "file": "GeonkickBells/Bell1.gkick",
+          "name": "Bell1"
+        },
+        {
+          "file": "GeonkickBells/Bell10.gkick",
+          "name": "Bell10"
+        },
+        {
+          "file": "GeonkickBells/Bell11.gkick",
+          "name": "Bell11"
+        },
+        {
+          "file": "GeonkickBells/Bell12.gkick",
+          "name": "Bell12"
+        },
+        {
+          "file": "GeonkickBells/Bell13.gkick",
+          "name": "Bell13"
+        },
+        {
+          "file": "GeonkickBells/Bell14.gkick",
+          "name": "Bell14"
+        },
+        {
+          "file": "GeonkickBells/Bell15.gkick",
+          "name": "Bell15"
+        },
+        {
+          "file": "GeonkickBells/Bell16.gkick",
+          "name": "Bell16"
+        },
+        {
+          "file": "GeonkickBells/Bell2.gkick",
+          "name": "Bell2"
+        },
+        {
+          "file": "GeonkickBells/Bell3.gkick",
+          "name": "Bell3"
+        },
+        {
+          "file": "GeonkickBells/Bell4.gkick",
+          "name": "Bell4"
+        },
+        {
+          "file": "GeonkickBells/Bell5.gkick",
+          "name": "Bell5"
+        },
+        {
+          "file": "GeonkickBells/Bell6.gkick",
+          "name": "Bell6"
+        },
+        {
+          "file": "GeonkickBells/Bell7.gkick",
+          "name": "Bell7"
+        },
+        {
+          "file": "GeonkickBells/Bell8.gkick",
+          "name": "Bell8"
+        },
+        {
+          "file": "GeonkickBells/Bell9.gkick",
+          "name": "Bell9"
+        }
+      ]
+    },
+    {
+      "name": "HaraldReveryKicks",
+      "presets": [
+        {
+          "file": "HaraldReveryKicks/B-Kick.gkick",
+          "name": "B Kick"
+        },
+        {
+          "file": "HaraldReveryKicks/C-Kick.gkick",
+          "name": "C Kick"
+        },
+        {
+          "file": "HaraldReveryKicks/D-Kick.gkick",
+          "name": "D Kick"
+        },
+        {
+          "file": "HaraldReveryKicks/E-Kick.gkick",
+          "name": "E Kick"
+        },
+        {
+          "file": "HaraldReveryKicks/F-Kick.gkick",
+          "name": "F Kick"
+        },
+        {
+          "file": "HaraldReveryKicks/F-sharp-Kick.gkick",
+          "name": "F sharp Kick"
+        },
+        {
+          "file": "HaraldReveryKicks/G-Kick.gkick",
+          "name": "G Kick"
+        }
+      ]
+    },
+    {
+      "name": "SPKickPresetsVol1",
+      "presets": [
+        {
+          "file": "SPKickPresetsVol1/kick-01.gkick",
+          "name": "kick 01"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-02.gkick",
+          "name": "kick 02"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-03.gkick",
+          "name": "kick 03"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-04.gkick",
+          "name": "kick 04"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-05.gkick",
+          "name": "kick 05"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-06.gkick",
+          "name": "kick 06"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-07.gkick",
+          "name": "kick 07"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-08.gkick",
+          "name": "kick 08"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-09.gkick",
+          "name": "kick 09"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-10.gkick",
+          "name": "kick 10"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-11.gkick",
+          "name": "kick 11"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-12.gkick",
+          "name": "kick 12"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-13.gkick",
+          "name": "kick 13"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-14.gkick",
+          "name": "kick 14"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-15.gkick",
+          "name": "kick 15"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-16.gkick",
+          "name": "kick 16"
+        },
+        {
+          "file": "SPKickPresetsVol1/kick-17.gkick",
+          "name": "kick 17"
+        }
+      ]
+    },
+    {
+      "name": "TimeKit",
+      "presets": [
+        {
+          "file": "TimeKit/Clap.gkick",
+          "name": "Clap"
+        },
+        {
+          "file": "TimeKit/Hit-Hat-Closed.gkick",
+          "name": "Hit Hat Closed"
+        },
+        {
+          "file": "TimeKit/Hit-Hat-Open.gkick",
+          "name": "Hit Hat Open"
+        },
+        {
+          "file": "TimeKit/Hit-Hat.gkick",
+          "name": "Hit Hat"
+        },
+        {
+          "file": "TimeKit/Kick.gkick",
+          "name": "Kick"
+        },
+        {
+          "file": "TimeKit/Shaker.gkick",
+          "name": "Shaker"
+        },
+        {
+          "file": "TimeKit/Snare.gkick",
+          "name": "Snare"
+        },
+        {
+          "file": "TimeKit/SnareT.gkick",
+          "name": "SnareT"
+        }
+      ]
+    },
+    {
+      "name": "UnfaTutorial",
+      "presets": [
+        {
+          "file": "UnfaTutorial/808.gkick",
+          "name": "808"
+        },
+        {
+          "file": "UnfaTutorial/Acoustic-Kick.gkick",
+          "name": "Acoustic Kick"
+        },
+        {
+          "file": "UnfaTutorial/Clap-Snare.gkick",
+          "name": "Clap Snare"
+        },
+        {
+          "file": "UnfaTutorial/Crash-Cymbal.gkick",
+          "name": "Crash Cymbal"
+        },
+        {
+          "file": "UnfaTutorial/DnBKick.gkick",
+          "name": "DnBKick"
+        },
+        {
+          "file": "UnfaTutorial/HH-1.gkick",
+          "name": "HH 1"
+        },
+        {
+          "file": "UnfaTutorial/HH-2.gkick",
+          "name": "HH 2"
+        },
+        {
+          "file": "UnfaTutorial/HH-3.gkick",
+          "name": "HH 3"
+        },
+        {
+          "file": "UnfaTutorial/Hard-Style-Kick.gkick",
+          "name": "Hard Style Kick"
+        },
+        {
+          "file": "UnfaTutorial/Metalic-Snare.gkick",
+          "name": "Metalic Snare"
+        },
+        {
+          "file": "UnfaTutorial/Neuro-Snare.gkick",
+          "name": "Neuro Snare"
+        },
+        {
+          "file": "UnfaTutorial/PsyKick.gkick",
+          "name": "PsyKick"
+        },
+        {
+          "file": "UnfaTutorial/Simple-Snare.gkick",
+          "name": "Simple Snare"
+        }
+      ]
+    }
+  ]
+}

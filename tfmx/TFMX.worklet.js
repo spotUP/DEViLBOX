@@ -60,6 +60,21 @@ class TFMXProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'resetPlayers': {
+        // Free all player handles without destroying the WASM context.
+        // Called on stop() to prevent player pool exhaustion across song loads.
+        if (!this.wasm || !this.ctx) break;
+        for (const hp of Object.keys(this.players)) {
+          const hi = parseInt(hp);
+          this.wasm._free(this.players[hi].outPtrL);
+          this.wasm._free(this.players[hi].outPtrR);
+          this.wasm._tfmx_destroy_player(this.ctx, hi);
+        }
+        this.players = {};
+        this._modulePlaying = false;
+        break;
+      }
+
       case 'loadInstrument': {
         if (!this.wasm || !this.ctx) break;
         const insData = new Uint8Array(data.buffer);
@@ -83,6 +98,107 @@ class TFMXProcessor extends AudioWorkletProcessor {
       case 'noteOff':
         if (this.wasm && this.ctx) {
           this.wasm._tfmx_note_off(this.ctx, data.handle);
+        }
+        break;
+
+      // ── Full-module playback messages ────────────────────────────────────
+      case 'loadModule': {
+        if (!this.wasm || !this.ctx) break;
+        // Clean up any standalone instrument players from previous loads
+        for (const hp of Object.keys(this.players)) {
+          const hi = parseInt(hp);
+          this.wasm._free(this.players[hi].outPtrL);
+          this.wasm._free(this.players[hi].outPtrR);
+          this.wasm._tfmx_destroy_player(this.ctx, hi);
+        }
+        this.players = {};
+        const mdat = new Uint8Array(data.mdatBuffer);
+        const smpl = data.smplBuffer ? new Uint8Array(data.smplBuffer) : null;
+        const mdatPtr = this.wasm._malloc(mdat.byteLength);
+        this.wasm.HEAPU8.set(mdat, mdatPtr);
+        let smplPtr = 0, smplLen = 0;
+        if (smpl && smpl.byteLength > 0) {
+          smplLen = smpl.byteLength;
+          smplPtr = this.wasm._malloc(smplLen);
+          this.wasm.HEAPU8.set(smpl, smplPtr);
+        }
+        const ret = this.wasm._tfmx_load_module(this.ctx, mdatPtr, mdat.byteLength,
+          smplPtr, smplLen, data.subsong || 0);
+        this.wasm._free(mdatPtr);
+        if (smplPtr) this.wasm._free(smplPtr);
+        if (ret === 0) {
+          this._moduleMode = true;
+          this._modulePlaying = false;
+          this._sampleRate = sampleRate;
+          const voices = this.wasm._tfmx_module_voices(this.ctx);
+          const songs = this.wasm._tfmx_module_songs(this.ctx);
+          const duration = this.wasm._tfmx_module_duration(this.ctx);
+          this._moduleDuration = duration;
+          this.port.postMessage({ type: 'moduleLoaded', voices, songs, duration });
+        } else {
+          this.port.postMessage({ type: 'error', message: 'tfmx_load_module failed: ' + ret });
+        }
+        break;
+      }
+
+      case 'reloadModule': {
+        // Re-runs tfmx_load_module with patched bytes — used by macro editor
+        // for live preview after instrument edits.
+        if (!this.wasm || !this.ctx) break;
+        const wasPlaying = this._modulePlaying;
+        this._modulePlaying = false;
+        this.wasm._tfmx_module_stop(this.ctx);
+        const mdat = new Uint8Array(data.mdatBuffer);
+        const smpl = data.smplBuffer ? new Uint8Array(data.smplBuffer) : null;
+        const mdatPtr = this.wasm._malloc(mdat.byteLength);
+        this.wasm.HEAPU8.set(mdat, mdatPtr);
+        let smplPtr = 0, smplLen = 0;
+        if (smpl && smpl.byteLength > 0) {
+          smplLen = smpl.byteLength;
+          smplPtr = this.wasm._malloc(smplLen);
+          this.wasm.HEAPU8.set(smpl, smplPtr);
+        }
+        const ret = this.wasm._tfmx_load_module(this.ctx, mdatPtr, mdat.byteLength,
+          smplPtr, smplLen, data.subsong || 0);
+        this.wasm._free(mdatPtr);
+        if (smplPtr) this.wasm._free(smplPtr);
+        if (ret === 0 && wasPlaying) {
+          this._modulePlaying = true;
+        }
+        this.port.postMessage({ type: 'moduleReloaded', ok: ret === 0 });
+        break;
+      }
+
+      case 'modulePlay':
+        this._modulePlaying = true;
+        break;
+
+      case 'moduleStop':
+        this._modulePlaying = false;
+        if (this.wasm && this.ctx) {
+          this.wasm._tfmx_module_stop(this.ctx);
+        }
+        break;
+
+      case 'moduleMuteVoice':
+        if (this.wasm && this.ctx) {
+          this.wasm._tfmx_module_mute_voice(this.ctx, data.voice, data.mute ? 1 : 0);
+        }
+        break;
+
+      case 'modulePreviewMacro':
+        // DEViLBOX extension — trigger an instrument macro on a chosen voice
+        // for editor audition. The C side calls TFMXDecoder::previewMacro
+        // which sets up the cmd struct and runs the regular noteCmd path,
+        // so the next render tick produces audio for that voice.
+        if (this.wasm && this.ctx && this.wasm._tfmx_module_preview_macro) {
+          this.wasm._tfmx_module_preview_macro(
+            this.ctx,
+            data.macroIdx | 0,
+            data.note | 0,
+            data.volume | 0,
+            data.channel | 0,
+          );
         }
         break;
 
@@ -178,6 +294,42 @@ class TFMXProcessor extends AudioWorkletProcessor {
     outputL.fill(0);
     outputR.fill(0);
 
+    // Full-module playback (dedicated player slot 0)
+    if (this._moduleMode && this._modulePlaying) {
+      // Allocate output buffers for module render (reuse player 0's if available)
+      if (!this._moduleOutL) {
+        this._moduleOutL = this.wasm._malloc(256 * 4);
+        this._moduleOutR = this.wasm._malloc(256 * 4);
+      }
+      this.wasm._tfmx_module_render(this.ctx, this._moduleOutL, this._moduleOutR, numSamples);
+      const heapF32 = this.wasm.HEAPF32;
+      const offL = this._moduleOutL >> 2;
+      const offR = this._moduleOutR >> 2;
+      for (let i = 0; i < numSamples; i++) {
+        outputL[i] += heapF32[offL + i];
+        outputR[i] += heapF32[offR + i];
+      }
+
+      // Send position update every ~100ms (4410 samples at 44100Hz)
+      this._positionCounter = (this._positionCounter || 0) + numSamples;
+      if (this._positionCounter >= 4410) {
+        this._positionCounter -= 4410;
+        const samplesRendered = this.wasm._tfmx_get_samples_rendered(this.ctx);
+        const songEnd = this.wasm._tfmx_module_song_end(this.ctx);
+        const sampleRate = this._sampleRate || 44100;
+        const elapsedMs = Math.round((samplesRendered / sampleRate) * 1000);
+        this.port.postMessage({ type: 'modulePosition', samplesRendered, elapsedMs, songEnd: songEnd !== 0 });
+
+        // If song ended, notify main thread (even with loop_mode=1, some songs don't loop)
+        if (songEnd !== 0) {
+          this.port.postMessage({ type: 'songEnd' });
+          this._modulePlaying = false;
+        }
+      }
+      return true;
+    }
+
+    // Per-instrument synth playback
     const heapF32 = this.wasm.HEAPF32;
 
     for (const h of Object.keys(this.players)) {
@@ -187,7 +339,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
 
       this.wasm._tfmx_render(this.ctx, hi, ptrs.outPtrL, ptrs.outPtrR, numSamples);
 
-      const offL = ptrs.outPtrL >> 2; // byte ptr → float32 index
+      const offL = ptrs.outPtrL >> 2;
       const offR = ptrs.outPtrR >> 2;
 
       for (let i = 0; i < numSamples; i++) {

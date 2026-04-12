@@ -131,7 +131,13 @@
       "Shift+Alt+6": "tracker_scratch_8crab",
       "Shift+Alt+7": "tracker_scratch_twdl",
       "Shift+Alt+0": "tracker_scratch_stop",
-      "Shift+Alt+B": "tracker_spinback"
+      "Shift+Alt+B": "tracker_spinback",
+      "Ctrl+=": "zoom_in",
+      "Ctrl+-": "zoom_out",
+      "Ctrl+0": "fit_to_window",
+      "Ctrl+1": "reset_zoom",
+      "Ctrl+L": "show_command_palette",
+      "Ctrl+K": "toggle_bookmark"
     },
     "mac": {
       "Up": "cursor_up",
@@ -261,7 +267,16 @@
       "Shift+Alt+6": "tracker_scratch_8crab",
       "Shift+Alt+7": "tracker_scratch_twdl",
       "Shift+Alt+0": "tracker_scratch_stop",
-      "Shift+Alt+B": "tracker_spinback"
+      "Shift+Alt+B": "tracker_spinback",
+      "Cmd+=": "zoom_in",
+      "Cmd+-": "zoom_out",
+      "Cmd+0": "fit_to_window",
+      "Cmd+1": "reset_zoom",
+      "Ctrl+1": "reset_zoom",
+      "Ctrl+L": "show_command_palette",
+      "Cmd+K": "toggle_bookmark"
     }
-  }
+  },
+  "Ctrl+Enter": "preview_note_at_cursor",
+  "Ctrl+Shift+L": "pattern_length_dialog"
 }

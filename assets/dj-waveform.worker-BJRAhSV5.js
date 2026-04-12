@@ -1,0 +1,294 @@
+(function() {
+  "use strict";
+  const OVERVIEW_H = 16;
+  const POSITION_COLOR = "#ef4444";
+  const CUE_COLOR = "#f59e0b";
+  const LOOP_COLOR = "rgba(6, 182, 212, 0.25)";
+  const LOOP_BORDER = "rgba(6, 182, 212, 0.6)";
+  let offCanvas = null;
+  let ctx = null;
+  let dpr = 1, width = 400, height = 120;
+  let waveformPeaks = null;
+  let durationMs = 0;
+  let audioPosition = 0;
+  let cuePoints = [];
+  let dirty = true;
+  let otherPeaks = null;
+  let otherDurationMs = 0;
+  let otherAudioPosition = 0;
+  let frequencyPeaks = null;
+  let loopActive = false;
+  let patternLoopStart = 0;
+  let patternLoopEnd = 0;
+  let cuePoint = -1;
+  let totalPositions = 1;
+  let colors = { bg: "#6e1418", bgTertiary: "#8c2028", border: "#581014" };
+  let beats = null;
+  let downbeats = null;
+  function applyOverview(ov) {
+    frequencyPeaks = ov.frequencyPeaks;
+    loopActive = ov.loopActive;
+    patternLoopStart = ov.patternLoopStart;
+    patternLoopEnd = ov.patternLoopEnd;
+    cuePoint = ov.cuePoint;
+    totalPositions = ov.totalPositions;
+    colors = ov.colors;
+    beats = ov.beats ?? null;
+    downbeats = ov.downbeats ?? null;
+  }
+  self.onmessage = (e) => {
+    const msg = e.data;
+    switch (msg.type) {
+      case "init":
+        offCanvas = msg.canvas;
+        offCanvas.width = Math.round(msg.width * msg.dpr);
+        offCanvas.height = Math.round(msg.height * msg.dpr);
+        ctx = offCanvas.getContext("2d");
+        dpr = msg.dpr;
+        width = msg.width;
+        height = msg.height;
+        waveformPeaks = msg.waveformPeaks;
+        durationMs = msg.durationMs;
+        audioPosition = msg.audioPosition;
+        cuePoints = msg.cuePoints;
+        applyOverview(msg.overview);
+        startRAF();
+        self.postMessage({ type: "ready" });
+        break;
+      case "waveformPeaks":
+        waveformPeaks = msg.peaks;
+        durationMs = msg.durationMs;
+        dirty = true;
+        break;
+      case "position":
+        audioPosition = msg.audioPosition;
+        dirty = true;
+        break;
+      case "cuePoints":
+        cuePoints = msg.cuePoints;
+        dirty = true;
+        break;
+      case "overview":
+        applyOverview(msg.overview);
+        dirty = true;
+        break;
+      case "otherDeck":
+        if (msg.peaks !== null) otherPeaks = msg.peaks;
+        otherDurationMs = msg.durationMs;
+        otherAudioPosition = msg.audioPosition;
+        dirty = true;
+        break;
+      case "resize":
+        dpr = msg.dpr;
+        width = msg.w;
+        height = msg.h;
+        if (offCanvas) {
+          offCanvas.width = Math.round(width * dpr);
+          offCanvas.height = Math.round(height * dpr);
+        }
+        dirty = true;
+        break;
+    }
+  };
+  function startRAF() {
+    const tick = () => {
+      if (dirty) renderFrame();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  function renderOverview() {
+    if (!ctx) return;
+    const oh = OVERVIEW_H;
+    const durationSec = durationMs / 1e3;
+    ctx.fillStyle = colors.bgTertiary;
+    ctx.fillRect(0, 0, width, oh);
+    if (waveformPeaks && waveformPeaks.length > 0 && durationSec > 0) {
+      const midY = oh / 2;
+      if (frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0) {
+        const low = frequencyPeaks[0], mid = frequencyPeaks[1], high = frequencyPeaks[2];
+        const freqBins = low.length;
+        const binW = width / freqBins;
+        for (let i = 0; i < freqBins; i++) {
+          const x = i * binW;
+          const bw = Math.max(1, binW - 0.3);
+          const lowH = low[i] * midY * 0.9;
+          const midH = mid[i] * midY * 0.9;
+          const highH = high[i] * midY * 0.9;
+          if (lowH > 0.3) {
+            ctx.fillStyle = "rgba(60, 130, 246, 0.7)";
+            ctx.fillRect(x, midY - lowH, bw, lowH * 2);
+          }
+          if (midH > 0.3) {
+            ctx.fillStyle = "rgba(74, 222, 128, 0.55)";
+            ctx.fillRect(x, midY - midH, bw, midH * 2);
+          }
+          if (highH > 0.3) {
+            ctx.fillStyle = "rgba(251, 191, 36, 0.5)";
+            ctx.fillRect(x, midY - highH, bw, highH * 2);
+          }
+        }
+      } else {
+        const numBins = waveformPeaks.length;
+        const binW = width / numBins;
+        const midY2 = oh / 2;
+        for (let i = 0; i < numBins; i++) {
+          const barH = waveformPeaks[i] * midY2 * 0.9;
+          ctx.fillStyle = "rgba(100, 160, 255, 0.5)";
+          ctx.fillRect(i * binW, midY2 - barH, Math.max(1, binW - 0.3), barH * 2);
+        }
+      }
+      if (loopActive && patternLoopEnd > patternLoopStart && totalPositions > 0) {
+        const lx = patternLoopStart / totalPositions * width;
+        const lw = (patternLoopEnd - patternLoopStart) / totalPositions * width;
+        ctx.fillStyle = LOOP_COLOR;
+        ctx.fillRect(lx, 0, lw, oh);
+        ctx.fillStyle = LOOP_BORDER;
+        ctx.fillRect(lx, 0, 1, oh);
+        ctx.fillRect(lx + lw - 1, 0, 1, oh);
+      }
+      if (cuePoint >= 0 && totalPositions > 0) {
+        const cueX = (cuePoint + 0.5) / totalPositions * width;
+        ctx.fillStyle = CUE_COLOR;
+        ctx.beginPath();
+        ctx.moveTo(cueX - 3, oh);
+        ctx.lineTo(cueX + 3, oh);
+        ctx.lineTo(cueX, oh - 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (durationSec > 0) {
+        const posX = audioPosition / durationSec * width;
+        ctx.fillStyle = POSITION_COLOR;
+        ctx.fillRect(posX - 1, 0, 2, oh);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(posX, 0, 1, oh);
+      }
+    }
+    ctx.fillStyle = colors.border;
+    ctx.fillRect(0, oh - 0.5, width, 0.5);
+  }
+  function renderScrollingWaveform() {
+    if (!ctx || !waveformPeaks || waveformPeaks.length === 0) return;
+    const durationSec = durationMs / 1e3;
+    if (durationSec <= 0) return;
+    const topY = OVERVIEW_H;
+    const wfH = height - OVERVIEW_H;
+    const midY = topY + wfH / 2;
+    ctx.fillStyle = colors.bg;
+    ctx.fillRect(0, topY, width, wfH);
+    const windowSec = 10;
+    const startSec = audioPosition - windowSec / 2;
+    if (otherPeaks && otherPeaks.length > 0 && otherDurationMs > 0) {
+      const otherDurSec = otherDurationMs / 1e3;
+      const otherBins = otherPeaks.length;
+      const otherStartSec = otherAudioPosition - windowSec / 2;
+      for (let px = 0; px < width; px++) {
+        const otherTimeSec = otherStartSec + px / width * windowSec;
+        const otherFrac = otherTimeSec / otherDurSec;
+        const otherBin = Math.floor(otherFrac * otherBins);
+        if (otherBin < 0 || otherBin >= otherBins) continue;
+        const amp = otherPeaks[otherBin];
+        const barH = amp * (wfH / 2) * 0.55;
+        ctx.fillStyle = "rgba(255, 100, 100, 0.18)";
+        ctx.fillRect(px, midY - barH, 1, barH * 2);
+      }
+      const otherCenterX = width / 2;
+      ctx.fillStyle = "rgba(255, 100, 100, 0.25)";
+      ctx.fillRect(otherCenterX - 0.5, topY, 1, wfH);
+    }
+    const numBins = waveformPeaks.length;
+    const hasFreq = frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0;
+    const freqLow = hasFreq ? frequencyPeaks[0] : null;
+    const freqMid = hasFreq ? frequencyPeaks[1] : null;
+    const freqHigh = hasFreq ? frequencyPeaks[2] : null;
+    const freqBins = (freqLow == null ? void 0 : freqLow.length) ?? 0;
+    for (let px = 0; px < width; px++) {
+      const timeSec = startSec + px / width * windowSec;
+      const fraction = timeSec / durationSec;
+      const binIndex = Math.floor(fraction * numBins);
+      if (binIndex < 0 || binIndex >= numBins) continue;
+      const played = timeSec < audioPosition;
+      const alphaScale = played ? 0.5 : 1;
+      if (freqLow && freqMid && freqHigh && freqBins > 0) {
+        const freqIdx = Math.floor(fraction * freqBins);
+        if (freqIdx >= 0 && freqIdx < freqBins) {
+          const lo = freqLow[freqIdx] ?? 0;
+          const mi = freqMid[freqIdx] ?? 0;
+          const hi = freqHigh[freqIdx] ?? 0;
+          const halfH = wfH / 2;
+          const loH = lo * halfH * 0.85;
+          ctx.fillStyle = `rgba(60, 130, 246, ${0.7 * alphaScale})`;
+          ctx.fillRect(px, midY - loH, 1, loH * 2);
+          const miH = mi * halfH * 0.65;
+          ctx.fillStyle = `rgba(74, 222, 128, ${0.55 * alphaScale})`;
+          ctx.fillRect(px, midY - miH, 1, miH * 2);
+          const hiH = hi * halfH * 0.45;
+          ctx.fillStyle = `rgba(251, 191, 36, ${0.5 * alphaScale})`;
+          ctx.fillRect(px, midY - hiH, 1, hiH * 2);
+        }
+      } else {
+        const amp = waveformPeaks[binIndex];
+        const barH = amp * (wfH / 2) * 0.85;
+        ctx.fillStyle = played ? "rgba(80, 130, 220, 0.4)" : "rgba(100, 170, 255, 0.7)";
+        ctx.fillRect(px, midY - barH, 1, barH * 2);
+      }
+    }
+    const endSec = audioPosition + windowSec / 2;
+    const downbeatSet = downbeats ? new Set(downbeats.map((d) => Math.round(d * 100))) : null;
+    if (beats && beats.length > 0) {
+      for (const beatSec of beats) {
+        if (beatSec < startSec || beatSec > endSec) continue;
+        const x = (beatSec - startSec) / windowSec * width;
+        const isDownbeat = (downbeatSet == null ? void 0 : downbeatSet.has(Math.round(beatSec * 100))) ?? false;
+        if (isDownbeat) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+          ctx.fillRect(Math.round(x), topY, 1, wfH);
+        } else {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+          ctx.fillRect(Math.round(x), midY - wfH * 0.25, 1, wfH * 0.5);
+        }
+      }
+    }
+    for (const cue of cuePoints) {
+      const cueSec = cue.position / 1e3;
+      if (cueSec < startSec || cueSec > endSec) continue;
+      const x = (cueSec - startSec) / windowSec * width;
+      ctx.fillStyle = cue.color + "80";
+      ctx.fillRect(Math.round(x), topY, 1, wfH);
+      ctx.fillStyle = cue.color;
+      ctx.beginPath();
+      ctx.moveTo(x - 3, topY);
+      ctx.lineTo(x + 3, topY);
+      ctx.lineTo(x, topY + 5);
+      ctx.closePath();
+      ctx.fill();
+      if (cue.name) {
+        ctx.fillStyle = cue.color;
+        ctx.font = "bold 8px monospace";
+        ctx.fillText(cue.name, x + 3, topY + 10);
+      }
+    }
+    const centerX = width / 2;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(centerX - 1, topY, 2, wfH);
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.fillRect(centerX - 1, topY, 2, wfH);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "10px monospace";
+    const min = Math.floor(audioPosition / 60);
+    const sec = Math.floor(audioPosition % 60);
+    const cs = Math.floor(audioPosition % 1 * 100);
+    ctx.fillText(`${min}:${String(sec).padStart(2, "0")}.${String(cs).padStart(2, "0")}`, 4, topY + wfH - 4);
+  }
+  function renderFrame() {
+    if (!ctx) return;
+    dirty = false;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderOverview();
+    renderScrollingWaveform();
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+  }
+})();

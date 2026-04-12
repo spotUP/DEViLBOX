@@ -1,0 +1,266 @@
+{
+"osc8": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 620, 
+"ampl_env": {
+"amplitude": 0.09630, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.01806 , 0.49583], [ 0.08516 , 0.05833], [ 0.20516 , 0.00000], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 1555.89001, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 0.11613 , 0.87529], [ 0.29032 , 0.85388], [ 1.00000 , 0.80159]], 
+"factor": 204.69682
+}
+}
+,
+"osc7": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 2.26195, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.30370, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.01419 , 0.35833], [ 0.02839 , 0.07917], [ 0.07742 , 0.03333], [ 0.17806 , 0.01250], [ 0.39871 , 0.00000], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 1985.20312, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 0.92673]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc6": {
+"enabled": true, 
+"is_fm": true, 
+"function": 0,
+"phase": 2.26195, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 1.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 1581.70764, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 0.91359]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc5": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 160, 
+"ampl_env": {
+"amplitude": 0.12593, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.05677 , 0.36667], [ 0.12903 , 0.27500], [ 0.25290 , 0.17083], [ 0.43355 , 0.09583], [ 0.74065 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 479.58740, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 0.20387 , 0.96106], [ 1.00000 , 0.87468]], 
+"factor": 129.15497
+}
+}
+,
+"osc1": {
+"enabled": false, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc0": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 0.00000, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.26000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.07613 , 1.00000], [ 0.20774 , 0.84583], [ 0.30968 , 0.57500], [ 0.40387 , 0.26667], [ 0.50710 , 0.14583], [ 0.62452 , 0.05833], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 391.70291, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.09419 , 0.88343], [ 1.00000 , 0.88343]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"osc2": {
+"enabled": true, 
+"is_fm": false, 
+"function": 4,
+"phase": 0.00000, 
+"seed": 440, 
+"ampl_env": {
+"amplitude": 0.04444, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.02710 , 0.54583], [ 0.06065 , 0.25833], [ 0.12129 , 0.13333], [ 0.22968 , 0.05000], [ 0.37935 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 150.00000, 
+"points": [
+]
+},
+"filter": {
+"enabled": true, 
+"type": 2, 
+"cutoff": 1478.27991, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 251.18864
+}
+}
+,
+"osc3": {
+"enabled": true, 
+"is_fm": true, 
+"function": 2,
+"phase": 1.50796, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 1.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.58194 , 0.05417], [ 1.00000 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 1181.00989, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": true, 
+"type": 1, 
+"cutoff": 616.47986, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 1000.00000
+}
+}
+,
+"osc4": {
+"enabled": true, 
+"is_fm": false, 
+"function": 0,
+"phase": 1.63363, 
+"seed": 0, 
+"ampl_env": {
+"amplitude": 0.16296, 
+"points": [
+[ 0.00000 , 1.00000], [ 0.04516 , 0.26667], [ 0.09161 , 0.07917], [ 0.33548 , 0.03333], [ 0.62839 , 0.00833], [ 0.85806 , 0.00000]]
+},
+"freq_env": {
+"amplitude": 800.00000, 
+"points": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+},
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 800.00000, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]], 
+"factor": 10.00000
+}
+}
+,
+"kick": {
+"PercussionAppVersion": 131074,
+"id": 15,
+"channel": 0,
+"name": "Cowbell",
+"playing_key": 81,
+"layers": [0, 1, 2],
+"layers_amplitude": [1.00000, 1.00000, 1.00000],
+"limiter": 1.14588, 
+"tuned_output": false, 
+"ampl_env": {
+"amplitude": 1.00000, 
+"length": 504.81479, 
+"points": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]}, 
+"filter": {
+"enabled": false, 
+"type": 0, 
+"cutoff": 200.00, 
+"factor": 10.00, 
+"cutoff_env": [[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}, 
+"compressor": {
+"enabled": false, 
+"attack": 0.01000, 
+"release": 0.01000, 
+"threshold": 0.00000, 
+"ratio": 1.00000, 
+"knee": 0.00000, 
+"makeup": 1.00000
+}, 
+"distortion": {
+"enabled": false, 
+"in_limiter": 1.00000, 
+"volume": 0.50119, 
+"drive": 1.00000, 
+"drive_env": [
+[ 0.00000 , 1.00000], [ 1.00000 , 1.00000]]
+}
+}
+}

@@ -1,0 +1,403 @@
+import { D as DEFAULT_FURNACE } from "./main-BbV5VyEH.js";
+import "./client-DHYdgbIN.js";
+import "./vendor-ui-AJ7AT9BN.js";
+import "./vendor-react-Dgd_wxYf.js";
+import "./vendor-utils-a-Usm5Xm.js";
+import "./vendor-tone-48TQc1H3.js";
+function emptyCell() {
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+function emptyPattern(id, name, numCh, rows) {
+  return {
+    id,
+    name,
+    length: rows,
+    channels: Array.from({ length: numCh }, (_, i) => ({
+      id: `ch${i}`,
+      name: `AY ${String.fromCharCode(65 + i)}`,
+      muted: false,
+      solo: false,
+      collapsed: false,
+      volume: 100,
+      pan: 0,
+      instrumentId: null,
+      color: null,
+      rows: Array.from({ length: rows }, emptyCell)
+    }))
+  };
+}
+function readNullTerminated(buf, off) {
+  let text = "";
+  let i = off;
+  while (i < buf.length && buf[i] !== 0) {
+    text += String.fromCharCode(buf[i++]);
+  }
+  return { text, nextOff: i + 1 };
+}
+function ayPeriodToNote(period) {
+  if (period <= 0) return 0;
+  const freq = 2e6 / (16 * period);
+  if (freq < 20) return 0;
+  const note = Math.round(12 * Math.log2(freq / 440) + 69);
+  return Math.max(1, Math.min(96, note));
+}
+function decodeLZH5(src) {
+  const DICBIT = 13, DICSIZ = 1 << DICBIT, THRESHOLD = 3;
+  const NC = 510, CBIT = 9, NT = DICBIT + 1, TBIT = 5, NP = DICBIT + 1, PBIT = 4;
+  const MAX_TABLE = 4096;
+  const dic = new Uint8Array(DICSIZ).fill(32);
+  const out = [];
+  let dicPos = 0, srcPos = 0;
+  let bitBuf = 0, subBuf = 0, bitCount = 0;
+  function fillBuf(n) {
+    bitBuf = bitBuf << n >>> 0 & 65535;
+    while (n > bitCount) {
+      n -= bitCount;
+      bitBuf |= subBuf << n >>> 0 & 65535;
+      subBuf = srcPos < src.length ? src[srcPos++] : 0;
+      bitCount = 8;
+    }
+    bitCount -= n;
+    bitBuf |= subBuf >> bitCount & 65535;
+    bitBuf &= 65535;
+  }
+  function getBits(n) {
+    const r = bitBuf >> 16 - n & (1 << n) - 1;
+    fillBuf(n);
+    return r;
+  }
+  subBuf = srcPos < src.length ? src[srcPos++] : 0;
+  fillBuf(16);
+  const cLen = new Uint8Array(NC);
+  const cTable = new Uint16Array(MAX_TABLE);
+  const pLen = new Uint8Array(NP);
+  const pTable = new Uint16Array(256);
+  function makeTable(nchar, bitlen, tablebits, table) {
+    const tableSize = 1 << tablebits;
+    const count = new Uint16Array(17);
+    for (let i = 0; i < nchar; i++) count[Math.min(bitlen[i], 16)]++;
+    const start = new Uint16Array(18);
+    start[1] = 0;
+    for (let i = 1; i <= 16; i++) start[i + 1] = start[i] + count[i];
+    for (let i = 0; i < tableSize; i++) table[i] = 65535;
+    for (let p = 0; p < nchar; p++) {
+      const len = bitlen[p];
+      if (len === 0) continue;
+      const startIdx = start[len];
+      start[len]++;
+      if (len <= tablebits) {
+        const fillCount = 1 << tablebits - len;
+        const base = startIdx << tablebits - len;
+        for (let i = 0; i < fillCount; i++) {
+          if (base + i < tableSize) table[base + i] = p;
+        }
+      }
+    }
+  }
+  function readPtLen(nn, nbit, special) {
+    let n = getBits(nbit);
+    if (n === 0) {
+      const c = getBits(nbit);
+      for (let i = 0; i < nn; i++) pLen[i] = 0;
+      for (let i = 0; i < 256; i++) pTable[i] = c;
+    } else {
+      let i = 0;
+      while (i < n) {
+        let c = bitBuf >> 13 & 7;
+        if (c === 7) {
+          let k = 4096;
+          while (k & bitBuf) {
+            k >>= 1;
+            c++;
+          }
+        }
+        c = Math.min(c, 15);
+        fillBuf(c < 7 ? 3 : c - 3);
+        pLen[i++] = c;
+        if (i === special) {
+          c = getBits(2);
+          while (--c >= 0 && i < nn) pLen[i++] = 0;
+        }
+      }
+      while (i < nn) pLen[i++] = 0;
+      makeTable(nn, pLen, 8, pTable);
+    }
+  }
+  function readCLen() {
+    let n = getBits(CBIT);
+    if (n === 0) {
+      const c = getBits(CBIT);
+      for (let i = 0; i < NC; i++) cLen[i] = 0;
+      for (let i = 0; i < MAX_TABLE; i++) cTable[i] = c;
+    } else {
+      let i = 0;
+      while (i < n) {
+        let c = pTable[bitBuf >> 8 & 255];
+        if (c === 65535 || c >= NT) {
+          c = NT - 1;
+        }
+        fillBuf(pLen[c]);
+        if (c <= 2) {
+          if (c === 0) {
+            c = 1;
+          } else if (c === 1) {
+            c = getBits(4) + 3;
+          } else {
+            c = getBits(CBIT) + 20;
+          }
+          while (--c >= 0 && i < NC) cLen[i++] = 0;
+        } else {
+          cLen[i++] = c - 2;
+        }
+      }
+      while (i < NC) cLen[i++] = 0;
+      makeTable(NC, cLen, 12, cTable);
+    }
+  }
+  let blockSize = 0;
+  while (out.length < 256 * 1024) {
+    if (blockSize === 0) {
+      blockSize = getBits(16);
+      if (blockSize === 0) break;
+      readPtLen(NT, TBIT, 3);
+      readCLen();
+      readPtLen(NP, PBIT, -1);
+    }
+    blockSize--;
+    let j = cTable[bitBuf >> 4 & 4095];
+    if (j === 65535 || j >= NC) break;
+    fillBuf(cLen[j]);
+    if (j <= 255) {
+      dic[dicPos] = j;
+      out.push(j);
+      dicPos = dicPos + 1 & DICSIZ - 1;
+    } else {
+      const matchLen = j - 256 + THRESHOLD;
+      let pv = pTable[bitBuf >> 8 & 255];
+      if (pv === 65535 || pv >= NP) break;
+      fillBuf(pLen[pv]);
+      if (pv >= 2) {
+        pv = pv - 1 << 1 | getBits(1);
+      }
+      const matchPos = dicPos - pv - 1 & DICSIZ - 1;
+      for (let k = 0; k < matchLen; k++) {
+        const c = dic[matchPos + k & DICSIZ - 1];
+        dic[dicPos] = c;
+        out.push(c);
+        dicPos = dicPos + 1 & DICSIZ - 1;
+      }
+    }
+  }
+  return new Uint8Array(out);
+}
+function isLHAArchive(buf) {
+  if (buf.length < 22) return false;
+  return buf[2] === 45 && (buf[3] === 108 && buf[4] === 104) && buf[6] === 45;
+}
+function extractFromLHA(buf) {
+  const headerSize = buf[0];
+  const level = buf.length > 20 ? buf[20] : 0;
+  let compressedSize;
+  let method;
+  let dataStart;
+  if (level === 0 || level === 1) {
+    method = String.fromCharCode(buf[2], buf[3], buf[4], buf[5], buf[6]);
+    compressedSize = buf[7] | buf[8] << 8 | buf[9] << 16 | buf[10] << 24;
+    if (level === 0) {
+      dataStart = headerSize + 2;
+    } else {
+      dataStart = headerSize + 2;
+      let pos = headerSize + 2;
+      while (pos + 2 < buf.length) {
+        const extSize = buf[pos] | buf[pos + 1] << 8;
+        if (extSize === 0) {
+          pos += 2;
+          break;
+        }
+        pos += extSize;
+      }
+      dataStart = pos;
+    }
+  } else if (level === 2) {
+    method = String.fromCharCode(buf[2], buf[3], buf[4], buf[5], buf[6]);
+    compressedSize = buf[7] | buf[8] << 8 | buf[9] << 16 | buf[10] << 24;
+    const totalHeaderSize = buf[0] | buf[1] << 8;
+    dataStart = totalHeaderSize;
+  } else {
+    throw new Error("Unsupported LHA header level: " + level);
+  }
+  if (dataStart >= buf.length) throw new Error("LHA data offset beyond file");
+  const compressed = buf.subarray(dataStart, dataStart + compressedSize);
+  if (method === "-lh0-" || method === "-lz4-") {
+    return compressed;
+  } else if (method === "-lh5-" || method === "-lh6-" || method === "-lh7-") {
+    return decodeLZH5(compressed);
+  } else {
+    throw new Error("Unsupported LHA method: " + method);
+  }
+}
+function parseYMHeader(buf) {
+  const version = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (version === "YM2!" || version === "YM3!" || version === "YM3b") {
+    const regsPerFrame = 14;
+    const numFrames = Math.floor((buf.length - 4) / regsPerFrame);
+    return {
+      version,
+      numFrames,
+      attributes: 0,
+      clock: 2e6,
+      playerHz: 50,
+      title: "",
+      author: "",
+      regsPerFrame,
+      interleaved: false,
+      dataOffset: 4
+    };
+  }
+  if (version === "YM4!" || version === "YM5!" || version === "YM6!") {
+    let off = 4 + 8;
+    const dv = new DataView(buf.buffer, buf.byteOffset);
+    const numFrames = dv.getUint32(off, false);
+    off += 4;
+    const attributes = dv.getUint32(off, false);
+    off += 4;
+    const numDigidrums = dv.getUint16(off, false);
+    off += 2;
+    const clock = dv.getUint32(off, false);
+    off += 4;
+    const playerHz = dv.getUint16(off, false);
+    off += 2;
+    dv.getUint32(off, false);
+    off += 4;
+    const extraSize = dv.getUint16(off, false);
+    off += 2 + extraSize;
+    for (let d = 0; d < numDigidrums; d++) {
+      const dSize = dv.getUint32(off, false);
+      off += 4 + dSize;
+    }
+    const readStr = () => {
+      const r = readNullTerminated(buf, off);
+      off = r.nextOff;
+      return r.text;
+    };
+    const title = readStr();
+    const author = readStr();
+    readStr();
+    return {
+      version,
+      numFrames,
+      attributes,
+      clock: clock || 2e6,
+      playerHz: playerHz || 50,
+      title,
+      author,
+      regsPerFrame: 16,
+      interleaved: !!(attributes & 1),
+      dataOffset: off
+    };
+  }
+  throw new Error(`Unknown YM version: ${version}`);
+}
+function extractFrames(buf, hdr) {
+  const { numFrames, regsPerFrame, interleaved, dataOffset } = hdr;
+  const data = buf.subarray(dataOffset);
+  const frames = [];
+  for (let f = 0; f < numFrames; f++) {
+    const regs = new Uint8Array(regsPerFrame);
+    for (let r = 0; r < regsPerFrame; r++) {
+      const idx = interleaved ? r * numFrames + f : f * regsPerFrame + r;
+      regs[r] = idx < data.length ? data[idx] : 0;
+    }
+    frames.push(regs);
+  }
+  return frames;
+}
+const MAX_ROWS = 256;
+function framesToPattern(frames) {
+  const step = Math.max(1, Math.ceil(frames.length / MAX_ROWS));
+  const rows = Math.min(MAX_ROWS, Math.ceil(frames.length / step));
+  const pat = emptyPattern("p0", "Pattern 1", 3, rows);
+  const lastNote = [0, 0, 0];
+  const lastVol = [-1, -1, -1];
+  for (let row = 0; row < rows; row++) {
+    const f = frames[Math.min(row * step, frames.length - 1)];
+    const mixer = f[7] ?? 255;
+    for (let ch = 0; ch < 3; ch++) {
+      const periodLo = f[ch * 2] ?? 0;
+      const periodHi = (f[ch * 2 + 1] ?? 0) & 15;
+      const period = periodHi << 8 | periodLo;
+      const vol = (f[8 + ch] ?? 0) & 15;
+      const toneOn = !(mixer >> ch & 1);
+      const note = toneOn && vol > 0 && period > 0 ? ayPeriodToNote(period) : 0;
+      const cell = pat.channels[ch].rows[row];
+      if (note !== lastNote[ch]) {
+        cell.note = note > 0 ? note : lastNote[ch] > 0 ? 97 : 0;
+        if (note > 0) cell.instrument = 1;
+        lastNote[ch] = note;
+      }
+      if (vol !== lastVol[ch]) {
+        cell.volume = vol > 0 ? Math.round(vol / 15 * 64) : 0;
+        lastVol[ch] = vol;
+      }
+    }
+  }
+  return pat;
+}
+async function parseYMFile(buffer, filename) {
+  let buf = new Uint8Array(buffer);
+  if (isLHAArchive(buf)) {
+    try {
+      buf = new Uint8Array(extractFromLHA(buf));
+    } catch (e) {
+      throw new Error("Failed to extract YM file from LHA archive: " + (e instanceof Error ? e.message : e));
+    }
+  }
+  const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (!["YM2!", "YM3!", "YM3b", "YM4!", "YM5!", "YM6!"].includes(magic)) {
+    throw new Error("Not a valid YM file (magic: " + magic + ")");
+  }
+  const hdr = parseYMHeader(buf);
+  let frames;
+  if (hdr.version === "YM5!" || hdr.version === "YM6!") {
+    try {
+      const compressed = buf.subarray(hdr.dataOffset);
+      const decompressed = decodeLZH5(compressed);
+      const full = new Uint8Array(hdr.dataOffset + decompressed.length);
+      full.set(buf.subarray(0, hdr.dataOffset));
+      full.set(decompressed, hdr.dataOffset);
+      buf = full;
+      frames = extractFrames(buf, { ...hdr, dataOffset: hdr.dataOffset });
+    } catch {
+      frames = [new Uint8Array(16)];
+    }
+  } else {
+    frames = extractFrames(buf, hdr);
+  }
+  const pattern = framesToPattern(frames);
+  const name = hdr.title || filename.replace(/\.ym$/i, "");
+  const ayInst = {
+    id: 1,
+    name: "AY Channel",
+    type: "synth",
+    synthType: "FurnaceAY",
+    furnace: { ...DEFAULT_FURNACE, chipType: 6, ops: 2 },
+    effects: [],
+    volume: 0,
+    pan: 0
+  };
+  return {
+    name: name + (hdr.author ? ` — ${hdr.author}` : ""),
+    format: "YM",
+    patterns: [pattern],
+    instruments: [ayInst],
+    songPositions: [0],
+    songLength: 1,
+    restartPosition: 0,
+    numChannels: 3,
+    initialSpeed: 1,
+    initialBPM: hdr.playerHz === 50 ? 50 : 60
+  };
+}
+export {
+  parseYMFile
+};

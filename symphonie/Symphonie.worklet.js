@@ -536,6 +536,10 @@ class VoiceExpander {
     this._orderPos    = 0;
     this._rowPos      = 0;
 
+    // Per-channel gain (indexed by pattern channel = voice index / MixChannels)
+    this.channelGains = new Float32Array(32);
+    this.channelGains.fill(1.0);
+
     // Initialise voices array and frequency table
     this.Voices = new Array(this.NumbOfVoices);
     for (let i = 0; i < this.NumbOfVoices; i++) {
@@ -602,6 +606,12 @@ class VoiceExpander {
   // ---- loadSong — called from SymphonieProcessor with SymphoniePlaybackData ----
 
   loadSong(data) {
+    console.log('[Symphonie] loadSong v2 patterns=' + data.patterns.length + ' instruments=' + data.instruments.length);
+    // Log first pattern events to debug CMD_REPLAY_FROM
+    if (data.patterns.length > 0) {
+      const firstEvs = data.patterns[0].events.slice(0, 5);
+      console.log('[Symphonie] first 5 events:', JSON.stringify(firstEvs));
+    }
     this._orderList = data.orderList;
     this._patterns  = data.patterns;
     this._orderPos  = 0;
@@ -749,7 +759,14 @@ class VoiceExpander {
       if (ev.instrument <= 0) continue; // 1-based; 0 = no instrument
       const inst = this._instruments[ev.instrument - 1];
       if (!inst || !inst.checkReady()) continue;
-      if (ev.note > 0) {
+      if (ev.cmd === 5) {
+        // CMD_REPLAY_FROM: retrigger sample from byte offset (param = 0-255 position)
+        const voiceNr = ev.channel * 2;
+        const noteIdx = ev.note > 0 ? ev.note - 1 : 0;
+        console.log('[Symphonie] CMD_REPLAY_FROM ch=' + ev.channel + ' inst=' + ev.instrument + ' noteIdx=' + noteIdx + ' param=' + ev.param + ' instReady=' + inst.checkReady());
+        this.SongEventKeyOnSamplePos(inst, voiceNr,     noteIdx, ev.param);
+        this.SongEventKeyOnSamplePos(inst, voiceNr + 1, noteIdx, ev.param);
+      } else if (ev.note > 0) {
         const vol = (ev.volume > 0 && ev.volume !== 255) ? ev.volume : inst.Volume;
         // PlayInstrumentNote equivalent (using channel-based voice allocation)
         const voiceNr = ev.channel * 2; // L voice for this channel; R = voiceNr+1
@@ -761,7 +778,7 @@ class VoiceExpander {
         this.PlayInstrumentIntoVoice(inst, voiceNr + 1, freq, vol);
       }
       // Handle volume-only events (note === 0, volume change)
-      if (ev.note === 0 && ev.volume !== 255 && ev.volume >= 0) {
+      if (ev.note === 0 && ev.cmd !== 5 && ev.volume !== 255 && ev.volume >= 0) {
         const voiceNr = ev.channel * 2;
         this.SongEventSetVolume(voiceNr,     ev.volume);
         this.SongEventSetVolume(voiceNr + 1, ev.volume);
@@ -1114,7 +1131,14 @@ class VoiceExpander {
     for (let i = 0; i < this.NumbOfVoices; i += ChannelStep) {
       const idx = i + ChannelNr;
       if (this.isVoicePlaying(idx) === true && this.isVoicePausing(idx) === false) {
-        SampleMix += this.getNextVoiceSample(idx);
+        const patternCh = Math.floor(i / ChannelStep);
+        const gain = patternCh < this.channelGains.length ? this.channelGains[patternCh] : 1.0;
+        if (gain > 0.0) {
+          SampleMix += this.getNextVoiceSample(idx) * gain;
+        } else {
+          // Still advance voice state even when muted to keep sequencer in sync
+          this.getNextVoiceSample(idx);
+        }
       }
     }
     return SampleMix;
@@ -1215,6 +1239,12 @@ class SymphonieProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e) => {
       const msg = e.data;
       switch (msg.type) {
+        case 'init':
+          // No WASM needed - pure JS engine, ready immediately
+          this._ready = true;
+          this.port.postMessage({ type: 'ready' });
+          break;
+
         case 'load':
           try {
             this._expander.loadSong(msg.playbackData);
@@ -1232,6 +1262,22 @@ class SymphonieProcessor extends AudioWorkletProcessor {
 
         case 'volume':
           this._masterVolume = msg.value;
+          break;
+
+        case 'setMuteMask': {
+          const mask = msg.mask || 0;
+          const numCh = this._expander.channelGains.length;
+          for (let ch = 0; ch < numCh; ch++) {
+            const muted = (mask & (1 << ch)) !== 0;
+            this._expander.channelGains[ch] = muted ? 0.0 : 1.0;
+          }
+          break;
+        }
+
+        case 'setChannelGain':
+          if (msg.channel >= 0 && msg.channel < this._expander.channelGains.length) {
+            this._expander.channelGains[msg.channel] = msg.gain;
+          }
           break;
 
         default:

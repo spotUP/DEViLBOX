@@ -116,7 +116,7 @@
       "Ctrl+J": "toggle_fast_volume",
       "Ctrl+U": "vary_channel_volume",
       "Ctrl+Y": "vary_panbrello",
-      "Ctrl+K": "vary_current_effect",
+      "Ctrl+K": "toggle_bookmark",
       "Ctrl+B": "pattern_to_sample",
       "Ctrl+O": "pattern_to_sample_mono",
       "Ctrl+V": "toggle_default_volumes",
@@ -150,7 +150,12 @@
       "Shift+Alt+7": "tracker_scratch_twdl",
       "Shift+Alt+0": "tracker_scratch_stop",
       "Shift+Alt+B": "tracker_spinback",
-      "Shift+Space": "power_cut_stop"
+      "Shift+Space": "power_cut_stop",
+      "Ctrl+=": "zoom_in",
+      "Ctrl+-": "zoom_out",
+      "Ctrl+L": "show_command_palette",
+      ",": "toggle_mask_at_cursor",
+      "Ctrl+Shift+K": "jump_to_next_bookmark"
     },
     "mac": {
       "Space": "toggle_edit_mode",
@@ -248,7 +253,7 @@
       "Cmd+J": "toggle_fast_volume",
       "Cmd+U": "vary_channel_volume",
       "Cmd+Y": "vary_panbrello",
-      "Cmd+K": "vary_current_effect",
+      "Cmd+K": "toggle_bookmark",
       "Cmd+B": "pattern_to_sample",
       "Cmd+O": "pattern_to_sample_mono",
       "Cmd+V": "toggle_default_volumes",
@@ -297,7 +302,15 @@
       "Shift+Alt+7": "tracker_scratch_twdl",
       "Shift+Alt+0": "tracker_scratch_stop",
       "Shift+Alt+B": "tracker_spinback",
-      "Shift+Space": "power_cut_stop"
+      "Shift+Space": "power_cut_stop",
+      "Cmd+=": "zoom_in",
+      "Cmd+-": "zoom_out",
+      "Ctrl+1": "reset_zoom",
+      "Ctrl+L": "show_command_palette",
+      ",": "toggle_mask_at_cursor",
+      "Cmd+Shift+K": "jump_to_next_bookmark"
     }
-  }
+  },
+  "Ctrl+Enter": "preview_note_at_cursor",
+  "Ctrl+Shift+L": "pattern_length_dialog"
 }

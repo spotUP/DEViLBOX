@@ -1,0 +1,291 @@
+import { ToneAudioNode, Gain, getContext } from "./vendor-tone-48TQc1H3.js";
+import { b_ as getNativeAudioNode } from "./main-BbV5VyEH.js";
+import "./client-DHYdgbIN.js";
+import "./vendor-ui-AJ7AT9BN.js";
+import "./vendor-react-Dgd_wxYf.js";
+import "./vendor-utils-a-Usm5Xm.js";
+class GOTTCompEffect extends ToneAudioNode {
+  name = "GOTTComp";
+  _input;
+  _output;
+  dryGain;
+  wetGain;
+  workletNode = null;
+  isWasmReady = false;
+  pendingParams = [];
+  _lowCross;
+  _highCross;
+  _lowThresh;
+  _midThresh;
+  _highThresh;
+  _lowRatio;
+  _midRatio;
+  _highRatio;
+  _attack;
+  _release;
+  _mix;
+  _wet;
+  static wasmBinary = null;
+  static jsCode = null;
+  static loadedContexts = /* @__PURE__ */ new Set();
+  static initPromises = /* @__PURE__ */ new Map();
+  constructor(options = {}) {
+    super();
+    this._lowCross = options.lowCross ?? 200;
+    this._highCross = options.highCross ?? 4e3;
+    this._lowThresh = options.lowThresh ?? -18;
+    this._midThresh = options.midThresh ?? -18;
+    this._highThresh = options.highThresh ?? -18;
+    this._lowRatio = options.lowRatio ?? 4;
+    this._midRatio = options.midRatio ?? 4;
+    this._highRatio = options.highRatio ?? 4;
+    this._attack = options.attack ?? 10;
+    this._release = options.release ?? 100;
+    this._mix = options.mix ?? 1;
+    this._wet = options.wet ?? 1;
+    this._input = new Gain(1);
+    this._output = new Gain(1);
+    this.dryGain = new Gain(1 - this._wet);
+    this.wetGain = new Gain(this._wet);
+    this._input.connect(this.dryGain);
+    this.dryGain.connect(this._output);
+    this.wetGain.connect(this._output);
+    this._input.connect(this.wetGain);
+    void this._initWorklet();
+  }
+  get input() {
+    return this._input;
+  }
+  get output() {
+    return this._output;
+  }
+  async _initWorklet() {
+    try {
+      const rawCtx = getContext().rawContext;
+      await GOTTCompEffect.ensureInitialized(rawCtx);
+      this.workletNode = new AudioWorkletNode(rawCtx, "gott-comp-processor", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2]
+      });
+      this.workletNode.port.onmessage = (e) => {
+        if (e.data.type === "ready") {
+          this.isWasmReady = true;
+          for (const p of this.pendingParams) {
+            this.workletNode.port.postMessage({ type: "parameter", param: p.param, value: p.value });
+          }
+          this.pendingParams = [];
+          try {
+            const rawInput = getNativeAudioNode(this._input);
+            const rawWet = getNativeAudioNode(this.wetGain);
+            rawInput.connect(this.workletNode);
+            this.workletNode.connect(rawWet);
+            try {
+              this._input.disconnect(this.wetGain);
+            } catch {
+            }
+            const rawCtx2 = getContext().rawContext;
+            const keepalive = rawCtx2.createGain();
+            keepalive.gain.value = 0;
+            this.workletNode.connect(keepalive);
+            keepalive.connect(rawCtx2.destination);
+          } catch (swapErr) {
+            console.warn("[GOTTComp] WASM swap failed, staying on passthrough:", swapErr);
+          }
+        }
+      };
+      this.workletNode.port.postMessage(
+        { type: "init", wasmBinary: GOTTCompEffect.wasmBinary, jsCode: GOTTCompEffect.jsCode },
+        [GOTTCompEffect.wasmBinary.slice(0)]
+      );
+      this.sendParam("lowCross", this._lowCross);
+      this.sendParam("highCross", this._highCross);
+      this.sendParam("lowThresh", this._lowThresh);
+      this.sendParam("midThresh", this._midThresh);
+      this.sendParam("highThresh", this._highThresh);
+      this.sendParam("lowRatio", this._lowRatio);
+      this.sendParam("midRatio", this._midRatio);
+      this.sendParam("highRatio", this._highRatio);
+      this.sendParam("attack", this._attack);
+      this.sendParam("release", this._release);
+      this.sendParam("mix", this._mix);
+    } catch (err) {
+      console.warn("[GOTTComp] Worklet init failed:", err);
+    }
+  }
+  static async ensureInitialized(ctx) {
+    if (this.loadedContexts.has(ctx)) return;
+    const existing = this.initPromises.get(ctx);
+    if (existing) return existing;
+    const p = (async () => {
+      const base = "/";
+      const [wasmResp, jsResp] = await Promise.all([
+        fetch(`${base}gott-comp/GOTTComp.wasm`),
+        fetch(`${base}gott-comp/GOTTComp.js`)
+      ]);
+      this.wasmBinary = await wasmResp.arrayBuffer();
+      let js = await jsResp.text();
+      js = js.replace(/if\s*\(typeof exports\s*===\s*"object".*$/s, "");
+      this.jsCode = js;
+      await ctx.audioWorklet.addModule(`${base}gott-comp/GOTTComp.worklet.js`);
+      this.loadedContexts.add(ctx);
+    })();
+    this.initPromises.set(ctx, p);
+    return p;
+  }
+  sendParam(param, value) {
+    if (this.workletNode && this.isWasmReady) {
+      this.workletNode.port.postMessage({ type: "parameter", param, value });
+    } else {
+      this.pendingParams = this.pendingParams.filter((p) => p.param !== param);
+      this.pendingParams.push({ param, value });
+    }
+  }
+  setLowCross(v) {
+    this._lowCross = Math.max(20, Math.min(1e3, v));
+    this.sendParam("lowCross", this._lowCross);
+  }
+  setHighCross(v) {
+    this._highCross = Math.max(500, Math.min(16e3, v));
+    this.sendParam("highCross", this._highCross);
+  }
+  setLowThresh(v) {
+    this._lowThresh = Math.max(-60, Math.min(0, v));
+    this.sendParam("lowThresh", this._lowThresh);
+  }
+  setMidThresh(v) {
+    this._midThresh = Math.max(-60, Math.min(0, v));
+    this.sendParam("midThresh", this._midThresh);
+  }
+  setHighThresh(v) {
+    this._highThresh = Math.max(-60, Math.min(0, v));
+    this.sendParam("highThresh", this._highThresh);
+  }
+  setLowRatio(v) {
+    this._lowRatio = Math.max(1, Math.min(20, v));
+    this.sendParam("lowRatio", this._lowRatio);
+  }
+  setMidRatio(v) {
+    this._midRatio = Math.max(1, Math.min(20, v));
+    this.sendParam("midRatio", this._midRatio);
+  }
+  setHighRatio(v) {
+    this._highRatio = Math.max(1, Math.min(20, v));
+    this.sendParam("highRatio", this._highRatio);
+  }
+  setAttack(v) {
+    this._attack = Math.max(0.1, Math.min(100, v));
+    this.sendParam("attack", this._attack);
+  }
+  setRelease(v) {
+    this._release = Math.max(10, Math.min(1e3, v));
+    this.sendParam("release", this._release);
+  }
+  setMix(v) {
+    this._mix = Math.max(0, Math.min(1, v));
+    this.sendParam("mix", this._mix);
+  }
+  get lowCross() {
+    return this._lowCross;
+  }
+  get highCross() {
+    return this._highCross;
+  }
+  get lowThresh() {
+    return this._lowThresh;
+  }
+  get midThresh() {
+    return this._midThresh;
+  }
+  get highThresh() {
+    return this._highThresh;
+  }
+  get lowRatio() {
+    return this._lowRatio;
+  }
+  get midRatio() {
+    return this._midRatio;
+  }
+  get highRatio() {
+    return this._highRatio;
+  }
+  get attack() {
+    return this._attack;
+  }
+  get release() {
+    return this._release;
+  }
+  get mix() {
+    return this._mix;
+  }
+  get wet() {
+    return this._wet;
+  }
+  set wet(value) {
+    this._wet = Math.max(0, Math.min(1, value));
+    this.wetGain.gain.value = this._wet;
+    this.dryGain.gain.value = 1 - this._wet;
+  }
+  setParam(param, value) {
+    switch (param) {
+      case "lowCross":
+        this.setLowCross(value);
+        break;
+      case "highCross":
+        this.setHighCross(value);
+        break;
+      case "lowThresh":
+        this.setLowThresh(value);
+        break;
+      case "midThresh":
+        this.setMidThresh(value);
+        break;
+      case "highThresh":
+        this.setHighThresh(value);
+        break;
+      case "lowRatio":
+        this.setLowRatio(value);
+        break;
+      case "midRatio":
+        this.setMidRatio(value);
+        break;
+      case "highRatio":
+        this.setHighRatio(value);
+        break;
+      case "attack":
+        this.setAttack(value);
+        break;
+      case "release":
+        this.setRelease(value);
+        break;
+      case "mix":
+        this.setMix(value);
+        break;
+      case "wet":
+        this.wet = value;
+        break;
+    }
+  }
+  dispose() {
+    if (this.workletNode) {
+      try {
+        this.workletNode.port.postMessage({ type: "dispose" });
+      } catch {
+      }
+      try {
+        this.workletNode.disconnect();
+      } catch {
+      }
+      this.workletNode = null;
+    }
+    this.dryGain.dispose();
+    this.wetGain.dispose();
+    this._input.dispose();
+    this._output.dispose();
+    super.dispose();
+    return this;
+  }
+}
+export {
+  GOTTCompEffect
+};

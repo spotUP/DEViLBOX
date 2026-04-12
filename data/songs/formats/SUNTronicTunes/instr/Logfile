@@ -1,0 +1,11 @@
+
+---ABORT "NO DIAL TONE"---
+
+---DIALNEXT "BUSY","NO CARRIER"---
+
+---WAIT "CONNECT"---
+ATM2L5DI089216374
+
+CONNECT
++++ found 'CONNECT' +++
+

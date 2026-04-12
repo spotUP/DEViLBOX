@@ -1,169 +1,210 @@
 /**
  * V2Synth.worklet.js
  * AudioWorklet for Farbrausch V2 Synth (WASM)
- *
- * IMPORTANT: AudioWorklets don't support dynamic import().
- * The WASM module JS is passed as a string and executed via Function constructor.
+ * 
+ * Real-time synthesizer with note-on/off, CC, and patch control.
  */
 
 class V2SynthProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this._initialized = false;
-    this._module = null;
-    this._wasmMemory = null;
-    this._outLPtr = 0;
-    this._outRPtr = 0;
-    this._outL = null;
-    this._outR = null;
-
-    this.port.onmessage = async (event) => {
-      if (event.data.type === 'init') {
-        try {
-          const { wasmBinary, jsCode } = event.data;
-
-          // Load JS module via Function constructor (dynamic import not allowed in worklets)
-          if (jsCode && !globalThis.V2Synth) {
-            console.log('[V2 Worklet] Loading JS module, code length:', jsCode.length);
-
-            const wrappedCode = jsCode + '\nreturn typeof V2Synth !== "undefined" ? V2Synth : (typeof Module !== "undefined" ? Module : null);';
-            const factory = new Function(wrappedCode);
-            const result = factory();
-
-            if (typeof result === 'function') {
-              globalThis.V2Synth = result;
-              console.log('[V2 Worklet] ✓ JS module loaded');
-            } else {
-              console.error('[V2 Worklet] Unexpected result type:', typeof result);
-              this.port.postMessage({ type: 'error', error: 'JS module returned ' + typeof result });
-              return;
-            }
-          }
-
-          if (typeof globalThis.V2Synth !== 'function') {
-            console.error('[V2 Worklet] V2Synth not available');
-            this.port.postMessage({ type: 'error', error: 'V2Synth factory not available' });
-            return;
-          }
-
-          // Intercept WebAssembly.instantiate to capture WASM memory and exports
-          // (Emscripten may not export wasmMemory/_malloc on Module depending on build flags)
-          let capturedMemory = null;
-          let capturedMalloc = null;
-          const origInstantiate = WebAssembly.instantiate;
-          WebAssembly.instantiate = async function(...args) {
-            const result = await origInstantiate.apply(this, args);
-            const instance = result.instance || result;
-            if (instance.exports) {
-              for (const value of Object.values(instance.exports)) {
-                if (value instanceof WebAssembly.Memory) {
-                  capturedMemory = value;
-                  break;
-                }
-              }
-              // Capture _malloc if available in raw exports
-              if (typeof instance.exports._malloc === 'function') {
-                capturedMalloc = instance.exports._malloc;
-              }
-            }
-            return result;
-          };
-
-          // Initialize WASM module
-          const config = {};
-          if (wasmBinary) {
-            config.wasmBinary = wasmBinary;
-          }
-          // Prevent Emscripten from using URL() to locate files (not available in WorkletGlobalScope)
-          config.locateFile = (path) => path;
-
-          try {
-            this._module = await globalThis.V2Synth(config);
-          } finally {
-            WebAssembly.instantiate = origInstantiate;
-          }
-
-          // Resolve memory and malloc from multiple sources:
-          // 1. Module.wasmMemory (from JS preprocessing) or capturedMemory (from interception)
-          // 2. Module._malloc (from preprocessing) or capturedMalloc (from interception)
-          this._wasmMemory = this._module.wasmMemory || capturedMemory;
-          const malloc = this._module._malloc || this._module.malloc || capturedMalloc;
-
-          console.log('[V2 Worklet] WASM loaded, exports:', Object.keys(this._module).filter(k => k.startsWith('_')),
-            'memory:', !!this._wasmMemory, 'malloc:', !!malloc);
-
-          // Initialize synth at sample rate
-          if (this._module._initSynth) {
-            this._module._initSynth(sampleRate);
-          } else if (this._module.initSynth) {
-            this._module.initSynth(sampleRate);
-          }
-
-          // Allocate output buffers
-          if (malloc && this._wasmMemory) {
-            this._outLPtr = malloc(128 * 4);
-            this._outRPtr = malloc(128 * 4);
-
-            this._outL = new Float32Array(this._wasmMemory.buffer, this._outLPtr, 128);
-            this._outR = new Float32Array(this._wasmMemory.buffer, this._outRPtr, 128);
-            console.log('[V2 Worklet] Output buffers allocated at', this._outLPtr, this._outRPtr);
-          } else {
-            console.warn('[V2 Worklet] No malloc or memory available, audio output disabled');
-          }
-
-          this._initialized = true;
-          this.port.postMessage({ type: 'ready' });
-          console.log('[V2 Worklet] ✓ Ready');
-        } catch (err) {
-          console.error('[V2 Worklet] Failed to load WASM module:', err);
-          this.port.postMessage({ type: 'error', error: err.message });
-        }
-      } else if (event.data.type === 'midi') {
-        if (this._initialized && this._module) {
-          const processMIDI = this._module._processMIDI || this._module.processMIDI;
-          if (processMIDI) {
-            processMIDI(event.data.msg[0], event.data.msg[1], event.data.msg[2]);
-          }
-        }
-      } else if (event.data.type === 'param') {
-        if (this._initialized && this._module) {
-          const setParameter = this._module._setParameter || this._module.setParameter;
-          if (setParameter) {
-            setParameter(0, event.data.index, event.data.value);
-          }
-        }
-      }
-    };
+    this.module = null;
+    this.initialized = false;
+    this.renderBuffer = null;
+    
+    this.port.onmessage = (e) => this.handleMessage(e.data);
   }
+  
+  async handleMessage(msg) {
+    switch (msg.type) {
+      case 'init':
+        console.log('[V2Synth] init received, sampleRate:', msg.sampleRate, 'wasmBinary length:', msg.wasmBinary?.length || msg.wasmBinary?.byteLength);
+        await this.initModule(msg.sampleRate, msg.wasmBinary, msg.jsCode);
+        break;
+      case 'loadPatch':
+        this.loadPatch(msg.channel, msg.patchData);
+        break;
+      case 'setGlobals':
+        this.setGlobals(msg.globalsData);
+        break;
+      case 'noteOn':
+        // console.log('[V2Synth] noteOn ch:', msg.channel, 'note:', msg.note, 'vel:', msg.velocity, 'init:', this.initialized);
+        this.noteOn(msg.channel, msg.note, msg.velocity);
+        break;
+      case 'noteOff':
+        this.noteOff(msg.channel, msg.note);
+        break;
+      case 'controlChange':
+        this.controlChange(msg.channel, msg.cc, msg.value);
+        break;
+      case 'pitchBend':
+        this.pitchBend(msg.channel, msg.value);
+        break;
+      case 'programChange':
+        this.programChange(msg.channel, msg.program);
+        break;
+      case 'allNotesOff':
+        this.allNotesOff(msg.channel);
+        break;
+    }
+  }
+  
+  async initModule(sampleRate, wasmBinary, jsCode) {
+    try {
+      // Convert Uint8Array back to ArrayBuffer if needed (structured clone from main thread)
+      const wasmBuffer = wasmBinary instanceof Uint8Array ? wasmBinary.buffer : wasmBinary;
 
+      // Execute the Emscripten module code - append return statement after the var declaration
+      let createFn;
+      try {
+        createFn = new Function(jsCode + '\nreturn createV2Synth;');
+      } catch (syntaxErr) {
+        throw new Error('new Function() syntax error: ' + syntaxErr.message + ' | jsCode tail: ' + jsCode.slice(-100));
+      }
+      let createModule;
+      try {
+        createModule = createFn();
+      } catch (callErr) {
+        throw new Error('createFn() call error: ' + callErr.message);
+      }
+
+      this.module = await createModule({
+        wasmBinary: wasmBuffer,
+        print: (text) => console.log('[V2Synth]', text),
+        printErr: (text) => console.error('[V2Synth]', text),
+      });
+
+      // Initialize the V2 synth
+      const result = this.module._v2synth_init(sampleRate);
+
+      if (result === 0 || result === 1) {
+        this.initialized = true;
+        // Pre-allocate render buffer for 128 stereo samples
+        this.renderBuffer = this.module._malloc(128 * 2 * 4);
+        this.port.postMessage({ type: 'initialized' });
+        console.log('[V2Synth] Initialized at', sampleRate, 'Hz');
+      } else {
+        this.port.postMessage({ type: 'error', error: 'Failed to initialize V2 synth: _v2synth_init returned ' + result });
+      }
+    } catch (error) {
+      console.error('[V2Synth] Init error:', error.message || error);
+      this.port.postMessage({ type: 'error', error: error.message || String(error) });
+    }
+  }
+  
+  loadPatch(channel, patchData) {
+    if (!this.initialized) return;
+    
+    try {
+      // Allocate memory for patch data
+      const ptr = this.module._v2synth_alloc(patchData.length);
+      this.module.HEAPU8.set(patchData, ptr);
+      
+      // Load the patch
+      const result = this.module._v2synth_load_patch(channel, ptr, patchData.length);
+      
+      // Free the input buffer
+      this.module._v2synth_free(ptr);
+      
+      if (result === 0) {
+        this.port.postMessage({ type: 'patchLoaded', channel });
+      } else {
+        this.port.postMessage({ type: 'error', error: `Failed to load patch on channel ${channel}` });
+      }
+    } catch (error) {
+      this.port.postMessage({ type: 'error', error: error.message });
+    }
+  }
+  
+  setGlobals(globalsData) {
+    if (!this.initialized) return;
+    
+    try {
+      const ptr = this.module._v2synth_alloc(globalsData.length);
+      this.module.HEAPU8.set(globalsData, ptr);
+      this.module._v2synth_set_globals(ptr);
+      this.module._v2synth_free(ptr);
+    } catch (error) {
+      this.port.postMessage({ type: 'error', error: error.message });
+    }
+  }
+  
+  noteOn(channel, note, velocity) {
+    if (!this.initialized) return;
+    this.module._v2synth_note_on(channel, note, velocity);
+  }
+  
+  noteOff(channel, note) {
+    if (!this.initialized) return;
+    this.module._v2synth_note_off(channel, note);
+  }
+  
+  controlChange(channel, cc, value) {
+    if (!this.initialized) return;
+    this.module._v2synth_control_change(channel, cc, value);
+  }
+  
+  pitchBend(channel, value) {
+    if (!this.initialized) return;
+    this.module._v2synth_pitch_bend(channel, value);
+  }
+  
+  programChange(channel, program) {
+    if (!this.initialized) return;
+    this.module._v2synth_program_change(channel, program);
+  }
+  
+  allNotesOff(channel) {
+    if (!this.initialized) return;
+    // Send note-off for all 128 notes
+    for (let note = 0; note < 128; note++) {
+      this.module._v2synth_note_off(channel, note);
+    }
+  }
+  
   process(inputs, outputs, parameters) {
-    if (!this._initialized || !this._module) return true;
-
     const output = outputs[0];
-    if (!output || !output[0]) return true;
-
+    if (!output || output.length === 0) return true;
+    
     const left = output[0];
-    const right = output[1];
+    const right = output[1] || output[0];
     const numSamples = left.length;
+    
+    if (!this.initialized || !this.renderBuffer) {
+      // Fill with silence
+      left.fill(0);
+      right.fill(0);
+      return true;
+    }
+    
+    // Render audio from V2 synth
+    this.module._v2synth_render(this.renderBuffer, numSamples);
 
-    // Render audio
-    const render = this._module._render || this._module.render;
-    if (render && this._outL && this._outR) {
-      // Handle WASM memory growth
-      if (this._wasmMemory && this._outL.buffer !== this._wasmMemory.buffer) {
-        this._outL = new Float32Array(this._wasmMemory.buffer, this._outLPtr, 128);
-        this._outR = new Float32Array(this._wasmMemory.buffer, this._outRPtr, 128);
-      }
+    // Copy from WASM buffer to output (interleaved stereo F32)
+    const heapF32 = this.module.HEAPF32;
+    const offset = this.renderBuffer / 4; // F32 offset
 
-      render(this._outLPtr, this._outRPtr, numSamples);
-      left.set(this._outL.subarray(0, numSamples));
-      if (right) {
-        right.set(this._outR.subarray(0, numSamples));
-      }
+    let maxSample = 0;
+    for (let i = 0; i < numSamples; i++) {
+      left[i] = heapF32[offset + i * 2];
+      right[i] = heapF32[offset + i * 2 + 1];
+      const abs = Math.abs(left[i]);
+      if (abs > maxSample) maxSample = abs;
+    }
+
+    // Debug: log first frame that has audio
+    if (!this._dbgLogged && maxSample > 0.0001) {
+      this._dbgLogged = true;
+      // console.log('[V2Synth process] AUDIO DETECTED maxSample=' + maxSample.toFixed(4));
+    }
+    if (!this._dbgFrames) this._dbgFrames = 0;
+    this._dbgFrames++;
+    if (this._dbgFrames === 200 && !this._dbgLogged) {
+      // console.log('[V2Synth process] 200 frames, maxSample so far=', maxSample, 'initialized=', this.initialized);
     }
 
     return true;
   }
 }
 
-registerProcessor('v2-synth-processor', V2SynthProcessor);
+try { registerProcessor('v2-synth-processor', V2SynthProcessor); } catch { /* already registered — harmless on hot reload */ }

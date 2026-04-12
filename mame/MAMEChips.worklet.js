@@ -3,6 +3,33 @@
  * Handles ES5506 (VFX), ES5503 (DOC), Roland SA (D-50), SWP30 (MU-2000), etc.
  */
 
+// Inline init function (self-contained worklet support)
+if (!globalThis.initMAMEWasmModule) {
+  globalThis.initMAMEWasmModule = async function(wasmBinary, jsCode, factoryName) {
+    if (!wasmBinary || !jsCode) throw new Error('Missing wasmBinary or jsCode');
+    if (typeof URL === 'undefined') globalThis.URL = class URL { constructor() { this.href = ''; } };
+    const processedCode = jsCode.replace(/import\.meta\.url/g, '""').replace(/export\s+default\s+\w+;?/g, '');
+    let createModule;
+    try {
+      const wrappedCode = `${processedCode}; return typeof ${factoryName} !== 'undefined' ? ${factoryName} : (typeof Module !== 'undefined' ? Module : null);`;
+      createModule = new Function(wrappedCode)();
+    } catch (e) { throw new Error(`Could not evaluate ${factoryName}: ${e.message}`); }
+    if (!createModule) throw new Error(`Could not find factory function ${factoryName}`);
+    let capturedMemory = null;
+    const origInstantiate = WebAssembly.instantiate;
+    WebAssembly.instantiate = async function(...args) {
+      const result = await origInstantiate.apply(this, args);
+      const inst = result.instance || result;
+      if (inst.exports) for (const v of Object.values(inst.exports)) if (v instanceof WebAssembly.Memory) { capturedMemory = v; break; }
+      return result;
+    };
+    let Module;
+    try { Module = await createModule({ wasmBinary }); } finally { WebAssembly.instantiate = origInstantiate; }
+    if (capturedMemory && !Module.wasmMemory) Module.wasmMemory = capturedMemory;
+    return Module;
+  };
+}
+
 // Synth type constants (must match MAMEChips.cpp)
 const SynthType = {
   VFX: 0,      // ES5506 (Ensoniq VFX/TS-10)
@@ -90,14 +117,15 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
         wasmBinary = await response.arrayBuffer();
       }
 
-      // Create module from JS code or fetch it
+      // Create module from JS code or use minimal instantiation
       let moduleFactory;
       if (jsCode) {
-        // Evaluate the JS module code
-        const blob = new Blob([jsCode], { type: 'application/javascript' });
-        const url = URL.createObjectURL(blob);
-        moduleFactory = (await import(url)).default;
-        URL.revokeObjectURL(url);
+        this.wasmModule = await globalThis.initMAMEWasmModule(wasmBinary, jsCode, 'MAMEChipsEngine');
+        this.allocateBuffers(128);
+        this.isInitialized = true;
+        this.port.postMessage({ type: 'initialized' });
+        console.log('[MAMEChips.worklet] WASM initialized');
+        return;
       } else {
         // Minimal instantiation
         const wasmModule = await WebAssembly.compile(wasmBinary);
@@ -130,19 +158,6 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
         return;
       }
 
-      // Full Emscripten module initialization
-      this.wasmModule = await moduleFactory({
-        wasmBinary,
-        noInitialRun: true,
-        noExitRuntime: true,
-      });
-
-      // Allocate output buffers
-      this.allocateBuffers(128);
-
-      this.isInitialized = true;
-      this.port.postMessage({ type: 'initialized' });
-      console.log('[MAMEChips.worklet] WASM initialized');
 
     } catch (err) {
       console.error('[MAMEChips.worklet] Init error:', err);
@@ -190,7 +205,7 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
 
     const mod = this.wasmModule || this.wasmInstance.exports;
     const ptr = mod._malloc(romData.byteLength);
-    const heap = new Uint8Array(mod.HEAPU8.buffer);
+    const heap = new Uint8Array(mod.wasmMemory.buffer);
     heap.set(new Uint8Array(romData), ptr);
     mod._mame_set_rom(bank, ptr, romData.byteLength);
 
@@ -209,7 +224,7 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
     const ptr6 = mod._malloc(ic6.byteLength);
     const ptr7 = mod._malloc(ic7.byteLength);
 
-    const heap = new Uint8Array(mod.HEAPU8.buffer);
+    const heap = new Uint8Array(mod.wasmMemory.buffer);
     heap.set(new Uint8Array(ic5), ptr5);
     heap.set(new Uint8Array(ic6), ptr6);
     heap.set(new Uint8Array(ic7), ptr7);
@@ -264,7 +279,7 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
       mod._mame_render(handle, this.leftPtr, this.rightPtr, numSamples);
 
       // Get rendered audio from WASM heap
-      const heap = new Float32Array(mod.HEAPF32.buffer);
+      const heap = new Float32Array(mod.wasmMemory.buffer);
       const leftOffset = this.leftPtr / 4;
       const rightOffset = this.rightPtr / 4;
 

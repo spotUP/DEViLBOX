@@ -1,0 +1,71 @@
+// Wurlitzer EP200 Electric Piano
+// Converted from Greg Sullivan / kinwie FLAC version to WAV
+// 4 velocity layers: pp, mp, f, ff
+
+<control>
+default_path=Samples/
+label_cc7=Vol
+label_cc10=Pan
+set_cc7=100
+set_hdcc10=0.5
+
+<global>
+amp_veltrack=80
+ampeg_release=0.3
+
+// Velocity layer 1: pp (1-40)
+<group> lovel=1 hivel=40
+<region> lokey=33 hikey=38 pitch_keycenter=33 sample=a1pp.wav
+<region> lokey=39 hikey=47 pitch_keycenter=44 sample=ab2pp.wav
+<region> lokey=48 hikey=53 pitch_keycenter=51 sample=eb3pp.wav
+<region> lokey=54 hikey=59 pitch_keycenter=56 sample=ab3pp.wav
+<region> lokey=60 hikey=65 pitch_keycenter=61 sample=db4pp.wav
+<region> lokey=66 hikey=71 pitch_keycenter=67 sample=g4pp.wav
+<region> lokey=72 hikey=77 pitch_keycenter=73 sample=db5pp.wav
+<region> lokey=78 hikey=96 pitch_keycenter=79 sample=g5mp.wav
+
+// Velocity layer 2: mp (41-80)
+<group> lovel=41 hivel=80
+<region> lokey=33 hikey=38 pitch_keycenter=33 sample=a1mp.wav
+<region> lokey=39 hikey=44 pitch_keycenter=40 sample=e2mp.wav
+<region> lokey=45 hikey=47 pitch_keycenter=45 sample=a2mp.wav
+<region> lokey=48 hikey=53 pitch_keycenter=51 sample=eb3mp.wav
+<region> lokey=54 hikey=59 pitch_keycenter=56 sample=ab3mp.wav
+<region> lokey=60 hikey=65 pitch_keycenter=61 sample=db4mp.wav
+<region> lokey=66 hikey=68 pitch_keycenter=66 sample=gb4mp.wav
+<region> lokey=69 hikey=71 pitch_keycenter=71 sample=b4mp.wav
+<region> lokey=72 hikey=77 pitch_keycenter=73 sample=db5mp.wav
+<region> lokey=78 hikey=83 pitch_keycenter=79 sample=g5mp.wav
+<region> lokey=84 hikey=89 pitch_keycenter=85 sample=db6mp.wav
+<region> lokey=90 hikey=96 pitch_keycenter=92 sample=ab6mp.wav
+
+// Velocity layer 3: f (81-110)
+<group> lovel=81 hivel=110
+<region> lokey=33 hikey=38 pitch_keycenter=33 sample=a1f.wav
+<region> lokey=39 hikey=42 pitch_keycenter=36 sample=c2f.wav
+<region> lokey=43 hikey=47 pitch_keycenter=41 sample=f2f.wav
+<region> lokey=48 hikey=51 pitch_keycenter=47 sample=b2f.wav
+<region> lokey=52 hikey=56 pitch_keycenter=52 sample=e3f.wav
+<region> lokey=57 hikey=59 pitch_keycenter=56 sample=ab3f.wav
+<region> lokey=60 hikey=65 pitch_keycenter=61 sample=db4f.wav
+<region> lokey=66 hikey=71 pitch_keycenter=68 sample=ab4f.wav
+<region> lokey=72 hikey=77 pitch_keycenter=73 sample=db5f.wav
+<region> lokey=78 hikey=83 pitch_keycenter=79 sample=g5f.wav
+<region> lokey=84 hikey=89 pitch_keycenter=85 sample=db6f.wav
+<region> lokey=90 hikey=96 pitch_keycenter=92 sample=ab6f.wav
+
+// Velocity layer 4: ff (111-127)
+<group> lovel=111 hivel=127
+<region> lokey=33 hikey=38 pitch_keycenter=33 sample=a1ff.wav
+<region> lokey=39 hikey=42 pitch_keycenter=36 sample=c2ff.wav
+<region> lokey=43 hikey=47 pitch_keycenter=41 sample=f2ff.wav
+<region> lokey=48 hikey=51 pitch_keycenter=47 sample=b2ff.wav
+<region> lokey=52 hikey=56 pitch_keycenter=52 sample=e3ff.wav
+<region> lokey=57 hikey=59 pitch_keycenter=56 sample=ab3ff.wav
+<region> lokey=60 hikey=65 pitch_keycenter=61 sample=db4ff.wav
+<region> lokey=66 hikey=68 pitch_keycenter=64 sample=e4ff.wav
+<region> lokey=69 hikey=71 pitch_keycenter=67 sample=g4ff.wav
+<region> lokey=72 hikey=77 pitch_keycenter=73 sample=db5ff.wav
+<region> lokey=78 hikey=83 pitch_keycenter=79 sample=g5ff.wav
+<region> lokey=84 hikey=89 pitch_keycenter=85 sample=db6f.wav
+<region> lokey=90 hikey=96 pitch_keycenter=92 sample=ab6f.wav
