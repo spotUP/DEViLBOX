@@ -121,21 +121,35 @@ export function parseCinemawareFile(buffer: ArrayBuffer, filename: string): Trac
       ? `${moduleName} [Cinemaware](${sampleCount} smp)`
       : moduleName;
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Instruments — names extracted from 138-byte group descriptors ──────
+  // Each group at offset 5 + i*138 has 60 bytes of group data then 3 × 26B
+  // sub-entries. Each sub-entry's first 6 bytes are an IFF filename (e.g.
+  // "DRUM01") referencing a companion Instruments/*.iff file. Full PCM
+  // extraction requires those companion files; here we at least surface
+  // the real instrument names instead of "Sample N" placeholders.
 
   const instrumentLength = Math.max(sampleCount, 1);
   const instruments: InstrumentConfig[] = Array.from(
     { length: instrumentLength },
-    (_, i) =>
-      ({
+    (_, i) => {
+      let name = `Sample ${i + 1}`;
+      const groupOff = 5 + i * 138;
+      const subEntryOff = groupOff + 60;
+      if (subEntryOff + 6 <= buf.length) {
+        const nameBytes = buf.slice(subEntryOff, subEntryOff + 6);
+        const decoded = String.fromCharCode(...nameBytes).replace(/\0/g, '').trim();
+        if (decoded.length > 0) name = decoded;
+      }
+      return {
         id: i + 1,
-        name: `Sample ${i + 1}`,
+        name,
         type: 'synth' as const,
         synthType: 'Synth' as const,
         effects: [],
         volume: 0,
         pan: 0,
-      }) as InstrumentConfig,
+      } as InstrumentConfig;
+    },
   );
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
