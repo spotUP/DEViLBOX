@@ -3,8 +3,11 @@
  */
 
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import type { DrumPad } from '../../types/drumpad';
+import type { DrumPad, PadMode } from '../../types/drumpad';
 import { useUIStore } from '@stores/useUIStore';
+import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { DEFAULT_DJFX_PADS, DEFAULT_ONESHOT_PADS, DEFAULT_SCRATCH_PADS } from '../../constants/djPadModeDefaults';
+import type { ModePadMapping } from '../../constants/djPadModeDefaults';
 
 interface PadButtonProps {
   pad: DrumPad;
@@ -16,6 +19,8 @@ interface PadButtonProps {
   onSelect: (padId: number) => void;
   onEmptyPadClick?: (padId: number) => void;  // Opens sample browser for empty pads
   onFocus?: () => void;  // Focus callback
+  padMode?: PadMode;
+  onQuickAssign?: (padId: number, rect: DOMRect) => void;
   className?: string;
 }
 
@@ -29,9 +34,21 @@ export const PadButton: React.FC<PadButtonProps> = ({
   onSelect,
   onEmptyPadClick,
   onFocus,
+  padMode = 'samples',
+  onQuickAssign,
   className = '',
 }) => {
   const useHex = useUIStore(s => s.useHexNumbers);
+  const activeFxPads = useDrumPadStore(s => s.activeFxPads);
+
+  // Compute mode mapping for non-samples modes
+  const padIndex = (pad.id - 1) % 16;
+  const modeMapping: ModePadMapping | undefined = useMemo(() => {
+    if (padMode === 'djfx') return DEFAULT_DJFX_PADS[padIndex];
+    if (padMode === 'oneshots') return DEFAULT_ONESHOT_PADS[padIndex];
+    if (padMode === 'scratch') return DEFAULT_SCRATCH_PADS[padIndex];
+    return undefined;
+  }, [padMode, padIndex]);
   const [isPressed, setIsPressed] = useState(false);
   const [triggerIntensity, setTriggerIntensity] = useState(0); // 0-1 animated flash
   const decayTimerRef = useRef<number | null>(null);
@@ -82,7 +99,12 @@ export const PadButton: React.FC<PadButtonProps> = ({
   }, []);
 
   // A pad is "loaded" if it has a sample, synth config, or legacy instrument assigned
-  const isLoaded = !!(pad.sample || pad.synthConfig || pad.instrumentId != null);
+  // In non-samples modes, a mode mapping counts as loaded
+  const isLoaded = padMode !== 'samples'
+    ? !!modeMapping
+    : !!(pad.sample || pad.synthConfig || pad.instrumentId != null);
+
+  const isFxActive = padMode === 'djfx' && activeFxPads.has(pad.id);
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
@@ -110,6 +132,14 @@ export const PadButton: React.FC<PadButtonProps> = ({
       onSelect(pad.id);
     }
   }, [pad.id, onSelect]);
+
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    if (onQuickAssign) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      onQuickAssign(pad.id, rect);
+    }
+  }, [pad.id, onQuickAssign]);
 
   // Touch support — use ref-based listeners with { passive: false } to allow preventDefault
   const touchHandlersRef = useRef({
@@ -161,6 +191,11 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   // Determine pad style based on state
   const padStyle = useMemo(() => {
+    // Mode mapping color takes priority in non-samples modes
+    if (modeMapping && padMode !== 'samples') {
+      return { className: '', bgColor: modeMapping.color };
+    }
+
     // Custom color takes priority
     if (pad.color && isLoaded) {
       return { className: '', bgColor: pad.color };
@@ -176,7 +211,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
     }
 
     return { className: 'bg-emerald-800', bgColor: undefined };
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.color, isSelected]);
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.color, isSelected, modeMapping, padMode]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
@@ -204,6 +239,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       onFocus={onFocus}
       tabIndex={0}
       aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty - click to assign)'}`}
@@ -228,9 +264,19 @@ export const PadButton: React.FC<PadButtonProps> = ({
       {/* Pad name */}
       <div className="absolute inset-0 flex items-center justify-center px-2">
         <span className="text-xs font-bold text-text-primary text-center truncate leading-tight">
-          {pad.name}
+          {modeMapping && padMode !== 'samples' ? modeMapping.label : pad.name}
         </span>
       </div>
+
+      {/* DJ FX active glow */}
+      {isFxActive && (
+        <div
+          className="absolute inset-0 rounded-lg pointer-events-none animate-pulse"
+          style={{
+            boxShadow: `0 0 12px 4px ${modeMapping?.color ?? '#fff'}`,
+          }}
+        />
+      )}
 
       {/* Pad badges */}
       <div className="absolute bottom-1 left-1 flex items-center gap-0.5">
@@ -255,8 +301,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
         </div>
       )}
 
-      {/* Empty state icon */}
-      {!isLoaded && (
+      {/* Empty state icon (samples mode only) */}
+      {!isLoaded && padMode === 'samples' && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-2xl text-white/20">+</div>
         </div>

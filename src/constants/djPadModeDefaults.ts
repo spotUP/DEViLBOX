@@ -1,0 +1,152 @@
+/**
+ * DJ Pad Mode Defaults — default pad mappings for the 4 DJ pad modes.
+ *
+ * Uses design-system color constants from pixi/colors.ts for consistent
+ * theming across DOM and GL renderers.
+ */
+
+import type { DjFxActionId } from '../engine/drumpad/DjFxActions';
+import type { ScratchActionId } from '../types/drumpad';
+import {
+  DJ_STUTTER, DJ_DELAY, DJ_FILTER, DJ_REVERB, DJ_MODULATION,
+  DJ_DISTORTION, DJ_TAPE, DJ_ONESHOT,
+  DJ_SCRATCH, DJ_SCRATCH_ADV, DJ_SCRATCH_EXP, DJ_SCRATCH_CTL,
+  colorToHex,
+} from '../pixi/colors';
+
+// ─── Interfaces ──────────────────────────────────────────────────────────────
+
+export interface ModePadMapping {
+  label: string;
+  category: string;
+  color: string;      // CSS hex '#rrggbb'
+  colorNum: number;    // 0xRRGGBB for GL
+}
+
+export interface DjFxPadMapping extends ModePadMapping {
+  actionId: DjFxActionId;
+}
+
+export interface OneShotPadMapping extends ModePadMapping {
+  presetIndex: number;
+}
+
+export interface ScratchPadMapping extends ModePadMapping {
+  actionId: ScratchActionId;
+}
+
+// ─── Category → Color maps ───────────────────────────────────────────────────
+
+export const DJ_FX_CATEGORY_COLORS: Record<string, number> = {
+  'Stutter': DJ_STUTTER,
+  'Delay': DJ_DELAY,
+  'Filter': DJ_FILTER,
+  'Reverb': DJ_REVERB,
+  'Modulation': DJ_MODULATION,
+  'Distortion': DJ_DISTORTION,
+  'Tape': DJ_TAPE,
+};
+
+export const ONE_SHOT_CATEGORY_COLORS: Record<string, number> = {
+  'Horns': DJ_ONESHOT,
+  'Sirens': DJ_DISTORTION,
+  'Impacts': DJ_MODULATION,
+  'Transitions': DJ_TAPE,
+  'Risers': DJ_FILTER,
+  'Lasers': DJ_SCRATCH,
+  'Noise': DJ_DELAY,
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fxPad(label: string, category: string, colorNum: number, actionId: DjFxActionId): DjFxPadMapping {
+  return { label, category, color: colorToHex(colorNum), colorNum, actionId };
+}
+
+function osPad(label: string, category: string, colorNum: number, presetIndex: number): OneShotPadMapping {
+  return { label, category, color: colorToHex(colorNum), colorNum, presetIndex };
+}
+
+function scPad(label: string, category: string, colorNum: number, actionId: ScratchActionId): ScratchPadMapping {
+  return { label, category, color: colorToHex(colorNum), colorNum, actionId };
+}
+
+// ─── Default DJ FX Pads (16) ─────────────────────────────────────────────────
+
+export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
+  // Row 1: Stutter x3, Delay x1
+  fxPad('Stutter 1/8',  'Stutter',     DJ_STUTTER,     'fx_stutter_8th'),
+  fxPad('Stutter 1/16', 'Stutter',     DJ_STUTTER,     'fx_stutter_16th'),
+  fxPad('Stutter 1/32', 'Stutter',     DJ_STUTTER,     'fx_stutter_32nd'),
+  fxPad('Dub Echo',     'Delay',       DJ_DELAY,       'fx_dub_echo'),
+  // Row 2: Delay x2, Filter x2
+  fxPad('Tape Echo',    'Delay',       DJ_DELAY,       'fx_tape_echo'),
+  fxPad('Ping Pong',    'Delay',       DJ_DELAY,       'fx_ping_pong'),
+  fxPad('HP Sweep',     'Filter',      DJ_FILTER,      'fx_filter_hp_sweep'),
+  fxPad('LP Sweep',     'Filter',      DJ_FILTER,      'fx_filter_lp_sweep'),
+  // Row 3: Reverb x1, Modulation x3
+  fxPad('Reverb Wash',  'Reverb',      DJ_REVERB,      'fx_reverb_wash'),
+  fxPad('Flanger',      'Modulation',  DJ_MODULATION,  'fx_flanger'),
+  fxPad('Phaser',       'Modulation',  DJ_MODULATION,  'fx_phaser'),
+  fxPad('Ring Mod',     'Modulation',  DJ_MODULATION,  'fx_ring_mod'),
+  // Row 4: Tape x2, Distortion x2
+  fxPad('Tape Stop',    'Tape',        DJ_TAPE,        'fx_tape_stop'),
+  fxPad('Vinyl Brake',  'Tape',        DJ_TAPE,        'fx_vinyl_brake'),
+  fxPad('Bitcrush',     'Distortion',  DJ_DISTORTION,  'fx_bitcrush'),
+  fxPad('Overdrive',    'Distortion',  DJ_DISTORTION,  'fx_overdrive'),
+];
+
+// ─── Default One-Shot Pads (16) ──────────────────────────────────────────────
+
+export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
+  // Horns x2
+  osPad('Air Horn',      'Horns',       DJ_ONESHOT,     0),
+  osPad('Reggae Horn',   'Horns',       DJ_ONESHOT,     1),
+  // Sirens x2
+  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  20),
+  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  21),
+  // Impacts x2
+  osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),
+  osPad('Boom',          'Impacts',     DJ_MODULATION,  12),
+  // Transitions x2
+  osPad('Rewind',        'Transitions', DJ_TAPE,        29),
+  osPad('Tape Stop',     'Transitions', DJ_TAPE,        30),
+  // Risers x4
+  osPad('Noise Riser',   'Risers',      DJ_FILTER,      6),
+  osPad('Freq Sweep',    'Risers',      DJ_FILTER,      8),
+  osPad('Dark Riser',    'Risers',      DJ_FILTER,      9),
+  osPad('Euphoria',      'Risers',      DJ_FILTER,      10),
+  // Lasers x2
+  osPad('DJ Laser',      'Lasers',      DJ_SCRATCH,     17),
+  osPad('Glitch Zap',    'Lasers',      DJ_SCRATCH,     18),
+  // Noise x1
+  osPad('Vinyl Scratch', 'Noise',       DJ_DELAY,       25),
+  // Transitions x1
+  osPad('Echo Washout',  'Transitions', DJ_TAPE,        28),
+];
+
+// ─── Default Scratch Pads (16) ───────────────────────────────────────────────
+
+export const DEFAULT_SCRATCH_PADS: ScratchPadMapping[] = [
+  // Basic x4
+  scPad('Baby',          'Basic',       DJ_SCRATCH,     'scratch_baby'),
+  scPad('Transform',     'Basic',       DJ_SCRATCH,     'scratch_trans'),
+  scPad('Flare',         'Basic',       DJ_SCRATCH,     'scratch_flare'),
+  scPad('Chirp',         'Basic',       DJ_SCRATCH,     'scratch_chirp'),
+  // Advanced x4
+  scPad('Crab',          'Advanced',    DJ_SCRATCH_ADV, 'scratch_crab'),
+  scPad('Orbit',         'Advanced',    DJ_SCRATCH_ADV, 'scratch_orbit'),
+  scPad('Hydro',         'Advanced',    DJ_SCRATCH_ADV, 'scratch_hydro'),
+  scPad('Tear',          'Advanced',    DJ_SCRATCH_ADV, 'scratch_tear'),
+  // Expert x4
+  scPad('Uzi',           'Expert',      DJ_SCRATCH_EXP, 'scratch_uzi'),
+  scPad('8-Crab',        'Expert',      DJ_SCRATCH_EXP, 'scratch_8crab'),
+  scPad('3-Flare',       'Expert',      DJ_SCRATCH_EXP, 'scratch_3flare'),
+  scPad('Twiddle',       'Expert',      DJ_SCRATCH_EXP, 'scratch_twiddle'),
+  // Special x3
+  scPad('Laser',         'Special',     DJ_SCRATCH_EXP, 'scratch_laser'),
+  scPad('Phaser',        'Special',     DJ_SCRATCH_EXP, 'scratch_phaser'),
+  scPad('Drag',          'Special',     DJ_SCRATCH_EXP, 'scratch_drag'),
+  // Control x1
+  scPad('Stop',          'Control',     DJ_SCRATCH_CTL, 'scratch_stop'),
+];
