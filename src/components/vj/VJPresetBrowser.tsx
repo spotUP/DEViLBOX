@@ -179,6 +179,9 @@ export const VJPresetBrowser: React.FC<VJPresetBrowserProps> = ({
         setEntries(e);
         setFavorites(loadFavorites(FAVORITES_KEY));
         setLoading(false);
+      }).catch(err => {
+        console.error('[VJPresetBrowser] Failed to load presets:', err);
+        setLoading(false);
       });
     }
   }, [isOpen, mode]);

@@ -104,6 +104,7 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
     const currentIdxRef = useRef(0);
     const visibleRef = useRef(visible);
     const [ready, setReady] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
 
     useEffect(() => { visibleRef.current = visible; }, [visible]);
 
@@ -170,7 +171,8 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
           bus.enable();
           audioDataBusRef.current = bus;
         } catch (err) {
-          void err;
+          console.error('[VJ] butterchurn load failed:', err);
+          if (!cancelled) setLoadFailed(true);
         }
       }
 
@@ -270,7 +272,9 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
         />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center bg-black">
-            <div className="text-white/60 font-mono text-sm">Loading Milkdrop visualizer...</div>
+            <div className="text-white/60 font-mono text-sm">
+              {loadFailed ? 'Butterchurn failed to load — using ISF/projectM' : 'Loading Milkdrop visualizer...'}
+            </div>
           </div>
         )}
       </>
