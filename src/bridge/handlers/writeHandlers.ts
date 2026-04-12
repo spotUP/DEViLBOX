@@ -2282,6 +2282,9 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
       const { exportMED } = await import('../../lib/export/MEDExporter');
       const buf = exportMED(song);
       result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.mmd0`, warnings: [] };
+    } else if (format === 'PreTracker' as string) {
+      const { exportAsPreTracker } = await import('../../lib/export/PreTrackerExporter');
+      result = await exportAsPreTracker(baseName);
     } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
       const { exportAsHively } = await import('../../lib/export/HivelyExporter');
       const hvlFmt = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';

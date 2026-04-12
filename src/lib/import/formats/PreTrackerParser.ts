@@ -18,6 +18,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { PreTrackerConfig } from '@/types/instrument';
 
 // ── Binary reading helpers ───────────────────────────────────────────────
 
@@ -166,15 +167,15 @@ export async function parsePreTrackerFile(
   interface PrtCell {
     note: number;
     instrument: number;
+    hasArpeggio: boolean;
     effectType: number;
     effectParam: number;
   }
 
   function readSingleChannelPattern(patIdx: number): PrtCell[] {
     if (patIdx === 0) {
-      // Pattern 0 is implicit empty
       return Array.from({ length: meta.rowsPerPattern }, () => ({
-        note: 0, instrument: 0, effectType: 0, effectParam: 0,
+        note: 0, instrument: 0, hasArpeggio: false, effectType: 0, effectParam: 0,
       }));
     }
     const base = meta.patternDataOffset + (patIdx - 1) * patternSize;
@@ -185,14 +186,19 @@ export async function parsePreTrackerFile(
         const b0 = u8(v, cellOff);
         const b1 = u8(v, cellOff + 1);
         const b2 = u8(v, cellOff + 2);
-        cells.push({
-          note: b0,
-          instrument: (b1 >> 4) & 0x0F,
-          effectType: b1 & 0x0F,
-          effectParam: b2,
-        });
+        // Full 3-byte cell format:
+        // b0: bits 5-0=note, bit 6=has_arpeggio, bit 7=instrument high bit
+        // b1: bits 7-4=instrument low nibble, bits 3-0=effect cmd
+        // b2: effect data
+        const note = b0 & 0x3F;
+        const hasArpeggio = (b0 & 0x40) !== 0;
+        const instHi = (b0 & 0x80) ? 0x10 : 0;
+        const instrument = instHi | ((b1 >> 4) & 0x0F);
+        const effectType = hasArpeggio ? 0 : (b1 & 0x0F);
+        const effectParam = b2;
+        cells.push({ note, instrument, hasArpeggio, effectType, effectParam });
       } else {
-        cells.push({ note: 0, instrument: 0, effectType: 0, effectParam: 0 });
+        cells.push({ note: 0, instrument: 0, hasArpeggio: false, effectType: 0, effectParam: 0 });
       }
     }
     return cells;
@@ -269,40 +275,57 @@ export async function parsePreTrackerFile(
         originalChannelCount: NUM_CHANNELS,
         originalPatternCount: meta.numPatterns,
         originalInstrumentCount: meta.numSamples,
+        prtTrackMap: posEntry.map(e => e.pattern),
+        prtTransposeMap: posEntry.map(e => e.transpose),
       },
     };
   });
 
   // ── Read instrument/sample names ─────────────────────────────────────
+  // Build a shared pretracker config that all instruments reference.
+  // Wave/instrument data will be populated from the WASM engine after load.
+  const prtConfig: PreTrackerConfig = {
+    waves: [],
+    instruments: [],
+    waveNames: [],
+    instrumentNames: [],
+    numPositions: meta.numPositions,
+    numSteps: meta.rowsPerPattern,
+    subsongCount: meta.subsongCount,
+    title: meta.songName,
+    author: '',
+  };
+
   const instruments: InstrumentConfig[] = [];
   if (meta.numSamples > 0) {
     let nameOff = meta.sampleNamesOffset;
     for (let i = 0; i < meta.numSamples && nameOff < buffer.byteLength; i++) {
       const name = readNullString(v, nameOff, 64);
-      nameOff += name.length + 1; // skip past null terminator
+      nameOff += name.length + 1;
       instruments.push({
         id: i + 1,
-        name: name || `Sample ${i + 1}`,
+        name: name || `Instrument ${i + 1}`,
         type: 'synth' as const,
         synthType: 'PreTrackerSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,
+        pretracker: prtConfig,
       } as unknown as InstrumentConfig);
     }
   }
 
-  // Ensure at least one instrument exists
   if (instruments.length === 0) {
     instruments.push({
       id: 1,
-      name: 'Sample 1',
+      name: 'Instrument 1',
       type: 'synth' as const,
-      synthType: 'Synth' as const,
+      synthType: 'PreTrackerSynth' as const,
       effects: [],
       volume: 0,
       pan: 0,
-    } as InstrumentConfig);
+      pretracker: prtConfig,
+    } as unknown as InstrumentConfig);
   }
 
   // Song positions: one per order entry (each is already a composite pattern)

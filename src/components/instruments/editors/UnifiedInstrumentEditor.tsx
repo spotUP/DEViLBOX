@@ -171,6 +171,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   // if (synthType === 'Amsynth') return 'amsynth' as EditorMode;
   // MdaEPiano/JX10/DX10, ToneAM, Raffo, CalfMono, SetBfree, SynthV1,
   // TalNoizeMaker, Aeolus, FluidSynth, ZynAddSubFX — fall through to 'layout' mode
+  if (synthType === 'PreTrackerSynth') return 'pretracker';
   if (isHivelyType(synthType)) return 'hively';
   if (isGTUltraType(synthType)) return 'gtultra';
   if (synthType === 'JamCrackerSynth') return 'jamcracker';
