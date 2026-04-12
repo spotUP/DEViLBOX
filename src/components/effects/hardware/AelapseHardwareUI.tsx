@@ -317,8 +317,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
-          // Position the springs overlay on the SpringsGL stub region.
-          // Stay hidden until we get valid bounds, then lock them in.
+          // Position the springs overlay using CSS clip-path instead of
+          // offset positioning. The overlay canvas is the SAME size as the
+          // JUCE canvas (avoids all coordinate mismatch issues) and
+          // clip-path restricts rendering to the SpringsGL region.
           if (!springsBoundsRef.current) {
             const sprX = modRef._aelapse_ui_get_springs_x();
             const sprY = modRef._aelapse_ui_get_springs_y();
@@ -326,11 +328,20 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             const sprH = modRef._aelapse_ui_get_springs_h();
             if (sprW > 10 && sprH > 10 && sprW < w && sprH < h) {
               springsBoundsRef.current = { x: sprX, y: sprY, w: sprW, h: sprH };
+              // Match JUCE canvas dimensions exactly
+              overlay.width  = w;
+              overlay.height = h;
+              overlay.style.width  = jcanvas.style.width;
+              overlay.style.height = jcanvas.style.height;
+              overlay.style.left   = '0';
+              overlay.style.top    = '0';
+              // Clip to SpringsGL region (CSS pixels)
               const cssScale = jcanvas.clientWidth / w;
-              overlay.style.left   = `${Math.round(sprX * cssScale)}px`;
-              overlay.style.top    = `${Math.round(sprY * cssScale)}px`;
-              overlay.style.width  = `${Math.round(sprW * cssScale)}px`;
-              overlay.style.height = `${Math.round(sprH * cssScale)}px`;
+              const cx = Math.round(sprX * cssScale);
+              const cy = Math.round(sprY * cssScale);
+              const cw = Math.round(sprW * cssScale);
+              const ch = Math.round(sprH * cssScale);
+              overlay.style.clipPath = `inset(${cy}px calc(100% - ${cx + cw}px) calc(100% - ${cy + ch}px) ${cx}px)`;
               overlay.style.display = 'block';
             }
           }
