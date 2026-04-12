@@ -275,6 +275,7 @@ export type SynthType =
   | 'MAMES14001A'     // SSi TSI S14001A delta modulation speech (Berzerk)
   | 'MAMEVLM5030'     // Sanyo VLM5030 LPC speech (Konami arcade)
   | 'MAMEHC55516'     // Harris HC55516 CVSD speech codec (Williams/Bally)
+  | 'RonKlarenSynth' // Ron Klaren Sound Module (wavetable synthesis + ADSR + vibrato)
   | 'StartrekkerAMSynth' // Startrekker AM synth (WASM replayer)
   | 'Geonkick'        // Geonkick percussion synth (Quamplex, GPL-3 WASM port)
   | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
