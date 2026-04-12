@@ -59,6 +59,8 @@ import { PixiStartrekkerAMPanel } from '../views/instruments/PixiStartrekkerAMPa
 import { PixiSidMon1Panel } from '../views/instruments/PixiSidMon1Panel';
 import { PixiOctaMEDPanel } from '../views/instruments/PixiOctaMEDPanel';
 import { PixiSymphoniePanel } from '../views/instruments/PixiSymphoniePanel';
+import { PixiGeonkickPanel } from '../views/instruments/PixiGeonkickPanel';
+import { PixiRonKlarenPanel } from '../views/instruments/PixiRonKlarenPanel';
 import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
@@ -1891,6 +1893,12 @@ const NativeInstrumentPanel: React.FC<{
   }
   if (instrument.synthType === 'OctaMEDSynth' && instrument.octamed) {
     return <PixiOctaMEDPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'Geonkick' && instrument.geonkick) {
+    return <PixiGeonkickPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'RonKlarenSynth' && instrument.ronKlaren) {
+    return <PixiRonKlarenPanel instrument={instrument} onUpdate={onUpdate} />;
   }
   if (instrument.synthType === 'SymphonieSynth' && instrument.symphonie) {
     return <PixiSymphoniePanel instrument={instrument} onUpdate={onUpdate} />;
