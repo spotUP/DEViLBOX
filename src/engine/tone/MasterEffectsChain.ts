@@ -142,20 +142,32 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   });
 
   // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
-  // Some effects (Buzzmachine, etc.) are DevilboxSynth objects with native
-  // Web Audio .input/.output GainNodes instead of Tone.ToneAudioNodes.
-  // Use getNativeAudioNode to bridge between Tone.js and native nodes.
+  // Most effects are Tone.ToneAudioNodes and use Tone's .connect() directly.
+  // DevilboxSynth effects (Buzzmachine) have native Web Audio .input/.output
+  // GainNodes — bridge those at the native level using getNativeAudioNode.
   const isNativeSynth = (n: any): boolean => !!(n.input && n.output && !(n instanceof Tone.ToneAudioNode));
 
-  /** Connect src (Tone or native) → dst (Tone or native) */
+  /** Connect src → dst, bridging Tone.js ↔ native when one side is a DevilboxSynth */
   const chainConnect = (src: any, dst: any) => {
-    const srcNode = isNativeSynth(src) ? src.output : getNativeAudioNode(src) ?? src;
-    const dstNode = isNativeSynth(dst) ? dst.input : getNativeAudioNode(dst) ?? dst;
-    if (srcNode instanceof AudioNode && dstNode instanceof AudioNode) {
-      srcNode.connect(dstNode);
-    } else {
-      // Tone→Tone fallback
+    const srcIsNative = isNativeSynth(src);
+    const dstIsNative = isNativeSynth(dst);
+
+    if (!srcIsNative && !dstIsNative) {
+      // Both Tone.js — use Tone's connect (preserves internal routing)
       src.connect(dst);
+    } else if (srcIsNative && dstIsNative) {
+      // Both native — direct Web Audio connect
+      (src.output as AudioNode).connect(dst.input as AudioNode);
+    } else if (srcIsNative) {
+      // Native → Tone: connect native output to Tone's native input
+      const dstNative = getNativeAudioNode(dst);
+      if (dstNative) (src.output as AudioNode).connect(dstNative);
+      else src.output.connect(dst);
+    } else {
+      // Tone → Native: connect Tone's native output to native input
+      const srcNative = getNativeAudioNode(src);
+      if (srcNative) srcNative.connect(dst.input as AudioNode);
+      else src.connect(dst.input);
     }
   };
 
