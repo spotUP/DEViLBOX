@@ -534,10 +534,14 @@ static bool aon_load(AonSong* song, const u8* data, u32 size) {
         u32 chunk_size = read_be32(data + pos + 4);
         pos += 8;
 
-        // Reject zero-size chunks (would cause infinite loop) and overflow
-        if (chunk_size == 0 || chunk_size > size - pos) {
-            fprintf(stderr, "AoN: chunk '%s' has invalid size %u\n", chunk_name, chunk_size);
+        // Reject overflow (chunk extends past file end)
+        if (chunk_size > size - pos) {
+            fprintf(stderr, "AoN: chunk '%s' has invalid size %u (pos=%u, file=%u)\n", chunk_name, chunk_size, pos, size);
             break;
+        }
+        // Zero-size chunks are valid (e.g. empty RMRK) — just skip them
+        if (chunk_size == 0) {
+            continue;
         }
 
         const u8* chunk = data + pos;
