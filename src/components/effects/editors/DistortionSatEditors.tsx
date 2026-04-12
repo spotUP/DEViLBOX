@@ -395,3 +395,59 @@ export const BassEnhancerEditor: React.FC<VisualEffectEditorProps> = ({ effect, 
     </div>
   );
 };
+
+// ============================================================================
+// SWEDISH CHAINSAW — Boss HM-2 + JCM800 tonestack
+// ============================================================================
+
+export const SwedishChainsawEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdateParameter, onUpdateWet }) => {
+  const tight = getParam(effect, 'tight', 0);
+  const pedalGain = getParam(effect, 'pedalGain', 50);
+  const ampGain = getParam(effect, 'ampGain', 50);
+  const bass = getParam(effect, 'bass', 5);
+  const middle = getParam(effect, 'middle', 50);
+  const treble = getParam(effect, 'treble', 50);
+  const volume = getParam(effect, 'volume', 50);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  return (
+    <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#dc2626" />
+      <Section>
+        <SectionHeader size="lg" color="#dc2626" title="HM-2 Pedal" />
+        <div className="flex justify-around items-end">
+          <Knob value={pedalGain} min={0} max={100} onChange={(v) => onUpdateParameter('pedalGain', v)}
+            label="Gain" color="#dc2626" formatValue={(v) => `${Math.round(v)}%`} />
+          <Knob value={tight} min={0} max={100} onChange={(v) => onUpdateParameter('tight', v > 50 ? 100 : 0)}
+            label="Tight" color="#b91c1c" formatValue={(v) => v > 50 ? 'ON' : 'OFF'} />
+        </div>
+      </Section>
+      <Section>
+        <SectionHeader size="lg" color="#92400e" title="Amplifier" />
+        <div className="flex justify-around items-end">
+          <Knob value={ampGain} min={0} max={100} onChange={(v) => onUpdateParameter('ampGain', v)}
+            label="Amp Gain" color="#92400e" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </Section>
+      <Section>
+        <SectionHeader size="lg" color="#b45309" title="Tone Stack" />
+        <div className="flex justify-around items-end">
+          <Knob value={bass} min={0} max={100} onChange={(v) => onUpdateParameter('bass', v)}
+            label="Bass" color="#78350f" formatValue={(v) => `${Math.round(v)}%`} />
+          <Knob value={middle} min={0} max={100} onChange={(v) => onUpdateParameter('middle', v)}
+            label="Middle" color="#92400e" formatValue={(v) => `${Math.round(v)}%`} />
+          <Knob value={treble} min={0} max={100} onChange={(v) => onUpdateParameter('treble', v)}
+            label="Treble" color="#b45309" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </Section>
+      <Section>
+        <div className="flex justify-around items-end">
+          <Knob value={volume} min={0} max={100} onChange={(v) => onUpdateParameter('volume', v)}
+            label="Volume" color="#fbbf24" formatValue={(v) => `${Math.round(v)}%`} />
+          <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet}
+            label="Mix" color="#6b7280" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </Section>
+    </div>
+  );
+};

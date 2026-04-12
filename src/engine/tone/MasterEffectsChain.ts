@@ -17,6 +17,21 @@ export interface MasterEffectsContext {
   updateBpmSyncedEffects: (bpm: number) => Promise<void>;
 }
 
+async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
+  if (!('getSidechainInput' in node)) return;
+  const scInput = (node as any).getSidechainInput() as Tone.Gain;
+  try { scInput.disconnect(); } catch { /* nothing connected */ }
+  if (sourceChannel < 0 || isNaN(sourceChannel)) return;
+  try {
+    const { getToneEngine } = await import('../ToneEngine');
+    const engine = getToneEngine();
+    const sourceOutput = engine.getChannelOutputByIndex(sourceChannel);
+    if (sourceOutput) {
+      sourceOutput.channel.connect(scInput);
+    }
+  } catch { /* Engine not ready */ }
+}
+
 /**
  * Rebuild entire master effects chain from config array (now async for neural effects)
  * Called when effects are added, removed, or reordered
@@ -139,11 +154,16 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Chain: masterEffectsInput → [effect → compGain?] → [effect → compGain?] → blepInput
   const chainNodes: Tone.ToneAudioNode[] = [];
   successNodes.forEach((node, index) => {
+    const config = successConfigs[index];
     ctx.masterEffectsNodes.push(node);
-    ctx.masterEffectConfigs.set(successConfigs[index].id, { node, config: successConfigs[index] });
+    ctx.masterEffectConfigs.set(config.id, { node, config });
     chainNodes.push(node);
 
-    const compLinear = getEffectGainCompensation(successConfigs[index].type);
+    if (typeof config.sidechainSource === 'number' && config.sidechainSource >= 0) {
+      void wireMasterSidechain(node, config.sidechainSource);
+    }
+
+    const compLinear = getEffectGainCompensation(config.type);
     if (compLinear !== 1) {
       const compGain = new Tone.Gain(compLinear);
       ctx.masterEffectsNodes.push(compGain); // tracked for disposal
@@ -378,9 +398,18 @@ export function updateMasterEffectParams(ctx: MasterEffectsContext, effectId: st
       }
     }
 
+    // Re-wire sidechain routing if sidechainSource changed
+    if ('sidechainSource' in changedParams && 'getSidechainInput' in node) {
+      void wireMasterSidechain(node as Tone.ToneAudioNode, Number(changedParams.sidechainSource));
+    }
+
+    // Strip routing params before sending to DSP
+    const dspParams = { ...changedParams };
+    delete dspParams.sidechainSource;
+
     // Only apply effect params if something actually changed
-    if (Object.keys(changedParams).length > 0) {
-      ctx.applyEffectParametersDiff(node, config.type, changedParams);
+    if (Object.keys(dspParams).length > 0) {
+      ctx.applyEffectParametersDiff(node, config.type, dspParams);
 
       // If bpmSync or syncDivision changed, immediately recompute synced params
       if ('bpmSync' in changedParams || 'syncDivision' in changedParams) {

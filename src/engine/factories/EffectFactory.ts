@@ -153,6 +153,8 @@ switch (type) {
     return { wow: 30, flutter: 20, hiss: 15, dropouts: 0, saturation: 30, toneShift: 50 };
   case 'AmbientDelay':
     return { time: 375, feedback: 55, taps: 2, filterType: 'lowpass', filterFreq: 2500, filterQ: 1.5, modRate: 30, modDepth: 15, stereoSpread: 50, diffusion: 20 };
+  case 'SwedishChainsaw':
+    return { tight: 0, pedalGain: 50, ampGain: 50, bass: 50, middle: 50, treble: 50, volume: 50 };
   default:
     return {};
 }
@@ -532,281 +534,22 @@ export async function createEffect(
       });
       break;
 
-    // Buzzmachines
-    case 'BuzzDistortion': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('ArguruDistortion');
-
-      // Apply parameters from config
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) {
-          synth.setParameter(paramIndex, value as number);
-        }
-      });
-
-      node = synth;
-      break;
-    }
-
-    case 'BuzzSVF': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('ElakSVF');
-
-      // Apply parameters from config
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) {
-          synth.setParameter(paramIndex, value as number);
-        }
-      });
-
-      node = synth;
-      break;
-    }
-
-    case 'BuzzDelay': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('JeskolaDelay');
-
-      // Apply parameters from config
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) {
-          synth.setParameter(paramIndex, value as number);
-        }
-      });
-
-      node = synth;
-      break;
-    }
-
-    case 'BuzzChorus': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('FSMChorus');
-
-      // Apply parameters from config
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) {
-          synth.setParameter(paramIndex, value as number);
-        }
-      });
-
-      node = synth;
-      break;
-    }
-
-    case 'BuzzCompressor': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('GeonikCompressor');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzOverdrive': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('GeonikOverdrive');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzDistortion2': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('JeskolaDistortion');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzCrossDelay': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('JeskolaCrossDelay');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzPhilta': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('FSMPhilta');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzDist2': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('ElakDist2');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzFreeverb': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('JeskolaFreeverb');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzFreqShift': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('BigyoFrequencyShifter');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzNotch': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('CyanPhaseNotch');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzStereoGain': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('DedaCodeStereoGain');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzSoftSat': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('GraueSoftSat');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzLimiter': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('LdSLimit');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzExciter': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('OomekExciter');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzMasterizer': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('OomekMasterizer');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzStereoDist': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('WhiteNoiseStereoDist');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzWhiteChorus': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('WhiteNoiseWhiteChorus');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzZfilter': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('QZfilter');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzChorus2': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('FSMChorus2');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
-    case 'BuzzPanzerDelay': {
-      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
-      const synth = new BuzzmachineSynth('FSMPanzerDelay');
-      Object.entries(config.parameters).forEach(([key, value]) => {
-        const paramIndex = parseInt(key, 10);
-        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
-      });
-      node = synth;
-      break;
-    }
-
     // WASM effects
+    case 'SwedishChainsaw': {
+      const { SwedishChainsawEffect } = await import('../effects/SwedishChainsawEffect');
+      node = new SwedishChainsawEffect({
+        tight: Number(p.tight) > 50 ? 1 : 0,
+        pedalGain: (Number(p.pedalGain) || 50) / 100,
+        ampGain: (Number(p.ampGain) || 50) / 100,
+        bass: (Number(p.bass) || 5) / 100,
+        middle: (Number(p.middle) || 50) / 100,
+        treble: (Number(p.treble) || 50) / 100,
+        volume: (Number(p.volume) || 50) / 100,
+        wet: wetValue,
+      });
+      break;
+    }
+
     case 'MoogFilter':
       node = new MoogFilterEffect({
         cutoff: Number(p.cutoff) || 1000,

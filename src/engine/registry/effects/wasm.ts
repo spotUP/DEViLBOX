@@ -1834,6 +1834,44 @@ const wasmEffects: EffectDescriptor[] = [
       { name: 'Dub Delay', params: { delayTime: 0.5, feedback: 0.8, mix: 0.55, toneFreq: 1500, drive: 0.5, wowDepth: 0.2, flutterDepth: 0.1 } },
     ],
   },
+  // ── Swedish Chainsaw — Boss HM-2 + JCM800 tonestack ──
+  {
+    id: 'SwedishChainsaw', name: 'Swedish Chainsaw', category: 'wasm', group: 'Distortion',
+    loadMode: 'eager',
+    create: async (c: EffectConfig) => {
+      const { SwedishChainsawEffect } = await import('@engine/effects/SwedishChainsawEffect');
+      const p = c.parameters;
+      return new SwedishChainsawEffect({
+        tight: Number(p.tight) > 50 ? 1 : 0,
+        pedalGain: (Number(p.pedalGain) || 50) / 100,
+        ampGain: (Number(p.ampGain) || 50) / 100,
+        bass: (Number(p.bass) || 50) / 100,
+        middle: (Number(p.middle) || 50) / 100,
+        treble: (Number(p.treble) || 50) / 100,
+        volume: (Number(p.volume) || 50) / 100,
+        wet: c.wet / 100,
+      });
+    },
+    getDefaultParameters: () => ({ tight: 0, pedalGain: 50, ampGain: 50, bass: 50, middle: 50, treble: 50, volume: 50 }),
+    presets: [
+      // ── Guitar presets ──
+      { name: 'Gothenburg Sound', params: { tight: 0, pedalGain: 75, ampGain: 60, bass: 70, middle: 30, treble: 65, volume: 50 } },
+      { name: 'Sunlight Studio', params: { tight: 0, pedalGain: 85, ampGain: 70, bass: 80, middle: 20, treble: 60, volume: 45 } },
+      { name: 'Entombed Buzz', params: { tight: 0, pedalGain: 90, ampGain: 75, bass: 90, middle: 15, treble: 55, volume: 40 } },
+      { name: 'Dismember Grind', params: { tight: 100, pedalGain: 80, ampGain: 65, bass: 60, middle: 25, treble: 70, volume: 50 } },
+      { name: 'HM-2 Clean Boost', params: { tight: 0, pedalGain: 30, ampGain: 20, bass: 50, middle: 50, treble: 50, volume: 60 } },
+      { name: 'Crust Punk', params: { tight: 100, pedalGain: 70, ampGain: 55, bass: 55, middle: 40, treble: 75, volume: 55 } },
+      { name: 'Doom Sludge', params: { tight: 0, pedalGain: 65, ampGain: 50, bass: 95, middle: 35, treble: 30, volume: 55 } },
+      { name: 'Shoegaze Wall', params: { tight: 0, pedalGain: 55, ampGain: 40, bass: 65, middle: 45, treble: 60, volume: 50 } },
+      // ── TB-303 presets ──
+      { name: '303 Acid Chainsaw', params: { tight: 100, pedalGain: 45, ampGain: 35, bass: 40, middle: 55, treble: 80, volume: 60 } },
+      { name: '303 Industrial', params: { tight: 100, pedalGain: 60, ampGain: 50, bass: 30, middle: 45, treble: 85, volume: 55 } },
+      { name: '303 Warm Overdrive', params: { tight: 0, pedalGain: 35, ampGain: 25, bass: 60, middle: 55, treble: 50, volume: 65 } },
+      { name: '303 Scream Machine', params: { tight: 100, pedalGain: 70, ampGain: 55, bass: 25, middle: 60, treble: 90, volume: 50 } },
+      { name: '303 Lo-Fi Tape', params: { tight: 0, pedalGain: 40, ampGain: 30, bass: 70, middle: 40, treble: 35, volume: 60 } },
+      { name: '303 Techno Crunch', params: { tight: 100, pedalGain: 50, ampGain: 40, bass: 45, middle: 50, treble: 70, volume: 60 } },
+    ],
+  },
 ];
 
 EffectRegistry.register(wasmEffects);

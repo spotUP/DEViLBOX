@@ -30,30 +30,6 @@ export type AudioEffectType =
   | 'BiPhase'
   | 'DubFilter'
   | 'Neural' // Neural effects category
-  // Buzzmachines (WASM-emulated Buzz effects)
-  | 'BuzzDistortion'   // Arguru Distortion
-  | 'BuzzSVF'          // Elak State Variable Filter
-  | 'BuzzDelay'        // Jeskola Delay
-  | 'BuzzChorus'       // FSM Chorus
-  | 'BuzzCompressor'   // Geonik Compressor
-  | 'BuzzOverdrive'    // Geonik Overdrive
-  | 'BuzzDistortion2'  // Jeskola Distortion
-  | 'BuzzCrossDelay'   // Jeskola Cross Delay
-  | 'BuzzPhilta'       // FSM Philta (filter)
-  | 'BuzzDist2'        // Elak Dist2
-  | 'BuzzFreeverb'     // Jeskola Freeverb (reverb)
-  | 'BuzzFreqShift'    // Bigyo Frequency Shifter
-  | 'BuzzNotch'        // CyanPhase Notch Filter
-  | 'BuzzStereoGain'   // DedaCode Stereo Gain
-  | 'BuzzSoftSat'      // Graue Soft Saturation
-  | 'BuzzLimiter'      // Ld Soft Limiter
-  | 'BuzzExciter'      // Oomek Exciter
-  | 'BuzzMasterizer'   // Oomek Masterizer
-  | 'BuzzStereoDist'   // WhiteNoise Stereo Distortion
-  | 'BuzzWhiteChorus'  // WhiteNoise White Chorus
-  | 'BuzzZfilter'      // Q Zfilter
-  | 'BuzzChorus2'      // FSM Chorus 2
-  | 'BuzzPanzerDelay'  // FSM Panzer Delay
   | 'SpaceyDelayer'    // WASM SpaceyDelayer multitap tape delay
   | 'RETapeEcho'       // WASM RE-150/201 tape echo
   // WASM effects (native C++ DSP via AudioWorklet)
@@ -66,6 +42,7 @@ export type AudioEffectType =
   | 'TapeSimulator'   // Kiss of Shame tape deck emulator (WASM port)
   | 'ToneArm'         // Physics-based vinyl playback simulation (AudioWorklet, 1:1 port)
   | 'Aelapse'         // Ælapse tape delay + spring reverb (WASM, smiarx/aelapse port)
+  | 'SwedishChainsaw' // Boss HM-2 + JCM800 tonestack (WASM, Barabas5532 port)
   | 'TapeDelay'       // RE-201/Echoplex tape delay (AudioWorklet, cyrusasfa port)
   // *Wave / ambient effects
   | 'ShimmerReverb'   // Shimmer reverb with pitch-shifted feedback (WASM)
@@ -87,7 +64,7 @@ export type AudioEffectType =
   | 'WAMGraphicEQ'      // Graphic Equalizer
   | 'WAMPedalboard';    // Pedalboard multi-FX
 
-export type EffectCategory = 'tonejs' | 'neural' | 'buzzmachine' | 'wasm' | 'wam';
+export type EffectCategory = 'tonejs' | 'neural' | 'wasm' | 'wam';
 
 export interface EffectConfig {
   id: string;

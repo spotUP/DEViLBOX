@@ -122,8 +122,8 @@ export default defineConfig({
     },
     // Reduce resource usage for better performance when running multiple servers
     watch: {
-      usePolling: false, // Disable polling to reduce CPU usage
-      ignored: ['**/node_modules/**', '**/dist/**', '**/Reference Code/**'],
+      usePolling: false,
+      ignored: ['**/*'], // Disable all file watching — HMR is off anyway
     },
     hmr: false, // Disabled — prevents browser reload during DJ sets / live use
   },

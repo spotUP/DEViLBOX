@@ -32,7 +32,6 @@ import { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, 
 import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
 import { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, GranularFreezeEditor } from './AdditionalEffectEditors';
-import { BuzzmachineEditor } from './BuzzmachineEditor';
 import { NeuralEditor } from './NeuralEditor';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 import { EffectPresetSelector } from './EffectPresetSelector';
@@ -51,6 +50,7 @@ import {
 import {
   OverdriveEditor, SaturatorEditor, ExciterEditor, AutoSatEditor, SatmaEditor,
   DistortionShaperEditor, TubeAmpEditor, CabinetSimEditor, DrivaEditor, BassEnhancerEditor,
+  SwedishChainsawEditor,
 } from './DistortionSatEditors';
 
 // Zynthian-ported EQ, modulation, reverb, delay, stereo, creative editors
@@ -72,7 +72,6 @@ export { SpaceyDelayerEditor, RETapeEchoEditor, SpaceEchoEditor, ToneArmEditor, 
 export { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, FrequencyShifterEditor, PitchShiftEditor, JCReverbEditor, StereoWidenerEditor } from './SpecializedEffectEditors';
 export { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
 export { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, GranularFreezeEditor } from './AdditionalEffectEditors';
-export { BuzzmachineEditor } from './BuzzmachineEditor';
 export { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
 // ============================================================================
@@ -158,6 +157,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   CabinetSim: CabinetSimEditor,
   Driva: DrivaEditor,
   BassEnhancer: BassEnhancerEditor,
+  SwedishChainsaw: SwedishChainsawEditor,
   // Zynthian-ported EQ effects
   ParametricEQ: ParametricEQEditor,
   EQ5Band: EQ5BandEditor,
@@ -197,30 +197,6 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   Masha: MashaEditor,
   Bitta: BittaEditor,
   Vinyl: VinylEditor,
-  // Buzzmachine WASM effects — dynamic knob editor
-  BuzzDistortion: BuzzmachineEditor,
-  BuzzOverdrive: BuzzmachineEditor,
-  BuzzDistortion2: BuzzmachineEditor,
-  BuzzDist2: BuzzmachineEditor,
-  BuzzSoftSat: BuzzmachineEditor,
-  BuzzStereoDist: BuzzmachineEditor,
-  BuzzSVF: BuzzmachineEditor,
-  BuzzPhilta: BuzzmachineEditor,
-  BuzzNotch: BuzzmachineEditor,
-  BuzzZfilter: BuzzmachineEditor,
-  BuzzDelay: BuzzmachineEditor,
-  BuzzCrossDelay: BuzzmachineEditor,
-  BuzzFreeverb: BuzzmachineEditor,
-  BuzzPanzerDelay: BuzzmachineEditor,
-  BuzzChorus: BuzzmachineEditor,
-  BuzzChorus2: BuzzmachineEditor,
-  BuzzWhiteChorus: BuzzmachineEditor,
-  BuzzFreqShift: BuzzmachineEditor,
-  BuzzCompressor: BuzzmachineEditor,
-  BuzzLimiter: BuzzmachineEditor,
-  BuzzExciter: BuzzmachineEditor,
-  BuzzMasterizer: BuzzmachineEditor,
-  BuzzStereoGain: BuzzmachineEditor,
   // Neural/GuitarML AI amp models
   Neural: NeuralEditor,
   // WAM 2.0 effects — embed native plugin GUI
@@ -333,6 +309,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   Satma:               { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#dc2626', border: '#3a1a0a' },
   DistortionShaper:    { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
   Driva:               { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#dc2626', border: '#3a1a0a' },
+  SwedishChainsaw:     { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
   // ── WASM effects — Modulation ──
   Flanger:             { bg: '#200a18', bgEnd: '#180614', accent: '#ec4899', border: '#301428' },
   RingMod:             { bg: '#200a18', bgEnd: '#180614', accent: '#ec4899', border: '#301428' },

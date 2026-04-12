@@ -391,3 +391,150 @@ void gk_wasm_set_osc_seed(gk_instance *kick, int osc_index, int seed)
         if (!kick || osc_index < 0) return;
         geonkick_set_osc_seed(kick, (size_t)osc_index, (unsigned int)seed);
 }
+
+/* ────────────────────────────────────────────────────────────────────
+ * Distortion input limiter (kick-level).
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_distortion_in_limiter(gk_instance *kick, double value)
+{
+        if (!kick) return;
+        geonkick_distortion_set_in_limiter(kick, (gkick_real)value);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Per-oscillator pitch shift and noise density.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_osc_pitch_shift(gk_instance *kick, int osc_index, double semitones)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_pitch_shift(kick, (size_t)osc_index, (gkick_real)semitones);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_noise_density(gk_instance *kick, int osc_index, double density)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_set_osc_noise_density(kick, (size_t)osc_index, (gkick_real)density);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * FM modulation depth (k factor).
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_osc_fm_k(gk_instance *kick, int osc_index, double k)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_set_fm_k(kick, (size_t)osc_index, (gkick_real)k);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Per-oscillator distortion (5 setters).
+ * gkick_distortion_type: 0=hard_clip..9=backward_compat.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_osc_distortion_enabled(gk_instance *kick, int osc_index, int enable)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_distortion_enable(kick, (size_t)osc_index, enable ? true : false);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_distortion_type(gk_instance *kick, int osc_index, int type)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_distortion_set_type(kick, (size_t)osc_index,
+                                         (enum gkick_distortion_type)type);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_distortion_in_limiter(gk_instance *kick, int osc_index, double value)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_distortion_set_in_limiter(kick, (size_t)osc_index, (gkick_real)value);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_distortion_out_limiter(gk_instance *kick, int osc_index, double value)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_distortion_set_out_limiter(kick, (size_t)osc_index, (gkick_real)value);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_distortion_drive(gk_instance *kick, int osc_index, double drive)
+{
+        if (!kick || osc_index < 0) return;
+        geonkick_osc_distortion_set_drive(kick, (size_t)osc_index, (gkick_real)drive);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Envelope apply type (linear vs logarithmic).
+ * gkick_envelope_apply_type: 0=linear, 1=logarithmic.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_kick_env_apply_type(gk_instance *kick, int env_type, int apply_type)
+{
+        if (!kick) return;
+        geonkick_kick_env_set_apply_type(kick,
+                                         (enum geonkick_envelope_type)env_type,
+                                         (enum gkick_envelope_apply_type)apply_type);
+}
+
+GK_EXPORT
+void gk_wasm_set_osc_env_apply_type(gk_instance *kick, int osc_index, int env_index, int apply_type)
+{
+        if (!kick || osc_index < 0 || env_index < 0) return;
+        geonkick_osc_envelope_set_apply_type(kick,
+                                             (size_t)osc_index,
+                                             (size_t)env_index,
+                                             (enum gkick_envelope_apply_type)apply_type);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Humanizer — velocity/timing variation.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_humanizer_enable(gk_instance *kick, int enable)
+{
+        if (!kick) return;
+        geonkick_humanizer_enable(kick, enable ? true : false);
+}
+
+GK_EXPORT
+void gk_wasm_humanizer_set_velocity(gk_instance *kick, double value)
+{
+        if (!kick) return;
+        geonkick_humanizer_set_velocity(kick, (float)value);
+}
+
+GK_EXPORT
+void gk_wasm_humanizer_set_timing(gk_instance *kick, double value)
+{
+        if (!kick) return;
+        geonkick_humanizer_set_timing(kick, (float)value);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Tuned output — pitch-tracks MIDI note.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_tune_audio_output(gk_instance *kick, int tune)
+{
+        if (!kick) return;
+        geonkick_tune_audio_output(kick, 0, tune ? true : false);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Sample loading for oscillator function type 7 (Sample).
+ * data is a float array of sample_count mono samples.
+ * ─────────────────────────────────────────────────────────────────── */
+GK_EXPORT
+void gk_wasm_set_osc_sample(gk_instance *kick, int osc_index,
+                            const float *data, int sample_count)
+{
+        if (!kick || osc_index < 0 || !data || sample_count <= 0) return;
+        geonkick_set_osc_sample(kick, (size_t)osc_index,
+                                (const gkick_real *)data, (size_t)sample_count);
+}

@@ -113,6 +113,65 @@ class GeonkickProcessor extends AudioWorkletProcessor {
       case 'setOscFunction':
         w._gk_wasm_set_osc_function(h, data.oscIndex | 0, data.func | 0);
         break;
+      case 'setOscPitchShift':
+        w._gk_wasm_set_osc_pitch_shift(h, data.oscIndex | 0, Number(data.semitones) || 0);
+        break;
+      case 'setOscNoiseDensity':
+        w._gk_wasm_set_osc_noise_density(h, data.oscIndex | 0, Number(data.density) || 0);
+        break;
+      case 'setOscFmK':
+        w._gk_wasm_set_osc_fm_k(h, data.oscIndex | 0, Number(data.k) || 0);
+        break;
+      case 'setDistortionInLimiter':
+        w._gk_wasm_set_distortion_in_limiter(h, Number(data.value) || 1);
+        break;
+      case 'setOscDistortionEnabled':
+        w._gk_wasm_set_osc_distortion_enabled(h, data.oscIndex | 0, data.enabled ? 1 : 0);
+        break;
+      case 'setOscDistortionType':
+        w._gk_wasm_set_osc_distortion_type(h, data.oscIndex | 0, data.distortionType | 0);
+        break;
+      case 'setOscDistortionInLimiter':
+        w._gk_wasm_set_osc_distortion_in_limiter(h, data.oscIndex | 0, Number(data.value) || 1);
+        break;
+      case 'setOscDistortionOutLimiter':
+        w._gk_wasm_set_osc_distortion_out_limiter(h, data.oscIndex | 0, Number(data.value) || 1);
+        break;
+      case 'setOscDistortionDrive':
+        w._gk_wasm_set_osc_distortion_drive(h, data.oscIndex | 0, Number(data.drive) || 0);
+        break;
+      case 'setKickEnvApplyType':
+        w._gk_wasm_set_kick_env_apply_type(h, data.envType | 0, data.applyType | 0);
+        break;
+      case 'setOscEnvApplyType':
+        w._gk_wasm_set_osc_env_apply_type(h, data.oscIndex | 0, data.envIndex | 0, data.applyType | 0);
+        break;
+      case 'setHumanizerEnabled':
+        w._gk_wasm_humanizer_enable(h, data.enabled ? 1 : 0);
+        break;
+      case 'setHumanizerVelocity':
+        w._gk_wasm_humanizer_set_velocity(h, Number(data.value) || 0);
+        break;
+      case 'setHumanizerTiming':
+        w._gk_wasm_humanizer_set_timing(h, Number(data.value) || 0);
+        break;
+      case 'setTunedOutput':
+        w._gk_wasm_tune_audio_output(h, data.tuned ? 1 : 0);
+        break;
+      case 'setOscSample': {
+        if (data.samples && data.samples.length > 0) {
+          const count = data.samples.length;
+          const ptr = w._malloc(count * 4);
+          if (ptr) {
+            const heap = w.HEAPF32;
+            const off = ptr >> 2;
+            for (let i = 0; i < count; i++) heap[off + i] = data.samples[i];
+            w._gk_wasm_set_osc_sample(h, data.oscIndex | 0, ptr, count);
+            w._free(ptr);
+          }
+        }
+        break;
+      }
       case 'setKickEnvelope': {
         const n = this.uploadEnvPoints(data.points);
         if (n > 0) {

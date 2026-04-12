@@ -15,6 +15,9 @@
 
 set -euo pipefail
 
+# Raise file descriptor limit — macOS default (256) is too low for Vite's file watchers
+ulimit -n 65536 2>/dev/null || true
+
 FRONTEND_PORT=5173
 BACKEND_PORT=3001
 COLLAB_PORT=4002
