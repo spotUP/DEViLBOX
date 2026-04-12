@@ -74,6 +74,8 @@ interface Args {
   reportPath: string;
   crashThreshold: number;
   relayUrl: string;
+  scenario: string | null;
+  musicDir: string | null;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -92,6 +94,8 @@ function parseArgs(argv: string[]): Args {
     reportPath: get('report', 'tools/soak-report.md')!,
     crashThreshold: Number(get('crash-threshold', '50')),
     relayUrl: get('relay', 'ws://localhost:4003/mcp')!,
+    scenario: get('scenario') ?? null,
+    musicDir: get('music-dir') ?? null,
   };
 }
 
@@ -455,22 +459,257 @@ function writeReport(
   return lines.join('\n');
 }
 
+// ─── DJ/VJ scenario runner ──────────────────────────────────────────────────
+
+interface ScenarioResult {
+  cycle: number;
+  actionOk: number;
+  actionFail: number;
+  frameStats: Array<{ timestamp: number; p50: number; p95: number; p99: number; max: number; jank: number }>;
+  gpuStats: Array<{ timestamp: number; renderer: string; maxTextureSize: number }>;
+  heapStats: Array<{ timestamp: number; data: unknown }>;
+  errors: string[];
+}
+
+async function runScenarioMode(client: RelayClient, args: Args): Promise<void> {
+  const { buildGigScenario } = await import('./soak-scenarios/gig');
+
+  // Discover music files for track loading
+  const musicDir = args.musicDir || args.moduleDir;
+  console.log(`[soak-dj] discovering tracks in ${musicDir} ...`);
+  const tracks = await walkDir(resolve(musicDir));
+  if (tracks.length === 0) {
+    console.error(`[soak-dj] no music files found in ${musicDir}`);
+    process.exit(3);
+  }
+  shuffle(tracks);
+  console.log(`[soak-dj] discovered ${tracks.length} tracks`);
+
+  const startTs = Date.now();
+  const endTs = startTs + args.durationHours * 3600_000;
+  let stopRequested = false;
+  let trackIdx = 0;
+
+  process.on('SIGINT', () => {
+    console.log('\n[soak-dj] SIGINT — writing report');
+    stopRequested = true;
+  });
+
+  const result: ScenarioResult = {
+    cycle: 0,
+    actionOk: 0,
+    actionFail: 0,
+    frameStats: [],
+    gpuStats: [],
+    heapStats: [],
+    errors: [],
+  };
+
+  let activeSide: 'A' | 'B' = 'A';
+
+  while (!stopRequested && Date.now() < endTs) {
+    const scenario = buildGigScenario(activeSide);
+    const cycleStart = Date.now();
+    result.cycle++;
+
+    console.log(
+      `[soak-dj ${fmtDuration(Date.now() - startTs)}] ` +
+      `cycle #${result.cycle}: ${scenario.name} ` +
+      `(remaining ${fmtDuration(endTs - Date.now())})`
+    );
+
+    // Walk steps in time order
+    const sortedSteps = [...scenario.steps].sort((a, b) => a.t - b.t);
+    for (const step of sortedSteps) {
+      if (stopRequested) break;
+
+      // Wait until step time
+      const targetMs = cycleStart + step.t * 1000;
+      const waitMs = targetMs - Date.now();
+      if (waitMs > 0) await sleep(waitMs);
+
+      // Log
+      if (step.log) {
+        console.log(`  [t=${step.t}s] ${step.log}`);
+      }
+
+      // Action
+      if (step.action) {
+        try {
+          const actionArgs = { ...step.args } as Record<string, unknown>;
+          // Replace __RANDOM_TRACK__ placeholder with a real path
+          if (actionArgs.path === '__RANDOM_TRACK__') {
+            actionArgs.path = tracks[trackIdx % tracks.length];
+            trackIdx++;
+          }
+
+          await client.call('dj_vj_action', {
+            action: step.action,
+            args: actionArgs,
+          });
+          result.actionOk++;
+        } catch (err) {
+          result.actionFail++;
+          const msg = `cycle ${result.cycle} t=${step.t}s ${step.action}: ${(err as Error).message}`;
+          result.errors.push(msg);
+          console.warn(`  [FAIL] ${msg}`);
+        }
+      }
+
+      // Telemetry
+      if (step.telemetry === 'frame') {
+        try {
+          const stats = await client.call('get_frame_stats') as Record<string, number>;
+          if (stats) {
+            result.frameStats.push({
+              timestamp: Date.now(),
+              p50: stats.p50Ms ?? 0,
+              p95: stats.p95Ms ?? 0,
+              p99: stats.p99Ms ?? 0,
+              max: stats.maxMs ?? 0,
+              jank: stats.jankRatio ?? 0,
+            });
+          }
+        } catch { /* telemetry failure is non-fatal */ }
+      }
+      if (step.telemetry === 'gpu') {
+        try {
+          const stats = await client.call('get_gpu_stats') as Record<string, unknown>;
+          if (stats) {
+            result.gpuStats.push({
+              timestamp: Date.now(),
+              renderer: String(stats.renderer ?? 'unknown'),
+              maxTextureSize: Number(stats.maxTextureSize ?? 0),
+            });
+          }
+        } catch { /* non-fatal */ }
+      }
+      if (step.telemetry === 'heap') {
+        try {
+          const data = await client.call('get_monitoring_data');
+          result.heapStats.push({ timestamp: Date.now(), data });
+        } catch { /* non-fatal */ }
+      }
+    }
+
+    // Wait for cycle to finish (any remaining time)
+    const cycleEnd = cycleStart + scenario.cycleDurationSec * 1000;
+    const remaining = cycleEnd - Date.now();
+    if (remaining > 0 && !stopRequested) await sleep(remaining);
+
+    // Swap deck roles
+    activeSide = activeSide === 'A' ? 'B' : 'A';
+  }
+
+  client.close();
+
+  // Write scenario report
+  const lines: string[] = [];
+  lines.push('# DEViLBOX DJ/VJ Soak Test Report');
+  lines.push('');
+  lines.push(`- **Start**: ${new Date(startTs).toISOString()}`);
+  lines.push(`- **End**:   ${new Date().toISOString()}`);
+  lines.push(`- **Duration**: ${fmtDuration(Date.now() - startTs)} (target ${args.durationHours}h)`);
+  lines.push(`- **Cycles**: ${result.cycle}`);
+  lines.push(`- **Actions OK**: ${result.actionOk}`);
+  lines.push(`- **Actions FAIL**: ${result.actionFail}`);
+  lines.push('');
+
+  // Frame stats
+  if (result.frameStats.length > 0) {
+    lines.push('## Frame Time');
+    lines.push('');
+    const p95s = result.frameStats.map(f => f.p95);
+    const janks = result.frameStats.map(f => f.jank);
+    lines.push(`| Snapshot | p50 | p95 | p99 | max | jank% |`);
+    lines.push(`|---------|-----|-----|-----|-----|-------|`);
+    for (let i = 0; i < result.frameStats.length; i++) {
+      const f = result.frameStats[i];
+      lines.push(`| ${i + 1} | ${f.p50.toFixed(1)} | ${f.p95.toFixed(1)} | ${f.p99.toFixed(1)} | ${f.max.toFixed(1)} | ${(f.jank * 100).toFixed(1)}% |`);
+    }
+    lines.push('');
+
+    // Stability check: p95 std dev between first-third and last-third
+    if (p95s.length >= 6) {
+      const firstThird = p95s.slice(0, Math.floor(p95s.length / 3));
+      const lastThird = p95s.slice(-Math.floor(p95s.length / 3));
+      const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+      const drift = Math.abs(mean(lastThird) - mean(firstThird));
+      lines.push(`- p95 drift (first→last third): ${drift.toFixed(1)} ms`);
+      lines.push(`- Mean jank ratio: ${(mean(janks) * 100).toFixed(2)}%`);
+    }
+    lines.push('');
+  }
+
+  // GPU stats
+  if (result.gpuStats.length > 0) {
+    lines.push('## GPU');
+    lines.push(`- Renderer: ${result.gpuStats[0].renderer}`);
+    lines.push(`- Max texture: ${result.gpuStats[0].maxTextureSize}`);
+    lines.push('');
+  }
+
+  // Heap stats
+  if (result.heapStats.length > 0) {
+    lines.push('## Memory');
+    const heapSeries: number[] = [];
+    for (const s of result.heapStats) {
+      const bytes = extractHeapBytes(s.data);
+      if (bytes !== undefined) heapSeries.push(bytes);
+    }
+    if (heapSeries.length > 0) {
+      const mb = (b: number) => (b / 1024 / 1024).toFixed(1) + ' MB';
+      const min = Math.min(...heapSeries);
+      const max = Math.max(...heapSeries);
+      lines.push(`- Heap min: ${mb(min)}`);
+      lines.push(`- Heap max: ${mb(max)}`);
+      lines.push(`- Drift: ${mb(max - min)}`);
+      lines.push(`- Sparkline: ${sparkline(heapSeries)}`);
+    }
+    lines.push('');
+  }
+
+  // Errors
+  if (result.errors.length > 0) {
+    lines.push('## Action Failures');
+    for (const e of result.errors) lines.push(`- ${e}`);
+    lines.push('');
+  }
+
+  // Pass/fail gate
+  lines.push('## Pass/Fail');
+  const heapDriftOk = (() => {
+    const heapSeries: number[] = [];
+    for (const s of result.heapStats) {
+      const b = extractHeapBytes(s.data);
+      if (b !== undefined) heapSeries.push(b);
+    }
+    if (heapSeries.length < 2) return true; // not enough data
+    return (Math.max(...heapSeries) - Math.min(...heapSeries)) < 50 * 1024 * 1024;
+  })();
+  const jankOk = result.frameStats.length === 0 ||
+    result.frameStats.every(f => f.jank < 0.01);
+  const actionsOk = result.actionFail === 0;
+  const pass = heapDriftOk && jankOk && actionsOk;
+  lines.push(`- Heap drift < 50 MB: ${heapDriftOk ? 'PASS' : 'FAIL'}`);
+  lines.push(`- Jank < 1%: ${jankOk ? 'PASS' : 'FAIL'}`);
+  lines.push(`- Zero action failures: ${actionsOk ? 'PASS' : 'FAIL'}`);
+  lines.push(`- **Overall: ${pass ? 'PASS' : 'FAIL'}**`);
+  lines.push('');
+
+  const report = lines.join('\n');
+  await writeFile(resolve(args.reportPath), report, 'utf8');
+  console.log(`[soak-dj] report written: ${resolve(args.reportPath)}`);
+  process.exit(pass ? 0 : 1);
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   console.log('[soak] config:', args);
 
-  const moduleDir = resolve(args.moduleDir);
-  console.log(`[soak] discovering modules in ${moduleDir} ...`);
-  const modules = await walkDir(moduleDir);
-  if (modules.length === 0) {
-    console.error(`[soak] no supported modules found under ${moduleDir}`);
-    process.exit(3);
-  }
-  shuffle(modules);
-  console.log(`[soak] discovered ${modules.length} modules`);
-
+  // ── Connect to relay ────────────────────────────────────────────────
   const client = new RelayClient(args.relayUrl);
   try {
     await client.connect();
@@ -480,6 +719,24 @@ async function main(): Promise<void> {
     console.error('[soak] is the dev server running and is the browser open?');
     process.exit(2);
   }
+
+  // ── Branch: scenario mode vs format-cycling mode ────────────────────
+  if (args.scenario) {
+    console.log(`[soak] scenario mode: ${args.scenario}`);
+    await runScenarioMode(client, args);
+    return;
+  }
+
+  // ── Format-cycling mode (original behavior) ─────────────────────────
+  const moduleDir = resolve(args.moduleDir);
+  console.log(`[soak] discovering modules in ${moduleDir} ...`);
+  const modules = await walkDir(moduleDir);
+  if (modules.length === 0) {
+    console.error(`[soak] no supported modules found under ${moduleDir}`);
+    process.exit(3);
+  }
+  shuffle(modules);
+  console.log(`[soak] discovered ${modules.length} modules`);
 
   const startTs = Date.now();
   const endTs = startTs + args.durationHours * 3600_000;
