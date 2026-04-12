@@ -361,6 +361,23 @@ function parseAsylumAMF(v: DataView, raw: Uint8Array, filename: string): Tracker
     numPatterns,
     moduleSize: v.byteLength,
     encodeCell: encodeAMFCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 4-byte ASYLUM cell: [note, instr, command, param]
+      const noteRaw = bytes[0];
+      const instr   = bytes[1];
+      const command = bytes[2];
+      const param   = bytes[3];
+
+      // ASYLUM note: noteRaw > 0 && noteRaw + 12 + 1 <= 120 → noteRaw + 13
+      let note = 0;
+      if (noteRaw > 0 && noteRaw + 13 <= 120) {
+        note = noteRaw + 13;
+      }
+
+      const { effTyp, eff } = convertModCommand(command, param);
+
+      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

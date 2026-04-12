@@ -424,6 +424,42 @@ export async function parseTCBTrackerFile(
     numPatterns,
     moduleSize: buf.length,
     encodeCell: encodeTCBTrackerCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 2-byte TCB Tracker cell decode
+      const noteByte    = bytes[0];
+      const instrEffect = bytes[1];
+
+      const rawInstr   = (instrEffect >> 4) + 1; // 1-based instrument
+      const effectType = instrEffect & 0x0F;
+
+      // Note: high nibble=octave, low nibble=semitone (0x10-0x3B valid)
+      // xmNote = octave*12 + semitone + 37 + noteOffset
+      let xmNote = 0;
+      if (noteByte >= 0x10 && noteByte <= 0x3B) {
+        const octave   = noteByte >> 4;
+        const semitone = noteByte & 0x0F;
+        if (semitone < 12) {
+          xmNote = octave * 12 + semitone + 37 + noteOffset;
+        }
+      }
+
+      // Effect: only pattern break (0x0D) is mapped
+      let effTyp = 0;
+      let eff = 0;
+      if (effectType === 0x0D) {
+        effTyp = 0x0D;
+      }
+
+      return {
+        note: xmNote,
+        instrument: xmNote > 0 || effectType > 0 ? rawInstr : 0,
+        volume: 0,
+        effTyp,
+        eff,
+        effTyp2: 0,
+        eff2: 0,
+      };
+    },
   };
 
   return {

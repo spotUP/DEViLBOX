@@ -584,6 +584,27 @@ export async function parsePLMFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodePLMCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 5-byte PLM cell decode
+      const noteByte = bytes[0];
+      const instr    = bytes[1];
+      const volByte  = bytes[2];
+      const cmd      = bytes[3];
+      const param    = bytes[4];
+
+      // Note: 0=empty, >=0x90=ignore, else (hi*12)+lo+12+1
+      let note = 0;
+      if (noteByte > 0 && noteByte < 0x90) {
+        note = ((noteByte >> 4) * 12) + (noteByte & 0x0F) + 12 + 1;
+      }
+
+      // Volume: 0xFF = empty (0x00), else 0x10 + min(volByte, 64)
+      const volume = volByte !== 0xFF ? 0x10 + Math.min(volByte, 64) : 0x00;
+
+      const [effTyp, eff] = transformEffect(cmd, param);
+
+      return { note, instrument: instr, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // PLM uses a 2D canvas; resolve through the pre-built offset map
       const key = `${pattern}:${row}:${channel}`;

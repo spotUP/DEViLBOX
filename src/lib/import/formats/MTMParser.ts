@@ -354,6 +354,20 @@ export async function parseMTMFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeMTMCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 3-byte MTM cell decode
+      const noteInstr = bytes[0];
+      const instrCmd  = bytes[1];
+      const par       = bytes[2];
+
+      const rawNote = noteInstr >> 2;
+      const note    = (noteInstr & 0xFC) !== 0 ? mtmNoteToXM(rawNote) : 0;
+      const instr   = ((noteInstr & 0x03) << 4) | (instrCmd >> 4);
+      const cmd     = instrCmd & 0x0F;
+      const { effTyp, eff } = mapMTMEffect(cmd, par);
+
+      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const refs = patTrackTable[pattern];
       if (!refs) return 0;

@@ -1282,6 +1282,25 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     numPatterns: numFCPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: createFCEncoder(instrReverseMap),
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of FCEncoder's 2-byte cell: [note, val]
+      const noteByte = bytes[0];
+      const val      = bytes[1];
+
+      // Note: 0=empty, 0x49=note-off (97), 1-72 → raw + 37
+      let note = 0;
+      if (noteByte === 0x49) {
+        note = 97; // note off
+      } else if (noteByte >= 1 && noteByte <= 72) {
+        note = noteByte + 37;
+      }
+
+      // Instrument: val bits[0-5] = FC vol macro index → trackerInstrId
+      const fcIdx = val & 0x3F;
+      const instrument = macroToInstrument.get(fcIdx) ?? waveToInstrument.get(fcIdx) ?? fcIdx;
+
+      return { note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern, row, channel) => {
       // TrackerSong pattern = sequence index, channel maps to FC pattern via seq.pat[ch]
       const seq = sequences[pattern];

@@ -362,6 +362,27 @@ export async function parseIMSFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeIMSCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of parser's 3-byte IMS cell decode
+      const b0 = bytes[0];
+      const b1 = bytes[1];
+      const b2 = bytes[2];
+
+      const noteIdx    = b0 & 0x3F;
+      const instrHi    = (b0 & 0xC0) >> 2;   // bits [5:4] of instrument
+      const instrLo    = (b1 & 0xF0) >> 4;   // bits [3:0] of instrument
+      const instrument = instrHi | instrLo;
+      const effTyp     = b1 & 0x0F;
+      const eff        = b2;
+
+      // imsNoteToXM: 63=empty(0), 0-47 → 13+noteIdx
+      let note = 0;
+      if (noteIdx !== 63 && noteIdx < 48) {
+        note = 13 + noteIdx;
+      }
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {
