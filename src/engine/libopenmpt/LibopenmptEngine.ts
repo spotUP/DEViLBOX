@@ -279,6 +279,8 @@ export class LibopenmptEngine {
     console.log('[LibopenmptEngine] play(): sending', data.byteLength, 'bytes to worklet');
     // Clear isolation state — worklet's play() destroys all slots
     this._isolationSlotMasks.fill(null);
+    // Restore gain (muted by stop())
+    try { if (this.gainNode) this.gainNode.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
     this.workletNode.port.postMessage({ cmd: 'play', val: data });
     this._playing = true;
 
@@ -304,6 +306,9 @@ export class LibopenmptEngine {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'stop' });
     this._playing = false;
+    // Immediately mute output to prevent audio leaking while the async
+    // stop message is processed by the worklet thread.
+    try { if (this.gainNode) this.gainNode.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
     this._onTransportEvent?.('stop');
   }
 
@@ -315,6 +320,7 @@ export class LibopenmptEngine {
 
   resume(): void {
     if (!this.workletNode) return;
+    try { if (this.gainNode) this.gainNode.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
     this.workletNode.port.postMessage({ cmd: 'unpause' });
     this._onTransportEvent?.('unpause');
   }
