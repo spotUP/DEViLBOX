@@ -81,17 +81,25 @@ class UADEProcessor extends AudioWorkletProcessor {
         // _uade_wasm_stop() tears down the WASM player state; just setting _playing=true
         // would cause _uade_wasm_render() to return 0 (ended) immediately → silence.
         if (this._needsReload && this._lastData && this._wasm && this._ready) {
-          this._wasm._uade_wasm_stop();
-          const reloadRet = this._loadIntoWasm(this._lastData, this._lastHint);
-          if (reloadRet !== 0) {
-            console.error('[UADE.worklet] Failed to reload song for play (ret=' + reloadRet + ')');
+          try {
+            this._wasm._uade_wasm_stop();
+            const reloadRet = this._loadIntoWasm(this._lastData, this._lastHint);
+            if (reloadRet !== 0) {
+              console.error('[UADE.worklet] Failed to reload song for play (ret=' + reloadRet + ')');
+              this._lastLoadFailed = true;
+              this.port.postMessage({ type: 'error', message: 'Failed to reload song for playback' });
+              break;
+            }
+            if (this._currentSubsong > 0) {
+              this._wasm._uade_wasm_set_subsong(this._currentSubsong);
+            }
+            this._needsReload = false;
+          } catch (reloadErr) {
+            console.error('[UADE.worklet] Reload threw:', reloadErr.message || reloadErr);
+            this._lastLoadFailed = true;
             this.port.postMessage({ type: 'error', message: 'Failed to reload song for playback' });
             break;
           }
-          if (this._currentSubsong > 0) {
-            this._wasm._uade_wasm_set_subsong(this._currentSubsong);
-          }
-          this._needsReload = false;
         }
         this._playing = true;
         this._paused = false;
@@ -671,21 +679,31 @@ class UADEProcessor extends AudioWorkletProcessor {
     // paths like "paranoimia/cust.paranoimia" cause "Cannot write to MEMFS".
     const basename = filenameHint.includes('/') ? filenameHint.split('/').pop() : filenameHint;
 
-    const ptr = this._wasm._malloc(data.byteLength);
-    if (!ptr) throw new Error('malloc failed for file data (' + data.byteLength + ' bytes)');
-    this._wasm.HEAPU8.set(data, ptr);
+    let ptr = 0, hintPtr = 0;
+    try {
+      ptr = this._wasm._malloc(data.byteLength);
+      if (!ptr) throw new Error('malloc failed for file data (' + data.byteLength + ' bytes)');
+      this._wasm.HEAPU8.set(data, ptr);
 
-    const hintLen = basename.length * 3 + 1;
-    const hintPtr = this._wasm._malloc(hintLen);
-    if (!hintPtr) throw new Error('malloc failed for filename hint');
-    this._wasm.stringToUTF8(basename, hintPtr, hintLen);
+      const hintLen = basename.length * 3 + 1;
+      hintPtr = this._wasm._malloc(hintLen);
+      if (!hintPtr) throw new Error('malloc failed for filename hint');
+      this._wasm.stringToUTF8(basename, hintPtr, hintLen);
 
-    this._lastAbortReason = null;
-    const ret = this._wasm._uade_wasm_load(ptr, data.byteLength, hintPtr);
+      this._lastAbortReason = null;
+      const ret = this._wasm._uade_wasm_load(ptr, data.byteLength, hintPtr);
 
-    this._wasm._free(ptr);
-    this._wasm._free(hintPtr);
-    return ret;
+      this._wasm._free(ptr);
+      this._wasm._free(hintPtr);
+      return ret;
+    } catch (err) {
+      // Clean up any allocated memory on failure
+      try { if (ptr) this._wasm._free(ptr); } catch { /* wasm may be dead */ }
+      try { if (hintPtr) this._wasm._free(hintPtr); } catch { /* wasm may be dead */ }
+      // Mark as failed so next load triggers full reinit
+      this._lastLoadFailed = true;
+      throw err;
+    }
   }
 
   async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false, scanTimeoutSec = undefined) {
@@ -898,6 +916,8 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       this.port.postMessage(msg);
     } catch (err) {
+      // Ensure next load triggers full WASM reinit after any exception
+      this._lastLoadFailed = true;
       let errMsg;
       if (err instanceof Error) {
         errMsg = err.message + (err.stack ? '\n' + err.stack : '');
@@ -909,7 +929,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         errMsg = String(err);
       }
       console.error('[UADE.worklet] Load error:', errMsg);
-      this.port.postMessage({ type: 'error', message: errMsg });
+      this.port.postMessage({ type: 'error', message: 'UADE could not play: ' + this._lastHint + ' (' + errMsg + ')' });
     }
   }
 
@@ -1937,7 +1957,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     const outR = outputs[0][1] || outputs[0][0];  // Mono fallback
     const frames = outL.length;  // Usually 128
 
-    if (!this._ready || !this._playing || this._paused) {
+    if (!this._ready || !this._playing || this._paused || !this._wasm) {
       // Silence
       outL.fill(0);
       if (outR !== outL) outR.fill(0);
