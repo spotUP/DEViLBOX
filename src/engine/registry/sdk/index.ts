@@ -72,3 +72,9 @@ SynthRegistry.registerLazy(
   ['ModularSynth'],
   () => import('./modularsynth').then(() => {}),
 );
+
+// ── Demoscene synths (WaveSabre, Oidos, Tunefish) ──────────────────────────
+SynthRegistry.registerLazy(
+  ['WaveSabreSynth', 'OidosSynth', 'TunefishSynth'],
+  () => import('./demoscene').then(() => {}),
+);
