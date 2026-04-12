@@ -318,14 +318,15 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           // Position springs overlay. Use percentage-based CSS so it
           // works regardless of container scaling. The springs panel is
           // the right ~20% width, top ~50% height of the 720×400 editor.
-          if (overlay.style.display === 'none' && jcanvas.clientWidth > 0) {
-            const cw = jcanvas.clientWidth;
-            const ch = jcanvas.clientHeight;
+          // Reposition springs overlay to track JUCE canvas size changes
+          const cw = jcanvas.clientWidth;
+          const ch = jcanvas.clientHeight;
+          if (cw > 0 && ch > 0) {
             overlay.style.left   = `${Math.round(cw * 0.80)}px`;
             overlay.style.top    = `${Math.round(ch * 0.12)}px`;
             overlay.style.width  = `${Math.round(cw * 0.19)}px`;
             overlay.style.height = `${Math.round(ch * 0.52)}px`;
-            overlay.style.display = 'block';
+            if (overlay.style.display === 'none') overlay.style.display = 'block';
           }
 
           // Springs overlay — pull latest RMS snapshot and a handful of
