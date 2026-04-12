@@ -22,6 +22,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -156,5 +158,16 @@ export function parseInfogramesFile(buffer: ArrayBuffer, filename: string): Trac
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'infogrames',
+      patternDataFileOffset: 0,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: 4,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+      decodeCell: decodeMODCell,
+    } as UADEPatternLayout,
   };
 }

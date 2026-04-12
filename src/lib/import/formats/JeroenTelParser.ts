@@ -31,6 +31,10 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { amigaNoteToXM } from './AmigaUtils';
 
+// NOTE: uadePatternLayout not added — Jeroen Tel uses variable-length byte stream
+// encoding per track (not fixed-size cells). Requires UADEVariablePatternLayout with
+// per-track address/size tracking during parsing.
+
 // ── Constants ───────────────────────────────────────────────────────────────
 
 /** Minimum file size enforced by the Check2 routine (ble.b Fault if <= 1700). */

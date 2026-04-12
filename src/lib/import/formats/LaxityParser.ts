@@ -12,6 +12,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 /** ProTracker / MOD marker tags at offset 0x438 */
 const MOD_TAGS = ['M.K.', 'M!K!', 'FLT4', 'FLT8', '4CHN', '6CHN', '8CHN'];
@@ -83,5 +85,15 @@ export function parseLaxityFile(buffer: ArrayBuffer, filename: string): TrackerS
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'mod',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: 4,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+    } satisfies UADEPatternLayout,
   };
 }

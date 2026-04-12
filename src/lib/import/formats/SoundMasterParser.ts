@@ -31,6 +31,10 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
 
+// NOTE: uadePatternLayout not added — Sound Master uses compiled 68k executable
+// layout with variable-length note data discovered by opcode scanning. No fixed-size
+// cell format exists. Requires UADEVariablePatternLayout with per-track tracking.
+
 // ── Constants ───────────────────────────────────────────────────────────────
 
 /**
