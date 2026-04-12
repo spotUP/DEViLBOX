@@ -35,6 +35,7 @@ import { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, Granula
 import { BuzzmachineEditor } from './BuzzmachineEditor';
 import { NeuralEditor } from './NeuralEditor';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
+import { EffectPresetSelector } from './EffectPresetSelector';
 
 // Zynthian-ported dynamics editors
 import {
@@ -605,6 +606,11 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
               <p className="text-[11px] text-text-secondary font-medium">
                 {effect.enabled ? 'Active' : 'Bypassed'} | Mix: {effect.wet}%
               </p>
+              <EffectPresetSelector
+                effect={effect}
+                onApply={(params) => onUpdateParameters?.(params)}
+                color={enc.accent}
+              />
             </div>
           </div>
         </div>
