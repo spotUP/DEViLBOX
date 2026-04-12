@@ -1903,10 +1903,19 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
+      // In DJ/VJ view: block ALL tracker-specific shortcuts (undo, redo, play song,
+      // Right Shift, delete, etc). The DJ/VJ views have their own controls.
+      // DJ scratch commands (registered with 'dj' context) are still allowed through
+      // because they are dispatched via the registry below, not here.
+      const _activeView = useUIStore.getState().activeView;
+      const _isDJVJ = _activeView === 'dj' || _activeView === 'vj';
+
       // Right Shift = play song from start, Right Alt/Option = play pattern from start.
       // Uses the same code path as the toolbar buttons — playSong/playPattern handle
       // both cold start and restart (including WASM engine stop+restart).
+      // Skip in DJ/VJ view — these shortcuts would corrupt the active song.
       if (e.code === 'ShiftRight' || e.code === 'AltRight') {
+        if (_isDJVJ) return;
         e.preventDefault();
         e.stopPropagation();
         if (e.code === 'ShiftRight') playSong(); else playPattern();
@@ -1945,6 +1954,25 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       if (!commandName) {
         // No mapping found - let browser handle it
         return;
+      }
+
+      // In DJ/VJ view: block tracker-destructive commands that have no meaning
+      // in the DJ view and could corrupt the song (undo/redo) or collide with
+      // DJ controls (play_song, delete, etc).
+      if (_isDJVJ) {
+        const TRACKER_ONLY_COMMANDS = new Set([
+          'undo', 'redo', 'undo_revert_pattern',
+          'play_song', 'play_song_from_order', 'play_song_alt', 'play_from_start',
+          'play_pattern', 'play_from_cursor', 'play_row', 'play_line', 'play_block',
+          'play_stop_toggle', 'stop', 'stop_and_reset', 'pause',
+          'delete_note', 'delete_and_pull', 'delete_and_pull_up', 'delete_line',
+          'insert_row', 'insert_line', 'clear_pattern', 'clear_channel',
+          'cut_row', 'cut_note', 'clear_note', 'clear_row', 'delete_row_pull_up',
+          'toggle_edit_mode', 'toggle_record', 'recording',
+        ]);
+        if (TRACKER_ONLY_COMMANDS.has(commandName)) {
+          return;
+        }
       }
 
       // Get current context
