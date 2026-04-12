@@ -398,11 +398,11 @@ export class HivelyEngine implements IsolationCapableEngine {
   }
 }
 
-// Register with the per-channel isolation system
+// Register with the per-channel isolation system (hively editor mode)
 registerIsolationEngineResolver(async () => {
   if (HivelyEngine.hasInstance()) {
     const engine = HivelyEngine.getInstance();
     if (engine.isAvailable()) return engine;
   }
   return null;
-});
+}, 'hively');

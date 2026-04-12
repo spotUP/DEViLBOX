@@ -1223,11 +1223,11 @@ export class UADEEngine implements IsolationCapableEngine {
   }
 }
 
-// Register with the per-channel isolation system
+// Register with the per-channel isolation system (tfmx editor mode = UADE formats)
 registerIsolationEngineResolver(async () => {
   if (UADEEngine.hasInstance()) {
     const engine = UADEEngine.getInstance();
     if (engine.isAvailable()) return engine;
   }
   return null;
-});
+}, 'tfmx');
