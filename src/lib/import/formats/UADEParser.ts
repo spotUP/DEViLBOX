@@ -1271,7 +1271,6 @@ export async function parseUADEFile(
       const warnings = activeEnhancedScan?.warnings ?? [];
       if (warnings.length > 0) {
         console.warn('[UADEParser] Scan warnings:', warnings);
-        song.name = `${song.name} [${warnings.join('; ')}]`;
       }
       song.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
       song.uadeEditableFileName ??= filename;
