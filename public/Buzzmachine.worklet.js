@@ -1191,29 +1191,13 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   }
 
   setParameter(paramIndex, value) {
-    if (!this.buzzModule || !this.globalValsPtr) return;
+    if (!this.buzzModule || !this.machinePtr) return;
 
-    const layout = this.paramLayout && this.paramLayout[paramIndex];
-    if (!layout) {
-      // Fallback for machines without layout: assume word at paramIndex*2
-      const offset = this.globalValsPtr + (paramIndex * 2);
-      this.writeWord(offset, value);
-      return;
-    }
-
-    // Determine target pointer (global or track)
-    let basePtr = this.globalValsPtr;
-    if (layout.isTrack && this.trackValsPtr) {
-      basePtr = this.trackValsPtr;
-    }
-
-    const offset = basePtr + layout.byteOffset;
-    const clamped = Math.max(0, Math.round(value));
-
-    if (layout.size === 1) {
-      this.writeByte(offset, Math.min(0xFF, clamped));
-    } else {
-      this.writeWord(offset, Math.min(0xFFFF, clamped));
+    // Use the C++ buzz_set_parameter — it knows the struct layout
+    // and writes byte/word at the correct offset via CMachineInfo
+    if (typeof this.buzzModule._buzz_set_parameter === 'function') {
+      const clamped = Math.max(0, Math.round(value));
+      this.buzzModule._buzz_set_parameter(this.machinePtr, paramIndex, clamped);
     }
   }
 
