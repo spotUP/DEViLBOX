@@ -759,5 +759,6 @@ export function parseMDXFile(buffer: ArrayBuffer): TrackerSong {
     numChannels,
     initialSpeed: 6,
     initialBPM: bpm,
+    mdxminiFileData: buffer.slice(0),
   };
 }
