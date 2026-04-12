@@ -242,6 +242,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   },
   {
     category: 'wasm',
+    type: 'Aelapse',
+    label: 'Ælapse Tape+Springs',
+    group: 'Reverb & Delay',
+    description: 'Tape delay chained into a 4-spring reverb tank — saturation, drift, 3 delay modes, spring scatter & chaos. Port of smiarx/aelapse with hardware JUCE UI (WASM)',
+  },
+  {
+    category: 'wasm',
     type: 'VinylNoise',
     label: 'Vinyl Noise',
     group: 'Texture',
