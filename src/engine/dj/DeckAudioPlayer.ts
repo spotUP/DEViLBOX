@@ -43,6 +43,7 @@ export class DeckAudioPlayer {
   private _loopOut: number | null = null;
   private _loopCheckTimer: number | null = null;
   private _originalFileBytes: ArrayBuffer | null = null;
+  private _disposed = false;
 
   constructor(outputNode: Tone.ToneAudioNode) {
     this.player = new Tone.Player({
@@ -191,6 +192,7 @@ export class DeckAudioPlayer {
    * Checkpoints position before applying new rate so getPosition() stays accurate.
    */
   setPlaybackRate(rate: number): void {
+    const clamped = Math.max(0, Math.min(4, rate)); // 0x to 4x — covers any realistic scratch or pitch bend
     if (this._loaded && this.player.state === 'started') {
       // Checkpoint current position before rate change
       const now = Tone.now();
@@ -206,8 +208,8 @@ export class DeckAudioPlayer {
       }
       this._rateChangeTime = now;
     }
-    this._playbackRate = rate;
-    this.player.playbackRate = rate;
+    this._playbackRate = clamped;
+    this.player.playbackRate = clamped;
   }
 
   getPlaybackRate(): number {
@@ -316,10 +318,17 @@ export class DeckAudioPlayer {
    * Pass null to clear a loop point.
    */
   setLoopRegion(loopIn: number | null, loopOut: number | null): void {
-    this._loopIn = loopIn;
-    this._loopOut = loopOut;
+    if (loopIn !== null && loopOut !== null) {
+      const clampedIn = Math.max(0, Math.min(loopIn, this._duration));
+      const clampedOut = Math.max(clampedIn + 0.001, Math.min(loopOut, this._duration));
+      this._loopIn = clampedIn;
+      this._loopOut = clampedOut;
+    } else {
+      this._loopIn = loopIn;
+      this._loopOut = loopOut;
+    }
 
-    if (loopIn !== null && loopOut !== null && loopOut > loopIn) {
+    if (this._loopIn !== null && this._loopOut !== null && this._loopOut > this._loopIn) {
       this.startLoopCheck();
     } else {
       this.stopLoopCheck();
@@ -333,6 +342,7 @@ export class DeckAudioPlayer {
   private startLoopCheck(): void {
     this.stopLoopCheck();
     const check = () => {
+      if (!this._loaded || this._disposed) return; // player is gone — don't reschedule
       if (this._loopIn === null || this._loopOut === null) {
         this.stopLoopCheck();
         return;
@@ -354,6 +364,7 @@ export class DeckAudioPlayer {
   }
 
   dispose(): void {
+    this._disposed = true;  // set BEFORE stopLoopCheck so any in-flight rAF sees it
     this.stopLoopCheck();
     try { this.player.stop(); } catch { /* ignore */ }
     this.player.disconnect();
