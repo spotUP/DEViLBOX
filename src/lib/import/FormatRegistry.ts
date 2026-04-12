@@ -1692,6 +1692,16 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/SAPParser', parseFn: 'parseSAPFile' },
   },
   {
+    key: 'asap-native',
+    label: 'ASAP',
+    description: 'Atari 8-bit POKEY native formats (CMC/RMT/TMC/DLT/MPT)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.(cmc|cm3|cmr|cms|dmc|dlt|mpt|mpd|rmt|tmc|tm8|tm2|fc)$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/AsapParser', parseFn: 'parseAsapFile' },
+  },
+  {
     key: 'ay',
     label: 'AY',
     description: 'ZX Spectrum AY (ZXAYEMUL)',
