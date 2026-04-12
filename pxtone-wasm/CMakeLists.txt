@@ -25,6 +25,8 @@ target_include_directories(Pxtone PRIVATE
 
 target_compile_definitions(Pxtone PRIVATE
     _WASM
+    pxINCLUDE_OGGVORBIS
+    pxINCLUDE_OGGVORBIS_STB
 )
 
 target_compile_options(Pxtone PRIVATE
