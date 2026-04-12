@@ -233,6 +233,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
         // Mouse event forwarding.
         const onMouseDown = (e: MouseEvent) => {
           e.preventDefault();
+          e.stopPropagation();
           jcanvas.focus();
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_down(cx, cy, getModifiers(e));
@@ -242,6 +243,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           m._aelapse_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
         const onMouseMove = (e: MouseEvent) => {
+          if ((e.buttons & 1) !== 0) e.preventDefault();
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_move(cx, cy, getModifiers(e));
         };
@@ -393,6 +395,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             display: loaded ? 'block' : 'none',
             cursor: 'default',
             imageRendering: 'pixelated',
+            touchAction: 'none',
           }}
         />
         <canvas
