@@ -388,5 +388,6 @@ export function parsePMDFile(buffer: ArrayBuffer): TrackerSong {
     numChannels: numCh,
     initialSpeed: 6,
     initialBPM: 125,
+    pmdFileData: buffer.slice(0),
   };
 }
