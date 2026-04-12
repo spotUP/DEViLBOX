@@ -487,6 +487,10 @@ export async function parseCheeseCutterFile(
     songPositions.push(patIdx);
   }
 
+  // Tag all patterns with sourceFormat so usePatternPlayback routes to C64SIDEngine
+  const meta = { sourceFormat: 'SID' as const, originalIndex: 0 };
+  for (const p of patterns) (p as any).importMetadata = meta;
+
   // ── Build instrument configs ────────────────────────────────────────
   const instruments: InstrumentConfig[] = [];
   for (let i = 0; i < MAX_INSTRUMENTS; i++) {
