@@ -261,6 +261,84 @@ void aelapse_ui_set_program(int p) { if (g_processor) g_processor->setCurrentPro
 EMSCRIPTEN_KEEPALIVE
 int aelapse_ui_get_program_count() { return g_processor ? g_processor->getNumPrograms() : 0; }
 
+// ── Springs overlay bounds ──────────────────────────────────────────────────
+// Returns the editor-relative bounds [x, y, w, h] of the SpringsGL stub
+// component so the React wrapper can position the WebGL2 overlay canvas
+// exactly on top of the region the JUCE editor left empty.
+
+EMSCRIPTEN_KEEPALIVE
+int aelapse_ui_get_springs_x()
+{
+    if (!g_editor) return 0;
+    // Find the Component named "Springs" (set in SpringsSection constructor)
+    std::function<juce::Component*(juce::Component*)> find =
+        [&](juce::Component* c) -> juce::Component* {
+            if (c->getName() == "Springs") return c;
+            for (int i = 0; i < c->getNumChildComponents(); ++i) {
+                if (auto* r = find(c->getChildComponent(i))) return r;
+            }
+            return nullptr;
+        };
+    auto* spr = find(g_editor);
+    if (!spr) return 0;
+    auto pos = spr->getPosition();
+    for (auto* p = spr->getParentComponent(); p && p != g_editor; p = p->getParentComponent())
+        pos += p->getPosition();
+    return static_cast<int>(pos.x * g_scale);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int aelapse_ui_get_springs_y()
+{
+    if (!g_editor) return 0;
+    std::function<juce::Component*(juce::Component*)> find =
+        [&](juce::Component* c) -> juce::Component* {
+            if (c->getName() == "Springs") return c;
+            for (int i = 0; i < c->getNumChildComponents(); ++i) {
+                if (auto* r = find(c->getChildComponent(i))) return r;
+            }
+            return nullptr;
+        };
+    auto* spr = find(g_editor);
+    if (!spr) return 0;
+    auto pos = spr->getPosition();
+    for (auto* p = spr->getParentComponent(); p && p != g_editor; p = p->getParentComponent())
+        pos += p->getPosition();
+    return static_cast<int>(pos.y * g_scale);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int aelapse_ui_get_springs_w()
+{
+    if (!g_editor) return 0;
+    std::function<juce::Component*(juce::Component*)> find =
+        [&](juce::Component* c) -> juce::Component* {
+            if (c->getName() == "Springs") return c;
+            for (int i = 0; i < c->getNumChildComponents(); ++i) {
+                if (auto* r = find(c->getChildComponent(i))) return r;
+            }
+            return nullptr;
+        };
+    auto* spr = find(g_editor);
+    return spr ? static_cast<int>(spr->getWidth() * g_scale) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int aelapse_ui_get_springs_h()
+{
+    if (!g_editor) return 0;
+    std::function<juce::Component*(juce::Component*)> find =
+        [&](juce::Component* c) -> juce::Component* {
+            if (c->getName() == "Springs") return c;
+            for (int i = 0; i < c->getNumChildComponents(); ++i) {
+                if (auto* r = find(c->getChildComponent(i))) return r;
+            }
+            return nullptr;
+        };
+    auto* spr = find(g_editor);
+    return spr ? static_cast<int>(spr->getHeight() * g_scale) : 0;
+}
+
 // ── Cleanup ─────────────────────────────────────────────────────────────────
 
 EMSCRIPTEN_KEEPALIVE

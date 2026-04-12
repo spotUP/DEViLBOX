@@ -144,6 +144,10 @@ set(EXPORTED_FUNCS
     "_aelapse_ui_set_program"
     "_aelapse_ui_get_program_count"
     "_aelapse_ui_shutdown"
+    "_aelapse_ui_get_springs_x"
+    "_aelapse_ui_get_springs_y"
+    "_aelapse_ui_get_springs_w"
+    "_aelapse_ui_get_springs_h"
     "_malloc"
     "_free"
 )

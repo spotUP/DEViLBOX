@@ -39,6 +39,10 @@ interface AelapseUIModule {
   _aelapse_ui_set_param: (index: number, value: number) => void;
   _aelapse_ui_get_param: (index: number) => number;
   _aelapse_ui_get_param_count: () => number;
+  _aelapse_ui_get_springs_x: () => number;
+  _aelapse_ui_get_springs_y: () => number;
+  _aelapse_ui_get_springs_w: () => number;
+  _aelapse_ui_get_springs_h: () => number;
   _aelapse_ui_shutdown: () => void;
   _malloc: (n: number) => number;
   _free: (p: number) => void;
@@ -310,19 +314,29 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           const memBuf = modRef.wasmMemory?.buffer ?? modRef.HEAPU8?.buffer;
           if (memBuf) blitFramebuffer(modRef, memBuf, ctx, imgData, w, h);
 
+          // Position the springs overlay exactly on top of the stubbed
+          // SpringsGL component inside the JUCE editor.
+          const sprX = modRef._aelapse_ui_get_springs_x();
+          const sprY = modRef._aelapse_ui_get_springs_y();
+          const sprW = modRef._aelapse_ui_get_springs_w();
+          const sprH = modRef._aelapse_ui_get_springs_h();
+
+          if (sprW > 0 && sprH > 0) {
+            // Convert framebuffer pixels to CSS pixels (match the JUCE
+            // canvas's CSS scaling so they stay 1:1).
+            const cssScale = jcanvas.clientWidth / w;
+            overlay.style.left   = `${Math.round(sprX * cssScale)}px`;
+            overlay.style.top    = `${Math.round(sprY * cssScale)}px`;
+            overlay.style.width  = `${Math.round(sprW * cssScale)}px`;
+            overlay.style.height = `${Math.round(sprH * cssScale)}px`;
+          }
+
           // Springs overlay — pull latest RMS snapshot and a handful of
           // knob values straight from the JUCE param vector.
           const rmsSnap = getRMSSnapshot?.() ?? null;
           const stack = rmsSnap ? rmsSnap.stack : fallbackRMSRef.current;
           const pos   = rmsSnap ? rmsSnap.pos   : 0;
 
-          // JUCE indices: match aelapse::PluginProcessor::ParamId —
-          //   kSpringsDamp = 15  → radius
-          //   kSpringsShape = 17 → shape
-          //   kSpringsChaos = 20 → coils (mapped through: chaos → coils
-          //                        is a bit of an alias but matches the
-          //                        visual feedback the reference plugin
-          //                        gives its spring display)
           const radius = modRef._aelapse_ui_get_param(15);
           const shape  = modRef._aelapse_ui_get_param(17);
           const coils  = modRef._aelapse_ui_get_param(20);
