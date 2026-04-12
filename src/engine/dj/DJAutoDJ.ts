@@ -31,7 +31,8 @@ type TransitionType = 'crossfade' | 'cut' | 'echo-out' | 'filter-build' | 'bass-
 
 const POLL_INTERVAL_MS = 500;
 const PRELOAD_LEAD_TIME_SEC = 60;
-const MAX_SKIP_ATTEMPTS = 50; // Skip up to 50 unloadable tracks (local files without modland: prefix)
+const MAX_SKIP_ATTEMPTS = 50;
+const MAX_CONSECUTIVE_NETWORK_FAILURES = 3;
 const SKIP_TRANSITION_BARS = 4;
 
 
@@ -60,6 +61,9 @@ class DJAutoDJ {
   // Stale position detection — if timeRemaining doesn't change for too long, force preload
   private lastTimeRemaining = Infinity;
   private staleCount = 0;
+  // Network-down backoff — exponential delay between retry attempts
+  private preloadFailCount = 0;
+  private lastPreloadFailTime = 0;
 
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -360,13 +364,17 @@ class DJAutoDJ {
         // Waiting for preload — handled by preloadNextTrack callback
         break;
 
-      case 'preload-failed':
-        // Retry preload — previous attempt failed, try again
-        console.log('[AutoDJ] Retrying after preload failure');
+      case 'preload-failed': {
+        // Exponential backoff: 5s, 10s, 20s, 40s… capped at 60s
+        const backoffMs = Math.min(60_000, 5_000 * Math.pow(2, this.preloadFailCount - 1));
+        const elapsed = Date.now() - this.lastPreloadFailTime;
+        if (elapsed < backoffMs) break; // Wait for backoff to expire
+        console.log(`[AutoDJ] Retrying preload after ${(elapsed / 1000).toFixed(0)}s backoff (attempt ${this.preloadFailCount})`);
         this.preloading = false;
         this.preloadedDeck = null;
         store.setAutoDJStatus('playing');
         break;
+      }
 
       case 'idle':
         this.stopPolling();
@@ -390,11 +398,11 @@ class DJAutoDJ {
     store.setAutoDJStatus('preloading');
     let nextIdx = store.autoDJNextTrackIndex;
     let attempts = 0;
+    let consecutiveNetworkFailures = 0;
 
     while (attempts < MAX_SKIP_ATTEMPTS) {
       const track = playlist.tracks[nextIdx];
       if (!track) {
-        // End of playlist — loop back
         nextIdx = 0;
         if (attempts > 0) break;
         attempts++;
@@ -407,7 +415,8 @@ class DJAutoDJ {
         const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
         if (loaded) {
           this.preloadedDeck = this.idleDeck;
-    
+          this.preloadFailCount = 0;
+
           useDJStore.getState().setAutoDJTrackIndices(
             useDJStore.getState().autoDJCurrentTrackIndex,
             nextIdx,
@@ -421,17 +430,33 @@ class DJAutoDJ {
         console.error(`[AutoDJ] Preload failed for ${track.fileName}:`, err);
       }
 
-      // Track couldn't be loaded — skip to next
+      // Detect network-down vs bad-track: "Failed to fetch" means the server is unreachable
+      const isNetworkError = !navigator.onLine || await this.isServerUnreachable();
+      if (isNetworkError) {
+        consecutiveNetworkFailures++;
+        if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
+          console.error(`[AutoDJ] Server unreachable — stopping preload after ${consecutiveNetworkFailures} consecutive network failures`);
+          this.preloadFailCount++;
+          this.lastPreloadFailTime = Date.now();
+          useDJStore.getState().setAutoDJStatus('preload-failed');
+          this.preloading = false;
+          return;
+        }
+      } else {
+        consecutiveNetworkFailures = 0;
+      }
+
       attempts++;
       nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
       console.warn(`[AutoDJ] Skipping unloadable track, trying index ${nextIdx}`);
     }
 
-    // All attempts failed
+    // All attempts exhausted (bad tracks, not network)
     console.error('[AutoDJ] Failed to preload any track after', MAX_SKIP_ATTEMPTS, 'attempts');
+    this.preloadFailCount++;
+    this.lastPreloadFailTime = Date.now();
     useDJStore.getState().setAutoDJStatus('preload-failed');
     this.preloading = false;
-
   }
 
   // ── Private: Transition ──────────────────────────────────────────────────
@@ -604,6 +629,21 @@ class DJAutoDJ {
     this.preloadNextTrack().catch(err =>
       console.warn('[AutoDJ] preload failed:', err instanceof Error ? err.message : err)
     );
+  }
+
+  // ── Private: Network Health ──────────────────────────────────────────────
+
+  private async isServerUnreachable(): Promise<boolean> {
+    const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+    try {
+      const resp = await fetch(`${API_URL}/modland/status`, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000),
+      });
+      return !resp.ok;
+    } catch {
+      return true;
+    }
   }
 
   // ── Private: Helpers ─────────────────────────────────────────────────────
