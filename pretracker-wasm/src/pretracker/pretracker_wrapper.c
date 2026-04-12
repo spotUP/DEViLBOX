@@ -129,6 +129,15 @@ EXPORT void player_get_channel_levels(float* out) {
     memcpy(out, g_channel_levels, 4 * sizeof(float));
 }
 
+EXPORT float* player_get_scope_buffer(int ch) {
+    if (ch < 0 || ch >= 4) return NULL;
+    return g_scope_bufs[ch];
+}
+
+EXPORT int player_get_scope_buffer_size(void) {
+    return g_scope_buf_size;
+}
+
 EXPORT void player_set_solo_channel(int ch) {
     if (g_song) pre_song_set_solo_channel(g_song, ch);
 }

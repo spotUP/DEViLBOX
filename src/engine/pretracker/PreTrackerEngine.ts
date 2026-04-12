@@ -8,6 +8,7 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import type { IsolationCapableEngine } from '@/engine/tone/ChannelRoutedEffects';
 
 export interface PreTrackerMetadata {
   title: string;
@@ -104,7 +105,8 @@ type InstPatternCallback = (patterns: (PreTrackerInstPattern | null)[]) => void;
 type RawFileCallback = (data: ArrayBuffer | null) => void;
 type RawInstInfoCallback = (instruments: (number[] | null)[]) => void;
 
-export class PreTrackerEngine {
+export class PreTrackerEngine implements IsolationCapableEngine {
+  static readonly MAX_ISOLATION_SLOTS = 4;
   private static instance: PreTrackerEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
   private static jsCode: string | null = null;
@@ -213,8 +215,8 @@ export class PreTrackerEngine {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'pretracker-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
+      outputChannelCount: [2, 2, 2, 2, 2],
+      numberOfOutputs: 1 + PreTrackerEngine.MAX_ISOLATION_SLOTS,
     });
 
     this.workletNode.port.onmessage = (event) => {
@@ -480,6 +482,28 @@ export class PreTrackerEngine {
 
   setPositionEntry(position: number, channel: number, trackNum: number, pitchShift: number): void {
     this.workletNode?.port.postMessage({ type: 'setPositionEntry', position, channel, trackNum, pitchShift });
+  }
+
+  // ── IsolationCapableEngine implementation ──
+
+  addIsolation(slotIndex: number, channelMask: number): void {
+    this.workletNode?.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
+  }
+
+  removeIsolation(slotIndex: number): void {
+    this.workletNode?.port.postMessage({ type: 'removeIsolation', slotIndex });
+  }
+
+  getWorkletNode(): AudioWorkletNode | null {
+    return this.workletNode;
+  }
+
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
+  isAvailable(): boolean {
+    return !this._disposed && this.workletNode !== null;
   }
 
   /** Set per-channel mute mask. Bit N=1 means channel N is active, 0=muted. */

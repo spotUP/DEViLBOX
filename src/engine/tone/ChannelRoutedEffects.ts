@@ -278,6 +278,10 @@ const engineResolversByMode: Record<string, () => Promise<IsolationCapableEngine
       const engine = LibopenmptEngine.getInstance();
       if (engine.isAvailable()) return engine;
     }
+    const { PreTrackerEngine } = await import('../pretracker/PreTrackerEngine');
+    if (PreTrackerEngine.hasInstance()) {
+      return PreTrackerEngine.getInstance() as IsolationCapableEngine;
+    }
     return null;
   },
 };
