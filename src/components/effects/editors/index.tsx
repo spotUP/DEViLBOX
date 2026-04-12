@@ -33,6 +33,7 @@ import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, Fre
 import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
 import { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, GranularFreezeEditor } from './AdditionalEffectEditors';
 import { BuzzmachineEditor } from './BuzzmachineEditor';
+import { NeuralEditor } from './NeuralEditor';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 
 // Zynthian-ported dynamics editors
@@ -219,6 +220,8 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   BuzzExciter: BuzzmachineEditor,
   BuzzMasterizer: BuzzmachineEditor,
   BuzzStereoGain: BuzzmachineEditor,
+  // Neural/GuitarML AI amp models
+  Neural: NeuralEditor,
   // WAM 2.0 effects — embed native plugin GUI
   WAMBigMuff: WAMEffectEditor,
   WAMTS9: WAMEffectEditor,
@@ -368,6 +371,8 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   Masha:               { bg: '#0d0a1a', bgEnd: '#080612', accent: '#7c3aed', border: '#1a1030' },
   Vinyl:               { bg: '#1a1008', bgEnd: '#120a04', accent: '#d97706', border: '#2a1a08' },
   Bitta:               { bg: '#1a1008', bgEnd: '#120a04', accent: '#d97706', border: '#2a1a08' },
+  // Neural/GuitarML AI amp models
+  Neural:              { bg: '#1a0a22', bgEnd: '#100618', accent: '#a855f7', border: '#2a1430' },
   // WAM 2.0 effects
   WAMBigMuff:          { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
   WAMTS9:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
@@ -527,6 +532,8 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     Masha: <Radio size={18} className="text-text-primary" />,
     Vinyl: <Disc size={18} className="text-text-primary" />,
     Bitta: <Disc size={18} className="text-text-primary" />,
+    // Neural/GuitarML AI amp models
+    Neural: <Zap size={18} className="text-text-primary" />,
   };
 
   const effectType = effect.type ?? '';
