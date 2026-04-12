@@ -224,6 +224,14 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       this.globalValsPtr = this.buzzModule._buzz_get_global_vals(this.machinePtr);
       console.log('[BuzzmachineWorklet] GlobalVals ptr:', this.globalValsPtr);
 
+      // Get TrackVals pointer for track parameter access (some machines have track params)
+      if (typeof this.buzzModule._buzz_get_track_vals === 'function') {
+        this.trackValsPtr = this.buzzModule._buzz_get_track_vals(this.machinePtr, 0);
+        console.log('[BuzzmachineWorklet] TrackVals ptr:', this.trackValsPtr);
+      } else {
+        this.trackValsPtr = 0;
+      }
+
       // Allocate audio buffer (stereo interleaved float32)
       const bufferSizeBytes = this.bufferSize * 2 * 4; // 128 samples * 2 channels * 4 bytes
       this.audioBufferPtr = this.buzzModule._malloc(bufferSizeBytes);
@@ -256,7 +264,7 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   }
 
   handleMessage(event) {
-    const { type, wasmBinary, jsCode, machineType, paramIndex, paramValue, frequency, velocity, accent, slide } = event.data;
+    const { type, wasmBinary, jsCode, machineType, paramIndex, paramValue, frequency, velocity, accent, slide, paramLayout } = event.data;
 
     switch (type) {
       case 'ping':
@@ -267,6 +275,8 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
 
       case 'init':
         console.log('[BuzzmachineWorklet] Received init message for', machineType);
+        // Store param layout for correct byte offset addressing
+        this.paramLayout = paramLayout || [];
         // Check if this is a generator type
         this.isGenerator = this.isGeneratorType(machineType);
         this.machineTypeName = machineType;
@@ -1183,21 +1193,27 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   setParameter(paramIndex, value) {
     if (!this.buzzModule || !this.globalValsPtr) return;
 
-    // GlobalVals structure varies by machine - handle each type appropriately
-    const machineType = this.machineTypeName || '';
-
-    if (machineType.includes('OomekAggressor')) {
-      // Oomek Aggressor uses BYTE (8-bit) parameters for all global vals:
-      // osctype(0), cutoff(1), resonance(2), envmod(3), decay(4), acclevel(5), finetune(6), volume(7)
-      // Each is 1 byte, sequential from offset 0
-      const offset = this.globalValsPtr + paramIndex;
-      this.writeByte(offset, Math.min(0xFF, Math.max(0, Math.round(value))));
-      console.log('[BuzzmachineWorklet] OomekAggressor setParameter:', { paramIndex, value, offset });
-    } else {
-      // Default: Most parameters are word (16-bit)
-      // Offset = paramIndex * 2 bytes (word size)
+    const layout = this.paramLayout && this.paramLayout[paramIndex];
+    if (!layout) {
+      // Fallback for machines without layout: assume word at paramIndex*2
       const offset = this.globalValsPtr + (paramIndex * 2);
       this.writeWord(offset, value);
+      return;
+    }
+
+    // Determine target pointer (global or track)
+    let basePtr = this.globalValsPtr;
+    if (layout.isTrack && this.trackValsPtr) {
+      basePtr = this.trackValsPtr;
+    }
+
+    const offset = basePtr + layout.byteOffset;
+    const clamped = Math.max(0, Math.round(value));
+
+    if (layout.size === 1) {
+      this.writeByte(offset, Math.min(0xFF, clamped));
+    } else {
+      this.writeWord(offset, Math.min(0xFFFF, clamped));
     }
   }
 
