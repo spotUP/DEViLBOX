@@ -121,8 +121,9 @@ export function useDeckStateSync(deckId: DeckId): void {
             store.setDeckPattern(deckId, null);
           }
         }
-      } catch {
-        // Engine might not be initialized yet
+      } catch (err) {
+        // Engine might not be initialized yet — log so live-set issues are diagnosable
+        console.warn('[useDeckStateSync] poll error:', err);
       }
 
       animFrameRef.current = requestAnimationFrame(poll);
