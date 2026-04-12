@@ -36,10 +36,16 @@ export async function tryChipDumpParse(
     return parseNSFFile(buffer, originalFileName);
   }
 
-  // ── SAP — Atari 8-bit POKEY ───────────────────────────────────────────────
+  // ── SAP — Atari 8-bit POKEY (via ASAP WASM engine) ────────────────────────
   if (/\.sap$/.test(filename)) {
     const { parseSAPFile } = await import('@lib/import/formats/SAPParser');
     return parseSAPFile(buffer, originalFileName);
+  }
+
+  // ── ASAP non-SAP formats — CMC, RMT, TMC, DLT, MPT etc. ────────────────
+  if (/\.(cmc|cm3|cmr|cms|dmc|dlt|mpt|mpd|rmt|tmc|tm8|tm2|fc)$/.test(filename)) {
+    const { parseAsapFile } = await import('@lib/import/formats/AsapParser');
+    return parseAsapFile(buffer, originalFileName);
   }
 
   // ── AY — ZX Spectrum AY (ZXAYEMUL) ───────────────────────────────────────

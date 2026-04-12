@@ -192,7 +192,7 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
     id: i + 1,
     name: `POKEY ${i + 1}`,
     type: 'synth' as const,
-    synthType: 'FurnacePOKEY' as const,
+    synthType: 'AsapSynth' as const,
     furnace: { ...DEFAULT_FURNACE, chipType: 20, ops: 2 },
     effects: [] as [],
     volume: 0,
@@ -239,7 +239,7 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
 
   return {
     name: (meta.name || filename.replace(/\.sap$/i, '')) + (meta.author ? ` — ${meta.author}` : ''),
-    format: 'SAP' as TrackerFormat,
+    format: 'ASAP' as TrackerFormat,
     patterns: [pattern],
     instruments,
     songPositions: [0],
@@ -248,5 +248,7 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
     numChannels: numCh,
     initialSpeed: 1,
     initialBPM: 50,
+    asapFileData: buffer.slice(0),
+    asapFilename: filename,
   };
 }
