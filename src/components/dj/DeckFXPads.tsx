@@ -9,7 +9,7 @@
  * When quantize is active, FX effects snap to the next beat/bar boundary.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import {
@@ -83,6 +83,16 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   const [page, setPage] = useState<PadPage>('fx');
   const [activePads, setActivePads] = useState<Set<string>>(new Set());
   const cancelRefs = useRef<Map<string, () => void>>(new Map());
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const filterResetTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Cleanup stray timers on unmount
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      if (filterResetTimerRef.current) clearTimeout(filterResetTimerRef.current);
+    };
+  }, []);
   const killLow = useDJStore((s) => s.decks[deckId].eqLowKill);
   const killMid = useDJStore((s) => s.decks[deckId].eqMidKill);
   const killHigh = useDJStore((s) => s.decks[deckId].eqHighKill);
@@ -128,7 +138,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
         break;
       case 'filter-reset':
         cancelFn = filterReset(deckId);
-        setTimeout(() => cancelPad(padId), 150);
+        filterResetTimerRef.current = setTimeout(() => cancelPad(padId), 150);
         break;
       case 'echo-out':
         cancelFn = echoOut(deckId, 8, () => cancelPad(padId));
@@ -197,7 +207,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       if (beats !== undefined) beatJump(deckId, beats);
       // Visual flash
       setActivePads((prev) => new Set(prev).add(pad.id));
-      setTimeout(() => setActivePads((prev) => { const n = new Set(prev); n.delete(pad.id); return n; }), 120);
+      flashTimerRef.current = setTimeout(() => setActivePads((prev) => { const n = new Set(prev); n.delete(pad.id); return n; }), 120);
     } else {
       activateFXPad(pad.id);
     }

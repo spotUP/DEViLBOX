@@ -66,6 +66,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
   const [selectedPadId, setSelectedPadId] = useState<number | null>(null);
   const heldPadsRef = useRef<Set<number>>(new Set());
+  const velocityTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const noteRepeatEnabledRef = useRef(false);
 
   // Audio engine refs
@@ -98,6 +99,11 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     return () => {
       noteRepeatRef.current?.dispose();
       engineRef.current?.dispose();
+      // Clear all velocity flash timers
+      for (const timer of velocityTimersRef.current.values()) {
+        clearTimeout(timer);
+      }
+      velocityTimersRef.current.clear();
     };
   }, []);
 
@@ -161,9 +167,13 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
       }
     }
 
-    setTimeout(() => {
+    // Clear any existing velocity timer for this pad before setting a new one
+    const existingTimer = velocityTimersRef.current.get(padId);
+    if (existingTimer) clearTimeout(existingTimer);
+    velocityTimersRef.current.set(padId, setTimeout(() => {
       setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
-    }, 200);
+      velocityTimersRef.current.delete(padId);
+    }, 200));
   }, [currentProgram]);
 
   const handlePadRelease = useCallback((padId: number) => {
