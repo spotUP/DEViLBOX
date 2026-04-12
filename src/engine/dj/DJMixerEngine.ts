@@ -148,15 +148,15 @@ export class DJMixerEngine {
         break;
     }
 
-    // Smooth ramp to avoid clicks — but hard-zero when fully cut
-    // (Tone.js exponential ramp never reaches exactly 0, so loud tracks bleed through)
+    // Smooth ramp to avoid clicks — use a very short ramp even for zero
+    // (2ms is fast enough to feel instant but avoids audible clicks during fast scratches)
     if (gainA < 0.001) {
-      this.inputA.gain.value = 0;
+      this.inputA.gain.rampTo(0, 0.002);
     } else {
       this.inputA.gain.rampTo(gainA, 0.01);
     }
     if (gainB < 0.001) {
-      this.inputB.gain.value = 0;
+      this.inputB.gain.rampTo(0, 0.002);
     } else {
       this.inputB.gain.rampTo(gainB, 0.01);
     }
@@ -315,24 +315,45 @@ export class DJMixerEngine {
     }
 
     // Wire new chain internally first (not yet connected to masterGain)
-    for (let i = 0; i < nodes.length - 1; i++) {
-      nodes[i].connect(nodes[i + 1]);
+    try {
+      for (let i = 0; i < nodes.length - 1; i++) {
+        nodes[i].connect(nodes[i + 1]);
+      }
+      nodes[nodes.length - 1].connect(this.duckGain);
+
+      // ZERO-GAP SWAP: connect new chain FIRST, then disconnect old
+      // Web Audio allows multiple connections — for one sample frame both paths carry audio
+      this.masterGain.connect(nodes[0]);
+      try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
+
+      // Dispose old effect nodes (already disconnected from masterGain)
+      for (const node of oldNodes) {
+        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+      }
+
+      this.masterEffectsNodes = nodes;
+
+      console.log(`[DJMixer] Master FX chain: ${enabled.map(e => e.type).join(' → ')}`);
+    } catch (err) {
+      console.error('[DJMixerEngine] FX chain connection failed, bypassing effects:', err);
+
+      // Dispose all new nodes that may be partially connected
+      for (const node of nodes) {
+        try { node.disconnect(); node.dispose(); } catch { /* */ }
+      }
+
+      // Ensure direct bypass: masterGain → duckGain → limiter (skip FX)
+      try {
+        this.masterGain.disconnect();
+      } catch { /* already disconnected */ }
+      this.masterGain.connect(this.duckGain);
+
+      // Also dispose old nodes
+      for (const node of oldNodes) {
+        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+      }
+      this.masterEffectsNodes = [];
     }
-    nodes[nodes.length - 1].connect(this.duckGain);
-
-    // ZERO-GAP SWAP: connect new chain FIRST, then disconnect old
-    // Web Audio allows multiple connections — for one sample frame both paths carry audio
-    this.masterGain.connect(nodes[0]);
-    try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
-
-    // Dispose old effect nodes (already disconnected from masterGain)
-    for (const node of oldNodes) {
-      try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
-    }
-
-    this.masterEffectsNodes = nodes;
-
-    console.log(`[DJMixer] Master FX chain: ${enabled.map(e => e.type).join(' → ')}`);
   }
 
   // ==========================================================================

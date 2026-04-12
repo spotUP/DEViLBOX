@@ -75,7 +75,26 @@ export async function togglePlay(
         const startRate = 1.0;
 
         await new Promise<void>((resolve) => {
+          function finishSpinDown() {
+            deck.pause();
+            // Restore normal playback rate for next play
+            if (deck.playbackMode === 'audio') {
+              deck.audioPlayer.setPlaybackRate(1.0);
+            } else {
+              deck.replayer.setTempoMultiplier(1.0);
+              deck.replayer.setPitchMultiplier(1.0);
+            }
+            useDJStore.getState().setDeckPlaying(deckId, false);
+            resolve();
+          }
+
           function tick() {
+            // Tab backgrounded — skip animation, stop immediately
+            if (document.hidden) {
+              finishSpinDown();
+              return;
+            }
+
             const elapsed = performance.now() - startTime;
             const progress = Math.min(1, elapsed / spinDownMs);
 
@@ -88,17 +107,7 @@ export async function togglePlay(
             }
 
             if (progress >= 1) {
-              // Spin-down complete — stop
-              deck.pause();
-              // Restore normal playback rate for next play
-              if (deck.playbackMode === 'audio') {
-                deck.audioPlayer.setPlaybackRate(1.0);
-              } else {
-                deck.replayer.setTempoMultiplier(1.0);
-                deck.replayer.setPitchMultiplier(1.0);
-              }
-              useDJStore.getState().setDeckPlaying(deckId, false);
-              resolve();
+              finishSpinDown();
               return;
             }
 
