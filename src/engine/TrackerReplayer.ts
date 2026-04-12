@@ -396,6 +396,11 @@ export interface TrackerSong {
 
   /** CheeseCutter store data — populated by CheeseCutterParser, consumed by useCheeseCutterStore */
   cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload;
+
+  /** Post-init C64 RAM patches — written to the emulator after PSID init completes.
+   *  Used by CheeseCutter: the PSID driver overwrites $C000-$CFFF with its shim,
+   *  but the CheeseCutter player may have music data there. These patches restore it. */
+  c64MemPatches?: Array<{ addr: number; data: Uint8Array }>;
 }
 
 // ============================================================================

@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, uadePatternLayout, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, c64MemPatches, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, uadePatternLayout, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -35,6 +35,7 @@ export const usePatternPlayback = () => {
     hivelyMeta: s.hivelyMeta,
     musiclineFileData: s.musiclineFileData,
     c64SidFileData: s.c64SidFileData,
+    c64MemPatches: s.c64MemPatches,
     jamCrackerFileData: s.jamCrackerFileData,
     futurePlayerFileData: s.futurePlayerFileData,
     preTrackerFileData: s.preTrackerFileData,
@@ -486,6 +487,7 @@ export const usePatternPlayback = () => {
           musiclineFileData: musiclineFileData ?? undefined,
           // C64 SID raw binary (required for C64SIDEngine)
           c64SidFileData: c64SidFileData ?? undefined,
+          c64MemPatches: c64MemPatches ?? undefined,
           // JamCracker raw binary (required for JamCrackerEngine WASM)
           jamCrackerFileData: jamCrackerFileData ?? undefined,
           futurePlayerFileData: futurePlayerFileData ?? undefined,

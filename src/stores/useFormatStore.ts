@@ -44,6 +44,7 @@ interface FormatStore {
   klysFileData: ArrayBuffer | null;
   musiclineFileData: Uint8Array | null;
   c64SidFileData: Uint8Array | null;
+  c64MemPatches: Array<{ addr: number; data: Uint8Array }> | null;
   goatTrackerData: Uint8Array | null;
   jamCrackerFileData: ArrayBuffer | null;
   futurePlayerFileData: ArrayBuffer | null;
@@ -299,6 +300,7 @@ export const useFormatStore = create<FormatStore>()(
     klysFileData: null,
     musiclineFileData: null,
     c64SidFileData: null,
+    c64MemPatches: null,
     goatTrackerData: null,
     jamCrackerFileData: null,
     futurePlayerFileData: null,
@@ -704,6 +706,7 @@ export const useFormatStore = create<FormatStore>()(
       let newEditorMode: EditorMode = 'classic';
       set((state) => {
         state.c64SidFileData = song.c64SidFileData ?? null;
+        state.c64MemPatches = (song as any).c64MemPatches ?? null;
         state.goatTrackerData = song.goatTrackerData ?? null;
         state.jamCrackerFileData = song.jamCrackerFileData ?? null;
         state.futurePlayerFileData = song.futurePlayerFileData ?? null;
@@ -951,6 +954,7 @@ export const useFormatStore = create<FormatStore>()(
       state.editorMode = 'classic';
       clearNative(state);
       state.c64SidFileData = null;
+      state.c64MemPatches = null;
       state.goatTrackerData = null;
       state.jamCrackerFileData = null;
       state.futurePlayerFileData = null;
