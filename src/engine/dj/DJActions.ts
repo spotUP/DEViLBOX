@@ -617,7 +617,9 @@ export function seekDeck(deckId: DeckId, position: number, pattPos = 0): void {
 export function seekDeckAudio(deckId: DeckId, seconds: number): void {
   try {
     getDJEngine().getDeck(deckId).audioPlayer.seek(seconds);
-  } catch { /* engine not ready */ }
+  } catch (err) {
+    console.warn('[DJActions] seek failed (crossfade or engine not ready):', err);
+  }
 }
 
 // ============================================================================
