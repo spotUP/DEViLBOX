@@ -400,15 +400,12 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             touchAction: 'none',
           }}
         />
+        {/* Springs overlay disabled for now — positioning is unstable
+            and blocks knob interaction testing. Re-enable once the
+            JUCE editor + DSP audio path are verified working. */}
         <canvas
           ref={overlayRef}
-          style={{
-            display: loaded ? 'block' : 'none',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            pointerEvents: 'none',
-          }}
+          style={{ display: 'none' }}
         />
       </div>
     </div>
