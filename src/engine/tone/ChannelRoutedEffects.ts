@@ -23,10 +23,37 @@ interface IsolationSlot {
   channels: number[];
   channelMask: number;
   effectConfigs: EffectConfig[];
-  effectNodes: Tone.ToneAudioNode[];
+  effectNodes: (Tone.ToneAudioNode | { input: AudioNode; output: AudioNode; dispose(): void })[];
   /** Native GainNode connected between worklet output and effect chain */
   outputGain: GainNode;
 }
+
+/** Returns true if node is a native DevilboxSynth (has input/output GainNodes but is not a ToneAudioNode) */
+const isNativeSynth = (n: any): boolean => !!(n.input && n.output && !(n instanceof Tone.ToneAudioNode));
+
+/** Connect src → dst, bridging Tone.js ↔ native DevilboxSynth nodes */
+const chainConnect = (src: any, dst: any) => {
+  const srcIsNative = isNativeSynth(src) || src instanceof AudioNode;
+  const dstIsNative = isNativeSynth(dst) || dst instanceof AudioNode;
+
+  if (!srcIsNative && !dstIsNative) {
+    src.connect(dst);
+  } else if (srcIsNative && dstIsNative) {
+    const srcOut = src instanceof AudioNode ? src : src.output as AudioNode;
+    const dstIn = dst instanceof AudioNode ? dst : dst.input as AudioNode;
+    srcOut.connect(dstIn);
+  } else if (srcIsNative) {
+    const srcOut = src instanceof AudioNode ? src : src.output as AudioNode;
+    const dstNative = getNativeAudioNode(dst);
+    if (dstNative) srcOut.connect(dstNative);
+    else srcOut.connect(dst);
+  } else {
+    const dstIn = dst instanceof AudioNode ? dst : dst.input as AudioNode;
+    const srcNative = getNativeAudioNode(src);
+    if (srcNative) srcNative.connect(dstIn);
+    else src.connect(dstIn);
+  }
+};
 
 export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
@@ -73,11 +100,11 @@ export class ChannelRoutedEffectsManager {
       // Tell worklet to create isolation module for this channel
       engine.addIsolation(slotIdx, channelMask);
 
-      // Create effect nodes
-      const effectNodes: Tone.ToneAudioNode[] = [];
+      // Create effect nodes (may be Tone.js or native DevilboxSynth like BuzzmachineSynth)
+      const effectNodes: IsolationSlot['effectNodes'] = [];
       for (const config of enabledEffects) {
         try {
-          const node = await createEffect(config) as Tone.ToneAudioNode;
+          const node = await createEffect(config) as Tone.ToneAudioNode | { input: AudioNode; output: AudioNode; dispose(): void };
           if (node) {
             if ('wet' in node && (node as any).wet instanceof Tone.Signal) {
               ((node as any).wet as Tone.Signal).value = config.wet / 100;
@@ -113,12 +140,12 @@ export class ChannelRoutedEffectsManager {
       }
 
       // Chain: outputGain → effect1 → effect2 → ... → masterEffectsInput
-      const firstNative = getNativeAudioNode(effectNodes[0]);
-      if (firstNative) outputGain.connect(firstNative);
+      // Uses chainConnect to bridge Tone.js ↔ native DevilboxSynth (Buzzmachine) nodes
+      chainConnect(outputGain, effectNodes[0]);
       for (let i = 0; i < effectNodes.length - 1; i++) {
-        effectNodes[i].connect(effectNodes[i + 1]);
+        chainConnect(effectNodes[i], effectNodes[i + 1]);
       }
-      effectNodes[effectNodes.length - 1].connect(this.masterEffectsInput);
+      chainConnect(effectNodes[effectNodes.length - 1], this.masterEffectsInput);
 
       this.slots[slotIdx] = {
         slotIndex: slotIdx,
@@ -162,7 +189,7 @@ export class ChannelRoutedEffectsManager {
       }
     }
     if (Object.keys(changed).length > 0) {
-      applyEffectParametersDiff(node, config.type, changed);
+      applyEffectParametersDiff(node as Tone.ToneAudioNode, config.type, changed);
     }
 
     slot.effectConfigs[effectIndex] = config;
@@ -178,7 +205,7 @@ export class ChannelRoutedEffectsManager {
 
       // Disconnect effects
       for (const node of slot.effectNodes) {
-        try { node.disconnect(); } catch { /* */ }
+        try { (node as any).disconnect?.(); } catch { /* */ }
         try { node.dispose(); } catch { /* */ }
       }
       try { slot.outputGain.disconnect(); } catch { /* */ }
