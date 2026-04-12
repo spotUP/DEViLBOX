@@ -326,11 +326,12 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             // The shader has transparent background so JUCE knobs show
             // through the gaps between coils. pointer-events: none means
             // clicks pass through to the JUCE canvas underneath.
-            // Col 5 width, rows 1-2 height (above the bottom knob row)
+            // Match the original SpringsGL aspect ratio (~1.06:1) but
+            // scaled up to fill the column. Original was 123×116.
             overlay.style.left   = `${Math.round(cw * (575 / 720))}px`;
             overlay.style.top    = `${Math.round(ch * (52 / 400))}px`;
             overlay.style.width  = `${Math.round(cw * (140 / 720))}px`;
-            overlay.style.height = `${Math.round(ch * (220 / 400))}px`;
+            overlay.style.height = `${Math.round(cw * (132 / 720))}px`;
             if (overlay.style.display === 'none') overlay.style.display = 'block';
           }
 
