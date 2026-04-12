@@ -17,7 +17,7 @@ export interface EffectDescriptor {
   id: string;
   /** Display name for UI */
   name: string;
-  /** Category: tonejs, wasm, wam, neural, buzzmachine */
+  /** Category: tonejs, wasm, wam, neural */
   category: EffectCategory;
   /** UI group: 'Distortion', 'Filter', 'Reverb & Delay', etc. */
   group: string;

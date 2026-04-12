@@ -25,7 +25,6 @@ function categoryLabel(cat: EffectCategory): string {
     case 'neural':     return 'NEURAL';
     case 'wasm':       return 'WASM';
     case 'wam':        return 'WAM';
-    case 'buzzmachine':return 'BUZZ';
     case 'tonejs':
     default:           return 'TONE';
   }
@@ -36,7 +35,6 @@ function categoryBgColor(cat: EffectCategory): number {
     case 'neural':     return 0x130820;
     case 'wasm':       return 0x071a1a;
     case 'wam':        return 0x111500;
-    case 'buzzmachine':return 0x1a0c06;
     case 'tonejs':
     default:           return 0x0a0c18;
   }
