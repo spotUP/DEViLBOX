@@ -335,7 +335,7 @@ struct V2Moog
 
     b4 -= b4*b4*b4 * (1.0f/6.0f); // clipping
     b4 -= fcdcoffset; // un-bias
-    b[4] = b4 - fcdcoffset;
+    b[4] = b4;
     b[0] = realin;
 
     return b4;
@@ -857,7 +857,7 @@ private:
       output(dest + i, gain * x);
     }
 
-    flt = nf;
+    nf = flt;
     nseed = seed;
   }
 
