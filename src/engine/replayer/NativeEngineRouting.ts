@@ -581,6 +581,11 @@ export async function startNativeEngines(
       _runningEngineKeys.add(desc.key);
 
       if (!muted) {
+        // Restore gain in case it was muted by a previous stopNativeEngines
+        const output = (instance as unknown as { output?: { gain?: AudioParam } }).output;
+        if (output?.gain) {
+          try { output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
+        }
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
 
@@ -1117,10 +1122,27 @@ export function resumeNativeEngines(
 
     const ref = tryResolveSync(desc);
     if (ref) {
-      try { if (ref.hasInstance()) ref.getInstance().play(); } catch { /* ignored */ }
+      try {
+        if (ref.hasInstance()) {
+          const inst = ref.getInstance();
+          // Restore gain muted by stopNativeEngines
+          const output = (inst as unknown as { output?: { gain?: AudioParam } }).output;
+          if (output?.gain) {
+            try { output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
+          }
+          inst.play();
+        }
+      } catch { /* ignored */ }
     } else {
       resolveEngine(desc).then(cls => {
-        if (cls.hasInstance()) cls.getInstance().play();
+        if (cls.hasInstance()) {
+          const inst = cls.getInstance();
+          const output = (inst as unknown as { output?: { gain?: AudioParam } }).output;
+          if (output?.gain) {
+            try { output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
+          }
+          inst.play();
+        }
       }).catch(() => {});
     }
   }
