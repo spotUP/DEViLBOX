@@ -317,31 +317,28 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
 
-          // Position the springs overlay using CSS clip-path instead of
-          // offset positioning. The overlay canvas is the SAME size as the
-          // JUCE canvas (avoids all coordinate mismatch issues) and
-          // clip-path restricts rendering to the SpringsGL region.
-          if (!springsBoundsRef.current) {
+          // Position the springs overlay clipped to the SpringsGL region.
+          // Wait until both bounds are valid AND canvas has layout.
+          const jcw = jcanvas.clientWidth;
+          if (!springsBoundsRef.current && jcw > 0) {
             const sprX = modRef._aelapse_ui_get_springs_x();
             const sprY = modRef._aelapse_ui_get_springs_y();
             const sprW = modRef._aelapse_ui_get_springs_w();
             const sprH = modRef._aelapse_ui_get_springs_h();
             if (sprW > 10 && sprH > 10 && sprW < w && sprH < h) {
               springsBoundsRef.current = { x: sprX, y: sprY, w: sprW, h: sprH };
-              // Match JUCE canvas dimensions exactly
               overlay.width  = w;
               overlay.height = h;
               overlay.style.width  = jcanvas.style.width;
               overlay.style.height = jcanvas.style.height;
               overlay.style.left   = '0';
               overlay.style.top    = '0';
-              // Clip to SpringsGL region (CSS pixels)
-              const cssScale = jcanvas.clientWidth / w;
-              const cx = Math.round(sprX * cssScale);
-              const cy = Math.round(sprY * cssScale);
-              const cw = Math.round(sprW * cssScale);
-              const ch = Math.round(sprH * cssScale);
-              overlay.style.clipPath = `inset(${cy}px calc(100% - ${cx + cw}px) calc(100% - ${cy + ch}px) ${cx}px)`;
+              // Clip with polygon in percentages (robust against CSS sizing)
+              const l = ((sprX / w) * 100).toFixed(2);
+              const t = ((sprY / h) * 100).toFixed(2);
+              const r = (((sprX + sprW) / w) * 100).toFixed(2);
+              const b = (((sprY + sprH) / h) * 100).toFixed(2);
+              overlay.style.clipPath = `polygon(${l}% ${t}%, ${r}% ${t}%, ${r}% ${b}%, ${l}% ${b}%)`;
               overlay.style.display = 'block';
             }
           }
@@ -363,6 +360,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             time: (nowMs - startTimeRef.current) / 1000,
             rmsStack: stack,
             rmsPos: pos,
+            clip: springsBoundsRef.current ?? undefined,
           });
         };
         rafId = requestAnimationFrame(renderLoop);
