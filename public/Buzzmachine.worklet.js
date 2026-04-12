@@ -288,7 +288,7 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         break;
 
       case 'setParameter':
-        if (this.isInitialized && this.globalValsPtr) {
+        if (this.isInitialized) {
           this.setParameter(paramIndex, paramValue);
         }
         break;
@@ -1193,8 +1193,6 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
   setParameter(paramIndex, value) {
     if (!this.buzzModule || !this.machinePtr) return;
 
-    // Use the C++ buzz_set_parameter — it knows the struct layout
-    // and writes byte/word at the correct offset via CMachineInfo
     if (typeof this.buzzModule._buzz_set_parameter === 'function') {
       const clamped = Math.max(0, Math.round(value));
       this.buzzModule._buzz_set_parameter(this.machinePtr, paramIndex, clamped);

@@ -717,12 +717,13 @@ hard reload** (Cmd+Shift+R / Ctrl+Shift+R) to pick up new WASM files.
 
 ### Files to Modify
 
+- [ ] `src/constants/unifiedEffects.ts` — **Add to `AVAILABLE_EFFECTS` array** (THIS IS THE EFFECTS BROWSER — without it the effect won't appear in the UI!)
 - [ ] `src/engine/factories/EffectFactory.ts` — Add to `getDefaultEffectParameters()`, `getDefaultEffectWet()`, `createEffectNode()`
 - [ ] `src/engine/tone/EffectParameterEngine.ts` — Add case block for param routing
 - [ ] `src/engine/tone/MasterEffectsChain.ts` — Add import if needed
-- [ ] `src/types/instrument.ts` — Add `'YourEffect'` to effect type union
+- [ ] `src/types/instrument/effects.ts` — Add `'YourEffect'` to `AudioEffectType` union
 - [ ] `src/components/effects/editors/` — Create UI editor component
-- [ ] `src/components/effects/VisualEffectEditors.tsx` — Register editor component
+- [ ] `src/components/effects/editors/index.tsx` — Register in `EFFECT_EDITORS` map + `ENCLOSURE_COLORS`
 
 ### Verification
 
