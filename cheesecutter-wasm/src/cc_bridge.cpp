@@ -107,6 +107,11 @@ void cc_play_init(int subtune) {
     frame_counter = 0;
 }
 
+/* --- SID register diff buffer (for hardware output) --- */
+#define MAX_SID_DIFFS 256
+static struct { uint8_t reg; uint8_t val; } sid_diff_buf[MAX_SID_DIFFS];
+static int sid_diff_count = 0;
+
 /* --- Apply SID register changes from RAM to reSID --- */
 static void sync_sid_regs(void) {
     for (int r = 0; r < 25; r++) {
@@ -114,8 +119,25 @@ static void sync_sid_regs(void) {
         if (val != prev_sid_regs[r]) {
             sid->write(r, val);
             prev_sid_regs[r] = val;
+            if (sid_diff_count < MAX_SID_DIFFS) {
+                sid_diff_buf[sid_diff_count].reg = r;
+                sid_diff_buf[sid_diff_count].val = val;
+                sid_diff_count++;
+            }
         }
     }
+}
+
+/* --- Get buffered SID register diffs since last call --- */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int cc_get_sid_diffs(uint8_t* out) {
+    int count = sid_diff_count;
+    for (int i = 0; i < count; i++) {
+        out[i * 2] = sid_diff_buf[i].reg;
+        out[i * 2 + 1] = sid_diff_buf[i].val;
+    }
+    sid_diff_count = 0;
+    return count;
 }
 
 /* --- Render audio --- */
