@@ -12,6 +12,7 @@ export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
 export type PlayMode = 'oneshot' | 'sustain';
 export type DecayMode = 'start' | 'end';  // Decay from note-on or sample-end
 export type PadBank = 'A' | 'B' | 'C' | 'D';
+export type PadMode = 'samples' | 'djfx' | 'oneshots' | 'scratch';
 
 export interface MpcResampleConfig {
   enabled: boolean;
