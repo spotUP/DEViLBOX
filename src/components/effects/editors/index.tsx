@@ -608,7 +608,8 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
               </p>
               <EffectPresetSelector
                 effect={effect}
-                onApply={(params) => onUpdateParameters?.(params)}
+                onApply={onUpdateParameters}
+                onUpdateParameter={onUpdateParameter}
                 color={enc.accent}
               />
             </div>
