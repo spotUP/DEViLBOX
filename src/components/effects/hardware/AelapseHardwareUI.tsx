@@ -50,32 +50,105 @@ interface AelapseUIModule {
   wasmMemory?: WebAssembly.Memory;
 }
 
-// ─── Framebuffer blit ──────────────────────────────────────────────────────
-// JUCE renders to an ARGB `juce::Image` which on little-endian machines is
-// stored as [B, G, R, A]. The Canvas2D ImageData expects [R, G, B, A].
-function blitFramebuffer(
-  mod: AelapseUIModule,
-  heapBuffer: ArrayBufferLike,
-  ctx: CanvasRenderingContext2D,
-  imgData: ImageData,
-  fbWidth: number,
-  fbHeight: number,
-): void {
-  const fbPtr = mod._aelapse_ui_get_fb();
-  if (!fbPtr) return;
+// ─── GPU-accelerated framebuffer blit ──────────────────────────────────────
+// JUCE renders ARGB (little-endian: [B,G,R,A] bytes). Instead of a CPU
+// loop swapping 288K pixels/frame, we upload the raw bytes as a BGRA
+// texture and let the GPU do the swizzle via WebGL2's BGRA extension
+// or a trivial fragment shader fallback.
 
-  const totalPixels = fbWidth * fbHeight;
-  const src = new Uint8Array(heapBuffer, fbPtr, totalPixels * 4);
-  const dst = imgData.data;
+const BLIT_VS = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+    v_uv = a_pos * 0.5 + 0.5;
+    v_uv.y = 1.0 - v_uv.y;
+    gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
 
-  for (let i = 0; i < totalPixels; i++) {
-    const off = i * 4;
-    dst[off]     = src[off + 2]; // R
-    dst[off + 1] = src[off + 1]; // G
-    dst[off + 2] = src[off];     // B
-    dst[off + 3] = 255;          // A
+const BLIT_FS = `#version 300 es
+precision mediump float;
+in vec2 v_uv;
+uniform sampler2D u_tex;
+out vec4 fragColor;
+void main() {
+    vec4 c = texture(u_tex, v_uv);
+    fragColor = vec4(c.b, c.g, c.r, 1.0); // BGRA → RGBA swizzle
+}`;
+
+class GPUBlitter {
+  private gl: WebGL2RenderingContext;
+  private program: WebGLProgram;
+  private tex: WebGLTexture;
+  private vao: WebGLVertexArrayObject;
+  private w: number;
+  private h: number;
+
+  constructor(canvas: HTMLCanvasElement, w: number, h: number) {
+    this.w = w;
+    this.h = h;
+    canvas.width = w;
+    canvas.height = h;
+
+    const gl = canvas.getContext('webgl2', {
+      alpha: false, antialias: false, premultipliedAlpha: false,
+      preserveDrawingBuffer: true, desynchronized: true,
+    })!;
+    this.gl = gl;
+
+    // Compile shader
+    const vs = gl.createShader(gl.VERTEX_SHADER)!;
+    gl.shaderSource(vs, BLIT_VS);
+    gl.compileShader(vs);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(fs, BLIT_FS);
+    gl.compileShader(fs);
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    this.program = prog;
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
+
+    // Fullscreen quad
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const buf = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a_pos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    this.vao = vao;
+
+    // Texture for JUCE framebuffer
+    const tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.tex = tex;
   }
-  ctx.putImageData(imgData, 0, 0);
+
+  blit(src: Uint8Array): void {
+    const gl = this.gl;
+    gl.viewport(0, 0, this.w, this.h);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.w, this.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    gl.useProgram(this.program);
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindVertexArray(null);
+  }
+
+  dispose(): void {
+    const gl = this.gl;
+    gl.deleteProgram(this.program);
+    gl.deleteTexture(this.tex);
+    gl.deleteVertexArray(this.vao);
+  }
 }
 
 // ─── Props ─────────────────────────────────────────────────────────────────
@@ -236,9 +309,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
         if (containerRef.current) ro.observe(containerRef.current);
         eventCleanups.push(() => ro.disconnect());
 
-        const ctx = jcanvas.getContext('2d');
-        if (!ctx) return;
-        const imgData = ctx.createImageData(w, h);
+        const blitter = new GPUBlitter(jcanvas, w, h);
 
         // Mouse event forwarding.
         const onMouseDown = (e: MouseEvent) => {
@@ -313,7 +384,13 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           modRef._aelapse_ui_tick();
 
-          if (modRef.HEAPU8) blitFramebuffer(modRef, modRef.HEAPU8.buffer, ctx, imgData, w, h);
+          if (modRef.HEAPU8) {
+            const fbPtr = modRef._aelapse_ui_get_fb();
+            if (fbPtr) {
+              const src = new Uint8Array(modRef.HEAPU8.buffer, fbPtr, w * h * 4);
+              blitter.blit(src);
+            }
+          }
 
           // Position springs overlay. Use percentage-based CSS so it
           // works regardless of container scaling. The springs panel is
@@ -378,6 +455,8 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
         try { springsRef.current.dispose(); } catch { /* already disposed */ }
         springsRef.current = null;
       }
+      // GPUBlitter is local to the init closure — no ref needed since
+      // the rAF loop is already cancelled above via `cancelled = true`.
       if (moduleRef.current) {
         try { moduleRef.current._aelapse_ui_shutdown(); } catch { /* already shut down */ }
         moduleRef.current = null;
