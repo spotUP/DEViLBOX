@@ -190,8 +190,12 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     }
   }, [nativeData, activePosition]);
 
-  const handlePlay = useCallback(() => {
+  const handlePlay = useCallback(async () => {
     if (!KlysEngine.hasInstance()) return;
+    const toneEngine = getToneEngine();
+    await toneEngine.init();
+    toneEngine.stop();
+    await new Promise(r => setTimeout(r, 60));
     KlysEngine.getInstance().play();
     useTransportStore.setState((s) => { s.isPlaying = true; s.isPaused = false; });
   }, []);
