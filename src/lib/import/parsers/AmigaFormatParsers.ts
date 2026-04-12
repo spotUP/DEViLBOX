@@ -521,6 +521,16 @@ export async function tryRouteFormat(
     throw new Error(`${originalFileName}: SoundFont (.sf2) files are not supported as tracker formats`);
   }
 
+  // ── CheeseCutter (.ct) ────────────────────────────────────────────────────
+  // CheeseCutter C64 SID tracker. Magic: bytes[0..2] = 'CC2' (0x43 0x43 0x32).
+  if (matchesExt(filename, ['ct'])) {
+    const { isCheeseCutterFile, parseCheeseCutterFile } = await import('@lib/import/formats/CheeseCutterParser');
+    if (isCheeseCutterFile(buffer)) {
+      return parseCheeseCutterFile(buffer, originalFileName);
+    }
+    throw new Error(`${originalFileName}: Not a valid CheeseCutter file (missing CC2 magic)`);
+  }
+
   // ── SidMon 1.0 (.sid1) ───────────────────────────────────────────────────
   // .sid1 files may be SidMon 1.0 or Commodore 64 SID — try magic detection first.
   if (matchesExt(filename, ['sid1'])) {
@@ -1377,7 +1387,7 @@ export async function tryRouteFormat(
   // Magic: bytes[0..2]="RJP", bytes[4..7]="SMOD".
   // Native parser decodes patterns + samples; UADE handles audio.
   if (
-    matchesExt(filename, ['rjp']) ||
+    matchesExt(filename, ['rjp', 'rj']) ||
     (matchesExt(filename, ['sng']) && buffer.byteLength >= 16 &&
       new Uint8Array(buffer)[0] === 0x52 &&   // 'R'
       new Uint8Array(buffer)[1] === 0x4a &&   // 'J'

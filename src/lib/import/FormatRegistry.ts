@@ -584,7 +584,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.ice$/i,
     prefixes: ['ice.'],
     prefKey: 'iceTracker',
-    nativeParser: { module: '@lib/import/formats/IceTrackerParser', parseFn: 'parseIceTrackerFile', detectFn: 'isIceTrackerFormat' },
+    nativeParser: { module: '@lib/import/formats/ICEParser', parseFn: 'parseICEFile', detectFn: 'isICEFormat' },
     uadeFallback: true,
   },
   {
@@ -982,7 +982,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Steve Turner/JasonPage Old (jpo.*/jpold.* / .jpo)',
     family: 'amiga-native',
     matchMode: 'both',
-    extRegex: /\.jpold?$/i,
+    extRegex: /\.(jpo|jpold)$/i,
     prefixes: ['jpo.', 'jpold.'],
     prefKey: 'steveTurner',
     nativeParser: { module: '@lib/import/formats/SteveTurnerParser', parseFn: 'parseSteveTurnerFile', detectFn: 'isSteveTurnerFormat' },
@@ -1065,7 +1065,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(mm4|sdata)$/i,
     prefixes: ['mm4.', 'sdata.'],
     prefKey: 'musicMaker4V',
-    nativeParser: { module: '@lib/import/formats/MusicMaker4VParser', parseFn: 'parseMusicMaker4VFile', detectFn: 'isMusicMaker4VFormat' },
+    nativeParser: { module: '@lib/import/formats/MusicMakerParser', parseFn: 'parseMusicMaker4VFile', detectFn: 'isMusicMaker4VFormat' },
     uadeFallback: true,
   },
   {
@@ -1077,7 +1077,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.mm8$/i,
     prefixes: ['mm8.'],
     prefKey: 'musicMaker8V',
-    nativeParser: { module: '@lib/import/formats/MusicMaker8VParser', parseFn: 'parseMusicMaker8VFile', detectFn: 'isMusicMaker8VFormat' },
+    nativeParser: { module: '@lib/import/formats/MusicMakerParser', parseFn: 'parseMusicMaker8VFile', detectFn: 'isMusicMaker8VFormat' },
     uadeFallback: true,
   },
   {
@@ -2096,19 +2096,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     key: 'suntronic',
     label: 'SunTronic',
     description: 'SunTronic / TSM — The Sun Machine (Amiga synth exe, tsm.* prefix / .sun extension)',
-    family: 'amiga-native',
-    matchMode: 'both',
-    extRegex: /\.(sun|tsm)$/i,
-    prefixes: ['tsm.'],
-    prefKey: 'suntronic',
-    uadeFallback: true,
-  },
-
-  // ── SunTronic / TSM (The Sun Machine) ────────────────────────────────────
-  {
-    key: 'suntronic',
-    label: 'SunTronic',
-    description: 'SunTronic / TSM — The Sun Machine (Amiga synth exe)',
     family: 'amiga-native',
     matchMode: 'both',
     extRegex: /\.(sun|tsm)$/i,
