@@ -25,6 +25,7 @@ export class CheeseCutterEngine {
   private readyResolve: (() => void) | null = null;
   private readyPromise: Promise<void>;
   private _sidRegsCallback: ((regs: Uint8Array) => void) | null = null;
+  private _onSidDiffs: ((diffs: Uint8Array) => void) | null = null;
 
   static getInstance(): CheeseCutterEngine {
     if (!CheeseCutterEngine._instance) {
@@ -111,6 +112,11 @@ export class CheeseCutterEngine {
           this._sidRegsCallback = null;
         }
         break;
+      case 'sidDiffs':
+        if (this._onSidDiffs) {
+          this._onSidDiffs(msg.diffs as Uint8Array);
+        }
+        break;
     }
   }
 
@@ -159,6 +165,20 @@ export class CheeseCutterEngine {
   writeByte(addr: number, value: number): void {
     if (this.workletNode && this._ready) {
       this.workletNode.port.postMessage({ type: 'writeByte', addr, value });
+    }
+  }
+
+  enableAsid(onDiffs: (diffs: Uint8Array) => void): void {
+    this._onSidDiffs = onDiffs;
+    if (this.workletNode && this._ready) {
+      this.workletNode.port.postMessage({ type: 'enableAsid', enabled: true });
+    }
+  }
+
+  disableAsid(): void {
+    this._onSidDiffs = null;
+    if (this.workletNode && this._ready) {
+      this.workletNode.port.postMessage({ type: 'enableAsid', enabled: false });
     }
   }
 

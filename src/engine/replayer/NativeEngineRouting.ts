@@ -812,6 +812,19 @@ export async function startNativeEngines(
       const mult = ccState.speedMultiplier || 1;
 
       await cc.loadAndPlay(song.cheeseCutterFileData, 0, mult);
+
+      // Enable ASID/WebUSB hardware output if setting is on
+      const { useSettingsStore } = await import('@stores/useSettingsStore');
+      if (useSettingsStore.getState().sidHardwareMode !== 'off') {
+        const { getSIDHardwareManager } = await import('@/lib/sid/SIDHardwareManager');
+        const mgr = getSIDHardwareManager();
+        cc.enableAsid((diffs) => {
+          for (let i = 0; i < diffs.length; i += 2) {
+            mgr.writeRegister(0, diffs[i], diffs[i + 1]);
+          }
+        });
+      }
+
       console.log('[NativeEngineRouting] CheeseCutterEngine loaded & playing, multiplier:', mult);
     } catch (err) {
       console.error('[NativeEngineRouting] Failed to start CheeseCutterEngine:', err);
