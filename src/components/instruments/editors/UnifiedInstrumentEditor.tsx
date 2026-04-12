@@ -15,6 +15,7 @@ import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { useInstrumentStore } from '@stores';
+import { useCheeseCutterStore } from '@stores/useCheeseCutterStore';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { Monitor, Cpu } from 'lucide-react';
@@ -268,9 +269,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     unbakeInstrument(instrument.id);
   };
 
+  const cheeseCutterLoaded = useCheeseCutterStore(s => s.loaded);
+
   const synthEditorMode = getEditorMode(instrument.synthType);
-  const editorMode = instrument.metadata?.mlSynthConfig
+  const editorMode: EditorMode = instrument.metadata?.mlSynthConfig
     ? 'musicline'
+    : (cheeseCutterLoaded && instrument.synthType === 'C64SID')
+      ? 'cheesecutter'
     // If synthType has a dedicated editor, use it even if sample data is attached
     // (Amiga synth formats attach waveform PCM for preview but should show synth editor)
     : (synthEditorMode !== 'generic' && synthEditorMode !== 'sample')

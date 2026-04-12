@@ -1022,6 +1022,16 @@ export function stopNativeEngines(
     // handler already stops playback and clears stale state before loading new data.
   }
 
+  // Stop CheeseCutterEngine if active (singleton — always check, song may already be null)
+  import('../cheesecut/CheeseCutterEngine').then(({ CheeseCutterEngine }) => {
+    if (CheeseCutterEngine.hasInstance()) {
+      const engine = CheeseCutterEngine.getInstance();
+      engine.stop();
+      const node = engine.output;
+      if (node) { try { node.disconnect(); } catch { /* ignored */ } }
+    }
+  }).catch(() => {});
+
   // Stop C64SIDEngine (instance-based)
   if (c64SidEngine) {
     try {
