@@ -112,21 +112,29 @@ function toDb(rms: number): number {
 }
 
 async function measure(durationMs = 2000) {
+  await ensurePlaying(); // Restart song if it ended during the test
   const r = await mcpCall('get_audio_level', { durationMs });
   return { rmsAvg: r?.rmsAvg ?? 0, peakMax: r?.peakMax ?? 0, silent: r?.silent ?? (r?.isSilent ?? true) };
 }
 
 async function ensurePlaying() {
   const pb = await mcpCall('get_playback_state');
-  if (!pb?.isPlaying) { await mcpCall('play'); await sleep(500); }
+  if (!pb?.isPlaying) {
+    // Song ended — restart from the beginning
+    await mcpCall('seek_to', { position: 0, row: 0 }).catch(() => {});
+    await mcpCall('play', { mode: 'song' });
+    await sleep(1500); // Let audio settle
+  }
 }
 
 async function removeAll() {
-  const state = await mcpCall('get_audio_state');
-  for (const fx of (state?.masterEffects ?? [])) {
-    await mcpCall('remove_master_effect', { effectId: fx.id });
-  }
-  await sleep(1500); // Chain rebuild is async — give it time to settle
+  try {
+    const state = await mcpCall('get_audio_state');
+    for (const fx of (state?.masterEffects ?? [])) {
+      await mcpCall('remove_master_effect', { effectId: fx.id }).catch(() => {});
+    }
+  } catch { /* connection lost — effects will be gone after browser reload anyway */ }
+  await sleep(1500);
 }
 
 async function auditOne(type: string, baseRms: number) {
@@ -208,6 +216,33 @@ async function auditOne(type: string, baseRms: number) {
   }
 }
 
+/** Reconnect the WebSocket if it was closed */
+async function ensureConnected(): Promise<void> {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  console.log('  (reconnecting...)');
+  ws = new WebSocket(WS_URL);
+  await new Promise<void>((resolve, reject) => {
+    ws.on('open', resolve);
+    ws.on('error', reject);
+  });
+  await sleep(2000); // Let browser settle after reconnect
+}
+
+/** Fetch current tracker state and return set of already-passing effect keys */
+async function getPassingEffects(): Promise<Set<string>> {
+  const passing = new Set<string>();
+  try {
+    const resp = await fetch('http://localhost:4444/get-data');
+    const data = await resp.json() as Record<string, { auditStatus?: string }>;
+    for (const [key, val] of Object.entries(data)) {
+      if (val.auditStatus === 'fixed' || val.auditStatus === 'works') {
+        passing.add(key);
+      }
+    }
+  } catch { /* tracker not running */ }
+  return passing;
+}
+
 async function main() {
   const onlyIdx = process.argv.indexOf('--only');
   const onlyType = onlyIdx >= 0 ? process.argv[onlyIdx + 1] : null;
@@ -215,25 +250,48 @@ async function main() {
 
   if (onlyType && effects.length === 0) { console.error('Unknown: ' + onlyType); process.exit(1); }
 
-  console.log('FX Audit: ' + effects.length + ' effects -> http://localhost:4444\n');
+  // Skip effects that already pass in the tracker
+  const alreadyPassing = await getPassingEffects();
+  const toTest = effects.filter(fx => !alreadyPassing.has(fxKey(fx)));
+  const skipped = effects.length - toTest.length;
+
+  console.log('FX Audit: ' + toTest.length + ' to test (' + skipped + ' already passing) -> http://localhost:4444\n');
+  if (toTest.length === 0) { console.log('All effects already passing!'); process.exit(0); }
 
   ws = new WebSocket(WS_URL);
   await new Promise<void>((resolve, reject) => { ws.on('open', resolve); ws.on('error', reject); });
 
+  // Ensure song is playing AND looping so it doesn't end mid-audit
   await ensurePlaying();
+  try { await mcpCall('execute_command', { command: 'setLooping', args: [true] }); } catch { /* */ }
   const pb = await mcpCall('get_playback_state');
   if (!pb?.isPlaying) { console.error('Nothing playing!'); ws.close(); process.exit(1); }
-  console.log('Playing at ' + pb.bpm + ' BPM');
+  console.log('Playing at ' + pb.bpm + ' BPM (looping)');
 
   await removeAll();
-  const base = await measure(3000);
+  let base = await measure(3000);
   console.log('Baseline: ' + toDb(base.rmsAvg).toFixed(1) + ' dBFS\n');
 
   if (base.rmsAvg < 0.01) console.error('WARNING: Baseline very low!');
 
   await pushTracker('fx-baseline', { auditStatus: 'fixed', notes: 'Baseline: ' + toDb(base.rmsAvg).toFixed(1) + ' dBFS', rmsDb: Math.round(toDb(base.rmsAvg) * 10) / 10 });
 
-  for (const fx of effects) await auditOne(fx, base.rmsAvg);
+  for (const fx of toTest) {
+    try {
+      await ensureConnected();
+      await auditOne(fx, base.rmsAvg);
+    } catch (err: any) {
+      console.log('[' + fx + '] CONNECTION ERROR: ' + err.message + ' — reconnecting...');
+      await pushTracker(fxKey(fx), { auditStatus: 'fail', notes: 'Connection lost: ' + err.message });
+      await sleep(5000);
+      try {
+        await ensureConnected();
+        await ensurePlaying();
+        const newBase = await measure(2000);
+        if (newBase.rmsAvg > 0.001) base.rmsAvg = newBase.rmsAvg;
+      } catch { /* will retry on next iteration */ }
+    }
+  }
 
   console.log('\nDone.');
   ws.close();
