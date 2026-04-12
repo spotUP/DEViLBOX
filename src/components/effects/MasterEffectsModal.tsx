@@ -26,6 +26,8 @@ import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useFormatStore } from '@stores/useFormatStore';
+import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
@@ -66,6 +68,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   } = useAudioStore();
 
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
+  const editorMode = useFormatStore(s => s.editorMode);
+  const isolationSupported = supportsChannelIsolation(editorMode);
 
   const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
     updateMasterEffect(effectId, { selectedChannels: channels });
@@ -507,6 +511,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
                         onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
                         numChannels={numChannels}
+                        isolationSupported={isolationSupported}
                       />
                     ))}
                   </SortableContext>
@@ -658,9 +663,10 @@ interface SortableEffectItemProps {
   onWetChange: (wet: number) => void;
   onChannelSelect: (channels: number[] | undefined) => void;
   numChannels: number;
+  isolationSupported: boolean;
 }
 
-function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, numChannels }: SortableEffectItemProps) {
+function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, numChannels, isolationSupported }: SortableEffectItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -811,8 +817,8 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
         </div>
       </div>
 
-      {/* Channel routing selector */}
-      <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
+      {/* Channel routing selector — only for formats with multi-output isolation */}
+      {isolationSupported && <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: `${enc.accent}80` }}>Route</span>
           <button
@@ -864,7 +870,7 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>  );
 }
 

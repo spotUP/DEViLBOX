@@ -306,6 +306,21 @@ export async function getActiveIsolationEngine(): Promise<IsolationCapableEngine
   return null;
 }
 
+/**
+ * Editor modes that support per-channel isolation via multi-output worklet.
+ * Used by UI to gate the channel routing selector.
+ */
+const ISOLATION_CAPABLE_MODES = new Set(['classic', 'furnace']);
+
+/**
+ * Check if the current format/editor mode supports per-channel isolation.
+ * Returns true for formats with multi-output worklet engines (LibOpenMPT, Furnace).
+ * Returns false for single-output WASM engines (SID, Hively, UADE, etc.).
+ */
+export function supportsChannelIsolation(editorMode: string): boolean {
+  return ISOLATION_CAPABLE_MODES.has(editorMode);
+}
+
 // Singleton
 let routedEffectsInstance: ChannelRoutedEffectsManager | null = null;
 
