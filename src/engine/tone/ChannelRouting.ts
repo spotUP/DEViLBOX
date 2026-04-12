@@ -138,17 +138,20 @@ export function updateRealtimeChannelLevels(state: ChannelMeterState, levels: nu
  * Get realtime per-channel levels for VU meters.
  * Returns the levels array if recently updated (within 100ms), otherwise null.
  */
+// Pre-allocated result buffer — reused each call to avoid per-frame GC pressure
+const _realtimeLevelsBuf: number[] = [];
+
 export function getRealtimeChannelLevels(state: ChannelMeterState, numChannels: number): number[] | null {
   const s = state as any;
   // Consider stale if not updated in last 100ms
   if (performance.now() - s._realtimeLevelsTimestamp > 100) {
     return null;
   }
-  const result: number[] = [];
+  _realtimeLevelsBuf.length = numChannels;
   for (let i = 0; i < numChannels; i++) {
-    result.push(s._realtimeChannelLevels[i] || 0);
+    _realtimeLevelsBuf[i] = s._realtimeChannelLevels[i] || 0;
   }
-  return result;
+  return _realtimeLevelsBuf;
 }
 
 // ============================================
