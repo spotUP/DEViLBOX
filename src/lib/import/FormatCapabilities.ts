@@ -23,7 +23,7 @@ const EDITABLE_FORMAT_LABELS = new Set([
   'Furnace', 'DefleMask / X-Tracker',
 
   // ── Native editors (non-UADE) ──
-  'HivelyTracker', 'Klystrack', 'GoatTracker', 'MusicLine Editor',
+  'HivelyTracker', 'Klystrack', 'GoatTracker', 'MusicLine Editor', 'PreTracker',
 
   // ── Amiga native with UADE chip RAM editing ──
   'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
@@ -88,7 +88,7 @@ const NATIVE_EXPORTABLE_LABELS = new Set([
   'Furnace',
 
   // ── Native editors with dedicated exporters ──
-  'HivelyTracker', 'Klystrack', 'MusicLine Editor', 'JamCracker Pro',
+  'HivelyTracker', 'Klystrack', 'MusicLine Editor', 'JamCracker Pro', 'PreTracker',
 
   // ── Amiga native with UADE chip RAM export ──
   'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
@@ -151,14 +151,14 @@ const NO_PATTERN_DISPLAY_LABELS = new Set([
   'PMD',             // PC-98
   'MDX',             // X68000
   // Not in FormatRegistry — matched by extension fallback:
-  'PreTracker', 'Ben Daglish', 'Hippel ST', 'Sonix Music Driver',
+  'Ben Daglish', 'Hippel ST', 'Sonix Music Driver',
   'PxTone', 'Organya', 'EUP', 'IXS', 'Psycle',
   'ZXTune',
 ]);
 
 /** Extensions of formats that are WASM-only with no pattern display */
 const NO_PATTERN_DISPLAY_EXTENSIONS = new Set([
-  '.prt', '.ptcop', '.pttune', '.org', '.eup', '.ixs', '.psy',
+  '.ptcop', '.pttune', '.org', '.eup', '.ixs', '.psy',
   '.pt3', '.pt2', '.pt1', '.stc', '.st1', '.st3', '.stp', '.vtx', '.psg',
   '.psm', '.sqt', '.psc', '.asc', '.gtr', '.ftc', '.ayc',
   '.cop', '.tfc', '.tfd', '.tf0', '.pdt', '.chi', '.str', '.dst', '.dmm', '.et1',
