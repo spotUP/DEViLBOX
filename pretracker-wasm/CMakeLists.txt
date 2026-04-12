@@ -33,6 +33,7 @@ if(EMSCRIPTEN)
         "_player_get_wave_info" "_player_get_inst_info"
         "_player_set_wave_info" "_player_set_inst_info"
         "_player_get_raw_inst_info" "_player_set_raw_inst_info"
+        "_player_get_scope_buffer" "_player_get_scope_buffer_size"
         "_player_set_inst_pattern_step" "_player_set_track_cell" "_player_set_position_entry"
         "_player_get_inst_pattern_steps" "_player_get_inst_pattern_step"
         "_player_get_num_tracks" "_player_get_raw_file_size" "_player_get_raw_file_data"

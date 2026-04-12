@@ -430,8 +430,16 @@ export async function tryRouteFormat(
   }
 
   // ── PreTracker ───────────────────────────────────────────────────────────
-  // UADE for audio. WASM replayer WIP (songInit+playerInit work, startSong crashes).
+  // Native WASM replayer (emoon's C99 port of Raspberry Casket)
   if (matchesExt(filename, ['prt'])) {
+    try {
+      const { isPreTrackerFormat, parsePreTrackerFile } = await import('@lib/import/formats/PreTrackerParser');
+      if (isPreTrackerFormat(buffer)) {
+        return parsePreTrackerFile(buffer, originalFileName);
+      }
+    } catch (err) {
+      console.warn(`[PreTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
@@ -2491,6 +2499,14 @@ export async function tryRouteFormat(
     const { isPsycleFormat, parsePsycleFile } = await import('@lib/import/formats/CpsycleParser');
     if (isPsycleFormat(buffer)) {
       return parsePsycleFile(buffer, originalFileName);
+    }
+  }
+
+  // ── QSF — Capcom QSound (.qsf, .miniqsf) ────────────────────────────────────
+  if (matchesExt(filename, ['qsf', 'miniqsf'])) {
+    const { isQsfFormat, parseQsfFile } = await import('@lib/import/formats/QsfParser');
+    if (isQsfFormat(originalFileName, buffer)) {
+      return parseQsfFile(buffer, originalFileName);
     }
   }
 
