@@ -228,6 +228,14 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
               <EffectParameterEditor
                 effect={selectedEffect}
                 onUpdateParameter={handleUpdateParameter}
+                onUpdateParameters={(params) => {
+                  const effects = effectsRef.current;
+                  const fx = effects[selectedIndex];
+                  if (!fx) return;
+                  updateChannelInsertEffect(channelIndex, selectedIndex, {
+                    parameters: { ...fx.parameters, ...params },
+                  });
+                }}
                 onUpdateWet={handleWetChange}
               />
             ) : (

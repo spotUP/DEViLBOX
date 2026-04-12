@@ -557,6 +557,14 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         parameters: { ...current.parameters, [key]: value }
                       });
                     }}
+                    onUpdateParameters={(params) => {
+                      if (!editingEffectId) return;
+                      const current = editingEffectRef.current;
+                      if (!current) return;
+                      updateMasterEffect(editingEffectId, {
+                        parameters: { ...current.parameters, ...params }
+                      });
+                    }}
                     onUpdateWet={(wet) => {
                       if (editingEffectId) updateMasterEffect(editingEffectId, { wet });
                     }}
