@@ -47,6 +47,14 @@ export interface UADEPatternLayout {
   encodeCell: (cell: TrackerCell) => Uint8Array;
 
   /**
+   * Decode native binary bytes back to a TrackerCell.
+   * Inverse of encodeCell. Used by the chip RAM pattern reader to populate
+   * pattern display after UADE loads a packed/compiled module.
+   * If not provided, the format's parser is responsible for populating patterns.
+   */
+  decodeCell?: (bytes: Uint8Array) => TrackerCell;
+
+  /**
    * Optional custom offset calculation for formats with non-standard layouts
    * (e.g., track indirection, IFF chunks with per-pattern offsets).
    * If provided, overrides the default row-major offset calculation.
@@ -89,6 +97,50 @@ export function getCellChipRamAddr(
   channel: number,
 ): number {
   return moduleBase + getCellFileOffset(layout, pattern, row, channel);
+}
+
+// ─── Standard MOD Cell Decoder ────────────────────────────────────────────────
+
+/** Amiga period table for standard MOD note decoding (C-1 to B-3, finetune 0) */
+const MOD_PERIODS = [
+  856,808,762,720,678,640,604,570,538,508,480,453,  // C-1..B-1
+  428,404,381,360,339,320,302,285,269,254,240,226,  // C-2..B-2
+  214,202,190,180,170,160,151,143,135,127,120,113,  // C-3..B-3
+];
+
+/** Convert Amiga period to tracker note (1-based, C-1=1). Returns 0 if no match. */
+function periodToNote(period: number): number {
+  if (period === 0) return 0;
+  // Find closest period
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < MOD_PERIODS.length; i++) {
+    const dist = Math.abs(MOD_PERIODS[i] - period);
+    if (dist < bestDist) { bestDist = dist; best = i + 1; }
+  }
+  return bestDist <= 4 ? best : 0; // Allow ±4 tolerance for finetune
+}
+
+/**
+ * Decode a standard 4-byte MOD cell from chip RAM bytes.
+ * Format: [sample_hi:4|period_hi:12] [sample_lo:4|effect:4|param:8]
+ * This covers: ProTracker, NoiseTracker, SoundTracker, and all MOD-compatible packers.
+ */
+export function decodeModCell(bytes: Uint8Array): TrackerCell {
+  const b0 = bytes[0], b1 = bytes[1], b2 = bytes[2], b3 = bytes[3];
+  const period = ((b0 & 0x0F) << 8) | b1;
+  const instrument = (b0 & 0xF0) | ((b2 >> 4) & 0x0F);
+  const effect = b2 & 0x0F;
+  const param = b3;
+  return {
+    note: periodToNote(period) as TrackerCell['note'],
+    instrument: (instrument || 0) as TrackerCell['instrument'],
+    volume: 0 as TrackerCell['volume'],
+    effTyp: effect as TrackerCell['effTyp'],
+    eff: param as TrackerCell['eff'],
+    effTyp2: 0 as TrackerCell['effTyp2'],
+    eff2: 0 as TrackerCell['eff2'],
+  };
 }
 
 // ─── Encoder Registry ─────────────────────────────────────────────────────────
