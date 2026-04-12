@@ -4,7 +4,7 @@
  * Classic VJ staple: a sphere that breathes with bass and distorts with mids.
  */
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import type { VJSceneProps } from './types';
@@ -22,6 +22,14 @@ export const WireframeSphere: React.FC<VJSceneProps> = ({ audioRef }) => {
     uHigh: { value: 0 },
     uBeat: { value: 0 },
   }), []);
+
+  // Dispose GPU resources on unmount
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      materialRef.current?.dispose();
+    };
+  }, [geometry]);
 
   useFrame((state) => {
     const audio = audioRef.current;

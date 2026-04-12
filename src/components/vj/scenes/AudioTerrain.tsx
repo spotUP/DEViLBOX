@@ -5,7 +5,7 @@
  * mid (detail), and high (shimmer). Camera flies forward continuously.
  */
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import type { VJSceneProps } from './types';
@@ -32,6 +32,14 @@ export const AudioTerrain: React.FC<VJSceneProps> = ({ audioRef }) => {
     uColor1: { value: new THREE.Color(0x0066ff) },
     uColor2: { value: new THREE.Color(0xff0066) },
   }), []);
+
+  // Dispose GPU resources on unmount
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      materialRef.current?.dispose();
+    };
+  }, [geometry]);
 
   useFrame((state) => {
     const audio = audioRef.current;
