@@ -368,6 +368,12 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
         setLoaded(true);
 
+        // Track JUCE param values to detect preset loads (which don't
+        // fire parameterValueChanged). Poll every frame and push diffs.
+        const paramCount = m._aelapse_ui_get_param_count();
+        const prevParams = new Float32Array(paramCount);
+        for (let i = 0; i < paramCount; i++) prevParams[i] = m._aelapse_ui_get_param(i);
+
         // rAF loop — throttled to 30fps (same as OBXf). The JUCE
         // framebuffer blit is 720×400×4 = 1.15 MB/frame of byte-swapping;
         // at 60fps it causes jerky knob interaction.
@@ -383,6 +389,16 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           if (!modRef) return;
 
           modRef._aelapse_ui_tick();
+
+          // Poll JUCE params for changes (catches preset loads that
+          // don't fire parameterValueChanged individually).
+          for (let i = 0; i < paramCount; i++) {
+            const cur = modRef._aelapse_ui_get_param(i);
+            if (cur !== prevParams[i]) {
+              prevParams[i] = cur;
+              onUpdateParameterRef.current?.(i, cur);
+            }
+          }
 
           if (modRef.HEAPU8) {
             const fbPtr = modRef._aelapse_ui_get_fb();
