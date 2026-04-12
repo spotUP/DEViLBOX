@@ -621,6 +621,45 @@ export async function parseSoundFXFile(
     numPatterns: highestPosition + 1,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSoundFXCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of encodeSoundFXCell
+      // Byte 0-1: signed int16 BE period
+      const period = ((bytes[0] << 8) | bytes[1]) | 0;
+      const signedPeriod = period > 0x7FFF ? period - 0x10000 : period;
+
+      // Byte 2: (sampleHi << 4) | effect
+      const instr = (bytes[2] >> 4) & 0x0F;
+      const sfxEff = bytes[2] & 0x0F;
+
+      // Byte 3: effect param
+      const param = bytes[3];
+
+      // Decode note
+      let note = 0;
+      if (signedPeriod === -2) {
+        note = 97; // note off
+      } else if (signedPeriod > 0) {
+        note = sfxPeriodToNote(signedPeriod);
+      }
+
+      // Decode effect (inverse of reverseEffect in SoundFXEncoder)
+      let effTyp = 0;
+      let eff = 0;
+      if (sfxEff !== 0 || param !== 0) {
+        switch (sfxEff) {
+          case 0: effTyp = 0x00; eff = param; break; // arpeggio
+          case 1: effTyp = 0x01; eff = param; break; // portamento up
+          case 2: effTyp = 0x02; eff = param; break; // portamento down
+          case 3: effTyp = 0x0E; eff = param; break; // filter/extended
+          case 5: effTyp = 0x0A; eff = param; break; // volume slide
+          case 6: effTyp = 0x0C; eff = param; break; // set volume
+          case 9: effTyp = 0x0F; eff = param; break; // set speed
+          default: break;
+        }
+      }
+
+      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {
