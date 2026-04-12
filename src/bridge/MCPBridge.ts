@@ -379,6 +379,23 @@ const handlers: Record<string, Handler> = {
   clear_console_errors: () => clearConsoleErrors(),
   evaluate_script: evaluateScript,
 
+  // ─── Soak Test (dev-only) ───────────────────────────────────────────────
+  dj_vj_action: async (params: Record<string, unknown>) => {
+    const action = params.action as string;
+    const args = (params.args as Record<string, unknown>) || {};
+    const fn = window.__soakActions__?.[action];
+    if (!fn) throw new Error(`Unknown soak action: ${action} (hooks not installed — is DEV mode active?)`);
+    return fn(args);
+  },
+  get_frame_stats: () => {
+    if (!window.__soakTelemetry__) throw new Error('Soak telemetry not installed (DEV mode only)');
+    return window.__soakTelemetry__.getFrameStats();
+  },
+  get_gpu_stats: () => {
+    if (!window.__soakTelemetry__) throw new Error('Soak telemetry not installed (DEV mode only)');
+    return window.__soakTelemetry__.getGpuStats();
+  },
+
   // ─── DJ Remote Control ─────────────────────────────────────────────────
   dj_get_state: getDJState,
   dj_get_playlist_state: getDJPlaylistState,
