@@ -393,6 +393,7 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   { category: 'wasm', type: 'SlapbackDelay', label: 'Slapback Delay', group: 'Reverb & Delay', description: 'Short single-repeat rockabilly delay' },
   { category: 'wasm', type: 'VintageDelay', label: 'Vintage Delay', group: 'Reverb & Delay', description: 'Warm analog-modeled vintage delay' },
   { category: 'wasm', type: 'ZamDelay', label: 'ZAM Delay', group: 'Reverb & Delay', description: 'Clean digital delay with feedback control' },
+  { category: 'wasm', type: 'TapeDelay', label: 'Tape Delay', group: 'Reverb & Delay', description: 'RE-201/Echoplex tape delay — wow, flutter, tape saturation, tone filter' },
 
   // ── Distortion ──
   { category: 'wasm', type: 'AutoSat', label: 'Auto Saturator', group: 'Distortion', description: 'Automatic saturation with dynamic response' },
