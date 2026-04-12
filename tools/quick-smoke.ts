@@ -69,8 +69,10 @@ async function main() {
     const fmt = dir.padEnd(22);
 
     try {
-      // Stop previous
+      // Stop previous — wait for UADE worklet to fully quiesce
       await call('stop').catch(() => {});
+      await call('release_all_notes').catch(() => {});
+      await sleep(500);
 
       // Load via base64 (WS relay expects filename + data, not path)
       const fileData = readFileSync(filePath);
