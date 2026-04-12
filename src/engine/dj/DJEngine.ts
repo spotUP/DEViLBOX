@@ -5,6 +5,7 @@
  * This is the main entry point for all DJ audio operations.
  */
 
+import * as Tone from 'tone';
 import { DeckEngine, type DeckId } from './DeckEngine';
 import { DJMixerEngine, type CrossfaderCurve } from './DJMixerEngine';
 import { DJCueEngine } from './DJCueEngine';
@@ -27,6 +28,7 @@ export class DJEngine {
   readonly cueEngine: DJCueEngine;
 
   private disposed = false;
+  private _visibilityHandler: (() => void) | null = null;
 
   /** Active set recorder (null when not recording) */
   recorder: DJSetRecorder | null = null;
@@ -79,6 +81,20 @@ export class DJEngine {
     void this.cueEngine.init().catch(err => {
       console.warn('[DJEngine] Cue engine init failed:', err);
     });
+
+    // Tab visibility handler — resume AudioContext when user returns to tab
+    // (audio worklets keep running in background, but AudioContext may suspend)
+    this._visibilityHandler = () => {
+      if (document.hidden) {
+        console.log('[DJ] tab backgrounded');
+      } else {
+        if (Tone.context.state === 'suspended') {
+          Tone.start().catch(() => {});
+        }
+        console.log('[DJ] tab restored, AudioContext:', Tone.context.state);
+      }
+    };
+    document.addEventListener('visibilitychange', this._visibilityHandler);
   }
 
   // ==========================================================================
@@ -230,6 +246,10 @@ export class DJEngine {
     if (this.disposed) return;
     this.disposed = true;
 
+    if (this._visibilityHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
     this.deckA.dispose();
     this.deckB.dispose();
     this.deckC.dispose();
