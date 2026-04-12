@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-12T08:42:35.767Z
+ * Generated: 2026-04-12T09:24:01.968Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.4949';
-export const BUILD_NUMBER = '4949';
-export const BUILD_HASH = '6334cd705';
+export const BUILD_VERSION = '1.0.4954';
+export const BUILD_NUMBER = '4954';
+export const BUILD_HASH = '8c6a14b06';
 export const BUILD_DATE = '2026-04-12';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.4949',
+    version: '1.0.4954',
     date: '2026-04-12',
     changes: [
+      {
+        type: 'feature',
+        "description": "Sample extraction for KrisHatlelid, SoundPlayer, JesperOlsen, AshleyHogg"
+      },
+      {
+        type: 'fix',
+        "description": "Add to AVAILABLE_EFFECTS so it appears in the effect picker"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove Arrangement, Piano Roll, TB-303 view, and Split view"
+      },
+      {
+        type: 'feature',
+        "description": "Sample extraction for MartinWalker + CoreDesign"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent recursive public/dist build bomb"
+      },
       {
         type: 'fix',
         "description": "Respect layers + add per-osc filter/FM/phase/seed"
@@ -214,26 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Move theme picker to settings only, move Tips button to header"
-      },
-      {
-        type: 'fix',
-        "description": "Status bar fixed-width numerals to prevent layout jumps"
-      },
-      {
-        type: 'feature',
-        "description": "F5 resize, Shift+F5 expand, F6 remove unused sequences"
-      },
-      {
-        type: 'feature',
-        "description": "Play markers, notation mode, SID toggle, expand/resize sequence"
-      },
-      {
-        type: 'fix',
-        "description": "VisualEffectEditorWrapper crash + Furnace frozen config mutation"
-      },
-      {
-        type: 'fix',
-        "description": "Reorder audit tests — stable engines first, UADE-heavy formats last"
       }
     ]
   }

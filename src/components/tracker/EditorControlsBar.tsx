@@ -216,7 +216,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <ModuleInfoButton />
 
         {/* Channel Selector (grid and piano roll views) */}
-        {(viewMode === 'grid' || viewMode === 'pianoroll') && (
+        {viewMode === 'grid' && (
           <>
             <span className="text-text-secondary text-[10px] font-medium">CH:</span>
             <CustomSelect

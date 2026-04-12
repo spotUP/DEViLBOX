@@ -261,8 +261,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════ LAYOUT ═══════ */}
           <SectionHeader text="LAYOUT" />
 
-          <SettingRow label="TB-303 Panel:">
-            <PixiCheckbox checked={!s.tb303Collapsed} onChange={(v) => s.setTB303Collapsed(!v)} />
+          <SettingRow label="Knob Panel:">
+            <PixiCheckbox checked={!s.knobPanelCollapsed} onChange={(v) => s.setKnobPanelCollapsed(!v)} />
           </SettingRow>
 
           <SettingRow label="Oscilloscope:">

@@ -8,7 +8,7 @@ import type { NormalizedKeyEvent } from './types';
 /**
  * View type matching useUIStore.activeView
  */
-export type ViewType = 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio' | 'split';
+export type ViewType = 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
 
 /**
  * Keys that should work globally across all views.
@@ -56,7 +56,7 @@ export const GLOBAL_KEY_COMBOS = new Set([
   'Ctrl+Shift+D', // Toggle DJ view
   'Ctrl+Shift+V', // Toggle VJ view
   'Ctrl+Shift+T', // Toggle tracker view
-  'Ctrl+Shift+A', // Toggle arrangement view
+  'Ctrl+Shift+M', // Toggle mixer view
 
   // AI assistant
   'Ctrl+L',       // Toggle AI panel

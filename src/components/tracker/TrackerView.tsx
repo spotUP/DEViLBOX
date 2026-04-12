@@ -530,7 +530,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       )}
 
       {/* Instrument Knob Panel (hidden in editor fullscreen mode) */}
-      {!editorFullscreen && viewMode !== 'tb303' && (
+      {!editorFullscreen && (
         <div className="flex-shrink-0">
           <InstrumentKnobPanel />
         </div>

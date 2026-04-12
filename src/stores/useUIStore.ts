@@ -9,7 +9,7 @@ import type { PanelType } from '@typedefs/project';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
-export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio' | 'split';
+export type TrackerViewMode = 'tracker' | 'grid' | 'sunvox' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
 
 export type DialogCommand =
   | 'interpolate-volume'
@@ -67,7 +67,7 @@ interface UIStore {
   blankEmptyCells: boolean; // Hide ---, .., ... etc. for clean pattern view
 
   // Responsive layout state
-  tb303Collapsed: boolean;
+  knobPanelCollapsed: boolean;
   scCollapsed: boolean;
   cmiCollapsed: boolean;
   oscilloscopeVisible: boolean;
@@ -84,8 +84,7 @@ interface UIStore {
   scratchAcceleration: boolean; // Scroll acceleration for scratch (true = smoothed, false = raw 1:1)
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
-  // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ vs studio)
-  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio' | 'split';
+  activeView: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
 
   // Tracker sub-view state (shared between DOM and GL renderers)
   trackerViewMode: TrackerViewMode;
@@ -97,14 +96,11 @@ interface UIStore {
   viewExposeSelectedIdx: number;
 
   // Pop-out window state
-  tb303PoppedOut: boolean;
   instrumentEditorPoppedOut: boolean;
   hardwareUiPoppedOut: boolean;
   masterEffectsPoppedOut: boolean;
   instrumentEffectsPoppedOut: boolean;
-  pianoRollPoppedOut: boolean;
   oscilloscopePoppedOut: boolean;
-  arrangementPoppedOut: boolean;
   vjPoppedOut: boolean;
   patternEditorPoppedOut: boolean;
 
@@ -146,8 +142,8 @@ interface UIStore {
   setStatusMessage: (msg: string, carry?: boolean, timeout?: number) => void;
 
   // Responsive layout actions
-  toggleTB303Collapsed: () => void;
-  setTB303Collapsed: (collapsed: boolean) => void;
+  toggleKnobPanelCollapsed: () => void;
+  setKnobPanelCollapsed: (collapsed: boolean) => void;
   toggleSCCollapsed: () => void;
   setSCCollapsed: (collapsed: boolean) => void;
   toggleCMICollapsed: () => void;
@@ -167,7 +163,7 @@ interface UIStore {
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio' | 'split') => void;
+  setActiveView: (view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio') => void;
   toggleActiveView: () => void;
 
   // Tracker sub-view actions
@@ -182,14 +178,11 @@ interface UIStore {
   setViewExposeSelectedIdx: (idx: number) => void;
 
   // Pop-out window actions
-  setTB303PoppedOut: (v: boolean) => void;
   setInstrumentEditorPoppedOut: (v: boolean) => void;
   setHardwareUiPoppedOut: (v: boolean) => void;
   setMasterEffectsPoppedOut: (v: boolean) => void;
   setInstrumentEffectsPoppedOut: (v: boolean) => void;
-  setPianoRollPoppedOut: (v: boolean) => void;
   setOscilloscopePoppedOut: (v: boolean) => void;
-  setArrangementPoppedOut: (v: boolean) => void;
   setVJPoppedOut: (v: boolean) => void;
   setPatternEditorPoppedOut: (v: boolean) => void;
 
@@ -259,7 +252,7 @@ export const useUIStore = create<UIStore>()(
       blankEmptyCells: false, // Show ---, .., ... by default
 
       // Responsive layout state (default to expanded/visible)
-      tb303Collapsed: true, // TB-303 panel ALWAYS collapsed by default
+      knobPanelCollapsed: true, // TB-303 panel ALWAYS collapsed by default
       scCollapsed: true, // SC panel collapsed by default
       cmiCollapsed: false, // CMI panel expanded by default to show rich editor
       oscilloscopeVisible: true,
@@ -293,14 +286,11 @@ export const useUIStore = create<UIStore>()(
       viewExposeSelectedIdx: 0,
 
       // Pop-out window state
-      tb303PoppedOut: false,
       instrumentEditorPoppedOut: false,
       hardwareUiPoppedOut: false,
       masterEffectsPoppedOut: false,
       instrumentEffectsPoppedOut: false,
-      pianoRollPoppedOut: false,
       oscilloscopePoppedOut: false,
-      arrangementPoppedOut: false,
       vjPoppedOut: false,
       patternEditorPoppedOut: false,
 
@@ -458,14 +448,14 @@ export const useUIStore = create<UIStore>()(
         }),
 
       // Responsive layout actions
-      toggleTB303Collapsed: () =>
+      toggleKnobPanelCollapsed: () =>
         set((state) => {
-          state.tb303Collapsed = !state.tb303Collapsed;
+          state.knobPanelCollapsed = !state.knobPanelCollapsed;
         }),
 
-      setTB303Collapsed: (collapsed) =>
+      setKnobPanelCollapsed: (collapsed) =>
         set((state) => {
-          state.tb303Collapsed = collapsed;
+          state.knobPanelCollapsed = collapsed;
         }),
 
       toggleSCCollapsed: () =>
@@ -509,7 +499,7 @@ export const useUIStore = create<UIStore>()(
           // Version 8: Nuclear option - force collapse no matter what
           if (state.uiVersion < 8) {
             state.uiVersion = 8;
-            state.tb303Collapsed = true; // FORCE collapse TB-303 panel
+            state.knobPanelCollapsed = true; // FORCE collapse TB-303 panel
           }
 
           // Only apply once per session
@@ -596,7 +586,7 @@ export const useUIStore = create<UIStore>()(
 
       toggleActiveView: () =>
         set((state) => {
-          state.activeView = state.activeView === 'tracker' ? 'arrangement' : 'tracker';
+          state.activeView = state.activeView === 'tracker' ? 'mixer' : 'tracker';
         }),
 
       // Tracker sub-view actions
@@ -615,7 +605,7 @@ export const useUIStore = create<UIStore>()(
           state.viewExposeActive = !state.viewExposeActive;
           if (state.viewExposeActive) {
             // Pre-select current view when opening
-            const EXPOSE_VIEWS = ['tracker', 'arrangement', 'pianoroll', 'mixer', 'dj', 'vj', 'studio', 'split'];
+            const EXPOSE_VIEWS = ['tracker', 'mixer', 'dj', 'vj', 'studio'];
             const idx = EXPOSE_VIEWS.indexOf(state.activeView);
             state.viewExposeSelectedIdx = idx >= 0 ? idx : 0;
           }
@@ -628,11 +618,6 @@ export const useUIStore = create<UIStore>()(
         set((state) => { state.viewExposeSelectedIdx = idx; }),
 
       // Pop-out window actions
-      setTB303PoppedOut: (v) =>
-        set((state) => {
-          state.tb303PoppedOut = v;
-        }),
-
       setInstrumentEditorPoppedOut: (v) =>
         set((state) => {
           state.instrumentEditorPoppedOut = v;
@@ -653,19 +638,9 @@ export const useUIStore = create<UIStore>()(
           state.instrumentEffectsPoppedOut = v;
         }),
 
-      setPianoRollPoppedOut: (v) =>
-        set((state) => {
-          state.pianoRollPoppedOut = v;
-        }),
-
       setOscilloscopePoppedOut: (v) =>
         set((state) => {
           state.oscilloscopePoppedOut = v;
-        }),
-
-      setArrangementPoppedOut: (v) =>
-        set((state) => {
-          state.arrangementPoppedOut = v;
         }),
 
       setVJPoppedOut: (v) =>
@@ -774,7 +749,7 @@ export const useUIStore = create<UIStore>()(
       merge: (persisted, current) => {
         const merged = { ...current, ...(persisted as Record<string, unknown>) };
         // Validate activeView — reset to 'tracker' if persisted value is invalid
-        const validViews = ['tracker', 'arrangement', 'dj', 'drumpad', 'pianoroll', 'vj', 'mixer', 'studio', 'split'];
+        const validViews = ['tracker', 'dj', 'drumpad', 'vj', 'mixer', 'studio'];
         if (merged.activeView && !validViews.includes(merged.activeView as string)) {
           console.warn(`[useUIStore] Invalid persisted activeView "${merged.activeView}", resetting to "tracker"`);
           merged.activeView = 'tracker';
@@ -787,7 +762,7 @@ export const useUIStore = create<UIStore>()(
         showAutomationLanes: state.showAutomationLanes,
         showMacroLanes: state.showMacroLanes,
         showMacroSlots: state.showMacroSlots,
-        tb303Collapsed: state.tb303Collapsed,
+        knobPanelCollapsed: state.knobPanelCollapsed,
         scCollapsed: state.scCollapsed,
         cmiCollapsed: state.cmiCollapsed,
         oscilloscopeVisible: state.oscilloscopeVisible,
