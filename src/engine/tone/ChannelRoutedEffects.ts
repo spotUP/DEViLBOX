@@ -1,13 +1,17 @@
 /**
  * ChannelRoutedEffects — Per-channel effect routing via multi-output worklet.
  *
- * Architecture (single-worklet, multiple openmpt module instances):
- *   The main libopenmpt worklet has 5 outputs: output[0] = main mix,
- *   outputs[1-4] = isolation slots. Each isolation slot contains a secondary
- *   openmpt module instance that renders ONLY the target channels.
- *   All modules advance in the same process() call = perfect lockstep.
+ * Architecture: Any engine implementing IsolationCapableEngine can provide
+ * per-channel isolation. The worklet has 5 outputs: output[0] = main mix,
+ * outputs[1-4] = isolation slots. Each slot renders ONLY the target channels.
  *
- *   worklet output[0] (main mix, ch1 muted) → gainNode → synthBus → master
+ * Supported engines:
+ *   - LibOpenMPT: secondary openmpt module instances in lockstep
+ *   - FurnaceDispatch: mute-and-re-render per slot (same sequencer instance)
+ *   - Hively: secondary player instances with channel gain isolation
+ *   - UADE: internal Paula per-channel buffer splitting
+ *
+ *   worklet output[0] (main mix, isolated ch muted) → gainNode → synthBus → master
  *   worklet output[1] (ch1 only) → BitCrusher → masterEffectsInput
  *   worklet output[2] (ch3 only) → Reverb → masterEffectsInput
  */
@@ -17,6 +21,20 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { createEffect } from '../factories/EffectFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { applyEffectParametersDiff } from './EffectParameterEngine';
+
+/**
+ * Interface for any WASM engine that supports per-channel isolation via
+ * multi-output AudioWorkletNode. Engines implement this to participate in
+ * the per-channel effects routing system.
+ */
+export interface IsolationCapableEngine {
+  addIsolation(slotIndex: number, channelMask: number): void;
+  removeIsolation(slotIndex: number): void;
+  diagIsolation?(): void;
+  getWorkletNode(): AudioWorkletNode | null;
+  getAudioContext(): AudioContext | null;
+  isAvailable(): boolean;
+}
 
 interface IsolationSlot {
   slotIndex: number;
@@ -66,17 +84,21 @@ export class ChannelRoutedEffectsManager {
   /**
    * Rebuild per-channel effect routing based on mixer store state.
    * Connects worklet outputs[1..4] → per-channel effect chains → masterEffectsInput.
+   * @param channelEffects Map of channel index → effect configs to apply
+   * @param engine The isolation-capable engine to route through (auto-detected if omitted)
    */
   async rebuild(
     channelEffects: Map<number, EffectConfig[]>,
+    engine?: IsolationCapableEngine,
   ): Promise<void> {
     console.log(`[ChannelRoutedEffects] rebuild() called with ${channelEffects.size} channels:`,
       [...channelEffects.entries()].map(([ch, fx]) => `ch${ch}: ${fx.length} effects (${fx.filter(e=>e.enabled).length} enabled)`));
 
-    // Lazy import to avoid circular dependency
-    const { LibopenmptEngine } = await import('../libopenmpt/LibopenmptEngine');
-    if (!LibopenmptEngine.hasInstance()) { console.warn('[ChannelRoutedEffects] No LibopenmptEngine instance'); return; }
-    const engine = LibopenmptEngine.getInstance();
+    // If no engine passed, try to find one
+    if (!engine) {
+      engine = await getActiveIsolationEngine() ?? undefined;
+    }
+    if (!engine) { console.warn('[ChannelRoutedEffects] No isolation-capable engine available'); return; }
     if (!engine.isAvailable()) { console.warn('[ChannelRoutedEffects] Engine not available'); return; }
 
     const workletNode = engine.getWorkletNode();
@@ -161,8 +183,9 @@ export class ChannelRoutedEffectsManager {
     }
 
     // Request diagnostic from worklet after a short delay to let messages settle
-    if (slotIdx > 0) {
-      setTimeout(() => engine.diagIsolation(), 200);
+    if (slotIdx > 0 && engine.diagIsolation) {
+      const diagEngine = engine;
+      setTimeout(() => diagEngine.diagIsolation!(), 200);
     }
   }
 
@@ -231,9 +254,9 @@ export class ChannelRoutedEffectsManager {
 
   async dispose(): Promise<void> {
     try {
-      const { LibopenmptEngine } = await import('../libopenmpt/LibopenmptEngine');
-      if (LibopenmptEngine.hasInstance()) {
-        this.teardown(LibopenmptEngine.getInstance());
+      const engine = await getActiveIsolationEngine();
+      if (engine) {
+        this.teardown(engine);
       } else {
         this.teardown();
       }
@@ -241,6 +264,46 @@ export class ChannelRoutedEffectsManager {
       this.teardown();
     }
   }
+}
+
+/**
+ * Registry of engine resolvers, checked in priority order.
+ * Each resolver returns an IsolationCapableEngine if that engine is
+ * currently active and available, or null otherwise.
+ * New engines register here when they implement IsolationCapableEngine.
+ */
+const engineResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [
+  // LibopenmptEngine (MOD/XM/IT/S3M)
+  async () => {
+    const { LibopenmptEngine } = await import('../libopenmpt/LibopenmptEngine');
+    if (LibopenmptEngine.hasInstance()) {
+      const engine = LibopenmptEngine.getInstance();
+      if (engine.isAvailable()) return engine;
+    }
+    return null;
+  },
+];
+
+/**
+ * Register an engine resolver for per-channel isolation.
+ * Called by engines that implement IsolationCapableEngine during their module init.
+ */
+export function registerIsolationEngineResolver(resolver: () => Promise<IsolationCapableEngine | null>): void {
+  engineResolvers.push(resolver);
+}
+
+/**
+ * Detect which isolation-capable engine is currently active and available.
+ * Checks registered engines in priority order via lazy imports.
+ */
+export async function getActiveIsolationEngine(): Promise<IsolationCapableEngine | null> {
+  for (const resolver of engineResolvers) {
+    try {
+      const engine = await resolver();
+      if (engine) return engine;
+    } catch { /* engine module not loaded */ }
+  }
+  return null;
 }
 
 // Singleton
@@ -259,4 +322,3 @@ export function disposeChannelRoutedEffectsManager(): void {
     routedEffectsInstance = null;
   }
 }
-

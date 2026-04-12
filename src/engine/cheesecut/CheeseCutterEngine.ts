@@ -24,6 +24,7 @@ export class CheeseCutterEngine {
   private _playing = false;
   private readyResolve: (() => void) | null = null;
   private readyPromise: Promise<void>;
+  private _sidRegsCallback: ((regs: Uint8Array) => void) | null = null;
 
   static getInstance(): CheeseCutterEngine {
     if (!CheeseCutterEngine._instance) {
@@ -104,6 +105,12 @@ export class CheeseCutterEngine {
       case 'stopped':
         this._playing = false;
         break;
+      case 'sidRegs':
+        if (this._sidRegsCallback) {
+          this._sidRegsCallback(msg.regs as Uint8Array);
+          this._sidRegsCallback = null;
+        }
+        break;
     }
   }
 
@@ -135,6 +142,29 @@ export class CheeseCutterEngine {
     if (this.outputNode) {
       try { this.outputNode.disconnect(); } catch { /* already disconnected */ }
       this.outputNode.connect(destination);
+    }
+  }
+
+  requestSidRegs(): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.workletNode || !this._ready) {
+        resolve(new Uint8Array(25));
+        return;
+      }
+      this._sidRegsCallback = resolve;
+      this.workletNode.port.postMessage({ type: 'getSidRegs' });
+    });
+  }
+
+  writeByte(addr: number, value: number): void {
+    if (this.workletNode && this._ready) {
+      this.workletNode.port.postMessage({ type: 'writeByte', addr, value });
+    }
+  }
+
+  writeBytes(addrs: number[], values: number[]): void {
+    if (this.workletNode && this._ready) {
+      this.workletNode.port.postMessage({ type: 'writeBytes', addrs, values });
     }
   }
 

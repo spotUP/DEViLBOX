@@ -90,6 +90,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // the main-thread lookahead scheduler.
     this.scheduledCommands = [];
 
+    // Per-channel effect isolation slots (max 4).
+    // Each slot renders only channels in its channelMask to outputs[slotIndex+1].
+    // Uses mute-and-re-render: save mute state → isolate → render → restore.
+    this.isolationSlots = [null, null, null, null];
+
     // Exported WASM functions (cwrap'd)
     this.wasm = null;
 
@@ -392,6 +397,43 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             this.wasm.seqSetMute(data.chan, data.mute ? 1 : 0);
           }
         }
+        break;
+      }
+
+      // --- Per-channel effect isolation ---
+      case 'addIsolation': {
+        const { slotIndex, channelMask } = data;
+        if (slotIndex >= 0 && slotIndex < 4) {
+          this.isolationSlots[slotIndex] = { channelMask };
+          this.port.postMessage({ type: 'isolationReady', slotIndex, channelMask });
+        }
+        break;
+      }
+
+      case 'removeIsolation': {
+        if (data.slotIndex >= 0 && data.slotIndex < 4) {
+          this.isolationSlots[data.slotIndex] = null;
+        }
+        break;
+      }
+
+      case 'updateIsolationMask': {
+        if (data.slotIndex >= 0 && data.slotIndex < 4 && this.isolationSlots[data.slotIndex]) {
+          this.isolationSlots[data.slotIndex].channelMask = data.channelMask;
+        }
+        break;
+      }
+
+      case 'diagIsolation': {
+        const activeSlots = this.isolationSlots
+          .map((s, i) => s ? { slot: i, mask: '0x' + s.channelMask.toString(16) } : null)
+          .filter(Boolean);
+        this.port.postMessage({
+          type: 'diagIsolation',
+          slots: activeSlots,
+          chipCount: this.chips.size,
+          totalChannels: [...this.chips.values()].reduce((sum, c) => sum + c.numChannels, 0)
+        });
         break;
       }
 
@@ -1038,16 +1080,54 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
       }
 
-      // Render each chip and mix into output with postAmp scaling
+      // Check if any isolation slots are active
+      const hasIsolation = this.isolationSlots.some(s => s !== null);
+
+      // Build a bitmask of all channels currently isolated (for muting in main output)
+      let isolatedChannelBits = 0;
+      if (hasIsolation) {
+        for (let s = 0; s < 4; s++) {
+          if (this.isolationSlots[s]) isolatedChannelBits |= this.isolationSlots[s].channelMask;
+        }
+      }
+
+      // Compute per-chip channel offsets (globalCh = chipOffset + localCh)
+      const chipOffsets = new Map();
+      let channelOffset = 0;
+      for (const [pType, chip] of this.chips) {
+        chipOffsets.set(pType, channelOffset);
+        channelOffset += chip.numChannels;
+      }
+
+      // Render each chip and mix into main output with postAmp scaling.
+      // Channels that are isolated are muted in the main output to avoid double-summation.
       for (const chip of this.chips.values()) {
+        const chipOff = chipOffsets.get(chip.platformType) || 0;
         try {
+          // If isolation is active, mute isolated channels for main output render
+          if (isolatedChannelBits) {
+            for (let ch = 0; ch < chip.numChannels; ch++) {
+              if (isolatedChannelBits & (1 << (chipOff + ch))) {
+                this.wasm.mute(chip.handle, ch, 1);
+              }
+            }
+          }
+
           this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
-          // Re-acquire buffer views — WASM heap may have grown during render
           this.updateBufferViews();
           const amp = POST_AMP[chip.platformType] || 1.0;
           for (let i = 0; i < numSamples; i++) {
             outputL[i] += this.outputBufferL[i] * amp;
             outputR[i] += this.outputBufferR[i] * amp;
+          }
+
+          // Restore mutes after main render
+          if (isolatedChannelBits) {
+            for (let ch = 0; ch < chip.numChannels; ch++) {
+              if (isolatedChannelBits & (1 << (chipOff + ch))) {
+                this.wasm.mute(chip.handle, ch, 0);
+              }
+            }
           }
         } catch (chipErr) {
           if (!this._badChips) this._badChips = new Set();
@@ -1055,6 +1135,50 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             this._badChips.add(chip.platformType);
             const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
             this.port.postMessage({ type: 'error', message: msg });
+          }
+        }
+      }
+
+      // --- Render isolation slots (per-channel effect routing) ---
+      // For each active slot, mute all channels EXCEPT the slot's channelMask,
+      // re-render each chip, and mix to the slot's output buffer.
+      if (hasIsolation) {
+        for (let s = 0; s < 4; s++) {
+          const slot = this.isolationSlots[s];
+          if (!slot) continue;
+
+          const slotOutput = outputs[s + 1];
+          if (!slotOutput || slotOutput.length === 0) continue;
+
+          const slotL = slotOutput[0];
+          const slotR = slotOutput[1] || slotOutput[0];
+          slotL.fill(0);
+          slotR.fill(0);
+
+          for (const chip of this.chips.values()) {
+            const chipOff = chipOffsets.get(chip.platformType) || 0;
+            try {
+              // Mute all channels except those in this slot's mask
+              for (let ch = 0; ch < chip.numChannels; ch++) {
+                const shouldPlay = (slot.channelMask & (1 << (chipOff + ch))) !== 0;
+                this.wasm.mute(chip.handle, ch, shouldPlay ? 0 : 1);
+              }
+
+              this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
+              this.updateBufferViews();
+              const amp = POST_AMP[chip.platformType] || 1.0;
+              for (let i = 0; i < numSamples; i++) {
+                slotL[i] += this.outputBufferL[i] * amp;
+                slotR[i] += this.outputBufferR[i] * amp;
+              }
+
+              // Restore all channels to unmuted after isolation render
+              for (let ch = 0; ch < chip.numChannels; ch++) {
+                this.wasm.mute(chip.handle, ch, 0);
+              }
+            } catch (e) {
+              // Isolation render failure is non-fatal — main output still works
+            }
           }
         }
       }
