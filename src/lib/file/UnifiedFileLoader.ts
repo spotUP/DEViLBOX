@@ -136,8 +136,10 @@ export async function importTrackerModule(
   engine.disposeAllInstruments();
 
   // ── Try OpenMPT WASM soundlib for PC tracker formats ──
+  // Skip OpenMPT when native parser data exists — native XM/MOD parser extracts
+  // volume envelopes correctly, OpenMPT WASM loses them.
   const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3|med|mmd[0-3]|okt|okta)$/i.test(info.file?.name || '');
-  if (info.arrayBuffer && isOpenMPTFormat) {
+  if (info.arrayBuffer && isOpenMPTFormat && !info.nativeData) {
     try {
       const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
       const song = await parseWithOpenMPT(info.arrayBuffer, info.file?.name || 'module');
@@ -180,10 +182,8 @@ export async function importTrackerModule(
     const { format: nativeFormat, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
     format = nativeFormat;
 
-    // Warn if an OpenMPT-compatible format fell through to the old TS parser
-    if (isOpenMPTFormat) {
-      console.warn(`[Import] WARNING: ${format} file using OLD native TS parser instead of OpenMPT WASM!`);
-      notify.warning(`OLD IMPORT PATH: "${info.file?.name || 'module'}" used legacy ${format} parser instead of OpenMPT. Report this!`);
+    if (isOpenMPTFormat && !useLibopenmpt) {
+      console.warn(`[Import] WARNING: ${format} file using native TS parser without libopenmpt fallback`);
     }
 
     console.log(`[Import] Using native ${format} parser: ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
