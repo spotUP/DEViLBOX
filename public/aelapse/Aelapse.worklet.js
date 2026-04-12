@@ -12,6 +12,18 @@
  * copyRMSFrames Embind methods every N process() blocks (~30Hz cadence).
  */
 
+// Polyfill crypto for AudioWorklet scope — Emscripten's WASM module factory
+// calls crypto.getRandomValues() during initialization but the Web Crypto API
+// is not available in AudioWorklet global scope.
+if (typeof crypto === 'undefined') {
+  globalThis.crypto = {
+    getRandomValues(arr) {
+      for (let i = 0; i < arr.length; i++) arr[i] = (Math.random() * 256) | 0;
+      return arr;
+    }
+  };
+}
+
 // Polyfill URL for AudioWorklet scope — Emscripten calls new URL() even
 // when wasmBinary is provided directly.
 if (typeof URL === 'undefined') {
