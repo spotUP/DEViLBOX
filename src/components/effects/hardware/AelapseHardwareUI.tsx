@@ -119,6 +119,14 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
   const [loaded, setLoaded] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
 
+  // Store callback props in refs so the useEffect doesn't re-run when
+  // the parent re-renders with new function references. The JUCE WASM
+  // module must be initialized exactly once.
+  const onUpdateParameterRef = useRef(onUpdateParameter);
+  onUpdateParameterRef.current = onUpdateParameter;
+  const getRMSSnapshotRef = useRef(getRMSSnapshot);
+  getRMSSnapshotRef.current = getRMSSnapshot;
+
   const fbWidthRef  = useRef(900);
   const fbHeightRef = useRef(600);
 
@@ -244,8 +252,17 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
+        let dragLogCount = 0;
         const onMouseMove = (e: MouseEvent) => {
-          if ((e.buttons & 1) !== 0) e.preventDefault();
+          const isDown = (e.buttons & 1) !== 0;
+          if (isDown) {
+            e.preventDefault();
+            if (dragLogCount < 5) {
+              const [dx, dy] = canvasCoords(jcanvas, e);
+              console.log(`[AelapseUI] drag @ ${dx},${dy} buttons=${e.buttons}`);
+              dragLogCount++;
+            }
+          }
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_move(cx, cy, getModifiers(e));
         };
@@ -267,10 +284,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           () => jcanvas.removeEventListener('wheel', onWheel),
         );
 
-        // Param callback: JUCE UI → JS → onUpdateParameter prop.
+        // Param callback: JUCE UI → JS → onUpdateParameter prop (via ref).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._aelapseUIParamCallback = (paramIndex: number, normalizedValue: number) => {
-          if (onUpdateParameter) onUpdateParameter(paramIndex, normalizedValue);
+          onUpdateParameterRef.current?.(paramIndex, normalizedValue);
         };
         eventCleanups.push(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -320,7 +337,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
           // Springs overlay — pull latest RMS snapshot and a handful of
           // knob values straight from the JUCE param vector.
-          const rmsSnap = getRMSSnapshot?.() ?? null;
+          const rmsSnap = getRMSSnapshotRef.current?.() ?? null;
           const stack = rmsSnap ? rmsSnap.stack : fallbackRMSRef.current;
           const pos   = rmsSnap ? rmsSnap.pos   : 0;
 
@@ -356,7 +373,8 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
       if (springsRef.current) { springsRef.current.dispose(); springsRef.current = null; }
       if (moduleRef.current)  { moduleRef.current._aelapse_ui_shutdown(); moduleRef.current = null; }
     };
-  }, [canvasCoords, getModifiers, onUpdateParameter, getRMSSnapshot]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- callback props use refs; WASM init must run exactly once
+  }, []);
 
   if (error) {
     return (
