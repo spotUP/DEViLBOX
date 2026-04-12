@@ -1017,6 +1017,23 @@ export function stopNativeEngines(
     }
   }
 
+  // Force-stop UADEEngine regardless of song state — generic UADE files
+  // (unrecognized extensions) activate UADEEngine but aren't tracked in WASM_ENGINES.
+  import('../uade/UADEEngine').then(({ UADEEngine: UE }) => {
+    if (UE.hasInstance()) {
+      const inst = UE.getInstance();
+      inst.stop();
+      try { inst.output.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
+    }
+  }).catch(() => {});
+
+  // Force-stop LibopenmptEngine — not in WASM_ENGINES but manages its own worklet
+  import('../libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine: LE }) => {
+    if (LE.hasInstance()) {
+      LE.getInstance().stop();
+    }
+  }).catch(() => {});
+
   // Stop SymphonieEngine if active
   if (song?.symphonieFileData) {
     import('../symphonie/SymphonieEngine').then(({ SymphonieEngine }) => {
