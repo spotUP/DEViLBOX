@@ -136,7 +136,7 @@ export function applyEffectParametersDiff(
         _shaper?: { setMap: (fn: (v: number) => number, len?: number) => void };
       };
       if (crusherNode._isBitCrusher && 'bits' in changed) {
-        const newBits = Number(changed.bits) || 4;
+        const newBits = Math.max(1, Math.floor(Number(changed.bits) || 4));
         crusherNode._bitsValue = newBits;
         const step = Math.pow(0.5, newBits - 1);
         crusherNode._shaper?.setMap(
