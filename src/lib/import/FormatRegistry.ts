@@ -1630,6 +1630,21 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/SIDFactory2Parser', parseFn: 'parseSIDFactory2File', detectFn: 'isSIDFactory2File' },
     customDispatch: true, // Must distinguish from SoundFont (.sf2 = RIFF header)
   },
+  {
+    key: 'cheesecutter',
+    label: 'CheeseCutter',
+    description: 'CheeseCutter C64 SID tracker (.ct)',
+    family: 'c64-chip',
+    matchMode: 'extension',
+    extRegex: /\.ct$/i,
+    nativeOnly: true,
+    customDispatch: true,
+    nativeParser: {
+      module: '@lib/import/formats/CheeseCutterParser',
+      parseFn: 'parseCheeseCutterFile',
+      detectFn: 'isCheeseCutterFile',
+    },
+  },
 
   // ── Chip dump formats ─────────────────────────────────────────────────────
   {
