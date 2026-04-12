@@ -58,19 +58,20 @@ export async function precachePlaylist(
 
   console.log(`[Precache] Starting: ${total} tracks, ${cachedNames.size} already cached`);
 
+  let consecutiveNetworkFailures = 0;
+  const MAX_CONSECUTIVE_NETWORK_FAILURES = 5;
+
   for (const { track } of modlandTracks) {
     const modlandPath = track.fileName.slice('modland:'.length);
     const filename = modlandPath.split('/').pop() || 'unknown';
     const processed = cached + failed + skipped;
 
-    // Check if already cached (by filename match)
     if (cachedNames.has(filename)) {
       skipped++;
       onProgress?.({ current: processed + 1, total, cached, failed, skipped, trackName: track.trackName, status: 'skipped' });
       continue;
     }
 
-    // Throttle to avoid Modland rate limiting
     if (processed > 0) {
       await new Promise(r => setTimeout(r, 4000));
     }
@@ -78,7 +79,6 @@ export async function precachePlaylist(
     onProgress?.({ current: processed + 1, total, cached, failed, skipped, trackName: track.trackName, status: 'downloading' });
 
     try {
-      // Download with retry on rate limit
       const { downloadModlandFile } = await import('@/lib/modlandApi');
       let buffer: ArrayBuffer;
       let retries = 0;
@@ -99,10 +99,9 @@ export async function precachePlaylist(
         }
       }
 
-      // Cache the raw source file first (so we have it even if render fails)
+      consecutiveNetworkFailures = 0;
       await cacheSourceFile(buffer, filename);
 
-      // Render through pipeline (this also caches the WAV + analysis)
       onProgress?.({ current: processed + 1, total, cached, failed, skipped, trackName: track.trackName, status: 'rendering' });
 
       if (!isAudioFile(filename)) {
@@ -110,11 +109,23 @@ export async function precachePlaylist(
       }
 
       cached++;
-      cachedNames.add(filename); // Mark as cached for subsequent checks
+      cachedNames.add(filename);
       onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: track.trackName, status: 'cached' });
       console.log(`[Precache] ${cached + failed + skipped}/${total} — ${track.trackName} cached`);
     } catch (err) {
       failed++;
+      const msg = err instanceof Error ? err.message : String(err);
+      const isNetworkError = msg.includes('Failed to fetch') || msg.includes('NetworkError') || !navigator.onLine;
+      if (isNetworkError) {
+        consecutiveNetworkFailures++;
+        if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
+          console.error(`[Precache] Server unreachable — aborting after ${consecutiveNetworkFailures} consecutive network failures`);
+          onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: 'Server unreachable', status: 'error' });
+          break;
+        }
+      } else {
+        consecutiveNetworkFailures = 0;
+      }
       console.warn(`[Precache] ${cached + failed + skipped}/${total} FAIL — ${track.trackName}:`, err);
       onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: track.trackName, status: 'error' });
     }
