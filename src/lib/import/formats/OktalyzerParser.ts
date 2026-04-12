@@ -262,6 +262,22 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeOktalyzerCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of encodeOktalyzerCell
+      // Byte 0: raw Amiga note index → XM note via amigaNoteToXM (raw + 12)
+      const rawNote = bytes[0];
+      const note = amigaNoteToXM(rawNote);
+
+      // Byte 1: sample index
+      const instrument = bytes[1];
+
+      // Byte 2-3: effect command + data
+      const cmd = bytes[2];
+      const data = bytes[3];
+      const { effTyp, eff } = mapOKTEffect(cmd, data);
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const cellDataStart = patternFileOffsets[pattern];
       if (cellDataStart === undefined) return 0;
