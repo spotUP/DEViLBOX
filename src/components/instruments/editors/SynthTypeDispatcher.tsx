@@ -17,7 +17,7 @@ import {
   DEFAULT_GTULTRA,
   DEFAULT_JAMCRACKER,
   DEFAULT_SF2,
-  DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
+  DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_RONKLAREN, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_STEVE_TURNER, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
   DEFAULT_INSTEREO2,
@@ -137,6 +137,7 @@ const JamCrackerControls = lazy(() => import('../controls/JamCrackerControls').t
 const SF2Controls = lazy(() => import('../controls/SF2Controls').then(m => ({ default: m.SF2Controls })));
 const SoundMonControls = lazy(() => import('../controls/SoundMonControls').then(m => ({ default: m.SoundMonControls })));
 const SidMonControls = lazy(() => import('../controls/SidMonControls').then(m => ({ default: m.SidMonControls })));
+const RonKlarenControls = lazy(() => import('../controls/RonKlarenControls').then(m => ({ default: m.RonKlarenControls })));
 const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m => ({ default: m.DigMugControls })));
 const FCControls = lazy(() => import('../controls/FCControls').then(m => ({ default: m.FCControls })));
 const FredControls = lazy(() => import('../controls/FredControls').then(m => ({ default: m.FredControls })));
@@ -183,7 +184,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -322,6 +323,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   const handleSidMonChange = useCallback((updates: Partial<typeof instrument.sidMon>) => {
     updateAmigaSynth('sidMon', instrument.sidMon || DEFAULT_SIDMON, updates);
   }, [instrument.sidMon, updateAmigaSynth]);
+
+  const handleRonKlarenChange = useCallback((updates: Partial<typeof instrument.ronKlaren>) => {
+    updateAmigaSynth('ronKlaren', instrument.ronKlaren || DEFAULT_RONKLAREN, updates);
+  }, [instrument.ronKlaren, updateAmigaSynth]);
 
   const handleDigMugChange = useCallback((updates: Partial<typeof instrument.digMug>) => {
     updateAmigaSynth('digMug', instrument.digMug || DEFAULT_DIGMUG, updates);
@@ -954,6 +959,29 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={sidMonConfig}
             onChange={handleSidMonChange}
             uadeChipRam={instrument.uadeChipRam}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // RON KLAREN EDITOR
+  // ============================================================================
+  if (editorMode === 'ronklaren') {
+    const ronKlarenConfig = deepMerge(DEFAULT_RONKLAREN, instrument.ronKlaren || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#001a2e] to-[#000810]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <RonKlarenControls
+            config={ronKlarenConfig}
+            onChange={handleRonKlarenChange}
           />
         </Suspense>
       </div>

@@ -84,6 +84,7 @@ import type {
   FuturePlayerConfig,
   SymphonieConfig,
   SF2Config,
+  RonKlarenConfig,
 } from './exotic';
 import type {
   DrumMachineConfig,
@@ -303,6 +304,7 @@ export interface InstrumentConfig {
   davidWhittaker?: DavidWhittakerConfig;
   futurePlayer?: FuturePlayerConfig;
   symphonie?: SymphonieConfig;
+  ronKlaren?: RonKlarenConfig;
   // Geonkick (percussion synthesizer; Quamplex GPL-3 WASM port)
   geonkick?: import('./exotic').GeonkickConfig;
   // SunVox WASM patch
@@ -875,6 +877,24 @@ export const DEFAULT_SYMPHONIE: SymphonieConfig = {
   numLoops: 0,          // Infinite
   newLoopSystem: false,
   sampledFrequency: 8363,
+};
+
+export const DEFAULT_RONKLAREN: RonKlarenConfig = {
+  isSample: false,
+  phaseSpeed: 0,
+  phaseLengthInWords: 0,
+  vibratoSpeed: 0,
+  vibratoDepth: 0,
+  vibratoDelay: 0,
+  adsr: [
+    { point: 64, increment: 4 },
+    { point: 32, increment: 4 },
+    { point: 32, increment: 0 },
+    { point: 0,  increment: 4 },
+  ],
+  phaseValue: 0,
+  phaseDirection: false,
+  phasePosition: 0,
 };
 
 export const DEFAULT_SUNVOX: SunVoxConfig = {

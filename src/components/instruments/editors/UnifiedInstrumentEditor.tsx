@@ -93,6 +93,11 @@ function isSidMonType(synthType: SynthType): boolean {
   return synthType === 'SidMonSynth';
 }
 
+/** Check if synth type is Ron Klaren */
+function isRonKlarenType(synthType: SynthType): boolean {
+  return synthType === 'RonKlarenSynth';
+}
+
 /** Check if synth type is Digital Mugician */
 function isDigMugType(synthType: SynthType): boolean {
   return synthType === 'DigMugSynth';
@@ -171,6 +176,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SF2Synth') return 'sidfactory2';
   if (isSoundMonType(synthType)) return 'soundmon';
   if (isSidMonType(synthType)) return 'sidmon';
+  if (isRonKlarenType(synthType)) return 'ronklaren';
   if (isDigMugType(synthType)) return 'digmug';
   if (isSonicArrangerType(synthType)) return 'sonic-arranger';
   if (isInStereo2Type(synthType)) return 'instereo2';
