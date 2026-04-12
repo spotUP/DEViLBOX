@@ -498,7 +498,7 @@ export async function parseCheeseCutterFile(
         id: i + 1, // 1-indexed
         name: ci.name || `Inst ${i + 1}`,
         type: 'synth',
-        synthType: 'chip',
+        synthType: 'C64SID',
       } as unknown as InstrumentConfig);
     }
   }
@@ -509,7 +509,7 @@ export async function parseCheeseCutterFile(
       id: 1,
       name: 'Default',
       type: 'synth',
-      synthType: 'chip',
+      synthType: 'C64SID',
     } as unknown as InstrumentConfig);
   }
 
