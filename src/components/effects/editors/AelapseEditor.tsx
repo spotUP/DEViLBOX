@@ -29,46 +29,62 @@ import { AelapseHardwareUI } from '@components/effects/hardware/AelapseHardwareU
 import { useAudioStore } from '@stores/useAudioStore';
 import { AelapseEffect } from '@engine/effects/AelapseEffect';
 
-// JUCE ParamId ordinal → DEViLBOX store key. `null` entries are the two
-// BPM-sync params (kDelayTimeType, kDelayBeats) that we skip in the DSP WASM.
-const JUCE_INDEX_TO_STORE_KEY: (string | null)[] = [
-  'delayActive',      // 0  kDelayActive
-  'delayDryWet',      // 1  kDelayDrywet
-  null,               // 2  kDelayTimeType — BPM sync deferred
-  'delayTime',        // 3  kDelaySeconds
-  null,               // 4  kDelayBeats    — BPM sync deferred
-  'delayFeedback',    // 5  kDelayFeedback
-  'delayCutLow',      // 6  kDelayCutLow
-  'delayCutHi',       // 7  kDelayCutHi
-  'delaySaturation',  // 8  kDelaySaturation
-  'delayDrift',       // 9  kDelayDrift
-  'delayMode',        // 10 kDelayMode
-  'springsActive',    // 11 kSpringsActive
-  'springsDryWet',    // 12 kSpringsDryWet
-  'springsWidth',     // 13 kSpringsWidth
-  'springsLength',    // 14 kSpringsLength
-  'springsDecay',     // 15 kSpringsDecay
-  'springsDamp',      // 16 kSpringsDamp
-  'springsShape',     // 17 kSpringsShape
-  'springsTone',      // 18 kSpringsTone
-  'springsScatter',   // 19 kSpringsScatter
-  'springsChaos',     // 20 kSpringsChaos
-];
+// Map JUCE string param IDs (from window._aelapseParamIds) to DEViLBOX
+// store key names. This is more reliable than index-based mapping because
+// JUCE's AudioProcessorParameterGroup can reorder param indices.
+const JUCE_ID_TO_STORE_KEY: Record<string, string> = {
+  'delay_active':     'delayActive',
+  'delay_drywet':     'delayDryWet',
+  'delay_seconds':    'delayTime',
+  'delay_feedback':   'delayFeedback',
+  'delay_cutoff_low': 'delayCutLow',
+  'delay_cutoff_hi':  'delayCutHi',
+  'delay_saturation': 'delaySaturation',
+  'delay_drift':      'delayDrift',
+  'delay_mode':       'delayMode',
+  'springs_active':   'springsActive',
+  'springs_drywet':   'springsDryWet',
+  'springs_width':    'springsWidth',
+  'springs_length':   'springsLength',
+  'springs_decay':    'springsDecay',
+  'springs_damp':     'springsDamp',
+  'springs_shape':    'springsShape',
+  'springs_tone':     'springsTone',
+  'springs_scatter':  'springsScatter',
+  'springs_chaos':    'springsChaos',
+};
+
+const BOOL_PARAMS = new Set(['delayActive', 'springsActive']);
+const CHOICE_PARAMS = new Set(['delayMode']);
 
 export const AelapseEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
 }) => {
-  // JUCE knob → store. Normalizes 0..1 → 0..100 (how the other effect params
-  // are stored) and drops JUCE indices that have no DSP counterpart.
+  // JUCE knob → store. Uses the _aelapseParamIds string array to look up
+  // the store key by JUCE param string ID (reliable across JUCE versions).
   const handleParam = useCallback(
     (juceIndex: number, value01: number) => {
-      const key = JUCE_INDEX_TO_STORE_KEY[juceIndex];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const paramIds = (window as any)._aelapseParamIds as string[] | undefined;
+      if (!paramIds || juceIndex < 0 || juceIndex >= paramIds.length) return;
+
+      const juceId = paramIds[juceIndex];
+      const key = JUCE_ID_TO_STORE_KEY[juceId];
       if (!key) return;
-      // Boolean params go through the store as 0 or 100 so the toggle in
-      // the create() factory reads `> 50` correctly.
-      const isBool = key === 'delayActive' || key === 'springsActive';
-      const stored = isBool ? (value01 > 0.5 ? 100 : 0) : value01 * 100;
+
+      let stored: number;
+      if (BOOL_PARAMS.has(key)) {
+        stored = value01 > 0.5 ? 100 : 0;
+      } else if (CHOICE_PARAMS.has(key)) {
+        // Choice params (mode): JUCE sends normalized 0..1 for N choices.
+        // Store as the raw choice index (0, 1, 2) × (100/N) so the
+        // engine's /100 recovers the 0..1 for the C++ converter.
+        stored = Math.round(value01 * 100);
+      } else {
+        stored = value01 * 100;
+      }
+
       onUpdateParameter(key, stored);
     },
     [onUpdateParameter],
