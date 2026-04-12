@@ -14,10 +14,10 @@ const iconMap: Record<NotificationType, React.ReactNode> = {
 };
 
 const colorMap: Record<NotificationType, string> = {
-  success: 'text-accent-success border-accent-success/30 bg-accent-success/10',
-  error: 'text-accent-error border-accent-error/30 bg-accent-error/10',
-  warning: 'text-accent-warning border-accent-warning/30 bg-accent-warning/10',
-  info: 'text-accent-primary border-accent-primary/30 bg-accent-primary/10',
+  success: 'text-accent-success border-accent-success/40 bg-dark-bg/95',
+  error: 'text-accent-error border-accent-error/40 bg-dark-bg/95',
+  warning: 'text-accent-warning border-accent-warning/40 bg-dark-bg/95',
+  info: 'text-accent-primary border-accent-primary/40 bg-dark-bg/95',
 };
 
 export const ToastNotification: React.FC = () => {
@@ -26,7 +26,7 @@ export const ToastNotification: React.FC = () => {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[10050] flex flex-col gap-2 max-w-sm">
+    <div className="fixed bottom-4 right-4 z-[10050] flex flex-col gap-2 max-w-sm backdrop-blur-sm">
       {notifications.map((notification) => (
         <div
           key={notification.id}
