@@ -475,6 +475,10 @@ Without this, the pattern display keeps scrolling after the audio stops.
 | `formatIsPlaying={true}` on order matrix | Matrix scrolls with pattern rows | Pass `formatIsPlaying={false}` for order matrices |
 | Singleton FormatPlaybackState not reset | Stale row persists after stop | Call `setFormatPlaybackPlaying(false)` on stop |
 | Store cursor not synced from canvas | Note entry at wrong position | Use `onFormatCursorChange` callback |
+| USB-SID-Pico write buffer not flushed | ~124ms hardware audio lag | `SIDHardwareManager.scheduleFlush()` via `setTimeout(0)` after each write |
+| `USBSIDPicoDevice(cycleExact: true)` | `flush()` garbles 2-byte writes as CYCLED_WRITE | Use `cycleExact: false` — nothing uses `writeCycled()` |
+| Circular store imports (A→B→C→A) | TDZ on `const` in production bundle | Use `storeAccess.ts` leaf-module registry — never static-import sibling stores |
+| `SIDHardwareManager.lastRegisters` stale | First frame's writes filtered | Call `clearDiffCache()` on bridge enable |
 
 ---
 
@@ -577,6 +581,17 @@ sidFile.set(rawPRG, 124);       // Full PRG including 2-byte load address
 | `src/lib/import/FormatRegistry.ts` | Added entry (key: sidFactory2, family: c64-chip) |
 | `src/lib/import/parsers/AmigaFormatParsers.ts` | Added .sf2 routing with SoundFont check |
 
+### Hardware SID Output
+
+Because SF2 uses C64SIDEngine, it inherits the register-dump hardware bridge for free.
+The SF2View toolbar includes a `SIDHardwareToggle` that calls
+`sf2Engine.engine.enableHardwareOutput()`. The afterProcess callback on the websid
+ScriptProcessorNode reads $D400-$D418 at ~43 Hz and diff-writes to the USB-SID-Pico.
+
+The jsSID backend (used for standalone .sid playback, not SF2) has its own cycle-exact
+bridge that's more accurate but doesn't support RAM write access — so SF2 always uses
+websid for its C64SIDEngine backend.
+
 ### Lessons Learned
 
 - **Read the actual source code** — The SF2 C++ source on GitHub has the exact binary format
@@ -587,6 +602,8 @@ sidFile.set(rawPRG, 124);       // Full PRG including 2-byte load address
   other C64 trackers.
 - **Duration expansion is critical** — Without expanding duration bytes into hold rows,
   patterns look compressed and don't align with the actual playback timing.
+- **Hardware output is a free bonus** — Any format using C64SIDEngine gets USB-SID-Pico
+  routing with one method call + a toolbar toggle. No additional WASM or engine work needed.
 
 ---
 
@@ -737,6 +754,100 @@ playRow = fpsActive ? fps.row : formatCurrentRowRef.current;
 FormatPlaybackState for scrolling. Order matrices pass `formatIsPlaying={false}`
 to prevent scrolling with the pattern — they track song position via their own
 `formatCurrentRow` prop instead.
+
+---
+
+## SID Hardware Output (USB-SID-Pico / ASID)
+
+Any format that uses C64 SID emulation can route its register writes to real
+SID hardware via the USB-SID-Pico (WebUSB) or ASID (Web MIDI) transports.
+
+### Architecture
+
+```
+SID Emulator (WASM)
+  ↓ reads registers from emulated RAM ($D400-$D418)
+C64SIDEngine.enableHardwareOutput()
+  ↓ afterProcess callback reads 25 registers per audio buffer
+SIDHardwareManager.writeRegister(chip, reg, value)
+  ↓ diff cache (skip unchanged), setTimeout(0) batched flush
+USBSIDPico.write(chip, reg, value) → USB bulk transfer
+  ↓
+Real SID chip on USB-SID-Pico hardware
+```
+
+### Two Hardware Bridges
+
+**1. jsSID cycle-exact bridge** (JSSIDEngine) — writes registers individually as
+the SID emulator produces them, with cycle timing. Most accurate. Enabled
+automatically when `sidHardwareMode === 'webusb'` in settings.
+
+**2. C64SIDEngine register-dump bridge** — reads all 25 SID registers from
+emulated C64 RAM after each ScriptProcessorNode buffer fill (~43 Hz at 1024
+samples/44.1kHz). Diff-writes changed registers to SIDHardwareManager. Used
+by websid, tinyrsid, websidplay backends. Less precise than cycle-exact but
+more than adequate for real-time playback.
+
+### Key Implementation Details
+
+**Diff cache in SIDHardwareManager:** Every `writeRegister()` compares against
+`lastRegisters` Map. Only changed values go to USB. Call `clearDiffCache()` when
+enabling the bridge so the first frame sends all 25 registers.
+
+**Batched USB flush:** `writeRegister()` calls `scheduleFlush()` — a `setTimeout(0)`
+debounce that fires AFTER all pending message events in the current event-loop tick.
+A full frame's register dump batches into one USB bulk transfer instead of 25
+individual ones. Without this, registers sit in the pico's 31-entry write buffer
+for ~124 ms before draining.
+
+**Clock rate:** Call `SIDHardwareManager.applyClockFromSettings()` on bridge enable
+to sync the Pico's PAL/NTSC/DREAN clock with the persisted setting. Without this,
+the Pico plays at whatever clock it last remembered — potentially wrong pitch.
+
+**USBSIDPico cycleExact flag:** The singleton is `new USBSIDPicoDevice(false)` because
+every call site uses the 2-byte `write()` method, never `writeCycled()`. With
+`cycleExact: true`, the public `flush()` method wraps 2-byte entries in a
+CYCLED_WRITE (4-byte) command header, garbling the stream.
+
+**Muting the softsynth:** When hardware output is enabled, set the engine's
+GainNode to 0 so the emulated SID and the real chip don't play in parallel.
+Restore on disable.
+
+### Adding Hardware Output to a New SID Format
+
+If your format uses `C64SIDEngine`, hardware output is built in — call
+`engine.enableHardwareOutput()` and add the `SIDHardwareToggle` component
+to your toolbar:
+
+```tsx
+import { SIDHardwareToggle } from '@/components/common/SIDHardwareToggle';
+
+// In your format view:
+const c64Engine = myEngine.engine; // C64SIDEngine instance
+
+<SIDHardwareToggle
+  bridgeEnabled={hwEnabled}
+  onEnable={() => c64Engine?.enableHardwareOutput()}
+  onDisable={() => c64Engine?.disableHardwareOutput()}
+  writeCount={writeCount}
+/>
+```
+
+For GoatTracker (which uses its own WASM reSID, not C64SIDEngine), the bridge
+works differently — the WASM emits register dumps via EM_JS `js_asid_write()`
+callback → `GTUltraASIDBridge` → `SIDHardwareManager`. See
+`src/engine/gtultra/GTUltraASIDBridge.ts` for that pattern.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/sid/SIDHardwareManager.ts` | Unified manager — routes to WebUSB or ASID |
+| `src/lib/sid/USBSIDPico.ts` | WebUSB driver for USB-SID-Pico |
+| `src/lib/sid/ASIDDeviceManager.ts` | Web MIDI ASID device management |
+| `src/engine/C64SIDEngine.ts` | Register-dump bridge for non-jsSID backends |
+| `src/engine/gtultra/GTUltraASIDBridge.ts` | GT Ultra's EM_JS-based bridge |
+| `src/components/common/SIDHardwareToggle.tsx` | Shared UI toggle component |
 
 ---
 
