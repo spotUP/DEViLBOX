@@ -306,17 +306,79 @@ export class GeonkickEngine {
     });
   }
 
-  /**
-   * Enable/disable an oscillator group (0..2). Each group contains 3
-   * oscillators (group 0 = osc 0..2, group 1 = osc 3..5, group 2 = osc 6..8).
-   * gk_wasm_create only enables group 0; preset loaders enable groups 1
-   * and 2 when the preset uses oscillators beyond index 2.
-   */
   enableGroup(groupIndex: number, enabled: boolean): void {
     this.workletNode?.port.postMessage({
       type: 'enableGroup',
       groupIndex: groupIndex | 0,
       enabled,
+    });
+  }
+
+  setGroupAmplitude(groupIndex: number, amplitude: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setGroupAmplitude',
+      groupIndex: groupIndex | 0,
+      amplitude,
+    });
+  }
+
+  setKickAmplitude(amplitude: number): void {
+    this.workletNode?.port.postMessage({ type: 'setKickAmplitude', amplitude });
+  }
+
+  setOscillatorFilterEnabled(oscIndex: number, enabled: boolean): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFilterEnabled',
+      oscIndex: oscIndex | 0,
+      enabled,
+    });
+  }
+
+  setOscillatorFilterCutoff(oscIndex: number, frequencyHz: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFilterCutoff',
+      oscIndex: oscIndex | 0,
+      frequency: frequencyHz,
+    });
+  }
+
+  setOscillatorFilterFactor(oscIndex: number, q: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFilterFactor',
+      oscIndex: oscIndex | 0,
+      q,
+    });
+  }
+
+  setOscillatorFilterType(oscIndex: number, type: GeonkickFilterType): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFilterType',
+      oscIndex: oscIndex | 0,
+      filterType: type | 0,
+    });
+  }
+
+  setOscillatorFm(oscIndex: number, isFm: boolean): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscFm',
+      oscIndex: oscIndex | 0,
+      isFm,
+    });
+  }
+
+  setOscillatorPhase(oscIndex: number, phase: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscPhase',
+      oscIndex: oscIndex | 0,
+      phase,
+    });
+  }
+
+  setOscillatorSeed(oscIndex: number, seed: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscSeed',
+      oscIndex: oscIndex | 0,
+      seed: seed | 0,
     });
   }
 

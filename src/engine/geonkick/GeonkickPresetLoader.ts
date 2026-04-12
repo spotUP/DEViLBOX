@@ -7,8 +7,9 @@
  * (in *milliseconds*), filter, distortion, and metadata.
  *
  * Authoritative parser is upstream src/InstrumentState.cpp; this loader
- * mirrors the field/setter mapping but skips the rare fields the bridge
- * doesn't expose yet (per-osc filter, compressor, humanizer, samples).
+ * mirrors the field/setter mapping. Covers: layers, layers_amplitude,
+ * length, limiter, kick amplitude, filter, distortion, per-osc filter,
+ * FM flag, phase, seed, envelopes. Skips compressor, humanizer, samples.
  */
 
 import {
@@ -60,6 +61,9 @@ interface PresetKick {
   name?: string;
   channel?: number;
   limiter?: number;
+  layers?: number[];
+  layers_amplitude?: number[];
+  tuned_output?: boolean;
   ampl_env?: {
     length?: number;       // milliseconds
     amplitude?: number;
@@ -108,13 +112,16 @@ function clampOscFunction(t: number | undefined): GeonkickOscFunction {
 function applyKickBlock(engine: GeonkickEngine, kick: PresetKick): void {
   if (kick.ampl_env) {
     if (typeof kick.ampl_env.length === 'number') {
-      // JSON length is in milliseconds; engine wants seconds.
       engine.setLength(kick.ampl_env.length / 1000);
     }
-    const ampPoints = pointsFromArray(kick.ampl_env.points);
-    if (ampPoints.length > 0) {
-      engine.setKickEnvelope(GeonkickKickEnvelope.Amplitude, ampPoints);
+    if (typeof kick.ampl_env.amplitude === 'number') {
+      engine.setKickAmplitude(kick.ampl_env.amplitude);
     }
+    const ampPoints = pointsFromArray(kick.ampl_env.points);
+    engine.setKickEnvelope(
+      GeonkickKickEnvelope.Amplitude,
+      ampPoints.length > 0 ? ampPoints : DEFAULT_ENVELOPE,
+    );
   }
 
   if (typeof kick.limiter === 'number') {
@@ -166,46 +173,64 @@ function applyOscillator(
   oscIndex: number,
   osc: PresetOscillator,
 ): void {
-  if (typeof osc.enabled === 'boolean') {
-    engine.enableOscillator(oscIndex, osc.enabled);
-  }
-  if (typeof osc.function === 'number') {
-    engine.setOscillatorFunction(oscIndex, clampOscFunction(osc.function));
+  // ── enable / waveform ──────────────────────────────────────────────
+  engine.enableOscillator(oscIndex, osc.enabled ?? false);
+  engine.setOscillatorFunction(oscIndex, clampOscFunction(osc.function));
+
+  // ── FM, phase, seed ────────────────────────────────────────────────
+  engine.setOscillatorFm(oscIndex, osc.is_fm ?? false);
+  engine.setOscillatorPhase(oscIndex, osc.phase ?? 0);
+  engine.setOscillatorSeed(oscIndex, osc.seed ?? 0);
+
+  // ── amplitude envelope ─────────────────────────────────────────────
+  engine.setOscillatorAmplitude(oscIndex, osc.ampl_env?.amplitude ?? 0.26);
+  engine.setOscillatorEnvelope(
+    oscIndex,
+    GeonkickOscEnvelope.Amplitude,
+    pointsFromArray(osc.ampl_env?.points) || DEFAULT_ENVELOPE,
+  );
+
+  // ── frequency envelope ─────────────────────────────────────────────
+  engine.setOscillatorFrequency(oscIndex, osc.freq_env?.amplitude ?? 800);
+  const freqPoints = pointsFromArray(osc.freq_env?.points);
+  if (freqPoints.length > 0) {
+    engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.Frequency, freqPoints);
+  } else {
+    engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.Frequency, DEFAULT_ENVELOPE);
   }
 
-  if (osc.ampl_env) {
-    if (typeof osc.ampl_env.amplitude === 'number') {
-      engine.setOscillatorAmplitude(oscIndex, osc.ampl_env.amplitude);
-    }
-    const points = pointsFromArray(osc.ampl_env.points);
-    if (points.length > 0) {
-      engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.Amplitude, points);
-    }
+  // ── pitch shift envelope ───────────────────────────────────────────
+  const pitchPoints = pointsFromArray(osc.pitchshift_env?.points);
+  if (pitchPoints.length > 0) {
+    engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.PitchShift, pitchPoints);
+  } else {
+    engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.PitchShift, [
+      { x: 0, y: 0.5, controlPoint: false },
+      { x: 1, y: 0.5, controlPoint: false },
+    ]);
   }
 
-  if (osc.freq_env) {
-    if (typeof osc.freq_env.amplitude === 'number') {
-      engine.setOscillatorFrequency(oscIndex, osc.freq_env.amplitude);
-    }
-    const points = pointsFromArray(osc.freq_env.points);
-    if (points.length > 0) {
-      engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.Frequency, points);
-    }
-  }
-
-  if (osc.pitchshift_env) {
-    const points = pointsFromArray(osc.pitchshift_env.points);
-    if (points.length > 0) {
-      engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.PitchShift, points);
+  // ── per-oscillator filter ──────────────────────────────────────────
+  const f = osc.filter;
+  engine.setOscillatorFilterEnabled(oscIndex, f?.enabled ?? false);
+  if (f) {
+    engine.setOscillatorFilterType(oscIndex, clampFilterType(f.type));
+    engine.setOscillatorFilterCutoff(oscIndex, f.cutoff ?? 800);
+    engine.setOscillatorFilterFactor(oscIndex, f.factor ?? 10);
+    const cutoffEnvPoints = pointsFromArray(f.cutoff_env);
+    if (cutoffEnvPoints.length > 0) {
+      engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.FilterCutoff, cutoffEnvPoints);
     }
   }
-
-  // Per-oscillator filter (osc.filter) is currently not exposed by the
-  // bridge — the kick-level filter handles most preset behaviour. TODO:
-  // wire gk_wasm_set_osc_filter_* if a preset audibly needs it.
 }
 
 /* ── Public API ────────────────────────────────────────────────────────── */
+
+/** Default envelope shape — full-on from start to end. */
+const DEFAULT_ENVELOPE: GeonkickEnvelopePoint[] = [
+  { x: 0, y: 1, controlPoint: false },
+  { x: 1, y: 1, controlPoint: false },
+];
 
 /**
  * Apply a parsed Geonkick preset to a live engine instance. Triggers a
@@ -213,30 +238,39 @@ function applyOscillator(
  * worker stub batches them but the final state takes effect on the
  * next note trigger).
  *
- * The loader does NOT reset the engine to defaults first — fields the
- * preset omits keep their current values. Call this on a freshly
- * created engine to get a deterministic result.
+ * Applies deterministically: for every field, writes either the preset's
+ * value OR a safe default so stale state from a previous preset can't
+ * bleed through. The critical `layers` array is respected — groups NOT
+ * listed in it are explicitly disabled, matching upstream InstrumentState.cpp.
  */
 export function applyGeonkickPreset(engine: GeonkickEngine, preset: GeonkickPreset): void {
-  // Enable all 3 osc groups so the preset's per-oscillator enable flags
-  // become the determining gate. gk_wasm_create only enables group 0.
-  engine.enableGroup(0, true);
-  engine.enableGroup(1, true);
-  engine.enableGroup(2, true);
+  // ── Layers (which oscillator groups are active) ─────────────────────
+  // Upstream starts with all layers disabled, then enables only the ones
+  // listed in the layers array. My loader mirrors this exactly.
+  const activeLayers = new Set<number>(preset.kick?.layers ?? [0]);
+  for (let g = 0; g < 3; g++) {
+    engine.enableGroup(g, activeLayers.has(g));
+  }
 
+  // ── Layers amplitude ────────────────────────────────────────────────
+  const layersAmp = preset.kick?.layers_amplitude ?? [1, 1, 1];
+  for (let g = 0; g < 3; g++) {
+    engine.setGroupAmplitude(g, layersAmp[g] ?? 1);
+  }
+
+  // ── Kick block ─────────────────────────────────────────────────────
   if (preset.kick) {
     applyKickBlock(engine, preset.kick);
   }
 
-  // Apply oscillators in 0..8 order. Geonkick's own JSON writes them
-  // 8..0 but order doesn't matter for the setters.
+  // ── Oscillators ─────────────────────────────────────────────────────
   const oscList: Array<[number, PresetOscillator | undefined]> = [
     [0, preset.osc0], [1, preset.osc1], [2, preset.osc2],
     [3, preset.osc3], [4, preset.osc4], [5, preset.osc5],
     [6, preset.osc6], [7, preset.osc7], [8, preset.osc8],
   ];
   for (const [idx, osc] of oscList) {
-    if (osc) applyOscillator(engine, idx, osc);
+    applyOscillator(engine, idx, osc ?? { enabled: false });
   }
 }
 
