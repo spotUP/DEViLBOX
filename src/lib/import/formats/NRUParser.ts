@@ -516,6 +516,39 @@ export async function parseNRUFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeNRUCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // Inverse of encodeNRUCell — matches parser's cell decode
+      const d0 = raw[0];
+      const d1 = raw[1];
+      const d2 = raw[2];
+      const d3 = raw[3];
+
+      // Instrument: upper 5 bits of d3
+      const instrument = d3 >> 3;
+
+      // Note: 0 = empty; otherwise xmNote = d2 / 2 + 36
+      const note = d2 > 0 ? (d2 / 2) + 36 : 0;
+
+      // Effect: d0 mapping (matches parser exactly)
+      let modEffect: number;
+      if (d0 === 0x00) {
+        modEffect = 0x03; // tone portamento
+      } else if (d0 === 0x0C) {
+        modEffect = 0x00; // arpeggio
+      } else {
+        modEffect = d0 >> 2;
+      }
+
+      let effTyp = 0;
+      let eff = 0;
+      if (modEffect !== 0 || d1 !== 0) {
+        const converted = convertModEffect(modEffect, d1);
+        effTyp = converted.effTyp;
+        eff = converted.eff;
+      }
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

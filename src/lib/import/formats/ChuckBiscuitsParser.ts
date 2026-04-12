@@ -500,6 +500,37 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     numPatterns,
     moduleSize: bytes.length,
     encodeCell: encodeCBACell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // Inverse of encodeCBACell — matches parser's cell decode
+      // Byte 0: instrument (1-based, 0 = none)
+      const instrument = raw[0];
+
+      // Byte 1: note (0=none, 255=note cut, 1-96=pitch)
+      const noteByte = raw[1];
+      let note = 0;
+      if (noteByte === NOTE_CUT_BYTE) {
+        note = CMD_NOTE_CUT; // 254
+      } else if (noteByte > 0 && noteByte <= 96) {
+        note = 12 + noteByte;
+      }
+
+      // Byte 2: volume (0=no volume, 1-65 → 0-64)
+      const volByte = raw[2];
+      const volume = volByte > 0 ? Math.min(volByte, 65) - 1 : 0;
+
+      // Bytes 3-4: command + param → translateEffect
+      const command = raw[3];
+      const param = raw[4];
+      let effTyp = 0;
+      let eff = 0;
+      if (command > 0) {
+        const fx = translateEffect(command, param);
+        effTyp = fx.effTyp;
+        eff = fx.eff;
+      }
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

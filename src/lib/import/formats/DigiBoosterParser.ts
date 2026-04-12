@@ -330,6 +330,21 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeDigiBoosterCell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of encodeDigiBoosterCell — matches parser's cell decode
+      // Byte 0: raw note (0=none, 1-96 → xmNote = raw + 12)
+      const rawNote = bytes[0];
+      const note = rawNote > 0 ? rawNote + 12 : 0;
+
+      // Byte 1: instrument (stored directly, no offset)
+      const instrument = bytes[1];
+
+      // Byte 2-3: effect type + param (ProTracker compatible, 1:1 mapping)
+      const effTyp = bytes[2];
+      const eff = bytes[3];
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const pat = dbPatterns[pattern];
       if (!pat) return 0;

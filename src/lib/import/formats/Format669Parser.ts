@@ -382,6 +382,43 @@ export async function parse669File(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encode669Cell,
+    decodeCell: (bytes: Uint8Array): TrackerCell => {
+      // Inverse of encode669Cell — matches parser's cell decode
+      const byte0 = bytes[0]; // noteInstr
+      const byte1 = bytes[1]; // instrVol
+      const byte2 = bytes[2]; // effParam
+
+      let note = 0;
+      let instrument = 0;
+      let volume = 0;
+
+      if (byte0 < 0xFE) {
+        // Has note + instrument
+        const rawNote = byte0 >> 2;
+        const instrRaw = ((byte0 & 0x03) << 4) | (byte1 >> 4);
+        note = Math.max(1, Math.min(96, rawNote + 37));
+        instrument = instrRaw + 1; // parser adds 1 for 1-based
+      }
+
+      if (byte0 <= 0xFE) {
+        // Has volume (noteInstr < 0xFF)
+        const rawVol = byte1 & 0x0F;
+        volume = Math.round((rawVol * 64 + 8) / 15);
+      }
+
+      // Effect: 0xFF = no effect
+      let effTyp = 0;
+      let eff = 0;
+      if (byte2 !== 0xFF) {
+        const command = byte2 >> 4;
+        const param = byte2 & 0x0F;
+        const mapped = map669Effect(command, param);
+        effTyp = mapped.effTyp;
+        eff = mapped.eff;
+      }
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {
