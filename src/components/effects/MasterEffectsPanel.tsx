@@ -23,6 +23,8 @@ import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '../../types/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useFormatStore } from '@stores/useFormatStore';
+import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
@@ -40,9 +42,11 @@ interface SortableVisualEffectProps {
   onWetChange: (wet: number) => void;
   onChannelSelect: (channels: number[] | undefined) => void;
   numChannels: number;
+  /** Whether the current format supports per-channel isolation */
+  isolationSupported: boolean;
 }
 
-function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels }: SortableVisualEffectProps) {
+function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onUpdateParameters, onWetChange, onChannelSelect, numChannels, isolationSupported }: SortableVisualEffectProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -122,8 +126,8 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
         />
       </div>
 
-      {/* Channel routing selector — always visible */}
-      <div className="mx-2 mb-2 mt-1 p-1.5 rounded-lg bg-dark-bg/60 border border-dark-border/40">
+      {/* Channel routing selector — only for formats with multi-output isolation */}
+      {isolationSupported && <div className="mx-2 mb-2 mt-1 p-1.5 rounded-lg bg-dark-bg/60 border border-dark-border/40">
         <div className="flex items-center gap-1.5 mb-1.5">
           <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Route</span>
           <button
@@ -165,7 +169,7 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -209,6 +213,10 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
 
   // Channel count for channel selection UI
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
+
+  // Per-channel isolation only available for multi-output worklet engines
+  const editorMode = useFormatStore(s => s.editorMode);
+  const isolationSupported = supportsChannelIsolation(editorMode);
 
   // Keep masterEffects ref in sync to avoid stale closures (critical for smooth knobs)
   const masterEffectsRef = useRef(masterEffects);
@@ -608,6 +616,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                   onWetChange={(wet) => handleWetChange(effect.id, wet)}
                   onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
                   numChannels={numChannels}
+                  isolationSupported={isolationSupported}
                 />
               ))}
             </SortableContext>
