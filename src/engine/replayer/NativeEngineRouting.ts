@@ -990,7 +990,18 @@ export function stopNativeEngines(
     // Try synchronous stop first (fast path)
     const ref = tryResolveSync(desc);
     if (ref) {
-      try { if (ref.hasInstance()) ref.getInstance().stop(); } catch { /* ignored */ }
+      try {
+        if (ref.hasInstance()) {
+          const inst = ref.getInstance();
+          inst.stop();
+          // Immediately mute the output gain to prevent audio leaking while
+          // the async stop message is processed by the worklet thread.
+          const output = (inst as unknown as { output?: { gain?: AudioParam } }).output;
+          if (output?.gain) {
+            try { output.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
+          }
+        }
+      } catch { /* ignored */ }
     }
     // If not synchronously resolvable but was started this session, stop via
     // cached dynamic resolver. This handles TFMXModule and other dynamicResolver engines.
