@@ -30,12 +30,27 @@ interface ScopeCanvasProps {
 const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted, onClick }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
+  // Count consecutive idle frames so we can stop rAF when not playing
+  const idleFramesRef = useRef<number>(0);
   const isAll = channel === -1;
   const viz = useDeckVisualizationData(deckId);
+  // Subscribe to isPlaying so the rAF loop restarts when the deck starts playing
+  // (after having been stopped and idle for >60 frames)
+  const isPlaying = useDJStore((s) => s.decks[deckId]?.isPlaying ?? false);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // Idle guard: count frames since last play. After 60 frames (~1 sec at 60fps)
+    // the rAF loop stops (see reschedule logic at end of draw).
+    // isPlaying is subscribed above — when deck starts playing React re-renders,
+    // the draw callback changes identity, and useEffect restarts the loop.
+    if (!isPlaying) {
+      idleFramesRef.current++;
+    } else {
+      idleFramesRef.current = 0;
+    }
 
     const dpr = window.devicePixelRatio || 1;
 
@@ -69,7 +84,6 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     ctx.stroke();
 
     // Waveform trace — read from shared visualization cache
-    const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
     const waveform = isPlaying ? viz.getWaveform() : null;
 
     if (waveform && waveform.length >= 256) {
@@ -123,10 +137,17 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
       ctx.globalAlpha = 1;
     }
 
-    rafRef.current = requestAnimationFrame(draw);
-  }, [deckId, channel, size, muted, isAll]);
+    // Keep scheduling only while playing or during the ~1s idle cool-down
+    if (isPlaying || idleFramesRef.current <= 60) {
+      rafRef.current = requestAnimationFrame(draw);
+    }
+    // When paused for >60 frames the loop stops. It restarts automatically
+    // whenever `draw` identity changes (muted prop, size, etc) via the useEffect.
+  }, [deckId, channel, size, muted, isAll, isPlaying, viz]);
 
   useEffect(() => {
+    // Reset idle counter so we always draw at least ~1s worth of frames on mount
+    idleFramesRef.current = 0;
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
   }, [draw]);
