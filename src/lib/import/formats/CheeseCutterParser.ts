@@ -375,13 +375,17 @@ export async function parseCheeseCutterFile(
   else if (sidModel === 1) flags |= (0x02 << 4); // 8580
   psidView.setUint16(118, flags);
 
-  // Load $0002-$CFFF: includes zero page vars, frequency tables, pointer
-  // table at $0FA0, player at $0E00+, and all music data. Stop before
-  // $D000 (I/O space) to leave $D000-$FFFF free for the PSID driver
-  // and KERNAL vectors — loading to $FFFF causes websid's "no free
-  // memory for driver" error.
+  // PSID v2 free-page hint (offset 0x78-0x79): tell the emulator's PSID
+  // driver to install itself at $C000-$CFFF (page $C0, 16 pages = 4KB).
+  // Without this, loading data up to $BFFF leaves no room and websid
+  // reports "FATAL ERROR: no free memory for driver".
+  psidHeader[0x78] = 0xC0; // startPage = $C000
+  psidHeader[0x79] = 0x10; // pageLength = 16 pages (4KB)
+
+  // Load $0002-$BFFF: player + music data. Leave $C000-$CFFF free for
+  // the PSID driver shim, and $D000+ for I/O and KERNAL.
   const LOAD_START = 0x0002;
-  const LOAD_END = 0xD000; // exclusive — stop before I/O space
+  const LOAD_END = 0xC000; // exclusive — leave room for PSID driver
   const loadPrefix = new Uint8Array([LOAD_START & 0xFF, LOAD_START >> 8]);
   const memSlice = mem.subarray(LOAD_START, LOAD_END);
 
