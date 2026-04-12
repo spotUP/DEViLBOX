@@ -322,10 +322,14 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           const cw = jcanvas.clientWidth;
           const ch = jcanvas.clientHeight;
           if (cw > 0 && ch > 0) {
-            overlay.style.left   = `${Math.round(cw * 0.85)}px`;
-            overlay.style.top    = `${Math.round(ch * 0.10)}px`;
-            overlay.style.width  = `${Math.round(cw * 0.14)}px`;
-            overlay.style.height = `${Math.round(ch * 0.55)}px`;
+            // Computed from JUCE layout source:
+            // Editor 720×400, kMargin=8, springs flex=1/(0.68+1)=59.5%
+            // Grid col5 = Fr(2)/Fr(6), row1 extended by kHeaderHeight=30
+            // → x=582 y=68 w=123 h=116 in editor pixels
+            overlay.style.left   = `${Math.round(cw * (582 / 720))}px`;
+            overlay.style.top    = `${Math.round(ch * (68 / 400))}px`;
+            overlay.style.width  = `${Math.round(cw * (123 / 720))}px`;
+            overlay.style.height = `${Math.round(ch * (116 / 400))}px`;
             if (overlay.style.display === 'none') overlay.style.display = 'block';
           }
 
