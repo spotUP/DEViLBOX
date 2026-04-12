@@ -28,6 +28,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 const MIN_FILE_SIZE = 22;
 
@@ -120,5 +122,16 @@ export function parseMIDILoricielFile(buffer: ArrayBuffer, filename: string): Tr
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'midiLoriciel',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: 4,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+      decodeCell: decodeMODCell,
+    } as UADEPatternLayout,
   };
 }
