@@ -394,6 +394,8 @@ export interface TrackerSong {
   /** SID Factory II store data — populated by SIDFactory2Parser, consumed by useSF2Store */
   sf2StoreData?: import('@/stores/useSF2Store').SF2LoadPayload;
 
+  /** CheeseCutter raw 64KB C64 memory image — played by cheesecutter-wasm engine */
+  cheeseCutterFileData?: ArrayBuffer;
   /** CheeseCutter store data — populated by CheeseCutterParser, consumed by useCheeseCutterStore */
   cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload;
 

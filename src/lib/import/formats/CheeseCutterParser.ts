@@ -336,112 +336,13 @@ export async function parseCheeseCutterFile(
   // Simplified: BPM = vbiRate * 60 / (speed * 4) = vbiRate * 15 / speed
   const bpm = Math.round((vbiRate * 15) / speed);
 
-  // ── Build PSID header ───────────────────────────────────────────────
-  const psidHeader = new Uint8Array(124);
-  const psidView = new DataView(psidHeader.buffer);
-
-  // Magic "PSID"
-  psidHeader[0] = 0x50; psidHeader[1] = 0x53;
-  psidHeader[2] = 0x49; psidHeader[3] = 0x44;
-
-  psidView.setUint16(4, 0x0002);  // version = 2
-  psidView.setUint16(6, 0x007C);  // dataOffset = 124
-  psidView.setUint16(8, 0x0000);  // loadAddress (in data)
-  psidView.setUint16(10, 0x1000); // initAddress
-  psidView.setUint16(12, 0x1003); // playAddress
-  psidView.setUint16(14, subtuneCount); // songs
-  psidView.setUint16(16, 0x0001); // startSong
-  psidView.setUint32(18, 0x00000000); // speed (VBI for all)
-
-  // Title (32 bytes at offset 22)
-  const titleBytes = new TextEncoder().encode(title.substring(0, 31));
-  psidHeader.set(titleBytes, 22);
-
-  // Author (32 bytes at offset 54)
-  const authorBytes = new TextEncoder().encode(author.substring(0, 31));
-  psidHeader.set(authorBytes, 54);
-
-  // Released (32 bytes at offset 86)
-  const releaseBytes = new TextEncoder().encode(release.substring(0, 31));
-  psidHeader.set(releaseBytes, 86);
-
-  // Flags at offset 118 (PSID v2)
-  // bits 2-3: clock (00=unknown, 01=PAL, 10=NTSC, 11=PAL+NTSC)
-  // bits 4-5: SID model (00=unknown, 01=6581, 10=8580, 11=6581+8580)
-  let flags = 0;
-  if (clock === 0) flags |= (0x01 << 2);      // PAL
-  else if (clock === 1) flags |= (0x02 << 2);  // NTSC
-  if (sidModel === 0) flags |= (0x01 << 4);    // 6581
-  else if (sidModel === 1) flags |= (0x02 << 4); // 8580
-  psidView.setUint16(118, flags);
-
-  // startPage = $00 → websid auto-detects free memory for its 33-byte
-  // PSID driver. With data ending at ~$B689, the driver lands at $CFE0.
-  // Verified: pointer table entries 0-38 all reference $0E00-$B689 range.
-  psidHeader[0x78] = 0x00; // startPage = auto-detect
-  psidHeader[0x79] = 0x00; // pageLength = unused in auto mode
-
-  // ── Multispeed wrapper ──────────────────────────────────────────────
-  // CheeseCutter supports multispeed (multiplier 1-16). Each VBI frame,
-  // the host calls $1003 (main play) once, then $1006 (sub-frame play)
-  // (multiplier-1) more times. websid only calls the PSID play address
-  // once per VBI. For multiplier > 1, we install a tiny 6502 stub at
-  // $CFA0 that calls $1003 + (multiplier-1) × $1006, and point the
-  // PSID play address to the stub instead of $1003.
-  const WRAPPER_ADDR = 0xCFA0;
-  let wrapperBytes: Uint8Array | null = null;
-
-  if (speedMultiplier > 1) {
-    // 6502 machine code:
-    //   JSR $1003       ; 20 03 10  (3 bytes)
-    //   LDX #(mult-1)   ; A2 xx     (2 bytes)
-    // loop:
-    //   JSR $1006       ; 20 06 10  (3 bytes)
-    //   DEX             ; CA        (1 byte)
-    //   BNE loop        ; D0 FB     (2 bytes) — branch back 5 bytes
-    //   RTS             ; 60        (1 byte)
-    //                               Total: 12 bytes
-    wrapperBytes = new Uint8Array([
-      0x20, 0x03, 0x10,                       // JSR $1003
-      0xA2, (speedMultiplier - 1) & 0xFF,     // LDX #(mult-1)
-      0x20, 0x06, 0x10,                       // JSR $1006
-      0xCA,                                   // DEX
-      0xD0, 0xFB,                             // BNE -5 (back to JSR $1006)
-      0x60,                                   // RTS
-    ]);
-    // Update PSID header play address to point to wrapper
-    psidView.setUint16(12, WRAPPER_ADDR);
-  }
-
-  // Load ONLY the player binary + music data ($0DFE-$BFFF). The 2-byte
-  // load address header at $0DFE-$0DFF ($00,$0E → load at $0E00) is
-  // part of the data per PSID spec (loadAddress=$0000 in header means
-  // data starts with a 2-byte LE load address).
-  const LOAD_START = 0x0DFE;
-  const LOAD_END = 0xC000;
-  const playerData = mem.subarray(LOAD_START, LOAD_END);
-
-  // Assemble PSID file: header + player data + optional wrapper stub.
-  // If multispeed, append the wrapper as a second PRG block. But PSID
-  // only supports one load block — so we extend the player data to
-  // include the wrapper address range by padding zeros between the
-  // player data end ($BFFF) and the wrapper ($CFA0).
-  let sidFileData: Uint8Array;
-  if (wrapperBytes) {
-    const padStart = LOAD_END;       // $C000
-    const padEnd = WRAPPER_ADDR;     // $CFA0
-    const padLen = padEnd - padStart;
-    const totalDataLen = playerData.length + padLen + wrapperBytes.length;
-    sidFileData = new Uint8Array(124 + totalDataLen);
-    sidFileData.set(psidHeader, 0);
-    sidFileData.set(playerData, 124);
-    // Zero padding from $C000 to $CFA0 is implicit (Uint8Array inits to 0)
-    sidFileData.set(wrapperBytes, 124 + playerData.length + padLen);
-  } else {
-    sidFileData = new Uint8Array(124 + playerData.length);
-    sidFileData.set(psidHeader, 0);
-    sidFileData.set(playerData, 124);
-  }
+  // ── Store raw 64KB memory image for the CheeseCutter WASM engine ────
+  // PSID wrapping doesn't work for .ct files: the editor player binary
+  // runs in flat-RAM mode (no I/O mapping at $D400), which is incompatible
+  // with PSID's I/O-mapped SID chip. Instead, we use a dedicated WASM
+  // module (cheesecutter-wasm/) with its own 6502 CPU + reSID that loads
+  // the 64KB image directly — matching CheeseCutter's own emulator.
+  const cheeseCutterFileData = mem.slice(0, C64_MEM_SIZE);
 
   // ── Build patterns for tracker display ──────────────────────────────
   // Determine order length as max non-end entries across the 3 voices
@@ -610,7 +511,10 @@ export async function parseCheeseCutterFile(
     numChannels: 3,
     initialSpeed: speed,
     initialBPM: bpm,
-    c64SidFileData: sidFileData,
+    cheeseCutterFileData: cheeseCutterFileData.buffer.slice(
+      cheeseCutterFileData.byteOffset,
+      cheeseCutterFileData.byteOffset + cheeseCutterFileData.byteLength,
+    ) as ArrayBuffer,
     cheeseCutterStoreData: storeData,
   };
 }

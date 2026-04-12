@@ -793,6 +793,31 @@ export async function startNativeEngines(
     }
   }
 
+  // --- CheeseCutter — 6502 CPU + reSID WASM engine (flat RAM, no PSID) ---
+  if (song.cheeseCutterFileData) {
+    suppressNotes = true;
+    try {
+      const { CheeseCutterEngine } = await import('../cheesecut/CheeseCutterEngine');
+      const cc = CheeseCutterEngine.getInstance();
+      await cc.init();
+      await cc.ready();
+
+      const synthBusNode = getNativeAudioNode(toneEngine.synthBus as any);
+      if (synthBusNode) cc.connectTo(synthBusNode);
+      else if (cc.output) cc.output.connect(Tone.getContext().rawContext as AudioContext as unknown as AudioNode);
+
+      // Read multiplier from store data
+      const { useCheeseCutterStore } = await import('@stores/useCheeseCutterStore');
+      const ccState = useCheeseCutterStore.getState();
+      const mult = ccState.speedMultiplier || 1;
+
+      await cc.loadAndPlay(song.cheeseCutterFileData, 0, mult);
+      console.log('[NativeEngineRouting] CheeseCutterEngine loaded & playing, multiplier:', mult);
+    } catch (err) {
+      console.error('[NativeEngineRouting] Failed to start CheeseCutterEngine:', err);
+    }
+  }
+
   // --- Symphonie Pro — parse file data and load directly into WASM engine ---
   if (song.symphonieFileData) {
     suppressNotes = true;
