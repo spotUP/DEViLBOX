@@ -125,11 +125,7 @@ export default defineConfig({
       usePolling: false, // Disable polling to reduce CPU usage
       ignored: ['**/node_modules/**', '**/dist/**', '**/Reference Code/**'],
     },
-    hmr: {
-      host: 'localhost',
-      protocol: 'ws',
-      overlay: false,
-    },
+    hmr: false, // Disabled — prevents browser reload during DJ sets / live use
   },
   build: {
     // Target older Chromium for Tesla/embedded browser compatibility
