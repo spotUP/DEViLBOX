@@ -68,6 +68,14 @@ export class DeckAudioPlayer {
       throw new Error(`File too large (${(buffer.byteLength / 1024 / 1024).toFixed(0)} MB, max ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
     }
 
+    // Release previous track resources before loading new ones
+    if (this._originalFileBytes) {
+      this._originalFileBytes = null;
+    }
+    if (this.player?.buffer?.loaded) {
+      try { this.player.buffer.dispose(); } catch { /* ignore */ }
+    }
+
     this._originalFileBytes = buffer.slice(0);
     console.log(`[DeckAudioPlayer] loadAudioFile: ${filename}, buffer size: ${buffer.byteLength} bytes`);
     

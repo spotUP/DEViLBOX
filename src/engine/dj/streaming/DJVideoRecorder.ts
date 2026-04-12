@@ -12,6 +12,9 @@ export class DJVideoRecorder {
   private _recording = false;
   private _mimeType = '';
   private _totalBytes = 0;
+  private _partIndex = 0;
+  private _lastAutoSaveTime = 0;
+  private static readonly AUTO_SAVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
   /** Callbacks */
   onDataAvailable?: (sizeBytes: number, durationMs: number) => void;
@@ -24,6 +27,8 @@ export class DJVideoRecorder {
     this._mimeType = pickMimeType();
     this._chunks = [];
     this._totalBytes = 0;
+    this._partIndex = 0;
+    this._lastAutoSaveTime = Date.now();
 
     this._recorder = new MediaRecorder(stream, {
       mimeType: this._mimeType,
@@ -36,6 +41,13 @@ export class DJVideoRecorder {
         this._chunks.push(e.data);
         this._totalBytes += e.data.size;
         this.onDataAvailable?.(this._totalBytes, this.durationMs);
+
+        // Periodically flush chunks to disk to prevent unbounded RAM growth
+        const now = Date.now();
+        if (now - this._lastAutoSaveTime >= DJVideoRecorder.AUTO_SAVE_INTERVAL_MS) {
+          this._autoSaveChunks();
+          this._lastAutoSaveTime = now;
+        }
       }
     };
 
@@ -63,6 +75,18 @@ export class DJVideoRecorder {
 
       this._recorder.stop();
     });
+  }
+
+  /** Flush accumulated chunks to a downloaded partial file and clear from RAM */
+  private _autoSaveChunks(): void {
+    if (this._chunks.length === 0) return;
+    const blob = new Blob(this._chunks, { type: this._mimeType });
+    this._chunks = [];
+    this._partIndex++;
+    const ext = this._mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const filename = `set-part${this._partIndex}-${Date.now()}.${ext}`;
+    DJVideoRecorder.download(blob, filename);
+    console.log(`[DJVideoRecorder] Auto-saved part ${this._partIndex}: ${(blob.size / 1024 / 1024).toFixed(1)}MB → ${filename}`);
   }
 
   /** Download the blob as a file */

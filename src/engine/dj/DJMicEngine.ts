@@ -15,6 +15,10 @@ export class DJMicEngine {
   private _chunks: Blob[] = [];
   private _active = false;
   private _recording = false;
+  private _recMimeType = '';
+  private _partIndex = 0;
+  private _lastAutoSaveTime = 0;
+  private static readonly AUTO_SAVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
   constructor(mixerSamplerInput: GainNode) {
     const ctx = Tone.getContext().rawContext as AudioContext;
@@ -74,16 +78,27 @@ export class DJMicEngine {
     if (this._recording || !this._stream) return;
 
     // Pick best available codec
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    this._recMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
       : MediaRecorder.isTypeSupported('audio/webm')
         ? 'audio/webm'
         : 'audio/mp4'; // Safari fallback
 
     this._chunks = [];
-    this._recorder = new MediaRecorder(this._stream, { mimeType });
+    this._partIndex = 0;
+    this._lastAutoSaveTime = Date.now();
+    this._recorder = new MediaRecorder(this._stream, { mimeType: this._recMimeType });
     this._recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this._chunks.push(e.data);
+      if (e.data.size > 0) {
+        this._chunks.push(e.data);
+
+        // Periodically flush chunks to disk to prevent unbounded RAM growth
+        const now = Date.now();
+        if (now - this._lastAutoSaveTime >= DJMicEngine.AUTO_SAVE_INTERVAL_MS) {
+          this._autoSaveChunks();
+          this._lastAutoSaveTime = now;
+        }
+      }
     };
     this._recorder.start(1000); // 1s chunks
     this._recording = true;
@@ -95,10 +110,27 @@ export class DJMicEngine {
     this._recorder.stop();
     this._recording = false;
 
-    const blob = new Blob(this._chunks, { type: this._recorder.mimeType });
+    const blob = new Blob(this._chunks, { type: this._recMimeType });
     this._chunks = [];
     this._recorder = null;
     return blob;
+  }
+
+  /** Flush accumulated chunks to a downloaded partial file and clear from RAM */
+  private _autoSaveChunks(): void {
+    if (this._chunks.length === 0) return;
+    const blob = new Blob(this._chunks, { type: this._recMimeType });
+    this._chunks = [];
+    this._partIndex++;
+    const ext = this._recMimeType.startsWith('audio/mp4') ? 'm4a' : 'webm';
+    const filename = `mic-part${this._partIndex}-${Date.now()}.${ext}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log(`[DJMicEngine] Auto-saved mic part ${this._partIndex}: ${(blob.size / 1024 / 1024).toFixed(1)}MB → ${filename}`);
   }
 
   /** Dispose all resources */
