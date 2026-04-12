@@ -26,14 +26,10 @@ export function scheduleWasmEffectRebuild(): void {
     _wasmRebuildTimer = null;
     void (async () => {
       try {
-        const { LibopenmptEngine } = await import('../engine/libopenmpt/LibopenmptEngine');
-        if (!LibopenmptEngine.hasInstance()) {
-          console.log('[MixerStore] scheduleWasmEffectRebuild: no LibopenmptEngine instance');
-          return;
-        }
-        const engine = LibopenmptEngine.getInstance();
-        if (!engine.isAvailable()) {
-          console.log('[MixerStore] scheduleWasmEffectRebuild: engine not available');
+        const { getActiveIsolationEngine } = await import('../engine/tone/ChannelRoutedEffects');
+        const engine = await getActiveIsolationEngine();
+        if (!engine) {
+          console.log('[MixerStore] scheduleWasmEffectRebuild: no isolation-capable engine available');
           return;
         }
 
@@ -66,7 +62,7 @@ export function scheduleWasmEffectRebuild(): void {
         }
 
         console.log(`[MixerStore] scheduleWasmEffectRebuild: rebuilding with ${channelEffects.size} channels having effects`);
-        await mgr.rebuild(channelEffects);
+        await mgr.rebuild(channelEffects, engine);
       } catch (e) {
         console.warn('[MixerStore] Failed to rebuild WASM per-channel effects:', e);
       }

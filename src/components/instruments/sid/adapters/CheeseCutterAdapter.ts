@@ -4,6 +4,18 @@ import type {
   SIDTableData, SIDTableDef, SIDFeatures,
 } from '../SIDInstrumentAdapter';
 
+const MAX_INSTRUMENTS = 48;
+const PTR_INST = 18;
+const PTR_ARP1 = 14;
+const PTR_FILTTAB = 16;
+const PTR_PULSTAB = 17;
+
+async function getEngine() {
+  const { CheeseCutterEngine } = await import('@/engine/cheesecut/CheeseCutterEngine');
+  if (CheeseCutterEngine.hasInstance()) return CheeseCutterEngine.getInstance();
+  return null;
+}
+
 export class CheeseCutterAdapter implements SIDInstrumentAdapter {
   readonly formatName = 'CheeseCutter';
   readonly accentColor = '#ffaa33';
@@ -17,7 +29,7 @@ export class CheeseCutterAdapter implements SIDInstrumentAdapter {
     hasGateTimer: false,
     hasPCMSamples: false,
     hasSoundDesigner: false,
-    isEditable: false,
+    isEditable: true,
     hasControlBits: false,
   };
 
@@ -43,8 +55,32 @@ export class CheeseCutterAdapter implements SIDInstrumentAdapter {
     };
   }
 
-  setADSR(_adsr: Partial<SIDADSR>): void {
-    // Read-only until WASM bridge is extended
+  setADSR(adsr: Partial<SIDADSR>): void {
+    const s = useCheeseCutterStore.getState();
+    const inst = s.instruments[s.currentInstrument];
+    if (!inst) return;
+    const cur = this.getADSR();
+    const a = adsr.attack ?? cur.attack;
+    const d = adsr.decay ?? cur.decay;
+    const su = adsr.sustain ?? cur.sustain;
+    const r = adsr.release ?? cur.release;
+    const newAD = (a << 4) | (d & 0xF);
+    const newSR = (su << 4) | (r & 0xF);
+
+    const ptrs = s.pointerTable;
+    const instAddr = ptrs[PTR_INST];
+    if (instAddr) {
+      const idx = s.currentInstrument;
+      const adAddr = instAddr + 0 * MAX_INSTRUMENTS + idx;
+      const srAddr = instAddr + 1 * MAX_INSTRUMENTS + idx;
+      getEngine().then(eng => {
+        if (eng) eng.writeBytes([adAddr, srAddr], [newAD, newSR]);
+      });
+    }
+
+    const instruments = [...s.instruments];
+    instruments[s.currentInstrument] = { ...inst, ad: newAD, sr: newSR };
+    useCheeseCutterStore.setState({ instruments });
   }
 
   getWaveform(): SIDWaveform | null {
@@ -89,8 +125,32 @@ export class CheeseCutterAdapter implements SIDInstrumentAdapter {
     return null;
   }
 
-  setTableEntry(_key: string, _row: number, _side: 'left' | 'right', _value: number): void {
-    // Read-only until WASM bridge is extended
+  setTableEntry(key: string, row: number, side: 'left' | 'right', value: number): void {
+    const s = useCheeseCutterStore.getState();
+    const ptrs = s.pointerTable;
+    if (!ptrs.length) return;
+
+    if (key === 'wave' && s.waveTable) {
+      const baseAddr = ptrs[PTR_ARP1];
+      const offset = side === 'left' ? row : 256 + row;
+      getEngine().then(eng => { if (eng) eng.writeByte(baseAddr + offset, value & 0xFF); });
+      const wt = { ...s.waveTable };
+      if (side === 'left') { wt.wave1 = new Uint8Array(wt.wave1); wt.wave1[row] = value & 0xFF; }
+      else { wt.wave2 = new Uint8Array(wt.wave2); wt.wave2[row] = value & 0xFF; }
+      useCheeseCutterStore.setState({ waveTable: wt });
+    } else if (key === 'pulse' && s.pulseTable) {
+      const baseAddr = ptrs[PTR_PULSTAB];
+      getEngine().then(eng => { if (eng) eng.writeByte(baseAddr + row, value & 0xFF); });
+      const pt = new Uint8Array(s.pulseTable);
+      pt[row] = value & 0xFF;
+      useCheeseCutterStore.setState({ pulseTable: pt });
+    } else if (key === 'filter' && s.filterTable) {
+      const baseAddr = ptrs[PTR_FILTTAB];
+      getEngine().then(eng => { if (eng) eng.writeByte(baseAddr + row, value & 0xFF); });
+      const ft = new Uint8Array(s.filterTable);
+      ft[row] = value & 0xFF;
+      useCheeseCutterStore.setState({ filterTable: ft });
+    }
   }
 
   getTablePointer(key: string): number {
@@ -103,8 +163,29 @@ export class CheeseCutterAdapter implements SIDInstrumentAdapter {
     return 0;
   }
 
-  setTablePointer(_key: string, _value: number): void {
-    // Read-only until WASM bridge is extended
+  setTablePointer(key: string, value: number): void {
+    const s = useCheeseCutterStore.getState();
+    const inst = s.instruments[s.currentInstrument];
+    if (!inst) return;
+
+    const ptrFieldMap: Record<string, number> = { wave: 2, pulse: 3, filter: 4 };
+    const byteIdx = ptrFieldMap[key];
+    if (byteIdx === undefined) return;
+
+    const ptrs = s.pointerTable;
+    const instAddr = ptrs[PTR_INST];
+    if (instAddr) {
+      const addr = instAddr + byteIdx * MAX_INSTRUMENTS + s.currentInstrument;
+      getEngine().then(eng => { if (eng) eng.writeByte(addr, value & 0xFF); });
+    }
+
+    const instruments = [...s.instruments];
+    const updates: Record<string, number> = {};
+    if (key === 'wave') updates.wavePtr = value;
+    else if (key === 'pulse') updates.pulsePtr = value;
+    else if (key === 'filter') updates.filterPtr = value;
+    instruments[s.currentInstrument] = { ...inst, ...updates };
+    useCheeseCutterStore.setState({ instruments });
   }
 
   getArpeggio(): { table: number[]; speed: number } | null {
@@ -113,8 +194,10 @@ export class CheeseCutterAdapter implements SIDInstrumentAdapter {
 
   setArpeggio(_arp: Partial<{ table: number[]; speed: number }>): void {}
 
+  private _sidRegs: Uint8Array | null = null;
+
   getSidRegisters(_chipIndex: number): Uint8Array | null {
-    return null;
+    return this._sidRegs;
   }
 
   getSidCount(): number {
@@ -122,6 +205,11 @@ export class CheeseCutterAdapter implements SIDInstrumentAdapter {
   }
 
   refreshSidRegisters(): void {
-    // TODO: query cc_get_sid_regs from worklet
+    getEngine().then(eng => {
+      if (!eng) return;
+      eng.requestSidRegs().then((regs: Uint8Array) => {
+        this._sidRegs = regs;
+      });
+    });
   }
 }

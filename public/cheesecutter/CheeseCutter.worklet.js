@@ -38,6 +38,9 @@ class CheeseCutterProcessor extends AudioWorkletProcessor {
           this._playInit = this.module.cwrap('cc_play_init', null, ['number']);
           this._render = this.module.cwrap('cc_render', null, ['number', 'number', 'number']);
           this._getSidRegs = this.module.cwrap('cc_get_sid_regs', 'number', []);
+          this._writeByte = this.module.cwrap('cc_write_byte', null, ['number', 'number']);
+          this._readByte = this.module.cwrap('cc_read_byte', 'number', ['number']);
+          this._getRam = this.module.cwrap('cc_get_ram', 'number', []);
           this._shutdown = this.module.cwrap('cc_shutdown', null, []);
 
           this._init(msg.sampleRate || 44100, msg.sidModel || 0);
@@ -77,6 +80,37 @@ class CheeseCutterProcessor extends AudioWorkletProcessor {
       case 'stop': {
         this.playing = false;
         this.port.postMessage({ type: 'stopped' });
+        break;
+      }
+
+      case 'getSidRegs': {
+        if (!this.ready) break;
+        const ptr = this._getSidRegs();
+        const regs = new Uint8Array(this.module.HEAPU8.buffer, ptr, 25).slice();
+        this.port.postMessage({ type: 'sidRegs', regs }, [regs.buffer]);
+        break;
+      }
+
+      case 'writeByte': {
+        if (!this.ready) break;
+        this._writeByte(msg.addr, msg.value);
+        break;
+      }
+
+      case 'writeBytes': {
+        if (!this.ready) break;
+        for (let i = 0; i < msg.addrs.length; i++) {
+          this._writeByte(msg.addrs[i], msg.values[i]);
+        }
+        break;
+      }
+
+      case 'readBytes': {
+        if (!this.ready) break;
+        const result = new Uint8Array(msg.length);
+        const ramPtr = this._getRam();
+        result.set(new Uint8Array(this.module.HEAPU8.buffer, ramPtr + msg.addr, msg.length));
+        this.port.postMessage({ type: 'readBytes', id: msg.id, data: result }, [result.buffer]);
         break;
       }
     }

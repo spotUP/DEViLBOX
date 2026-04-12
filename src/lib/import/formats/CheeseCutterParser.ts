@@ -497,6 +497,7 @@ export async function parseCheeseCutterFile(
     pulseTable,
     filterTable,
     commandTable,
+    pointerTable: ptrs,
   };
 
   // ── Assemble TrackerSong ────────────────────────────────────────────
