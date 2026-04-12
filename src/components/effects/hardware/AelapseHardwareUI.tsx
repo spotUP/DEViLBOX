@@ -166,7 +166,7 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           if (typeof existing === 'function') { resolve(existing); return; }
 
           const script = document.createElement('script');
-          script.src = '/aelapse/AelapseUI.js';
+          script.src = `/aelapse/AelapseUI.js?v=${Date.now()}`;
           script.onload = () => {
             const fn = (window as unknown as { createAelapseUIModule?: AelapseFactory })
               .createAelapseUIModule;
