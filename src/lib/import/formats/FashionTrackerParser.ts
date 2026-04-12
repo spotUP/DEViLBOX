@@ -33,7 +33,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeMODCell, decodeMODCell as decodeStdMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -283,6 +283,7 @@ export function parseFashionTrackerFile(buffer: ArrayBuffer, filename: string): 
     numPatterns: availablePatterns,
     moduleSize: buf.length,
     encodeCell: encodeMODCell,
+    decodeCell: decodeStdMODCell,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       return PATTERN_DATA_OFF + pattern * PATTERN_SIZE + row * BYTES_PER_ROW + channel * 4;
     },

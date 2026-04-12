@@ -685,6 +685,11 @@ export async function parseRJPFile(
       }
       return new Uint8Array([bestRjp]);
     },
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const rjpNote = raw[0];
+      const note = rjpNoteToXM(rjpNote);
+      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const key = `${pattern}:${row}:${channel}`;
       const entry = cellOffsetMap.get(key);

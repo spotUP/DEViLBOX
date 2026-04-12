@@ -12,6 +12,7 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSeanConnollyCell } from '@/engine/uade/encoders/SeanConnollyEncoder';
+import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -107,6 +108,7 @@ export function parseSeanConnollyFile(buffer: ArrayBuffer, filename: string): Tr
     numPatterns: 1,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSeanConnollyCell,
+    decodeCell: decodeMODCell,
   };
 
   return {

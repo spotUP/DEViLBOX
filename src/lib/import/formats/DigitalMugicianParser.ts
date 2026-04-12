@@ -878,6 +878,33 @@ export async function parseDigitalMugicianFile(
     numPatterns: numDMPatterns,
     moduleSize: buf.byteLength,
     encodeCell: encodeDigitalMugicianCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // byte[0] = DM note index, byte[1] = sample (6-bit), byte[2] = effect, byte[3] = param (s8)
+      const dmNote = raw[0];
+      const sample = raw[1] & 0x3F;
+      const effect = raw[2];
+      const param  = raw[3] >= 128 ? raw[3] - 256 : raw[3]; // signed
+
+      const note = dmNote > 0 ? Math.min(96, dmNote + 1) : 0;
+
+      // Effect: 0-63 = portamento (val1=1), 64 = no effect, 65+ = effect type
+      let effTyp = 0, eff = 0;
+      if (effect < 64) {
+        // Portamento: param is pitch slide
+        if (param > 0) { effTyp = 0x01; eff = Math.min(param, 0xFF); }
+        else if (param < 0) { effTyp = 0x02; eff = Math.min(-param, 0xFF); }
+      } else if (effect > 64) {
+        const val1 = effect - 62;
+        switch (val1) {
+          case 6: effTyp = 0x0F; eff = (param & 0xFF); break; // speed
+          case 7: effTyp = 0x0E; eff = 0x01; break; // filter on
+          case 8: effTyp = 0x0E; eff = 0x00; break; // filter off
+          case 12: effTyp = 0x03; eff = (param & 0xFF); break; // tone porta
+        }
+      }
+
+      return { note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= patternChannelBaseRows.length) return patternDataStart;
       if (channel < 0 || channel >= 4) return patternDataStart;

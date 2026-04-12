@@ -780,6 +780,17 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.byteLength,
     encodeCell: encodeSoundFactoryCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // 3 bytes: opcode, durationHi, durationLo
+      const opcode = raw[0];
+      if (opcode >= 0x80) {
+        // Pause/rest (0x80+)
+        return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+      }
+      // Note: psfNoteToXm = opcode + 13
+      const note = Math.max(1, Math.min(96, opcode + 13));
+      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const globalRow = pattern * ROWS_PER_PATTERN + row;
       if (channel < 0 || channel >= flatChannelOffsets.length) return -1;

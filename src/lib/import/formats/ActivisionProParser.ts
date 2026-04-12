@@ -739,6 +739,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.byteLength,
     encodeCell: encodeActivisionProCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const b = raw[0];
+      const noteIdx = b & 0x3F;
+      const instrField = (b >> 6) & 0x03;
+      // avpNoteToXM: xm = 37 + (noteIdx - 60) = noteIdx - 23
+      const note = noteIdx > 0 ? avpNoteToXM(noteIdx) : 0;
+      return { note, instrument: instrField, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;
       const patOffsets = cellOffsetMap[pattern];

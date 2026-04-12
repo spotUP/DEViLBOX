@@ -538,6 +538,22 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     numPatterns: NOP,
     moduleSize: bytes.length,
     encodeCell: encodeSynthesisCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const noteIdx = raw[0];
+      const instrument = raw[1];
+      const byte2 = raw[2];
+      const effectArg = raw[3];
+      const effect = byte2 & 0x0F;
+
+      // synNoteToXM: xm = 13 + (noteIdx - 49) = noteIdx - 36
+      const note = noteIdx > 0 ? Math.max(1, Math.min(96, noteIdx - 36)) : 0;
+      return {
+        note, instrument, volume: 0,
+        effTyp: (effect !== 0 || effectArg !== 0) ? effect : 0,
+        eff: (effect !== 0 || effectArg !== 0) ? effectArg : 0,
+        effTyp2: 0, eff2: 0,
+      };
+    },
   };
 
   return {

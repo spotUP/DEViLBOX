@@ -514,6 +514,14 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.byteLength,
     encodeCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // 4 bytes: noteByte, instrument, unused, volume
+      const noteByte = raw[0];
+      const instrument = raw[1];
+      const volume = raw[3] & 0x7F;
+      const note = is40orHigher ? sc40NoteToXm(noteByte) : sc3xNoteToXm(noteByte);
+      return { note, instrument, volume, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const pos = positions[pattern];
       if (!pos) return -1;

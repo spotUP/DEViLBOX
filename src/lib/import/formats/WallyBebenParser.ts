@@ -396,6 +396,12 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
       }
       return out;
     },
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const b = raw[0];
+      // amigaNoteToXM(b + 1) = b + 13; values 0x24+ are rest
+      const note = (b < 0x24) ? amigaNoteToXM(b + 1) : 0;
+      return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       return cellOffsetMap.get(`${pattern}-${channel}-${row}`) ?? -1;
     },

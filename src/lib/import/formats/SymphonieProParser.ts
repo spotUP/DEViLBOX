@@ -1015,6 +1015,44 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
     numPatterns: patterns.length,
     moduleSize: bytes.length,
     encodeCell: encodeSymphonieProCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const cmd  = raw[0];
+      const note = raw[1] >= 128 ? raw[1] - 256 : raw[1]; // signed int8
+      const param = raw[2];
+      const inst  = raw[3];
+
+      const cell: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+
+      switch (cmd) {
+        case 0: // CMD_KEYON
+          if (note >= 0 && note <= 84) {
+            const n = note + 25;
+            if (n >= 1 && n <= 119) cell.note = Math.min(96, n);
+          }
+          if (inst < 255) cell.instrument = inst + 1;
+          if (param > 0 && param <= 100) cell.volume = Math.min(Math.round(param * 0.64), 64);
+          break;
+        case 9: // CMD_SET_SPEED
+          cell.effTyp = 0x0F; cell.eff = param > 0 ? param : 4; break;
+        case 1: // CMD_VOLSLIDE_UP
+          cell.effTyp = 0x0A; cell.eff = (Math.min(param, 0x0F) << 4); break;
+        case 2: // CMD_VOLSLIDE_DOWN
+          cell.effTyp = 0x0A; cell.eff = Math.min(param, 0x0F); break;
+        case 3: // CMD_PITCH_UP
+          cell.effTyp = 0x01; cell.eff = param; break;
+        case 4: // CMD_PITCH_DOWN
+          cell.effTyp = 0x02; cell.eff = param; break;
+        case 13: // CMD_VIBRATO
+          cell.effTyp = 0x04; cell.eff = (Math.min(inst >> 3, 15) << 4) | Math.min(param, 15); break;
+        case 12: // CMD_TREMOLO
+          cell.effTyp = 0x07; cell.eff = (Math.min(inst >> 3, 15) << 4) | Math.min(param >> 3, 15); break;
+        case 5: // CMD_REPLAY_FROM
+          cell.effTyp = 0x09; cell.eff = param; break;
+        case 18: // CMD_ADD_HALFTONE
+          cell.effTyp = 0x03; break;
+      }
+      return cell;
+    },
     getCellFileOffset(pattern: number, row: number, channel: number): number {
       // Look up which raw pattern block this TrackerSong pattern came from.
       // The pattern's importMetadata or the patternMap key encodes this.

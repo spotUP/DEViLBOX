@@ -28,6 +28,7 @@ import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
 import { encodeDavidWhittakerCell } from '@/engine/uade/encoders/DavidWhittakerEncoder';
+import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -915,6 +916,7 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     numPatterns: patterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeDavidWhittakerCell,
+    decodeCell: decodeMODCell,
     getCellFileOffset: (pat: number, row: number, channel: number): number => {
       const patternByteSize = ROWS * CHANNELS * 4;
       return pat * patternByteSize + row * CHANNELS * 4 + channel * 4;
