@@ -117,7 +117,8 @@ export type TrackerFormat =
   | 'PxTone'          // PxTone Collage (.ptcop, .pttune)
   | 'SteveTurner'    // Steve Turner (.jpo) — Amiga 4-voice with 7-phase envelope
   | 'PreTracker'    // PreTracker (.prt) — Amiga 4-channel by Ratt/Abyss
-  | 'TFMX';         // TFMX Professional (Jochen Hippel, libtfmxaudiodecoder WASM)
+  | 'TFMX'          // TFMX Professional (Jochen Hippel, libtfmxaudiodecoder WASM)
+  | 'ASAP';         // ASAP (Another Slight Atari Player) - Atari 8-bit POKEY formats
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -320,6 +321,8 @@ export interface TrackerSong {
   fredEditorWasmFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
+  /** Raw PMD (.m/.m2) binary for PmdminiEngine WASM playback (PC-98 YM2608) */
+  pmdFileData?: ArrayBuffer;
   /** Raw Ben Daglish (.bd) binary for BdEngine WASM playback */
   bdFileData?: ArrayBuffer;
   /** Raw SidMon 2.0 (.sid2) binary for Sd2Engine WASM playback */
@@ -332,6 +335,8 @@ export interface TrackerSong {
   uadeEditableFileData?: ArrayBuffer;
   /** Original filename hint for UADE format detection */
   uadeEditableFileName?: string;
+  /** Raw MDX binary for mdxmini WASM playback (Sharp X68000 YM2151) */
+  mdxminiFileData?: ArrayBuffer;
   /** Raw file binary for AdPlug streaming playback (patterns displayed, AdPlug renders audio) */
   adplugFileData?: ArrayBuffer;
   /** Original filename for AdPlug format detection */
@@ -344,6 +349,10 @@ export interface TrackerSong {
   symphonieFileData?: ArrayBuffer;
   /** Raw module binary for libopenmpt WASM playback (MOD/XM/IT/S3M) */
   libopenmptFileData?: ArrayBuffer;
+  /** Raw ASAP file data for AsapEngine WASM playback (SAP/CMC/RMT/TMC/DLT/MPT etc.) */
+  asapFileData?: ArrayBuffer;
+  /** Original filename for ASAP format detection (extension determines format) */
+  asapFilename?: string;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
