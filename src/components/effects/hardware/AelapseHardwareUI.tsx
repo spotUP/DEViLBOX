@@ -252,16 +252,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_up(cx, cy, getModifiers(e));
         };
-        let dragLogCount = 0;
         const onMouseMove = (e: MouseEvent) => {
           const isDown = (e.buttons & 1) !== 0;
           if (isDown) {
             e.preventDefault();
-            if (dragLogCount < 5) {
-              const [dx, dy] = canvasCoords(jcanvas, e);
-              console.log(`[AelapseUI] drag @ ${dx},${dy} buttons=${e.buttons}`);
-              dragLogCount++;
-            }
           }
           const [cx, cy] = canvasCoords(jcanvas, e);
           m._aelapse_ui_on_mouse_move(cx, cy, getModifiers(e));
@@ -303,12 +297,16 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
 
         setLoaded(true);
 
-        // rAF loop — 60fps for the JUCE blit AND the springs overlay.
-        // We run both at the same cadence so knob changes and springs
-        // animation stay visually coherent.
+        // rAF loop — throttled to 30fps (same as OBXf). The JUCE
+        // framebuffer blit is 720×400×4 = 1.15 MB/frame of byte-swapping;
+        // at 60fps it causes jerky knob interaction.
+        let lastFrameTime = 0;
+        const FRAME_INTERVAL = 1000 / 30;
         const renderLoop = (nowMs: number) => {
           if (cancelled) return;
           rafId = requestAnimationFrame(renderLoop);
+          if (nowMs - lastFrameTime < FRAME_INTERVAL) return;
+          lastFrameTime = nowMs;
 
           const modRef = moduleRef.current;
           if (!modRef) return;
@@ -385,8 +383,17 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
       if (rafId) cancelAnimationFrame(rafId);
       eventCleanups.forEach((fn) => fn());
 
-      if (springsRef.current) { springsRef.current.dispose(); springsRef.current = null; }
-      if (moduleRef.current)  { moduleRef.current._aelapse_ui_shutdown(); moduleRef.current = null; }
+      // Reset bounds so re-mount recalculates
+      springsBoundsRef.current = null;
+
+      if (springsRef.current) {
+        try { springsRef.current.dispose(); } catch { /* already disposed */ }
+        springsRef.current = null;
+      }
+      if (moduleRef.current) {
+        try { moduleRef.current._aelapse_ui_shutdown(); } catch { /* already shut down */ }
+        moduleRef.current = null;
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- callback props use refs; WASM init must run exactly once
   }, []);
