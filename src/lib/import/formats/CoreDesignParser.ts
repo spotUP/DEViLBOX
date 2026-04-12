@@ -18,6 +18,15 @@
  *   u32BE(buf, 56) !== 0            (EndSong pointer)
  *   u32BE(buf, 60) !== 0            (Subsongs pointer)
  *
+ * Sample extraction (from Core Design.asm SampleInit + InitPlayer):
+ *   The code body in the HUNK starts at file offset 32 (standard single-hunk).
+ *   At code[32] (file offset 64): SampleInfoPtr (section-relative before relocation)
+ *   At code[36] (file offset 68): EndSampleInfoPtr
+ *   Count = (EndSampleInfoPtr - SampleInfoPtr) / 14
+ *   Each 14-byte entry: u32 at +6 = section-relative address of sample data area.
+ *   At sample data area: u16 length in words, then PCM data follows.
+ *   Sample length in bytes = u16 * 2.
+ *
  * File prefix: "CORE." (e.g. "CORE.songname")
  * Single-file format: music data binary.
  * Actual audio playback is delegated to UADE.
@@ -27,6 +36,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 const MIN_FILE_SIZE = 64;
 
@@ -88,6 +98,131 @@ function readCString(buf: Uint8Array, off: number, maxLen: number): string {
   return s;
 }
 
+/**
+ * Parse the Amiga HUNK header to find where the code body starts in the file.
+ *
+ * Standard single-hunk layout:
+ *   offset  0: 0x000003F3 (HUNK_HEADER)
+ *   offset  4: 0x00000000 (no string table)
+ *   offset  8: num_hunks
+ *   offset 12: first_hunk
+ *   offset 16: last_hunk
+ *   offset 20: hunk_sizes[0..n-1]  (n = last - first + 1)
+ *   offset 20+n*4: 0x000003E9 (HUNK_CODE)
+ *   offset 24+n*4: code_longwords
+ *   offset 28+n*4: code body starts
+ *
+ * Returns the file offset of the first byte of code, or -1 on failure.
+ */
+function findHunkCodeBodyStart(buf: Uint8Array): number {
+  if (buf.length < 32) return -1;
+  if (u32BE(buf, 0) !== 0x000003F3) return -1;
+
+  // Skip string table (offset 4: number of resident library name entries, usually 0)
+  const stringTableCount = u32BE(buf, 4);
+  let off = 8;
+  for (let i = 0; i < stringTableCount; i++) {
+    if (off + 4 > buf.length) return -1;
+    const strLongs = u32BE(buf, off);
+    off += 4 + strLongs * 4;
+  }
+
+  if (off + 12 > buf.length) return -1;
+  const numHunks = u32BE(buf, off);
+  off += 12; // skip numHunks, firstHunk, lastHunk
+
+  // Skip hunk size entries
+  off += numHunks * 4;
+
+  // Expect HUNK_CODE (0x3E9), mask off memory type flags in high bits
+  if (off + 8 > buf.length) return -1;
+  const hunkType = u32BE(buf, off) & 0x3FFFFFFF;
+  if (hunkType !== 0x3E9) return -1;
+  off += 8; // skip HUNK_CODE + code_longwords
+
+  return off;
+}
+
+/**
+ * Extract sample PCM data from a Core Design module using HUNK structure.
+ *
+ * From the ASM (InitPlayer + SampleInit):
+ *   - After codeBase + 12 (skip 0x70FF4E75 + 'S.PHIPPS'): 7 longword reads
+ *   - code[32] = SampleInfoPtr, code[36] = EndSampleInfoPtr (section-relative)
+ *   - Count = (EndSampleInfoPtr - SampleInfoPtr) / 14
+ *   - Each 14-byte entry: u32 at +6 = section-relative address of sample data
+ *   - At sample data: u16 length in words, then PCM follows
+ */
+function extractCoreDesignSamples(buf: Uint8Array, codeStart: number): InstrumentConfig[] {
+  const instruments: InstrumentConfig[] = [];
+  const ENTRY_SIZE = 14;
+
+  // SampleInfoPtr at code[32], EndSampleInfoPtr at code[36]
+  const sampleInfoPtrOff = codeStart + 32;
+  const endSampleInfoPtrOff = codeStart + 36;
+
+  if (endSampleInfoPtrOff + 4 > buf.length) return instruments;
+
+  const sampleInfoRelative = u32BE(buf, sampleInfoPtrOff);
+  const endSampleInfoRelative = u32BE(buf, endSampleInfoPtrOff);
+
+  if (sampleInfoRelative === 0 || endSampleInfoRelative === 0) return instruments;
+  if (endSampleInfoRelative <= sampleInfoRelative) return instruments;
+
+  const sampleInfoFileOff = sampleInfoRelative + codeStart;
+  const endSampleInfoFileOff = endSampleInfoRelative + codeStart;
+
+  if (sampleInfoFileOff >= buf.length || endSampleInfoFileOff > buf.length) return instruments;
+
+  const tableBytes = endSampleInfoFileOff - sampleInfoFileOff;
+  if (tableBytes % ENTRY_SIZE !== 0) return instruments;
+  const count = tableBytes / ENTRY_SIZE;
+  if (count === 0 || count > 128) return instruments;
+
+  for (let i = 0; i < count; i++) {
+    const entryOff = sampleInfoFileOff + i * ENTRY_SIZE;
+    if (entryOff + ENTRY_SIZE > buf.length) break;
+
+    // u32 at entry+6 = section-relative address of sample data area
+    const sampleAreaRelative = u32BE(buf, entryOff + 6);
+    if (sampleAreaRelative === 0) {
+      instruments.push({
+        id: i + 1, name: `CORE Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+      continue;
+    }
+
+    const sampleAreaFileOff = sampleAreaRelative + codeStart;
+    if (sampleAreaFileOff + 2 > buf.length) {
+      instruments.push({
+        id: i + 1, name: `CORE Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+      continue;
+    }
+
+    // First u16 at sample area = length in words
+    const lengthWords = u16BE(buf, sampleAreaFileOff);
+    const lengthBytes = lengthWords * 2;
+    const pcmStart = sampleAreaFileOff + 2;
+
+    if (lengthBytes > 0 && lengthBytes < 0x100000 && pcmStart + lengthBytes <= buf.length) {
+      const pcm = buf.slice(pcmStart, pcmStart + lengthBytes);
+      instruments.push(createSamplerInstrument(
+        i + 1, `CORE Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+      ));
+    } else {
+      instruments.push({
+        id: i + 1, name: `CORE Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
+  }
+
+  return instruments;
+}
+
 export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isCoreDesignFormat(buf)) throw new Error('Not a Core Design module');
@@ -95,80 +230,42 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^core\./i, '') || baseName;
 
-  // ── Extract pointers from the module header ─────────────────────────────
-  //
-  // The HUNK-format module header has known pointer slots after the signature:
-  //   +44: Interrupt pointer
-  //   +48: AudioInterrupt pointer
-  //   +52: InitSong pointer
-  //   +56: EndSong pointer
-  //   +60: Subsongs pointer
-  //   +64: SampleInfoPtr (if present)
-  //   +68: EndSampleInfoPtr (if present)
-  //
-  // Sample info entries are 14 bytes each:
-  //   u16 offsetHi, u32 offsetLo (6 bytes offset), u8 type, u8 flags,
-  //   u16 reserved, u16 lengthWords, u16 volume
-
-  // ── Sample extraction ──────────────────────────────────────────────────
+  // ── Extract samples from HUNK code body ────────────────────────────────
 
   const instruments: InstrumentConfig[] = [];
-  let sampleCount = 0;
   let songName = '';
   let authorName = '';
 
-  try {
-    // Scan for sample-like 14-byte entries in the region after the header.
-    // A valid sample entry has: non-zero length (u16 at +10), volume 0-64 (u16 at +12)
-    const SAMPLE_ENTRY_SIZE = 14;
-    const scanStart = 64;
-    const scanEnd = Math.min(buf.length, 2048);
+  const codeStart = findHunkCodeBodyStart(buf);
 
-    // Try to find a contiguous run of valid 14-byte sample entries
-    for (let base = scanStart; base < scanEnd; base += 2) {
-      const candidates: Array<{ length: number; volume: number }> = [];
-      let off = base;
+  if (codeStart > 0) {
+    // Structural extraction using HUNK pointers
+    const extracted = extractCoreDesignSamples(buf, codeStart);
+    instruments.push(...extracted);
 
-      for (let i = 0; i < 64 && off + SAMPLE_ENTRY_SIZE <= buf.length; i++) {
-        const lenWords = u16BE(buf, off + 10);
-        const vol = u16BE(buf, off + 12);
-        if (lenWords === 0 || lenWords > 0x8000) break;
-        if (vol > 64) break;
-        candidates.push({ length: lenWords * 2, volume: vol });
-        off += SAMPLE_ENTRY_SIZE;
-      }
-
-      if (candidates.length >= 2) {
-        for (let i = 0; i < candidates.length; i++) {
-          instruments.push({
-            id: i + 1,
-            name: `Sample ${i + 1} (${candidates[i].length} bytes)`,
-            type: 'synth' as const,
-            synthType: 'Synth' as const,
-            effects: [],
-            volume: 0,
-            pan: 0,
-          } as InstrumentConfig);
+    // Extract song/author names from header pointers
+    // After the 7 longword reads (code[12..39]), InitPlayer reads:
+    //   code[40] = SongName, code[44] = AuthorName (section-relative pointers)
+    const songNamePtrOff = codeStart + 40;
+    const authorNamePtrOff = codeStart + 44;
+    if (songNamePtrOff + 4 <= buf.length) {
+      const songNameRelative = u32BE(buf, songNamePtrOff);
+      if (songNameRelative > 0) {
+        const nameFileOff = songNameRelative + codeStart;
+        if (nameFileOff < buf.length) {
+          songName = readCString(buf, nameFileOff, 64);
         }
-        sampleCount = candidates.length;
-        break;
       }
     }
-
-    // Try extracting ASCII strings from the region around offset 64-200
-    // for song/author names (some Core Design modules embed these)
-    for (let off = 64; off < Math.min(buf.length - 32, 512); off++) {
-      const test = readCString(buf, off, 32);
-      if (test.length >= 4 && !songName) {
-        // Heuristic: first printable string of 4+ chars could be the title
-        songName = test;
-      } else if (test.length >= 4 && songName && !authorName && test !== songName) {
-        authorName = test;
-        break;
+    if (authorNamePtrOff + 4 <= buf.length) {
+      const authorNameRelative = u32BE(buf, authorNamePtrOff);
+      if (authorNameRelative > 0) {
+        const nameFileOff = authorNameRelative + codeStart;
+        if (nameFileOff < buf.length) {
+          authorName = readCString(buf, nameFileOff, 64);
+        }
       }
     }
-  } catch {
-    // Binary scan failed — fall back to defaults
   }
 
   // Fallback: single placeholder instrument
@@ -177,7 +274,6 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
       id: 1, name: 'Sample 1', type: 'synth' as const,
       synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
     } as InstrumentConfig);
-    sampleCount = 1;
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ───────────
@@ -198,7 +294,7 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
       originalChannelCount: 4, originalPatternCount: 1,
-      originalInstrumentCount: sampleCount,
+      originalInstrumentCount: instruments.length,
     },
   };
 

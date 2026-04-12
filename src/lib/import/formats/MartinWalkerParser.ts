@@ -25,6 +25,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // Minimum plausible file size: need at least the header + body check areas.
 // Format 1 checks offsets up to 160(body)+4 bytes; body is at offset 8+.
@@ -38,6 +39,14 @@ function u16BE(buf: Uint8Array, off: number): number {
 
 function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
+}
+
+/**
+ * Read signed 16-bit big-endian at offset.
+ */
+function s16BE(buf: Uint8Array, off: number): number {
+  const v = ((buf[off] << 8) | buf[off + 1]) & 0xFFFF;
+  return v >= 0x8000 ? v - 0x10000 : v;
 }
 
 /**
@@ -212,6 +221,89 @@ export function isMartinWalkerFormat(buffer: ArrayBuffer | Uint8Array): boolean 
   return false;
 }
 
+/**
+ * Scan for the Martin Walker sample table magic (0x2A325000) and extract
+ * SamplesInfoPtr, SamplesPtr, and EndSamplesInfoPtr file offsets.
+ *
+ * Mirrors the FindSample routine from Martin Walker_v2.asm:
+ *   1. Scan for 0x2A325000 (magicPos)
+ *   2. SamplesInfoPtr = (magicPos-2) + s16BE(buf, magicPos-2)
+ *   3. SamplesPtr = (magicPos+6) + s16BE(buf, magicPos+6), align to even
+ *   4. Scan for 0xCAFC near magicPos+6 to find EndSamplesInfoPtr via PC-relative
+ *   5. Count = (end - start) / 4, capped at 32
+ *
+ * Returns null if the magic cannot be found or pointers are out of bounds.
+ */
+function scanMartinWalkerSamplePointers(buf: Uint8Array): {
+  samplesInfoOff: number;
+  samplesOff: number;
+  sampleCount: number;
+} | null {
+  const len = buf.length;
+
+  // Scan for magic 0x2A325000
+  let magicPos = -1;
+  for (let i = 0; i + 3 < len; i += 2) {
+    if (u32BE(buf, i) === 0x2A325000) {
+      magicPos = i;
+      break;
+    }
+  }
+  if (magicPos < 2) return null;
+
+  // SamplesInfoPtr: A3 = magicPos - 2; A3 += s16BE(buf, A3)
+  const infoBase = magicPos - 2;
+  if (infoBase + 1 >= len) return null;
+  const samplesInfoOff = infoBase + s16BE(buf, infoBase);
+  if (samplesInfoOff < 0 || samplesInfoOff >= len) return null;
+
+  // SamplesPtr: A6 = magicPos + 6; A3 = A6; A3 += s16BE(buf, A6); align to even
+  const sampBase = magicPos + 6;
+  if (sampBase + 1 >= len) return null;
+  let samplesOff = sampBase + s16BE(buf, sampBase);
+  if (samplesOff & 1) samplesOff += 1; // odd alignment fix
+  if (samplesOff < 0 || samplesOff >= len) return null;
+
+  // EndSamplesInfoPtr: scan for 0xCAFC from magicPos+6, up to 10 words
+  let endInfoOff = -1;
+  let scanPos = magicPos + 6;
+  for (let i = 0; i <= 10 && scanPos + 1 < len; i++, scanPos += 2) {
+    if (u16BE(buf, scanPos) === 0xCAFC) {
+      // OK4: A6 = scanPos + 2 (past CAFC); skip 4 more bytes; A2 = A6
+      const a2Base = scanPos + 2 + 4;
+      if (a2Base + 1 < len) {
+        // A2 += s16BE(buf, A2) — PC-relative
+        endInfoOff = a2Base + s16BE(buf, a2Base);
+      }
+      break;
+    }
+  }
+
+  // Compute count: (endInfoOff - samplesInfoOff) / 4
+  // If CAFC scan failed, try a heuristic: cap at 32 entries
+  let entryCount: number;
+  if (endInfoOff > samplesInfoOff && endInfoOff <= len) {
+    entryCount = Math.floor((endInfoOff - samplesInfoOff) / 4);
+  } else {
+    // Fallback: scan entries until offset goes out of bounds or is 0
+    entryCount = 0;
+    for (let off = samplesInfoOff; off + 4 <= len && entryCount < 32; off += 4) {
+      const val = u32BE(buf, off);
+      if (val >= (len - samplesOff)) break; // offset past sample area
+      entryCount++;
+    }
+  }
+
+  // Cap at 32 (same as ASM)
+  if (entryCount > 32) entryCount = 32;
+  if (entryCount < 2) return null; // Need at least 2 entries (1 sample + end marker)
+
+  // Number of samples = entryCount - 1 (last entry provides end offset for last sample)
+  const sampleCount = entryCount - 1;
+
+  return { samplesInfoOff, samplesOff, sampleCount };
+}
+
 export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isMartinWalkerFormat(buf)) throw new Error('Not a Martin Walker module');
@@ -219,10 +311,42 @@ export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): Tr
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^(avp|mw)\./i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  // ── Extract samples ──────────────────────────────────────────────────────
+  const instruments: InstrumentConfig[] = [];
+  const ptrs = scanMartinWalkerSamplePointers(buf);
+
+  if (ptrs) {
+    const { samplesInfoOff, samplesOff, sampleCount } = ptrs;
+    for (let i = 0; i < sampleCount; i++) {
+      const entryOff = samplesInfoOff + i * 4;
+      if (entryOff + 8 > buf.length) break; // need current + next entry
+
+      const currentOffset = u32BE(buf, entryOff);
+      const nextOffset = u32BE(buf, entryOff + 4);
+      const sampleLen = (nextOffset - currentOffset) >>> 0;
+      const pcmFileOff = samplesOff + currentOffset;
+
+      if (sampleLen > 0 && sampleLen < 0x100000 && pcmFileOff + sampleLen <= buf.length) {
+        const pcm = buf.slice(pcmFileOff, pcmFileOff + sampleLen);
+        instruments.push(createSamplerInstrument(
+          i + 1, `MW Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+        ));
+      } else {
+        instruments.push({
+          id: i + 1, name: `MW Sample ${i + 1}`, type: 'synth' as const,
+          synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+        } as InstrumentConfig);
+      }
+    }
+  }
+
+  // Fallback: single placeholder instrument
+  if (instruments.length === 0) {
+    instruments.push({
+      id: 1, name: 'Sample 1', type: 'synth' as const,
+      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    } as InstrumentConfig);
+  }
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
@@ -239,7 +363,8 @@ export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): Tr
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: 4, originalPatternCount: 1,
+      originalInstrumentCount: instruments.length,
     },
   };
 
