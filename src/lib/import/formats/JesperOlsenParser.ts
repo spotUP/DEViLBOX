@@ -31,6 +31,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 const MIN_FILE_SIZE = 20;
 
@@ -40,6 +41,101 @@ function u16BE(buf: Uint8Array, off: number): number {
 
 function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
+}
+
+/** Read a 4-character ASCII tag at offset. */
+function tag4(buf: Uint8Array, off: number): string {
+  return String.fromCharCode(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
+}
+
+/**
+ * Scan for IFF FORM chunks starting at `start` on 2-byte boundaries.
+ * Mirrors the NextIFF / NextIFFO scanning in Jesper Olsen_v1.asm.
+ */
+function scanIffForms(buf: Uint8Array, start: number): Array<{ formOff: number; formSize: number }> {
+  const len = buf.length;
+  const forms: Array<{ formOff: number; formSize: number }> = [];
+
+  let off = start;
+  // Scan for first FORM
+  while (off + 8 <= len) {
+    if (tag4(buf, off) === 'FORM') break;
+    off += 2;
+  }
+
+  // Walk consecutive FORM chunks
+  while (off + 8 <= len && tag4(buf, off) === 'FORM') {
+    const formSize = u32BE(buf, off + 4);
+    if (formSize === 0 || formSize > 0x1000000 || off + 8 + formSize > len + 4) break;
+    forms.push({ formOff: off, formSize });
+    // ASM: addq.l #4,A2; add.l (A2),A2; addq.l #2,A2
+    // = skip FORM(4) + read size at +4, add it, then +2 for alignment padding
+    off += 8 + formSize;
+    if (off & 1) off++;
+    // Then checks addq.l #2,A2 (another 2-byte skip) before comparing again
+    // But the next FORM check is at the new offset — the ASM also does addq.l #2
+    // for the non-FORM case. Let's check if FORM is at this offset, if not, step 2
+    if (off + 4 <= len && tag4(buf, off) !== 'FORM') {
+      off += 2;
+    }
+  }
+
+  return forms;
+}
+
+/**
+ * Extract PCM from an IFF FORM chunk by finding the BODY sub-chunk.
+ * Also extracts name (NAME) and loop info (VHDR).
+ */
+function extractIffSample(buf: Uint8Array, formOff: number, formSize: number): {
+  pcm: Uint8Array; name: string; loopStart: number; loopEnd: number;
+} | null {
+  const dataStart = formOff + 12;
+  const dataEnd = formOff + 8 + formSize;
+
+  let pcm: Uint8Array | null = null;
+  let name = '';
+  let oneShotHiSamples = 0;
+  let repeatHiSamples = 0;
+
+  let pos = dataStart;
+  while (pos + 8 <= dataEnd) {
+    const chunkTag = tag4(buf, pos);
+    const chunkSize = u32BE(buf, pos + 4);
+    const chunkData = pos + 8;
+
+    if (chunkTag === 'BODY') {
+      const bodyLen = Math.min(chunkSize, dataEnd - chunkData);
+      if (bodyLen > 0) pcm = buf.slice(chunkData, chunkData + bodyLen);
+    } else if (chunkTag === 'NAME') {
+      const nameLen = Math.min(chunkSize, 64, dataEnd - chunkData);
+      if (nameLen > 0) {
+        name = String.fromCharCode(...Array.from(buf.slice(chunkData, chunkData + nameLen)))
+          .replace(/\0/g, '').trim();
+      }
+    } else if (chunkTag === 'VHDR') {
+      if (chunkSize >= 8 && chunkData + 8 <= dataEnd) {
+        oneShotHiSamples = u32BE(buf, chunkData);
+        repeatHiSamples = u32BE(buf, chunkData + 4);
+      }
+    }
+
+    let nextPos = chunkData + chunkSize;
+    if (nextPos & 1) nextPos++;
+    if (nextPos <= pos) break;
+    pos = nextPos;
+  }
+
+  if (!pcm || pcm.length === 0) return null;
+
+  let loopStart = 0;
+  let loopEnd = 0;
+  if (repeatHiSamples > 2) {
+    loopStart = oneShotHiSamples;
+    loopEnd = oneShotHiSamples + repeatHiSamples;
+  }
+
+  return { pcm, name, loopStart, loopEnd };
 }
 
 /**
@@ -168,10 +264,37 @@ export function parseJesperOlsenFile(buffer: ArrayBuffer, filename: string): Tra
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^jo\./i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  // ── Extract IFF FORM samples ─────────────────────────────────────────────
+  // All three Jesper Olsen format variants (0, 1, -1) store IFF 8SVX FORM
+  // chunks within the file. The ASM InitPlayer scans for 'FORM' on 2-byte
+  // boundaries in the latter portion of the file data.
+  const instruments: InstrumentConfig[] = [];
+  const forms = scanIffForms(buf, 0);
+
+  for (let i = 0; i < forms.length; i++) {
+    const { formOff, formSize } = forms[i];
+    const sample = extractIffSample(buf, formOff, formSize);
+    if (sample) {
+      const sampleName = sample.name || `JO Sample ${i + 1}`;
+      instruments.push(createSamplerInstrument(
+        i + 1, sampleName, sample.pcm, 64, 8287,
+        sample.loopStart, sample.loopEnd,
+      ));
+    } else {
+      instruments.push({
+        id: i + 1, name: `JO Sample ${i + 1}`, type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig);
+    }
+  }
+
+  // Fallback placeholder if no samples found
+  if (instruments.length === 0) {
+    instruments.push({
+      id: 1, name: 'Sample 1', type: 'synth' as const,
+      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    } as InstrumentConfig);
+  }
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
@@ -188,7 +311,8 @@ export function parseJesperOlsenFile(buffer: ArrayBuffer, filename: string): Tra
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: 4, originalPatternCount: 1,
+      originalInstrumentCount: forms.length,
     },
   };
 
