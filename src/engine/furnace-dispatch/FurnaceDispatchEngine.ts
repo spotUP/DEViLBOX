@@ -2262,11 +2262,11 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   }
 }
 
-// Register with the per-channel isolation system
+// Register with the per-channel isolation system (furnace editor mode)
 registerIsolationEngineResolver(async () => {
   if (FurnaceDispatchEngine.hasInstance()) {
     const engine = FurnaceDispatchEngine.getInstance();
     if (engine.isAvailable()) return engine;
   }
   return null;
-});
+}, 'furnace');
