@@ -611,6 +611,35 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: isMMD1Plus ? encodeMED4Cell : encodeMED3Cell,
+    decodeCell: isMMD1Plus
+      ? (raw: Uint8Array): TrackerCell => {
+          // MMD1+ (4 bytes): note, inst, effect, param
+          const rawNoteVal = raw[0];
+          const inst = raw[1];
+          const rawEff = raw[2];
+          const rawParam = raw[3];
+          let note = 0;
+          if (rawNoteVal === 0x80) {
+            note = 97; // note cut
+          } else {
+            const rawNote = rawNoteVal & 0x7F;
+            note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
+          }
+          const mapped = mapMEDEffect(rawEff, rawParam, tempoCtx);
+          return { note, instrument: inst, volume: 0, effTyp: mapped.effTyp, eff: mapped.eff, effTyp2: 0, eff2: 0 };
+        }
+      : (raw: Uint8Array): TrackerCell => {
+          // MMD0 (3 bytes): packed period/instrument/effect
+          const raw0 = raw[0];
+          const raw1 = raw[1];
+          const raw2 = raw[2];
+          const rawNote = raw0 & 0x3F;
+          const inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
+          const rawEff = raw1 & 0x0F;
+          const note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
+          const mapped = mapMEDEffect(rawEff, raw2, tempoCtx);
+          return { note, instrument: inst, volume: 0, effTyp: mapped.effTyp, eff: mapped.eff, effTyp2: 0, eff2: 0 };
+        },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const info = blockDataOffsets[pattern];
       if (!info) return 0;

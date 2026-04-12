@@ -9,6 +9,7 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeEarAcheCell } from '@/engine/uade/encoders/EarAcheEncoder';
+import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -62,6 +63,7 @@ export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): Tracker
     numPatterns: 1,
     moduleSize: buffer.byteLength,
     encodeCell: encodeEarAcheCell,
+    decodeCell: decodeMODCell,
     getCellFileOffset: (pat: number, row: number, channel: number): number => {
       const patternByteSize = ROWS * NUM_CHANNELS * 4;
       return pat * patternByteSize + row * NUM_CHANNELS * 4 + channel * 4;

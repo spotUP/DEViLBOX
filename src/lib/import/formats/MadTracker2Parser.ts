@@ -666,6 +666,14 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
         numPatterns: numPatterns2,
         moduleSize: bytes.length,
         encodeCell: encodeMT2Cell,
+        decodeCell: (raw: Uint8Array): TrackerCell => {
+          // 7 bytes: note, instr, vol, pan, fxcmd, fxparam1, fxparam2
+          const note    = convertMT2Note(raw[0]);
+          const instrument = raw[1];
+          const volume  = convertMT2Vol(raw[2]);
+          const [effTyp, eff] = convertMT2Effect(raw[4], raw[5], raw[6]);
+          return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+        },
         getCellFileOffset: (pattern: number, row: number, channel: number): number => {
           const start = patternChunkStarts[pattern] ?? 0;
           return start + (row * numChannels + channel) * CMD_SIZE;

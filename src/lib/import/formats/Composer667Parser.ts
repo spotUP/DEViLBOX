@@ -343,6 +343,33 @@ function _parse669(bytes: Uint8Array, filename: string): TrackerSong | null {
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encode669Cell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const noteInstr = raw[0];
+      const instrVol  = raw[1];
+      const effParam  = raw[2];
+
+      let note = 0, instrument = 0, volume = 0;
+      if (noteInstr < 0xFE) {
+        const rawNote = noteInstr >> 2;
+        instrument = ((noteInstr & 0x03) << 4) | (instrVol >> 4);
+        note = Math.max(1, Math.min(96, rawNote + 37));
+      }
+      if (noteInstr <= 0xFE) {
+        const rawVol = instrVol & 0x0F;
+        volume = Math.round((rawVol * 64 + 8) / 15);
+      }
+
+      let effTyp = 0, eff = 0;
+      if (effParam !== 0xFF) {
+        const command = effParam >> 4;
+        const param   = effParam & 0x0F;
+        const mapped  = map669Effect(command, param);
+        effTyp = mapped.effTyp;
+        eff    = mapped.eff;
+      }
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
   };
 
   return {

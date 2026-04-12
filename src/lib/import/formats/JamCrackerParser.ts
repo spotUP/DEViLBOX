@@ -418,6 +418,31 @@ export async function parseJamCrackerFile(
     numPatterns: nop,
     moduleSize: buffer.byteLength,
     encodeCell: encodeJCCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const period   = raw[0]; // note index 1-36
+      const instr    = raw[1]; // signed int8 (1-based)
+      const speed    = raw[2];
+      const arpeggio = raw[3];
+      const vibrato  = raw[4];
+      // const phase = raw[5]; // no XM equivalent
+      const vol      = raw[6]; // 0=no change, 1-65 → vol 0-64
+      const porta    = raw[7];
+
+      const note = period > 0 ? amigaNoteToXM(period) : 0;
+      const instrument = instr;
+
+      // Volume column: 0x10..0x50 = set volume 0..64
+      const volume = vol > 0 ? 0x10 + Math.min(vol - 1, 64) : 0;
+
+      // Effects: priority order speed > arpeggio > vibrato > porta
+      let effTyp = 0, eff = 0;
+      if (speed > 0) { effTyp = 0x0F; eff = speed; }
+      else if (arpeggio > 0) { effTyp = 0x00; eff = arpeggio; }
+      else if (vibrato > 0) { effTyp = 0x04; eff = vibrato; }
+      else if (porta > 0) { effTyp = 0x03; eff = porta; }
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset(pattern: number, row: number, channel: number): number {
       if (pattern < 0 || pattern >= nop) return -1;
       if (row < 0 || row >= jcPatterns[pattern].rows) return -1;

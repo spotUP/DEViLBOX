@@ -712,6 +712,29 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
     numPatterns: numBlocks,
     moduleSize: buffer.byteLength,
     encodeCell: encodeDeltaMusic1Cell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // byte[0] = instrument (0-based), byte[1] = note index, byte[2] = effect, byte[3] = effectArg
+      const instrRaw = raw[0];
+      const noteRaw  = raw[1];
+      const dm1Eff   = raw[2];
+      const dm1Arg   = raw[3];
+
+      const instrument = instrRaw > 0 ? instrRaw + 1 : 0; // 0-based → 1-based
+      // dm1NoteToXM: note index → DM1_PERIODS → periodToNoteIndex → amigaNoteToXM
+      // Simplified inverse of encoder: xmNote = noteRaw + 36
+      const note = noteRaw > 0 ? noteRaw + 36 : 0;
+
+      let effTyp = 0, eff = 0;
+      switch (dm1Eff) {
+        case 0x01: if (dm1Arg !== 0) { effTyp = 0x0F; eff = dm1Arg; } break; // SetSpeed
+        case 0x02: effTyp = 0x01; eff = dm1Arg; break; // SlideUp → porta up
+        case 0x03: effTyp = 0x02; eff = dm1Arg; break; // SlideDown → porta down
+        case 0x09: effTyp = 0x03; eff = dm1Arg; break; // SetPortamento → tone porta
+        case 0x0A: effTyp = 0x0C; eff = Math.min(64, dm1Arg); break; // SetVolume
+      }
+
+      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // pattern = TrackerSong pattern index (= song position)
       // Resolve the block number for this position+channel from effectiveEntries

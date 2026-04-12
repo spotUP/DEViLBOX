@@ -322,10 +322,10 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
           const cw = jcanvas.clientWidth;
           const ch = jcanvas.clientHeight;
           if (cw > 0 && ch > 0) {
-            overlay.style.left   = `${Math.round(cw * 0.80)}px`;
-            overlay.style.top    = `${Math.round(ch * 0.12)}px`;
-            overlay.style.width  = `${Math.round(cw * 0.19)}px`;
-            overlay.style.height = `${Math.round(ch * 0.52)}px`;
+            overlay.style.left   = `${Math.round(cw * 0.85)}px`;
+            overlay.style.top    = `${Math.round(ch * 0.10)}px`;
+            overlay.style.width  = `${Math.round(cw * 0.14)}px`;
+            overlay.style.height = `${Math.round(ch * 0.55)}px`;
             if (overlay.style.display === 'none') overlay.style.display = 'block';
           }
 

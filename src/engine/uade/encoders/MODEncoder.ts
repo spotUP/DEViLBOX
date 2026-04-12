@@ -54,6 +54,56 @@ export function encodeMODCell(cell: TrackerCell): Uint8Array {
   return out;
 }
 
+/**
+ * Find the closest period in the table and return the 1-based index.
+ */
+function periodToNoteIndex(period: number): number {
+  if (period === 0) return 0;
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < MOD_PERIODS.length; i++) {
+    const d = Math.abs(MOD_PERIODS[i] - period);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+  return bestIdx + 1; // 1-based
+}
+
+/**
+ * Decode standard ProTracker MOD binary (4 bytes) back to a TrackerCell.
+ * Exact inverse of encodeMODCell.
+ */
+export function decodeMODCell(bytes: Uint8Array): TrackerCell {
+  const b0 = bytes[0];
+  const b1 = bytes[1];
+  const b2 = bytes[2];
+  const b3 = bytes[3];
+
+  const instrHi = b0 & 0xF0;
+  const period  = ((b0 & 0x0F) << 8) | b1;
+  const instrLo = (b2 >> 4) & 0x0F;
+  const effTyp  = b2 & 0x0F;
+  const eff     = b3;
+
+  const instrument = instrHi | instrLo;
+  const amigaIdx   = periodToNoteIndex(period);
+  // amigaNoteToXM: amigaNote + 12, but PT period index 1 = C-1 = XM 37
+  // periodToNoteIndex returns 1-based, XM note = index + 36
+  const note = amigaIdx > 0 ? amigaIdx + 36 : 0;
+
+  return {
+    note,
+    instrument,
+    volume: 0,
+    effTyp: (effTyp !== 0 || eff !== 0) ? effTyp : 0,
+    eff:    (effTyp !== 0 || eff !== 0) ? eff : 0,
+    effTyp2: 0,
+    eff2: 0,
+  };
+}
+
 // Register for all MOD-compatible formats
 registerPatternEncoder('mod', () => encodeMODCell);
 registerPatternEncoder('stk', () => encodeMODCell);

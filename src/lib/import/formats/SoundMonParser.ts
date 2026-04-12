@@ -721,6 +721,17 @@ export async function parseSoundMonFile(
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSoundMonCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // 3 bytes: note (s8), (sample<<4)|effect, param (s8)
+      const noteRaw = raw[0] >= 128 ? raw[0] - 256 : raw[0]; // signed
+      const sampleByte = raw[1];
+      const sample = (sampleByte & 0xF0) >> 4;
+      const effect = sampleByte & 0x0F;
+      const param = raw[2];
+
+      const note = bpNoteToXM(noteRaw, 0);
+      return { note, instrument: sample, volume: 0, effTyp: effect, eff: param, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const step = tracks[pattern * 4 + channel];
       if (!step || step.pattern === 0) return 0;

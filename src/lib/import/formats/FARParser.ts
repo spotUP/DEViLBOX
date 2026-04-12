@@ -484,6 +484,36 @@ export async function parseFARFile(
     numPatterns: MAX_PATTERNS,
     moduleSize: buffer.byteLength,
     encodeCell: encodeFARCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const noteRaw = raw[0];
+      const instrRaw = raw[1];
+      const volRaw = raw[2];
+      const effByte = raw[3];
+
+      const note = (noteRaw >= 1 && noteRaw <= 72) ? noteRaw + 36 : 0;
+      const instrument = instrRaw > 0 ? instrRaw + 1 : 0; // parser adds 1
+
+      // Volume: 1-16 → (rawVol - 1) * 64 / 15
+      let volume = 0;
+      if (volRaw >= 1 && volRaw <= 16) {
+        volume = 0x10 + Math.round((volRaw - 1) * 64 / 15); // XM vol column
+      }
+
+      // Effect byte: hi nibble = type, lo nibble = param
+      const fx = convertFAREffect(effByte);
+      let effTyp = fx.effTyp;
+      let eff = fx.eff;
+      if (fx.skipEffect) {
+        // Volume+portamento: effect goes into volume column
+        if (fx.volColOverride !== undefined && volume === 0) {
+          volume = 0x10 + Math.min(64, fx.volColOverride);
+        }
+        effTyp = 0;
+        eff = 0;
+      }
+
+      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const cellDataStart = patternCellOffsets[pattern];
       if (cellDataStart === 0) return 0; // pattern doesn't exist

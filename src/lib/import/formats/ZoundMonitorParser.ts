@@ -589,6 +589,19 @@ export async function parseZoundMonitorFile(
     numPatterns: builtPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeZoundMonitorCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      // 4 bytes as u32BE bitfield
+      const data = ((raw[0] << 24) | (raw[1] << 16) | (raw[2] << 8) | raw[3]) >>> 0;
+      const zmNote      = (data >>> 24) & 0x3F;
+      const sample      = (data >>> 20) & 0x0F;
+      const control     = (data >>> 16) & 0x0F;
+      // (data >>> 8) & 0xFF = volAdd — context-dependent, not mapped in decodeCell
+      const effectParam = data & 0xFF;
+
+      const note = zmNoteToXM(zmNote);
+      const { effTyp, eff } = zmEffectToXM(control, effectParam);
+      return { note, instrument: sample, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // Each pattern = one table entry; each channel references a part via table[pattern][channel].partno
       if (pattern >= table.length) return 0;

@@ -791,6 +791,32 @@ export function parseTFMXFile(
     numPatterns: trackerPatterns.length,
     moduleSize: buf.length,
     encodeCell: encodeTFMXCell,
+    decodeCell: (raw: Uint8Array): TrackerCell => {
+      const b0 = raw[0], b1 = raw[1], b2 = raw[2], b3 = raw[3];
+
+      if (b0 >= 0xF0) {
+        // Pattern commands (F0=end, F1=loop, F3=wait, F5=key-up, etc.)
+        if (b0 === 0xF5) return { note: 97, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+        if (b0 === 0xF0) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0D, eff: 0, effTyp2: 0, eff2: 0 };
+        if (b0 === 0xF3) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0F, eff: (b1 + 1), effTyp2: 0, eff2: 0 };
+        return { note: 0, instrument: 0, volume: 0, effTyp: b0 & 0x0F, eff: b1, effTyp2: 0, eff2: 0 };
+      }
+      if (b0 >= 0xC0) {
+        // Portamento
+        const noteIdx = b0 & 0x3F;
+        const xmNote = tfmxNoteToXM(noteIdx);
+        return { note: xmNote, instrument: b1 > 0 ? b1 + 1 : 0, volume: ((b2 >> 4) & 0x0F) * 4, effTyp: 0x03, eff: b3, effTyp2: 0, eff2: 0 };
+      }
+      // Note event (< 0xC0): < 0x80 = immediate, 0x80-0xBF = with wait
+      const noteIdx = b0 & 0x3F;
+      const xmNote = tfmxNoteToXM(noteIdx);
+      const hasWait = (b0 & 0x80) !== 0;
+      return {
+        note: xmNote, instrument: b1 + 1, volume: ((b2 >> 4) & 0x0F) * 4,
+        effTyp: hasWait ? 0x0F : 0, eff: hasWait ? b3 : 0,
+        effTyp2: !hasWait && b3 !== 0 ? 0x0E : 0, eff2: !hasWait ? b3 : 0,
+      };
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= channelOffsetMaps.length) return -1;
       const map = channelOffsetMaps[pattern];

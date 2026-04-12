@@ -37,7 +37,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // -- Utility functions -------------------------------------------------------
@@ -343,6 +343,7 @@ export async function parseMFPFile(
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeMODCell,
+    decodeCell: decodeMODCell,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const chanOff = patAddr + (patTable[pattern]?.[channel] ?? 0);
       const chanEnd = Math.min(chanOff + 1024, buf.length);
