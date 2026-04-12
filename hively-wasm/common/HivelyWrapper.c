@@ -137,6 +137,60 @@ void hively_set_channel_gain(int ch, float gain) {
     g_tune->ht_ChannelGain[ch] = g;
 }
 
+/* ---- Split tick/render for per-channel isolation ---- */
+
+/*
+ * Tick one frame without rendering audio. Advances sequencer state.
+ * After this, call hively_render_frame() one or more times with different
+ * channel gains to produce isolated audio for each channel group.
+ */
+EMSCRIPTEN_KEEPALIVE
+void hively_tick_frame(void) {
+    if (!g_tune) return;
+    hvl_TickFrame(g_tune);
+}
+
+/*
+ * Render one frame of audio using current voice state and channel gains.
+ * Does NOT advance the sequencer — call hively_tick_frame() first.
+ * Writes float32 to outL/outR. Returns number of samples written.
+ *
+ * For isolation: save positions → set gains → render → restore positions.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32 hively_render_frame(float *outL, float *outR) {
+    if (!g_tune) return 0;
+
+    uint32 frameSamples = g_sampleRate / 50;
+    ensure_mix_buffer(frameSamples);
+
+    memset(g_mixBufL, 0, frameSamples * sizeof(int16));
+    memset(g_mixBufR, 0, frameSamples * sizeof(int16));
+
+    hvl_RenderFrame(g_tune, (int8 *)g_mixBufL, (int8 *)g_mixBufR, 2);
+
+    const float scale = 1.0f / 32768.0f;
+    for (uint32 i = 0; i < frameSamples; i++) {
+        outL[i] = (float)g_mixBufL[i] * scale;
+        outR[i] = (float)g_mixBufR[i] * scale;
+    }
+
+    return frameSamples;
+}
+
+/* Save/restore voice sample positions for isolation re-render */
+EMSCRIPTEN_KEEPALIVE
+void hively_save_voice_positions(void) {
+    if (!g_tune) return;
+    hvl_SaveVoicePositions(g_tune);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void hively_restore_voice_positions(void) {
+    if (!g_tune) return;
+    hvl_RestoreVoicePositions(g_tune);
+}
+
 /* ---- Transport Getters ---- */
 
 EMSCRIPTEN_KEEPALIVE

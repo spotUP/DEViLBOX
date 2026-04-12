@@ -310,7 +310,7 @@ export async function getActiveIsolationEngine(): Promise<IsolationCapableEngine
  * Editor modes that support per-channel isolation via multi-output worklet.
  * Used by UI to gate the channel routing selector.
  */
-const ISOLATION_CAPABLE_MODES = new Set(['classic', 'furnace']);
+const ISOLATION_CAPABLE_MODES = new Set(['classic', 'furnace', 'hively', 'tfmx']);
 
 /**
  * Check if the current format/editor mode supports per-channel isolation.

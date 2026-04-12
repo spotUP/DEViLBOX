@@ -62,6 +62,10 @@ if(EMSCRIPTEN)
         "_hively_player_render"
         "_hively_set_track_step"
         "_hively_set_channel_gain"
+        "_hively_tick_frame"
+        "_hively_render_frame"
+        "_hively_save_voice_positions"
+        "_hively_restore_voice_positions"
     )
 
     # Join exported functions into a comma-separated list

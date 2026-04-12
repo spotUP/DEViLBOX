@@ -2043,10 +2043,10 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
 void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod )
 {
   uint32 samples, loops;
-  
+
   samples = ht->ht_Frequency/50/ht->ht_SpeedMultiplier;
   loops   = ht->ht_SpeedMultiplier;
-  
+
   do
   {
     hvl_play_irq( ht );
@@ -2055,6 +2055,55 @@ void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod 
     buf2 += samples * bufmod;
     loops--;
   } while( loops );
+}
+
+/*
+ * Split tick/render for per-channel isolation.
+ * Call hvl_TickFrame() once, then hvl_RenderFrame() N times with different
+ * channel gains. Use hvl_SaveVoicePositions/hvl_RestoreVoicePositions between
+ * renders to reset sample positions (since mixchunk advances them).
+ */
+void hvl_TickFrame( struct hvl_tune *ht )
+{
+  uint32 loops = ht->ht_SpeedMultiplier;
+  do
+  {
+    hvl_play_irq( ht );
+    loops--;
+  } while( loops );
+}
+
+void hvl_RenderFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod )
+{
+  uint32 samples = ht->ht_Frequency/50/ht->ht_SpeedMultiplier;
+  uint32 loops = ht->ht_SpeedMultiplier;
+  do
+  {
+    hvl_mixchunk( ht, samples, buf1, buf2, bufmod );
+    buf1 += samples * bufmod;
+    buf2 += samples * bufmod;
+    loops--;
+  } while( loops );
+}
+
+void hvl_SaveVoicePositions( struct hvl_tune *ht )
+{
+  uint32 i;
+  for( i=0; i<MAX_CHANNELS; i++ )
+  {
+    ht->ht_SavedSamplePos[i]     = ht->ht_Voices[i].vc_SamplePos;
+    ht->ht_SavedRingSamplePos[i]  = ht->ht_Voices[i].vc_RingSamplePos;
+  }
+}
+
+void hvl_RestoreVoicePositions( struct hvl_tune *ht )
+{
+  uint32 i;
+  for( i=0; i<MAX_CHANNELS; i++ )
+  {
+    ht->ht_Voices[i].vc_SamplePos     = ht->ht_SavedSamplePos[i];
+    ht->ht_Voices[i].vc_RingSamplePos  = ht->ht_SavedRingSamplePos[i];
+  }
 }
 
 int32 hvl_mix_findloudest( struct hvl_tune *ht, uint32 samples )
