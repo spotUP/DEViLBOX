@@ -88,6 +88,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const isLoggedIn = useAuthStore(s => !!s.token);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -102,6 +103,9 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch((err) => console.warn('Modland formats unavailable:', err));
     // Auto-focus search input
     requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
   }, []);
 
   // ── Click outside to close ──────────────────────────────────────────────
@@ -325,7 +329,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           const next = new Set(prev).add(deckId);
           const requiredDecks = thirdDeckActive ? 3 : 2;
           if (next.size >= requiredDecks && onClose) {
-            setTimeout(onClose, 300);
+            closeTimerRef.current = setTimeout(onClose, 300);
           }
           return next;
         });

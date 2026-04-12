@@ -39,6 +39,7 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
     const currentIdxRef = useRef(0);
     const visibleRef = useRef(visible);
     const [ready, setReady] = useState(false);
+    const [shaderError, setShaderError] = useState(false);
 
     useEffect(() => { visibleRef.current = visible; }, [visible]);
 
@@ -79,13 +80,14 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Render loop — only runs when visible (stops rAF entirely when hidden)
+    // Skips draw when shaderError is true to avoid rendering black/frozen frames
     useEffect(() => {
       if (!ready || !visible) return;
       const render = () => {
         if (!visibleRef.current) return; // stop loop if visibility changed mid-frame
         const engine = engineRef.current;
         const bus = audioBusRef.current;
-        if (engine) {
+        if (engine && !shaderError) {
           if (bus) {
             bus.update();
             const data = bus.getFrame();
@@ -104,7 +106,7 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
       };
       rafRef.current = requestAnimationFrame(render);
       return () => cancelAnimationFrame(rafRef.current);
-    }, [ready, visible]);
+    }, [ready, visible, shaderError]);
 
     // Resize handling
     useEffect(() => {
@@ -124,9 +126,26 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
     const doLoadPreset = useCallback((idx: number) => {
       const preset = ISF_PRESETS[idx];
       if (preset && engineRef.current) {
-        engineRef.current.loadPreset(preset);
-        currentIdxRef.current = idx;
-        onPresetChange?.(idx, preset.name);
+        try {
+          engineRef.current.loadPreset(preset);
+          currentIdxRef.current = idx;
+          setShaderError(false);
+          onPresetChange?.(idx, preset.name);
+        } catch (err) {
+          console.warn('[ISFCanvas] Shader compile failed for', preset.name, err);
+          setShaderError(true);
+          // Auto-recover: try loading the first preset as a known-good fallback
+          if (idx !== 0 && ISF_PRESETS.length > 0) {
+            try {
+              engineRef.current!.loadPreset(ISF_PRESETS[0]);
+              currentIdxRef.current = 0;
+              setShaderError(false);
+              onPresetChange?.(0, ISF_PRESETS[0].name);
+            } catch {
+              // Fallback also failed — stay in error state, render loop will skip
+            }
+          }
+        }
       }
     }, [onPresetChange]);
 

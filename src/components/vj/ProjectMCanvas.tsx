@@ -106,6 +106,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     const rafRef = useRef<number>(0);
     const currentIdxRef = useRef(0);
     const visibleRef = useRef(visible);
+    const mountedRef = useRef(true);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const audioBusRef = useRef<AudioDataBus | null>(null);
@@ -204,6 +205,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
 
       return () => {
         cancelled = true;
+        mountedRef.current = false;
         cancelAnimationFrame(raf);
         cancelAnimationFrame(rafRef.current);
         if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
@@ -225,7 +227,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       const name = names[wrappedIdx];
 
       const content = await fetchPresetContent(name);
-      if (!content || !engineRef.current) return;
+      if (!content || !engineRef.current || !mountedRef.current) return;
 
       // Cancel any in-progress fade
       if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
