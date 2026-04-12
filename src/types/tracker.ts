@@ -540,7 +540,7 @@ export const NOTE_OFF: TrackerCell = {
 };
 
 // ── Editor Mode ─────────────────────────────────
-export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker' | 'sc68' | 'tfmx' | 'sidfactory2';
+export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker' | 'sc68' | 'tfmx' | 'sidfactory2' | 'cheesecutter';
 
 // ── Furnace Native Data ─────────────────────────
 export interface FurnaceNativeData {
