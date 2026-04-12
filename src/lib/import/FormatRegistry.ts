@@ -2256,7 +2256,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Amiga music formats handled by AmigaFormatParsers',
     family: 'amiga-native',
     matchMode: 'extension',
-    extRegex: /\.(adpcm|adsc|alp|amc|aps|ash|bds|bye|cin|cm|dat|dln|dm|dm1|doda|dsc|dsr|dz|ex|fmt|fw|gray|hd|hip7|hst|ins|jb|jcb|jcbo|jd|jmf|jo|jp|jpn|jpnd|jpo|jpold|js|jt|kh|kim|max|mc|mco|mcr|mdst|mok|mon|mon_old|mosh|mxtx|npp|ntp|one|osp|pap|pat|powt|prt|pt|pvp|qpa|qts|rho|s7g|sb|scr|sg|sjs|sm|sm1|sm2|sm3|smpro|snd|soc|thm|tits|tmk|ts|two|uds|wb)$/i,
+    extRegex: /\.(adpcm|adsc|alp|amc|aps|ash|bds|bye|cin|cm|dat|dln|dm|dm1|doda|dsc|dsr|dz|ex|fmt|fw|gray|hd|hip|hip7|hst|ins|jb|jcb|jcbo|jd|jmf|jo|jp|jpn|jpnd|jpo|jpold|js|jt|kh|kim|max|mc|mco|mcr|mdst|mok|mon|mon_old|mosh|mxtx|npp|ntp|one|osp|pap|pat|powt|prt|pt|pvp|qpa|qts|rho|s7g|sb|scr|sg|sjs|sm|sm1|sm2|sm3|smpro|snd|soc|thm|tits|tmk|ts|two|uds|wb)$/i,
     uadeFallback: true,
   },
 
