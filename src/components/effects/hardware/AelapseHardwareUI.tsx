@@ -328,8 +328,8 @@ export const AelapseHardwareUI: React.FC<AelapseHardwareUIProps> = ({
             // clicks pass through to the JUCE canvas underneath.
             // Match the original SpringsGL aspect ratio (~1.06:1) but
             // scaled up to fill the column. Original was 123×116.
-            overlay.style.left   = `${Math.round(cw * (575 / 720))}px`;
-            overlay.style.top    = `${Math.round(ch * (52 / 400))}px`;
+            overlay.style.left   = `${Math.round(cw * (555 / 720))}px`;
+            overlay.style.top    = `${Math.round(ch * (62 / 400))}px`;
             overlay.style.width  = `${Math.round(cw * (140 / 720))}px`;
             overlay.style.height = `${Math.round(cw * (132 / 720))}px`;
             if (overlay.style.display === 'none') overlay.style.display = 'block';
