@@ -3,6 +3,8 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { getEffectGainCompensation } from '../factories/effectGainCompensation';
+import { useFormatStore } from '../../stores/useFormatStore';
+import { supportsChannelIsolation } from './ChannelRoutedEffects';
 
 export interface MasterEffectsContext {
   masterEffectsInput: Tone.Gain;
@@ -60,11 +62,15 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // Filter to only enabled effects
   const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
-  // Separate global effects (all channels) from channel-targeted effects
-  const globalEffects = enabledEffects.filter(
-    fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0
-  );
-  const hasChannelTargeted = enabledEffects.some(
+  // Check if isolation is available for the current format
+  const isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
+
+  // Separate global effects from channel-targeted effects.
+  // When isolation isn't available, treat all effects as global (ignore selectedChannels).
+  const globalEffects = isolationAvailable
+    ? enabledEffects.filter(fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0)
+    : enabledEffects;
+  const hasChannelTargeted = isolationAvailable && enabledEffects.some(
     fx => Array.isArray(fx.selectedChannels) && fx.selectedChannels.length > 0
   );
 
@@ -279,9 +285,11 @@ export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects:
   // For the fast path, compare GLOBAL effects (no selectedChannels) against current chain.
   // If selectedChannels changed, we need a full rebuild to move effects between
   // the global serial chain and the per-channel WASM isolation system.
-  const globalNew = enabledNew.filter(
-    fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0
-  );
+  // When isolation isn't available, all effects are global.
+  const isolationAvailable = supportsChannelIsolation(useFormatStore.getState().editorMode);
+  const globalNew = isolationAvailable
+    ? enabledNew.filter(fx => !Array.isArray(fx.selectedChannels) || fx.selectedChannels.length === 0)
+    : enabledNew;
   const currentIds = Array.from(ctx.masterEffectConfigs.keys());
 
   // Different number of global effects - need full rebuild
