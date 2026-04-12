@@ -679,11 +679,17 @@ export class UADEEngine implements IsolationCapableEngine {
   }
 
   play(): void {
+    // Restore gain (muted by stop())
+    try { this.output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
     this.workletNode?.port.postMessage({ type: 'play' });
   }
 
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
+    // Immediately mute the output GainNode to prevent audio leaking while
+    // the async stop message is processed by the worklet thread.
+    // The gain is restored on next loadTune/play.
+    try { this.output.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
   }
 
   pause(): void {
