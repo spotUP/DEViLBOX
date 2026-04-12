@@ -234,6 +234,10 @@ export class DJPipeline {
     this.renderWorker.onmessage = (e) => this.handleRenderMessage(e);
     this.renderWorker.onerror = (e) => {
       console.error('[DJPipeline] Render worker error:', e);
+      for (const [, cb] of this.renderCallbacks) {
+        cb.reject(new Error('Render worker crashed: ' + e.message));
+      }
+      this.renderCallbacks.clear();
     };
 
     // Analysis worker
@@ -244,6 +248,10 @@ export class DJPipeline {
     this.analysisWorker.onmessage = (e) => this.handleAnalysisMessage(e);
     this.analysisWorker.onerror = (e) => {
       console.error('[DJPipeline] Analysis worker error:', e);
+      for (const [, cb] of this.analysisCallbacks) {
+        cb.reject(new Error('Analysis worker crashed: ' + e.message));
+      }
+      this.analysisCallbacks.clear();
     };
 
     // Init both
@@ -653,7 +661,13 @@ export class DJPipeline {
     this.updateStoreQueue();
 
     try {
-      const result = await this.executeTask(task);
+      const TASK_TIMEOUT_MS = 60_000; // 60 seconds
+      const result = await Promise.race([
+        this.executeTask(task),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error(`Task timeout after ${TASK_TIMEOUT_MS / 1000}s: ${task.filename}`)), TASK_TIMEOUT_MS)
+        ),
+      ]);
       resolve(result);
     } catch (err) {
       console.error(`[DJPipeline] Task failed: ${task.filename}`, err);

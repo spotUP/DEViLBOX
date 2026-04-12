@@ -314,7 +314,9 @@ class DJAutoDJ {
           if (positionFrozen) {
             console.warn(`[AutoDJ] Position frozen at ${timeRemaining.toFixed(1)}s for ${this.staleCount} polls — forcing preload`);
           }
-          this.preloadNextTrack();
+          this.preloadNextTrack().catch(err =>
+            console.warn('[AutoDJ] preload failed:', err instanceof Error ? err.message : err)
+          );
         }
         break;
       }
@@ -599,7 +601,9 @@ class DJAutoDJ {
     // Don't wait for the poll loop — the new active deck's store position
     // may not have synced yet, so getTimeRemaining() could return a stale
     // value that prevents preload from triggering.
-    this.preloadNextTrack();
+    this.preloadNextTrack().catch(err =>
+      console.warn('[AutoDJ] preload failed:', err instanceof Error ? err.message : err)
+    );
   }
 
   // ── Private: Helpers ─────────────────────────────────────────────────────

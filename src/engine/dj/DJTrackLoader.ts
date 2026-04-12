@@ -96,7 +96,8 @@ export async function loadPlaylistTrackToDeck(
       );
       return true;
     } catch (err) {
-      console.error(`[DJTrackLoader] Failed to load Modland track ${modlandPath}:`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Parse/load failed for: ${track.trackName || modlandPath} — ${msg}`);
       return false;
     }
   }
