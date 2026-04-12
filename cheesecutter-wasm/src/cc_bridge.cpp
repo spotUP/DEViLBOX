@@ -183,6 +183,24 @@ uint8_t* cc_get_sid_regs(void) {
     return &cpu.ram[0xD400];
 }
 
+/* --- Read a byte from CPU RAM --- */
+extern "C" EMSCRIPTEN_KEEPALIVE
+uint8_t cc_read_byte(uint16_t addr) {
+    return cpu.ram[addr];
+}
+
+/* --- Write a byte to CPU RAM (for live editing instruments/tables) --- */
+extern "C" EMSCRIPTEN_KEEPALIVE
+void cc_write_byte(uint16_t addr, uint8_t value) {
+    cpu.ram[addr] = value;
+}
+
+/* --- Get pointer to CPU RAM (for bulk read/write) --- */
+extern "C" EMSCRIPTEN_KEEPALIVE
+uint8_t* cc_get_ram(void) {
+    return cpu.ram;
+}
+
 /* --- Shutdown --- */
 extern "C" EMSCRIPTEN_KEEPALIVE
 void cc_shutdown(void) {
