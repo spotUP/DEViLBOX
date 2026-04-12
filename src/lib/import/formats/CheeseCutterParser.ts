@@ -29,8 +29,8 @@ import type {
 // ── Constants ────────────────────────────────────────────────────────────
 
 const CC2_MAGIC = [0x43, 0x43, 0x32]; // "CC2"
-const DECOMPRESSED_SIZE = 167_832;
 const C64_MEM_SIZE = 0x10000; // 64KB
+const MIN_DECOMPRESSED_SIZE = C64_MEM_SIZE + 256;
 const META_BASE = 0x10000;
 const POINTER_TABLE_ADDR = 0x0FA0;
 const POINTER_TABLE_COUNT = 96;
@@ -55,8 +55,10 @@ const OFF_HIGHLIGHT_OFF  = 0x00026; // (version > 10)
 const ABS_TITLE    = 0x10105;
 const ABS_AUTHOR   = 0x10125;
 const ABS_RELEASE  = 0x10145;
-const ABS_INST_NAMES = 0x10195;  // 48 × 32 bytes
-const ABS_SUBTUNE_TRACKS = 0x109D5; // ubyte[1024][3][32]
+// Insnames = Title + 40*4 = 0x10105 + 160 = 0x101A5
+const ABS_INST_NAMES = 0x101A5;  // 48 × 32 bytes
+// Subtunes = Insnames + 1024*2 = 0x101A5 + 2048 = 0x109A5
+const ABS_SUBTUNE_TRACKS = 0x109A5; // ubyte[1024][3][32]
 
 // Pointer table key indices
 const PTR_ARP1    = 14; // Wave table start
@@ -146,9 +148,9 @@ export async function parseCheeseCutterFile(
     throw new Error(`CheeseCutter: zlib decompression failed — ${e}`);
   }
 
-  if (data.length !== DECOMPRESSED_SIZE) {
+  if (data.length < MIN_DECOMPRESSED_SIZE) {
     throw new Error(
-      `CheeseCutter: unexpected decompressed size ${data.length} (expected ${DECOMPRESSED_SIZE})`,
+      `CheeseCutter: decompressed size ${data.length} too small (need at least ${MIN_DECOMPRESSED_SIZE})`,
     );
   }
 
@@ -176,15 +178,20 @@ export async function parseCheeseCutterFile(
   const highlight = version > 10 ? data[META_BASE + OFF_HIGHLIGHT] || 4 : 4;
   const highlightOffset = version > 10 ? data[META_BASE + OFF_HIGHLIGHT_OFF] : 0;
 
-  // Strings
-  const title = readStr(data, ABS_TITLE, METADATA_STR_LEN);
-  const author = readStr(data, ABS_AUTHOR, METADATA_STR_LEN);
-  const release = readStr(data, ABS_RELEASE, METADATA_STR_LEN);
+  // Strings (bounds-guarded — newer versions may have different layouts)
+  const title = ABS_TITLE + METADATA_STR_LEN <= data.length
+    ? readStr(data, ABS_TITLE, METADATA_STR_LEN) : filename.replace(/\.ct$/i, '');
+  const author = ABS_AUTHOR + METADATA_STR_LEN <= data.length
+    ? readStr(data, ABS_AUTHOR, METADATA_STR_LEN) : '';
+  const release = ABS_RELEASE + METADATA_STR_LEN <= data.length
+    ? readStr(data, ABS_RELEASE, METADATA_STR_LEN) : '';
 
-  // Instrument names
+  // Instrument names (bounds-guarded)
   const instrumentNames: string[] = [];
   for (let i = 0; i < MAX_INSTRUMENTS; i++) {
-    instrumentNames.push(readStr(data, ABS_INST_NAMES + i * INST_NAME_LEN, INST_NAME_LEN));
+    const off = ABS_INST_NAMES + i * INST_NAME_LEN;
+    instrumentNames.push(off + INST_NAME_LEN <= data.length
+      ? readStr(data, off, INST_NAME_LEN) : '');
   }
 
   // ── Pointer table ───────────────────────────────────────────────────
