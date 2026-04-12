@@ -7,7 +7,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
-import { getSIDHardwareManager, type SIDHardwareStatus } from '../../lib/sid/SIDHardwareManager';
+import { SIDHardwareToggle } from '../common/SIDHardwareToggle';
 
 const BTN = 'px-2 py-0.5 text-[10px] font-mono border cursor-pointer transition-colors';
 const BTN_DEFAULT = `${BTN} bg-ft2-header text-ft2-textDim border-ft2-border hover:bg-ft2-border hover:text-ft2-text`;
@@ -203,69 +203,42 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
   );
 };
 
-/** SID hardware output toggle — works for both ASID (Web MIDI) and WebUSB transports */
+/** SID hardware output toggle — uses shared SIDHardwareToggle with GT ASID bridge */
 const ASIDToggle: React.FC = () => {
-  const [hwStatus, setHwStatus] = useState<SIDHardwareStatus>(() => getSIDHardwareManager().getStatus());
   const [bridgeEnabled, setBridgeEnabled] = useState(() => getGTUltraASIDBridge().isEnabled);
   const [writeCount, setWriteCount] = useState(0);
   const engine = useGTUltraStore((s) => s.engine);
 
   useEffect(() => {
-    const mgr = getSIDHardwareManager();
-    const bridge = getGTUltraASIDBridge();
-    const unsubMgr = mgr.onStatusChange(setHwStatus);
-    const unsubBridge = bridge.onChange(setBridgeEnabled);
-    setHwStatus(mgr.getStatus());
-    setBridgeEnabled(bridge.isEnabled);
-    return () => { unsubMgr(); unsubBridge(); };
+    const unsub = getGTUltraASIDBridge().onChange(setBridgeEnabled);
+    setBridgeEnabled(getGTUltraASIDBridge().isEnabled);
+    return unsub;
   }, []);
 
   useEffect(() => {
-    if (!bridgeEnabled) {
-      setWriteCount(0);
-      return;
-    }
+    if (!bridgeEnabled) { setWriteCount(0); return; }
     const interval = setInterval(() => {
       setWriteCount(getGTUltraASIDBridge().getWriteCount?.() ?? 0);
     }, 500);
     return () => clearInterval(interval);
   }, [bridgeEnabled]);
 
-  const connected = hwStatus.connected;
-  const modeLabel = hwStatus.mode === 'webusb' ? 'USB' : hwStatus.mode === 'asid' ? 'ASID' : '';
-  const deviceName = hwStatus.deviceName;
+  const handleEnable = useCallback(() => {
+    getGTUltraASIDBridge().enable();
+    engine?.enableAsid(true);
+  }, [engine]);
 
-  const toggle = useCallback(() => {
-    const bridge = getGTUltraASIDBridge();
-    if (bridgeEnabled) {
-      bridge.disable();
-      engine?.enableAsid(false);
-    } else {
-      bridge.enable();
-      engine?.enableAsid(true);
-    }
-  }, [bridgeEnabled, engine]);
-
-  const label = bridgeEnabled && connected
-    ? `${modeLabel} ${writeCount > 0 ? `${(writeCount / 1000).toFixed(1)}k` : 'ON'}`
-    : connected
-      ? (deviceName ? deviceName.slice(0, 10) : modeLabel || 'HW')
-      : 'No HW';
-
-  const title = connected
-    ? (bridgeEnabled
-        ? `${modeLabel} active: ${deviceName ?? 'device'} — softsynth muted`
-        : `Click to route to ${deviceName ?? (modeLabel || 'hardware')}`)
-    : 'No SID hardware — connect via Settings → SID Hardware';
+  const handleDisable = useCallback(() => {
+    getGTUltraASIDBridge().disable();
+    engine?.enableAsid(false);
+  }, [engine]);
 
   return (
-    <button
-      onClick={toggle}
-      title={title}
-      className={`${BTN} text-[9px] min-w-[60px] ${bridgeEnabled && connected ? 'bg-emerald-600 text-text-primary border-emerald-500' : connected ? BTN_DEFAULT : 'opacity-40 cursor-not-allowed bg-ft2-header text-ft2-textDim border-ft2-border'}`}
-      disabled={!connected}
-    >
-      {label}
-    </button>
+    <SIDHardwareToggle
+      bridgeEnabled={bridgeEnabled}
+      onEnable={handleEnable}
+      onDisable={handleDisable}
+      writeCount={writeCount}
+    />
   );
 };
