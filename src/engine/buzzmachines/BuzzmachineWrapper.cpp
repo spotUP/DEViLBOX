@@ -309,11 +309,77 @@ extern "C" EXPORT void buzz_stop(CMachineInterface *machine) {
  * @param value Parameter value
  */
 extern "C" EXPORT void buzz_set_parameter(CMachineInterface *machine, int index, int value) {
-    if (machine && machine->GlobalVals) {
-        // GlobalVals is a pointer to parameter struct
-        // We need to set the value at the correct offset
-        // This is tricky because parameter types vary (byte/word)
-        // For now, we'll handle this in JavaScript by accessing GlobalVals directly
+    if (!machine || !machine->GlobalVals) return;
+
+    CMachineInfo const *info = GetInfo();
+    if (!info) return;
+
+    // Compute byte offset by walking parameter types
+    int byteOffset = 0;
+    int targetGroup = 0; // 0=global, 1=track
+    int targetIndex = index;
+
+    // Check if index falls within global params
+    if (index < info->numGlobalParameters) {
+        for (int i = 0; i < index; i++) {
+            CMachineParameter const *p = info->Parameters[i];
+            if (!p) continue;
+            switch (p->Type) {
+                case pt_note:
+                case pt_switch:
+                case pt_byte:
+                    byteOffset += 1;
+                    break;
+                case pt_word:
+                    byteOffset += 2;
+                    break;
+            }
+        }
+        targetGroup = 0;
+    } else {
+        // Track parameter — compute offset into track vals
+        int trackParamIndex = index - info->numGlobalParameters;
+        byteOffset = 0;
+        for (int i = info->numGlobalParameters; i < info->numGlobalParameters + trackParamIndex; i++) {
+            CMachineParameter const *p = info->Parameters[i];
+            if (!p) continue;
+            switch (p->Type) {
+                case pt_note:
+                case pt_switch:
+                case pt_byte:
+                    byteOffset += 1;
+                    break;
+                case pt_word:
+                    byteOffset += 2;
+                    break;
+            }
+        }
+        targetGroup = 1;
+    }
+
+    // Get target pointer
+    unsigned char *target;
+    if (targetGroup == 0) {
+        target = (unsigned char *)machine->GlobalVals;
+    } else {
+        target = (unsigned char *)machine->TrackVals;
+        if (!target) return;
+    }
+
+    // Get param type
+    CMachineParameter const *param = info->Parameters[index];
+    if (!param) return;
+
+    // Write value at correct offset with correct size
+    switch (param->Type) {
+        case pt_note:
+        case pt_switch:
+        case pt_byte:
+            target[byteOffset] = (unsigned char)(value & 0xFF);
+            break;
+        case pt_word:
+            *(unsigned short *)(target + byteOffset) = (unsigned short)(value & 0xFFFF);
+            break;
     }
 }
 
