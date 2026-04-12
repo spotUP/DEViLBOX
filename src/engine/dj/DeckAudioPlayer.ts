@@ -62,6 +62,11 @@ export class DeckAudioPlayer {
   }
 
   async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+    if (buffer.byteLength > MAX_FILE_SIZE) {
+      throw new Error(`File too large (${(buffer.byteLength / 1024 / 1024).toFixed(0)} MB, max ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
+    }
+
     this._originalFileBytes = buffer.slice(0);
     console.log(`[DeckAudioPlayer] loadAudioFile: ${filename}, buffer size: ${buffer.byteLength} bytes`);
     
