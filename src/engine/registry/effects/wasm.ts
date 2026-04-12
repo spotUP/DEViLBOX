@@ -27,6 +27,12 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ cutoff: 1000, resonance: 10, drive: 1.0, model: 0, filterMode: 0 }),
+    presets: [
+      { name: 'Fat Bass', params: { cutoff: 300, resonance: 60, drive: 3 } },
+      { name: 'Acid Squelch', params: { cutoff: 800, resonance: 90, drive: 5 } },
+      { name: 'Dark Pad', params: { cutoff: 500, resonance: 30, drive: 1 } },
+      { name: 'Screaming', params: { cutoff: 2000, resonance: 95, drive: 7 } },
+    ],
   },
   {
     id: 'MVerb', name: 'MVerb Plate Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -42,6 +48,12 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ damping: 0.5, density: 0.5, bandwidth: 0.5, decay: 0.7, predelay: 0.0, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.5 }),
+    presets: [
+      { name: 'Small Room', params: { decay: 0.3, size: 0.3, mix: 0.2, earlyMix: 0.7, predelay: 0.0 } },
+      { name: 'Concert Hall', params: { decay: 0.8, size: 0.9, mix: 0.35, earlyMix: 0.4, bandwidth: 0.7 } },
+      { name: 'Infinite Wash', params: { decay: 0.99, size: 1.0, mix: 0.5, damping: 0.2, density: 0.8 } },
+      { name: 'Plate', params: { decay: 0.5, size: 0.5, mix: 0.3, density: 0.8, bandwidth: 0.9, earlyMix: 0.3 } },
+    ],
   },
   {
     id: 'Leslie', name: 'Leslie Rotary Speaker', category: 'wasm', group: 'Modulation',
@@ -57,6 +69,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 }),
+    presets: [
+      { name: 'Slow', params: { speed: 0.0, hornRate: 0.8, drumRate: 0.7, hornDepth: 0.5, drumDepth: 0.3 } },
+      { name: 'Fast', params: { speed: 1.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.9, drumDepth: 0.7 } },
+      { name: 'Gentle', params: { speed: 0.0, hornRate: 1.5, drumRate: 1.2, hornDepth: 0.3, drumDepth: 0.2, doppler: 0.2 } },
+    ],
   },
   {
     id: 'SpringReverb', name: 'Spring Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -71,6 +88,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 }),
+    presets: [
+      { name: 'Vintage Spring', params: { decay: 0.5, damping: 0.6, tension: 0.4, drip: 0.7, diffusion: 0.5 } },
+      { name: 'Surf', params: { decay: 0.8, damping: 0.2, tension: 0.7, drip: 0.9, mix: 0.5, diffusion: 0.8 } },
+      { name: 'Dark Spring', params: { decay: 0.7, damping: 0.8, tension: 0.3, drip: 0.3, mix: 0.3, diffusion: 0.6 } },
+    ],
   },
   {
     id: 'Aelapse', name: 'Ælapse Tape+Springs', category: 'wasm', group: 'Reverb & Delay',
@@ -109,6 +131,11 @@ const wasmEffects: EffectDescriptor[] = [
       springsDecay: 40, springsDamp: 30, springsShape: 30, springsTone: 50,
       springsScatter: 50, springsChaos: 10,
     }),
+    presets: [
+      { name: 'Tape Echo', params: { delayActive: 100, springsActive: 0, delayDryWet: 50, delayTime: 40, delayFeedback: 55, delaySaturation: 40, delayDrift: 25 } },
+      { name: 'Spring Wash', params: { delayActive: 0, springsActive: 100, springsDryWet: 60, springsLength: 70, springsDecay: 60, springsDamp: 20 } },
+      { name: 'Both', params: { delayActive: 100, springsActive: 100, delayDryWet: 30, delayTime: 25, delayFeedback: 35, springsDryWet: 35, springsLength: 50, springsDecay: 40 } },
+    ],
   },
   {
     id: 'ShimmerReverb', name: 'Shimmer Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -129,6 +156,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ decay: 70, shimmer: 50, pitch: 12, damping: 50, size: 70, predelay: 40, modRate: 30, modDepth: 20 }),
+    presets: [
+      { name: 'Ethereal', params: { decay: 85, shimmer: 70, pitch: 12, size: 90, modRate: 20, modDepth: 30 } },
+      { name: 'Angelic', params: { decay: 95, shimmer: 90, pitch: 24, damping: 30, size: 100, predelay: 60 } },
+      { name: 'Dark Shimmer', params: { decay: 80, shimmer: 40, pitch: 7, damping: 80, size: 60, modRate: 10 } },
+    ],
   },
   {
     id: 'Vocoder', name: 'Vocoder', category: 'wasm', group: 'Voice',
@@ -164,6 +196,11 @@ const wasmEffects: EffectDescriptor[] = [
       formantShift: 0.7,
       reactionTime: 25,     // ms (stored as ms, divided by 1000 in create)
     }),
+    presets: [
+      { name: 'Robot', params: { bands: 32, filtersPerBand: 6, carrierType: 0, carrierFreq: 110, formantShift: 1.0, reactionTime: 15 } },
+      { name: 'Whisper', params: { bands: 8, filtersPerBand: 2, carrierType: 3, formantShift: 0.5, reactionTime: 40 } },
+      { name: 'Choir', params: { bands: 24, filtersPerBand: 4, carrierType: 0, carrierFreq: 220, formantShift: 1.2, reactionTime: 30 } },
+    ],
   },
   {
     id: 'AutoTune', name: 'Auto-Tune', category: 'wasm', group: 'Voice',
@@ -187,6 +224,11 @@ const wasmEffects: EffectDescriptor[] = [
       strength: 100,     // full snap
       speed: 70,         // fairly fast
     }),
+    presets: [
+      { name: 'Subtle', params: { strength: 50, speed: 40 } },
+      { name: 'Natural', params: { strength: 80, speed: 60 } },
+      { name: 'Hard Tune', params: { strength: 100, speed: 100 } },
+    ],
   },
   {
     id: 'GranularFreeze', name: 'Granular Freeze', category: 'wasm', group: 'Granular',
@@ -212,6 +254,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ freeze: 0, grainSize: 80, density: 12, scatter: 30, pitch: 0, spray: 20, shimmer: 0, stereoWidth: 70, feedback: 0, captureLen: 500, attack: 5, release: 40, thru: 0 }),
+    presets: [
+      { name: 'Shimmer Pad', params: { freeze: 1, grainSize: 120, density: 20, shimmer: 60, stereoWidth: 100, feedback: 30, pitch: 12 } },
+      { name: 'Glitch', params: { freeze: 1, grainSize: 20, density: 30, scatter: 80, spray: 70, stereoWidth: 50, feedback: 10 } },
+      { name: 'Ambient', params: { freeze: 1, grainSize: 150, density: 8, scatter: 40, shimmer: 30, stereoWidth: 90, feedback: 20 } },
+    ],
   },
   {
     id: 'NoiseGate', name: 'Noise Gate', category: 'wasm', group: 'Dynamics',
@@ -230,6 +277,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -40, attack: 0.5, hold: 50, release: 100, range: 0, hpf: 0 }),
+    presets: [
+      { name: 'Gentle', params: { threshold: -50, attack: 2, hold: 80, release: 200, range: -20 } },
+      { name: 'Tight', params: { threshold: -30, attack: 0.1, hold: 20, release: 50, range: -60 } },
+      { name: 'Drums', params: { threshold: -35, attack: 0.2, hold: 30, release: 80, range: -40, hpf: 100 } },
+    ],
   },
   {
     id: 'Limiter', name: 'Limiter', category: 'wasm', group: 'Dynamics',
@@ -248,6 +300,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -1, ceiling: -0.3, attack: 5, release: 50, lookahead: 5, knee: 0 }),
+    presets: [
+      { name: 'Soft', params: { threshold: -3, ceiling: -0.5, attack: 10, release: 100, knee: 6 } },
+      { name: 'Loud', params: { threshold: -1, ceiling: -0.1, attack: 2, release: 30, lookahead: 5 } },
+      { name: 'Broadcast', params: { threshold: -2, ceiling: -0.3, attack: 5, release: 50, lookahead: 10, knee: 3 } },
+    ],
   },
   {
     id: 'Flanger', name: 'Flanger', category: 'wasm', group: 'Modulation',
@@ -266,6 +323,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ rate: 0.3, depth: 70, delay: 5, feedback: 30, stereo: 90, mix: 50 }),
+    presets: [
+      { name: 'Subtle', params: { rate: 0.1, depth: 30, feedback: 10, mix: 30 } },
+      { name: 'Jet', params: { rate: 0.5, depth: 90, delay: 3, feedback: 70, mix: 60 } },
+      { name: 'Metallic', params: { rate: 0.8, depth: 100, delay: 1, feedback: 85, stereo: 180, mix: 50 } },
+    ],
   },
   {
     id: 'Overdrive', name: 'Overdrive', category: 'wasm', group: 'Distortion',
@@ -282,6 +344,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ drive: 50, tone: 50, mix: 100, level: 50 }),
+    presets: [
+      { name: 'Blues', params: { drive: 25, tone: 40, level: 60 } },
+      { name: 'Rock', params: { drive: 55, tone: 55, level: 55 } },
+      { name: 'Metal', params: { drive: 85, tone: 65, level: 45 } },
+    ],
   },
   {
     id: 'RingMod', name: 'Ring Modulator', category: 'wasm', group: 'Modulation',
@@ -299,6 +366,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ frequency: 440, mix: 50, waveform: 0, lfoRate: 0, lfoDepth: 0 }),
+    presets: [
+      { name: 'Bell', params: { frequency: 800, mix: 40, waveform: 0 } },
+      { name: 'Robot', params: { frequency: 200, mix: 70, waveform: 1, lfoRate: 2, lfoDepth: 30 } },
+      { name: 'Subtle', params: { frequency: 440, mix: 20, waveform: 0, lfoRate: 0.5, lfoDepth: 10 } },
+    ],
   },
   {
     id: 'DragonflyPlate', name: 'Dragonfly Plate Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -316,6 +388,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ decay: 70, damping: 50, predelay: 10, width: 100, brightness: 70 }),
+    presets: [
+      { name: 'Bright Plate', params: { decay: 50, damping: 30, brightness: 90, predelay: 5 } },
+      { name: 'Dark Plate', params: { decay: 60, damping: 80, brightness: 30, predelay: 15 } },
+      { name: 'Long Plate', params: { decay: 95, damping: 40, brightness: 60, predelay: 25 } },
+    ],
   },
   {
     id: 'DragonflyHall', name: 'Dragonfly Hall Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -334,6 +411,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ decay: 80, damping: 40, predelay: 20, width: 100, earlyLevel: 50, size: 1.5 }),
+    presets: [
+      { name: 'Small Hall', params: { decay: 40, size: 0.5, earlyLevel: 70, predelay: 5 } },
+      { name: 'Grand Hall', params: { decay: 85, size: 2.0, earlyLevel: 40, predelay: 30 } },
+      { name: 'Cathedral', params: { decay: 95, size: 3.0, damping: 20, earlyLevel: 30, predelay: 50, width: 100 } },
+    ],
   },
   {
     id: 'DragonflyRoom', name: 'Dragonfly Room Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -352,6 +434,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ decay: 40, damping: 60, predelay: 5, width: 80, earlyLevel: 70, size: 0.7 }),
+    presets: [
+      { name: 'Tight Room', params: { decay: 20, size: 0.3, earlyLevel: 80, predelay: 2 } },
+      { name: 'Medium Room', params: { decay: 45, size: 0.8, earlyLevel: 60, predelay: 8 } },
+      { name: 'Large Room', params: { decay: 70, size: 1.5, earlyLevel: 40, predelay: 15, damping: 40 } },
+    ],
   },
   {
     id: 'JunoChorus', name: 'Juno-60 Chorus', category: 'wasm', group: 'Modulation',
@@ -368,6 +455,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ rate: 0.5, depth: 50, mode: 2, mix: 50 }),
+    presets: [
+      { name: 'Mode I', params: { mode: 1, rate: 0.5, depth: 40, mix: 50 } },
+      { name: 'Mode II', params: { mode: 2, rate: 0.5, depth: 50, mix: 50 } },
+      { name: 'Full', params: { mode: 3, rate: 0.8, depth: 70, mix: 60 } },
+    ],
   },
   {
     id: 'ParametricEQ', name: '4-Band Parametric EQ', category: 'wasm', group: 'Filter',
@@ -389,6 +481,11 @@ const wasmEffects: EffectDescriptor[] = [
       b3Freq: 2000, b3Gain: 0, b3Q: 0.7,
       b4Freq: 8000, b4Gain: 0, b4Q: 0.7,
     }),
+    presets: [
+      { name: 'Smiley', params: { b1Gain: 4, b2Gain: -2, b3Gain: -2, b4Gain: 4 } },
+      { name: 'Vocal Presence', params: { b2Freq: 800, b2Gain: 3, b3Freq: 3000, b3Gain: 4, b3Q: 1.2 } },
+      { name: 'Bass Boost', params: { b1Freq: 80, b1Gain: 6, b1Q: 0.5, b2Gain: 2 } },
+    ],
   },
   {
     id: 'CabinetSim', name: 'Cabinet Simulator', category: 'wasm', group: 'Distortion',
@@ -404,6 +501,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ cabinet: 0, mix: 100, brightness: 50 }),
+    presets: [
+      { name: 'Dark', params: { brightness: 20 } },
+      { name: 'Neutral', params: { brightness: 50 } },
+      { name: 'Bright', params: { brightness: 80 } },
+    ],
   },
   {
     id: 'TubeAmp', name: 'Tube Amplifier', category: 'wasm', group: 'Distortion',
@@ -423,6 +525,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ drive: 50, bass: 50, mid: 50, treble: 50, presence: 50, master: 50, sag: 20 }),
+    presets: [
+      { name: 'Clean', params: { drive: 15, bass: 50, mid: 50, treble: 55, master: 60, sag: 10 } },
+      { name: 'Crunch', params: { drive: 50, bass: 55, mid: 60, treble: 55, presence: 55, master: 45, sag: 25 } },
+      { name: 'High Gain', params: { drive: 85, bass: 60, mid: 45, treble: 60, presence: 65, master: 35, sag: 40 } },
+    ],
   },
   {
     id: 'DeEsser', name: 'De-Esser', category: 'wasm', group: 'Dynamics',
@@ -441,6 +548,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ frequency: 6000, bandwidth: 1, threshold: -20, ratio: 4, attack: 1, release: 50 }),
+    presets: [
+      { name: 'Light', params: { threshold: -15, ratio: 2, frequency: 6500 } },
+      { name: 'Medium', params: { threshold: -20, ratio: 4, frequency: 6000, bandwidth: 1.5 } },
+      { name: 'Aggressive', params: { threshold: -28, ratio: 8, frequency: 5500, bandwidth: 2 } },
+    ],
   },
   {
     id: 'MultibandComp', name: 'Multiband Compressor', category: 'wasm', group: 'Dynamics',
@@ -464,6 +576,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCrossover: 200, highCrossover: 3000, lowThreshold: -20, midThreshold: -20, highThreshold: -20, lowRatio: 4, midRatio: 4, highRatio: 4, lowGain: 1, midGain: 1, highGain: 1 }),
+    presets: [
+      { name: 'Gentle', params: { lowThreshold: -15, midThreshold: -15, highThreshold: -15, lowRatio: 2, midRatio: 2, highRatio: 2 } },
+      { name: 'Punchy', params: { lowThreshold: -18, midThreshold: -22, highThreshold: -20, lowRatio: 3, midRatio: 5, highRatio: 4, lowGain: 1.5 } },
+      { name: 'Mastering', params: { lowThreshold: -12, midThreshold: -14, highThreshold: -16, lowRatio: 3, midRatio: 3, highRatio: 3, lowGain: 1.2, midGain: 1.1, highGain: 1.3 } },
+    ],
   },
   {
     id: 'TransientDesigner', name: 'Transient Designer', category: 'wasm', group: 'Dynamics',
@@ -479,6 +596,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ attack: 0, sustain: 0, output: 1 }),
+    presets: [
+      { name: 'Snap', params: { attack: 0.8, sustain: -0.3 } },
+      { name: 'Sustain', params: { attack: -0.3, sustain: 0.7 } },
+      { name: 'Both', params: { attack: 0.5, sustain: 0.5 } },
+    ],
   },
   {
     id: 'BassEnhancer', name: 'Bass Enhancer', category: 'wasm', group: 'Filter',
@@ -495,6 +617,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ frequency: 100, amount: 0.5, drive: 0, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { amount: 0.3, drive: 0 } },
+      { name: 'Warm', params: { amount: 0.6, drive: 0.3, frequency: 80 } },
+      { name: 'Heavy', params: { amount: 0.9, drive: 0.6, frequency: 120 } },
+    ],
   },
   {
     id: 'Expander', name: 'Expander', category: 'wasm', group: 'Dynamics',
@@ -513,6 +640,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -30, ratio: 2, attack: 1, release: 100, range: -60, knee: 6 }),
+    presets: [
+      { name: 'Gentle', params: { threshold: -35, ratio: 1.5, range: -30, knee: 10 } },
+      { name: 'Medium', params: { threshold: -30, ratio: 3, range: -50, knee: 6 } },
+      { name: 'Hard', params: { threshold: -25, ratio: 6, range: -80, knee: 2, attack: 0.5 } },
+    ],
   },
   {
     id: 'ReverseDelay', name: 'Reverse Delay', category: 'wasm', group: 'Reverb & Delay',
@@ -528,6 +660,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 500, feedback: 0.3, mix: 0.5 }),
+    presets: [
+      { name: 'Short', params: { time: 200, feedback: 0.2, mix: 0.4 } },
+      { name: 'Medium', params: { time: 500, feedback: 0.4, mix: 0.5 } },
+      { name: 'Long', params: { time: 1000, feedback: 0.5, mix: 0.6 } },
+    ],
   },
   {
     id: 'VintageDelay', name: 'Vintage Delay', category: 'wasm', group: 'Reverb & Delay',
@@ -545,6 +682,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 400, feedback: 0.4, cutoff: 3000, drive: 0.3, mix: 0.5 }),
+    presets: [
+      { name: 'Warm Tape', params: { time: 350, feedback: 0.5, cutoff: 2000, drive: 0.5 } },
+      { name: 'Dirty', params: { time: 450, feedback: 0.6, cutoff: 1500, drive: 0.8 } },
+      { name: 'Clean', params: { time: 400, feedback: 0.3, cutoff: 8000, drive: 0.1 } },
+    ],
   },
   {
     id: 'ArtisticDelay', name: 'Artistic Delay', category: 'wasm', group: 'Reverb & Delay',
@@ -564,6 +706,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ timeL: 500, timeR: 375, feedback: 0.4, pan: 0.5, lpf: 12000, hpf: 40, mix: 0.5 }),
+    presets: [
+      { name: 'Stereo', params: { timeL: 500, timeR: 375, feedback: 0.35, pan: 0.5 } },
+      { name: 'Ping Pong', params: { timeL: 400, timeR: 400, feedback: 0.5, pan: 0.0 } },
+      { name: 'Ambient', params: { timeL: 750, timeR: 1000, feedback: 0.6, lpf: 4000, hpf: 200, mix: 0.4 } },
+    ],
   },
   {
     id: 'SlapbackDelay', name: 'Slapback Delay', category: 'wasm', group: 'Reverb & Delay',
@@ -580,6 +727,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 60, feedback: 0.1, tone: 4000, mix: 0.5 }),
+    presets: [
+      { name: 'Tight', params: { time: 30, feedback: 0.05, tone: 5000 } },
+      { name: 'Medium', params: { time: 80, feedback: 0.15, tone: 3500 } },
+      { name: 'Rockabilly', params: { time: 120, feedback: 0.25, tone: 3000, mix: 0.6 } },
+    ],
   },
   {
     id: 'ZamDelay', name: 'ZAM Delay', category: 'wasm', group: 'Reverb & Delay',
@@ -598,6 +750,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 500, feedback: 0.4, lpf: 8000, hpf: 60, invert: 0, mix: 0.5 }),
+    presets: [
+      { name: 'Clean', params: { time: 400, feedback: 0.3, lpf: 12000 } },
+      { name: 'Filtered', params: { time: 500, feedback: 0.5, lpf: 4000, hpf: 200 } },
+      { name: 'Dark', params: { time: 600, feedback: 0.55, lpf: 2000, hpf: 100 } },
+    ],
   },
   {
     id: 'Saturator', name: 'Saturator', category: 'wasm', group: 'Distortion',
@@ -615,6 +772,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ drive: 0.5, blend: 0.5, preFreq: 20000, postFreq: 20000, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { drive: 0.2, blend: 0.3 } },
+      { name: 'Warm', params: { drive: 0.5, blend: 0.6, postFreq: 10000 } },
+      { name: 'Hot', params: { drive: 0.9, blend: 0.8, preFreq: 12000, postFreq: 8000 } },
+    ],
   },
   {
     id: 'Exciter', name: 'Exciter', category: 'wasm', group: 'Distortion',
@@ -632,6 +794,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ frequency: 3000, amount: 0.5, blend: 0.5, ceil: 16000, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { amount: 0.25, blend: 0.3, frequency: 4000 } },
+      { name: 'Bright', params: { amount: 0.6, blend: 0.6, frequency: 2500, ceil: 14000 } },
+      { name: 'Extreme', params: { amount: 0.9, blend: 0.8, frequency: 2000, ceil: 12000 } },
+    ],
   },
   {
     id: 'AutoSat', name: 'Auto Saturator', category: 'wasm', group: 'Distortion',
@@ -646,6 +813,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ amount: 0.5, mix: 1 }),
+    presets: [
+      { name: 'Light', params: { amount: 0.2 } },
+      { name: 'Medium', params: { amount: 0.5 } },
+      { name: 'Heavy', params: { amount: 0.85 } },
+    ],
   },
   {
     id: 'Satma', name: 'Satma Distortion', category: 'wasm', group: 'Distortion',
@@ -661,6 +833,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ distortion: 0.5, tone: 0.5, mix: 1 }),
+    presets: [
+      { name: 'Warm', params: { distortion: 0.25, tone: 0.3 } },
+      { name: 'Gritty', params: { distortion: 0.6, tone: 0.6 } },
+      { name: 'Destroyed', params: { distortion: 0.95, tone: 0.8 } },
+    ],
   },
   {
     id: 'DistortionShaper', name: 'Distortion Shaper', category: 'wasm', group: 'Distortion',
@@ -682,6 +859,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ inputGain: 1, point1x: -0.5, point1y: -0.5, point2x: 0.5, point2y: 0.5, outputGain: 1, preLpf: 20000, postLpf: 20000, mix: 1 }),
+    presets: [
+      { name: 'Soft Clip', params: { point1x: -0.7, point1y: -0.4, point2x: 0.7, point2y: 0.4 } },
+      { name: 'Hard Clip', params: { point1x: -0.3, point1y: -0.3, point2x: 0.3, point2y: 0.3, inputGain: 2 } },
+      { name: 'Asymmetric', params: { point1x: -0.6, point1y: -0.3, point2x: 0.4, point2y: 0.6, postLpf: 12000 } },
+    ],
   },
   {
     id: 'MonoComp', name: 'Mono Compressor', category: 'wasm', group: 'Dynamics',
@@ -700,6 +882,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -12, ratio: 4, attack: 10, release: 100, knee: 6, makeup: 0 }),
+    presets: [
+      { name: 'Gentle', params: { threshold: -8, ratio: 2, knee: 10 } },
+      { name: 'Medium', params: { threshold: -16, ratio: 4, knee: 6, makeup: 3 } },
+      { name: 'Squash', params: { threshold: -24, ratio: 10, attack: 1, release: 50, knee: 2, makeup: 8 } },
+    ],
   },
   {
     id: 'SidechainGate', name: 'Sidechain Gate', category: 'wasm', group: 'Dynamics',
@@ -719,6 +906,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -30, attack: 1, hold: 50, release: 200, range: 0, scFreq: 200, scQ: 1 }),
+    presets: [
+      { name: 'Tight', params: { threshold: -25, attack: 0.5, hold: 20, release: 100, range: -40 } },
+      { name: 'Open', params: { threshold: -35, attack: 2, hold: 80, release: 300, range: -20 } },
+      { name: 'Filtered', params: { threshold: -30, hold: 40, release: 150, scFreq: 500, scQ: 2 } },
+    ],
   },
   {
     id: 'MultibandGate', name: 'Multiband Gate', category: 'wasm', group: 'Dynamics',
@@ -741,6 +933,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, highCross: 3000, lowThresh: -40, midThresh: -40, highThresh: -40, lowRange: 0, midRange: 0, highRange: 0, attack: 1, release: 200 }),
+    presets: [
+      { name: 'Gentle', params: { lowThresh: -50, midThresh: -50, highThresh: -50, lowRange: -10, midRange: -10, highRange: -10 } },
+      { name: 'Medium', params: { lowThresh: -40, midThresh: -35, highThresh: -35, lowRange: -20, midRange: -20, highRange: -20 } },
+      { name: 'Tight', params: { lowThresh: -30, midThresh: -28, highThresh: -28, lowRange: -40, midRange: -40, highRange: -40, attack: 0.5, release: 100 } },
+    ],
   },
   {
     id: 'MultibandLimiter', name: 'Multiband Limiter', category: 'wasm', group: 'Dynamics',
@@ -762,6 +959,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, highCross: 3000, lowCeil: -1, midCeil: -1, highCeil: -1, lowGain: 1, midGain: 1, highGain: 1, release: 50 }),
+    presets: [
+      { name: 'Soft', params: { lowCeil: -3, midCeil: -3, highCeil: -3, release: 80 } },
+      { name: 'Medium', params: { lowCeil: -1, midCeil: -1, highCeil: -1, release: 50 } },
+      { name: 'Loud', params: { lowCeil: -0.5, midCeil: -0.5, highCeil: -0.5, lowGain: 1.5, midGain: 1.3, highGain: 1.5, release: 30 } },
+    ],
   },
   {
     id: 'SidechainLimiter', name: 'Sidechain Limiter', category: 'wasm', group: 'Dynamics',
@@ -778,6 +980,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ ceiling: -1, release: 50, scFreq: 1000, scGain: 0 }),
+    presets: [
+      { name: 'Soft', params: { ceiling: -3, release: 80 } },
+      { name: 'Medium', params: { ceiling: -1, release: 50, scGain: 3 } },
+      { name: 'Brick', params: { ceiling: -0.3, release: 20, scFreq: 2000, scGain: 6 } },
+    ],
   },
   {
     id: 'Clipper', name: 'Clipper', category: 'wasm', group: 'Dynamics',
@@ -793,6 +1000,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ inputGain: 0, ceiling: -1, softness: 0.5 }),
+    presets: [
+      { name: 'Soft', params: { softness: 0.8, ceiling: -2 } },
+      { name: 'Medium', params: { softness: 0.4, inputGain: 3 } },
+      { name: 'Hard', params: { softness: 0.1, inputGain: 6, ceiling: -0.5 } },
+    ],
   },
   {
     id: 'DynamicsProc', name: 'Dynamics Processor', category: 'wasm', group: 'Dynamics',
@@ -811,6 +1023,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowerThresh: -40, upperThresh: -12, ratio: 4, attack: 10, release: 100, makeup: 0 }),
+    presets: [
+      { name: 'Gentle', params: { upperThresh: -8, ratio: 2, lowerThresh: -50 } },
+      { name: 'Medium', params: { upperThresh: -14, ratio: 4, makeup: 3 } },
+      { name: 'Heavy', params: { upperThresh: -20, ratio: 8, lowerThresh: -30, attack: 2, release: 60, makeup: 6 } },
+    ],
   },
   {
     id: 'X42Comp', name: 'X42 Compressor', category: 'wasm', group: 'Dynamics',
@@ -829,6 +1046,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -20, ratio: 4, attack: 10, release: 100, hold: 0, inputGain: 0 }),
+    presets: [
+      { name: 'Gentle', params: { threshold: -12, ratio: 2, attack: 20 } },
+      { name: 'Punchy', params: { threshold: -18, ratio: 6, attack: 2, release: 60, hold: 10 } },
+      { name: 'Squash', params: { threshold: -28, ratio: 12, attack: 1, release: 40, hold: 5, inputGain: 6 } },
+    ],
   },
   {
     id: 'EQ5Band', name: '5-Band EQ', category: 'wasm', group: 'EQ & Filter',
@@ -855,6 +1077,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowShelfFreq: 100, lowShelfGain: 0, peak1Freq: 500, peak1Gain: 0, peak1Q: 1, peak2Freq: 1500, peak2Gain: 0, peak2Q: 1, peak3Freq: 5000, peak3Gain: 0, peak3Q: 1, highShelfFreq: 8000, highShelfGain: 0, mix: 1 }),
+    presets: [
+      { name: 'Flat', params: {} },
+      { name: 'V-Shape', params: { lowShelfGain: 5, peak2Gain: -3, highShelfGain: 4 } },
+      { name: 'Bass Boost', params: { lowShelfGain: 6, peak1Gain: 3, peak1Freq: 200 } },
+    ],
   },
   {
     id: 'EQ8Band', name: '8-Band EQ', category: 'wasm', group: 'EQ & Filter',
@@ -895,6 +1122,11 @@ const wasmEffects: EffectDescriptor[] = [
       highShelfFreq: 8000, highShelfGain: 0,
       mix: 1,
     }),
+    presets: [
+      { name: 'Flat', params: {} },
+      { name: 'V-Shape', params: { lowShelfGain: 5, peak2Gain: -2, peak3Gain: -2, highShelfGain: 4 } },
+      { name: 'Presence', params: { peak3Freq: 4000, peak3Gain: 4, peak4Freq: 10000, peak4Gain: 3 } },
+    ],
   },
   {
     id: 'EQ12Band', name: '12-Band EQ', category: 'wasm', group: 'EQ & Filter',
@@ -917,6 +1149,11 @@ const wasmEffects: EffectDescriptor[] = [
       for (let i = 0; i < 12; i++) { params[`gain_${i}`] = 0; params[`q_${i}`] = 1; }
       return params;
     },
+    presets: [
+      { name: 'Flat', params: {} },
+      { name: 'V-Shape', params: { gain_0: 5, gain_1: 3, gain_5: -2, gain_6: -2, gain_10: 3, gain_11: 5 } },
+      { name: 'Warm', params: { gain_0: 3, gain_1: 2, gain_2: 1, gain_10: -1, gain_11: -2 } },
+    ],
   },
   {
     id: 'GEQ31', name: '31-Band Graphic EQ', category: 'wasm', group: 'EQ & Filter',
@@ -938,6 +1175,11 @@ const wasmEffects: EffectDescriptor[] = [
       for (let i = 0; i < 31; i++) { params[`band_${i}`] = 0; }
       return params;
     },
+    presets: [
+      { name: 'Flat', params: {} },
+      { name: 'Smiley', params: { band_0: 6, band_1: 5, band_2: 4, band_3: 3, band_14: -3, band_15: -4, band_16: -3, band_28: 3, band_29: 4, band_30: 5 } },
+      { name: 'Mid Cut', params: { band_12: -4, band_13: -5, band_14: -6, band_15: -5, band_16: -4 } },
+    ],
   },
   {
     id: 'ZamEQ2', name: 'ZAM EQ2', category: 'wasm', group: 'EQ & Filter',
@@ -957,6 +1199,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowFreq: 200, lowGain: 0, lowBw: 1, highFreq: 4000, highGain: 0, highBw: 1, mix: 1 }),
+    presets: [
+      { name: 'Bass Lift', params: { lowGain: 5, lowFreq: 150 } },
+      { name: 'Treble Lift', params: { highGain: 5, highFreq: 5000 } },
+      { name: 'Scoop', params: { lowGain: 3, highGain: 3, lowBw: 1.5, highBw: 1.5 } },
+    ],
   },
   {
     id: 'PhonoFilter', name: 'Phono Filter (RIAA)', category: 'wasm', group: 'EQ & Filter',
@@ -971,6 +1218,10 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ mode: 0, mix: 1 }),
+    presets: [
+      { name: 'RIAA', params: { mode: 0 } },
+      { name: 'Inverse RIAA', params: { mode: 1 } },
+    ],
   },
   {
     id: 'DynamicEQ', name: 'Dynamic EQ', category: 'wasm', group: 'EQ & Filter',
@@ -992,6 +1243,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ detectFreq: 1000, detectQ: 1, processFreq: 1000, processQ: 1, threshold: -20, maxGain: 0, attack: 10, release: 100, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { threshold: -15, maxGain: -3, attack: 20, release: 150 } },
+      { name: 'Medium', params: { threshold: -20, maxGain: -6, detectQ: 1.5, processQ: 1.5 } },
+      { name: 'Aggressive', params: { threshold: -28, maxGain: -12, detectQ: 2, processQ: 2, attack: 5, release: 60 } },
+    ],
   },
   {
     id: 'HaasEnhancer', name: 'Haas Stereo Enhancer', category: 'wasm', group: 'Stereo & Spatial',
@@ -1007,6 +1263,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ delay: 10, side: 0, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { delay: 5 } },
+      { name: 'Medium', params: { delay: 15 } },
+      { name: 'Wide', params: { delay: 30 } },
+    ],
   },
   {
     id: 'MultiSpread', name: 'Multi Spread', category: 'wasm', group: 'Stereo & Spatial',
@@ -1022,6 +1283,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ bands: 4, spread: 0.7, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { bands: 2, spread: 0.4 } },
+      { name: 'Medium', params: { bands: 4, spread: 0.7 } },
+      { name: 'Full', params: { bands: 8, spread: 1.0 } },
+    ],
   },
   {
     id: 'MultibandEnhancer', name: 'Multiband Enhancer', category: 'wasm', group: 'Stereo & Spatial',
@@ -1043,6 +1309,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, midCross: 2000, highCross: 8000, lowWidth: 1, midWidth: 1, highWidth: 1, topWidth: 1, harmonics: 0, mix: 1 }),
+    presets: [
+      { name: 'Subtle', params: { midWidth: 1.3, highWidth: 1.2, topWidth: 1.1 } },
+      { name: 'Wide', params: { lowWidth: 0.8, midWidth: 1.5, highWidth: 1.8, topWidth: 2.0, harmonics: 0.3 } },
+      { name: 'Extreme', params: { lowWidth: 0.5, midWidth: 2.0, highWidth: 2.5, topWidth: 3.0, harmonics: 0.6 } },
+    ],
   },
   {
     id: 'EarlyReflections', name: 'Early Reflections', category: 'wasm', group: 'Reverb & Delay',
@@ -1058,6 +1329,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ size: 1, damping: 0.3, mix: 0.3 }),
+    presets: [
+      { name: 'Small', params: { size: 0.3, damping: 0.5, mix: 0.2 } },
+      { name: 'Medium', params: { size: 1.0, damping: 0.3, mix: 0.3 } },
+      { name: 'Large', params: { size: 2.5, damping: 0.15, mix: 0.4 } },
+    ],
   },
   {
     id: 'Pulsator', name: 'Pulsator', category: 'wasm', group: 'Modulation',
@@ -1076,6 +1352,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ rate: 2, depth: 0.5, waveform: 0, stereoPhase: 180, offset: 0, mix: 1 }),
+    presets: [
+      { name: 'Gentle', params: { rate: 1, depth: 0.3, waveform: 0 } },
+      { name: 'Choppy', params: { rate: 4, depth: 0.9, waveform: 1 } },
+      { name: 'Trance', params: { rate: 8, depth: 1.0, waveform: 1, stereoPhase: 90 } },
+    ],
   },
   {
     id: 'Ducka', name: 'Ducka', category: 'wasm', group: 'Dynamics',
@@ -1092,6 +1373,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -20, drop: 0.5, release: 200, mix: 1 }),
+    presets: [
+      { name: 'Gentle', params: { threshold: -15, drop: 0.3, release: 300 } },
+      { name: 'Pumping', params: { threshold: -20, drop: 0.7, release: 150 } },
+      { name: 'Extreme', params: { threshold: -28, drop: 0.95, release: 80 } },
+    ],
   },
   {
     id: 'Masha', name: 'Masha Beat Stutter', category: 'wasm', group: 'Creative',
@@ -1109,6 +1395,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 100, volume: 1, passthrough: 0, active: 0, mix: 1 }),
+    presets: [
+      { name: 'Short Stutter', params: { time: 30, active: 1 } },
+      { name: 'Medium', params: { time: 100, active: 1 } },
+      { name: 'Long', params: { time: 300, active: 1, volume: 0.8 } },
+    ],
   },
   {
     id: 'Vinyl', name: 'Vinyl Simulator', category: 'wasm', group: 'Lo-Fi',
@@ -1127,6 +1418,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ crackle: 0.3, noise: 0.2, rumble: 0.1, wear: 0.3, speed: 0.5, mix: 1 }),
+    presets: [
+      { name: 'Clean', params: { crackle: 0.1, noise: 0.05, rumble: 0.05, wear: 0.1 } },
+      { name: 'Old', params: { crackle: 0.5, noise: 0.35, rumble: 0.2, wear: 0.5, speed: 0.4 } },
+      { name: 'Destroyed', params: { crackle: 0.9, noise: 0.7, rumble: 0.5, wear: 0.9, speed: 0.3 } },
+    ],
   },
   {
     id: 'BeatBreather', name: 'Beat Breather', category: 'wasm', group: 'Dynamics',
@@ -1145,6 +1441,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ transientBoost: 0, sustainBoost: 0, sensitivity: 0.5, attack: 5, release: 100, mix: 1 }),
+    presets: [
+      { name: 'Snap', params: { transientBoost: 0.6, sustainBoost: -0.2, sensitivity: 0.6, attack: 2 } },
+      { name: 'Sustain', params: { transientBoost: -0.2, sustainBoost: 0.6, sensitivity: 0.5, release: 150 } },
+      { name: 'Both', params: { transientBoost: 0.4, sustainBoost: 0.4, sensitivity: 0.5 } },
+    ],
   },
   {
     id: 'MultibandClipper', name: 'Multiband Clipper', category: 'wasm', group: 'Dynamics',
@@ -1164,6 +1465,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, highCross: 4000, lowCeil: -3, midCeil: -3, highCeil: -3, softness: 0.5, mix: 1 }),
+    presets: [
+      { name: 'Soft', params: { lowCeil: -6, midCeil: -6, highCeil: -6, softness: 0.8 } },
+      { name: 'Medium', params: { lowCeil: -3, midCeil: -3, highCeil: -3, softness: 0.5 } },
+      { name: 'Hard', params: { lowCeil: -1, midCeil: -1, highCeil: -1, softness: 0.1 } },
+    ],
   },
   {
     id: 'MultibandDynamics', name: 'Multiband Dynamics', category: 'wasm', group: 'Dynamics',
@@ -1188,6 +1494,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, highCross: 4000, lowExpThresh: -40, midExpThresh: -40, highExpThresh: -40, lowCompThresh: -12, midCompThresh: -12, highCompThresh: -12, ratio: 4, attack: 10, release: 100, mix: 1 }),
+    presets: [
+      { name: 'Gentle', params: { lowCompThresh: -8, midCompThresh: -8, highCompThresh: -8, ratio: 2 } },
+      { name: 'Medium', params: { lowCompThresh: -14, midCompThresh: -14, highCompThresh: -14, ratio: 4, lowExpThresh: -35, midExpThresh: -35, highExpThresh: -35 } },
+      { name: 'Heavy', params: { lowCompThresh: -20, midCompThresh: -20, highCompThresh: -20, ratio: 8, lowExpThresh: -30, midExpThresh: -30, highExpThresh: -30, attack: 2 } },
+    ],
   },
   {
     id: 'MultibandExpander', name: 'Multiband Expander', category: 'wasm', group: 'Dynamics',
@@ -1210,6 +1521,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, highCross: 4000, lowThresh: -40, midThresh: -40, highThresh: -40, ratio: 2, attack: 5, release: 100, range: -40, mix: 1 }),
+    presets: [
+      { name: 'Gentle', params: { lowThresh: -50, midThresh: -50, highThresh: -50, ratio: 1.5, range: -20 } },
+      { name: 'Medium', params: { lowThresh: -38, midThresh: -35, highThresh: -35, ratio: 3, range: -40 } },
+      { name: 'Tight', params: { lowThresh: -28, midThresh: -25, highThresh: -25, ratio: 5, range: -60, attack: 1 } },
+    ],
   },
   {
     id: 'GOTTComp', name: 'GOTT Compressor', category: 'wasm', group: 'Dynamics',
@@ -1233,6 +1549,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ lowCross: 200, highCross: 4000, lowThresh: -18, midThresh: -18, highThresh: -18, lowRatio: 4, midRatio: 4, highRatio: 4, attack: 10, release: 100, mix: 1 }),
+    presets: [
+      { name: 'Gentle', params: { lowThresh: -12, midThresh: -12, highThresh: -12, lowRatio: 2, midRatio: 2, highRatio: 2 } },
+      { name: 'Glue', params: { lowThresh: -16, midThresh: -16, highThresh: -16, lowRatio: 3, midRatio: 3, highRatio: 3, attack: 15, release: 120 } },
+      { name: 'Mastering', params: { lowThresh: -14, midThresh: -16, highThresh: -18, lowRatio: 3, midRatio: 4, highRatio: 5, attack: 8, release: 80 } },
+    ],
   },
   {
     id: 'Maximizer', name: 'Maximizer', category: 'wasm', group: 'Dynamics',
@@ -1248,6 +1569,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ ceiling: -0.3, release: 50, mix: 1 }),
+    presets: [
+      { name: 'Soft', params: { ceiling: -1, release: 80 } },
+      { name: 'Medium', params: { ceiling: -0.3, release: 50 } },
+      { name: 'Loud', params: { ceiling: -0.1, release: 20 } },
+    ],
   },
   {
     id: 'AGC', name: 'Auto Gain Control', category: 'wasm', group: 'Dynamics',
@@ -1264,6 +1590,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ target: -12, speed: 0.1, maxGain: 12, mix: 1 }),
+    presets: [
+      { name: 'Slow', params: { speed: 0.03, maxGain: 6 } },
+      { name: 'Medium', params: { speed: 0.1, maxGain: 12 } },
+      { name: 'Fast', params: { speed: 0.5, maxGain: 18 } },
+    ],
   },
   {
     id: 'Della', name: 'Della Delay', category: 'wasm', group: 'Reverb & Delay',
@@ -1280,6 +1611,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 300, feedback: 0.5, volume: 0.7, mix: 0.5 }),
+    presets: [
+      { name: 'Short', params: { time: 150, feedback: 0.3, volume: 0.8 } },
+      { name: 'Medium', params: { time: 350, feedback: 0.5, volume: 0.7 } },
+      { name: 'Long', params: { time: 600, feedback: 0.7, volume: 0.6, mix: 0.4 } },
+    ],
   },
   {
     id: 'Driva', name: 'Driva Distortion', category: 'wasm', group: 'Distortion',
@@ -1295,6 +1631,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ amount: 0.5, tone: 0, mix: 1 }),
+    presets: [
+      { name: 'Light', params: { amount: 0.2, tone: -0.2 } },
+      { name: 'Medium', params: { amount: 0.5, tone: 0.2 } },
+      { name: 'Heavy', params: { amount: 0.9, tone: 0.5 } },
+    ],
   },
   {
     id: 'Panda', name: 'Panda Comp/Expand', category: 'wasm', group: 'Dynamics',
@@ -1311,6 +1652,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ threshold: -20, factor: 0.5, release: 100, mix: 1 }),
+    presets: [
+      { name: 'Gentle', params: { threshold: -15, factor: 0.3, release: 150 } },
+      { name: 'Medium', params: { threshold: -20, factor: 0.5, release: 100 } },
+      { name: 'Heavy', params: { threshold: -28, factor: 0.8, release: 50 } },
+    ],
   },
   {
     id: 'BinauralPanner', name: 'Binaural Panner', category: 'wasm', group: 'Stereo & Spatial',
@@ -1327,6 +1673,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ azimuth: 0, elevation: 0, distance: 1, mix: 1 }),
+    presets: [
+      { name: 'Front', params: { azimuth: 0, elevation: 0, distance: 1 } },
+      { name: 'Left', params: { azimuth: -90, elevation: 0, distance: 1 } },
+      { name: 'Behind', params: { azimuth: 180, elevation: 0, distance: 2 } },
+    ],
   },
   {
     id: 'Roomy', name: 'Roomy Reverb', category: 'wasm', group: 'Reverb & Delay',
@@ -1342,6 +1693,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ time: 2, damping: 0.5, mix: 0.3 }),
+    presets: [
+      { name: 'Small', params: { time: 0.8, damping: 0.7, mix: 0.2 } },
+      { name: 'Medium', params: { time: 2, damping: 0.5, mix: 0.3 } },
+      { name: 'Huge', params: { time: 6, damping: 0.2, mix: 0.5 } },
+    ],
   },
   {
     id: 'Bitta', name: 'Bitta Crusher', category: 'wasm', group: 'Lo-Fi',
@@ -1356,6 +1712,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ crush: 8, mix: 1 }),
+    presets: [
+      { name: 'Light', params: { crush: 12 } },
+      { name: 'Medium', params: { crush: 8 } },
+      { name: 'Heavy', params: { crush: 4 } },
+    ],
   },
   {
     id: 'Kuiza', name: 'Kuiza EQ', category: 'wasm', group: 'EQ & Filter',
@@ -1374,6 +1735,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ low: 0, lowMid: 0, highMid: 0, high: 0, gain: 0, mix: 1 }),
+    presets: [
+      { name: 'Bass Boost', params: { low: 6, lowMid: 2 } },
+      { name: 'Mid Scoop', params: { lowMid: -4, highMid: -4, low: 2, high: 2 } },
+      { name: 'Bright', params: { highMid: 3, high: 5 } },
+    ],
   },
   {
     id: 'Vihda', name: 'Vihda Stereo', category: 'wasm', group: 'Stereo & Spatial',
@@ -1389,6 +1755,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ width: 1, invert: 0, mix: 1 }),
+    presets: [
+      { name: 'Narrow', params: { width: 0.5 } },
+      { name: 'Normal', params: { width: 1.0 } },
+      { name: 'Ultra Wide', params: { width: 2.0 } },
+    ],
   },
   {
     id: 'MultiChorus', name: 'Multi Chorus', category: 'wasm', group: 'Modulation',
@@ -1406,6 +1777,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ rate: 0.5, depth: 0.5, voices: 4, stereoPhase: 90, mix: 0.5 }),
+    presets: [
+      { name: 'Subtle', params: { rate: 0.3, depth: 0.3, voices: 2, mix: 0.3 } },
+      { name: 'Lush', params: { rate: 0.5, depth: 0.6, voices: 6, stereoPhase: 120, mix: 0.5 } },
+      { name: 'Wide', params: { rate: 0.8, depth: 0.8, voices: 8, stereoPhase: 180, mix: 0.6 } },
+    ],
   },
   {
     id: 'CalfPhaser', name: 'Calf Phaser', category: 'wasm', group: 'Modulation',
@@ -1424,6 +1800,11 @@ const wasmEffects: EffectDescriptor[] = [
       });
     },
     getDefaultParameters: () => ({ rate: 0.5, depth: 0.7, stages: 6, feedback: 0.5, stereoPhase: 90, mix: 0.5 }),
+    presets: [
+      { name: 'Slow', params: { rate: 0.15, depth: 0.5, stages: 4, feedback: 0.3 } },
+      { name: 'Jet', params: { rate: 0.8, depth: 0.9, stages: 8, feedback: 0.7, mix: 0.6 } },
+      { name: 'Deep', params: { rate: 0.3, depth: 1.0, stages: 12, feedback: 0.8, stereoPhase: 180, mix: 0.5 } },
+    ],
   },
 ];
 
