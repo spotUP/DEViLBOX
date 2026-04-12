@@ -381,23 +381,67 @@ export async function parseCheeseCutterFile(
   psidHeader[0x78] = 0x00; // startPage = auto-detect
   psidHeader[0x79] = 0x00; // pageLength = unused in auto mode
 
+  // ── Multispeed wrapper ──────────────────────────────────────────────
+  // CheeseCutter supports multispeed (multiplier 1-16). Each VBI frame,
+  // the host calls $1003 (main play) once, then $1006 (sub-frame play)
+  // (multiplier-1) more times. websid only calls the PSID play address
+  // once per VBI. For multiplier > 1, we install a tiny 6502 stub at
+  // $CFA0 that calls $1003 + (multiplier-1) × $1006, and point the
+  // PSID play address to the stub instead of $1003.
+  const WRAPPER_ADDR = 0xCFA0;
+  let wrapperBytes: Uint8Array | null = null;
+
+  if (speedMultiplier > 1) {
+    // 6502 machine code:
+    //   JSR $1003       ; 20 03 10  (3 bytes)
+    //   LDX #(mult-1)   ; A2 xx     (2 bytes)
+    // loop:
+    //   JSR $1006       ; 20 06 10  (3 bytes)
+    //   DEX             ; CA        (1 byte)
+    //   BNE loop        ; D0 FB     (2 bytes) — branch back 5 bytes
+    //   RTS             ; 60        (1 byte)
+    //                               Total: 12 bytes
+    wrapperBytes = new Uint8Array([
+      0x20, 0x03, 0x10,                       // JSR $1003
+      0xA2, (speedMultiplier - 1) & 0xFF,     // LDX #(mult-1)
+      0x20, 0x06, 0x10,                       // JSR $1006
+      0xCA,                                   // DEX
+      0xD0, 0xFB,                             // BNE -5 (back to JSR $1006)
+      0x60,                                   // RTS
+    ]);
+    // Update PSID header play address to point to wrapper
+    psidView.setUint16(12, WRAPPER_ADDR);
+  }
+
   // Load ONLY the player binary + music data ($0DFE-$BFFF). The 2-byte
   // load address header at $0DFE-$0DFF ($00,$0E → load at $0E00) is
   // part of the data per PSID spec (loadAddress=$0000 in header means
   // data starts with a 2-byte LE load address).
-  //
-  // We do NOT load $0002-$0DFD (zero page, stack, screen) — the init
-  // routine at $1000 sets up its own working variables. Loading the
-  // entire low range caused conflicts with websid's IRQ vector setup
-  // at $0314/$0315 and the PSID driver's bank switching.
-  const LOAD_START = 0x0DFE; // includes 2-byte load address header
-  const LOAD_END = 0xC000;   // exclusive — all data ends below $B689
-  const memSlice = mem.subarray(LOAD_START, LOAD_END);
+  const LOAD_START = 0x0DFE;
+  const LOAD_END = 0xC000;
+  const playerData = mem.subarray(LOAD_START, LOAD_END);
 
-  // Assemble PSID file (header + data with embedded load address)
-  const sidFileData = new Uint8Array(124 + memSlice.length);
-  sidFileData.set(psidHeader, 0);
-  sidFileData.set(memSlice, 124);
+  // Assemble PSID file: header + player data + optional wrapper stub.
+  // If multispeed, append the wrapper as a second PRG block. But PSID
+  // only supports one load block — so we extend the player data to
+  // include the wrapper address range by padding zeros between the
+  // player data end ($BFFF) and the wrapper ($CFA0).
+  let sidFileData: Uint8Array;
+  if (wrapperBytes) {
+    const padStart = LOAD_END;       // $C000
+    const padEnd = WRAPPER_ADDR;     // $CFA0
+    const padLen = padEnd - padStart;
+    const totalDataLen = playerData.length + padLen + wrapperBytes.length;
+    sidFileData = new Uint8Array(124 + totalDataLen);
+    sidFileData.set(psidHeader, 0);
+    sidFileData.set(playerData, 124);
+    // Zero padding from $C000 to $CFA0 is implicit (Uint8Array inits to 0)
+    sidFileData.set(wrapperBytes, 124 + playerData.length + padLen);
+  } else {
+    sidFileData = new Uint8Array(124 + playerData.length);
+    sidFileData.set(psidHeader, 0);
+    sidFileData.set(playerData, 124);
+  }
 
   // ── Build patterns for tracker display ──────────────────────────────
   // Determine order length as max non-end entries across the 3 voices
