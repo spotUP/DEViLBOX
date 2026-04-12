@@ -452,6 +452,9 @@ function deepMerge(dst: Record<string, unknown>, src: Record<string, unknown>): 
 // Main Router
 // ============================================================================
 
+/** Throttle timestamps for 'effect' CC updates (key = `instrumentId:effectId:param`) */
+const _effectThrottleTimestamps = new Map<string, number>();
+
 /**
  * Route a parameter change to the correct synth engine.
  *
@@ -513,6 +516,13 @@ export function routeParameterToEngine(
     case 'effect': {
       const fx = instrument.effects.find((e) => e.type === route.effectType);
       if (fx) {
+        // Throttle to ~30Hz: a physical CC knob can fire 100+ updates/sec, each
+        // triggering a full Zustand write + potential rebuildMasterEffects. Coalesce
+        // within a 33ms window keyed by instrumentId + effectId + param.
+        const throttleKey = `${instrument.id}:${fx.id}:${route.param}`;
+        const now = performance.now();
+        if (now - (_effectThrottleTimestamps.get(throttleKey) ?? 0) < 33) break;
+        _effectThrottleTimestamps.set(throttleKey, now);
         instrumentStore.updateEffect(instrument.id, fx.id, {
           parameters: { ...fx.parameters, [route.param]: value },
         });
