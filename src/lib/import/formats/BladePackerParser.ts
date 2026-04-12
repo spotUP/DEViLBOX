@@ -17,6 +17,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -149,5 +151,15 @@ export function parseBladePackerFile(buffer: ArrayBuffer, filename: string): Tra
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'mod',
+      patternDataFileOffset: 1084,
+      bytesPerCell: 4,
+      rowsPerPattern: 64,
+      numChannels: NUM_CHANNELS,
+      numPatterns: 1,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMODCell,
+    } satisfies UADEPatternLayout,
   };
 }

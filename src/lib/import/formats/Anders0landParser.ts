@@ -42,6 +42,10 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
 
+// NOTE: uadePatternLayout not added — Anders 0land uses variable-length byte stream
+// encoding per voice (not fixed-size cells). Requires UADEVariablePatternLayout with
+// per-track address/size tracking during parsing.
+
 // ── Constants ───────────────────────────────────────────────────────────────
 
 // Minimum size: 3 chunks × minimum 8 bytes header each
