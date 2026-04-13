@@ -1144,6 +1144,9 @@ static void sf_find_samples(SfModule* m) {
 
 static void sf_find_samples_in_list(SfModule* m, uint32_t offset) {
     bool stop = false;
+    // Track visited GOTO targets to detect loops
+    uint32_t visited_gotos[256];
+    int num_visited = 0;
 
     while (!stop && offset < m->opcodes_length) {
         uint8_t op = m->opcodes[offset++];
@@ -1216,7 +1219,18 @@ static void sf_find_samples_in_list(SfModule* m, uint32_t offset) {
 
             case SF_OP_GOTO: {
                 int32_t goff = sf_fetch_long_at(m, &offset);
-                offset = (uint32_t)((int32_t)offset + goff);
+                uint32_t target = (uint32_t)((int32_t)offset + goff);
+                // Check if we already visited this target (loop detection)
+                bool already_visited = false;
+                for (int vi = 0; vi < num_visited; vi++) {
+                    if (visited_gotos[vi] == target) { already_visited = true; break; }
+                }
+                if (already_visited || num_visited >= 256) {
+                    stop = true;
+                } else {
+                    visited_gotos[num_visited++] = target;
+                    offset = target;
+                }
                 skip = 0;
                 break;
             }
