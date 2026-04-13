@@ -100,7 +100,21 @@ export async function tryRouteFormat(
   // Must come BEFORE Furnace/DefleMask because both use .dmf extension.
   // DefleMask DMF starts with a different magic; X-Tracker starts with "DDMF".
   if (filename.endsWith('.dmf')) {
-    const bytes = new Uint8Array(buffer);
+    let bytes = new Uint8Array(buffer);
+
+    // DefleMask .dmf files are zlib-compressed (magic 0x78 0x9c / 0x78 0x01 / 0x78 0xDA)
+    if (bytes.length > 4 && bytes[0] === 0x78 && (bytes[1] === 0x9c || bytes[1] === 0x01 || bytes[1] === 0xDA)) {
+      try {
+        const pako = await import('pako');
+        const inflated = pako.inflate(bytes);
+        buffer = inflated.buffer as ArrayBuffer;
+        bytes = inflated;
+        console.log(`[AmigaFormatParsers] .dmf zlib inflated → ${buffer.byteLength} bytes`);
+      } catch (err) {
+        console.warn('[AmigaFormatParsers] .dmf zlib inflate failed:', err);
+      }
+    }
+
     if (prefs.xTracker === 'native') {
       try {
         const { isXTrackerFormat, parseXTrackerFile } = await import('@lib/import/formats/XTrackerParser');
