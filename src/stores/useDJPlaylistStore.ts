@@ -3,6 +3,9 @@
  *
  * Manages ordered playlists of tracker module files for the DJ view.
  * Persisted to localStorage and synced to server when logged in.
+ *
+ * Features: CRUD, multi-select, undo/redo, batch ops, duplicate detection,
+ * clone, import/export, cloud sync.
  */
 
 import { create } from 'zustand';
@@ -15,7 +18,9 @@ import type { EffectConfig } from '@/types/instrument/effects';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface PlaylistTrack {
-  /** Original filename (e.g. "axelf.mod") */
+  /** Stable unique ID for this track entry (for @dnd-kit, selection, etc.) */
+  id: string;
+  /** Original filename (e.g. "axelf.mod") or "modland:path/to/file" */
   fileName: string;
   /** Display name (from song.name or filename) */
   trackName: string;
@@ -42,6 +47,7 @@ export interface PlaylistTrack {
 export interface DJPlaylist {
   id: string;
   name: string;
+  description?: string;
   createdAt: number;
   updatedAt: number;
   tracks: PlaylistTrack[];
@@ -53,21 +59,68 @@ interface DJPlaylistState {
   playlists: DJPlaylist[];
   activePlaylistId: string | null;
 
-  // Actions
+  // ── Selection (ephemeral, not persisted) ──────────────────────────────
+  selectedTrackIndices: number[];
+  focusedTrackIndex: number;
+
+  // ── Undo/Redo (ephemeral, not persisted) ──────────────────────────────
+  _undoStack: DJPlaylist[][];
+  _redoStack: DJPlaylist[][];
+  canUndo: boolean;
+  canRedo: boolean;
+
+  // ── Playlist CRUD ─────────────────────────────────────────────────────
   createPlaylist: (name: string) => string;
   deletePlaylist: (playlistId: string) => void;
   renamePlaylist: (playlistId: string, name: string) => void;
   setActivePlaylist: (playlistId: string | null) => void;
-  addTrack: (playlistId: string, track: PlaylistTrack) => void;
+  updatePlaylistDescription: (playlistId: string, description: string) => void;
+  clonePlaylist: (playlistId: string) => string;
+
+  // ── Track CRUD ────────────────────────────────────────────────────────
+  addTrack: (playlistId: string, track: Omit<PlaylistTrack, 'id'> & { id?: string }) => void;
+  addTracks: (playlistId: string, tracks: Array<Omit<PlaylistTrack, 'id'> & { id?: string }>, opts?: { skipDuplicates?: boolean }) => void;
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
-  /** Save master FX chain to a playlist (applied when Auto DJ starts) */
   setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
+
+  // ── Selection actions ─────────────────────────────────────────────────
+  selectTrack: (index: number) => void;
+  selectTrackRange: (from: number, to: number) => void;
+  toggleTrackSelection: (index: number) => void;
+  selectAllTracks: () => void;
+  clearSelection: () => void;
+  setFocusedTrack: (index: number) => void;
+
+  // ── Batch operations ──────────────────────────────────────────────────
+  removeSelectedTracks: (playlistId: string) => void;
+  moveSelectedTracks: (fromPlaylistId: string, toPlaylistId: string) => void;
+  copySelectedTracks: (fromPlaylistId: string, toPlaylistId: string) => void;
+
+  // ── Undo/Redo actions ─────────────────────────────────────────────────
+  undo: () => void;
+  redo: () => void;
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function generateTrackId(): string {
+  return `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function ensureTrackId(track: Omit<PlaylistTrack, 'id'> & { id?: string }): PlaylistTrack {
+  return { ...track, id: track.id || generateTrackId() } as PlaylistTrack;
+}
+
+function deepClonePlaylists(playlists: DJPlaylist[]): DJPlaylist[] {
+  return JSON.parse(JSON.stringify(playlists));
+}
+
+const MAX_UNDO = 30;
 
 // ── Store ────────────────────────────────────────────────────────────────────
 
@@ -77,10 +130,23 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       playlists: [],
       activePlaylistId: null,
 
+      // Ephemeral state
+      selectedTrackIndices: [],
+      focusedTrackIndex: -1,
+      _undoStack: [],
+      _redoStack: [],
+      canUndo: false,
+      canRedo: false,
+
+      // ── Internal: push undo snapshot ──────────────────────────────────
+
+      // ── Playlist CRUD ─────────────────────────────────────────────────
+
       createPlaylist: (name: string) => {
         const id = `playlist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const now = Date.now();
         set((state) => {
+          pushUndo(state);
           state.playlists.push({
             id,
             name,
@@ -90,23 +156,26 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           });
           state.activePlaylistId = id;
         });
-        // Async sync — fire and forget
         syncPlaylists();
         return id;
       },
 
       deletePlaylist: (playlistId: string) => {
         set((state) => {
+          pushUndo(state);
           state.playlists = state.playlists.filter((p) => p.id !== playlistId);
           if (state.activePlaylistId === playlistId) {
             state.activePlaylistId = state.playlists[0]?.id ?? null;
           }
+          state.selectedTrackIndices = [];
+          state.focusedTrackIndex = -1;
         });
         syncPlaylists();
       },
 
       renamePlaylist: (playlistId: string, name: string) => {
         set((state) => {
+          pushUndo(state);
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
             p.name = name;
@@ -119,12 +188,47 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       setActivePlaylist: (playlistId: string | null) => {
         set((state) => {
           state.activePlaylistId = playlistId;
+          state.selectedTrackIndices = [];
+          state.focusedTrackIndex = -1;
         });
       },
 
-      addTrack: (playlistId: string, track: PlaylistTrack) => {
-        // Capture audio store state BEFORE mutating playlist store to avoid
-        // reading stale data if the audio store is mid-mutation.
+      updatePlaylistDescription: (playlistId: string, description: string) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p) {
+            p.description = description;
+            p.updatedAt = Date.now();
+          }
+        });
+        syncPlaylists();
+      },
+
+      clonePlaylist: (playlistId: string) => {
+        const newId = `playlist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        set((state) => {
+          pushUndo(state);
+          const source = state.playlists.find((p) => p.id === playlistId);
+          if (!source) return;
+          const clone: DJPlaylist = JSON.parse(JSON.stringify(source));
+          clone.id = newId;
+          clone.name = `${source.name} (Copy)`;
+          clone.createdAt = Date.now();
+          clone.updatedAt = Date.now();
+          // Give cloned tracks new IDs
+          for (const t of clone.tracks) {
+            t.id = generateTrackId();
+          }
+          state.playlists.push(clone);
+          state.activePlaylistId = newId;
+        });
+        syncPlaylists();
+        return newId;
+      },
+
+      // ── Track CRUD ────────────────────────────────────────────────────
+
+      addTrack: (playlistId: string, track: Omit<PlaylistTrack, 'id'> & { id?: string }) => {
         let masterFxSnapshot: EffectConfig[] | null = null;
         try {
           const { useAudioStore } = require('@/stores/useAudioStore');
@@ -135,11 +239,11 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         } catch { /* audio store not available */ }
 
         set((state) => {
+          pushUndo(state);
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
-            p.tracks.push(track);
+            p.tracks.push(ensureTrackId(track));
             p.updatedAt = Date.now();
-            // Auto-snapshot master FX to playlist if none saved yet
             if (!p.masterEffects && masterFxSnapshot) {
               p.masterEffects = masterFxSnapshot;
             }
@@ -148,12 +252,67 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         syncPlaylists();
       },
 
+      addTracks: (playlistId: string, tracks: Array<Omit<PlaylistTrack, 'id'> & { id?: string }>, opts?: { skipDuplicates?: boolean }) => {
+        let masterFxSnapshot: EffectConfig[] | null = null;
+        try {
+          const { useAudioStore } = require('@/stores/useAudioStore');
+          const fx = useAudioStore.getState().masterEffects;
+          if (fx.length > 0) {
+            masterFxSnapshot = JSON.parse(JSON.stringify(fx));
+          }
+        } catch { /* audio store not available */ }
+
+        set((state) => {
+          pushUndo(state);
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (!p) return;
+
+          let added = 0;
+          let skipped = 0;
+          for (const track of tracks) {
+            if (opts?.skipDuplicates) {
+              const isDuplicate = p.tracks.some((t) => t.fileName === track.fileName);
+              if (isDuplicate) { skipped++; continue; }
+            }
+            p.tracks.push(ensureTrackId(track));
+            added++;
+          }
+          p.updatedAt = Date.now();
+          if (!p.masterEffects && masterFxSnapshot) {
+            p.masterEffects = masterFxSnapshot;
+          }
+
+          if (skipped > 0) {
+            // Import notify lazily to avoid circular deps
+            import('@/stores/useNotificationStore').then(({ notify }) => {
+              notify.warning(`Skipped ${skipped} duplicate track${skipped > 1 ? 's' : ''}`);
+            });
+          }
+          if (added > 0) {
+            import('@/stores/useNotificationStore').then(({ notify }) => {
+              notify.success(`Added ${added} track${added > 1 ? 's' : ''}`);
+            });
+          }
+        });
+        syncPlaylists();
+      },
+
       removeTrack: (playlistId: string, index: number) => {
         set((state) => {
+          pushUndo(state);
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p && index >= 0 && index < p.tracks.length) {
             p.tracks.splice(index, 1);
             p.updatedAt = Date.now();
+            // Adjust selection
+            state.selectedTrackIndices = state.selectedTrackIndices
+              .filter((i) => i !== index)
+              .map((i) => (i > index ? i - 1 : i));
+            if (state.focusedTrackIndex === index) {
+              state.focusedTrackIndex = Math.min(index, p.tracks.length - 1);
+            } else if (state.focusedTrackIndex > index) {
+              state.focusedTrackIndex--;
+            }
           }
         });
         syncPlaylists();
@@ -163,9 +322,15 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
+            pushUndo(state);
             const [removed] = p.tracks.splice(fromIndex, 1);
             p.tracks.splice(toIndex, 0, removed);
             p.updatedAt = Date.now();
+            // Update focused index to follow the moved track
+            if (state.focusedTrackIndex === fromIndex) {
+              state.focusedTrackIndex = toIndex;
+            }
+            state.selectedTrackIndices = [];
           }
         });
         syncPlaylists();
@@ -173,16 +338,19 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
 
       sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => {
         set((state) => {
+          pushUndo(state);
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p) {
             p.tracks = sortedTracks;
             p.updatedAt = Date.now();
+            state.selectedTrackIndices = [];
+            state.focusedTrackIndex = -1;
           }
         });
         syncPlaylists();
       },
 
-      updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => {
+      updateTrackMeta: (playlistId: string, index: number, meta) => {
         set((state) => {
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p && index >= 0 && index < p.tracks.length) {
@@ -205,10 +373,15 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           for (const incoming of playlists) {
             const existing = state.playlists.find((p) => p.id === incoming.id);
             if (existing) {
-              // Server wins: overwrite
               Object.assign(existing, incoming);
             } else {
               state.playlists.push(incoming);
+            }
+          }
+          // Ensure all imported tracks have IDs
+          for (const pl of state.playlists) {
+            for (const t of pl.tracks) {
+              if (!t.id) t.id = generateTrackId();
             }
           }
         });
@@ -224,23 +397,169 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         });
         syncPlaylists();
       },
+
+      // ── Selection actions ─────────────────────────────────────────────
+
+      selectTrack: (index: number) => {
+        set((state) => {
+          state.selectedTrackIndices = [index];
+          state.focusedTrackIndex = index;
+        });
+      },
+
+      selectTrackRange: (from: number, to: number) => {
+        set((state) => {
+          const min = Math.min(from, to);
+          const max = Math.max(from, to);
+          const range: number[] = [];
+          for (let i = min; i <= max; i++) range.push(i);
+          state.selectedTrackIndices = range;
+          state.focusedTrackIndex = to;
+        });
+      },
+
+      toggleTrackSelection: (index: number) => {
+        set((state) => {
+          const idx = state.selectedTrackIndices.indexOf(index);
+          if (idx >= 0) {
+            state.selectedTrackIndices.splice(idx, 1);
+          } else {
+            state.selectedTrackIndices.push(index);
+          }
+          state.focusedTrackIndex = index;
+        });
+      },
+
+      selectAllTracks: () => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === state.activePlaylistId);
+          if (p) {
+            state.selectedTrackIndices = p.tracks.map((_, i) => i);
+          }
+        });
+      },
+
+      clearSelection: () => {
+        set((state) => {
+          state.selectedTrackIndices = [];
+        });
+      },
+
+      setFocusedTrack: (index: number) => {
+        set((state) => {
+          state.focusedTrackIndex = index;
+        });
+      },
+
+      // ── Batch operations ──────────────────────────────────────────────
+
+      removeSelectedTracks: (playlistId: string) => {
+        set((state) => {
+          pushUndo(state);
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (!p) return;
+          const toRemove = new Set(state.selectedTrackIndices);
+          p.tracks = p.tracks.filter((_, i) => !toRemove.has(i));
+          p.updatedAt = Date.now();
+          state.selectedTrackIndices = [];
+          state.focusedTrackIndex = Math.min(state.focusedTrackIndex, p.tracks.length - 1);
+        });
+        syncPlaylists();
+      },
+
+      moveSelectedTracks: (fromPlaylistId: string, toPlaylistId: string) => {
+        set((state) => {
+          pushUndo(state);
+          const from = state.playlists.find((p) => p.id === fromPlaylistId);
+          const to = state.playlists.find((p) => p.id === toPlaylistId);
+          if (!from || !to) return;
+          const indices = [...state.selectedTrackIndices].sort((a, b) => a - b);
+          const moved: PlaylistTrack[] = [];
+          for (const i of indices) {
+            if (i >= 0 && i < from.tracks.length) {
+              moved.push({ ...from.tracks[i], id: generateTrackId() });
+            }
+          }
+          // Remove from source (reverse order to preserve indices)
+          for (let j = indices.length - 1; j >= 0; j--) {
+            from.tracks.splice(indices[j], 1);
+          }
+          to.tracks.push(...moved);
+          from.updatedAt = Date.now();
+          to.updatedAt = Date.now();
+          state.selectedTrackIndices = [];
+          state.focusedTrackIndex = -1;
+        });
+        syncPlaylists();
+      },
+
+      copySelectedTracks: (fromPlaylistId: string, toPlaylistId: string) => {
+        set((state) => {
+          pushUndo(state);
+          const from = state.playlists.find((p) => p.id === fromPlaylistId);
+          const to = state.playlists.find((p) => p.id === toPlaylistId);
+          if (!from || !to) return;
+          const indices = [...state.selectedTrackIndices].sort((a, b) => a - b);
+          for (const i of indices) {
+            if (i >= 0 && i < from.tracks.length) {
+              to.tracks.push({ ...from.tracks[i], id: generateTrackId() });
+            }
+          }
+          to.updatedAt = Date.now();
+        });
+        syncPlaylists();
+      },
+
+      // ── Undo/Redo ─────────────────────────────────────────────────────
+
+      undo: () => {
+        set((state) => {
+          if (state._undoStack.length === 0) return;
+          const snapshot = state._undoStack.pop()!;
+          state._redoStack.push(deepClonePlaylists(state.playlists));
+          state.playlists = snapshot as DJPlaylist[];
+          state.canUndo = state._undoStack.length > 0;
+          state.canRedo = true;
+          state.selectedTrackIndices = [];
+          state.focusedTrackIndex = -1;
+        });
+        syncPlaylists();
+      },
+
+      redo: () => {
+        set((state) => {
+          if (state._redoStack.length === 0) return;
+          const snapshot = state._redoStack.pop()!;
+          state._undoStack.push(deepClonePlaylists(state.playlists));
+          state.playlists = snapshot as DJPlaylist[];
+          state.canUndo = true;
+          state.canRedo = state._redoStack.length > 0;
+          state.selectedTrackIndices = [];
+          state.focusedTrackIndex = -1;
+        });
+        syncPlaylists();
+      },
     })),
     {
       name: 'devilbox-dj-playlists',
       version: 2,
       migrate: (persisted: unknown) => {
-        // Wipe playlists on upgrade so bundled import re-runs with modland: prefixes
         const state = persisted as Record<string, unknown>;
         state.playlists = [];
         state.activePlaylistId = null;
         return state;
       },
+      partialize: (state) => ({
+        playlists: state.playlists,
+        activePlaylistId: state.activePlaylistId,
+      }),
       onRehydrateStorage: () => (state) => {
-        // Clear all "played" flags on session start — they're per-session only
         if (state) {
           for (const pl of state.playlists) {
             for (const t of pl.tracks) {
               t.played = undefined;
+              // Migrate: ensure all tracks have IDs
+              if (!t.id) t.id = generateTrackId();
             }
           }
         }
@@ -248,6 +567,18 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     },
   ),
 );
+
+// ── Internal: push undo snapshot (called inside immer set()) ────────────────
+
+function pushUndo(state: DJPlaylistState): void {
+  state._undoStack.push(deepClonePlaylists(state.playlists));
+  if (state._undoStack.length > MAX_UNDO) {
+    state._undoStack.shift();
+  }
+  state._redoStack = [];
+  state.canUndo = true;
+  state.canRedo = false;
+}
 
 // ── Auto-import bundled playlists on first launch ────────────────────────────
 
@@ -258,7 +589,7 @@ async function importBundledIfEmpty(): Promise<void> {
   bundledImportAttempted = true;
 
   const { playlists } = useDJPlaylistStore.getState();
-  if (playlists.length > 0) return; // Already have playlists
+  if (playlists.length > 0) return;
 
   try {
     const resp = await fetch('/data/playlists/imported-prg.json');
@@ -266,7 +597,6 @@ async function importBundledIfEmpty(): Promise<void> {
     const data: DJPlaylist[] = await resp.json();
     if (Array.isArray(data) && data.length > 0) {
       useDJPlaylistStore.getState().importPlaylists(data);
-      // Set the first playlist as active
       const first = useDJPlaylistStore.getState().playlists[0];
       if (first) useDJPlaylistStore.getState().setActivePlaylist(first.id);
       console.log(`[DJPlaylistStore] Imported ${data.length} bundled playlists`);
@@ -276,8 +606,6 @@ async function importBundledIfEmpty(): Promise<void> {
   }
 }
 
-// Trigger on store hydration (persist middleware fires synchronously,
-// so by the time this runs the localStorage data is already loaded)
 setTimeout(importBundledIfEmpty, 100);
 
 // ── Debounced server sync ────────────────────────────────────────────────────
@@ -289,5 +617,5 @@ function syncPlaylists(): void {
   syncTimer = setTimeout(() => {
     const { playlists } = useDJPlaylistStore.getState();
     pushToCloud(SYNC_KEYS.DJ_PLAYLISTS, playlists).catch(() => {});
-  }, 2000); // Debounce 2s to avoid rapid fire during drag-reorder
+  }, 2000);
 }

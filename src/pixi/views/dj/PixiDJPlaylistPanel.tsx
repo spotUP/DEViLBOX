@@ -2,11 +2,11 @@
  * PixiDJPlaylistPanel — GL-native DJ playlist panel for the Pixi.js scene graph.
  *
  * GL port of src/components/dj/DJPlaylistPanel.tsx.
- * Renders playlist tabs, track list with deck-load buttons, reorder controls,
- * and add-tracks via glFilePicker — entirely in Pixi (no DOM).
+ * Features: playlist CRUD, track list with deck-load buttons, reorder controls,
+ * multi-select, keyboard nav, search, sort, clone, undo/redo, confirmations.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { usePixiTheme } from '../../theme';
 import { DECK_A, DECK_B, DECK_C } from '../../colors';
 import { PixiButton } from '../../components/PixiButton';
@@ -24,13 +24,15 @@ import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
+import { showConfirm } from '@/stores/useConfirmStore';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 
-const PANEL_H = 280;
+const PANEL_H = 340;
 const HEADER_H = 30;
 const TABS_H = 28;
-const TRACK_ROW_H = 32;
+const TOOLBAR_H = 28;
 const PAD = 6;
 const ACCEPT_AUDIO = 'audio/*,.mod,.xm,.s3m,.it,.mptm,.stm,.669,.med,.oct,.okt,.far,.ult,.dmf,.fur';
 
@@ -45,8 +47,9 @@ function formatDuration(seconds: number): string {
 function trackSublabel(t: PlaylistTrack): string {
   const parts = [t.format];
   if (t.bpm > 0) parts.push(`${t.bpm} BPM`);
+  if (t.musicalKey) parts.push(t.musicalKey);
   if (t.duration > 0) parts.push(formatDuration(t.duration));
-  return parts.join(' · ');
+  return parts.join(' \u00b7 ');
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -71,6 +74,16 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
   const addTrack = useDJPlaylistStore((s) => s.addTrack);
   const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
   const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
+  const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
+  const clonePlaylist = useDJPlaylistStore((s) => s.clonePlaylist);
+  const selectedTrackIndices = useDJPlaylistStore((s) => s.selectedTrackIndices);
+  const selectTrack = useDJPlaylistStore((s) => s.selectTrack);
+  const clearSelection = useDJPlaylistStore((s) => s.clearSelection);
+  const removeSelectedTracks = useDJPlaylistStore((s) => s.removeSelectedTracks);
+  const canUndo = useDJPlaylistStore((s) => s.canUndo);
+  const canRedo = useDJPlaylistStore((s) => s.canRedo);
+  const undo = useDJPlaylistStore((s) => s.undo);
+  const redo = useDJPlaylistStore((s) => s.redo);
   const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
 
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
@@ -78,6 +91,19 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
   // Local state
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [showSort, setShowSort] = useState(false);
+  const lastClickedRef = useRef(-1);
+
+  // Sync PixiList selection with store
+  useEffect(() => {
+    if (selectedTrackId && activePlaylist) {
+      const idx = activePlaylist.tracks.findIndex((t) => t.id === selectedTrackId);
+      if (idx >= 0 && !selectedTrackIndices.includes(idx)) {
+        selectTrack(idx);
+        lastClickedRef.current = idx;
+      }
+    }
+  }, [selectedTrackId, activePlaylist, selectedTrackIndices, selectTrack]);
 
   // ── Playlist CRUD ──────────────────────────────────────────────────────────
 
@@ -86,9 +112,20 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     createPlaylist(name);
   }, [playlists.length, createPlaylist]);
 
-  const handleDeletePlaylist = useCallback(() => {
-    if (activePlaylistId) deletePlaylist(activePlaylistId);
-  }, [activePlaylistId, deletePlaylist]);
+  const handleDeletePlaylist = useCallback(async () => {
+    if (!activePlaylist) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Playlist',
+      message: `Delete "${activePlaylist.name}" and all ${activePlaylist.tracks.length} tracks?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (confirmed) deletePlaylist(activePlaylist.id);
+  }, [activePlaylist, deletePlaylist]);
+
+  const handleClonePlaylist = useCallback(() => {
+    if (activePlaylistId) clonePlaylist(activePlaylistId);
+  }, [activePlaylistId, clonePlaylist]);
 
   // ── Add files ──────────────────────────────────────────────────────────────
 
@@ -165,8 +202,6 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         } catch (err) {
           console.error(`[PixiDJPlaylistPanel] Pipeline failed for ${fileName}:`, err);
         }
-      } else {
-        console.warn(`[PixiDJPlaylistPanel] Cannot load ${fileName}: missing raw buffer`);
       }
     },
     [],
@@ -176,7 +211,6 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     async (track: PlaylistTrack, deckId: DeckId) => {
       const engine = getDJEngine();
 
-      // Modland tracks: re-download
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
@@ -199,7 +233,6 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         }
       }
 
-      // Prompt user to select file via GL picker
       const file = await pickFiles({ accept: ACCEPT_AUDIO });
       const selected = file[0];
       if (!selected) return;
@@ -246,24 +279,62 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     [activePlaylistId, removeTrack],
   );
 
+  const handleRemoveSelected = useCallback(async () => {
+    if (!activePlaylistId || selectedTrackIndices.length === 0) return;
+    if (selectedTrackIndices.length > 3) {
+      const confirmed = await showConfirm({
+        title: 'Remove Tracks',
+        message: `Remove ${selectedTrackIndices.length} selected tracks?`,
+        confirmLabel: 'Remove',
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
+    removeSelectedTracks(activePlaylistId);
+  }, [activePlaylistId, selectedTrackIndices, removeSelectedTracks]);
+
+  // ── Sort ───────────────────────────────────────────────────────────────────
+
+  const handleSort = useCallback((mode: 'smart' | 'bpm' | 'bpm-desc' | 'key' | 'energy' | 'name') => {
+    if (!activePlaylist) return;
+    const tracks = [...activePlaylist.tracks];
+    let sorted: PlaylistTrack[];
+    switch (mode) {
+      case 'smart': sorted = smartSort(tracks); break;
+      case 'bpm': sorted = sortByBPM(tracks); break;
+      case 'bpm-desc': sorted = sortByBPM(tracks, true); break;
+      case 'key': sorted = sortByKey(tracks); break;
+      case 'energy': sorted = sortByEnergy(tracks); break;
+      case 'name': sorted = sortByName(tracks); break;
+      default: sorted = tracks;
+    }
+    sortTracksAction(activePlaylist.id, sorted);
+    setShowSort(false);
+  }, [activePlaylist, sortTracksAction]);
+
   // ── Track list items for PixiList ──────────────────────────────────────────
+
+  const selectedSet = useMemo(() => new Set(selectedTrackIndices), [selectedTrackIndices]);
 
   const trackListItems = useMemo(() => {
     if (!activePlaylist) return [];
     return activePlaylist.tracks.map((t, i) => ({
-      id: `${t.fileName}-${i}`,
+      id: t.id,
       label: `${(i + 1).toString().padStart(2, ' ')}  ${t.played ? '[P] ' : ''}${t.trackName}`,
       sublabel: trackSublabel(t),
       iconName: 'diskio',
-      iconColor: t.played ? theme.success.color : undefined, // green icon for played tracks
+      iconColor: t.played ? theme.success.color : undefined,
+      selected: selectedSet.has(i),
       actions: [
         { label: '1', color: DECK_A, onClick: () => loadTrackToDeck(t, 'A') },
         { label: '2', color: DECK_B, onClick: () => loadTrackToDeck(t, 'B') },
         ...(thirdDeckActive ? [{ label: '3', color: DECK_C, onClick: () => loadTrackToDeck(t, 'C' as DeckId) }] : []),
+        { label: '\u25b2', color: 0x666666, onClick: () => handleMoveUp(i) },
+        { label: '\u25bc', color: 0x666666, onClick: () => handleMoveDown(i) },
         { label: 'X', color: 0x666666, onClick: () => handleRemoveTrack(i) },
       ],
     }));
-  }, [activePlaylist, thirdDeckActive, loadTrackToDeck, handleRemoveTrack]);
+  }, [activePlaylist, thirdDeckActive, selectedSet, loadTrackToDeck, handleMoveUp, handleMoveDown, handleRemoveTrack, theme.success.color]);
 
   // Find selected track index
   const selectedIdx = useMemo(() => {
@@ -273,7 +344,7 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
 
   // ── Dimensions ─────────────────────────────────────────────────────────────
 
-  const listH = PANEL_H - HEADER_H - TABS_H - TRACK_ROW_H - PAD * 3;
+  const listH = PANEL_H - HEADER_H - TABS_H - TOOLBAR_H - PAD * 4;
 
   if (!visible) return null;
 
@@ -311,25 +382,15 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
           layout={{ marginLeft: 2 }}
         />
         <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
-          <PixiButton
-            label="+ New"
-            variant="ghost"
-            size="sm"
-            width={52}
-            height={22}
-            onClick={handleNewPlaylist}
-          />
+          <PixiButton label="+ New" variant="ghost" size="sm" width={52} height={22} onClick={handleNewPlaylist} />
           {activePlaylistId && (
-            <PixiButton
-              label="Delete"
-              variant="ghost"
-              size="sm"
-              width={52}
-              height={22}
-              color="red"
-              onClick={handleDeletePlaylist}
-            />
+            <>
+              <PixiButton label="Clone" variant="ghost" size="sm" width={44} height={22} onClick={handleClonePlaylist} />
+              <PixiButton label="Delete" variant="ghost" size="sm" width={52} height={22} color="red" onClick={handleDeletePlaylist} />
+            </>
           )}
+          {canUndo && <PixiButton icon="undo" label="" variant="ghost" size="sm" width={24} height={22} onClick={undo} />}
+          {canRedo && <PixiButton icon="redo" label="" variant="ghost" size="sm" width={24} height={22} onClick={redo} />}
           {onClose && (
             <PixiButton icon="close" label="" variant="ghost" size="sm" width={24} height={22} onClick={onClose} />
           )}
@@ -361,95 +422,70 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         </layoutContainer>
       )}
 
-      {/* ── Toolbar: Add + reorder + remove ─────────────────────────────── */}
+      {/* ── Toolbar: Add + sort + selection actions ─────────────────────── */}
       {activePlaylist && (
         <layoutContainer
           layout={{
-            height: TRACK_ROW_H,
+            height: TOOLBAR_H,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
           }}
         >
           <PixiButton
-            label={isLoadingFile ? '...' : '+ Add Tracks'}
+            label={isLoadingFile ? '...' : '+ Add'}
             variant="default"
             size="sm"
-            width={90}
+            width={56}
             height={22}
             disabled={isLoadingFile}
             onClick={handleAddTracks}
           />
-          {selectedIdx >= 0 && (
+
+          {/* Sort buttons */}
+          <PixiButton
+            label="Sort"
+            variant="ghost"
+            size="sm"
+            width={40}
+            height={22}
+            onClick={() => setShowSort((v) => !v)}
+          />
+
+          {selectedTrackIndices.length > 1 && (
             <>
-              <PixiButton
-                label="▲"
-                variant="ghost"
-                size="sm"
-                width={24}
-                height={22}
-                disabled={selectedIdx <= 0}
-                onClick={() => handleMoveUp(selectedIdx)}
-              />
-              <PixiButton
-                label="▼"
-                variant="ghost"
-                size="sm"
-                width={24}
-                height={22}
-                disabled={!activePlaylist || selectedIdx >= activePlaylist.tracks.length - 1}
-                onClick={() => handleMoveDown(selectedIdx)}
-              />
-              <PixiButton
-                icon="close"
-                label=""
-                variant="ghost"
-                size="sm"
-                width={24}
-                height={22}
-                color="red"
-                onClick={() => handleRemoveTrack(selectedIdx)}
-              />
+              <PixiLabel text={`${selectedTrackIndices.length} sel`} size="xs" color="accent" />
+              <PixiButton label="Del sel" variant="ghost" size="sm" width={50} height={22} color="red" onClick={handleRemoveSelected} />
+              <PixiButton label="Clear" variant="ghost" size="sm" width={42} height={22} onClick={clearSelection} />
             </>
           )}
 
-          {/* Spacer */}
-          <layoutContainer layout={{ flex: 1 }} />
-
-          {/* Deck load buttons (shown when a track is selected) */}
-          {selectedIdx >= 0 && activePlaylist && (
-            <layoutContainer layout={{ flexDirection: 'row', gap: 3 }}>
-              <PixiButton
-                label="Deck 1"
-                variant="ft2"
-                size="sm"
-                color="blue"
-                width={50}
-                height={22}
-                onClick={() => loadTrackToDeck(activePlaylist.tracks[selectedIdx], 'A')}
-              />
-              <PixiButton
-                label="Deck 2"
-                variant="ft2"
-                size="sm"
-                color="red"
-                width={50}
-                height={22}
-                onClick={() => loadTrackToDeck(activePlaylist.tracks[selectedIdx], 'B')}
-              />
-              {thirdDeckActive && (
-                <PixiButton
-                  label="Deck 3"
-                  variant="ft2"
-                  size="sm"
-                  color="green"
-                  width={50}
-                  height={22}
-                  onClick={() => loadTrackToDeck(activePlaylist.tracks[selectedIdx], 'C')}
-                />
-              )}
-            </layoutContainer>
+          {selectedIdx >= 0 && (
+            <>
+              <layoutContainer layout={{ flex: 1 }} />
+              <layoutContainer layout={{ flexDirection: 'row', gap: 3 }}>
+                <PixiButton label="Deck 1" variant="ft2" size="sm" color="blue" width={50} height={22}
+                  onClick={() => loadTrackToDeck(activePlaylist.tracks[selectedIdx], 'A')} />
+                <PixiButton label="Deck 2" variant="ft2" size="sm" color="red" width={50} height={22}
+                  onClick={() => loadTrackToDeck(activePlaylist.tracks[selectedIdx], 'B')} />
+                {thirdDeckActive && (
+                  <PixiButton label="Deck 3" variant="ft2" size="sm" color="green" width={50} height={22}
+                    onClick={() => loadTrackToDeck(activePlaylist.tracks[selectedIdx], 'C')} />
+                )}
+              </layoutContainer>
+            </>
           )}
+        </layoutContainer>
+      )}
+
+      {/* ── Sort buttons row ────────────────────────────────────────────── */}
+      {showSort && activePlaylist && (
+        <layoutContainer layout={{ height: 24, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <PixiButton label="Smart" variant="ft2" size="sm" width={48} height={20} onClick={() => handleSort('smart')} />
+          <PixiButton label="BPM" variant="ft2" size="sm" width={36} height={20} onClick={() => handleSort('bpm')} />
+          <PixiButton label="Key" variant="ft2" size="sm" width={32} height={20} onClick={() => handleSort('key')} />
+          <PixiButton label="Energy" variant="ft2" size="sm" width={48} height={20} onClick={() => handleSort('energy')} />
+          <PixiButton label="Name" variant="ft2" size="sm" width={40} height={20} onClick={() => handleSort('name')} />
         </layoutContainer>
       )}
 
@@ -467,22 +503,14 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
           />
         ) : (
           <layoutContainer
-            layout={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
+            layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
           >
-            <PixiLabel text="Empty playlist — add tracks above" size="xs" color="textMuted" />
+            <PixiLabel text="Empty playlist \u2014 add tracks above" size="xs" color="textMuted" />
           </layoutContainer>
         )
       ) : (
         <layoutContainer
-          layout={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
+          layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
         >
           <PixiLabel text="Create a playlist to get started" size="xs" color="textMuted" />
         </layoutContainer>

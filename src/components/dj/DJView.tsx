@@ -21,6 +21,7 @@ import { DJCratePanel } from './DJCratePanel';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
 import { DJAutoDJPanel } from './DJAutoDJPanel';
+import { DJAutoMixNowButton } from './DJAutoMixNowButton';
 import { DJVocoderControl } from './DJVocoderControl';
 import { DJRemoteControlButton } from './DJRemoteControlButton';
 import { DeckAudioWaveform } from './DeckAudioWaveform';
@@ -321,8 +322,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* TOP BAR                                                            */}
       {/* ================================================================== */}
-      <div className="flex items-center justify-between px-4 py-2 shrink-0 bg-dark-bgSecondary border-b border-dark-border">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center px-2 py-1.5 shrink-0 bg-dark-bgSecondary border-b border-dark-border overflow-x-auto overflow-y-hidden scrollbar-hidden">
+        <div className="flex items-center gap-1.5 flex-nowrap [&>*]:shrink-0">
           <DJControllerSelector />
           <DJFxQuickPresets />
           <CustomSelect
@@ -365,6 +366,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
               </div>
             )}
           </div>
+          {autoDJEnabled && <DJAutoMixNowButton />}
           <DJVocoderControl />
           <DJRemoteControlButton />
           <button
