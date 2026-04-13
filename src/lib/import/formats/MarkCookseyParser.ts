@@ -37,6 +37,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -380,23 +381,27 @@ export async function parseMarkCookseyFile(
 
   // ── Instruments ──────────────────────────────────────────────────────────
 
-  const sampleCount = extractedSamples.length > 0 ? extractedSamples.length : 64;
+  const sampleCount = extractedSamples.length > 0 ? extractedSamples.length : 8;
   const instruments: InstrumentConfig[] = [];
 
   for (let i = 0; i < sampleCount; i++) {
     const smp = extractedSamples[i];
-    const name = smp
-      ? `Sample ${i + 1} (${smp.length} bytes)`
-      : `Sample ${i + 1}`;
-    instruments.push({
-      id: i + 1,
-      name,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+    if (smp && smp.offset > 0 && smp.offset + smp.length <= buf.length && smp.length > 0) {
+      const pcm = buf.slice(smp.offset, smp.offset + smp.length);
+      instruments.push(createSamplerInstrument(
+        i + 1, `MC Sample ${i + 1}`, pcm, 64, 8287, 0, 0,
+      ));
+    } else {
+      instruments.push({
+        id: i + 1,
+        name: `MC Sample ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Song positions ──────────────────────────────────────────────────────

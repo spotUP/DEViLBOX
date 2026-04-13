@@ -37,6 +37,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -225,16 +226,16 @@ export async function parseCustomMadeFile(
       }
 
       // Scan for LEA instructions after the signature to find sample tables
+      // and extract inline PCM data: each entry is [u32 len] [u16 period] [len bytes PCM]
       if (sigOffset > 0) {
         for (let off = sigOffset; off < Math.min(sigOffset + 512, buf.length - 4); off += 2) {
           const op = u16BE(buf, off);
-          // $41FA = LEA d16(PC),A0
           if (op === 0x41FA && off + 4 <= buf.length) {
             const disp = u16BE(buf, off + 2);
             const signedDisp = disp < 0x8000 ? disp : disp - 0x10000;
             const target = off + 2 + signedDisp;
             if (target > 0 && target + 8 <= buf.length) {
-              // Try to count sample entries at target
+              // First pass: count entries to validate
               let count = 0;
               let soff = target;
               for (let i = 0; i < 64 && soff + 6 <= buf.length; i++) {
@@ -247,6 +248,29 @@ export async function parseCustomMadeFile(
               }
               if (count >= 2) {
                 sampleCount = count;
+                // Second pass: extract PCM samples
+                soff = target;
+                for (let i = 0; i < count && soff + 6 <= buf.length; i++) {
+                  const len = u32BE(buf, soff);
+                  const period = u16BE(buf, soff + 4);
+                  const pcmStart = soff + 6;
+                  const pcmEnd = Math.min(pcmStart + len, buf.length);
+                  if (pcmEnd > pcmStart && len > 0) {
+                    const pcm = buf.slice(pcmStart, pcmEnd);
+                    // Convert period to sample rate: PAL clock / period
+                    const sampleRate = period > 0 ? Math.round(3546895 / period) : 8287;
+                    instruments.push(createSamplerInstrument(
+                      i + 1, `${variantLabel} ${i + 1}`, pcm, 64, sampleRate, 0, 0,
+                    ));
+                  } else {
+                    instruments.push({
+                      id: i + 1, name: `${variantLabel} ${i + 1}`,
+                      type: 'synth' as const, synthType: 'Synth' as const,
+                      effects: [], volume: 0, pan: 0,
+                    } as InstrumentConfig);
+                  }
+                  soff += 6 + len;
+                }
                 break;
               }
             }
@@ -258,18 +282,20 @@ export async function parseCustomMadeFile(
     // Binary scan failed — use defaults
   }
 
-  // ── Build instrument list ────────────────────────────────────────────────
+  // ── Build instrument list (fallback if PCM extraction didn't populate) ──
 
-  for (let i = 0; i < sampleCount; i++) {
-    instruments.push({
-      id: i + 1,
-      name: `${variantLabel} Sample ${i + 1}`,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  if (instruments.length === 0) {
+    for (let i = 0; i < sampleCount; i++) {
+      instruments.push({
+        id: i + 1,
+        name: `${variantLabel} Sample ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+      } as InstrumentConfig);
+    }
   }
 
   // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
