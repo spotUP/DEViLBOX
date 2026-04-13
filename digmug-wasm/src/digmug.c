@@ -1476,6 +1476,139 @@ size_t dm_render(DmModule* module, float* interleaved_stereo, size_t frames) {
     return frames_written;
 }
 
+size_t dm_render_multi(DmModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames) {
+    if (!module || frames == 0)
+        return 0;
+
+    float* ch_out[4] = { ch0, ch1, ch2, ch3 };
+    size_t frames_written = 0;
+
+    for (size_t f = 0; f < frames; f++) {
+        // Accumulate ticks
+        module->tick_accumulator += 1.0f;
+
+        if (module->tick_accumulator >= module->ticks_per_frame) {
+            module->tick_accumulator -= module->ticks_per_frame;
+            play_it(module);
+        }
+
+        // Always mix 4 hardware channels (for DMU2, channels 4-6 are mixed into the 4 Amiga channels
+        // by NostalgicPlayer's virtual channel system; here we mix all active channels with Amiga panning)
+        for (int ch_idx = 0; ch_idx < module->number_of_channels; ch_idx++) {
+            DmChannel* c = &module->channels[ch_idx];
+            float sample = 0.0f;
+
+            // For channels beyond 4, skip per-channel output (DMU2 extra channels)
+            if (ch_idx >= 4) {
+                // Still need to advance these channels but no separate output buffer
+                if (!c->active || c->muted || c->period == 0 || c->sample_data == nullptr)
+                    continue;
+
+                // Handle pending sample change
+                if (c->pending_set) {
+                    uint32_t pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+                    if (pos >= c->sample_length || !c->active) {
+                        c->sample_data = c->pending_sample_data;
+                        c->sample_offset = c->pending_sample_offset;
+                        c->sample_length = c->pending_sample_offset + c->pending_sample_length;
+                        c->position_fp = (uint64_t)c->pending_sample_offset << SAMPLE_FRAC_BITS;
+                        c->pending_set = false;
+                        c->active = true;
+                    }
+                }
+
+                double step = AMIGA_CLOCK / ((double)c->period * (double)module->sample_rate);
+                c->position_fp += (uint64_t)(step * (double)(1 << SAMPLE_FRAC_BITS));
+                uint32_t new_pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+
+                if (new_pos >= c->sample_length) {
+                    if (c->has_loop && c->loop_length > 0) {
+                        while (new_pos >= c->sample_length) {
+                            uint32_t overshoot = new_pos - c->sample_length;
+                            new_pos = c->loop_start + overshoot;
+                            c->sample_offset = c->loop_start;
+                            c->sample_length = c->loop_start + c->loop_length;
+                            if (new_pos >= c->sample_length && c->loop_length > 0) {
+                                uint32_t loop_offset = (new_pos - c->loop_start) % c->loop_length;
+                                new_pos = c->loop_start + loop_offset;
+                                break;
+                            }
+                        }
+                        c->position_fp = (uint64_t)new_pos << SAMPLE_FRAC_BITS;
+                    } else {
+                        c->active = false;
+                    }
+                }
+                continue;
+            }
+
+            if (!c->active || c->muted || c->period == 0 || c->sample_data == nullptr) {
+                if (ch_out[ch_idx]) ch_out[ch_idx][f] = 0.0f;
+                continue;
+            }
+
+            // Handle pending sample change (SetSample / deferred)
+            if (c->pending_set) {
+                uint32_t pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+                if (pos >= c->sample_length || !c->active) {
+                    c->sample_data = c->pending_sample_data;
+                    c->sample_offset = c->pending_sample_offset;
+                    c->sample_length = c->pending_sample_offset + c->pending_sample_length;
+                    c->position_fp = (uint64_t)c->pending_sample_offset << SAMPLE_FRAC_BITS;
+                    c->pending_set = false;
+                    c->active = true;
+                }
+            }
+
+            // Calculate step from period
+            double step = AMIGA_CLOCK / ((double)c->period * (double)module->sample_rate);
+
+            // Get current integer position
+            uint32_t pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+
+            // Read sample
+            if (pos < c->sample_length && c->sample_data != nullptr)
+                sample = (float)c->sample_data[pos] / 128.0f;
+
+            // Apply volume (0-64 -> 0.0-1.0)
+            sample *= (float)c->volume / 64.0f;
+
+            // Write to per-channel buffer (with same 0.5f scaling as stereo render)
+            if (ch_out[ch_idx]) ch_out[ch_idx][f] = sample * 0.5f;
+
+            // Advance position
+            c->position_fp += (uint64_t)(step * (double)(1 << SAMPLE_FRAC_BITS));
+            uint32_t new_pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+
+            // Handle loop / end
+            if (new_pos >= c->sample_length) {
+                if (c->has_loop && c->loop_length > 0) {
+                    // Wrap to loop
+                    while (new_pos >= c->sample_length) {
+                        uint32_t overshoot = new_pos - c->sample_length;
+                        new_pos = c->loop_start + overshoot;
+                        c->sample_offset = c->loop_start;
+                        c->sample_length = c->loop_start + c->loop_length;
+
+                        if (new_pos >= c->sample_length && c->loop_length > 0) {
+                            uint32_t loop_offset = (new_pos - c->loop_start) % c->loop_length;
+                            new_pos = c->loop_start + loop_offset;
+                            break;
+                        }
+                    }
+                    c->position_fp = (uint64_t)new_pos << SAMPLE_FRAC_BITS;
+                } else {
+                    c->active = false;
+                }
+            }
+        }
+
+        frames_written++;
+    }
+
+    return frames_written;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public API
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

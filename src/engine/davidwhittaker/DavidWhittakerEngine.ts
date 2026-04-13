@@ -4,6 +4,7 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 
 export class DavidWhittakerEngine {
@@ -106,7 +107,11 @@ export class DavidWhittakerEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[DavidWhittakerEngine] Module loaded, subsongs:', data.subsongCount);
+          break;
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
         case 'songEnd':
           this._songEndCallback?.();

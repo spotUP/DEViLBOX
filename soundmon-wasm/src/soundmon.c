@@ -1431,6 +1431,88 @@ size_t sm_render(SmModule* module, float* interleaved_stereo, size_t frames) {
     return frames_written;
 }
 
+size_t sm_render_multi(SmModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames) {
+    if (!module || frames == 0)
+        return 0;
+
+    float* ch_out[4] = { ch0, ch1, ch2, ch3 };
+    size_t frames_written = 0;
+
+    for (size_t f = 0; f < frames; f++) {
+        // Accumulate ticks
+        module->tick_accumulator += 1.0f;
+
+        if (module->tick_accumulator >= module->ticks_per_frame) {
+            module->tick_accumulator -= module->ticks_per_frame;
+            bp_play(module);
+
+            if (module->end_reached) {
+                module->has_ended = true;
+                module->end_reached = false;
+                mark_position_visited(module->playing_info.bp_step);
+            }
+        }
+
+        for (int ch = 0; ch < 4; ch++) {
+            SmChannel* c = &module->channels[ch];
+            float sample = 0.0f;
+
+            if (!c->active || c->muted || c->period == 0 || c->sample_data == nullptr) {
+                if (ch_out[ch]) ch_out[ch][f] = 0.0f;
+                continue;
+            }
+
+            // Calculate step from period
+            double step = AMIGA_CLOCK / ((double)c->period * (double)module->sample_rate);
+
+            // Get current integer position
+            uint32_t pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+
+            // Read sample
+            if (pos < c->sample_length)
+                sample = (float)c->sample_data[pos] / 128.0f;
+
+            // Apply volume (0-256 -> 0.0-1.0)
+            sample *= (float)c->volume / 256.0f;
+
+            // Write to per-channel buffer (with same 0.5f scaling as stereo render)
+            if (ch_out[ch]) ch_out[ch][f] = sample * 0.5f;
+
+            // Advance position
+            c->position_fp += (uint64_t)(step * (double)(1 << SAMPLE_FRAC_BITS));
+            uint32_t new_pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+
+            // Handle loop / end
+            if (new_pos >= c->sample_length) {
+                if (c->loop_length > 0) {
+                    // Wrap to loop
+                    while (new_pos >= c->sample_length) {
+                        uint32_t overshoot = new_pos - c->sample_length;
+                        new_pos = c->loop_start + overshoot;
+                        // After first wrap, sample_length becomes loop end
+                        c->sample_offset = c->loop_start;
+                        c->sample_length = c->loop_start + c->loop_length;
+
+                        if (new_pos >= c->sample_length && c->loop_length > 0) {
+                            // modulo within loop
+                            uint32_t loop_offset = (new_pos - c->loop_start) % c->loop_length;
+                            new_pos = c->loop_start + loop_offset;
+                            break;
+                        }
+                    }
+                    c->position_fp = (uint64_t)new_pos << SAMPLE_FRAC_BITS;
+                } else {
+                    c->active = false;
+                }
+            }
+        }
+
+        frames_written++;
+    }
+
+    return frames_written;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public API
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
