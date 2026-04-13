@@ -938,6 +938,7 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     numChannels: CHANNELS,
     initialSpeed,
     initialBPM: 125,
+    davidWhittakerFileData: buffer.slice(0) as ArrayBuffer,
     uadePatternLayout,
   };
 }
