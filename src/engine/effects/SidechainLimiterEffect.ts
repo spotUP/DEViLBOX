@@ -32,6 +32,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
   private sidechainInput: Tone.Gain;
+  private selfRouteGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ param: string; value: number }> = [];
@@ -65,6 +66,12 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
     this.dryGain.connect(this.output);
     this.wetGain.connect(this.output);
     this.input.connect(this.wetGain);
+
+    // Self-route: main input feeds sidechain for self-detection mode.
+    // Controlled by selfRouteGain — set to 0 when external source is wired.
+    this.selfRouteGain = new Tone.Gain(1);
+    this.input.connect(this.selfRouteGain);
+    this.selfRouteGain.connect(this.sidechainInput);
 
     void this._initWorklet();
   }
@@ -168,6 +175,11 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
 
   getSidechainInput(): Tone.Gain {
     return this.sidechainInput;
+  }
+
+  /** Enable/disable self-route (input→sidechain). Called by wireMasterSidechain. */
+  setSelfSidechain(enabled: boolean): void {
+    this.selfRouteGain.gain.value = enabled ? 1 : 0;
   }
 
   setParam(param: string, value: number): void {

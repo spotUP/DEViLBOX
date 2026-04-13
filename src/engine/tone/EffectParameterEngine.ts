@@ -388,7 +388,7 @@ export function applyEffectParametersDiff(
         if ('attack' in changed) node.attack = changed.attack as number;
         if ('release' in changed) node.release = changed.release as number;
         if ('knee' in changed) node.knee = changed.knee as number;
-        if ('sidechainGain' in changed) node.sidechainGain = changed.sidechainGain as number;
+        if ('sidechainGain' in changed) node.sidechainGain = Number(changed.sidechainGain) / 100; // UI 0-100 → internal 0-1
       }
       break;
 
