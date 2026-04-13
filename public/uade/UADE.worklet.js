@@ -769,38 +769,45 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      // Decide whether to reinit WASM or just reset the player state.
-      // Full reinit (new WASM instance) is expensive and leaks ~2.5MB per call.
-      // Only reinit when the WASM is truly corrupted (abort/malloc failure).
-      // For "score died" / "module check failed" (unsupported files), just
-      // call _uade_wasm_stop() to reset the protocol state machine.
-      if (this._wasmCorrupted && this._wasmBinary) {
-        // Real corruption: abort() was called, malloc failed, etc.
-        console.log('[UADE.worklet] Reinitializing WASM (corrupted)...');
-        try {
-          this._wasm = null;
-          this._ready = false;
+      // Reinit WASM when needed. UADE's protocol state machine gets stuck after
+      // "score died" errors — _uade_wasm_stop() alone is NOT enough to reset it.
+      // Full reinit is required, but each reinit allocates a new ~2.5MB instance.
+      // Limit consecutive reinits to prevent OOM on rapid failure sequences.
+      const needsReinit = this._wasmCorrupted || this._lastLoadFailed || this._hasRendered;
+      if (needsReinit && this._wasmBinary) {
+        if (!this._reinitCount) this._reinitCount = 0;
+        // Allow up to 20 consecutive reinits, then throttle (1 per 5 loads)
+        const throttled = this._reinitCount > 20 && (this._reinitCount % 5 !== 0);
+        if (throttled) {
+          // Skip reinit — try loading into the existing (possibly broken) instance.
+          // If it fails, _lastLoadFailed stays true for next attempt.
+          try { this._wasm._uade_wasm_stop(); } catch { /* */ }
           this._hasRendered = false;
-          this._wasmCorrupted = false;
-          this._lastLoadFailed = false;
-          await this._init(this._sampleRate, this._wasmBinary, null);
-          if (!this._wasm || !this._ready) {
-            this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+        } else {
+          const reason = this._wasmCorrupted ? 'corrupted' : this._lastLoadFailed ? 'load-failed' : 'rendered';
+          console.log('[UADE.worklet] Reinitializing WASM (' + reason + ', #' + this._reinitCount + ')...');
+          try {
+            this._wasm = null;
+            this._ready = false;
+            this._hasRendered = false;
+            this._wasmCorrupted = false;
+            this._lastLoadFailed = false;
+            await this._init(this._sampleRate, this._wasmBinary, null);
+            if (!this._wasm || !this._ready) {
+              this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+              return;
+            }
+            this._restoreCompanionFiles();
+          } catch (reinitErr) {
+            console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
+            this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
             return;
           }
-          this._restoreCompanionFiles();
-        } catch (reinitErr) {
-          console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
-          this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
-          return;
         }
-      } else if ((this._hasRendered || this._lastLoadFailed) && this._wasm && this._ready) {
-        // Soft reset: previous song played or failed with "score died".
-        // Just stop the player to reset the protocol state machine.
-        try { this._wasm._uade_wasm_stop(); } catch { /* may fail if already stopped */ }
-        this._hasRendered = false;
-        this._lastLoadFailed = false;
+        this._reinitCount++;
       }
+      // Reset counter on successful load (set at end of _load)
+
 
       let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
@@ -815,6 +822,9 @@ class UADEProcessor extends AudioWorkletProcessor {
         });
         return;
       }
+
+      // Successful load — reset reinit counter
+      this._reinitCount = 0;
 
       // Read back metadata
       const nameBuf = this._wasm._malloc(256);
