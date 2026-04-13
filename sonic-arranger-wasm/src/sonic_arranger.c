@@ -2351,3 +2351,305 @@ bool sa_has_ended(const SaModule* module) {
     if (!module) return true;
     return module->has_ended;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sa_get_num_positions(const SaModule* module) {
+    return module ? module->num_positions : 0;
+}
+
+int sa_get_num_track_lines(const SaModule* module) {
+    return module ? module->num_track_lines : 0;
+}
+
+int sa_get_rows_per_track(const SaModule* module, int subsong) {
+    if (!module || subsong < 0 || subsong >= module->num_sub_songs) return 0;
+    return module->sub_songs[subsong].rows_per_track;
+}
+
+void sa_get_cell(const SaModule* module, int idx,
+                 uint8_t* note, uint8_t* instrument, uint8_t* arpeggio,
+                 uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || idx < 0 || idx >= module->num_track_lines) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (arpeggio) *arpeggio = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const SaTrackLine* tl = &module->track_lines[idx];
+    if (note) *note = tl->note;
+    if (instrument) *instrument = tl->instrument;
+    if (arpeggio) *arpeggio = tl->arpeggio;
+    if (effect) *effect = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void sa_set_cell(SaModule* module, int idx,
+                 uint8_t note, uint8_t instrument, uint8_t arpeggio,
+                 uint8_t effect, uint8_t effect_arg) {
+    if (!module || idx < 0 || idx >= module->num_track_lines) return;
+    SaTrackLine* tl = &module->track_lines[idx];
+    tl->note = note;
+    tl->instrument = instrument;
+    tl->arpeggio = arpeggio;
+    tl->effect = (SaEffect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+void sa_get_position(const SaModule* module, int pos, int channel,
+                     uint16_t* start_track_row, int8_t* sound_transpose, int8_t* note_transpose) {
+    if (!module || pos < 0 || pos >= module->num_positions || channel < 0 || channel >= 4) {
+        if (start_track_row) *start_track_row = 0;
+        if (sound_transpose) *sound_transpose = 0;
+        if (note_transpose) *note_transpose = 0;
+        return;
+    }
+    const SaSinglePositionInfo* pi = &module->positions[pos][channel];
+    if (start_track_row) *start_track_row = pi->start_track_row;
+    if (sound_transpose) *sound_transpose = pi->sound_transpose;
+    if (note_transpose) *note_transpose = pi->note_transpose;
+}
+
+void sa_set_position(SaModule* module, int pos, int channel,
+                     uint16_t start_track_row, int8_t sound_transpose, int8_t note_transpose) {
+    if (!module || pos < 0 || pos >= module->num_positions || channel < 0 || channel >= 4) return;
+    SaSinglePositionInfo* pi = &module->positions[pos][channel];
+    pi->start_track_row = start_track_row;
+    pi->sound_transpose = sound_transpose;
+    pi->note_transpose = note_transpose;
+}
+
+int sa_get_instrument_count(const SaModule* module) {
+    return module ? module->num_instruments : 0;
+}
+
+const char* sa_get_instrument_name(const SaModule* module, int inst) {
+    if (!module || inst < 0 || inst >= module->num_instruments) return "";
+    return module->instruments[inst].name;
+}
+
+float sa_get_instrument_param(const SaModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return -1.0f;
+    const SaInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "type") == 0)             return (float)in->type;
+    if (strcmp(param, "waveformNumber") == 0)    return (float)in->waveform_number;
+    if (strcmp(param, "waveformLength") == 0)    return (float)in->waveform_length;
+    if (strcmp(param, "repeatLength") == 0)      return (float)in->repeat_length;
+    if (strcmp(param, "volume") == 0)            return (float)in->volume;
+    if (strcmp(param, "fineTuning") == 0)        return (float)in->fine_tuning;
+    if (strcmp(param, "portamentoSpeed") == 0)   return (float)in->portamento_speed;
+    if (strcmp(param, "vibratoDelay") == 0)      return (float)in->vibrato_delay;
+    if (strcmp(param, "vibratoSpeed") == 0)      return (float)in->vibrato_speed;
+    if (strcmp(param, "vibratoLevel") == 0)      return (float)in->vibrato_level;
+    if (strcmp(param, "amfNumber") == 0)         return (float)in->amf_number;
+    if (strcmp(param, "amfDelay") == 0)          return (float)in->amf_delay;
+    if (strcmp(param, "amfLength") == 0)         return (float)in->amf_length;
+    if (strcmp(param, "amfRepeat") == 0)         return (float)in->amf_repeat;
+    if (strcmp(param, "adsrNumber") == 0)        return (float)in->adsr_number;
+    if (strcmp(param, "adsrDelay") == 0)         return (float)in->adsr_delay;
+    if (strcmp(param, "adsrLength") == 0)        return (float)in->adsr_length;
+    if (strcmp(param, "adsrRepeat") == 0)        return (float)in->adsr_repeat;
+    if (strcmp(param, "sustainPoint") == 0)      return (float)in->sustain_point;
+    if (strcmp(param, "sustainDelay") == 0)      return (float)in->sustain_delay;
+    if (strcmp(param, "effect") == 0)            return (float)in->effect;
+    if (strcmp(param, "effectArg1") == 0)        return (float)in->effect_arg1;
+    if (strcmp(param, "effectArg2") == 0)        return (float)in->effect_arg2;
+    if (strcmp(param, "effectArg3") == 0)        return (float)in->effect_arg3;
+    if (strcmp(param, "effectDelay") == 0)       return (float)in->effect_delay;
+
+    return -1.0f;
+}
+
+void sa_set_instrument_param(SaModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return;
+    SaInstrument* in = &module->instruments[inst];
+    uint16_t v = (uint16_t)value;
+    int16_t sv = (int16_t)value;
+
+    if (strcmp(param, "type") == 0)             { in->type = (SaInstrumentType)(int)value; return; }
+    if (strcmp(param, "waveformNumber") == 0)    { in->waveform_number = v; return; }
+    if (strcmp(param, "waveformLength") == 0)    { in->waveform_length = v; return; }
+    if (strcmp(param, "repeatLength") == 0)      { in->repeat_length = v; return; }
+    if (strcmp(param, "volume") == 0)            { in->volume = v; return; }
+    if (strcmp(param, "fineTuning") == 0)        { in->fine_tuning = sv; return; }
+    if (strcmp(param, "portamentoSpeed") == 0)   { in->portamento_speed = v; return; }
+    if (strcmp(param, "vibratoDelay") == 0)      { in->vibrato_delay = v; return; }
+    if (strcmp(param, "vibratoSpeed") == 0)      { in->vibrato_speed = v; return; }
+    if (strcmp(param, "vibratoLevel") == 0)      { in->vibrato_level = v; return; }
+    if (strcmp(param, "amfNumber") == 0)         { in->amf_number = v; return; }
+    if (strcmp(param, "amfDelay") == 0)          { in->amf_delay = v; return; }
+    if (strcmp(param, "amfLength") == 0)         { in->amf_length = v; return; }
+    if (strcmp(param, "amfRepeat") == 0)         { in->amf_repeat = v; return; }
+    if (strcmp(param, "adsrNumber") == 0)        { in->adsr_number = v; return; }
+    if (strcmp(param, "adsrDelay") == 0)         { in->adsr_delay = v; return; }
+    if (strcmp(param, "adsrLength") == 0)        { in->adsr_length = v; return; }
+    if (strcmp(param, "adsrRepeat") == 0)        { in->adsr_repeat = v; return; }
+    if (strcmp(param, "sustainPoint") == 0)      { in->sustain_point = v; return; }
+    if (strcmp(param, "sustainDelay") == 0)      { in->sustain_delay = v; return; }
+    if (strcmp(param, "effect") == 0)            { in->effect = (SaSynthesisEffect)(int)value; return; }
+    if (strcmp(param, "effectArg1") == 0)        { in->effect_arg1 = v; return; }
+    if (strcmp(param, "effectArg2") == 0)        { in->effect_arg2 = v; return; }
+    if (strcmp(param, "effectArg3") == 0)        { in->effect_arg3 = v; return; }
+    if (strcmp(param, "effectDelay") == 0)       { in->effect_delay = v; return; }
+}
+
+// Export: serialize back to SOARV1.0 binary
+static void wr16(uint8_t* p, uint16_t v) { p[0] = v >> 8; p[1] = v & 0xff; }
+static void wr32(uint8_t* p, uint32_t v) { p[0] = v >> 24; p[1] = (v >> 16) & 0xff; p[2] = (v >> 8) & 0xff; p[3] = v & 0xff; }
+
+size_t sa_export(const SaModule* module, uint8_t* out, size_t max_size) {
+    if (!module) return 0;
+
+    // Calculate total size
+    size_t total = 8; // SOARV1.0
+    total += 4 + 4 + module->num_sub_songs * 12; // STBL + count + subsongs
+    total += 4 + 4 + module->num_positions * 4 * 4; // OVTB + count + positions
+    total += 4 + 4 + module->num_track_lines * 5; // NTBL + count + tracklines
+    total += 4 + 4; // INST + count
+    for (int i = 0; i < module->num_instruments; i++)
+        total += 30 + 26 + 4 + 3 * 16; // name(30) + fields(26) + arpeggios(3*16)
+    total += 4 + 4; // SD8B + sample count
+    for (int i = 0; i < module->num_samples; i++)
+        total += 4 + module->sample_lengths[i]; // size + data
+    total += 4 + 4 + module->num_waveforms * 128; // SYWT
+    total += 4 + 4 + module->num_adsr_tables * 128; // SYAR
+    total += 4 + 4 + module->num_amf_tables * 128; // SYAF
+
+    if (!out) return total;
+    if (max_size < total) return 0;
+
+    uint8_t* p = out;
+
+    // Magic
+    memcpy(p, "SOARV1.0", 8); p += 8;
+
+    // STBL + subsongs
+    memcpy(p, "STBL", 4); p += 4;
+    wr32(p, module->num_sub_songs); p += 4;
+    for (int i = 0; i < module->num_sub_songs; i++) {
+        const SaSongInfo* s = &module->sub_songs[i];
+        wr16(p, s->start_speed); p += 2;
+        wr16(p, s->rows_per_track); p += 2;
+        wr16(p, s->first_position); p += 2;
+        wr16(p, s->last_position); p += 2;
+        wr16(p, s->restart_position); p += 2;
+        *p++ = s->tempo;
+        *p++ = 0; // padding
+    }
+
+    // OVTB + positions
+    memcpy(p, "OVTB", 4); p += 4;
+    wr32(p, module->num_positions * 4); p += 4;
+    for (int i = 0; i < module->num_positions; i++) {
+        for (int ch = 0; ch < 4; ch++) {
+            const SaSinglePositionInfo* pi = &module->positions[i][ch];
+            wr16(p, pi->start_track_row); p += 2;
+            *p++ = (uint8_t)(int8_t)pi->sound_transpose;
+            *p++ = (uint8_t)(int8_t)pi->note_transpose;
+        }
+    }
+
+    // NTBL + track rows
+    memcpy(p, "NTBL", 4); p += 4;
+    wr32(p, module->num_track_lines); p += 4;
+    for (int i = 0; i < module->num_track_lines; i++) {
+        const SaTrackLine* tl = &module->track_lines[i];
+        *p++ = tl->note;
+        *p++ = tl->instrument;
+        uint8_t flags_arp = tl->arpeggio & 0x3f;
+        if (tl->disable_sound_transpose) flags_arp |= 0x80;
+        if (tl->disable_note_transpose) flags_arp |= 0x40;
+        *p++ = flags_arp;
+        *p++ = (uint8_t)tl->effect;
+        *p++ = tl->effect_arg;
+    }
+
+    // INST + instruments
+    memcpy(p, "INST", 4); p += 4;
+    wr32(p, module->num_instruments); p += 4;
+    for (int i = 0; i < module->num_instruments; i++) {
+        const SaInstrument* in = &module->instruments[i];
+        // Name: 30 bytes padded
+        memset(p, 0, 30);
+        size_t nlen = strlen(in->name);
+        if (nlen > 30) nlen = 30;
+        memcpy(p, in->name, nlen);
+        p += 30;
+        // Fields
+        wr16(p, (uint16_t)in->type); p += 2;
+        wr16(p, in->waveform_number); p += 2;
+        wr16(p, in->waveform_length); p += 2;
+        wr16(p, in->repeat_length); p += 2;
+        wr16(p, in->volume); p += 2;
+        wr16(p, (uint16_t)in->fine_tuning); p += 2;
+        wr16(p, in->portamento_speed); p += 2;
+        wr16(p, in->vibrato_delay); p += 2;
+        wr16(p, in->vibrato_speed); p += 2;
+        wr16(p, in->vibrato_level); p += 2;
+        wr16(p, in->amf_number); p += 2;
+        wr16(p, in->amf_delay); p += 2;
+        wr16(p, in->amf_length); p += 2;
+        wr16(p, in->amf_repeat); p += 2;
+        wr16(p, in->adsr_number); p += 2;
+        wr16(p, in->adsr_delay); p += 2;
+        wr16(p, in->adsr_length); p += 2;
+        wr16(p, in->adsr_repeat); p += 2;
+        wr16(p, in->sustain_point); p += 2;
+        wr16(p, in->sustain_delay); p += 2;
+        wr16(p, (uint16_t)in->effect); p += 2;
+        wr16(p, in->effect_arg1); p += 2;
+        wr16(p, in->effect_arg2); p += 2;
+        wr16(p, in->effect_arg3); p += 2;
+        wr16(p, in->effect_delay); p += 2;
+        // 3 arpeggios
+        for (int a = 0; a < 3; a++) {
+            *p++ = in->arpeggios[a].length;
+            *p++ = in->arpeggios[a].repeat;
+            memcpy(p, in->arpeggios[a].values, 14);
+            p += 14;
+        }
+    }
+
+    // SD8B + samples
+    memcpy(p, "SD8B", 4); p += 4;
+    wr16(p, (uint16_t)module->num_samples); p += 2;
+    // Sample sizes
+    for (int i = 0; i < module->num_samples; i++) {
+        wr32(p, module->sample_lengths[i]); p += 4;
+    }
+    // Sample data
+    for (int i = 0; i < module->num_samples; i++) {
+        if (module->sample_data[i] && module->sample_lengths[i] > 0) {
+            memcpy(p, module->sample_data[i], module->sample_lengths[i]);
+            p += module->sample_lengths[i];
+        }
+    }
+
+    // SYWT + waveforms
+    memcpy(p, "SYWT", 4); p += 4;
+    wr16(p, (uint16_t)module->num_waveforms); p += 2;
+    for (int i = 0; i < module->num_waveforms; i++) {
+        memcpy(p, module->waveform_data[i], 128);
+        p += 128;
+    }
+
+    // SYAR + ADSR tables
+    memcpy(p, "SYAR", 4); p += 4;
+    wr16(p, (uint16_t)module->num_adsr_tables); p += 2;
+    for (int i = 0; i < module->num_adsr_tables; i++) {
+        memcpy(p, module->adsr_tables[i], 128);
+        p += 128;
+    }
+
+    // SYAF + AMF tables
+    memcpy(p, "SYAF", 4); p += 4;
+    wr16(p, (uint16_t)module->num_amf_tables); p += 2;
+    for (int i = 0; i < module->num_amf_tables; i++) {
+        memcpy(p, module->amf_tables[i], 128);
+        p += 128;
+    }
+
+    return (size_t)(p - out);
+}

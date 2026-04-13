@@ -17,7 +17,7 @@ emcc \
     -O2 \
     -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/sonic_arranger.c" \
-    -sEXPORTED_FUNCTIONS="['_sa_create','_sa_destroy','_sa_subsong_count','_sa_select_subsong','_sa_channel_count','_sa_set_channel_mask','_sa_render','_sa_render_multi','_sa_has_ended','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_sa_create','_sa_destroy','_sa_subsong_count','_sa_select_subsong','_sa_channel_count','_sa_set_channel_mask','_sa_render','_sa_render_multi','_sa_has_ended','_sa_get_num_positions','_sa_get_num_track_lines','_sa_get_rows_per_track','_sa_get_cell','_sa_set_cell','_sa_get_position','_sa_set_position','_sa_get_instrument_count','_sa_get_instrument_param','_sa_set_instrument_param','_sa_get_instrument_name','_sa_export','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 \
     -sEXPORT_NAME=createSonicArranger \
