@@ -1014,7 +1014,10 @@ export async function parseUADEFile(
       'VoodooSupremeSynthesizer': async () => null,
       'AProSys': async () => null,
       'SoundProgrammingLanguage': async () => null,
-      'SynTracker': async () => null,
+      'SynTracker': async () => {
+        const { parseSynTrackerFile } = await import('./SynTrackerParser');
+        return parseSynTrackerFile(buffer, filename);
+      },
       'MarkII': async () => null,
 
       // ── Hybrid formats: native parser for samples + deferred tick reconstruction ──
