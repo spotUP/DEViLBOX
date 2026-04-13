@@ -773,6 +773,7 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    deltaMusic1FileData: buffer.slice(0) as ArrayBuffer,
     uadePatternLayout,
   };
 }
