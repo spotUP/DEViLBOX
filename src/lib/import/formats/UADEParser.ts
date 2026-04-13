@@ -1200,7 +1200,7 @@ export async function parseUADEFile(
     'pvp',   // PeterVerswyvelenPacker
     'dns',   // DynamicSynthesizer
     'vss',   // VoodooSupremeSynthesizer
-    'synmod', // SynTracker
+    'synmod', // Symphonie Pro (UADE misidentifies as SynTracker)
     'cus',    // CustomMade — compiled 68k replayer
     'cust',   // CustomMade variant
     'custom', // CustomMade variant
