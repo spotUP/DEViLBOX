@@ -548,7 +548,7 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
       id:         i + 1,
       name:       `Sample ${i + 1}`,
       type:       'synth' as const,
-      synthType:  'Sampler' as const,
+      synthType:  'SonixSynth' as const,
       effects:    [],
       volume:     0,
       pan:        0,

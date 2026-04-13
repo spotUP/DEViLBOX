@@ -551,11 +551,19 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   // ── Instruments ────────────────────────────────────────────────────────
   const instrumentsOffset = info.instrumentsOffset;
-  const trackOffsetsOffset2 = info.trackOffsetsOffset;
 
-  if (instrumentsOffset < 0 || trackOffsetsOffset2 <= instrumentsOffset) return null;
+  if (instrumentsOffset < 0) return null;
 
-  const numberOfInstruments = Math.floor((trackOffsetsOffset2 - instrumentsOffset) / 16);
+  // Find the next section after instruments to determine table size.
+  // Section order varies by format version — use the nearest section boundary.
+  const instrEndCandidates = [
+    info.trackOffsetsOffset,
+    info.tracksOffset,
+    info.subSongListOffset,
+    info.sampleStartOffsetsOffset,
+  ].filter(off => off > instrumentsOffset);
+  const instrEnd = instrEndCandidates.length > 0 ? Math.min(...instrEndCandidates) : len;
+  const numberOfInstruments = Math.floor((instrEnd - instrumentsOffset) / 16);
   const instruments: AvpInstrument[] = [];
 
   for (let i = 0; i < numberOfInstruments; i++) {
@@ -657,7 +665,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       id,
       name: `Instrument ${id}`,
       type: 'synth' as const,
-      synthType: 'Synth' as const,
+      synthType: 'ActivisionProWasmSynth' as const,
       effects: [],
       volume: 0,
       pan: 0,
@@ -665,26 +673,23 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   }
 
   // ── Build TrackerSong patterns ─────────────────────────────────────────
-  // Use sub-song 0 (primary). Each position list is decoded into track indices.
-  // Each position number references a track in the tracks array.
-
+  // Use subsong 0 by default. User can switch subsongs via the UI.
   const primarySong = songInfoList[0];
   const trackerPatterns: Pattern[] = [];
 
   // Build cell offset map: cellOffsetMap[patIdx][ch][row] = file offset
   const cellOffsetMap: number[][][] = [];
 
-  // Determine max position count across all 4 channels
-  const maxPositions = Math.max(...primarySong.positionLists.map(pl => countPositions(pl)));
-
+  // Extract flat track sequences per channel (unrolling position-list loops)
+  const channelTrackSeqs: number[][] = primarySong.positionLists.map(pl => extractTrackSequence(pl));
+  const maxPositions = Math.max(...channelTrackSeqs.map(seq => seq.length));
 
   for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
     const channelRows: TrackerCell[][] = [[], [], [], []];
     const patOffsets: number[][] = [[], [], [], []];
 
     for (let ch = 0; ch < 4; ch++) {
-      const positionList = primarySong.positionLists[ch];
-      const trackNum = getPositionTrackNumber(positionList, posIdx);
+      const trackNum = posIdx < channelTrackSeqs[ch].length ? channelTrackSeqs[ch][posIdx] : -1;
 
       const trackData = (trackNum >= 0 && trackNum < tracks.length) ? tracks[trackNum] : null;
       const trackFileStart = (trackNum >= 0 && trackNum < trackFileStarts.length) ? trackFileStarts[trackNum] : -1;
@@ -810,37 +815,77 @@ function loadPositionList(bytes: Uint8Array, off: number): Uint8Array {
   return new Uint8Array(result);
 }
 
-/** Count the number of track positions in a position list (excluding end marker) */
-function countPositions(list: Uint8Array): number {
-  let count = 0;
-  let i = 0;
-  while (i < list.length) {
-    const dat = list[i++];
-    if (dat === 0xfe || dat === 0xff) break;
-    if (dat >= 0xfd || (dat & 0x40) === 0) {
-      i++; // skip extra byte
-    } else {
-      count++;
-    }
-  }
-  return count;
-}
+/**
+ * Extract a flat sequence of track numbers from a raw position list,
+ * fully unrolling position-list loops.
+ *
+ * Position list entry types (matches NostalgicPlayer ParseNextPosition):
+ *   0xFE/0xFF + byte: end markers (stop / song loop)
+ *   0xFD + byte:      master volume fade command (skip)
+ *   bit 6 SET:        loop marker — lower 6 bits = loop count
+ *   bit 6 CLEAR:      normal entry — 2 bytes: loopTrackCounter + trackNumber
+ *
+ * Each normal entry emits trackNumber × loopTrackCounter positions.
+ * Loop markers cause a block of entries to repeat.
+ */
+function extractTrackSequence(list: Uint8Array): number[] {
+  const result: number[] = [];
+  // Simulate NostalgicPlayer's ParseNextPosition calls
+  let position = -1;
+  let loopEnabled = false;
+  let loopCount = 0;
+  let loopStart = 0;
+  const maxPositions = 256; // safety limit
 
-/** Get the track number for position posIdx in a position list */
-function getPositionTrackNumber(list: Uint8Array, posIdx: number): number {
-  let count = 0;
-  let i = 0;
-  while (i < list.length) {
-    const dat = list[i++];
-    if (dat === 0xfe || dat === 0xff) return -1;
-    if (dat >= 0xfd || (dat & 0x40) === 0) {
-      i++; // skip extra byte
-    } else {
-      if (count === posIdx) return dat;
-      count++;
-    }
+  while (result.length < maxPositions) {
+    let oneMore: boolean;
+    do {
+      oneMore = false;
+      position++;
+
+      if (position >= list.length) return result;
+
+      if (list[position] >= 0xfe) {
+        // Song end (0xFE = stop, 0xFF = loop)
+        return result;
+      }
+
+      if (list[position] === 0xfd) {
+        // Volume fade command — skip arg byte
+        position++;
+        oneMore = true;
+      } else {
+        if ((list[position] & 0x40) !== 0) {
+          // Loop marker
+          if (loopEnabled) {
+            loopCount--;
+            if (loopCount <= 0) {
+              loopEnabled = false;
+              oneMore = true;
+              continue;
+            }
+            position = loopStart;
+          } else {
+            loopEnabled = true;
+            loopCount = list[position] & 0x3f;
+            loopStart = ++position;
+          }
+        }
+
+        // Normal entry: loopTrackCounter + trackNumber
+        if (position >= list.length) return result;
+        const repeatCount = list[position++];
+        if (position >= list.length) return result;
+        const trackNumber = list[position];
+
+        for (let r = 0; r < repeatCount; r++) {
+          result.push(trackNumber);
+        }
+      }
+    } while (oneMore);
   }
-  return -1;
+
+  return result;
 }
 
 // ── Track loading ─────────────────────────────────────────────────────────

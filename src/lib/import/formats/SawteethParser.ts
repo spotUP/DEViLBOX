@@ -64,6 +64,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { SawteethConfig, SawteethInstrumentConfig } from '@/types/instrument/exotic';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -184,7 +185,6 @@ export function isSawteethFormat(bytes: Uint8Array): boolean {
  * Returns null if the file cannot be parsed.
  */
 export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerSong | null {
-  console.warn('[SawteethParser] parseSawteethFile called, bytes:', bytes.length);
   if (!isSawteethFormat(bytes)) return null;
 
   let off = 4; // skip "SWTD"
@@ -427,9 +427,39 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     off = r.nextOff;
   }
 
+  // ── Build SawteethConfig (shared across all instruments) ──────────────
+  const sawteethInstruments: SawteethInstrumentConfig[] = [];
+  const sawteethNames: string[] = [];
+  for (let i = 1; i < instrumentCount; i++) {
+    const inst = instruments[i];
+    sawteethNames.push(inst.name || `Instrument ${i}`);
+    sawteethInstruments.push({
+      filterMode: inst.filterMode,
+      clipMode: inst.clipMode,
+      boost: inst.boost,
+      vibS: inst.vibS,
+      vibD: inst.vibD,
+      pwmS: inst.pwmS,
+      pwmD: inst.pwmD,
+      res: inst.res,
+      sps: inst.sps,
+      len: inst.len,
+      loop: inst.loop,
+      ampEnv: inst.amp.map(p => ({ time: p.time, lev: p.lev })),
+      filterEnv: inst.filter.map(p => ({ time: p.time, lev: p.lev })),
+      steps: inst.steps.map(s => ({ note: s.note, wForm: s.wForm, relative: s.relative })),
+    });
+  }
+
+  const sawteethConfig: SawteethConfig = {
+    instruments: sawteethInstruments,
+    instrumentNames: sawteethNames,
+    title: moduleName,
+    author,
+    numChannels: channelCount,
+  };
+
   // ── Build InstrumentConfig[] ──────────────────────────────────────────
-  // Sawteeth is fully synthesized — no PCM samples. Map each instrument as a
-  // placeholder synth instrument. Instrument 0 is the dummy (skip for devilbox).
   const instrConfigs: InstrumentConfig[] = [];
   for (let i = 1; i < instrumentCount; i++) {
     const inst = instruments[i];
@@ -437,7 +467,8 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
       id: i,
       name: inst.name || `Instrument ${i}`,
       type: 'synth' as const,
-      synthType: 'Synth' as const,
+      synthType: 'SawteethSynth' as const,
+      sawteeth: sawteethConfig,
       effects: [],
       volume: 0,
       pan: 0,
@@ -581,7 +612,6 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     linearPeriods: false,
     sawteethFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   } as TrackerSong;
-  console.warn('[SawteethParser] returning song with sawteethFileData:', (result as any).sawteethFileData?.byteLength);
   return result;
 }
 

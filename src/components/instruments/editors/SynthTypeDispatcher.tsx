@@ -15,6 +15,8 @@ import {
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
   DEFAULT_PRETRACKER,
+  DEFAULT_SAWTEETH,
+  DEFAULT_FMPLAYER,
   DEFAULT_GTULTRA,
   DEFAULT_JAMCRACKER,
   DEFAULT_SF2,
@@ -134,6 +136,11 @@ const Odin2Controls = lazy(() => import('../controls/Odin2Controls').then(m => (
 const SurgeControls = lazy(() => import('../controls/SurgeControls').then(m => ({ default: m.SurgeControls })));
 const HivelyControls = lazy(() => import('../controls/HivelyControls').then(m => ({ default: m.HivelyControls })));
 const PreTrackerControls = lazy(() => import('../controls/PreTrackerControls').then(m => ({ default: m.PreTrackerControls })));
+const SawteethControls = lazy(() => import('../controls/SawteethControls').then(m => ({ default: m.SawteethControls })));
+const FmplayerControls = lazy(() => import('../controls/FmplayerControls').then(m => ({ default: m.FmplayerControls })));
+const EupminiControls = lazy(() => import('../controls/EupminiControls').then(m => ({ default: m.EupminiControls })));
+const WasmParamEditorWrapper = lazy(() => import('../controls/WasmParamEditorWrapper').then(m => ({ default: m.WasmParamEditorWrapper })));
+const WasmInfoEditor = lazy(() => import('../controls/WasmInfoEditor').then(m => ({ default: m.WasmInfoEditor })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
 const JamCrackerControls = lazy(() => import('../controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls })));
 const SF2Controls = lazy(() => import('../controls/SF2Controls').then(m => ({ default: m.SF2Controls })));
@@ -188,7 +195,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker' | 'sawteeth' | 'fmplayer' | 'eupmini' | 'wasm-param' | 'wasm-info';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -289,6 +296,30 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       pretracker: { ...current, ...updates },
     });
   }, [instrument.pretracker, handleChange]);
+
+  // Handle Sawteeth config updates
+  const handleSawteethChange = useCallback((updates: Partial<typeof instrument.sawteeth>) => {
+    const current = instrument.sawteeth || DEFAULT_SAWTEETH;
+    handleChange({
+      sawteeth: { ...current, ...updates },
+    });
+  }, [instrument.sawteeth, handleChange]);
+
+  // Handle FmPlayer config updates
+  const handleFmplayerChange = useCallback((updates: Partial<typeof instrument.fmplayer>) => {
+    const current = instrument.fmplayer || DEFAULT_FMPLAYER;
+    handleChange({
+      fmplayer: { ...current, ...updates },
+    });
+  }, [instrument.fmplayer, handleChange]);
+
+  // Handle Eupmini config updates
+  const handleEupminiChange = useCallback((updates: Partial<typeof instrument.eupmini>) => {
+    const current = instrument.eupmini || DEFAULT_FMPLAYER;
+    handleChange({
+      eupmini: { ...current, ...updates },
+    });
+  }, [instrument.eupmini, handleChange]);
 
   // Handle GTUltra config updates — push to WASM engine too
   const handleGTUltraChange = useCallback((updates: Partial<GTUltraConfig>) => {
@@ -1449,6 +1480,121 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         />
         <Suspense fallback={<LoadingControls />}>
           <MusicLineControls instrument={instrument} onChange={handleChange} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SAWTEETH EDITOR
+  // ============================================================================
+  if (editorMode === 'sawteeth') {
+    const stConfig = deepMerge(DEFAULT_SAWTEETH, instrument.sawteeth || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a0f1a] to-[#050810]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SawteethControls
+            config={stConfig}
+            onChange={handleSawteethChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // FMPLAYER EDITOR (PC-98 YM2608 OPNA)
+  // ============================================================================
+  if (editorMode === 'fmplayer') {
+    const fmpConfig = deepMerge(DEFAULT_FMPLAYER, instrument.fmplayer || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0f0a1a] to-[#080510]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <FmplayerControls
+            config={fmpConfig}
+            onChange={handleFmplayerChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // EUPMINI EDITOR (FM Towns Euphony)
+  // ============================================================================
+  if (editorMode === 'eupmini') {
+    const eupConfig = deepMerge(DEFAULT_FMPLAYER, instrument.eupmini || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a1a0f] to-[#051008]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <EupminiControls
+            config={eupConfig}
+            onChange={handleEupminiChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // GENERIC WASM PARAM EDITOR (Phase 2 formats: ActivisionPro, FC, Actionamics, etc.)
+  // ============================================================================
+  if (editorMode === 'wasm-param') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0f0f1a] to-[#080810]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <WasmParamEditorWrapper
+            synthType={instrument.synthType}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // WASM INFO EDITOR (Phase 3/4: playback-only formats)
+  // ============================================================================
+  if (editorMode === 'wasm-info') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0f0f1a] to-[#080810]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <WasmInfoEditor
+            synthType={instrument.synthType}
+            instrumentName={instrument.name}
+          />
         </Suspense>
       </div>
     );

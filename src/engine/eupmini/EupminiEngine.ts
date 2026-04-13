@@ -6,6 +6,9 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import type { FmChannelData, FmSlotData } from '@/engine/fmplayer/FmplayerEngine';
+
+export type { FmChannelData, FmSlotData };
 
 export class EupminiEngine {
   private static instance: EupminiEngine | null = null;
@@ -21,6 +24,8 @@ export class EupminiEngine {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   private _disposed = false;
+  private _pendingFmRequests = new Map<number, (data: FmChannelData) => void>();
+  private _pendingCountResolve: ((count: number) => void) | null = null;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -119,6 +124,21 @@ export class EupminiEngine {
           console.log('[EupminiEngine] Module loaded');
           break;
 
+        case 'fmInstrumentData': {
+          const d = data.data as FmChannelData;
+          const resolve = this._pendingFmRequests.get(d.ch ?? (d as unknown as { inst: number }).inst);
+          if (resolve) {
+            this._pendingFmRequests.delete(d.ch ?? (d as unknown as { inst: number }).inst);
+            resolve(d);
+          }
+          break;
+        }
+        case 'numFmInstruments':
+          if (this._pendingCountResolve) {
+            this._pendingCountResolve(data.count);
+            this._pendingCountResolve = null;
+          }
+          break;
         case 'error':
           console.error('[EupminiEngine]', data.message);
           break;
@@ -167,6 +187,32 @@ export class EupminiEngine {
 
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
+  /** Get the number of FM instruments in the loaded EUP file */
+  requestNumFmInstruments(): Promise<number> {
+    return new Promise((resolve) => {
+      this._pendingCountResolve = resolve;
+      this.workletNode?.port.postMessage({ type: 'getNumFmInstruments' });
+    });
+  }
+
+  /** Request full FM instrument data */
+  requestFmInstrument(inst: number): Promise<FmChannelData> {
+    return new Promise((resolve) => {
+      this._pendingFmRequests.set(inst, resolve);
+      this.workletNode?.port.postMessage({ type: 'getFmInstrument', inst });
+    });
+  }
+
+  /** Set a single FM operator parameter on an instrument */
+  setFmSlotParam(inst: number, op: number, paramId: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setFmSlotParam', inst, op, paramId, value });
+  }
+
+  /** Set an FM channel parameter (alg, fb, pan) on an instrument */
+  setFmChParam(inst: number, paramId: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setFmChParam', inst, paramId, value });
   }
 
   dispose(): void {

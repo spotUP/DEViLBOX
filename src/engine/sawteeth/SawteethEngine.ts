@@ -6,6 +6,51 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
+
+export interface SawteethEnvPoint {
+  time: number;
+  lev: number;
+}
+
+export interface SawteethStepData {
+  note: number;
+  wForm: number;
+  relative: boolean;
+}
+
+export interface SawteethInstrumentData {
+  ins: number;
+  filterMode: number;
+  clipMode: number;
+  boost: number;
+  vibS: number;
+  vibD: number;
+  pwmS: number;
+  pwmD: number;
+  res: number;
+  sps: number;
+  len: number;
+  loop: number;
+  ampEnv: SawteethEnvPoint[];
+  filterEnv: SawteethEnvPoint[];
+  steps: SawteethStepData[];
+}
+
+/** Parameter IDs matching sawteeth.h ST_PARAM_* */
+export const ST_PARAM = {
+  FILTER_MODE: 0,
+  CLIP_MODE: 1,
+  BOOST: 2,
+  VIB_S: 3,
+  VIB_D: 4,
+  PWM_S: 5,
+  PWM_D: 6,
+  RES: 7,
+  SPS: 8,
+  LEN: 9,
+  LOOP: 10,
+} as const;
 
 export class SawteethEngine {
   private static instance: SawteethEngine | null = null;
@@ -21,6 +66,7 @@ export class SawteethEngine {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   private _disposed = false;
+  private _pendingInstrumentRequests = new Map<number, (data: SawteethInstrumentData) => void>();
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -120,9 +166,23 @@ export class SawteethEngine {
           }
           break;
 
-        case 'moduleLoaded':
+        case 'moduleLoaded': {
           console.log('[SawteethEngine] Module loaded');
+          const numCh = data.meta?.channels ?? 4;
+          const names = Array.from({ length: numCh }, (_, i) => `Ch ${i + 1}`);
+          useOscilloscopeStore.getState().setChipInfo(numCh, 0, names);
           break;
+        }
+
+        case 'instrumentData': {
+          const insData = data.data as SawteethInstrumentData;
+          const resolve = this._pendingInstrumentRequests.get(insData.ins);
+          if (resolve) {
+            resolve(insData);
+            this._pendingInstrumentRequests.delete(insData.ins);
+          }
+          break;
+        }
 
         case 'error':
           console.error('[SawteethEngine]', data.message);
@@ -168,6 +228,55 @@ export class SawteethEngine {
   setMuteMask(mask: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
+  setChannelGain(channel: number, gain: number): void {
+    this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
+  }
+
+  /** Request full instrument data from WASM */
+  requestInstrumentData(insIdx: number): Promise<SawteethInstrumentData> {
+    return new Promise((resolve) => {
+      this._pendingInstrumentRequests.set(insIdx, resolve);
+      this.workletNode?.port.postMessage({ type: 'getInstrument', ins: insIdx });
+    });
+  }
+
+  /** Set a single scalar parameter on an instrument */
+  setParam(insIdx: number, paramId: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setParam', ins: insIdx, paramId, value });
+  }
+
+  /** Set the amplitude envelope for an instrument */
+  setAmpEnv(insIdx: number, points: SawteethEnvPoint[]): void {
+    this.workletNode?.port.postMessage({
+      type: 'setAmpEnv',
+      ins: insIdx,
+      times: points.map(p => p.time),
+      levs: points.map(p => p.lev),
+    });
+  }
+
+  /** Set the filter envelope for an instrument */
+  setFilterEnv(insIdx: number, points: SawteethEnvPoint[]): void {
+    this.workletNode?.port.postMessage({
+      type: 'setFilterEnv',
+      ins: insIdx,
+      times: points.map(p => p.time),
+      levs: points.map(p => p.lev),
+    });
+  }
+
+  /** Set a single step in the arpeggio/waveform sequence */
+  setStep(insIdx: number, stepIdx: number, note: number, wForm: number, relative: boolean): void {
+    this.workletNode?.port.postMessage({
+      type: 'setStep',
+      ins: insIdx,
+      stepIdx,
+      note,
+      wForm,
+      relative,
+    });
   }
 
   dispose(): void {

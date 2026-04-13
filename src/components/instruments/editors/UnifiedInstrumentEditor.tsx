@@ -171,6 +171,38 @@ function getEditorMode(synthType: SynthType): EditorMode {
   // if (synthType === 'Amsynth') return 'amsynth' as EditorMode;
   // MdaEPiano/JX10/DX10, ToneAM, Raffo, CalfMono, SetBfree, SynthV1,
   // TalNoizeMaker, Aeolus, FluidSynth, ZynAddSubFX — fall through to 'layout' mode
+  if (synthType === 'SawteethSynth') return 'sawteeth';
+  if (synthType === 'FmplayerSynth') return 'fmplayer';
+  if (synthType === 'EupminiSynth') return 'eupmini';
+  // Phase 2 — WASM replayer formats with string-param instrument editors
+  if (synthType === 'ActivisionProWasmSynth') return 'wasm-param';
+  if (synthType === 'FutureComposerWasmSynth') return 'wasm-param';
+  if (synthType === 'ActionamicsWasmSynth') return 'wasm-param';
+  if (synthType === 'SoundControlWasmSynth') return 'wasm-param';
+  if (synthType === 'FaceTheMusicWasmSynth') return 'wasm-param';
+  if (synthType === 'QuadraComposerWasmSynth') return 'wasm-param';
+  if (synthType === 'MusicAssemblerSynth') return 'wasm-info';
+  if (synthType === 'BenDaglishSynth') return 'wasm-info';
+  if (synthType === 'ArtOfNoiseSynth') return 'wasm-info';
+  if (synthType === 'SonixSynth') return 'wasm-info';
+  if (synthType === 'PxtoneSynth') return 'wasm-info';
+  if (synthType === 'OrganyaSynth') return 'wasm-info';
+  if (synthType === 'Sc68Synth') return 'wasm-info';
+  if (synthType === 'ZxtuneSynth') return 'wasm-info';
+  if (synthType === 'IxalanceSynth') return 'wasm-info';
+  if (synthType === 'CpsycleSynth') return 'wasm-info';
+  if (synthType === 'PumaTrackerSynth') return 'wasm-info';
+  if (synthType === 'HippelSynth') return 'wasm-info';
+  if (synthType === 'MdxminiSynth') return 'wasm-info';
+  if (synthType === 'PmdminiSynth') return 'wasm-info';
+  if (synthType === 'DssWasmSynth') return 'wasm-param';
+  if (synthType === 'SynthesisWasmSynth') return 'wasm-param';
+  if (synthType === 'SoundFactory2WasmSynth') return 'wasm-param';
+  if (synthType === 'OktalyzerWasmSynth') return 'wasm-param';
+  if (synthType === 'AsapSynth') return 'wasm-info';
+  if (synthType === 'KlysSynth') return 'wasm-info';
+  if (synthType === 'QsfSynth') return 'wasm-info';
+  // UADEEditableSynth already has chip-RAM editing via UADE — falls through to existing handler
   if (synthType === 'PreTrackerSynth') return 'pretracker';
   if (isHivelyType(synthType)) return 'hively';
   if (isGTUltraType(synthType)) return 'gtultra';
