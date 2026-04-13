@@ -68,6 +68,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { SoundMonEngine } from '@/engine/soundmon/SoundMonEngine';
 import { encodeSoundMonADSR, generateSoundMonWaveform } from '@/engine/uade/chipRamEncoders';
 import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 
@@ -189,6 +190,15 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
 
   const upd = useCallback(<K extends keyof SoundMonConfig>(key: K, value: SoundMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SoundMonConfig>);
+    // Push numeric params to WASM engine if running
+    if (typeof value === 'number' && SoundMonEngine.hasInstance()) {
+      const paramMap: Record<string, string> = {
+        volume: 'volume', vibratoSpeed: 'lfoSpeed', vibratoDepth: 'lfoDepth',
+        vibratoDelay: 'lfoDelay', attackSpeed: 'adsrSpeed', waveSpeed: 'egSpeed',
+      };
+      const wasmKey = paramMap[key as string];
+      if (wasmKey) SoundMonEngine.getInstance().setInstrumentParam(0, wasmKey, value);
+    }
   }, [onChange]);
 
   const updWithChipRam = useCallback(

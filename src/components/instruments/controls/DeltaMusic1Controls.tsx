@@ -43,6 +43,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { DeltaMusic1Engine } from '@/engine/deltamusic1/DeltaMusic1Engine';
 
 // ── DM1 instrument header byte offsets ─────────────────────────────────────
 
@@ -144,6 +145,10 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   // Basic updater — just calls onChange with the partial config
   const upd = useCallback(<K extends keyof DeltaMusic1Config>(key: K, value: DeltaMusic1Config[K]) => {
     onChange({ [key]: value } as Partial<DeltaMusic1Config>);
+    // Push numeric params to the WASM engine for live playback
+    if (typeof value === 'number' && DeltaMusic1Engine.hasInstance()) {
+      DeltaMusic1Engine.getInstance().setInstrumentParam(0, key as string, value);
+    }
   }, [onChange]);
 
   /**
@@ -153,6 +158,9 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   const updU8 = useCallback(
     (key: keyof DeltaMusic1Config, value: number, byteOffset: number) => {
       onChange({ [key]: value } as Partial<DeltaMusic1Config>);
+      if (DeltaMusic1Engine.hasInstance()) {
+        DeltaMusic1Engine.getInstance().setInstrumentParam(0, key as string, value);
+      }
       if (uadeChipRam) {
         void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
       }
@@ -166,6 +174,9 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   const updS8 = useCallback(
     (key: keyof DeltaMusic1Config, value: number, byteOffset: number) => {
       onChange({ [key]: value } as Partial<DeltaMusic1Config>);
+      if (DeltaMusic1Engine.hasInstance()) {
+        DeltaMusic1Engine.getInstance().setInstrumentParam(0, key as string, value);
+      }
       if (uadeChipRam) {
         void getEditor().writeS8(uadeChipRam.instrBase + byteOffset, value);
       }
@@ -179,6 +190,9 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   const updU16 = useCallback(
     (key: keyof DeltaMusic1Config, value: number, byteOffset: number) => {
       onChange({ [key]: value } as Partial<DeltaMusic1Config>);
+      if (DeltaMusic1Engine.hasInstance()) {
+        DeltaMusic1Engine.getInstance().setInstrumentParam(0, key as string, value);
+      }
       if (uadeChipRam) {
         void getEditor().writeU16(uadeChipRam.instrBase + byteOffset, value & 0xFFFF);
       }

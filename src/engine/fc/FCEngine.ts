@@ -172,6 +172,11 @@ export class FCEngine {
     });
   }
 
+  /** Set an instrument parameter by name */
+  setInstrumentParam(instrument: number, param: string, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
+  }
+
   /** Set per-channel mute mask. Bit N=1 means channel N is active, 0=muted. */
   setMuteMask(mask: number): void {
     if (!this.workletNode) return;

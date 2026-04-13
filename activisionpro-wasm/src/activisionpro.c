@@ -178,7 +178,9 @@ typedef struct AvpModule {
 
     // Original file data for export
     uint8_t* original_data;
-    size_t original_size;    bool has_ended;
+    size_t original_size;
+    bool has_ended;
+    uint8_t ended_channels; // bitmask of channels that have reached end
 
     // Extracted from player code
     int sub_song_list_offset;
@@ -976,6 +978,7 @@ static void avp_initialize_sound(AvpModule* m, int sub_song) {
     m->global_transpose = 0;
 
     m->has_ended = false;
+    m->ended_channels = 0;
 
     avp_initialize_voice_info(m);
 
@@ -1088,6 +1091,7 @@ static void avp_stop_and_reset(AvpModule* m) {
 
     avp_initialize_voice_info(m);
     m->has_ended = true;
+    m->ended_channels = 0x0f;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1328,12 +1332,17 @@ static void avp_parse_next_track_position(AvpModule* m, int channel, AvpVoiceInf
         avp_parse_next_position(m, vi, true);
 
         if (vi->track_number == 0xff) {
-            m->has_ended = true;
+            m->ended_channels |= (1 << channel);
+            if (m->ended_channels == 0x0f) // all 4 channels ended
+                m->has_ended = true;
             return;
         }
 
-        if (m->master_volume_fade_speed < 0)
-            m->has_ended = true;
+        if (m->master_volume_fade_speed < 0) {
+            m->ended_channels |= (1 << channel);
+            if (m->ended_channels == 0x0f)
+                m->has_ended = true;
+        }
     }
 
     uint8_t* track = m->tracks[vi->track_number];
@@ -1463,7 +1472,10 @@ static void avp_parse_next_track_position(AvpModule* m, int channel, AvpVoiceInf
     }
 
     if ((vi->note_and_flag & 0x80) == 0) {
-        AvpInstrument* instr = &m->instruments[vi->instrument_number];
+        int inst_idx = vi->instrument_number;
+        if (inst_idx < 0) inst_idx = 0;
+        if (inst_idx >= m->num_instruments) inst_idx = 0;
+        AvpInstrument* instr = &m->instruments[inst_idx];
 
         vi->instrument = instr;
         vi->enabled_effects_flag = instr->enabled_effect_flags;
@@ -1487,7 +1499,7 @@ static void avp_parse_next_track_position(AvpModule* m, int channel, AvpVoiceInf
         avp_ch_play_sample(ch, vi->sample_number, vi->sample_data, instr->sample_start_offset, vi->sample_length * 2U);
 
         if (vi->sample_loop_length > 1)
-            avp_ch_set_loop(ch, vi->sample_loop_start, vi->sample_loop_length * 2U);
+            avp_ch_set_loop(ch, vi->sample_loop_start * 2U, vi->sample_loop_length * 2U);
     }
 
     vi->note = (uint8_t)(vi->note + m->global_transpose);

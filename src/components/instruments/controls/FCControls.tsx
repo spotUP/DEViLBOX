@@ -35,6 +35,7 @@ import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { encodeFCVolEnvelope, encodeFCFreqMacro } from '@/engine/uade/chipRamEncoders';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { FCEngine } from '@/engine/fc/FCEngine';
 
 interface FCControlsProps {
   config: FCConfig;
@@ -74,6 +75,10 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
 
   const upd = useCallback(<K extends keyof FCConfig>(key: K, value: FCConfig[K]) => {
     onChange({ [key]: value } as Partial<FCConfig>);
+    // Push numeric params to the WASM engine for live playback
+    if (typeof value === 'number' && FCEngine.hasInstance()) {
+      FCEngine.getInstance().setInstrumentParam(0, key as string, value);
+    }
   }, [onChange]);
 
   /**

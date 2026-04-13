@@ -19,6 +19,7 @@ import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { SonicArrangerSynth } from '@/engine/sonic-arranger/SonicArrangerSynth';
+import { SonicArrangerEngine } from '@/engine/sonic-arranger/SonicArrangerEngine';
 
 // SA instrument struct byte offsets (from SonicArrangerParser.ts file header).
 // All multi-byte fields are uint16 big-endian unless noted.
@@ -297,6 +298,10 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
     value: SonicArrangerConfig[K],
   ) => {
     onChange({ ...configRef.current, [key]: value });
+    // Push numeric params to the WASM engine for live playback
+    if (typeof value === 'number' && SonicArrangerEngine.hasInstance()) {
+      SonicArrangerEngine.getInstance().setInstrumentParam(0, key as string, value);
+    }
     // Mirror to UADE chip RAM as a u16BE write at the SA instrument struct offset
     // for this parameter, when an SA instrument was loaded via UADE. Only numeric
     // fields are mirrored — string fields like `name` live in the file header and

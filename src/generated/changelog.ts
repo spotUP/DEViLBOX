@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-13T22:34:01.860Z
+ * Generated: 2026-04-13T22:39:41.194Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5187';
-export const BUILD_NUMBER = '5187';
-export const BUILD_HASH = 'ebb5b34b8';
+export const BUILD_VERSION = '1.0.5188';
+export const BUILD_NUMBER = '5188';
+export const BUILD_HASH = 'd35fa2b07';
 export const BUILD_DATE = '2026-04-13';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5187',
+    version: '1.0.5188',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'feature',
+        "description": "Sidechain compressor WASM isolation integration + effect browser filter"
+      },
       {
         type: 'feature',
         "description": "Instrument editors for 28+ WASM formats — interactive param editing"
@@ -222,10 +226,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Revert dedicated WASM engine wiring — all 7 engines crash or silent"
-      },
-      {
-        type: 'feature',
-        "description": "Implement loop tail truncation in cleanup dialog"
       }
     ]
   }

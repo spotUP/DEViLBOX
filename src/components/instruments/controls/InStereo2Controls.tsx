@@ -16,6 +16,7 @@ import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, WaveformLineCanvas, BarChart } from '@components/instruments/shared';
+import { InStereo2Engine } from '@/engine/instereo2/InStereo2Engine';
 
 // ── Arpeggio adapter ────────────────────────────────────────────────────────
 
@@ -101,6 +102,19 @@ export const InStereo2Controls: React.FC<InStereo2ControlsProps> = ({
 
   const updateParam = useCallback((key: keyof InStereo2Config, value: number) => {
     onChange({ ...configRef.current, [key]: value });
+
+    // Push to running WASM engine
+    if (InStereo2Engine.hasInstance()) {
+      // Map TS config keys to C param names (EG fields differ)
+      const paramMap: Record<string, string> = {
+        egStartLen: 'startLen',
+        egStopRep: 'stopRep',
+        egSpeedUp: 'speedUp',
+        egSpeedDown: 'speedDown',
+      };
+      const paramName = paramMap[key] ?? key;
+      InStereo2Engine.getInstance().setInstrumentParam(0, paramName, value);
+    }
   }, [onChange]);
 
   // ── SYNTHESIS TAB ──────────────────────────────────────────────────────────

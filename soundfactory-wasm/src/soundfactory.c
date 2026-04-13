@@ -910,7 +910,6 @@ static void sf_next_note(SfModule* m, SfVoiceInfo* v, SfChannel* ch, SfInstrumen
 
                 case SF_OP_LOOP:
                     v->current_position = v->start_position;
-                    v->voice_enabled = false;
                     m->ended_channels |= (1 << v->channel_number);
                     opcode = 0;
                     break;
@@ -1182,10 +1181,10 @@ static void sf_find_samples_in_list(SfModule* m, uint32_t offset) {
             }
 
             case SF_OP_SET_ADSR: {
-                skip = 4;
-                offset += 3;
-                bool rel = m->opcodes[offset++] != 0;
-                if (rel) skip++;
+                skip = 0;
+                offset += 3; // attack, decay, sustain
+                bool rel = m->opcodes[offset++] != 0; // release flag
+                if (rel) skip = 1; // optional releaseTime byte
                 break;
             }
 
@@ -1312,20 +1311,13 @@ static bool sf_load(SfModule* m, const uint8_t* data, size_t size) {
 
     if (song_count == 0) return false;
 
-    // Read offsets
+    // Read offsets — contiguous, one block per valid song (not per slot)
     pos = 20;
-    int si = 0;
-    for (int i = 0; i < 16; i++) {
-        uint8_t channels = data[4 + i];
-        if (channels != 0) {
-            for (int j = 0; j < 4; j++) {
-                uint32_t off = ((uint32_t)data[pos] << 24) | (data[pos+1] << 16) | (data[pos+2] << 8) | data[pos+3];
-                temp_songs[si].opcode_start_offsets[j] = off - 276;
-                pos += 4;
-            }
-            si++;
-        } else {
-            pos += 16; // skip 4 offsets
+    for (int si = 0; si < song_count; si++) {
+        for (int j = 0; j < 4; j++) {
+            uint32_t off = ((uint32_t)data[pos] << 24) | (data[pos+1] << 16) | (data[pos+2] << 8) | data[pos+3];
+            temp_songs[si].opcode_start_offsets[j] = off - 276;
+            pos += 4;
         }
     }
 

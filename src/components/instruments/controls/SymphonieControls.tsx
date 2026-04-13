@@ -14,6 +14,7 @@ import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { SymphonieEngine } from '@/engine/symphonie/SymphonieEngine';
 
 // ── Instrument type labels ─────────────────────────────────────────────────
 
@@ -65,6 +66,11 @@ export const SymphonieControls: React.FC<SymphonieControlsProps> = ({
 
   const upd = useCallback(<K extends keyof SymphonieConfig>(key: K, value: SymphonieConfig[K]) => {
     onChange({ [key]: value } as Partial<SymphonieConfig>);
+
+    // Push numeric values to the running WASM engine
+    if (typeof value === 'number' && SymphonieEngine.hasInstance()) {
+      SymphonieEngine.getInstance().setInstrumentParam(0, key, value);
+    }
   }, [onChange]);
 
   // ── GENERAL TAB ──────────────────────────────────────────────────────────
