@@ -7,13 +7,12 @@
 
 import React, { useCallback, useState, useMemo } from 'react';
 import { PixiSelect, type SelectOption } from '@/pixi/components/PixiSelect';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/fxPresets';
+import { MASTER_FX_PRESETS } from '@/constants/fxPresets';
 import { useAudioStore } from '@/stores/useAudioStore';
 import type { EffectConfig } from '@typedefs/instrument';
 
-const CATEGORY_ORDER: MasterFxPreset['category'][] = [
-  'Amiga', 'C64', 'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl',
-];
+// Derive categories from presets — no hardcoded list to maintain
+const ALL_CATEGORIES = [...new Set(MASTER_FX_PRESETS.map(p => p.category))].sort();
 
 const USER_PRESETS_KEY = 'master-fx-user-presets';
 
@@ -52,7 +51,7 @@ export const PixiDJFxPresets: React.FC<Props> = ({ width = 130, height = 24, lay
     }
 
     // Factory presets by category
-    for (const cat of CATEGORY_ORDER) {
+    for (const cat of ALL_CATEGORIES) {
       const catPresets = MASTER_FX_PRESETS.filter(p => p.category === cat);
       for (const p of catPresets) {
         opts.push({ value: `factory:${p.name}`, label: p.name, group: cat });
