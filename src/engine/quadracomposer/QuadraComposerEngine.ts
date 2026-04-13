@@ -147,7 +147,7 @@ export class QuadraComposerEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  dispose(): void {
+  /** Edit a pattern cell in the WASM replayer */  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });  }  /** Set an instrument parameter by name */  setInstrumentParam(instrument: number, param: string, value: number): void {    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });  }  dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });
     this.workletNode?.disconnect();
