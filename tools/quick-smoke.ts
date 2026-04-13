@@ -203,13 +203,6 @@ const NO_PATTERNS_OK = new Set([
 
 // Skip these — known incomplete/WIP, not bugs (separate work items)
 const SKIP = new Set<string>([
-  'deflemask',               // DMF import incomplete — separate session
-  'organya',                 // Organya engine incomplete — separate session
-  'piston-collage',          // PxTone engine incomplete — separate session
-  'piston-collage-protected', // PxTone engine incomplete — separate session
-  'sawteeth',                // .st extension conflict with 7 formats — separate session
-  'v2',                      // V2M synth WIP — separate session
-  'sunvox',                  // SunVox engine WIP — separate session
   'hippel-7v',               // Moved to TFMX player library — crashes UADE, needs investigation
 ]);
 
