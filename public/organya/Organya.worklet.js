@@ -32,6 +32,26 @@ class OrganyaProcessor extends AudioWorkletProcessor {
         await this.initModule(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
 
+      case 'loadSoundbank':
+        if (this.module) {
+          try {
+            const sbData = new Uint8Array(data.soundbankData);
+            const malloc = this.module._malloc || this.module.malloc;
+            if (!malloc) { this.port.postMessage({ type: 'error', message: 'malloc not available for soundbank' }); break; }
+            const sbPtr = malloc(sbData.length);
+            if (!sbPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed for soundbank' }); break; }
+            const heapU8 = this.module.HEAPU8 || (this.module.wasmMemory && new Uint8Array(this.module.wasmMemory.buffer));
+            if (heapU8) heapU8.set(sbData, sbPtr);
+            const result = this.module._organya_load_soundbank(sbPtr, sbData.length);
+            const free = this.module._free || this.module.free;
+            if (free) free(sbPtr);
+            this.port.postMessage({ type: result === 0 ? 'soundbankLoaded' : 'error', message: result !== 0 ? 'soundbank load failed: ' + result : undefined });
+          } catch (error) {
+            this.port.postMessage({ type: 'error', message: 'soundbank: ' + error.message });
+          }
+        }
+        break;
+
       case 'loadModule':
         if (this.module && typeof this.module._organya_init === 'function') {
           try {
