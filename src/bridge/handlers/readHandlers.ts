@@ -669,6 +669,7 @@ export function getFormatState(): Record<string, unknown> {
       format.zxtuneFileData && 'zxtune',
       format.pumaTrackerFileData && 'pumatracker',
       format.artOfNoiseFileData && 'artofnoise',
+      format.qsfFileData && 'qsf',
       format.bdFileData && 'bendaglish',
       format.sd2FileData && 'sidmon2',
       format.uadeEditableFileData && 'uade-editable',
