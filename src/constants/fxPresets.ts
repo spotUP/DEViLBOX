@@ -18,7 +18,8 @@ export type FxTag =
   | 'Bass' | 'Drums' | 'Leads' | 'Pads' | 'Vocals'
   | 'Lo-Fi' | 'Creative' | 'Space' | 'Dub' | 'Grit' | 'Modulation' | 'Ambient' | 'Texture'
   | 'Amp' | 'Guitar'
-  | 'Reverb' | 'Delay' | 'Compression';
+  | 'Reverb' | 'Delay' | 'Compression'
+  | 'Amiga' | 'C64';
 
 export interface FxPreset {
   name: string;
@@ -737,6 +738,136 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 21, parameters: { drive: 45, tone: 55, level: 70, dryWet: 70 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: 1, high: 0 } },
+    ] },
+
+  // ═══ RETRO HARDWARE — AMIGA CLUB ═══
+  { name: 'Paula Punchline', description: 'Ultimate Amiga club preset — bass lift, tape warmth, punchy glue', tags: ['Amiga', 'Loud', 'Bass'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: -1, high: 1.5, lowFrequency: 120, highFrequency: 6000 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 25, parameters: { drive: 35, tone: 10000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 } },
+    ] },
+  { name: 'Amiga Bass Cannon', description: 'Thunderous 8-bit bass — sub enhancement, saturation, heavy compression', tags: ['Amiga', 'Bass', 'Loud'],
+    effects: [
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 80, amount: 0.7, drive: 0.3, mix: 0.6 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 45, tone: 8000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 6, attack: 0.005, release: 0.1 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 5, mid: -1, high: -2, lowFrequency: 100, highFrequency: 5000 } },
+    ] },
+  { name: 'Tracker Dance Floor', description: 'ProTracker rave — aggressive compression, bass, hihat sizzle', tags: ['Amiga', 'DJ', 'Loud'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: -2, high: 3, lowFrequency: 150, highFrequency: 8000 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 6000, amount: 0.5, blend: 0.4, ceil: 16000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 5, attack: 0.003, release: 0.1 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 15, parameters: { drive: 40, tone: 12000 } },
+    ] },
+  { name: "Paula's Revenge", description: 'Maximum energy — exciter, bass boost, hard limiting, tape grit', tags: ['Amiga', 'Loud', 'Grit'],
+    effects: [
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 90, amount: 0.6, drive: 0.4, mix: 0.5 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 5000, amount: 0.6, blend: 0.5, ceil: 14000 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 30, parameters: { drive: 50, tone: 11000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.002, release: 0.08 } },
+      { category: 'wasm', type: 'Limiter', enabled: true, wet: 100, parameters: { threshold: -2, ceiling: -0.3, attack: 0.001, release: 0.05, lookahead: 0.005, knee: 0 } },
+    ] },
+  { name: 'Amiga Tape Warmth', description: 'Vintage club warmth — tape sim, gentle compression, soft rolloff', tags: ['Amiga', 'Warm', 'Vinyl'],
+    effects: [
+      { category: 'wasm', type: 'TapeSimulator', enabled: true, wet: 40, parameters: { drive: 30, character: 40, bias: 50, shame: 15, hiss: 3, speed: 1 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0.5, high: -1.5 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -18, ratio: 2.5, attack: 0.015, release: 0.25 } },
+    ] },
+  { name: 'Paula Dub Sirens', description: 'Amiga dub — space echo, spring tank, heavy subs', tags: ['Amiga', 'Dub', 'Bass'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 5, mid: -2, high: -1 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 3.5, attack: 0.008, release: 0.18 } },
+      { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 25, parameters: { mode: 4, rate: 300, intensity: 0.5, echoVolume: 0.7, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' } },
+      { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 15, parameters: { decay: 0.4, damping: 0.45, tension: 0.45, mix: 0.3, drip: 0.4, diffusion: 0.6 } },
+    ] },
+  { name: 'Amiga Multiband', description: 'Multiband control — tighten lows, scoop mids, open highs', tags: ['Amiga', 'Compression', 'Loud'],
+    effects: [
+      { category: 'wasm', type: 'MultibandComp', enabled: true, wet: 100, parameters: { lowCrossover: 200, highCrossover: 4000, lowThreshold: -18, midThreshold: -14, highThreshold: -16, lowRatio: 5, midRatio: 3, highRatio: 3.5, lowGain: 3, midGain: -1, highGain: 2 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 20, parameters: { drive: 30, tone: 10000 } },
+    ] },
+
+  // ═══ RETRO HARDWARE — AMIGA CHIPTUNE / EXOTIC ═══
+  { name: 'Chipgold', description: 'Fat bass + harmonic sparkle — clean chip enhancement with sub weight', tags: ['Amiga', 'Clean', 'Bass'],
+    effects: [
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 80, amount: 0.55, drive: 0.2, mix: 0.5 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1, mid: 1.5, high: 2, lowFrequency: 200, highFrequency: 5000 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 4000, amount: 0.35, blend: 0.3, ceil: 14000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 } },
+      { category: 'wasm', type: 'MVerb', enabled: true, wet: 10, parameters: { damping: 0.5, density: 0.5, bandwidth: 0.7, decay: 0.25, predelay: 0.0, size: 0.35, gain: 1.0, mix: 0.3, earlyMix: 0.7 } },
+    ] },
+  { name: 'Paula Sings', description: '8-bit made gorgeous — fat low end, air restoration, tape warmth, space', tags: ['Amiga', 'Warm', 'Bass'],
+    effects: [
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 85, amount: 0.6, drive: 0.25, mix: 0.55 } },
+      { category: 'wasm', type: 'Exciter', enabled: true, wet: 100, parameters: { frequency: 3500, amount: 0.4, blend: 0.35, ceil: 12000 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 30, parameters: { drive: 25, tone: 9000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -18, ratio: 2.5, attack: 0.01, release: 0.2 } },
+      { category: 'wasm', type: 'MVerb', enabled: true, wet: 15, parameters: { damping: 0.4, density: 0.6, bandwidth: 0.6, decay: 0.35, predelay: 0.015, size: 0.45, gain: 1.0, mix: 0.35, earlyMix: 0.6 } },
+    ] },
+  { name: 'Retro Arcade', description: 'Bass-heavy punchy chip — transient snap, mid-presence, energetic', tags: ['Amiga', 'Loud', 'Bass'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: 2, high: 3, lowFrequency: 200, highFrequency: 6000 } },
+      { category: 'wasm', type: 'TransientDesigner', enabled: true, wet: 100, parameters: { attack: 60, sustain: -20, output: 1 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 15, parameters: { drive: 30, tone: 12000 } },
+    ] },
+  { name: 'Exotic Shimmer', description: 'Fat bottom + ethereal ascending reverb — TFMX/FC/Hippel ambient', tags: ['Amiga', 'Ambient', 'Bass'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: 0, high: 1 } },
+      { category: 'tonejs', type: 'Chorus', enabled: true, wet: 15, parameters: { frequency: 0.3, depth: 0.2 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -18, ratio: 2, attack: 0.02, release: 0.3 } },
+      { category: 'wasm', type: 'ShimmerReverb', enabled: true, wet: 20, parameters: { decay: 60, shimmer: 40, pitch: 12, damping: 50, size: 65, predelay: 20, modRate: 15, modDepth: 10 } },
+    ] },
+
+  // ═══ RETRO HARDWARE — C64 SID ═══
+  { name: 'SID Shredder', description: 'SID as guitar lead — Mesa high gain, compression, spring reverb', tags: ['C64', 'Amp', 'Guitar'],
+    effects: [
+      { category: 'neural', type: 'Neural', enabled: true, wet: 45, neuralModelIndex: 11, parameters: { drive: 55, level: 65, presence: 60, dryWet: 45 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
+      { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 20, parameters: { decay: 0.45, damping: 0.4, tension: 0.5, mix: 0.3, drip: 0.4, diffusion: 0.6 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: 1, high: 1 } },
+    ] },
+  { name: 'SID Stadium', description: 'Epic SID — massive plate reverb, wide stereo, arena compression', tags: ['C64', 'Wide', 'Space'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: 0.5, high: 2 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 3.5, attack: 0.008, release: 0.18 } },
+      { category: 'wasm', type: 'MVerb', enabled: true, wet: 20, parameters: { damping: 0.35, density: 0.7, bandwidth: 0.6, decay: 0.55, predelay: 0.03, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.4 } },
+      { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 100, parameters: { width: 0.65 } },
+    ] },
+  { name: 'SID Bass Machine', description: 'SID bass made to pound — sub enhancement, saturation, tight compression', tags: ['C64', 'Bass', 'Loud'],
+    effects: [
+      { category: 'wasm', type: 'BassEnhancer', enabled: true, wet: 100, parameters: { frequency: 70, amount: 0.75, drive: 0.35, mix: 0.65 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 45, tone: 7000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 5, attack: 0.005, release: 0.1 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: 0, high: -1 } },
+    ] },
+  { name: 'SID Acid Trip', description: 'Psychedelic SID — phaser swirl, tape echo, plate reverb', tags: ['C64', 'Creative', 'Modulation'],
+    effects: [
+      { category: 'tonejs', type: 'BiPhase', enabled: true, wet: 30, parameters: { rateA: 0.25, depthA: 0.7, rateB: 2.5, depthB: 0.5, feedback: 0.45, routing: 0 } },
+      { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 3, rate: 350, intensity: 0.5, echoVolume: 0.75, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4d' } },
+      { category: 'wasm', type: 'MVerb', enabled: true, wet: 18, parameters: { damping: 0.35, density: 0.6, bandwidth: 0.5, decay: 0.5, predelay: 0.025, size: 0.65, gain: 1.0, mix: 0.35, earlyMix: 0.4 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0, high: 1 } },
+    ] },
+  { name: 'SID Raw Power', description: 'Minimal SID authority — bass boost, hard compression, no frills', tags: ['C64', 'Loud', 'Compression'],
+    effects: [
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: 0, high: 1, lowFrequency: 100, highFrequency: 6000 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.003, release: 0.1 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 12, parameters: { drive: 30, tone: 11000 } },
+    ] },
+  { name: 'SID Crunch Box', description: 'Aggressive SID — Friedman BE-OD crunch, tight compression, presence', tags: ['C64', 'Grit', 'Amp'],
+    effects: [
+      { category: 'neural', type: 'Neural', enabled: true, wet: 35, neuralModelIndex: 9, parameters: { drive: 45, tone: 55, level: 70, dryWet: 35 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: 1.5, high: 2 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.004, release: 0.12 } },
+    ] },
+  { name: 'SID Neon Nights', description: 'Synthwave SID — chorus thickening, tube warmth, delay, wide stereo', tags: ['C64', 'Modulation', 'Wide'],
+    effects: [
+      { category: 'tonejs', type: 'Chorus', enabled: true, wet: 25, parameters: { frequency: 1.2, delayTime: 3.5, depth: 0.5 } },
+      { category: 'tonejs', type: 'Chebyshev', enabled: true, wet: 8, parameters: { order: 2 } },
+      { category: 'tonejs', type: 'Delay', enabled: true, wet: 20, parameters: { delayTime: 0.375, feedback: 0.3, maxDelay: 2 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 3, attack: 0.01, release: 0.2 } },
+      { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 100, parameters: { width: 0.6 } },
     ] },
 ];
 
