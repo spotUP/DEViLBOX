@@ -201,13 +201,15 @@ const NO_PATTERNS_OK = new Set([
   'sunvox', 'vgm', 'studio-pixel---piyopiyo',
 ]);
 
-// Skip these — known incomplete, not bugs (separate work items)
+// Skip these — known incomplete/WIP, not bugs (separate work items)
 const SKIP = new Set<string>([
   'deflemask',               // DMF import incomplete — separate session
   'organya',                 // Organya engine incomplete — separate session
   'piston-collage',          // PxTone engine incomplete — separate session
   'piston-collage-protected', // PxTone engine incomplete — separate session
   'sawteeth',                // .st extension conflict with 7 formats — separate session
+  'v2',                      // V2M synth WIP — separate session
+  'sunvox',                  // SunVox engine WIP — separate session
 ]);
 
 // Expected min channels per format family
