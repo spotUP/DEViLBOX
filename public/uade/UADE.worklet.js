@@ -443,6 +443,22 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'enableOsc':
+        this._oscEnabled = true;
+        this._oscLastSendTime = 0;
+        // Allocate per-channel snapshot buffers (4 Paula channels, 256 samples each)
+        this._oscSnapshots = [
+          new Int16Array(256), new Int16Array(256),
+          new Int16Array(256), new Int16Array(256),
+        ];
+        this._oscWritePos = 0;
+        break;
+
+      case 'disableOsc':
+        this._oscEnabled = false;
+        this._oscSnapshots = null;
+        break;
+
       case 'enableLiveTickCapture': {
         const { enable } = data;
         this._liveTickCapture = !!enable;
@@ -2028,34 +2044,72 @@ class UADEProcessor extends AudioWorkletProcessor {
         if (outR !== outL) outR[i] = heapF32[baseR + i];
       }
 
-      // --- Per-channel isolation outputs ---
+      // --- Per-channel audio capture (isolation + oscilloscope) ---
       const hasIsolation = this._isolationSlots && this._isolationSlots.some(s => s !== null);
-      if (hasIsolation && this._wasm._uade_wasm_read_channel_samples && this._chPtrs) {
+      const needsPerChannel = hasIsolation || this._oscEnabled;
+      if (needsPerChannel && this._wasm._uade_wasm_read_channel_samples && this._chPtrs) {
         // Read per-channel audio captured during the render pass
         const chFrames = this._wasm._uade_wasm_read_channel_samples(
           this._chPtrs[0], this._chPtrs[1], this._chPtrs[2], this._chPtrs[3], frames
         );
         if (chFrames > 0) {
           const chBases = this._chPtrs.map(p => p >> 2);
-          for (let s = 0; s < 4; s++) {
-            const slot = this._isolationSlots[s];
-            if (!slot) continue;
-            const slotOut = outputs[s + 1];
-            if (!slotOut || slotOut.length === 0) continue;
-            const sL = slotOut[0];
-            const sR = slotOut[1] || slotOut[0];
-            sL.fill(0);
-            sR.fill(0);
-            // Mix channels in this slot's mask to stereo using Amiga panning
-            // Paula: ch0+ch3 = left, ch1+ch2 = right
-            for (let ch = 0; ch < 4; ch++) {
-              if (!(slot.channelMask & (1 << ch))) continue;
-              const isLeft = (ch === 0 || ch === 3);
-              const chBase = chBases[ch];
-              for (let i = 0; i < chFrames; i++) {
-                const sample = heapF32[chBase + i];
-                if (isLeft) sL[i] += sample; else sR[i] += sample;
+
+          // Route to isolation slot outputs
+          if (hasIsolation) {
+            for (let s = 0; s < 4; s++) {
+              const slot = this._isolationSlots[s];
+              if (!slot) continue;
+              const slotOut = outputs[s + 1];
+              if (!slotOut || slotOut.length === 0) continue;
+              const sL = slotOut[0];
+              const sR = slotOut[1] || slotOut[0];
+              sL.fill(0);
+              sR.fill(0);
+              // Mix channels in this slot's mask to stereo using Amiga panning
+              // Paula: ch0+ch3 = left, ch1+ch2 = right
+              for (let ch = 0; ch < 4; ch++) {
+                if (!(slot.channelMask & (1 << ch))) continue;
+                const isLeft = (ch === 0 || ch === 3);
+                const chBase = chBases[ch];
+                for (let i = 0; i < chFrames; i++) {
+                  const sample = heapF32[chBase + i];
+                  if (isLeft) sL[i] += sample; else sR[i] += sample;
+                }
               }
+            }
+          }
+
+          // Capture per-channel oscilloscope snapshots
+          if (this._oscEnabled && this._oscSnapshots) {
+            for (let ch = 0; ch < 4; ch++) {
+              const chBase = chBases[ch];
+              const snap = this._oscSnapshots[ch];
+              let wp = this._oscWritePos;
+              for (let i = 0; i < chFrames; i++) {
+                // Convert float (-1..1) to Int16 (-32768..32767)
+                snap[wp] = Math.max(-32768, Math.min(32767, (heapF32[chBase + i] * 32767) | 0));
+                wp = (wp + 1) & 255; // wrap at 256
+              }
+              // Only update write pos after last channel (all channels use same write pos)
+              if (ch === 3) this._oscWritePos = wp;
+            }
+
+            // Send oscilloscope data at ~30fps
+            if (currentTime - this._oscLastSendTime > 0.033) {
+              this._oscLastSendTime = currentTime;
+              // Copy snapshots for transfer (reorder from write position for contiguous waveform)
+              const out = new Array(4);
+              for (let ch = 0; ch < 4; ch++) {
+                const snap = this._oscSnapshots[ch];
+                const wp = this._oscWritePos;
+                const copy = new Int16Array(256);
+                for (let i = 0; i < 256; i++) {
+                  copy[i] = snap[(wp + i) & 255];
+                }
+                out[ch] = copy;
+              }
+              this.port.postMessage({ type: 'oscData', channels: out }, out.map(a => a.buffer));
             }
           }
         }

@@ -67,6 +67,13 @@ class MPT extends AudioWorkletProcessor {
 		this.userMuteMask = 0xFFFFFFFF  // all channels active (no user mute)
 		this.isolatedBits = 0            // no channels isolated
 		this._diagCounter = 0
+		// Per-channel oscilloscope: dedicated module instance for round-robin solo-render
+		this.oscModule = null   // { modulePtr, extPtr, muteFunc, leftPtr, rightPtr }
+		this.oscEnabled = false
+		this.oscChIndex = 0     // round-robin channel counter
+		this.oscSnapshots = null // Int16Array[] per channel, each 256 samples
+		this.oscWritePos = null  // number[] per channel write cursor
+		this.oscLastSendTime = 0
 	}
 
 	process(inputList, outputList, parameters) {
@@ -196,6 +203,11 @@ class MPT extends AudioWorkletProcessor {
 			})
 		}
 
+		// Per-channel oscilloscope capture (round-robin, one channel per process call)
+		if (this.oscEnabled && this.oscModule) {
+			this.captureOscChannel_()
+		}
+
 		return true // def. needed for Chrome
 	}
 
@@ -251,6 +263,9 @@ class MPT extends AudioWorkletProcessor {
 				this.forEachIsolationSlot_(s => {
 					libopenmpt._openmpt_module_set_position_seconds(s.modulePtr, v)
 				})
+				if (this.oscModule) {
+					libopenmpt._openmpt_module_set_position_seconds(this.oscModule.modulePtr, v)
+				}
 				break
 			case 'setOrderRow':
 				if (!this.modulePtr) return
@@ -258,6 +273,9 @@ class MPT extends AudioWorkletProcessor {
 				this.forEachIsolationSlot_(s => {
 					libopenmpt._openmpt_module_set_position_order_row(s.modulePtr, v.o, v.r)
 				})
+				if (this.oscModule) {
+					libopenmpt._openmpt_module_set_position_order_row(this.oscModule.modulePtr, v.o, v.r)
+				}
 				break
 			case 'hotReload':
 				// Reload module data while preserving playback position.
@@ -327,6 +345,12 @@ class MPT extends AudioWorkletProcessor {
 						hasExtPtr: !!s.extPtr,
 					} : null)
 				})
+				break
+			case 'enableOsc':
+				this.createOscModule_()
+				break
+			case 'disableOsc':
+				this.destroyOscModule_()
 				break
 			case 'decodeAll':
 				this.decodeAll(v)
@@ -445,6 +469,7 @@ class MPT extends AudioWorkletProcessor {
 		if (!paused) this.meta()
 	}
 	stop() {
+		this.destroyOscModule_()
 		if (!this.modulePtr && !this.extPtr) return
 		if (this.extPtr) {
 			libopenmpt._openmpt_module_ext_destroy(this.extPtr)
@@ -834,6 +859,171 @@ class MPT extends AudioWorkletProcessor {
 		for (let i = 0; i < MAX_ISOLATION_SLOTS; i++) {
 			const slot = this.isolationSlots[i]
 			if (slot && slot.modulePtr) fn(slot)
+		}
+	}
+
+	/**
+	 * Create a dedicated oscilloscope module instance for per-channel waveform capture.
+	 * Uses the same pattern as addIsolationSlot_ but without output routing.
+	 */
+	createOscModule_() {
+		this.destroyOscModule_()
+		if (!this.moduleBuffer || !this.channels || this.channels === 0) return
+		if (!libopenmpt._openmpt_module_ext_create_from_memory) return
+		if (!this.muteFunc || !libopenmpt.wasmTable) return
+
+		const byteArray = new Int8Array(this.moduleBuffer)
+		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
+		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
+
+		const extPtr = libopenmpt._openmpt_module_ext_create_from_memory(
+			ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0
+		)
+		libopenmpt._free(ptrToFile)
+		if (!extPtr) return
+
+		const modulePtr = libopenmpt._openmpt_module_ext_get_module(extPtr)
+		if (!modulePtr) {
+			libopenmpt._openmpt_module_ext_destroy(extPtr)
+			return
+		}
+
+		// Extract mute function pointer
+		let muteFunc = 0
+		if (libopenmpt._openmpt_module_ext_get_interface && libopenmpt.stackSave) {
+			const INTERACTIVE_STRUCT_SIZE = 64
+			const ifacePtr = libopenmpt._malloc(INTERACTIVE_STRUCT_SIZE)
+			if (ifacePtr) {
+				for (let i = 0; i < INTERACTIVE_STRUCT_SIZE; i++) {
+					libopenmpt.HEAPU8[ifacePtr + i] = 0
+				}
+				const stack = libopenmpt.stackSave()
+				const ok = libopenmpt._openmpt_module_ext_get_interface(
+					extPtr, asciiToStack('interactive'), ifacePtr, INTERACTIVE_STRUCT_SIZE
+				)
+				libopenmpt.stackRestore(stack)
+				if (ok) {
+					const read32 = libopenmpt.HEAPU32
+						? (off) => libopenmpt.HEAPU32[(ifacePtr + off) >> 2]
+						: (off) => new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + off, true)
+					muteFunc = read32(40)
+				}
+				libopenmpt._free(ifacePtr)
+			}
+		}
+
+		if (!muteFunc) {
+			libopenmpt._openmpt_module_ext_destroy(extPtr)
+			return
+		}
+
+		// Apply config to match main module
+		libopenmpt._openmpt_module_set_repeat_count(modulePtr, this.config.repeatCount)
+		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, this.config.stereoSeparation)
+		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
+
+		if (libopenmpt.stackSave) {
+			const stack = libopenmpt.stackSave()
+			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
+			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
+			libopenmpt.stackRestore(stack)
+		}
+
+		// Seek to main module position
+		if (this.modulePtr) {
+			const order = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
+			const row = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
+			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
+		}
+
+		// Allocate render buffers (128 samples max)
+		const leftPtr = libopenmpt._malloc(4 * 128)
+		const rightPtr = libopenmpt._malloc(4 * 128)
+
+		this.oscModule = { modulePtr, extPtr, muteFunc, leftPtr, rightPtr }
+		this.oscEnabled = true
+		this.oscChIndex = 0
+		this.oscLastSendTime = 0
+		// Allocate per-channel snapshot buffers
+		this.oscSnapshots = new Array(this.channels)
+		this.oscWritePos = new Array(this.channels)
+		for (let i = 0; i < this.channels; i++) {
+			this.oscSnapshots[i] = new Int16Array(256)
+			this.oscWritePos[i] = 0
+		}
+	}
+
+	/**
+	 * Destroy the oscilloscope module and free resources.
+	 */
+	destroyOscModule_() {
+		if (this.oscModule) {
+			if (this.oscModule.extPtr) {
+				libopenmpt._openmpt_module_ext_destroy(this.oscModule.extPtr)
+			}
+			if (this.oscModule.leftPtr) libopenmpt._free(this.oscModule.leftPtr)
+			if (this.oscModule.rightPtr) libopenmpt._free(this.oscModule.rightPtr)
+			this.oscModule = null
+		}
+		this.oscEnabled = false
+		this.oscSnapshots = null
+		this.oscWritePos = null
+		this.oscChIndex = 0
+	}
+
+	/**
+	 * Capture one channel's waveform via the oscilloscope module (called each process()).
+	 * Round-robins through channels: one channel per process() call.
+	 */
+	captureOscChannel_() {
+		const osc = this.oscModule
+		if (!osc || !osc.modulePtr || !this.oscSnapshots || this.channels === 0) return
+
+		const nc = this.channels
+		const ch = this.oscChIndex
+
+		// Solo this channel: mute all others
+		for (let i = 0; i < nc; i++) {
+			libopenmpt.wasmTable.get(osc.muteFunc)(osc.extPtr, i, i === ch ? 0 : 1)
+		}
+
+		// Render 128 samples
+		const frames = libopenmpt._openmpt_module_read_float_stereo(
+			osc.modulePtr, sampleRate, 128, osc.leftPtr, osc.rightPtr
+		)
+
+		if (frames > 0) {
+			const lBase = osc.leftPtr / 4
+			const rBase = osc.rightPtr / 4
+			const snap = this.oscSnapshots[ch]
+			let wp = this.oscWritePos[ch]
+			for (let i = 0; i < frames; i++) {
+				// Mix L+R to mono, convert to Int16
+				const mono = (libopenmpt.HEAPF32[lBase + i] + libopenmpt.HEAPF32[rBase + i]) * 0.5
+				snap[wp] = Math.max(-32768, Math.min(32767, (mono * 32767) | 0))
+				wp = (wp + 1) & 255
+			}
+			this.oscWritePos[ch] = wp
+		}
+
+		// Advance round-robin
+		this.oscChIndex = (ch + 1) % nc
+
+		// Send at ~30fps
+		if (currentTime - this.oscLastSendTime > 0.033) {
+			this.oscLastSendTime = currentTime
+			const out = new Array(nc)
+			for (let i = 0; i < nc; i++) {
+				const snap = this.oscSnapshots[i]
+				const wp = this.oscWritePos[i]
+				const copy = new Int16Array(256)
+				// Reorder from write position for contiguous waveform
+				for (let j = 0; j < 256; j++) {
+					copy[j] = snap[(wp + j) & 255]
+				}
+				out[i] = copy
+			}
+			this.port.postMessage({ cmd: 'oscData', channels: out }, out.map(a => a.buffer))
 		}
 	}
 
