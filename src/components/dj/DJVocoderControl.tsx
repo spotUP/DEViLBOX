@@ -1,12 +1,12 @@
 /**
  * DJVocoderControl — Vocoder toggle + mute + carrier type + formant shift for DJ mode.
  *
- * Appears in the DJ toolbar as a performance tool.
- * When active, routes mic through the WASM vocoder and shows the Kraftwerk head.
- * Includes a mic device selector so users can pick their real hardware mic.
+ * Toolbar shows: mic selector, TALK button, VOCODER button.
+ * All settings (Duck, Tune, Melody, FX, presets, sliders) are in a dropdown panel.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Settings } from 'lucide-react';
 import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPreset } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
 import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
@@ -34,24 +34,36 @@ export const DJVocoderControl: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [duckingEnabled, setDuckingEnabled] = useState(true);
-  /** Real pitch-correction autotune (YIN + scale snap) on the vocoder output. */
   const [realTuneEnabled, setRealTuneEnabled] = useState(false);
-  const [tuneKey, setTuneKey] = useState(0);            // 0..11
+  const [tuneKey, setTuneKey] = useState(0);
   const [tuneScale, setTuneScale] = useState<AutoTuneScale>('major');
-  /** Legacy "follow melody" — drives the vocoder carrier from the active deck's pattern data. */
   const [followMelodyEnabled, setFollowMelodyEnabled] = useState(true);
   const followMelodyRef = useRef<VocoderAutoTune | null>(null);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const engineRef = useRef<VocoderEngine | null>(null);
+  const [showPanel, setShowPanel] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Preload vocoder worklet + WASM on mount so toggle doesn't cause audio glitch
+  // Close panel on click outside
+  useEffect(() => {
+    if (!showPanel) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setShowPanel(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [showPanel]);
+
+  // Preload vocoder worklet + WASM on mount
   useEffect(() => {
     VocoderEngine.preload();
     return () => unregisterPTTHandlers();
   }, []);
 
-  // Enumerate audio input devices on mount and when devices change
+  // Enumerate audio input devices
   useEffect(() => {
     const enumerate = async () => {
       try {
@@ -63,7 +75,6 @@ export const DJVocoderControl: React.FC = () => {
             label: d.label || `Mic ${d.deviceId.slice(0, 8)}`,
           }));
         setDevices(inputs);
-        // Auto-select first real mic (skip virtual devices like BlackHole)
         if (!selectedDeviceId && inputs.length > 0) {
           const real = inputs.find(d =>
             !d.label.toLowerCase().includes('blackhole') &&
@@ -72,15 +83,11 @@ export const DJVocoderControl: React.FC = () => {
           );
           setSelectedDeviceId((real || inputs[0]).deviceId);
         }
-      } catch {
-        // Permission not yet granted — labels will be empty
-      }
+      } catch { /* Permission not yet granted */ }
     };
     enumerate();
     navigator.mediaDevices?.addEventListener('devicechange', enumerate);
-    return () => {
-      navigator.mediaDevices?.removeEventListener('devicechange', enumerate);
-    };
+    return () => { navigator.mediaDevices?.removeEventListener('devicechange', enumerate); };
   }, [selectedDeviceId]);
 
   // Cleanup on unmount
@@ -91,7 +98,6 @@ export const DJVocoderControl: React.FC = () => {
     };
   }, []);
 
-  // Ensure the engine is running (called on first PTT or vocoder toggle)
   const ensureEngine = useCallback(async (): Promise<VocoderEngine | null> => {
     if (engineRef.current) return engineRef.current;
     try {
@@ -101,23 +107,17 @@ export const DJVocoderControl: React.FC = () => {
       const engine = new VocoderEngine(destination);
       await engine.start(selectedDeviceId || undefined);
       engineRef.current = engine;
-      // Start muted — push-to-talk mode
       setMuted(true);
       engine.setMuted(true);
-
-      // Start "follow melody" if it was enabled before the engine was created
       if (followMelodyEnabled) {
         followMelodyRef.current = new VocoderAutoTune(engine);
         followMelodyRef.current.start();
       }
-      // Apply real autotune if it was enabled before the engine was created
       if (realTuneEnabled) {
         engine.setRealAutoTuneEnabled(true, {
           key: tuneKey, scale: tuneScale, strength: 1.0, speed: 0.7,
         });
       }
-
-      // Re-enumerate after permission grant
       const allDevices = await navigator.mediaDevices.enumerateDevices();
       const inputs = allDevices
         .filter(d => d.kind === 'audioinput')
@@ -135,32 +135,24 @@ export const DJVocoderControl: React.FC = () => {
   const handleToggle = useCallback(async () => {
     try {
       setError(null);
-
       if (!isActive) {
         const engine = await ensureEngine();
         if (!engine) return;
-        // Enable vocoder processing (robot voice)
         engine.setVocoderBypass(false);
         useVocoderStore.getState().setActive(true);
       } else {
-        // Disable vocoder but keep engine alive for clean mic PTT
         engineRef.current?.setVocoderBypass(true);
         useVocoderStore.getState().setActive(false);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('Permission') || msg.includes('NotAllowed')) {
-        setError('Mic blocked');
-      } else {
-        setError('Failed');
-      }
+      setError(msg.includes('Permission') || msg.includes('NotAllowed') ? 'Mic blocked' : 'Failed');
       console.error('[DJVocoderControl]', err);
     }
   }, [isActive, selectedDeviceId]);
 
   const handleDeviceChange = useCallback(async (deviceId: string) => {
     setSelectedDeviceId(deviceId);
-    // If already active, restart with new device
     if (engineRef.current?.isActive) {
       engineRef.current.stop();
       try {
@@ -176,22 +168,18 @@ export const DJVocoderControl: React.FC = () => {
     }
   }, []);
 
-  // Push-to-talk: hold to unmute mic, release to mute (delay tail rings out)
-  // Starts engine on first press if not running — always enables vocoder (robot voice).
   const handlePTTDown = useCallback(async () => {
     let engine = engineRef.current;
     if (!engine) {
       engine = await ensureEngine();
       if (!engine) return;
     }
-    // Always ensure vocoder is active (robot voice, not clean mic)
     if (!isActive || engine.isBypassed) {
       engine.setVocoderBypass(false);
       useVocoderStore.getState().setActive(true);
     }
     setMuted(false);
     engine.setMuted(false);
-    // Duck music while talking
     if (duckingEnabled) {
       try { getDJEngineIfActive()?.mixer.duck(); } catch { /* ok */ }
     }
@@ -201,13 +189,11 @@ export const DJVocoderControl: React.FC = () => {
     if (!engineRef.current) return;
     setMuted(true);
     engineRef.current.setMuted(true);
-    // Unduck music
     if (duckingEnabled) {
       try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
     }
   }, [duckingEnabled]);
 
-  // Register PTT handlers so global keyboard shortcut (Space/T) uses this engine
   useEffect(() => {
     registerPTTHandlers(handlePTTDown, handlePTTUp);
   }, [handlePTTDown, handlePTTUp]);
@@ -228,7 +214,6 @@ export const DJVocoderControl: React.FC = () => {
     if (engineRef.current) {
       engineRef.current.loadPreset(name);
     } else {
-      // Engine not running yet — update store so preset is ready when PTT starts
       useVocoderStore.getState().loadPreset(name);
     }
   }, []);
@@ -278,24 +263,12 @@ export const DJVocoderControl: React.FC = () => {
     engineRef.current?.applyFX(useVocoderStore.getState().fx);
   }, []);
 
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {/* Mic device selector (always visible so user can pick before activating) */}
-      {devices.length > 1 && (
-        <CustomSelect
-          value={selectedDeviceId}
-          onChange={handleDeviceChange}
-          options={devices.map(d => ({
-            value: d.deviceId,
-            label: d.label,
-          }))}
-          className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary max-w-[140px]"
-          title="Select microphone input"
-        />
-      )}
+  // Count active features for badge
+  const activeFeatureCount = [duckingEnabled, realTuneEnabled, followMelodyEnabled, fxEnabled].filter(Boolean).length;
 
-      {/* Push-to-talk: always available — hold to speak, release to let echo ring out */}
-      {/* Highlights when either local PTT (pointer) or global PTT (Space key) is active */}
+  return (
+    <div className="relative flex items-center gap-1">
+      {/* TALK button — always visible for performance */}
       <button
         onPointerDown={handlePTTDown}
         onPointerUp={handlePTTUp}
@@ -312,7 +285,7 @@ export const DJVocoderControl: React.FC = () => {
         TALK
       </button>
 
-      {/* Vocoder toggle — switches between clean mic and robot voice */}
+      {/* VOCODER toggle — always visible */}
       <button
         onClick={handleToggle}
         className={`
@@ -330,132 +303,156 @@ export const DJVocoderControl: React.FC = () => {
             style={{ opacity: amplitude * 0.5 }}
           />
         )}
-        <span className="relative">VOCODER</span>
+        <span className="relative">VOC</span>
       </button>
 
-      {/* Level meter — always visible when engine is running */}
-      {engineRef.current && (
-        <div
-          className="w-8 h-2 bg-dark-bgTertiary rounded-sm overflow-hidden"
-          title={`Level: ${Math.round(amplitude * 100)}%`}
-        >
-          <div
-            className={`h-full transition-[width] duration-75 ${isActive ? 'bg-purple-500' : 'bg-green-500'}`}
-            style={{ width: `${Math.min(100, (muted ? 0 : amplitude) * 300)}%` }}
-          />
-        </div>
-      )}
-
-      {/* Duck + AutoTune controls — always available */}
-      <div className="flex items-center gap-2 border-l border-dark-borderLight pl-1.5 ml-0.5">
-        <label className="flex items-center gap-0.5 cursor-pointer" title="Duck music volume while talking">
-          <input
-            type="checkbox"
-            checked={duckingEnabled}
-            onChange={() => setDuckingEnabled(!duckingEnabled)}
-            className="w-3 h-3 accent-amber-500"
-          />
-          <span className="text-[9px] text-text-muted">Duck</span>
-        </label>
-        <label className="flex items-center gap-0.5 cursor-pointer" title="Real pitch-correction autotune (YIN + scale snap) on the vocoder output">
-          <input
-            type="checkbox"
-            checked={realTuneEnabled}
-            onChange={handleRealTuneToggle}
-            className="w-3 h-3 accent-pink-500"
-          />
-          <span className="text-[9px] text-text-muted">Tune</span>
-        </label>
-        {realTuneEnabled && (
-          <>
-            <CustomSelect
-              value={String(tuneKey)}
-              onChange={handleTuneKeyChange}
-              options={KEY_NAMES.map((name, i) => ({
-                value: String(i),
-                label: name,
-              }))}
-              className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-pink-400"
-              title="Autotune key"
-            />
-            <CustomSelect
-              value={tuneScale}
-              onChange={handleTuneScaleChange}
-              options={SCALE_OPTIONS.map((s) => ({
-                value: s,
-                label: s,
-              }))}
-              className="px-1 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bgTertiary text-pink-400"
-              title="Autotune scale"
-            />
-          </>
+      {/* Settings gear — opens dropdown with all vocoder settings */}
+      <button
+        onPointerDown={(e) => { e.stopPropagation(); setShowPanel(v => !v); }}
+        className={`p-1 rounded transition-all ${
+          showPanel
+            ? 'text-accent-primary bg-accent-primary/10'
+            : 'text-text-muted hover:text-text-primary'
+        }`}
+        title="Mic &amp; vocoder settings"
+      >
+        <Settings size={12} />
+        {activeFeatureCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent-primary text-[7px] font-bold text-dark-bg flex items-center justify-center">
+            {activeFeatureCount}
+          </span>
         )}
-        <label className="flex items-center gap-0.5 cursor-pointer" title="Follow Melody — drive the vocoder carrier from the active deck's pattern data">
-          <input
-            type="checkbox"
-            checked={followMelodyEnabled}
-            onChange={handleFollowMelodyToggle}
-            className="w-3 h-3 accent-pink-500"
-          />
-          <span className="text-[9px] text-text-muted">Melody</span>
-        </label>
-      </div>
-      <div className="flex items-center gap-1 border-l border-dark-borderLight pl-1.5 ml-0.5">
-        <label className="flex items-center gap-0.5 cursor-pointer" title="Enable mic effects (echo/reverb)">
-          <input
-            type="checkbox"
-            checked={fxEnabled}
-            onChange={handleFXToggle}
-            className="w-3 h-3 accent-cyan-500"
-          />
-          <span className="text-[9px] text-text-muted">FX</span>
-        </label>
-        {fxEnabled && (
-          <CustomSelect
-            value={fxPreset}
-            onChange={handleFXPresetChange}
-            options={Object.keys(VOCODER_FX_PRESETS).map(name => ({
-              value: name,
-              label: name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
-            }))}
-            className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-cyan-400"
-            title="Effect preset"
-          />
-        )}
-      </div>
-
-      {/* Vocoder-specific controls — only when vocoder is active */}
-      {isActive && (
-        <>
-          <CustomSelect
-            value={presetName || ''}
-            onChange={handlePresetChange}
-            options={[
-              ...(!presetName ? [{ value: '', label: 'Custom' }] : []),
-              ...VOCODER_PRESETS.map(p => ({
-                value: p.name,
-                label: p.name,
-              })),
-            ]}
-            className="px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bgTertiary text-dark-textSecondary"
-            title="Vocoder voice preset"
-          />
-          <input
-            type="range" min="0.25" max="4.0" step="0.05"
-            value={params.formantShift} onChange={handleFormantShift}
-            className="w-12 h-1 accent-purple-500"
-            title={`Formant: ${params.formantShift.toFixed(2)}x`}
-          />
-          <input
-            type="range" min="0" max="1" step="0.01"
-            value={params.wet} onChange={handleWet}
-            className="w-12 h-1 accent-purple-500"
-            title={`Wet: ${Math.round(params.wet * 100)}%`}
-          />
-        </>
-      )}
+      </button>
 
       {error && <span className="text-[10px] text-red-400">{error}</span>}
+
+      {/* ── Settings dropdown panel ──────────────────────────────────── */}
+      {showPanel && (
+        <div
+          ref={panelRef}
+          className="absolute top-full right-0 mt-1 z-[99989] w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-3 space-y-3 text-xs font-mono"
+        >
+          {/* Mic selector */}
+          {devices.length > 0 && (
+            <div>
+              <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1">Microphone</div>
+              <CustomSelect
+                value={selectedDeviceId}
+                onChange={handleDeviceChange}
+                options={devices.map(d => ({ value: d.deviceId, label: d.label }))}
+                className="w-full px-2 py-1 text-xs rounded border border-dark-border bg-dark-bg text-text-primary"
+                title="Select microphone input"
+              />
+            </div>
+          )}
+
+          {/* Level meter */}
+          {engineRef.current && (
+            <div>
+              <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1">Level</div>
+              <div className="w-full h-2 bg-dark-bgTertiary rounded-sm overflow-hidden">
+                <div
+                  className={`h-full transition-[width] duration-75 ${isActive ? 'bg-purple-500' : 'bg-green-500'}`}
+                  style={{ width: `${Math.min(100, (muted ? 0 : amplitude) * 300)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Toggles row */}
+          <div>
+            <div className="text-[9px] text-text-muted uppercase tracking-wider mb-1.5">Features</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <label className="flex items-center gap-1.5 cursor-pointer" title="Duck music volume while talking">
+                <input type="checkbox" checked={duckingEnabled} onChange={() => setDuckingEnabled(!duckingEnabled)} className="w-3 h-3 accent-amber-500" />
+                <span className="text-text-secondary">Duck music</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer" title="Follow melody from active deck">
+                <input type="checkbox" checked={followMelodyEnabled} onChange={handleFollowMelodyToggle} className="w-3 h-3 accent-pink-500" />
+                <span className="text-text-secondary">Melody</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer" title="Pitch-correction autotune">
+                <input type="checkbox" checked={realTuneEnabled} onChange={handleRealTuneToggle} className="w-3 h-3 accent-pink-500" />
+                <span className="text-text-secondary">Autotune</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer" title="Mic effects (echo/reverb)">
+                <input type="checkbox" checked={fxEnabled} onChange={handleFXToggle} className="w-3 h-3 accent-cyan-500" />
+                <span className="text-text-secondary">Mic FX</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Autotune key/scale */}
+          {realTuneEnabled && (
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-text-muted">Key:</span>
+              <CustomSelect
+                value={String(tuneKey)}
+                onChange={handleTuneKeyChange}
+                options={KEY_NAMES.map((name, i) => ({ value: String(i), label: name }))}
+                className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-pink-400 w-14"
+              />
+              <CustomSelect
+                value={tuneScale}
+                onChange={handleTuneScaleChange}
+                options={SCALE_OPTIONS.map((s) => ({ value: s, label: s }))}
+                className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-pink-400 flex-1"
+              />
+            </div>
+          )}
+
+          {/* FX preset selector */}
+          {fxEnabled && (
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-text-muted">FX:</span>
+              <CustomSelect
+                value={fxPreset}
+                onChange={handleFXPresetChange}
+                options={Object.keys(VOCODER_FX_PRESETS).map(name => ({
+                  value: name,
+                  label: name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
+                }))}
+                className="flex-1 px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bg text-cyan-400"
+              />
+            </div>
+          )}
+
+          {/* Vocoder preset + sliders */}
+          {isActive && (
+            <div className="space-y-2 border-t border-dark-border pt-2">
+              <div className="text-[9px] text-text-muted uppercase tracking-wider">Vocoder</div>
+              <CustomSelect
+                value={presetName || ''}
+                onChange={handlePresetChange}
+                options={[
+                  ...(!presetName ? [{ value: '', label: 'Custom' }] : []),
+                  ...VOCODER_PRESETS.map(p => ({ value: p.name, label: p.name })),
+                ]}
+                className="w-full px-2 py-1 text-xs rounded border border-dark-border bg-dark-bg text-text-primary"
+                title="Vocoder voice preset"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-text-muted w-14">Formant</span>
+                <input
+                  type="range" min="0.25" max="4.0" step="0.05"
+                  value={params.formantShift} onChange={handleFormantShift}
+                  className="flex-1 h-1 accent-purple-500"
+                />
+                <span className="text-[9px] text-text-muted w-8 text-right">{params.formantShift.toFixed(2)}x</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-text-muted w-14">Wet</span>
+                <input
+                  type="range" min="0" max="1" step="0.01"
+                  value={params.wet} onChange={handleWet}
+                  className="flex-1 h-1 accent-purple-500"
+                />
+                <span className="text-[9px] text-text-muted w-8 text-right">{Math.round(params.wet * 100)}%</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
