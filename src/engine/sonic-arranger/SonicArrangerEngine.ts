@@ -65,7 +65,7 @@ export class SonicArrangerEngine {
 
     const initPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
-      try { await context.audioWorklet.addModule(`${baseUrl}sonic-arranger/SonicArranger.worklet.js`); } catch { /* already registered */ }
+      try { await context.audioWorklet.addModule(`${baseUrl}sonic-arranger/SonicArranger.worklet.js?v=${Date.now()}`); } catch { /* already registered */ }
 
       if (!this.wasmBinary || !this.jsCode) {
         const [wasmResponse, jsResponse] = await Promise.all([
@@ -78,6 +78,8 @@ export class SonicArrangerEngine {
           code = code
             .replace(/import\.meta\.url/g, "'.'")
             .replace(/export\s+default\s+\w+;?/g, '')
+            .replace(/self\.location\.href/g, "'.'")
+            .replace(/_scriptName=globalThis\.document\?\.currentScript\?\.src/, '_scriptName="."')
             .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
             .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
             .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
