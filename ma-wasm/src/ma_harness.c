@@ -124,6 +124,16 @@ EXPORT int ma_get_instrument_count(void) {
     return ma_instrument_count(g_module);
 }
 
+EXPORT float ma_get_instrument_param(int inst, const char *param) {
+    if (!g_module) return -1.0f;
+    return ma_instrument_get_param(g_module, inst, param);
+}
+
+EXPORT void ma_set_instrument_param(int inst, const char *param, float value) {
+    if (!g_module) return;
+    ma_instrument_set_param(g_module, inst, param, value);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Save / Export
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1945,6 +1945,42 @@ int ma_instrument_count(const MaModule* module) {
     return (int)module->instrument_count;
 }
 
+float ma_instrument_get_param(const MaModule* module, int index, const char* param) {
+    if (module == nullptr || index < 0 || index >= (int)module->instrument_count || param == nullptr) return -1.0f;
+    const Instrument* inst = &module->instruments[index];
+    if (strcmp(param, "sampleNumber") == 0)    return (float)inst->sample_number;
+    if (strcmp(param, "attack") == 0)          return (float)inst->attack;
+    if (strcmp(param, "decaySustain") == 0)    return (float)inst->decay_sustain;
+    if (strcmp(param, "release") == 0)         return (float)inst->release;
+    if (strcmp(param, "vibratoDelay") == 0)    return (float)inst->vibrato_delay;
+    if (strcmp(param, "vibratoSpeed") == 0)    return (float)inst->vibrato_speed;
+    if (strcmp(param, "vibratoLevel") == 0)    return (float)inst->vibrato_level;
+    if (strcmp(param, "arpeggio") == 0)        return (float)inst->arpeggio;
+    if (strcmp(param, "fxArpSpdlp") == 0)     return (float)inst->fx_arp_spdlp;
+    if (strcmp(param, "hold") == 0)            return (float)inst->hold;
+    if (strcmp(param, "keyWaveRate") == 0)     return (float)inst->key_wave_rate;
+    if (strcmp(param, "waveLevelSpeed") == 0)  return (float)inst->wave_level_speed;
+    return -1.0f;
+}
+
+void ma_instrument_set_param(MaModule* module, int index, const char* param, float value) {
+    if (module == nullptr || index < 0 || index >= (int)module->instrument_count || param == nullptr) return;
+    Instrument* inst = &module->instruments[index];
+    uint8_t v = (uint8_t)value;
+    if (strcmp(param, "sampleNumber") == 0)    { inst->sample_number = v; return; }
+    if (strcmp(param, "attack") == 0)          { inst->attack = v; return; }
+    if (strcmp(param, "decaySustain") == 0)    { inst->decay_sustain = v; return; }
+    if (strcmp(param, "release") == 0)         { inst->release = v; return; }
+    if (strcmp(param, "vibratoDelay") == 0)    { inst->vibrato_delay = v; return; }
+    if (strcmp(param, "vibratoSpeed") == 0)    { inst->vibrato_speed = v; return; }
+    if (strcmp(param, "vibratoLevel") == 0)    { inst->vibrato_level = v; return; }
+    if (strcmp(param, "arpeggio") == 0)        { inst->arpeggio = v; return; }
+    if (strcmp(param, "fxArpSpdlp") == 0)     { inst->fx_arp_spdlp = v; return; }
+    if (strcmp(param, "hold") == 0)            { inst->hold = v; return; }
+    if (strcmp(param, "keyWaveRate") == 0)     { inst->key_wave_rate = v; return; }
+    if (strcmp(param, "waveLevelSpeed") == 0)  { inst->wave_level_speed = v; return; }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void ma_note_on(MaModule* module, int instrument, int note, int velocity) {

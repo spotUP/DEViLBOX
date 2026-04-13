@@ -22,6 +22,7 @@ if(EMSCRIPTEN)
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration"
         "_player_get_channel_levels" "_player_set_channel_gain"
+        "_player_get_instrument_count" "_player_get_instrument_param" "_player_set_instrument_param"
     )
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})
 
