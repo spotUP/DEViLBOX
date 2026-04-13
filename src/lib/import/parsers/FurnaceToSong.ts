@@ -253,7 +253,20 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
   const { mapFurnaceInstrumentType } = await import('@lib/import/formats/FurnaceSongParser');
   const { BinaryReader } = await import('@/utils/BinaryReader');
 
-  const loaded = await loadFurFileWasm(buffer);
+  // Pre-decompress zlib (e.g. DefleMask DMF) before passing to WASM.
+  // The WASM's internal zlib aborts on files with corrupted adler32 checksums.
+  let wasmBuffer = buffer;
+  const hdr = new Uint8Array(buffer, 0, 2);
+  if (hdr[0] === 0x78 && (hdr[1] === 0x9c || hdr[1] === 0x01 || hdr[1] === 0xDA)) {
+    const pako = await import('pako');
+    const inflated = pako.inflateRaw(new Uint8Array(buffer).slice(2));
+    wasmBuffer = inflated.buffer.byteLength === inflated.byteLength
+      ? inflated.buffer as ArrayBuffer
+      : inflated.buffer.slice(inflated.byteOffset, inflated.byteOffset + inflated.byteLength) as ArrayBuffer;
+    console.log(`[FurnaceToSong] Pre-decompressed zlib DMF → ${wasmBuffer.byteLength} bytes`);
+  }
+
+  const loaded = await loadFurFileWasm(wasmBuffer);
 
   // Convert instruments from INS2 binary data extracted by WASM
   const instruments: InstrumentConfig[] = [];
