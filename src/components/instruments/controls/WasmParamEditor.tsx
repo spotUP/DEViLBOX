@@ -457,4 +457,78 @@ export const WASM_FORMAT_DESCRIPTORS: Record<string, WasmFormatDescriptor> = {
       { key: 'mode', label: 'Mode', min: 0, max: 3 },
     ],
   },
+
+  FredReplayerWasmSynth2: {
+    name: 'Fred Editor',
+    brandColor: '#ff6644',
+    params: [
+      { key: 'envVol', label: 'Volume', min: 0, max: 64, section: 'Sample' },
+      { key: 'instrumentNumber', label: 'Inst #', min: 0, max: 255 },
+      { key: 'instType', label: 'Type', min: 0, max: 3, type: 'select', options: [
+        { value: 0, label: 'Sample' }, { value: 1, label: 'Synth' },
+        { value: 2, label: 'Hybrid' }, { value: 3, label: 'Sync' },
+      ]},
+      { key: 'period', label: 'Period', min: 0, max: 65535 },
+      { key: 'sampleSize', label: 'Sample Size', min: 0, max: 65535 },
+      { key: 'repeatLen', label: 'Repeat Len', min: 0, max: 65535 },
+      { key: 'length', label: 'Length', min: 0, max: 65535 },
+      { key: 'attackSpeed', label: 'Atk Speed', min: 0, max: 255, section: 'ADSR' },
+      { key: 'attackVolume', label: 'Atk Vol', min: 0, max: 255 },
+      { key: 'decaySpeed', label: 'Dec Speed', min: 0, max: 255 },
+      { key: 'decayVolume', label: 'Dec Vol', min: 0, max: 255 },
+      { key: 'sustainDelay', label: 'Sus Delay', min: 0, max: 255 },
+      { key: 'releaseSpeed', label: 'Rel Speed', min: 0, max: 255 },
+      { key: 'releaseVolume', label: 'Rel Vol', min: 0, max: 255 },
+      { key: 'vibDelay', label: 'Vib Delay', min: 0, max: 255, section: 'Vibrato' },
+      { key: 'vibSpeed', label: 'Vib Speed', min: 0, max: 255 },
+      { key: 'vibAmpl', label: 'Vib Ampl', min: 0, max: 255 },
+      { key: 'arpSpeed', label: 'Arp Speed', min: 0, max: 255, section: 'Arpeggio' },
+      { key: 'arpCount', label: 'Arp Count', min: 0, max: 255 },
+      { key: 'pulseStart', label: 'Pulse Start', min: 0, max: 255, section: 'Pulse' },
+      { key: 'pulseEnd', label: 'Pulse End', min: 0, max: 255 },
+      { key: 'pulseSpeed', label: 'Pulse Speed', min: 0, max: 255 },
+      { key: 'pulseDelay', label: 'Pulse Delay', min: 0, max: 255 },
+      { key: 'pulseRateMin', label: 'Rate Min', min: 0, max: 255 },
+      { key: 'pulseRatePlus', label: 'Rate Plus', min: 0, max: 255 },
+      { key: 'pulseShotCounter', label: 'Shot Count', min: 0, max: 255 },
+      { key: 'blend', label: 'Blend', min: 0, max: 255, section: 'Blend' },
+      { key: 'blendDelay', label: 'Blend Delay', min: 0, max: 255 },
+      { key: 'blendShotCounter', label: 'Blend Shot', min: 0, max: 255 },
+      { key: 'instSync', label: 'Sync', min: 0, max: 1, type: 'checkbox', section: 'Misc' },
+      { key: 'fineTune', label: 'Fine Tune', min: -128, max: 127 },
+    ],
+  },
+
+  GmcWasmSynth: {
+    name: 'Game Music Creator',
+    brandColor: '#88aa44',
+    params: [
+      { key: 'volume', label: 'Volume', min: 0, max: 64, section: 'Sample' },
+      { key: 'length', label: 'Length', min: 0, max: 131072 },
+      { key: 'loopStart', label: 'Loop Start', min: 0, max: 131072 },
+      { key: 'loopLength', label: 'Loop Len', min: 0, max: 131072 },
+    ],
+  },
+
+  SoundFxWasmSynth: {
+    name: 'SoundFX',
+    brandColor: '#44aa88',
+    params: [
+      { key: 'volume', label: 'Volume', min: 0, max: 64, section: 'Sample' },
+      { key: 'length', label: 'Length', min: 0, max: 131072 },
+      { key: 'loopStart', label: 'Loop Start', min: 0, max: 131072 },
+      { key: 'loopLength', label: 'Loop Len', min: 0, max: 131072 },
+    ],
+  },
+
+  VoodooWasmSynth: {
+    name: 'Voodoo Supreme',
+    brandColor: '#aa4488',
+    params: [
+      { key: 'isSample', label: 'Is Sample', min: 0, max: 1, type: 'checkbox', section: 'Waveform' },
+      { key: 'dataLength', label: 'Data Len', min: 0, max: 65535 },
+      { key: 'sampleLength', label: 'Sample Len', min: 0, max: 65535 },
+      { key: 'offset', label: 'Offset', min: 0, max: 65535 },
+    ],
+  },
 };

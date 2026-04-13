@@ -3741,6 +3741,7 @@ var _tfmx_init,
   _tfmx_render,
   _tfmx_set_param,
   _tfmx_get_param,
+  _tfmx_set_instrument_param,
   _tfmx_load_module,
   _malloc,
   _tfmx_get_samples_rendered,
@@ -3772,6 +3773,7 @@ function assignWasmExports(wasmExports) {
   _tfmx_render = Module['_tfmx_render'] = wasmExports['tfmx_render'];
   _tfmx_set_param = Module['_tfmx_set_param'] = wasmExports['tfmx_set_param'];
   _tfmx_get_param = Module['_tfmx_get_param'] = wasmExports['tfmx_get_param'];
+  _tfmx_set_instrument_param = Module['_tfmx_set_instrument_param'] = wasmExports['tfmx_set_instrument_param'];
   _tfmx_load_module = Module['_tfmx_load_module'] = wasmExports['tfmx_load_module'];
   _malloc = Module['_malloc'] = wasmExports['malloc'];
   _tfmx_get_samples_rendered = Module['_tfmx_get_samples_rendered'] = wasmExports['tfmx_get_samples_rendered'];

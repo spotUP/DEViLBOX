@@ -344,6 +344,37 @@ int player_debug_pat_note(int patIdx, int noteIdx) {
     return (n->fx << 24) | (n->pitch << 16) | (n->volume << 8) | n->instr;
 }
 
+/* ---- Instrument parameter editing ---- */
+
+EMSCRIPTEN_KEEPALIVE
+void sym_set_instrument_param(int instIdx, const char* param, float value) {
+    if (instIdx < 0 || instIdx >= SYM_MAX_INSTRUMENTS) return;
+    SymInstrument* inst = &s_song.instruments[instIdx];
+
+    if (strcmp(param, "type") == 0)              inst->type = (int16_t)value;
+    else if (strcmp(param, "volume") == 0)        inst->volume = (uint8_t)value;
+    else if (strcmp(param, "finetune") == 0)      inst->finetune = (int16_t)value;
+    else if (strcmp(param, "tune") == 0)          inst->tune = (int16_t)value;
+    else if (strcmp(param, "loopStart") == 0)     inst->loopStart = (int32_t)value;
+    else if (strcmp(param, "loopEnd") == 0)       inst->loopEnd = (int32_t)value;
+    else if (strcmp(param, "sustStart") == 0)     inst->sustStart = (int32_t)value;
+    else if (strcmp(param, "sustEnd") == 0)       inst->sustEnd = (int32_t)value;
+    else if (strcmp(param, "loopNumb") == 0)      inst->loopNumb = (int16_t)value;
+    else if (strcmp(param, "multiChannel") == 0)  inst->multiChannel = (uint8_t)value;
+    else if (strcmp(param, "noDsp") == 0) {
+        if ((int)value)
+            inst->playFlags |= SYM_PFLAG_NODSP;
+        else
+            inst->playFlags &= ~SYM_PFLAG_NODSP;
+    }
+    else if (strcmp(param, "superFast") == 0) {
+        if ((int)value)
+            inst->playFlags |= SYM_PFLAG_SUPERFAST;
+        else
+            inst->playFlags &= ~SYM_PFLAG_SUPERFAST;
+    }
+}
+
 /* ---- Heap access for sample data transfer ---- */
 
 EMSCRIPTEN_KEEPALIVE

@@ -93,6 +93,20 @@ class RobHubbardProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setInstrumentParam': {
+        if (this.wasm && this.ctx) {
+          var paramMap = { volume: [0, 64], sampleVolume: [0, 64], portaSpeed: [1, 127], divider: [2, 255] };
+          var entry = paramMap[data.param];
+          if (entry) {
+            var normalized = data.value / entry[1];
+            for (var h in this.players) {
+              this.wasm._rh_set_param(this.ctx, parseInt(h), entry[0], normalized);
+            }
+          }
+        }
+        break;
+      }
+
       case 'setMuteMask':
         this.muteMask = data.mask;
         break;

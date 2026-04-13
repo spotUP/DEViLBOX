@@ -72,6 +72,9 @@ struct TFMXPlayer {
   uint8_t* miniMod;      // full minimal TFMX module buffer
   uint32_t miniModLen;
   uint32_t patternOff;   // byte offset of pattern data within miniMod
+  uint32_t volSeqOff;    // byte offset of VolModSeq within miniMod
+  uint32_t sndSeqsOff;   // byte offset of SndModSeqs within miniMod
+  uint32_t sndSeqsCount; // number of SndModSeqs
   bool     active;       // true = playing (note is on)
   bool     loaded;       // true = instrument loaded
 };
@@ -88,7 +91,7 @@ EMSCRIPTEN_KEEPALIVE
 void* tfmx_init(int sampleRate) {
   gSampleRate = sampleRate;
   for (int i = 0; i < MAX_PLAYERS; i++) {
-    gPlayers[i] = { nullptr, nullptr, 0, 0, false, false };
+    gPlayers[i] = { nullptr, nullptr, 0, 0, 0, 0, 0, false, false };
   }
   gInit = true;
   return (void*)1; // non-null = success
@@ -184,8 +187,11 @@ int tfmx_load_instrument(void* /*ctx*/, int handle, const uint8_t* blob, uint32_
   free(p.miniMod);
   p.miniMod = (uint8_t*)calloc(1, mTotalLen);
   if (!p.miniMod) return -5;
-  p.miniModLen = mTotalLen;
-  p.patternOff = mPatternOff;
+  p.miniModLen   = mTotalLen;
+  p.patternOff   = mPatternOff;
+  p.volSeqOff    = mVolSeqsOff;
+  p.sndSeqsOff   = mSndSeqsOff;
+  p.sndSeqsCount = sndSeqsCount;
 
   // Header — "TFMX\0" magic overlaps with sndSeqsMax high byte
   // TFMX magic: T(0x54) F(0x46) M(0x4D) X(0x58) [null = sndSeqsMax hi]
@@ -336,12 +342,58 @@ void tfmx_render(void* /*ctx*/, int handle, float* outL, float* outR, int numSam
 
 EMSCRIPTEN_KEEPALIVE
 void tfmx_set_param(void* /*ctx*/, int /*handle*/, int /*paramId*/, float /*value*/) {
-  /* No runtime parameters implemented yet */
+  /* No runtime parameters implemented yet — use tfmx_set_instrument_param instead */
 }
 
 EMSCRIPTEN_KEEPALIVE
 float tfmx_get_param(void* /*ctx*/, int /*handle*/, int /*paramId*/) {
   return 0.0f;
+}
+
+/**
+ * tfmx_set_instrument_param — write a byte into the miniMod buffer and reinit
+ * the decoder so the change takes effect on the next note trigger.
+ *
+ * section:
+ *   0 = VolModSeq  (64 bytes, byteIdx 0..63)
+ *   1 = SndModSeq  (64 bytes per seq, byteIdx = seqIdx*64 + posInSeq)
+ *
+ * Returns 0 on success, negative on error.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_set_instrument_param(void* /*ctx*/, int handle, int section,
+                              int byteIdx, int value) {
+  if (handle < 0 || handle >= MAX_PLAYERS) return -1;
+  TFMXPlayer& p = gPlayers[handle];
+  if (!p.miniMod || !p.loaded) return -2;
+
+  uint32_t absOff = 0;
+  if (section == 0) {
+    // VolModSeq: 64 bytes at p.volSeqOff
+    if (byteIdx < 0 || byteIdx >= TFMX_SEQ_SIZE) return -3;
+    absOff = p.volSeqOff + (uint32_t)byteIdx;
+  } else if (section == 1) {
+    // SndModSeq pool: sndSeqsCount * 64 bytes at p.sndSeqsOff
+    if (byteIdx < 0 || (uint32_t)byteIdx >= p.sndSeqsCount * TFMX_SEQ_SIZE) return -3;
+    absOff = p.sndSeqsOff + (uint32_t)byteIdx;
+  } else {
+    return -4; // unknown section
+  }
+
+  if (absOff >= p.miniModLen) return -5;
+
+  p.miniMod[absOff] = (uint8_t)(value & 0xFF);
+
+  // Reinitialize the decoder with the patched buffer so the change takes
+  // effect on the next note_on.  If a note is currently playing, the reinit
+  // will restart it — this is acceptable for live editing.
+  if (p.decoder) {
+    tfmxdec_init(p.decoder, p.miniMod, p.miniModLen, 0);
+    tfmxdec_mixer_init(p.decoder, gSampleRate, 16, 2, 0, 75);
+    tfmxdec_set_loop_mode(p.decoder, 1);
+  }
+
+  return 0;
 }
 
 // ── Full-module playback (uses player handle 0 as dedicated module player) ──
