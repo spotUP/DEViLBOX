@@ -157,6 +157,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   if (!cachedAPI) cachedAPI = getAPI(m);
   const api = cachedAPI;
 
+  console.log(`[FurnaceFileOps] loadFurFileWasm called, ${buffer.byteLength} bytes, header: ${new Uint8Array(buffer, 0, 4).join(',')}`);
   // Pre-decompress zlib data (e.g. DefleMask DMF) so the WASM receives raw data.
   // This avoids relying on the WASM's internal zlib which can crash on files
   // with corrupted adler32 checksums.
