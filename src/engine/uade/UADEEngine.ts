@@ -562,6 +562,14 @@ export class UADEEngine implements IsolationCapableEngine {
     UADEEngine.wasmBinary = null;
 
     this.workletNode.connect(this.output);
+
+    // Handle worklet processor crash — prevents browser tab from dying
+    this.workletNode.onprocessorerror = (event) => {
+      console.error('[UADEEngine] AudioWorklet processor crashed:', event);
+      // Disconnect to prevent further errors
+      try { this.workletNode?.disconnect(); } catch { /* */ }
+      try { this.output.gain.setValueAtTime(0, 0); } catch { /* */ }
+    };
   }
 
   /** Wait for WASM initialization to complete */
