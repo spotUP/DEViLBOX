@@ -123,6 +123,7 @@ static const SfInstrument sf_default_instrument_template = {
     .filter_frequency = 1, .filter_end = 50, .filter_speed = 2,
     .dasr_sustain_offset = 0, .dasr_release_offset = 0,
     .sample_data = nullptr
+
 };
 static int8_t sf_default_sample_data[2] = { 100, -100 };
 
@@ -208,6 +209,9 @@ typedef struct SfChannel {
 struct SfModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     SfSongInfo* song_infos;
     int num_songs;
 
@@ -241,6 +245,7 @@ struct SfModule {
 
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,11 +255,13 @@ struct SfModule {
 static const uint16_t sf_multiply_table[12] = {
     32768, 30929, 29193, 27555, 26008, 24549,
     23171, 21870, 20643, 19484, 18391, 17359
+
 };
 
 static const uint16_t sf_sample_table[12] = {
     54728, 51656, 48757, 46020, 43437, 40999,
     38698, 36526, 34476, 32541, 30715, 28964
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1449,6 +1456,10 @@ SfModule* sf_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!sf_load(m, data, size)) { sf_destroy(m); return nullptr; }
 
     sf_find_samples(m);
@@ -1466,6 +1477,7 @@ void sf_destroy(SfModule* module) {
     for (int i = 0; i < module->num_original_instruments; i++)
         if (module->original_instruments[i].sample_data)
             free(module->original_instruments[i].sample_data);
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1491,4 +1503,23 @@ void sf_set_channel_mask(SfModule* module, uint32_t mask) {
 bool sf_has_ended(const SfModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sf_get_instrument_count(const SfModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t sf_export(const SfModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

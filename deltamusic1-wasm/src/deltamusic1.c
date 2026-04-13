@@ -27,6 +27,7 @@ static const uint16_t dm1_periods[] = {
      428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
      214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
      113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113
+
 };
 
 #define DM1_PERIODS_COUNT (sizeof(dm1_periods) / sizeof(dm1_periods[0]))
@@ -221,6 +222,9 @@ static size_t reader_read(Dm1Reader* r, void* dst, size_t count) {
 struct Dm1Module {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     Dm1Track* tracks[4];
     uint16_t track_lengths[4];
 
@@ -238,6 +242,7 @@ struct Dm1Module {
     // Mixer state
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1073,6 +1078,10 @@ Dm1Module* dm1_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!dm1_load(m, data, size)) {
         dm1_destroy(m);
         return nullptr;
@@ -1119,6 +1128,7 @@ void dm1_destroy(Dm1Module* module) {
         }
     }
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1166,4 +1176,23 @@ void dm1_set_channel_mask(Dm1Module* module, uint32_t mask) {
 bool dm1_has_ended(const Dm1Module* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int dm1_get_instrument_count(const Dm1Module* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t dm1_export(const Dm1Module* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

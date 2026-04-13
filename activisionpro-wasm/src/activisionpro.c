@@ -37,18 +37,22 @@ static const uint16_t avp_periods[85] = {
      424,  400,  377,  357,  337,  317,  298,  282,  266,  252,  238,  224,
      212,  200,  189,  179,  169,  159,  149,  141,  133,  126,  119,  112,
      106
+
 };
 
 static const uint8_t avp_vibrato_counters[19] = {
     0, 1, 1, 1, 1, 4, 3, 2, 4, 3, 2, 1, 3, 2, 1, 3, 2, 2, 1
+
 };
 
 static const int8_t avp_vibrato_depths1[19] = {
     0, 5, 4, 3, 2, 5, 5, 4, 4, 4, 3, 1, 3, 2, 0, 1, 1, 0, 0
+
 };
 
 static const int8_t avp_vibrato_depths2[19] = {
     1, 32, 16, 8, 4, 32, 32, 16, 16, 16, 8, 2, 8, 4, 1, 2, 2, 1, 1
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,7 +175,10 @@ typedef struct AvpChannel {
 
 typedef struct AvpModule {
     float sample_rate;
-    bool has_ended;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    bool has_ended;
 
     // Extracted from player code
     int sub_song_list_offset;
@@ -1676,6 +1683,10 @@ AvpModule* avp_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->file_data = data;
     m->file_size = size;
 
@@ -1733,6 +1744,7 @@ void avp_destroy(AvpModule* module) {
         free(module->samples);
     }
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1762,4 +1774,23 @@ void avp_set_channel_mask(AvpModule* module, uint32_t mask) {
 bool avp_has_ended(const AvpModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int avp_get_instrument_count(const AvpModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t avp_export(const AvpModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct SynModule SynModule;
 
@@ -30,6 +27,4 @@ size_t syn_render_multi(SynModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool syn_has_ended(const SynModule* module);
 
-#ifdef __cplusplus
-}
-#endif
+

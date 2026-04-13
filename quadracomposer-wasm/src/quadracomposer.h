@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct QcModule QcModule;
 
@@ -30,6 +27,4 @@ size_t qc_render_multi(QcModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool qc_has_ended(const QcModule* module);
 
-#ifdef __cplusplus
-}
-#endif
+

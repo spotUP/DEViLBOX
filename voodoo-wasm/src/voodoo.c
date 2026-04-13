@@ -28,6 +28,7 @@ static const uint16_t vs_periods[99] = {
       848,   800,   756,   712,   672,   636,   600,   564,   532,   504,   476,   448,
       424,   400,   378,   356,   336,   318,   300,   282,   266,   252,   238,   224,
       212,   200,   189,   178,   168,   159,   150,   141,   133
+
 };
 
 static const uint16_t vs_frequency_ratio[26] = {
@@ -44,6 +45,7 @@ static const uint16_t vs_frequency_ratio[26] = {
     98, 55,
     168, 89,
     2, 1
+
 };
 
 static int8_t vs_empty_sample_data[256];  // zero-initialized
@@ -243,6 +245,9 @@ typedef struct VsMixChannel {
 struct VsModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     // Module data
     int          num_subsongs;
     VsSongInfo*  subsongs;
@@ -265,6 +270,7 @@ struct VsModule {
     // Tick timing
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1891,6 +1897,10 @@ VsModule* vs_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!load_module(m, data, size)) {
         vs_destroy(m);
         return nullptr;
@@ -1935,6 +1945,7 @@ void vs_destroy(VsModule* module) {
     }
 
     free(module->all_sample_indices);
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1966,4 +1977,23 @@ void vs_set_channel_mask(VsModule* module, uint32_t mask) {
 bool vs_has_ended(const VsModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int vs_get_instrument_count(const VsModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t vs_export(const VsModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

@@ -43,6 +43,7 @@ typedef enum DwEffect {
 static const uint16_t periods1[] = {
                                                            256,  242,  228,
      215,  203,  192,  181,  171,  161,  152,  144,  136
+
 };
 
 static const uint16_t periods2[] = {
@@ -54,6 +55,7 @@ static const uint16_t periods2[] = {
 
     // Extra periods for out-of-range arpeggio/transpose
                                                            256,  241,  228
+
 };
 
 static const uint16_t periods3[] = {
@@ -64,6 +66,7 @@ static const uint16_t periods3[] = {
      861,  813,  767,  724,  683,  645,  609,  575,  542,  512,  483,  456,
      430,  406,  383,  362,  341,  322,  304,  287,  271,  256,  241,  228,
      215,  203,  191,  181,  170,  161,  152,  143,  135
+
 };
 
 #define PERIODS1_COUNT (sizeof(periods1) / sizeof(periods1[0]))
@@ -272,12 +275,16 @@ struct DwModule {
 
     // Render state
     float sample_rate;
-    float ticks_per_frame;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    float ticks_per_frame;
     float tick_accumulator;
 
     // Copy of raw module data for loading
     uint8_t* raw_data;
     size_t raw_data_size;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2250,6 +2257,10 @@ DwModule* dw_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     // 50 Hz tick rate (PAL Amiga VBlank)
     m->ticks_per_frame = sample_rate / 50.0f;
     m->tick_accumulator = 0.0f;
@@ -2364,6 +2375,7 @@ void dw_destroy(DwModule* module) {
     // Free raw data
     free(module->raw_data);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -2396,4 +2408,23 @@ void dw_set_channel_mask(DwModule* module, uint32_t mask) {
 bool dw_has_ended(const DwModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int dw_get_instrument_count(const DwModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t dw_export(const DwModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

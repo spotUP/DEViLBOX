@@ -6,7 +6,7 @@ echo "=== Actionamics WASM Build ==="
 mkdir -p "$OUT_DIR"
 emcc -O2 -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-tautological-constant-out-of-range-compare \
     "$SCRIPT_DIR/src/actionamics.c" \
-    -sEXPORTED_FUNCTIONS="['_act_create','_act_destroy','_act_subsong_count','_act_select_subsong','_act_channel_count','_act_set_channel_mask','_act_render','_act_render_multi','_act_has_ended','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_act_create','_act_destroy','_act_subsong_count','_act_select_subsong','_act_channel_count','_act_set_channel_mask','_act_render','_act_render_multi','_act_has_ended','_act_get_instrument_count','_act_export','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createActionamics -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=4194304 -sMAXIMUM_MEMORY=16777216 \

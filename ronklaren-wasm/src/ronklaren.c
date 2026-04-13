@@ -45,6 +45,7 @@ static const uint16_t rk_periods[70] = {
      856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480,  452,
      428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
      214,  202,  190,  180,  170,  160,  151,  143,  135,  127
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +253,10 @@ static bool reader_read_mark(RkReader* r, char* buf, int length) {
 
 typedef struct RkModule {
     float sample_rate;
-    bool has_ended;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    bool has_ended;
     bool end_reached[4]; // per-channel end tracking
 
     bool clear_adsr_state_on_portamento;
@@ -1709,6 +1713,10 @@ RkModule* rk_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->cia_value = cia_value;
     m->clear_adsr_state_on_portamento = clear_adsr_on_portamento;
     memset(m->default_arpeggio, 0, sizeof(m->default_arpeggio));
@@ -1811,6 +1819,7 @@ void rk_destroy(RkModule* module) {
         free(module->sample_data);
     }
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1843,4 +1852,23 @@ void rk_set_channel_mask(RkModule* module, uint32_t mask) {
 bool rk_has_ended(const RkModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int rk_get_instrument_count(const RkModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t rk_export(const RkModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

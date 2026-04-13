@@ -6,7 +6,7 @@ echo "=== Gmc WASM Build ==="
 mkdir -p "$OUT_DIR"
 emcc -O2 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/gmc.c" \
-    -sEXPORTED_FUNCTIONS="['_gmc_create','_gmc_destroy','_gmc_subsong_count','_gmc_select_subsong','_gmc_channel_count','_gmc_set_channel_mask','_gmc_render','_gmc_render_multi','_gmc_has_ended','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_gmc_create','_gmc_destroy','_gmc_subsong_count','_gmc_select_subsong','_gmc_channel_count','_gmc_set_channel_mask','_gmc_render','_gmc_render_multi','_gmc_has_ended','_gmc_get_instrument_count','_gmc_export','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createGmc -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=4194304 -sMAXIMUM_MEMORY=16777216 \

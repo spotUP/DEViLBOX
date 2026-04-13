@@ -31,10 +31,12 @@ static const uint16_t fc_periods[132] = {
      428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
      214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
      113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113
+
 };
 
 static const uint8_t fc_silent[8] = {
     0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe1
+
 };
 
 #define FC_SILENT_LEN 8
@@ -160,6 +162,9 @@ typedef struct FcReader {
 typedef struct FcModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     FcSample samp_info[90];     // 10 samples + 80 wavetables
     int16_t samp_num;
     int16_t wav_num;
@@ -667,7 +672,7 @@ static void fc_effect(FcModule* m, uint32_t chan) {
     note &= 0x7f;
 
     // Get the period
-    uint16_t period = note < FC_PERIODS_LEN ? fc_periods[note] : 0;
+    uint16_t period = (uint8_t)note < FC_PERIODS_LEN ? fc_periods[(uint8_t)note] : 0;
     uint8_t vib_flag = voi->vib_flag;
 
     // Shall we vibrate?
@@ -1290,6 +1295,10 @@ FcModule* fc_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!load_module(m, data, size)) {
         fc_destroy(m);
         return nullptr;
@@ -1325,6 +1334,7 @@ void fc_destroy(FcModule* module) {
     if (module->frq_sequences) free(module->frq_sequences);
     if (module->vol_sequences) free(module->vol_sequences);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1357,4 +1367,23 @@ void fc_set_channel_mask(FcModule* module, uint32_t mask) {
 bool fc_has_ended(const FcModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int fc_get_instrument_count(const FcModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t fc_export(const FcModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }
