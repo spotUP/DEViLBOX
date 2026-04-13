@@ -286,14 +286,14 @@ export async function parsePxtoneFile(
         id: i + 1,
         name,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'PxtoneSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,
       } as InstrumentConfig))
     : [{
         id: 1, name: 'Sample 1', type: 'synth' as const,
-        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+        synthType: 'PxtoneSynth' as const, effects: [], volume: 0, pan: 0,
       } as InstrumentConfig];
 
   return {

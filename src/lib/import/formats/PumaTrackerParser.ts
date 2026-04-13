@@ -451,7 +451,7 @@ export async function parsePumaTrackerFile(
         id,
         name,
         type: 'sample' as const,
-        synthType: 'Sampler' as const,
+        synthType: 'PumaTrackerSynth' as const,
         effects: [],
         volume: -60,
         pan: 0,

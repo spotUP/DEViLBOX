@@ -97,6 +97,55 @@ class EupminiProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setFmSlotParam':
+        if (this.module && typeof this.module._eupmini_set_fm_slot_param === 'function') {
+          this.module._eupmini_set_fm_slot_param(data.inst, data.op, data.paramId, data.value);
+        }
+        break;
+
+      case 'setFmChParam':
+        if (this.module && typeof this.module._eupmini_set_fm_ch_param === 'function') {
+          this.module._eupmini_set_fm_ch_param(data.inst, data.paramId, data.value);
+        }
+        break;
+
+      case 'getFmInstrument': {
+        if (!this.module || typeof this.module._eupmini_get_fm_instrument !== 'function') break;
+        const m = this.module;
+        const inst = data.inst;
+        const malloc = m._malloc || m.malloc;
+        const free = m._free || m.free;
+        if (!malloc || !free) break;
+        const ptr = malloc(40 * 4);
+        m._eupmini_get_fm_instrument(inst, ptr);
+        const heap32 = new Int32Array(m.wasmMemory.buffer);
+        const base = ptr >> 2;
+        const result = {
+          inst,
+          alg: heap32[base], fb: heap32[base + 1],
+          panL: heap32[base + 2], panR: heap32[base + 3],
+          slots: [],
+        };
+        for (let s = 0; s < 4; s++) {
+          const sb = base + 4 + s * 9;
+          result.slots.push({
+            tl: heap32[sb], ar: heap32[sb + 1], dr: heap32[sb + 2],
+            sr: heap32[sb + 3], rr: heap32[sb + 4], sl: heap32[sb + 5],
+            mul: heap32[sb + 6], det: heap32[sb + 7], ks: heap32[sb + 8],
+          });
+        }
+        free(ptr);
+        this.port.postMessage({ type: 'fmInstrumentData', data: result });
+        break;
+      }
+
+      case 'getNumFmInstruments': {
+        if (!this.module || typeof this.module._eupmini_get_num_fm_instruments !== 'function') break;
+        const count = this.module._eupmini_get_num_fm_instruments();
+        this.port.postMessage({ type: 'numFmInstruments', count });
+        break;
+      }
+
       case 'dispose':
         this.cleanup();
         break;

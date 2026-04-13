@@ -86,6 +86,8 @@ import type {
   SF2Config,
   RonKlarenConfig,
   PreTrackerConfig,
+  SawteethConfig,
+  FmplayerConfig,
 } from './exotic';
 import type {
   DrumMachineConfig,
@@ -279,6 +281,12 @@ export interface InstrumentConfig {
   hively?: HivelyConfig;
   // PreTracker (synth tracker by Pink/Abyss)
   pretracker?: PreTrackerConfig;
+  // Sawteeth (software synth tracker by Stansen/Sanity)
+  sawteeth?: SawteethConfig;
+  // FmPlayer (PC-98 YM2608 OPNA — FMP/PLAY6 format)
+  fmplayer?: FmplayerConfig;
+  // Eupmini (FM Towns Euphony — 4-op FM + PCM)
+  eupmini?: FmplayerConfig;
   // GoatTracker Ultra (C64 SID tracker)
   gtUltra?: GTUltraConfig;
   // SID Factory II (C64 SID tracker — driver-defined instrument tables)
@@ -563,6 +571,20 @@ export const DEFAULT_PRETRACKER: PreTrackerConfig = {
   subsongCount: 1,
   title: '',
   author: '',
+};
+
+export const DEFAULT_FMPLAYER: FmplayerConfig = {
+  fmChannels: [],
+  ssgChannels: [],
+  title: '',
+};
+
+export const DEFAULT_SAWTEETH: SawteethConfig = {
+  instruments: [],
+  instrumentNames: [],
+  title: '',
+  author: '',
+  numChannels: 0,
 };
 
 export const DEFAULT_GTULTRA: GTUltraConfig = {

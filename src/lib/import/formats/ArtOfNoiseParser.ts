@@ -931,7 +931,7 @@ function makeSynthPlaceholder(id: number, name: string): InstrumentConfig {
     id,
     name: name.replace(/\0/g, '').trim() || `Instrument ${id}`,
     type: 'synth' as const,
-    synthType: 'Synth' as const,
+    synthType: 'ArtOfNoiseSynth' as const,
     effects: [],
     volume: 0,
     pan: 0,

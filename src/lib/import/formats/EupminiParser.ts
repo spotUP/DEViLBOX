@@ -89,7 +89,7 @@ export async function parseEupFile(
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'FM Towns', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    synthType: 'EupminiSynth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig];
 
   return {

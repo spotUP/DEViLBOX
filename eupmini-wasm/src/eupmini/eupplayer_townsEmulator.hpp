@@ -124,6 +124,34 @@ public:
     void keyOff();
     void frequency(int freq);
     int nextTick(int rate, int phaseShift);
+
+    /* Parameter accessors for WASM editor API */
+    int getDetune() const { return _detune; }
+    int getMultiple() const { return _multiple; }
+    int getTotalLevel() const { return _specifiedTotalLevel; }
+    int getKeyScale() const { return _keyScale; }
+    int getAttackRate() const { return _specifiedAttackRate; }
+    int getDecayRate() const { return _specifiedDecayRate; }
+    int getSustainLevel() const { return _specifiedSustainLevel; }
+    int getSustainRate() const { return _specifiedSustainRate; }
+    int getReleaseRate() const { return _specifiedReleaseRate; }
+    int getFeedbackLevel() const { return _feedbackLevel; }
+    void setDetune(int v) { _detune = v; }
+    void setMultiple(int v) { _multiple = v; }
+    void setTotalLevel(int v) {
+        _specifiedTotalLevel = v & 127;
+        _totalLevel = (static_cast<int64_t>(_specifiedTotalLevel) << 31) +
+                      (static_cast<int64_t>(127 - _velocity) << 29);
+    }
+    void setKeyScale(int v) { _keyScale = v & 3; }
+    void setAttackRate(int v) { _specifiedAttackRate = v & 31; }
+    void setDecayRate(int v) { _specifiedDecayRate = v & 31; }
+    void setSustainLevel(int v) {
+        _specifiedSustainLevel = v & 15;
+        _sustainLevel = static_cast<int64_t>(_specifiedSustainLevel) << (31 + 2);
+    }
+    void setSustainRate(int v) { _specifiedSustainRate = v & 31; }
+    void setReleaseRate(int v) { _specifiedReleaseRate = v & 15; }
 };
 
 class TownsFmEmulator : public EUP_TownsEmulator_MonophonicAudioSynthesizer {
@@ -153,6 +181,23 @@ public:
     void note(int n, int onVelo, int offVelo, int gateTime);
     void pitchBend(int value);
     void recalculateFrequency();
+
+    /* Parameter accessors for WASM editor API */
+    int getAlgorithm() const { return _algorithm; }
+    int getFeedback() const { return _opr[0].getFeedbackLevel(); }
+    int getVolume() const { return _chn_volume; }
+    int getExpression() const { return _expression; }
+    int getEnableL() const { return _enableL; }
+    int getEnableR() const { return _enableR; }
+    void setAlgorithm(int v) { _algorithm = v & 7; }
+    void setFeedbackLevel(int v) { _opr[0].feedbackLevel(v & 7); }
+    void setVolume(int v) { _chn_volume = v; }
+    void setExpression(int v) { _expression = v; }
+    void setEnableL(int v) { _enableL = v; }
+    void setEnableR(int v) { _enableR = v; }
+    TownsFmEmulator_Operator *getOperator(int idx) {
+        return (idx >= 0 && idx < _numOfOperators) ? &_opr[idx] : nullptr;
+    }
 };
 
 class TownsPcmEmulator : public EUP_TownsEmulator_MonophonicAudioSynthesizer {
@@ -261,6 +306,16 @@ public:
     void controlChange(int channel, int control, int value);
     void programChange(int channel, int num);
     void rate(int r);
+
+    /* FM instrument data accessor for WASM editor API.
+     * Returns pointer to 48-byte FM instrument data, or nullptr if invalid.
+     * Layout per 4 operators (offset 0,4,8,12,16,20,24,28): DT/MUL, -, -, TL, KS/AR, DR, SR, SL/RR
+     * Offset 32: ALG/FB, 33-47: unused/padding */
+    uint8_t *getFmInstrumentData(int num) {
+        if (num < 0 || num >= _maxFmInstrumentNum) return nullptr;
+        return _fmInstrument[num];
+    }
+    int getMaxFmInstruments() const { return _maxFmInstrumentNum; }
 };
 
 #endif

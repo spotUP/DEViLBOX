@@ -35,7 +35,7 @@ if(EMSCRIPTEN)
     "SHELL:-s WASM=1"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createEupmini'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_eupmini_init','_eupmini_stop','_eupmini_render','_eupmini_get_sample_rate','_eupmini_set_channel_mute','_malloc','_free']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_eupmini_init','_eupmini_stop','_eupmini_render','_eupmini_get_sample_rate','_eupmini_set_channel_mute','_eupmini_get_num_fm_instruments','_eupmini_get_fm_slot_param','_eupmini_set_fm_slot_param','_eupmini_get_fm_ch_param','_eupmini_set_fm_ch_param','_eupmini_get_fm_instrument','_malloc','_free']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPF32']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=8388608"
