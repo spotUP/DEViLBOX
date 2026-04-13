@@ -368,7 +368,13 @@ export interface TrackerSong {
   futureComposerFileData?: ArrayBuffer;
   inStereo2FileData?: ArrayBuffer;
   quadraComposerFileData?: ArrayBuffer;  uadeEditableFileData?: ArrayBuffer;
-  /** Original filename hint for UADE format detection */
+  ronKlarenFileData?: ArrayBuffer;
+  actionamicsFileData?: ArrayBuffer;
+  activisionProFileData?: ArrayBuffer;
+  synthesisFileData?: ArrayBuffer;
+  dssFileData?: ArrayBuffer;
+  soundFactoryFileData?: ArrayBuffer;
+  faceTheMusicFileData?: ArrayBuffer;  /** Original filename hint for UADE format detection */
   uadeEditableFileName?: string;
   /** Raw MDX binary for mdxmini WASM playback (Sharp X68000 YM2151) */
   mdxminiFileData?: ArrayBuffer;
