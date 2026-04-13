@@ -71,6 +71,8 @@ export interface ModuleInfo {
   };
   // GoatTracker .sng raw data (loaded by GTUltra WASM engine)
   goatTrackerData?: Uint8Array;
+  // Pre-parsed DefleMask TrackerSong (from Furnace WASM, bypasses TS parser)
+  dmfSong?: import('@/engine/TrackerReplayer').TrackerSong;
 }
 
 /** Error payload from ChiptunePlayer */
@@ -123,12 +125,31 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           return;
         }
 
-        // DefleMask .dmf → treat as Furnace (DivEngine::load() handles DMF natively,
-        // including zlib decompression, instrument parsing, and chip dispatch setup)
+        // DefleMask .dmf → route through parseFurnaceFile (WASM DivEngine::load()
+        // handles DMF natively: zlib, instruments, chip dispatch). Resolve directly
+        // since parseFurnaceFile returns a full TrackerSong, not the intermediate
+        // NativeParserResult that loadWithNativeParser produces.
         const isDefleMask = ext === '.dmf';
         if (isDefleMask) {
-          // Remap ext so loadWithNativeParser routes to the Furnace parser
-          ext = '.fur';
+          try {
+            const { parseFurnaceFile } = await import('./parsers/FurnaceToSong');
+            const song = await parseFurnaceFile(arrayBuffer, file.name);
+            const metadata: ModuleMetadata = {
+              title: song.name || file.name.replace(/\.dmf$/i, ''),
+              type: 'DefleMask',
+              channels: song.patterns[0]?.channels?.length || 0,
+              patterns: song.patterns.length,
+              orders: song.songPositions?.length || 0,
+              instruments: song.instruments.length,
+              samples: 0,
+              duration: 0,
+            };
+            resolve({ metadata, arrayBuffer, player: undefined, file, nativeData: undefined, dmfSong: song });
+          } catch (err) {
+            console.error('[ModuleLoader] DefleMask/Furnace WASM parse failed:', err);
+            reject(new Error('Failed to parse DefleMask file: ' + (err as Error).message));
+          }
+          return;
         }
         const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.xrns';
         // Try native parser for XM/MOD/XRNS
