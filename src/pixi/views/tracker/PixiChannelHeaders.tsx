@@ -27,7 +27,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { useAutomationStore } from '@stores/useAutomationStore';
 import { useCursorStore } from '@stores/useCursorStore';
 import { getParamsForFormat, groupParams, type AutomationFormat } from '@/engine/automation/AutomationParams';
-import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
+import { MASTER_FX_PRESETS } from '@constants/fxPresets';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
 import type { SynthType } from '@typedefs/instrument';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';

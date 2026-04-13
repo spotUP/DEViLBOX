@@ -14,8 +14,7 @@ import type { SendBusState } from '../../stores/useMixerStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { getToneEngine } from '../../engine/ToneEngine';
-import { getSendBusPresetsByCategory } from '../../constants/sendBusPresets';
-import { getChannelFxPresetsByCategory } from '../../constants/channelFxPresets';
+import { getSendBusPresetsByCategory, getChannelFxPresetsByCategory } from '../../constants/fxPresets';
 
 import { ChannelInsertEffectsModal } from '@components/effects/ChannelInsertEffectsModal';
 import { CustomSelect } from '@components/common/CustomSelect';

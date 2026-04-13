@@ -7,7 +7,7 @@
 
 import React, { useCallback, useState, useMemo } from 'react';
 import { PixiSelect, type SelectOption } from '@/pixi/components/PixiSelect';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/masterFxPresets';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/fxPresets';
 import { useAudioStore } from '@/stores/useAudioStore';
 import type { EffectConfig } from '@typedefs/instrument';
 

@@ -13,7 +13,7 @@ import { useInstrumentStore, notify } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
-import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/instrumentFxPresets';
+import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/fxPresets';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface InstrumentEffectsModalProps {

@@ -40,7 +40,7 @@ import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 import { CHANNEL_COLORS } from '@typedefs/tracker';
-import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
+import { MASTER_FX_PRESETS } from '@constants/fxPresets';
 import { notify } from '@stores/useNotificationStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
