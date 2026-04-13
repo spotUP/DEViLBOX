@@ -196,6 +196,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
+  const [activePresetName, setActivePresetName] = useState<string | null>(null);
 
   useImperativeHandle(ref, () => ({
     toggleAddMenu: () => setShowAddMenu(prev => !prev),
@@ -273,23 +274,30 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
 
   // Load a factory preset
   const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
-    // Convert preset effects to full EffectConfig with IDs
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects);
+    setActivePresetName(preset.name);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
   // Load user preset
   const handleLoadUserPreset = useCallback((preset: UserMasterFxPreset) => {
-    // Re-generate IDs to avoid conflicts
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
     setMasterEffects(effects);
+    setActivePresetName(preset.name);
+    setShowPresetMenu(false);
+  }, [setMasterEffects]);
+
+  // Clear all effects
+  const handleClearEffects = useCallback(() => {
+    setMasterEffects([]);
+    setActivePresetName(null);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
@@ -356,6 +364,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       neuralModelIndex: availableEffect.neuralModelIndex,
       neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
     });
+    setActivePresetName(null);
     setShowAddMenu(false);
   };
 
@@ -368,6 +377,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
 
   const handleRemove = useCallback((effectId: string) => {
     removeMasterEffect(effectId);
+    setActivePresetName(null);
   }, [removeMasterEffect]);
 
   const handleWetChange = useCallback((effectId: string, wet: number) => {
@@ -420,10 +430,13 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
             <div className="relative">
               <button
                 onClick={() => setShowPresetMenu(!showPresetMenu)}
-                className="px-3 py-1 text-xs font-medium rounded bg-dark-bg text-text-primary
-                         hover:bg-dark-bgHover transition-colors flex items-center gap-1 border border-dark-border"
+                className={`px-3 py-1 text-xs font-medium rounded flex items-center gap-1 border transition-colors truncate max-w-[180px]
+                  ${activePresetName
+                    ? 'border-green-600/60 bg-green-950/30 text-green-400'
+                    : 'bg-dark-bg text-text-primary hover:bg-dark-bgHover border-dark-border'
+                  }`}
               >
-                Presets <ChevronDown size={12} />
+                <span className="truncate">{activePresetName || 'Presets'}</span> <ChevronDown size={12} className="shrink-0" />
               </button>
             </div>
 
@@ -451,6 +464,13 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       {showPresetMenu && (
         <div className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-[99990] max-h-[70vh] overflow-y-auto"
           style={hideHeader ? { top: 0, right: 8 } : { top: '100%', right: 16 }}>
+          {/* None / Clear */}
+          <button
+            onClick={handleClearEffects}
+            className="w-full px-3 py-2 text-left text-xs font-mono text-text-muted hover:bg-dark-bgHover hover:text-text-primary border-b border-dark-border transition-colors"
+          >
+            None (clear all)
+          </button>
           {/* User Presets */}
           {userPresets.length > 0 && (
             <>

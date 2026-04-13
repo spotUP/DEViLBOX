@@ -73,19 +73,23 @@ export class ExciterEffect extends Tone.ToneAudioNode {
             this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
           this.pendingParams = [];
           // Connect WASM first, then disconnect passthrough (avoids silent gap)
+          // CRITICAL: use native disconnect to avoid Tone.js/standardized-audio-context
+          // clobbering other connections on the input node (the master effects chain
+          // has already wired previousEffect → this.input → this.output → nextEffect).
           try {
             const rawInput = getNativeAudioNode(this.input)!;
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            // Now safe to disconnect passthrough
-            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            // Disconnect passthrough using native API — Tone.js disconnect can
+            // clobber unrelated connections on the same node.
+            try { rawInput.disconnect(rawWet); } catch { /* */ }
             // Keepalive: ensure Chrome schedules the worklet
-            const rawCtx = Tone.getContext().rawContext as AudioContext;
-            const keepalive = rawCtx.createGain();
+            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;
             this.workletNode!.connect(keepalive);
-            keepalive.connect(rawCtx.destination);
+            keepalive.connect(rawCtx2.destination);
           } catch (swapErr) {
             console.warn('[Exciter] WASM swap failed, staying on passthrough:', swapErr);
           }
