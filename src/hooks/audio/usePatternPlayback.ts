@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, c64MemPatches, cheeseCutterFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, fmplayerFileData, qsfFileData, bdFileData, sd2FileData, symphonieFileData, v2mFileData, sonicArrangerFileData, uadeEditableFileData, uadePatternLayout, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, c64MemPatches, cheeseCutterFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, fmplayerFileData, qsfFileData, bdFileData, sd2FileData, symphonieFileData, v2mFileData, sonicArrangerFileData, soundMonFileData, digMugFileData, davidWhittakerFileData, uadeEditableFileData, uadePatternLayout, adplugFileData, adplugFileName, adplugTicksPerRow, libopenmptFileData, tfmxFileData, tfmxSmplData, furnaceNative, furnaceActiveSubsong, tfmxTimingTable } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -62,6 +62,9 @@ export const usePatternPlayback = () => {
     symphonieFileData: s.symphonieFileData,
     v2mFileData: s.v2mFileData,
     sonicArrangerFileData: s.sonicArrangerFileData,
+    soundMonFileData: s.soundMonFileData,
+    digMugFileData: s.digMugFileData,
+    davidWhittakerFileData: s.davidWhittakerFileData,
     uadeEditableFileData: s.uadeEditableFileData,
     uadePatternLayout: s.uadePatternLayout,
     adplugFileData: s.adplugFileData,
@@ -519,6 +522,9 @@ export const usePatternPlayback = () => {
           sd2FileData: sd2FileData ?? undefined,
           symphonieFileData: symphonieFileData ?? undefined,
           sonicArrangerFileData: sonicArrangerFileData ?? undefined,
+          soundMonFileData: soundMonFileData ?? undefined,
+          digMugFileData: digMugFileData ?? undefined,
+          davidWhittakerFileData: davidWhittakerFileData ?? undefined,
           uadeEditableFileData: uadeEditableFileData ?? undefined,
           uadePatternLayout: uadePatternLayout ?? undefined,
           v2mFileData: v2mFileData ?? undefined,
