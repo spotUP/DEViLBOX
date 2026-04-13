@@ -98,20 +98,24 @@ export const PadButton: React.FC<PadButtonProps> = ({
     return Math.max(1, Math.min(127, baseVelocity));
   }, []);
 
-  // A pad is "loaded" if it has a sample, synth config, or legacy instrument assigned
+  // A pad is "loaded" if it has any sound source assigned
   // In non-samples modes, a mode mapping counts as loaded
   const isLoaded = padMode !== 'samples'
     ? !!modeMapping
-    : !!(pad.sample || pad.synthConfig || pad.instrumentId != null);
+    : !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
 
   const isFxActive = padMode === 'djfx' && activeFxPads.has(pad.id);
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     
-    // Empty pads: just select (don't auto-open editor)
+    // Empty pads: open wizard (or fallback to select)
     if (!isLoaded) {
-      onSelect(pad.id);
+      if (onEmptyPadClick) {
+        onEmptyPadClick(pad.id);
+      } else {
+        onSelect(pad.id);
+      }
       return;
     }
     
@@ -119,7 +123,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
     const vel = calculateVelocity(event.clientY, event.currentTarget);
     flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, isLoaded, onTrigger, onSelect, calculateVelocity, flashTrigger]);
+  }, [pad.id, isLoaded, onTrigger, onSelect, onEmptyPadClick, calculateVelocity, flashTrigger]);
 
   const handleMouseUp = useCallback(() => {
     setIsPressed(false);
