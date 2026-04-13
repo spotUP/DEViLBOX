@@ -1533,6 +1533,7 @@ export async function parseSymphonieForPlayback(
   // ── Accumulated state ─────────────────────────────────────────────────────
   let trackLen        = 0;
   let initialBPM      = 125;
+  let sampleDiff      = 0;   // stereo phase offset from chunk type 12 (0-2000)
   let positionsData   = new Uint8Array(0);
   let sequencesData   = new Uint8Array(0);
   let patternData     = new Uint8Array(0);
@@ -1584,9 +1585,12 @@ export async function parseSymphonieForPlayback(
 
       case CHUNK_SAMPLE_BOOST:
       case CHUNK_STEREO_DETUNE:
-      case CHUNK_STEREO_PHASE:
       case CHUNK_EXTERNAL_SAMPLES:
         r.skip(4);
+        break;
+
+      case CHUNK_STEREO_PHASE:
+        sampleDiff = r.u32be();
         break;
 
       case CHUNK_POSITION_LIST:
@@ -1986,5 +1990,6 @@ export async function parseSymphonieForPlayback(
     globalDspType:     0,
     globalDspFeedback: 0,
     globalDspBufLen:   0,
+    sampleDiff,
   };
 }

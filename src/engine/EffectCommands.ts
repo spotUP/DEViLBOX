@@ -534,7 +534,7 @@ export class EffectProcessor {
       }
     }
     else if (effectLetter === 'L') {
-      // Lxx - Set Envelope Position (not implemented - no envelope system)
+      // Lxx - Set Envelope Position — requires per-note volume/panning envelopes (IT format feature, not supported)
     }
     else if (effectLetter === 'P') {
       // Pxy - Panning Slide
@@ -635,7 +635,7 @@ export class EffectProcessor {
       }
       // S9x - Sound Control (panning surround, etc.) - future extension
       else if (x === 9) {
-        // S91 - Set surround mode (not implemented)
+        // S91 - Set surround channel (inverts R phase) — requires per-channel phase inversion in mixer
       }
     }
     else if (effectLetter === 'Z') {

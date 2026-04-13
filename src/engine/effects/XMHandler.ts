@@ -445,7 +445,7 @@ export class XMHandler extends BaseFormatHandler {
       this.activeEffects.set(channel, { type: 'keyOff', param, x, y });
     }
     else if (effectLetter === 'L') {
-      // Lxx - Set envelope position (not implemented without envelope system)
+      // Lxx - Set envelope position — requires per-note IT-style envelopes
     }
     else if (effectLetter === 'P') {
       // Pxy - Panning slide

@@ -53,4 +53,5 @@ export interface SymphoniePlaybackData {
   globalDspType: number;   // song-level DSP type (0-4) from header
   globalDspFeedback: number;
   globalDspBufLen: number;
+  sampleDiff: number;      // stereo phase offset in sample units (chunk type 12, 0-2000)
 }
