@@ -14,6 +14,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 // ---------------------------------------------------------------------------
 // Position callback type
@@ -191,9 +192,16 @@ export class LibopenmptEngine {
         if (msg.data.meta?.dur > 0) {
           this._durationSeconds = msg.data.meta.dur;
         }
+        // Set up oscilloscope store with channel info from module metadata
+        if (msg.data.meta?.song?.channels) {
+          const chNames: string[] = msg.data.meta.song.channels;
+          const names = chNames.map((name: string, i: number) => name || `CH${i + 1}`);
+          useOscilloscopeStore.getState().setChipInfo(names.length, 0, names);
+        }
         break;
       case 'end':
         this._playing = false;
+        useOscilloscopeStore.getState().clear();
         this._onEnded?.();
         break;
       case 'err':
@@ -221,7 +229,7 @@ export class LibopenmptEngine {
         console.log('[LibopenmptEngine] Isolation diagnostics:', msg.data);
         break;
       case 'isolationDiag':
-        console.log('[LibopenmptEngine] 🔍 Periodic isolation state:', {
+        console.log('[LibopenmptEngine] Periodic isolation state:', {
           isolatedBits: '0x' + (msg.data.isolatedBits ?? 0).toString(16),
           userMuteMask: '0x' + (msg.data.userMuteMask ?? 0).toString(16),
           effectiveMainMask: '0x' + (msg.data.effectiveMainMask ?? 0).toString(16),
@@ -229,6 +237,9 @@ export class LibopenmptEngine {
           activeSlots: msg.data.activeSlots,
           slotMasks: msg.data.slotMasks,
         });
+        break;
+      case 'oscData':
+        useOscilloscopeStore.getState().updateChannelData(msg.data.channels);
         break;
     }
   }
@@ -286,6 +297,13 @@ export class LibopenmptEngine {
 
     // Rebuild per-channel effect isolation after a short delay (let worklet create the module first)
     setTimeout(() => this._rebuildIsolationAfterPlay(), 100);
+
+    // Enable per-channel oscilloscope after worklet creates the module
+    setTimeout(() => {
+      if (this._playing && this.workletNode) {
+        this.workletNode.port.postMessage({ cmd: 'enableOsc' });
+      }
+    }, 150);
   }
 
   /**
@@ -306,6 +324,7 @@ export class LibopenmptEngine {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'stop' });
     this._playing = false;
+    useOscilloscopeStore.getState().clear();
     // Immediately mute output to prevent audio leaking while the async
     // stop message is processed by the worklet thread.
     try { if (this.gainNode) this.gainNode.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
