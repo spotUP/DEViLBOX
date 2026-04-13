@@ -51,6 +51,12 @@ export type AudioEffectType =
   | 'AmbientDelay'    // Modulated multi-tap delay with feedback filter
   | 'Vocoder'         // Channel vocoder (WASM voclib) — chain or mic modulator
   | 'AutoTune'        // Real-time pitch correction (YIN detection + PitchShift)
+  // Dynamics & processing (WASM)
+  | 'BassEnhancer'    // Sub-harmonic bass enhancement (WASM)
+  | 'Exciter'         // Harmonic exciter (WASM)
+  | 'TransientDesigner' // Transient attack/sustain shaper (WASM)
+  | 'MultibandComp'   // 3-band multiband compressor (WASM)
+  | 'Limiter'         // Brick-wall limiter (WASM)
   // WAM 2.0 effects (external Web Audio Module plugins)
   | 'WAMBigMuff'        // Big Muff Pi fuzz
   | 'WAMTS9'            // TS-9 Overdrive
