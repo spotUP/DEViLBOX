@@ -284,6 +284,34 @@ export function pasteHelper(
 }
 
 // ---------------------------------------------------------------------------
+// Swap — copy selection, paste clipboard into selection, return copy as new clipboard
+// ---------------------------------------------------------------------------
+
+export function swapSelectionHelper(
+  pattern: Pattern,
+  sel: BlockSelection | null,
+  cursor: CursorPosition,
+  existingClipboard: ClipboardData,
+  pasteMask: number,
+): ClipboardData {
+  // 1. Copy current selection into a temp clipboard
+  const temp = copySelectionHelper(pattern, sel, cursor);
+
+  // 2. Paste existing clipboard into the selection area (at selection origin)
+  const resolved = sel
+    ? {
+        channelIndex: Math.min(sel.startChannel, sel.endChannel),
+        rowIndex: Math.min(sel.startRow, sel.endRow),
+        columnType: cursor.columnType,
+      } as CursorPosition
+    : cursor;
+  pasteHelper(pattern, resolved, existingClipboard, pasteMask);
+
+  // 3. Return the temp copy — caller stores it as the new clipboard
+  return temp;
+}
+
+// ---------------------------------------------------------------------------
 // Paste Mix — only fill empty cells
 // ---------------------------------------------------------------------------
 

@@ -66,6 +66,7 @@ interface FlowControl {
   positionJump: number | null; // Bxx
   patternBreak: number | null; // Dxx
   patternDelay: number; // EEx
+  stopSong: boolean; // F00
 }
 
 /**
@@ -94,6 +95,7 @@ export class FT2EffectHandler {
     positionJump: null,
     patternBreak: null,
     patternDelay: 0,
+    stopSong: false,
   };
 
   constructor() {}
@@ -156,6 +158,7 @@ export class FT2EffectHandler {
       positionJump: null,
       patternBreak: null,
       patternDelay: 0,
+      stopSong: false,
     };
 
     // Process main effect
@@ -228,7 +231,8 @@ export class FT2EffectHandler {
 
       case 'F': // Set speed/BPM
         if (param === 0) {
-          // F00 = stop playback (implementation-specific, ignored)
+          // F00 = stop song
+          this.flowControl.stopSong = true;
         } else if (param < 0x20) {
           this.playbackState.speed = param;
         } else {

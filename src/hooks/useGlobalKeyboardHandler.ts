@@ -43,7 +43,7 @@ import {
   setTrack1, setTrack2, setTrack3, setTrack4, setTrack5, setTrack6, setTrack7, setTrack8
 } from '@engine/keyboard/commands/channel';
 import {
-  copySelection, cutSelection, pasteSelection, selectAll, selectChannel, selectColumn,
+  copySelection, cutSelection, pasteSelection, swapSelection, selectAll, selectChannel, selectColumn,
   markBlockStart, markBlockEnd, clearSelection, copyTrack, cutTrack, pasteTrack
 } from '@engine/keyboard/commands/selection';
 import {
@@ -1281,10 +1281,7 @@ function initializeRegistry() {
       useUIStore.getState().setStatusMessage('Mask field toggled', false, 800);
       return true;
     }, description: 'Toggle mask field' },
-    { name: 'selection_swap', contexts: ['pattern'], handler: () => {
-      useUIStore.getState().setStatusMessage('Swap: not implemented', false, 1000);
-      return true;
-    }, description: 'Swap selection' },
+    { name: 'selection_swap', contexts: ['pattern'], handler: swapSelection, description: 'Swap selection' },
     { name: 'selection_set_sample', contexts: ['pattern'], handler: applyCurrentInstrument, description: 'Set sample on selection' },
     { name: 'selection_set_volume', contexts: ['pattern'], handler: () => {
       useUIStore.getState().setStatusMessage('Set volume: use volume column', false, 1000);
@@ -1669,14 +1666,11 @@ function initializeRegistry() {
     ...Array.from({ length: 10 }, (_, i) => ({
       name: `macro_${i + 1}`,
       contexts: ['pattern', 'global'] as CommandContext[],
-      handler: () => {
-        useUIStore.getState().setStatusMessage(`Macro ${i + 1}: not configured`, false, 1000);
-        return true;
-      },
+      handler: () => recallEffectMacro(i),
       description: `Execute macro ${i + 1}`,
     })),
-    { name: 'save_macro_8', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Save macro 8: not implemented', false, 1000); return true; }, description: 'Save macro 8' },
-    { name: 'save_macro_9', contexts: ['global'], handler: () => { useUIStore.getState().setStatusMessage('Save macro 9: not implemented', false, 1000); return true; }, description: 'Save macro 9' },
+    { name: 'save_macro_8', contexts: ['global'], handler: () => storeEffectMacro(7), description: 'Save macro 8' },
+    { name: 'save_macro_9', contexts: ['global'], handler: () => storeEffectMacro(8), description: 'Save macro 9' },
 
     // === OCTAMED SPECIFIC ===
     ...Array.from({ length: 10 }, (_, i) => ({
@@ -1738,7 +1732,7 @@ function initializeRegistry() {
     { name: 'pattern_to_sample', contexts: ['global'], handler: renderToSample, description: 'Render pattern to sample' },
     { name: 'pattern_to_sample_mono', contexts: ['global'], handler: renderToSample, description: 'Render pattern to sample (mono)' },
     { name: 'split_keyboard_dialog', contexts: ['global'], handler: () => {
-      useUIStore.getState().setStatusMessage('Split keyboard: not implemented', false, 1000);
+      useUIStore.getState().setStatusMessage('Split keyboard: coming soon', false, 1000);
       return true;
     }, description: 'Split keyboard dialog' },
     { name: 'volume_amplify', contexts: ['pattern'], handler: amplifySelection, description: 'Volume amplify' },

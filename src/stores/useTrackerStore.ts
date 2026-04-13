@@ -166,7 +166,7 @@ import {
   scaleVolumeHelper, fadeVolumeHelper, amplifySelectionHelper, swapChannelsHelper,
 } from './tracker/patternEditActions';
 import {
-  copySelectionHelper, cutSelectionHelper,
+  copySelectionHelper, cutSelectionHelper, swapSelectionHelper,
   pasteHelper, pasteMixHelper, pasteFloodHelper, pastePushForwardHelper,
   copyTrackHelper, cutTrackHelper, pasteTrackHelper,
   copyCommandsHelper, cutCommandsHelper, pasteCommandsHelper,
@@ -213,6 +213,7 @@ interface TrackerStore {
   copySelection: () => void;
   cutSelection: () => void;
   paste: () => void;
+  swapSelection: () => void;
   // Advanced paste modes (OpenMPT-style)
   pasteMix: () => void;           // Only fill empty cells
   pasteFlood: () => void;         // Paste until pattern end
@@ -702,6 +703,23 @@ export const useTrackerStore = create<TrackerStore>()(
         pasteHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE', 'Paste', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex]);
+    },
+
+    swapSelection: () => {
+      if (!get().clipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        if (!state.clipboard) return;
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { cursor, selection } = useCursorStore.getState();
+        state.clipboard = swapSelectionHelper(
+          pattern, selection, cursor, state.clipboard,
+          useEditorStore.getState().pasteMask,
+        );
+      });
+      useHistoryStore.getState().pushAction('SWAP_SELECTION', 'Swap selection', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex]);
     },
 
@@ -1398,23 +1416,6 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patterns[index].name = name.trim();
         }
       }),
-
-    // updateTimeSignature: (index, signature) =>
-    //   set((state) => {
-    //     if (index >= 0 && index < state.patterns.length) {
-    //       const pattern = state.patterns[index];
-    //       if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
-    //       Object.assign(pattern.timeSignature, signature);
-    //     }
-    //   }),
-
-    // updateAllTimeSignatures: (signature) =>
-    //   set((state) => {
-    //     state.patterns.forEach(pattern => {
-    //       if (!pattern.timeSignature) pattern.timeSignature = { beatsPerMeasure: 4, stepsPerBeat: 4 };
-    //       Object.assign(pattern.timeSignature, signature);
-    //     });
-    //   }),
 
     // Channel management
     addChannel: () => {

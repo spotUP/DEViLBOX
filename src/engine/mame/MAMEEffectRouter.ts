@@ -56,6 +56,7 @@ export interface EffectFlowControl {
   positionJump: number | null;  // Bxx
   patternBreak: number | null;  // Dxx
   patternDelay: number;         // EEx
+  stopSong: boolean;            // F00
 }
 
 /**
@@ -127,6 +128,7 @@ export class MAMEEffectRouter {
       positionJump: null,
       patternBreak: null,
       patternDelay: 0,
+      stopSong: false,
     };
 
     if (!effect || effect.length < 3) return flow;
@@ -217,7 +219,8 @@ export class MAMEEffectRouter {
 
       case 'F': // Set speed/BPM
         if (param === 0) {
-          // F00 = stop (handled by caller)
+          // F00 = stop song
+          flow.stopSong = true;
         } else if (param < 0x20) {
           this.speed = param;
         } else {
