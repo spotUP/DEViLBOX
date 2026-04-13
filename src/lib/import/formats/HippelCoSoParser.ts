@@ -652,8 +652,7 @@ export async function parseHippelCoSoFile(
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, speedBPM)),
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
+    hippelFileData: buffer.slice(0),
     uadeVariableLayout: variableLayout,
   };
 }

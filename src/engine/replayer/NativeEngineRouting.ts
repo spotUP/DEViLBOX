@@ -207,7 +207,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'HippelSynth',
     suppressNotes: true,
     fileDataKey: 'hippelFileData',
-    formats: ['Hippel'],
+    formats: null, // activate whenever hippelFileData exists (handles ST, 7V, CoSo, FC, MCMD)
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,

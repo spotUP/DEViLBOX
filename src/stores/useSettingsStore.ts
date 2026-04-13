@@ -401,7 +401,7 @@ export const useSettingsStore = create<SettingsStore>()(
         richardJoseph: 'native',  // RichardJosephParser — dedicated Richard Joseph support
         daveLowe: 'uade',       // DaveLoweParser — dedicated Dave Lowe support
         lme: 'uade',            // LMEParser — dedicated Leggless Music Editor support
-        jochenHippelST: 'uade', // JochenHippelSTParser — dedicated Jochen Hippel ST support
+        jochenHippelST: 'native', // JochenHippelSTParser — Hippel WASM engine (libtfmxaudiodecoder)
         specialFX: 'uade',      // SpecialFXParser — dedicated Special FX ST support
         timeTracker: 'uade',          // TimeTrackerParser — dedicated TimeTracker support
         kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
@@ -442,7 +442,7 @@ export const useSettingsStore = create<SettingsStore>()(
         ashleyHogg: 'uade',           // AshleyHoggParser — dedicated Ashley Hogg support
         adpcmMono: 'uade',            // ADPCMmonoParser — dedicated ADPCM Mono support
         janneSalmijarvi: 'uade',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
-        jochenHippel7V: 'uade',       // JochenHippel7VParser — dedicated Jochen Hippel 7V support
+        jochenHippel7V: 'native',       // JochenHippel7VParser — Hippel WASM engine (libtfmxaudiodecoder)
         maximumEffect: 'uade',        // MaximumEffectParser — dedicated Maximum Effect support
         midiLoriciel: 'native',         // MIDILoricielParser — dedicated MIDI Loriciel support
         onEscapee: 'uade',            // OnEscapeeParser — dedicated onEscapee support
