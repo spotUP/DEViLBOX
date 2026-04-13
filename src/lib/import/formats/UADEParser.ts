@@ -1047,10 +1047,9 @@ export async function parseUADEFile(
         const { parseSoundProgrammingLanguageFile } = await import('./SoundProgrammingLanguageParser');
         return parseSoundProgrammingLanguageFile(buffer, filename);
       },
-      // UADE reports 'SynTracker' for synmod prefix, but these are Symphonie Pro files
       'SynTracker': async () => {
-        const { parseSymphonieProFile } = await import('./SymphonieProParser');
-        return parseSymphonieProFile(new Uint8Array(buffer), filename);
+        const { parseSynTrackerFile } = await import('./SynTrackerParser');
+        return parseSynTrackerFile(buffer, filename);
       },
       'MarkII': async () => {
         const { parseMarkIIFile } = await import('./MarkIIParser');
@@ -1139,7 +1138,7 @@ export async function parseUADEFile(
     'pvp',   // PeterVerswyvelenPacker — compiled 68k replayer
     'dns',   // DynamicSynthesizer — compiled 68k replayer
     'vss',   // VoodooSupremeSynthesizer — synthesis-based
-    'synmod', // Symphonie Pro (UADE misidentifies as SynTracker)
+    'synmod', // SynTracker — synthesis-based
     'cus',    // CustomMade — compiled 68k replayer
     'cust',   // CustomMade variant
     'custom', // CustomMade variant
@@ -1200,7 +1199,7 @@ export async function parseUADEFile(
     'pvp',   // PeterVerswyvelenPacker
     'dns',   // DynamicSynthesizer
     'vss',   // VoodooSupremeSynthesizer
-    'synmod', // Symphonie Pro (UADE misidentifies as SynTracker)
+    'synmod', // SynTracker — synthesis-based
     'cus',    // CustomMade — compiled 68k replayer
     'cust',   // CustomMade variant
     'custom', // CustomMade variant
