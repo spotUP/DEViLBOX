@@ -1,190 +1,248 @@
 /**
- * SonicArranger.worklet.js - AudioWorklet processor for Sonic Arranger WASM synth
+ * SonicArranger.worklet.js — AudioWorklet processor for Sonic Arranger WASM replayer
+ *
+ * Uses the whole-song replayer API: sa_create() loads module, sa_render() produces
+ * interleaved stereo float audio. Pattern follows Bd.worklet.js (ben_daglish).
  */
 
 class SonicArrangerProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.wasm = null;
-    this.ctx = null;
+    this.module = null;
+    this.saModule = 0;          // sa_create() handle (pointer)
+    this.interleavedPtr = 0;
+    this.interleavedBuf = null;
     this.initialized = false;
-    this.players = {};
-    // Pre-allocated array of active player handles — avoids Object.keys() allocation in process()
-    this._activeHandles = [];
+    this.playing = false;
+    this.bufferSize = 128;
+    this.lastHeapBuffer = null;
+    this.initializing = false;
+
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
-  /** Rebuild the cached handle list after player add/remove */
-  _rebuildHandles() {
-    const arr = [];
-    for (const k in this.players) arr.push(+k);
-    this._activeHandles = arr;
-  }
+  async handleMessage(data) {
+    if (data.type !== 'init' && !this.module && this.initializing) return;
 
-  handleMessage(data) {
     switch (data.type) {
       case 'init':
-        this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
+        await this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
 
-      case 'createPlayer': {
-        if (!this.wasm || !this.ctx) break;
-        const handle = this.wasm._sa_create_player(this.ctx);
-        if (handle >= 0) {
-          const floatBytes = 256 * 4;
-          this.players[handle] = {
-            outPtrL: this.wasm._malloc(floatBytes),
-            outPtrR: this.wasm._malloc(floatBytes),
-          };
-          this._rebuildHandles();
-          this.port.postMessage({ type: 'playerCreated', handle });
-        } else {
-          this.port.postMessage({ type: 'error', message: 'sa_create_player failed (max players reached)' });
-        }
-        break;
-      }
-
-      case 'destroyPlayer': {
-        if (!this.wasm || !this.ctx) break;
-        const h = data.handle;
-        if (this.players[h]) {
-          this.wasm._free(this.players[h].outPtrL);
-          this.wasm._free(this.players[h].outPtrR);
-          delete this.players[h];
-          this._rebuildHandles();
-        }
-        this.wasm._sa_destroy_player(this.ctx, h);
-        break;
-      }
-
-      case 'loadInstrument': {
-        if (!this.wasm || !this.ctx) break;
-        const insData = new Uint8Array(data.buffer);
-        const ptr = this.wasm._malloc(insData.length);
-        const heap = new Uint8Array(this.wasm.HEAPU8.buffer, ptr, insData.length);
-        heap.set(insData);
-        const result = this.wasm._sa_load_instrument(this.ctx, data.handle, ptr, insData.length);
-        this.wasm._free(ptr);
-        if (result !== 0) {
-          this.port.postMessage({ type: 'error', message: `sa_load_instrument failed: ${result}` });
-        }
-        break;
-      }
-
-      case 'noteOn':
-        if (this.wasm && this.ctx) {
-          this.wasm._sa_note_on(this.ctx, data.handle, data.note, data.velocity || 100);
-        }
-        break;
-
-      case 'noteOff':
-        if (this.wasm && this.ctx) {
-          this.wasm._sa_note_off(this.ctx, data.handle);
-        }
-        break;
-
-      case 'forceQuiet':
-        if (this.wasm && this.ctx) {
-          if (this.wasm._sa_force_quiet) {
-            this.wasm._sa_force_quiet(this.ctx, data.handle);
-          } else {
-            this.wasm._sa_note_off(this.ctx, data.handle);
+      case 'loadModule': {
+        if (!this.module) break;
+        try {
+          // Destroy previous module if any
+          if (this.saModule) {
+            this.module._sa_destroy(this.saModule);
+            this.saModule = 0;
           }
+
+          const uint8Data = new Uint8Array(data.moduleData);
+          const wasmPtr = this.module._malloc(uint8Data.length);
+          if (!wasmPtr) {
+            this.port.postMessage({ type: 'error', message: 'malloc failed for module data' });
+            return;
+          }
+
+          this.module.HEAPU8.set(uint8Data, wasmPtr);
+          this.saModule = this.module._sa_create(wasmPtr, uint8Data.length, sampleRate);
+          this.module._free(wasmPtr);
+
+          if (!this.saModule) {
+            this.port.postMessage({ type: 'error', message: 'sa_create failed (unsupported format)' });
+            return;
+          }
+
+          const subsongCount = this.module._sa_subsong_count(this.saModule);
+          if (typeof data.subsong === 'number' && data.subsong > 0) {
+            this.module._sa_select_subsong(this.saModule, data.subsong);
+          }
+
+          this.playing = false;
+          this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4 });
+        } catch (error) {
+          this.port.postMessage({ type: 'error', message: error.message });
+        }
+        break;
+      }
+
+      case 'play':
+        this.playing = true;
+        break;
+
+      case 'stop':
+        this.playing = false;
+        // Re-select subsong 0 to reset position
+        if (this.saModule) {
+          this.module._sa_select_subsong(this.saModule, 0);
+        }
+        this.port.postMessage({ type: 'stopped' });
+        break;
+
+      case 'pause':
+        this.playing = !this.playing;
+        break;
+
+      case 'setSubsong':
+        if (this.saModule) {
+          this.module._sa_select_subsong(this.saModule, data.subsong);
         }
         break;
 
-      case 'setParam':
-        if (this.wasm && this.ctx) {
-          this.wasm._sa_set_param(this.ctx, data.handle, data.paramId, data.value);
+      case 'setChannelMask':
+        if (this.saModule) {
+          this.module._sa_set_channel_mask(this.saModule, data.mask);
         }
         break;
 
       case 'dispose':
-        if (this.wasm && this.ctx) {
-          for (let i = 0; i < this._activeHandles.length; i++) {
-            const hi = this._activeHandles[i];
-            this.wasm._free(this.players[hi].outPtrL);
-            this.wasm._free(this.players[hi].outPtrR);
-            this.wasm._sa_destroy_player(this.ctx, hi);
-          }
-          this.players = {};
-          this._activeHandles = [];
-          this.wasm._sa_dispose(this.ctx);
-          this.ctx = null;
-        }
-        this.initialized = false;
+        this.cleanup();
         break;
     }
   }
 
-  async initWasm(sr, wasmBinary, jsCode) {
+  async initWasm(rate, wasmBinary, jsCode) {
+    this.initializing = true;
     try {
+      this.cleanup();
+
+      // Install Emscripten polyfills for AudioWorkletGlobalScope
       if (typeof globalThis.document === 'undefined') {
         globalThis.document = {
-          createElement: () => ({ setAttribute: () => {}, appendChild: () => {}, style: {}, addEventListener: () => {} }),
-          head: { appendChild: () => {} },
-          body: { appendChild: () => {} },
-          createTextNode: () => ({}),
-          getElementById: () => null,
-          querySelector: () => null,
+          createElement: () => ({ relList: { supports: () => false }, tagName: 'DIV', rel: '', addEventListener: () => {}, removeEventListener: () => {} }),
+          getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
+          getElementsByTagName: () => [], head: { appendChild: () => {} },
+          addEventListener: () => {}, removeEventListener: () => {}
         };
       }
-      if (typeof globalThis.location === 'undefined') {
-        globalThis.location = { href: '.', pathname: '/' };
+      if (typeof globalThis.window === 'undefined') {
+        globalThis.window = { addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => {}, customElements: { whenDefined: () => Promise.resolve() }, location: { href: '', pathname: '' } };
       }
-      if (typeof globalThis.performance === 'undefined') {
-        globalThis.performance = { now: () => Date.now() };
+      if (typeof globalThis.MutationObserver === 'undefined') {
+        globalThis.MutationObserver = class { constructor() {} observe() {} disconnect() {} };
+      }
+      if (typeof globalThis.DOMParser === 'undefined') {
+        globalThis.DOMParser = class { parseFromString() { return { querySelector: () => null, querySelectorAll: () => [] }; } };
+      }
+      if (typeof globalThis.URL === 'undefined') {
+        globalThis.URL = class { constructor(path) { this.href = path; } };
       }
 
+      // Load Emscripten JS factory
       if (jsCode && !globalThis.createSonicArranger) {
         const wrappedCode = jsCode + '\nreturn createSonicArranger;';
         const factory = new Function(wrappedCode);
         const result = factory();
         if (typeof result === 'function') {
           globalThis.createSonicArranger = result;
+        } else {
+          this.port.postMessage({ type: 'error', message: 'Failed to load JS module' });
+          return;
         }
       }
 
-      if (!globalThis.createSonicArranger) {
-        throw new Error('createSonicArranger factory not available');
+      if (typeof globalThis.createSonicArranger !== 'function') {
+        this.port.postMessage({ type: 'error', message: 'createSonicArranger factory not available' });
+        return;
       }
 
-      this.wasm = await globalThis.createSonicArranger({ wasmBinary: wasmBinary });
-      this.ctx = this.wasm._sa_init(Math.floor(sr));
-      if (!this.ctx) throw new Error('sa_init returned null');
+      // Capture WebAssembly.Memory for heap access
+      let capturedMemory = null;
+      const origInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = async function(...args) {
+        const result = await origInstantiate.apply(this, args);
+        const instance = result.instance || result;
+        if (instance.exports) {
+          for (const value of Object.values(instance.exports)) {
+            if (value instanceof WebAssembly.Memory) { capturedMemory = value; break; }
+          }
+        }
+        return result;
+      };
 
+      const config = {};
+      if (wasmBinary) config.wasmBinary = wasmBinary;
+
+      try {
+        this.module = await globalThis.createSonicArranger(config);
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
+      }
+
+      if (!this.module.wasmMemory && capturedMemory) {
+        this.module.wasmMemory = capturedMemory;
+      }
+
+      // Allocate interleaved stereo buffer
+      this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
+      if (!this.interleavedPtr) {
+        this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
+        return;
+      }
+
+      this.updateBufferViews();
       this.initialized = true;
+      this.initializing = false;
       this.port.postMessage({ type: 'ready' });
-    } catch (err) {
-      console.error('[SonicArranger Worklet] Init failed:', err);
-      this.port.postMessage({ type: 'error', message: err.message || String(err) });
+    } catch (error) {
+      this.initializing = false;
+      this.port.postMessage({ type: 'error', message: error.message });
     }
   }
 
-  process(_inputs, outputs, _parameters) {
-    if (!this.initialized || !this.wasm || !this.ctx) return true;
+  updateBufferViews() {
+    if (!this.module || !this.interleavedPtr) return;
+    const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+    if (!heapF32) return;
+    if (this.lastHeapBuffer !== heapF32.buffer) {
+      this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
+      this.lastHeapBuffer = heapF32.buffer;
+    }
+  }
+
+  cleanup() {
+    if (this.module && this.saModule) {
+      this.module._sa_destroy(this.saModule);
+      this.saModule = 0;
+    }
+    if (this.module && this.interleavedPtr) {
+      this.module._free(this.interleavedPtr);
+      this.interleavedPtr = 0;
+    }
+    this.interleavedBuf = null;
+    this.module = null;
+    this.initialized = false;
+    this.playing = false;
+    this.lastHeapBuffer = null;
+  }
+
+  process(inputs, outputs) {
+    if (!this.initialized || !this.module || !this.saModule || !this.playing) return true;
     const output = outputs[0];
-    if (!output || output.length === 0) return true;
+    if (!output || output.length < 2) return true;
     const outputL = output[0];
-    const outputR = output[1] || output[0];
-    const numSamples = outputL.length;
-    outputL.fill(0);
-    outputR.fill(0);
-    const heapF32 = this.wasm.HEAPF32;
-    const handles = this._activeHandles;
-    const players = this.players;
-    for (let idx = 0; idx < handles.length; idx++) {
-      const hi = handles[idx];
-      const ptrs = players[hi];
-      if (!ptrs) continue;
-      this.wasm._sa_render(this.ctx, hi, ptrs.outPtrL, ptrs.outPtrR, numSamples);
-      const offL = ptrs.outPtrL >> 2;
-      const offR = ptrs.outPtrR >> 2;
-      for (let i = 0; i < numSamples; i++) {
-        outputL[i] += heapF32[offL + i];
-        outputR[i] += heapF32[offR + i];
+    const outputR = output[1];
+    if (!outputL || !outputR) return true;
+
+    const numSamples = Math.min(outputL.length, this.bufferSize);
+
+    this.updateBufferViews();
+    if (this.interleavedBuf) {
+      const rendered = this.module._sa_render(this.saModule, this.interleavedPtr, numSamples);
+      if (rendered > 0) {
+        for (let i = 0; i < rendered; i++) {
+          outputL[i] = this.interleavedBuf[i * 2];
+          outputR[i] = this.interleavedBuf[i * 2 + 1];
+        }
+      }
+
+      // Check if song ended
+      if (this.module._sa_has_ended(this.saModule)) {
+        this.port.postMessage({ type: 'songEnd' });
       }
     }
+
     return true;
   }
 }
