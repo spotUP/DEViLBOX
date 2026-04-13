@@ -926,6 +926,7 @@ export async function parseDigitalMugicianFile(
     initialSpeed: songSpeed > 0 ? songSpeed : 6,
     initialBPM: 125,
     linearPeriods: false,
+    digMugFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout,
