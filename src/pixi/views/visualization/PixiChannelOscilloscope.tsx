@@ -8,6 +8,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { useTransportStore, useTrackerStore } from '@stores';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
 interface PixiChannelOscilloscopeProps {
@@ -40,8 +41,15 @@ export const PixiChannelOscilloscope: React.FC<PixiChannelOscilloscopeProps> = (
       const cellW = width / cols;
       const cellH = height / rows;
 
-      let waveform: Float32Array;
-      try { waveform = getToneEngine().getWaveform(); } catch { rafId = requestAnimationFrame(draw); return; }
+      // Prefer per-channel WASM oscilloscope data from store
+      const oscState = useOscilloscopeStore.getState();
+      const oscData = oscState.isActive ? oscState.channelData : null;
+
+      // Fallback: master waveform from Tone.js analyser
+      let masterWaveform: Float32Array | null = null;
+      if (!oscData) {
+        try { masterWaveform = getToneEngine().getWaveform(); } catch { /* not ready */ }
+      }
 
       for (let ch = 0; ch < numChannels; ch++) {
         const col = ch % cols;
@@ -61,21 +69,35 @@ export const PixiChannelOscilloscope: React.FC<PixiChannelOscilloscopeProps> = (
         g.lineTo(x0 + cellW - 4, midY);
         g.stroke({ color: theme.border.color, alpha: 0.15, width: 1 });
 
-        // Draw waveform slice for this channel
-        const samplesPerCh = Math.floor(waveform.length / numChannels);
-        const startSample = ch * samplesPerCh;
         const drawW = cellW - 8;
         const amplitude = (cellH / 2) - 4;
 
-        if (samplesPerCh > 0) {
-          const step = samplesPerCh / drawW;
-          g.moveTo(x0 + 4, midY + (waveform[startSample] || 0) * amplitude);
+        // Per-channel WASM oscilloscope data (Int16 → float)
+        const chData = oscData?.[ch];
+        if (chData && chData.length > 0) {
+          const step = chData.length / drawW;
+          g.moveTo(x0 + 4, midY - (chData[0] / 32768.0) * amplitude);
           for (let i = 1; i < drawW; i++) {
-            const sIdx = startSample + Math.floor(i * step);
-            const val = waveform[sIdx] || 0;
-            g.lineTo(x0 + 4 + i, midY + val * amplitude);
+            const sIdx = Math.floor(i * step);
+            const val = chData[sIdx] / 32768.0;
+            g.lineTo(x0 + 4 + i, midY - val * amplitude);
           }
           g.stroke({ color: theme.accent.color, alpha: 0.8, width: 1 });
+        }
+        // Fallback: slice of master waveform
+        else if (masterWaveform && masterWaveform.length > 0) {
+          const samplesPerCh = Math.floor(masterWaveform.length / numChannels);
+          const startSample = ch * samplesPerCh;
+          if (samplesPerCh > 0) {
+            const step = samplesPerCh / drawW;
+            g.moveTo(x0 + 4, midY + (masterWaveform[startSample] || 0) * amplitude);
+            for (let i = 1; i < drawW; i++) {
+              const sIdx = startSample + Math.floor(i * step);
+              const val = masterWaveform[sIdx] || 0;
+              g.lineTo(x0 + 4 + i, midY + val * amplitude);
+            }
+            g.stroke({ color: theme.accent.color, alpha: 0.8, width: 1 });
+          }
         }
       }
 

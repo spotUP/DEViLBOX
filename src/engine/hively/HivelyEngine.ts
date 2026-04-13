@@ -8,6 +8,7 @@
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 export interface HivelyTuneInfo {
   name: string;
@@ -166,6 +167,9 @@ export class HivelyEngine implements IsolationCapableEngine {
 
         case 'tuneLoaded':
           if (this._resolveTune) {
+            const numCh = data.channels ?? 4;
+            const chNames = Array.from({ length: numCh }, (_, i) => `CH${i + 1}`);
+            useOscilloscopeStore.getState().setChipInfo(numCh, 0, chNames);
             this._resolveTune({
               name: data.name,
               channels: data.channels,
@@ -214,6 +218,10 @@ export class HivelyEngine implements IsolationCapableEngine {
             const resolve = this._playerHandleResolvers.shift()!;
             resolve(data.handle);
           }
+          break;
+
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels);
           break;
 
         case 'debug':
@@ -267,10 +275,13 @@ export class HivelyEngine implements IsolationCapableEngine {
 
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
+    this.workletNode?.port.postMessage({ type: 'enableOsc' });
   }
 
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
+    this.workletNode?.port.postMessage({ type: 'disableOsc' });
+    useOscilloscopeStore.getState().clear();
   }
 
   pause(): void {
