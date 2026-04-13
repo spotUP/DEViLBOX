@@ -2634,6 +2634,8 @@ struct V2Synth
     syVChan chansv[CHANS];
     V2Chan chansw[CHANS];
 
+    float channelGainOverride[CHANS]; // per-channel gain multiplier (1.0 = passthrough, 0.0 = mute)
+
     struct Globals
     {
         syVReverb rvbparm;
@@ -2691,6 +2693,7 @@ struct V2Synth
         {
             chans[i].ctl[6] = 0x7f;
             chansw[i].init(&instance, chandelbuf[i][0], chandelbuf[i][1], COUNTOF(chandelbuf[i][0]));
+            channelGainOverride[i] = 1.0f;
         }
 
         // global filters
@@ -3218,6 +3221,17 @@ private:
             if (chan == CHANS - 1)
                 ronanCBProcess(&ronan, &instance.chanbuf[0].l, nsamples);
 
+            // apply per-channel gain override before mixing
+            if (channelGainOverride[chan] != 1.0f)
+            {
+                float g = channelGainOverride[chan];
+                for (int i = 0; i < nsamples; i++)
+                {
+                    instance.chanbuf[i].l *= g;
+                    instance.chanbuf[i].r *= g;
+                }
+            }
+
             chansw[chan].process(nsamples);
         }
 
@@ -3314,6 +3328,12 @@ long synthGetFrameSize(void *pthis)
 extern "C" void *synthGetSpeechMem(void *pthis)
 {
     return &((V2Synth *)pthis)->ronan;
+}
+
+void synthSetChannelGain(void *pthis, int ch, float gain)
+{
+    if (ch >= 0 && ch < V2Synth::CHANS)
+        ((V2Synth *)pthis)->channelGainOverride[ch] = gain;
 }
 
 #if COVERAGE

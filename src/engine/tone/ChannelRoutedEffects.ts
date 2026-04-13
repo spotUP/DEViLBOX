@@ -77,9 +77,148 @@ export class ChannelRoutedEffectsManager {
   private slots: (IsolationSlot | null)[] = [null, null, null, null];
   private masterEffectsInput: Tone.Gain;
 
+  /**
+   * Sidechain tap system — allows sidechain compressors to tap per-channel audio
+   * from WASM engines via the isolation system.
+   *
+   * sidechainConsumers: channelIndex → set of AudioNodes (sidechain inputs) to feed.
+   *   Survives teardown/rebuild so taps are re-established automatically.
+   * sidechainTaps: channelIndex → active isolation slot + outputGain for that channel.
+   *   Torn down and rebuilt alongside per-channel effect slots.
+   */
+  private sidechainConsumers = new Map<number, Set<AudioNode>>();
+  private sidechainTaps = new Map<number, { slotIndex: number; outputGain: GainNode }>();
+
   constructor(masterEffectsInput: Tone.Gain) {
     this.masterEffectsInput = masterEffectsInput;
   }
+
+  // ── Sidechain tap API ─────────────────────────────────────────────
+
+  /**
+   * Register an AudioNode (sidechain input) as a consumer of isolated channel audio.
+   * Allocates an isolation slot if one isn't already active for this channel.
+   * Returns true if the tap is connected (or was already connected).
+   */
+  async addSidechainTap(channelIndex: number, scInputNode: AudioNode): Promise<boolean> {
+    let consumers = this.sidechainConsumers.get(channelIndex);
+    if (!consumers) {
+      consumers = new Set();
+      this.sidechainConsumers.set(channelIndex, consumers);
+    }
+    consumers.add(scInputNode);
+
+    // If we already have an active tap for this channel, just connect the new consumer
+    const existing = this.sidechainTaps.get(channelIndex);
+    if (existing) {
+      try { existing.outputGain.connect(scInputNode); } catch { /* */ }
+      return true;
+    }
+
+    // Allocate a new isolation slot
+    return this._allocateSidechainSlot(channelIndex);
+  }
+
+  /**
+   * Unregister an AudioNode from a sidechain tap. Frees the isolation slot
+   * when the last consumer for a channel is removed.
+   */
+  removeSidechainTap(channelIndex: number, scInputNode: AudioNode): void {
+    const consumers = this.sidechainConsumers.get(channelIndex);
+    if (!consumers) return;
+    consumers.delete(scInputNode);
+
+    // Disconnect this specific consumer
+    const tap = this.sidechainTaps.get(channelIndex);
+    if (tap) {
+      try { tap.outputGain.disconnect(scInputNode); } catch { /* */ }
+    }
+
+    if (consumers.size === 0) {
+      this.sidechainConsumers.delete(channelIndex);
+      // No more consumers — free the isolation slot
+      if (tap) {
+        try { tap.outputGain.disconnect(); } catch { /* */ }
+        this.sidechainTaps.delete(channelIndex);
+        void getActiveIsolationEngine().then(e => {
+          if (e) e.removeIsolation(tap.slotIndex);
+        });
+        console.log(`[ChannelRoutedEffects] Released sidechain tap: slot ${tap.slotIndex} (ch${channelIndex + 1})`);
+      }
+    }
+  }
+
+  /** Allocate an isolation slot for a sidechain tap, connect worklet output → consumers. */
+  private async _allocateSidechainSlot(channelIndex: number, engine?: IsolationCapableEngine): Promise<boolean> {
+    if (!engine) engine = (await getActiveIsolationEngine()) ?? undefined;
+    if (!engine?.isAvailable()) return false;
+
+    const workletNode = engine.getWorkletNode();
+    const audioContext = engine.getAudioContext();
+    if (!workletNode || !audioContext) return false;
+
+    // Find a free slot (not used by effects or other sidechain taps)
+    const usedSlots = new Set<number>();
+    for (const slot of this.slots) { if (slot) usedSlots.add(slot.slotIndex); }
+    for (const tap of this.sidechainTaps.values()) usedSlots.add(tap.slotIndex);
+
+    let freeSlot = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!usedSlots.has(i)) { freeSlot = i; break; }
+    }
+    if (freeSlot < 0) {
+      console.warn('[ChannelRoutedEffects] No free isolation slots for sidechain tap ch' + (channelIndex + 1));
+      return false;
+    }
+
+    const channelMask = 1 << channelIndex;
+    engine.addIsolation(freeSlot, channelMask);
+
+    const outputGain = audioContext.createGain();
+    outputGain.gain.value = 1;
+
+    try {
+      workletNode.connect(outputGain, freeSlot + 1);
+    } catch (e) {
+      console.warn('[ChannelRoutedEffects] Sidechain tap connect failed:', e);
+      engine.removeIsolation(freeSlot);
+      return false;
+    }
+
+    // Connect to all registered consumers for this channel (sidechain inputs)
+    const consumers = this.sidechainConsumers.get(channelIndex);
+    if (consumers) {
+      for (const node of consumers) {
+        try { outputGain.connect(node); } catch { /* */ }
+      }
+    }
+
+    // Route the isolated channel back into the mix AFTER the master effects chain.
+    // Isolation removes the channel from worklet output[0] (main mix). We re-inject it
+    // at blepInput (post-effects) so it bypasses the sidechain compressor — otherwise
+    // the kick would duck itself (the compressor detects the kick AND ducks its own input).
+    try {
+      const { getPostEffectsInput } = await import('./MasterEffectsChain');
+      const postFx = getPostEffectsInput();
+      if (postFx) {
+        const postFxNative = getNativeAudioNode(postFx);
+        if (postFxNative) outputGain.connect(postFxNative);
+      } else {
+        // Fallback: route to masterEffectsInput (kick will be ducked, but at least audible)
+        const masterIn = getNativeAudioNode(this.masterEffectsInput);
+        if (masterIn) outputGain.connect(masterIn);
+      }
+    } catch {
+      const masterIn = getNativeAudioNode(this.masterEffectsInput);
+      if (masterIn) outputGain.connect(masterIn);
+    }
+
+    this.sidechainTaps.set(channelIndex, { slotIndex: freeSlot, outputGain });
+    console.log(`[ChannelRoutedEffects] Sidechain tap: slot ${freeSlot} → ch${channelIndex + 1} (routed back to mix)`);
+    return true;
+  }
+
+  // ── Per-channel effect routing ──────────────────────────────────
 
   /**
    * Rebuild per-channel effect routing based on mixer store state.
@@ -182,8 +321,16 @@ export class ChannelRoutedEffectsManager {
       slotIdx++;
     }
 
+    // Re-establish sidechain taps that were torn down
+    if (this.sidechainConsumers.size > 0) {
+      for (const channelIndex of this.sidechainConsumers.keys()) {
+        await this._allocateSidechainSlot(channelIndex, engine);
+      }
+    }
+
     // Request diagnostic from worklet after a short delay to let messages settle
-    if (slotIdx > 0 && engine.diagIsolation) {
+    const activeSlots = slotIdx + this.sidechainTaps.size;
+    if (activeSlots > 0 && engine.diagIsolation) {
       const diagEngine = engine;
       setTimeout(() => diagEngine.diagIsolation!(), 200);
     }
@@ -220,8 +367,10 @@ export class ChannelRoutedEffectsManager {
 
   /**
    * Tear down all isolation slots and disconnect effects.
+   * Sidechain consumer requests are preserved so taps are re-established on rebuild.
    */
   teardown(engine?: { removeIsolation: (slotIndex: number) => void }): void {
+    // Tear down per-channel effect slots
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
       if (!slot) continue;
@@ -240,6 +389,13 @@ export class ChannelRoutedEffectsManager {
 
       this.slots[i] = null;
     }
+
+    // Tear down sidechain tap slots (but keep sidechainConsumers for rebuild)
+    for (const [, tap] of this.sidechainTaps) {
+      try { tap.outputGain.disconnect(); } catch { /* */ }
+      if (engine) engine.removeIsolation(tap.slotIndex);
+    }
+    this.sidechainTaps.clear();
   }
 
   /** Whether any slots are active. */
@@ -263,6 +419,8 @@ export class ChannelRoutedEffectsManager {
     } catch {
       this.teardown();
     }
+    // On dispose, also clear consumer requests (they won't survive a new manager)
+    this.sidechainConsumers.clear();
   }
 }
 

@@ -6,6 +6,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as Tone from 'tone';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
@@ -62,6 +63,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
   const [showCrate, setShowCrate] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
+  const autoDJBtnRef = useRef<HTMLButtonElement>(null);
+  const [autoDJDropdownPos, setAutoDJDropdownPos] = useState({ top: 0, left: 0 });
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
   const health = useDJHealth();
 
@@ -322,35 +325,42 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* TOP BAR                                                            */}
       {/* ================================================================== */}
-      <div className="flex items-center px-2 py-1.5 shrink-0 bg-dark-bgSecondary border-b border-dark-border overflow-x-auto overflow-y-hidden scrollbar-hidden">
-        <div className="flex items-center gap-1.5 flex-nowrap [&>*]:shrink-0">
-          <DJControllerSelector />
-          <DJFxQuickPresets />
-          <CustomSelect
-            value={deckViewMode}
-            onChange={(v) => useDJStore.getState().setDeckViewMode(v as 'visualizer' | 'vinyl' | '3d')}
-            options={[
-              { value: 'visualizer', label: 'Deck: Visualizer' },
-              { value: 'vinyl', label: 'Deck: Vinyl' },
-              { value: '3d', label: 'Deck: 3D' },
-            ]}
-            className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
-            title="Select deck view mode"
-          />
-          <button
-            onClick={() => setThirdDeckActive(!thirdDeckActive)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
-              ${thirdDeckActive
-                ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
-                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
-              }`}
-            title="Toggle 3rd deck (Deck C)"
-          >
-            Deck C
-          </button>
-          <div className="relative">
+      <div className="relative shrink-0 bg-dark-bgSecondary border-b border-dark-border">
+        <div className="flex items-center px-2 py-1.5 overflow-x-auto scrollbar-hidden">
+          <div className="flex items-center gap-1.5 flex-nowrap [&>*]:shrink-0">
+            <DJControllerSelector />
+            <DJFxQuickPresets />
+            <CustomSelect
+              value={deckViewMode}
+              onChange={(v) => useDJStore.getState().setDeckViewMode(v as 'visualizer' | 'vinyl' | '3d')}
+              options={[
+                { value: 'visualizer', label: 'Deck: Visualizer' },
+                { value: 'vinyl', label: 'Deck: Vinyl' },
+                { value: '3d', label: 'Deck: 3D' },
+              ]}
+              className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+              title="Select deck view mode"
+            />
             <button
-              onClick={() => setShowAutoDJ(!showAutoDJ)}
+              onClick={() => setThirdDeckActive(!thirdDeckActive)}
+              className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+                ${thirdDeckActive
+                  ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+                }`}
+              title="Toggle 3rd deck (Deck C)"
+            >
+              Deck C
+            </button>
+            <button
+              ref={autoDJBtnRef}
+              onClick={() => {
+                if (!showAutoDJ && autoDJBtnRef.current) {
+                  const r = autoDJBtnRef.current.getBoundingClientRect();
+                  setAutoDJDropdownPos({ top: r.bottom + 4, left: r.left });
+                }
+                setShowAutoDJ(!showAutoDJ);
+              }}
               className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
                 ${showAutoDJ || autoDJEnabled
                   ? 'border-green-500 bg-green-900/20 text-green-400'
@@ -360,26 +370,31 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             >
               Auto DJ{autoDJEnabled ? ' ON' : ''}
             </button>
-            {showAutoDJ && (
-              <div className="absolute top-full right-0 mt-1 z-[99989] w-80">
-                <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
-              </div>
-            )}
+            {autoDJEnabled && <DJAutoMixNowButton />}
+            <DJVocoderControl />
+            <DJRemoteControlButton />
+            <button
+              onClick={() => setShowCrate(!showCrate)}
+              className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
+                ${showCrate
+                  ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
+                  : 'border-accent-primary bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20'
+                }`}
+            >
+              Crate
+            </button>
           </div>
-          {autoDJEnabled && <DJAutoMixNowButton />}
-          <DJVocoderControl />
-          <DJRemoteControlButton />
-          <button
-            onClick={() => setShowCrate(!showCrate)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
-              ${showCrate
-                ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
-                : 'border-accent-primary bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20'
-              }`}
-          >
-            Crate
-          </button>
         </div>
+        {/* Portal: renders outside DOM hierarchy so overflow:hidden can't clip it */}
+        {showAutoDJ && createPortal(
+          <div
+            className="fixed z-[99989] w-80"
+            style={{ top: autoDJDropdownPos.top, left: autoDJDropdownPos.left }}
+          >
+            <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
+          </div>,
+          document.body,
+        )}
       </div>
 
       {/* ================================================================== */}

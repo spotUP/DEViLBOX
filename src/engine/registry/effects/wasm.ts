@@ -907,9 +907,12 @@ const wasmEffects: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ threshold: -30, attack: 1, hold: 50, release: 200, range: 0, scFreq: 200, scQ: 1 }),
     presets: [
-      { name: 'Tight', params: { threshold: -25, attack: 0.5, hold: 20, release: 100, range: -40 } },
-      { name: 'Open', params: { threshold: -35, attack: 2, hold: 80, release: 300, range: -20 } },
-      { name: 'Filtered', params: { threshold: -30, hold: 40, release: 150, scFreq: 500, scQ: 2 } },
+      { name: 'Kick Gate', params: { threshold: -25, attack: 0.1, hold: 30, release: 80, range: -60, scFreq: 100, scQ: 0.5 } },
+      { name: 'Rhythmic Chop', params: { threshold: -30, attack: 0.5, hold: 10, release: 50, range: -80, scFreq: 200, scQ: 1 } },
+      { name: 'Trance Pump', params: { threshold: -28, attack: 0.1, hold: 5, release: 120, range: -80, scFreq: 150, scQ: 0.8 } },
+      { name: 'Soft Gate', params: { threshold: -20, attack: 1, hold: 60, release: 200, range: -20, scFreq: 300, scQ: 1 } },
+      { name: 'Stutter', params: { threshold: -35, attack: 0.1, hold: 5, release: 30, range: -80, scFreq: 200, scQ: 1.5 } },
+      { name: 'Bass Cleaner', params: { threshold: -22, attack: 0.5, hold: 40, release: 150, range: -40, scFreq: 80, scQ: 0.3 } },
     ],
   },
   {
@@ -981,9 +984,12 @@ const wasmEffects: EffectDescriptor[] = [
     },
     getDefaultParameters: () => ({ ceiling: -1, release: 50, scFreq: 1000, scGain: 0 }),
     presets: [
-      { name: 'Soft', params: { ceiling: -3, release: 80 } },
-      { name: 'Medium', params: { ceiling: -1, release: 50, scGain: 3 } },
-      { name: 'Brick', params: { ceiling: -0.3, release: 20, scFreq: 2000, scGain: 6 } },
+      { name: 'Transparent', params: { ceiling: -1, release: 80, scFreq: 1000, scGain: 0 } },
+      { name: 'Kick Tamer', params: { ceiling: -2, release: 40, scFreq: 100, scGain: 6 } },
+      { name: 'Brick Wall', params: { ceiling: -0.3, release: 15, scFreq: 2000, scGain: 8 } },
+      { name: 'Bass Control', params: { ceiling: -3, release: 60, scFreq: 80, scGain: 10 } },
+      { name: 'De-Harsh', params: { ceiling: -1.5, release: 50, scFreq: 4000, scGain: 8 } },
+      { name: 'Loud Master', params: { ceiling: -0.5, release: 25, scFreq: 1000, scGain: 4 } },
     ],
   },
   {

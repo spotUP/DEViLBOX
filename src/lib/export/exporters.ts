@@ -15,7 +15,7 @@ import { useFormatStore } from '@stores/useFormatStore';
 const BINARY_FILE_DATA_FIELDS = [
   'hivelyFileData', 'klysFileData', 'musiclineFileData', 'c64SidFileData',
   'goatTrackerData', 'jamCrackerFileData', 'futurePlayerFileData', 'preTrackerFileData',
-  'maFileData', 'hippelFileData', 'sonixFileData', 'pxtoneFileData', 'organyaFileData',
+  'maFileData', 'hippelFileData', 'sonixFileData', 'pxtoneFileData', 'organyaFileData', 'sawteethFileData',
   'eupFileData', 'ixsFileData', 'psycleFileData', 'sc68FileData', 'zxtuneFileData',
   'pumaTrackerFileData', 'steveTurnerFileData', 'sidmon1WasmFileData',
   'fredEditorWasmFileData', 'artOfNoiseFileData', 'qsfFileData', 'startrekkerAMFileData',

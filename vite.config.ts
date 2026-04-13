@@ -120,12 +120,12 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
-    // Reduce resource usage for better performance when running multiple servers
+    // HMR disabled — repo too large for file watchers (EMFILE), prevents live-set interruptions
     watch: {
       usePolling: false,
-      ignored: ['**/*'], // Disable all file watching — HMR is off anyway
+      ignored: ['**/*'],
     },
-    hmr: false, // Disabled — prevents browser reload during DJ sets / live use
+    hmr: false,
   },
   build: {
     // Target older Chromium for Tesla/embedded browser compatibility

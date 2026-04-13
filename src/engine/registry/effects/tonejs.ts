@@ -440,14 +440,24 @@ const tonejs: EffectDescriptor[] = [
         threshold: Number(p.threshold) ?? -24, ratio: Number(p.ratio) ?? 4,
         attack: Number(p.attack) ?? 0.003, release: Number(p.release) ?? 0.25,
         knee: Number(p.knee) ?? 6, sidechainGain: (Number(p.sidechainGain) ?? 100) / 100,
+        scFreq: Number(p.scFreq) ?? 0, scQ: Number(p.scQ) ?? 1,
+        scFilterType: String(p.scFilterType || 'lowpass'),
         wet: c.wet / 100,
       });
     },
-    getDefaultParameters: () => ({ threshold: -24, ratio: 4, attack: 0.003, release: 0.25, knee: 6, sidechainGain: 100 }),
+    getDefaultParameters: () => ({ threshold: -24, ratio: 4, attack: 0.003, release: 0.25, knee: 6, sidechainGain: 100, scFreq: 0, scQ: 1, scFilterType: 'lowpass' }),
     presets: [
-      { name: 'Pumping', params: { threshold: -30, ratio: 8, attack: 0.001, release: 0.15, knee: 3, sidechainGain: 100 } },
-      { name: 'Ducking', params: { threshold: -20, ratio: 4, attack: 0.005, release: 0.3, knee: 10, sidechainGain: 80 } },
-      { name: 'Extreme', params: { threshold: -36, ratio: 12, attack: 0.001, release: 0.1, knee: 0, sidechainGain: 100 } },
+      // scFreq=0 means filter off (full spectrum detection)
+      { name: 'EDM Pump', params: { threshold: -30, ratio: 8, attack: 0.001, release: 0.2, knee: 0, sidechainGain: 100, scFreq: 0 } },
+      { name: 'Deep House', params: { threshold: -34, ratio: 10, attack: 0.001, release: 0.35, knee: 3, sidechainGain: 100, scFreq: 0 } },
+      { name: 'Kick Only', params: { threshold: -30, ratio: 8, attack: 0.001, release: 0.2, knee: 0, sidechainGain: 100, scFreq: 200, scQ: 0.7, scFilterType: 'lowpass' } },
+      { name: 'Kick Tight', params: { threshold: -28, ratio: 6, attack: 0.001, release: 0.1, knee: 0, sidechainGain: 100, scFreq: 150, scQ: 0.5, scFilterType: 'lowpass' } },
+      { name: 'Snare Only', params: { threshold: -26, ratio: 6, attack: 0.001, release: 0.15, knee: 2, sidechainGain: 100, scFreq: 2000, scQ: 1, scFilterType: 'highpass' } },
+      { name: 'HiHat Only', params: { threshold: -24, ratio: 5, attack: 0.001, release: 0.08, knee: 2, sidechainGain: 100, scFreq: 6000, scQ: 0.7, scFilterType: 'highpass' } },
+      { name: 'Subtle Duck', params: { threshold: -22, ratio: 4, attack: 0.003, release: 0.15, knee: 6, sidechainGain: 80, scFreq: 0 } },
+      { name: 'Smash', params: { threshold: -38, ratio: 20, attack: 0.001, release: 0.08, knee: 0, sidechainGain: 100, scFreq: 0 } },
+      { name: 'Breathing', params: { threshold: -32, ratio: 7, attack: 0.001, release: 0.5, knee: 3, sidechainGain: 100, scFreq: 0 } },
+      { name: 'Trance Gate', params: { threshold: -34, ratio: 20, attack: 0.001, release: 0.05, knee: 0, sidechainGain: 100, scFreq: 0 } },
     ],
   },
 

@@ -43,7 +43,7 @@ set(FILEOPS_SOURCES
   # File operations
   ${FURNACE_ENGINE}/fileOps/fur.cpp
   ${FURNACE_ENGINE}/fileOps/dmf.cpp
-  ${FURNACE_ENGINE}/fileOps/fileOpsCommon.cpp
+  src/fileOpsCommon_patched.cpp
 
   # I/O
   ${FURNACE_ENGINE}/safeReader.cpp
@@ -87,6 +87,7 @@ include_directories(
 
   # Furnace headers
   ${FURNACE_ENGINE}
+  ${FURNACE_ENGINE}/fileOps
   ${FURNACE_ENGINE}/platform
   ${FURNACE_ENGINE}/platform/sound
   ${FURNACE_SRC}
@@ -109,6 +110,9 @@ add_executable(FurnaceFileOps
 target_compile_options(FurnaceFileOps PRIVATE
   -include "${CMAKE_SOURCE_DIR}/stubs/fileops_preempt.h"
 )
+
+# Enable C++ exception handling (required for NotZlibException catch in load())
+target_compile_options(FurnaceFileOps PRIVATE -fexceptions)
 
 # Suppress warnings from Furnace source
 target_compile_options(FurnaceFileOps PRIVATE
@@ -141,5 +145,6 @@ target_link_options(FurnaceFileOps PRIVATE
   "SHELL:-s INITIAL_MEMORY=67108864"
   "SHELL:-s STACK_SIZE=2097152"
   "SHELL:-s NO_EXIT_RUNTIME=1"
+  "SHELL:-s DISABLE_EXCEPTION_CATCHING=0"
   -O2
 )

@@ -169,6 +169,10 @@ export class FredEngine {
     });
   }
 
+  setInstrumentParam(instrument: number, param: string, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });

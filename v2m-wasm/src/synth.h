@@ -23,6 +23,8 @@ extern "C"
 
     extern long synthGetFrameSize(void *pthis);
 
+    extern void synthSetChannelGain(void *pthis, int ch, float gain);
+
 #ifdef RONAN
     extern void synthSetLyrics(void *pthis, const char **ptr);
 #endif

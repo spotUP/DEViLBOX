@@ -169,6 +169,24 @@ export class V2MEngine {
     this.workletNode?.port.postMessage({ type: 'stop', fadeMs: 0 });
   }
 
+  /**
+   * Set the gain for a single V2 synth channel (0-15).
+   * @param ch   Channel index (0..15)
+   * @param gain Linear gain multiplier (1.0 = passthrough, 0.0 = mute)
+   */
+  setChannelGain(ch: number, gain: number): void {
+    this.workletNode?.port.postMessage({ type: 'setChannelGain', channel: ch, gain });
+  }
+
+  /**
+   * Mute/unmute channels via a 16-bit bitmask.
+   * A set bit means the channel is muted (gain = 0).
+   * @param mask Bitmask where bit N corresponds to channel N
+   */
+  setMuteMask(mask: number): void {
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'stop', fadeMs: 0 });

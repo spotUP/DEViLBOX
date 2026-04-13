@@ -182,7 +182,11 @@ export class SidechainGateEffect extends Tone.ToneAudioNode {
   get release(): number { return this._release; }
   set release(v: number) { this._release = clamp(v, 1, 5000); this.sendParam('release', this._release); }
   get range(): number { return this._range; }
-  set range(v: number) { this._range = clamp(v, 0, 1); this.sendParam('range', this._range); }
+  set range(v: number) {
+    // UI sends dB (-80..0), WASM DSP expects linear 0..1 (0=full gate, 1=no gating)
+    this._range = v <= -80 ? 0 : Math.pow(10, clamp(v, -80, 0) / 20);
+    this.sendParam('range', this._range);
+  }
   get scFreq(): number { return this._scFreq; }
   set scFreq(v: number) { this._scFreq = clamp(v, 20, 20000); this.sendParam('scFreq', this._scFreq); }
   get scQ(): number { return this._scQ; }
@@ -223,6 +227,7 @@ export class SidechainGateEffect extends Tone.ToneAudioNode {
       this.workletNode = null;
     }
     this.dryGain.dispose(); this.wetGain.dispose(); this.sidechainInput.dispose();
+    this.selfRouteGain.dispose();
     this.input.dispose(); this.output.dispose();
     super.dispose();
     return this;

@@ -67,7 +67,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
 
   // ── Measured very quiet — boost output ──
   MultibandLimiter:    +12.7,
-  SidechainLimiter:    +7.4,
+  SidechainLimiter:    0, // Dynamics processor — no static compensation
   SlapbackDelay:       +4.7,
   HaasEnhancer:        +4.8,
   MultiSpread:         +2.3,
@@ -76,7 +76,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   // ── Legacy calibrated (prior session) ──
   SpaceyDelayer:       +6.0,
   RETapeEcho:          +6.0,
-  SidechainCompressor: +5.5,
+  SidechainCompressor: 0, // Dynamics processor — no static compensation (output varies by design)
   AmbientDelay:        +5.0,
   Chorus:              +4.5,
   JCReverb:            +3.0,
