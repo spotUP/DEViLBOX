@@ -40,6 +40,7 @@ interface DrumPadStore extends DrumPadState {
   clipboardPad: DrumPad | null;
   copyPad: (padId: number) => void;
   pastePad: (targetPadId: number) => void;
+  swapPad: (padId: number) => void;
 
   // Note repeat
   noteRepeatEnabled: boolean;
@@ -94,6 +95,7 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
   defaultProgram: 'A-01',
   velocitySensitivity: 1.0,
   padColors: {},
+  showAdvanced: false,
 };
 
 // Bump this when factory presets or stored schema changes — discards stale data
@@ -183,6 +185,16 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       djFxAction: clipboardPad.djFxAction,
     });
     get().saveToIndexedDB();
+  },
+  swapPad: (padId: number) => {
+    const { clipboardPad, programs, currentProgramId } = get();
+    if (!clipboardPad) return;
+    const program = programs.get(currentProgramId);
+    const targetPad = program?.pads.find(p => p.id === padId);
+    if (!targetPad) return;
+    const targetCopy = { ...targetPad, layers: targetPad.layers.map(l => ({ ...l, sample: { ...l.sample } })) };
+    get().pastePad(padId);
+    set({ clipboardPad: targetCopy });
   },
 
   // Note repeat

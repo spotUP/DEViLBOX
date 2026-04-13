@@ -6,6 +6,8 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrumPadKeyboard } from '@/hooks/drumpad/useDrumPadKeyboard';
 import { PadGrid } from './PadGrid';
 import { PadEditor } from './PadEditor';
+import { PadSetupWizard } from './PadSetupWizard';
+import { usePadSetupWizard } from '@/hooks/drumpad/usePadSetupWizard';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -21,6 +23,7 @@ import { useDJStore } from '../../stores/useDJStore';
 import { X, Download, Piano, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
 
 const PAD_MODES: { id: PadMode; label: string }[] = [
@@ -56,6 +59,8 @@ interface DrumPadManagerProps {
 export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
   // Register keyboard shortcuts for drum pad view
   useDrumPadKeyboard();
+
+  const padWizard = usePadSetupWizard();
 
   const [selectedPadId, setSelectedPadId] = useState<number | null>(null);
   const [showSampleBrowser, setShowSampleBrowser] = useState(false);
@@ -184,8 +189,8 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
   const handleEmptyPadClick = useCallback((padId: number) => {
     setSelectedPadId(padId);
-    setShowPadEditor(true);
-  }, []);
+    padWizard.open(padId);
+  }, [padWizard]);
 
   const handleLoadSample = useCallback((sample: SampleData) => {
     if (selectedPadId !== null) {
@@ -536,10 +541,10 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </div>
 
             {/* Right: Controls and Info */}
-            <div className="space-y-4">
-              {/* Program Selector */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="text-xs font-mono text-text-muted mb-2">PROGRAM</div>
+            <div className="space-y-3 overflow-y-auto max-h-full">
+              {/* Program Selector (compact) */}
+              <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                <div className="text-[10px] font-mono text-text-muted mb-1.5">PROGRAM</div>
                 <CustomSelect
                   value={currentProgramId}
                   onChange={(v) => handleProgramChange(v)}
@@ -550,275 +555,204 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                   className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 />
 
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  <button
-                    onClick={handleNewProgram}
-                    className="px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
-                  >
+                <div className="grid grid-cols-3 gap-1.5 mt-2">
+                  <button onClick={handleNewProgram}
+                    className="px-2 py-1.5 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-[10px] font-bold rounded transition-colors">
                     + New
                   </button>
-                  <button
-                    onClick={handleCopyProgram}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-text-primary text-xs font-bold rounded transition-colors"
-                  >
+                  <button onClick={handleCopyProgram}
+                    className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-text-primary text-[10px] font-bold rounded transition-colors">
                     Copy
                   </button>
-                  <button
-                    onClick={handleDeleteProgram}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-text-primary text-xs font-bold rounded transition-colors"
-                    disabled={programs.size <= 1}
-                  >
+                  <button onClick={handleDeleteProgram}
+                    className="px-2 py-1.5 bg-red-600 hover:bg-red-700 text-text-primary text-[10px] font-bold rounded transition-colors"
+                    disabled={programs.size <= 1}>
                     Delete
                   </button>
                 </div>
-
-                {/* Kit Selector */}
-                <div className="mt-3">
-                  <label className="block text-xs text-text-muted mb-1">Kit Source</label>
-                  <CustomSelect
-                    value={selectedKitSourceId}
-                    onChange={(v) => setSelectedKitSourceId(v)}
-                    options={allKitSources.map((source) => ({
-                      value: source.id,
-                      label: `${source.type === 'preset' ? '🎵 ' : '📦 '}${source.name}`,
-                    }))}
-                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                  />
-                  <p className="text-xs text-text-muted mt-1">
-                    {allKitSources.find(s => s.id === selectedKitSourceId)?.description || ''}
-                  </p>
-                </div>
-
-                {/* Add to Instruments Button */}
-                <button
-                  onClick={handleLoadKit}
-                  className="w-full mt-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-text-primary text-xs font-bold rounded transition-colors flex items-center justify-center gap-2"
-                >
-                  <Download className="w-3 h-3" />
-                  Add to Instruments
-                </button>
               </div>
 
-              {/* Master Controls */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="text-xs font-mono text-text-muted mb-3">MASTER</div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-text-muted">
-                      Level: {localMasterLevel !== null ? localMasterLevel : (programs.get(currentProgramId)?.masterLevel || 100)}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="127"
-                      value={localMasterLevel !== null ? localMasterLevel : (programs.get(currentProgramId)?.masterLevel || 100)}
-                      onChange={(e) => handleMasterLevelChange(parseInt(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-text-muted">
-                      Tune: {localMasterTune !== null ? localMasterTune : (programs.get(currentProgramId)?.masterTune || 0)} st
-                    </label>
-                    <input
-                      type="range"
-                      min="-12"
-                      max="12"
-                      value={localMasterTune !== null ? localMasterTune : (programs.get(currentProgramId)?.masterTune || 0)}
-                      onChange={(e) => handleMasterTuneChange(parseInt(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Output Bus Levels */}
-              {(() => {
-                const currentProg = programs.get(currentProgramId);
-                const busesInUse = ['out1', 'out2', 'out3', 'out4'].filter(
-                  bus => currentProg?.pads.some(p => p.output === bus)
-                );
-                if (busesInUse.length === 0) return null;
-                return (
-                  <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                    <div className="text-xs font-mono text-text-muted mb-3">OUTPUT BUSES</div>
-                    <div className="space-y-2">
-                      {busesInUse.map(bus => (
-                        <div key={bus}>
-                          <label className="text-xs text-text-muted">
-                            {bus}: {busLevels[bus] ?? 100}
-                          </label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="127"
-                            value={busLevels[bus] ?? 100}
-                            onChange={(e) => setBusLevel(bus, parseInt(e.target.value))}
-                            className="w-full"
-                          />
+              {/* ── Inline Pad Quick-Edit ──────────────────────────────── */}
+              <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                {selectedPadId !== null ? (() => {
+                  const selectedPad = programs.get(currentProgramId)?.pads.find(p => p.id === selectedPadId);
+                  if (!selectedPad) return null;
+                  const { updatePad, clearPad } = useDrumPadStore.getState();
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-text-muted">PAD {selectedPadId}</span>
+                        {selectedPad.synthConfig && (
+                          <span className="text-[9px] font-mono text-blue-400 bg-blue-400/10 px-1 rounded">{selectedPad.synthConfig.synthType}</span>
+                        )}
+                        {selectedPad.sample && (
+                          <span className="text-[9px] font-mono text-emerald-400 bg-emerald-400/10 px-1 rounded">{selectedPad.sample.name}</span>
+                        )}
+                      </div>
+                      <input value={selectedPad.name}
+                        onChange={(e) => updatePad(selectedPadId, { name: e.target.value })}
+                        className="w-full px-2 py-1 text-xs font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary" placeholder="Pad name" />
+                      <div>
+                        <div className="flex justify-between text-[10px] font-mono text-text-muted mb-0.5"><span>Level</span><span>{selectedPad.level}</span></div>
+                        <input type="range" min="0" max="127" value={selectedPad.level}
+                          onChange={(e) => updatePad(selectedPadId, { level: parseInt(e.target.value) })} className="w-full accent-accent-primary" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-[10px] font-mono text-text-muted mb-0.5"><span>Tune</span><span>{(selectedPad.tune / 10).toFixed(1)} st</span></div>
+                        <input type="range" min="-120" max="120" value={selectedPad.tune}
+                          onChange={(e) => updatePad(selectedPadId, { tune: parseInt(e.target.value) })} className="w-full accent-accent-primary" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-text-muted mb-1">Mode</div>
+                        <div className="flex gap-1.5">
+                          {(['oneshot', 'sustain'] as const).map(m => (
+                            <button key={m} onClick={() => updatePad(selectedPadId, { playMode: m })}
+                              className={`flex-1 px-2 py-1 text-[10px] font-mono rounded border transition-all ${
+                                selectedPad.playMode === m ? 'border-accent-primary bg-accent-primary/10 text-accent-primary font-bold' : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:border-text-muted'
+                              }`}>{m === 'oneshot' ? 'One-shot' : 'Sustain'}</button>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-text-muted mb-1">Mute Group</div>
+                        <div className="flex gap-1">
+                          {[0,1,2,3,4,5,6,7,8].map(g => (
+                            <button key={g} onClick={() => updatePad(selectedPadId, { muteGroup: g })}
+                              className={`w-6 h-6 text-[9px] font-mono rounded border transition-all ${
+                                selectedPad.muteGroup === g ? 'border-accent-primary bg-accent-primary/10 text-accent-primary font-bold' : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:border-text-muted'
+                              }`}>{g === 0 ? '-' : g}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-text-muted mb-1">Color</div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          <button onClick={() => updatePad(selectedPadId, { color: undefined })}
+                            className={`w-5 h-5 rounded border-2 transition-all ${!selectedPad.color ? 'border-accent-primary' : 'border-dark-borderLight hover:border-text-muted'}`}
+                            style={{ backgroundColor: '#1e293b' }} title="Default" />
+                          {PAD_COLOR_PRESETS.map(c => (
+                            <button key={c.id} onClick={() => updatePad(selectedPadId, { color: c.hex })}
+                              className={`w-5 h-5 rounded border-2 transition-all ${selectedPad.color === c.hex ? 'border-white' : 'border-transparent hover:border-white/30'}`}
+                              style={{ backgroundColor: c.hex }} title={c.label} />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => setShowPadEditor(true)}
+                          className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-text-primary text-[10px] font-bold rounded transition-colors">Full Editor</button>
+                        <button onClick={() => clearPad(selectedPadId)}
+                          className="px-2 py-1.5 bg-dark-bgTertiary hover:bg-accent-error/20 text-accent-error text-[10px] font-mono rounded border border-dark-borderLight transition-colors">Clear</button>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="flex items-center justify-center py-6 text-text-muted">
+                    <span className="text-[10px] font-mono">Click a pad to edit</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Advanced Toggle ──────────────────────────────────────── */}
+              <label className="flex items-center gap-2 px-1 cursor-pointer">
+                <input type="checkbox" checked={preferences.showAdvanced}
+                  onChange={(e) => setPreference('showAdvanced', e.target.checked)}
+                  className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary" />
+                <span className="text-[10px] font-mono text-text-muted">Advanced</span>
+              </label>
+
+              {/* ── Advanced Sections ────────────────────────────────────── */}
+              {preferences.showAdvanced && (<>
+                <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                  <div className="text-[10px] font-mono text-text-muted mb-1.5">KIT SOURCE</div>
+                  <CustomSelect value={selectedKitSourceId} onChange={(v) => setSelectedKitSourceId(v)}
+                    options={allKitSources.map(s => ({ value: s.id, label: s.name }))}
+                    className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary" />
+                  <button onClick={handleLoadKit}
+                    className="w-full mt-2 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-text-primary text-[10px] font-bold rounded transition-colors flex items-center justify-center gap-1">
+                    <Download className="w-3 h-3" /> Load Kit
+                  </button>
+                </div>
+                <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                  <div className="text-[10px] font-mono text-text-muted mb-2">MASTER</div>
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                        <span>Level</span><span>{localMasterLevel !== null ? localMasterLevel : (programs.get(currentProgramId)?.masterLevel || 100)}</span>
+                      </div>
+                      <input type="range" min="0" max="127" value={localMasterLevel !== null ? localMasterLevel : (programs.get(currentProgramId)?.masterLevel || 100)}
+                        onChange={(e) => handleMasterLevelChange(parseInt(e.target.value))} className="w-full accent-accent-primary" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                        <span>Tune</span><span>{localMasterTune !== null ? localMasterTune : (programs.get(currentProgramId)?.masterTune || 0)} st</span>
+                      </div>
+                      <input type="range" min="-12" max="12" value={localMasterTune !== null ? localMasterTune : (programs.get(currentProgramId)?.masterTune || 0)}
+                        onChange={(e) => handleMasterTuneChange(parseInt(e.target.value))} className="w-full accent-accent-primary" />
                     </div>
                   </div>
-                );
-              })()}
-
-              {/* Settings */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="text-xs font-mono text-text-muted mb-3">SETTINGS</div>
-                <div>
-                  <label className="text-xs text-text-muted">
-                    Velocity Sensitivity: {preferences.velocitySensitivity.toFixed(1)}x
+                </div>
+                {(() => {
+                  const currentProg = programs.get(currentProgramId);
+                  const busesInUse = ['out1', 'out2', 'out3', 'out4'].filter(bus => currentProg?.pads.some(p => p.output === bus));
+                  if (busesInUse.length === 0) return null;
+                  return (
+                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                      <div className="text-[10px] font-mono text-text-muted mb-2">OUTPUT BUSES</div>
+                      <div className="space-y-2">
+                        {busesInUse.map(bus => (
+                          <div key={bus}>
+                            <div className="flex justify-between text-[10px] font-mono text-text-muted mb-0.5"><span>{bus}</span><span>{busLevels[bus] ?? 100}</span></div>
+                            <input type="range" min="0" max="127" value={busLevels[bus] ?? 100}
+                              onChange={(e) => setBusLevel(bus, parseInt(e.target.value))} className="w-full accent-accent-primary" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                  <div className="text-[10px] font-mono text-text-muted mb-2">SETTINGS</div>
+                  <div className="flex justify-between text-[10px] font-mono text-text-muted mb-0.5">
+                    <span>Velocity Sensitivity</span><span>{preferences.velocitySensitivity.toFixed(1)}x</span>
+                  </div>
+                  <input type="range" min="0" max="2" step="0.1" value={preferences.velocitySensitivity}
+                    onChange={(e) => setPreference('velocitySensitivity', parseFloat(e.target.value))} className="w-full accent-accent-primary" />
+                </div>
+                <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                  <div className="text-[10px] font-mono text-text-muted mb-2">NOTE REPEAT</div>
+                  <label className="flex items-center gap-2 text-[10px] text-text-muted cursor-pointer mb-2">
+                    <input type="checkbox" checked={noteRepeatEnabled} onChange={(e) => setNoteRepeatEnabled(e.target.checked)}
+                      className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary" /> Enable
                   </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={preferences.velocitySensitivity}
-                    onChange={(e) => setPreference('velocitySensitivity', parseFloat(e.target.value))}
-                    className="w-full"
-                  />
+                  <div className="flex flex-wrap gap-1">
+                    {(['1/4', '1/8', '1/16', '1/32', '1/8T', '1/16T'] as const).map(rate => (
+                      <button key={rate} onClick={() => setNoteRepeatRate(rate)}
+                        className={`px-2 py-0.5 text-[9px] font-mono rounded transition-colors ${noteRepeatRate === rate ? 'bg-accent-primary text-text-primary' : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'}`}>
+                        {rate}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              {/* Note Repeat */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="text-xs font-mono text-text-muted mb-3">NOTE REPEAT</div>
-                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer mb-3">
-                  <input
-                    type="checkbox"
-                    checked={noteRepeatEnabled}
-                    onChange={(e) => setNoteRepeatEnabled(e.target.checked)}
-                    className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
-                  />
-                  Enable
-                </label>
-                <div className="flex flex-wrap gap-1">
-                  {(['1/4', '1/8', '1/16', '1/32', '1/8T', '1/16T'] as const).map(rate => (
-                    <button
-                      key={rate}
-                      onClick={() => setNoteRepeatRate(rate)}
-                      className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
-                        noteRepeatRate === rate
-                          ? 'bg-accent-primary text-text-primary'
-                          : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'
-                      }`}
-                    >
-                      {rate}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* MPC Resampling */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="text-xs font-mono text-text-muted mb-3">MPC RESAMPLING</div>
-                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer mb-3">
-                  <input
-                    type="checkbox"
-                    checked={programs.get(currentProgramId)?.mpcResample?.enabled ?? false}
-                    onChange={(e) => {
-                      const currentProg = programs.get(currentProgramId);
-                      if (currentProg) {
-                        saveProgram({
-                          ...currentProg,
-                          mpcResample: {
-                            enabled: e.target.checked,
-                            model: currentProg.mpcResample?.model ?? 'MPC60',
-                          },
-                        });
-                      }
-                    }}
-                    className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
-                  />
-                  Enable on sample load
-                </label>
-                {programs.get(currentProgramId)?.mpcResample?.enabled && (
-                  <div>
-                    <label className="block text-xs text-text-muted mb-1">Model</label>
-                    <CustomSelect
-                      value={programs.get(currentProgramId)?.mpcResample?.model ?? 'MPC60'}
-                      onChange={(v) => {
-                        const currentProg = programs.get(currentProgramId);
-                        if (currentProg) {
-                          saveProgram({
-                            ...currentProg,
-                            mpcResample: {
-                              enabled: true,
-                              model: v as MpcResampleConfig['model'],
-                            },
-                          });
-                        }
-                      }}
+                <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                  <div className="text-[10px] font-mono text-text-muted mb-2">MPC RESAMPLING</div>
+                  <label className="flex items-center gap-2 text-[10px] text-text-muted cursor-pointer mb-2">
+                    <input type="checkbox" checked={programs.get(currentProgramId)?.mpcResample?.enabled ?? false}
+                      onChange={(e) => { const cp = programs.get(currentProgramId); if (cp) saveProgram({ ...cp, mpcResample: { enabled: e.target.checked, model: cp.mpcResample?.model ?? 'MPC60' } }); }}
+                      className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary" /> Enable on sample load
+                  </label>
+                  {programs.get(currentProgramId)?.mpcResample?.enabled && (
+                    <CustomSelect value={programs.get(currentProgramId)?.mpcResample?.model ?? 'MPC60'}
+                      onChange={(v) => { const cp = programs.get(currentProgramId); if (cp) saveProgram({ ...cp, mpcResample: { enabled: true, model: v as MpcResampleConfig['model'] } }); }}
                       options={[
                         { value: 'MPC60', label: 'MPC 60 (12-bit, 40kHz)' },
                         { value: 'MPC3000', label: 'MPC 3000 (16-bit, 44.1kHz)' },
                         { value: 'SP1200', label: 'SP-1200 (12-bit, 26kHz)' },
                         { value: 'MPC2000XL', label: 'MPC 2000XL (16-bit, 44.1kHz)' },
                       ]}
-                      className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
-                    />
-                    <p className="text-[10px] text-text-muted mt-1">
-                      Samples loaded to pads will be processed through the selected MPC emulation.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Selected Pad Info */}
-              {selectedPadId !== null && (() => {
-                const selectedPad = programs.get(currentProgramId)?.pads.find(p => p.id === selectedPadId);
-                return (
-                  <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                    <div className="text-xs font-mono text-text-muted mb-2">
-                      PAD {selectedPadId}
-                    </div>
-                    <div className="text-sm text-text-primary mb-1">
-                      {selectedPad?.name || 'Empty'}
-                    </div>
-                    {selectedPad?.sample && (
-                      <div className="text-[10px] text-emerald-400 font-mono mb-1">
-                        Sample: {selectedPad.sample.name}
-                      </div>
-                    )}
-                    {selectedPad?.instrumentId != null && (
-                      <div className="text-[10px] text-blue-400 font-mono mb-1">
-                        Inst #{selectedPad.instrumentId}
-                      </div>
-                    )}
-                    {selectedPad?.synthConfig && (
-                      <div className="text-[10px] text-blue-400 font-mono mb-1">
-                        Synth: {selectedPad.synthConfig.synthType}
-                      </div>
-                    )}
-                    <div className="space-y-2 mt-3">
-                      <button
-                        onClick={() => setShowSampleBrowser(true)}
-                        className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
-                      >
-                        Load Sample
-                      </button>
-                      <button
-                        onClick={() => setShowPadEditor(true)}
-                        className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-text-primary text-xs font-bold rounded transition-colors"
-                      >
-                        Assign Instrument / Edit
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Quick Info */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
-                <div className="text-xs font-mono text-text-muted mb-2">SHORTCUTS</div>
-                <div className="space-y-1 text-xs text-text-muted font-mono">
-                  <div>Click: Trigger pad</div>
-                  <div>Shift+Click: Select pad</div>
-                  <div>Q-P / A-; / Z-/: Trigger pads</div>
+                      className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1.5 text-[10px] text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono" />
+                  )}
                 </div>
-              </div>
+              </>)}
             </div>
             </div>
           </div>
@@ -850,6 +784,9 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </div>
           </div>
         )}
+
+        {/* Pad Setup Wizard */}
+        <PadSetupWizard wizard={padWizard} />
 
         {/* Confirm Dialog */}
         <ConfirmDialog
