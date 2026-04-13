@@ -27,7 +27,7 @@ import { useInstrumentStore, notify } from '@stores';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
-import { INSTRUMENT_FX_PRESETS } from '@constants/instrumentFxPresets';
+import { INSTRUMENT_FX_PRESETS } from '@constants/fxPresets';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 

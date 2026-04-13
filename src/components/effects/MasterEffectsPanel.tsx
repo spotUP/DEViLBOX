@@ -26,7 +26,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
 import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';

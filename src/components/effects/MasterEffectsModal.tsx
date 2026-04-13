@@ -28,7 +28,7 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useFormatStore } from '@stores/useFormatStore';
 import { supportsChannelIsolation } from '@engine/tone/ChannelRoutedEffects';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';

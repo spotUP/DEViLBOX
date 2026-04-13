@@ -29,7 +29,7 @@ import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import type { SelectOption } from '../components/PixiSelect';
 import { VU_GREEN, VU_YELLOW, VU_RED } from '../colors';
-import { CHANNEL_FX_PRESETS } from '../../constants/channelFxPresets';
+import { CHANNEL_FX_PRESETS } from '../../constants/fxPresets';
 import { useMixerStore } from '../../stores/useMixerStore';
 
 // ─── Props ────────────────────────────────────────────────────────────────────

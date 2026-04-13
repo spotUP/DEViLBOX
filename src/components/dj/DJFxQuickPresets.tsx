@@ -9,7 +9,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ChevronDown, Star, Trash2, CloudOff, Cloud, Plus } from 'lucide-react';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/masterFxPresets';
+import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/fxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@/constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@/constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';

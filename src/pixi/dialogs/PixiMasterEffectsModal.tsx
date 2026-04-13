@@ -26,7 +26,7 @@ import { usePixiTheme } from '../theme';
 import { useAudioStore } from '@stores/useAudioStore';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
+import { MASTER_FX_PRESETS } from '@constants/fxPresets';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 

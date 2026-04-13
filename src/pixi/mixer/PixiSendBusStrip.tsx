@@ -17,7 +17,7 @@ import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import type { SendBusState } from '../../stores/useMixerStore';
 import { useMixerStore } from '../../stores/useMixerStore';
-import { SEND_BUS_PRESETS } from '../../constants/sendBusPresets';
+import { SEND_BUS_PRESETS } from '../../constants/fxPresets';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import type { SelectOption } from '../components/PixiSelect';
 import type { Container as ContainerType } from 'pixi.js';
