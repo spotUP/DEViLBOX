@@ -199,6 +199,10 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SynthesisWasmSynth') return 'wasm-param';
   if (synthType === 'SoundFactory2WasmSynth') return 'wasm-param';
   if (synthType === 'OktalyzerWasmSynth') return 'wasm-param';
+  if (synthType === 'FredReplayerWasmSynth2') return 'wasm-param';
+  if (synthType === 'GmcWasmSynth') return 'wasm-param';
+  if (synthType === 'SoundFxWasmSynth') return 'wasm-param';
+  if (synthType === 'VoodooWasmSynth') return 'wasm-param';
   if (synthType === 'AsapSynth') return 'wasm-info';
   if (synthType === 'KlysSynth') return 'wasm-info';
   if (synthType === 'QsfSynth') return 'wasm-info';

@@ -309,6 +309,7 @@ export type SynthType =
   | 'DigMugWasmSynth'          // Digital Mugician (WASM replayer variant)
   | 'DssWasmSynth'             // Digital Sound Studio (WASM replayer)
   | 'FredReplayerWasmSynth2'   // Fred Editor v2 (WASM replayer variant)
+  | 'GmcWasmSynth'             // Game Music Creator (WASM replayer)
   | 'InStereo1WasmSynth'       // InStereo! 1.0 (WASM replayer variant)
   | 'InStereo2WasmSynth'       // InStereo! 2.0 (WASM replayer variant)
   | 'MdxminiSynth'             // MDX (Sharp X68000 FM)
@@ -318,10 +319,12 @@ export type SynthType =
   | 'SidMon2Synth'             // SidMon 2 (WASM replayer)
   | 'SonicArrangerWasmSynth'   // Sonic Arranger (WASM replayer variant)
   | 'SoundFactory2WasmSynth'   // Sound Factory 2 (WASM replayer)
+  | 'SoundFxWasmSynth'         // SoundFX (WASM replayer)
   | 'SoundMonWasmSynth'        // SoundMon (WASM replayer variant)
   | 'SynthesisWasmSynth'       // Synthesis (WASM replayer)
   | 'TFMXModuleSynth'          // TFMX Module (WASM replayer variant)
   | 'V2MSynth'                 // V2M file playback (Farbrausch V2 player)
+  | 'VoodooWasmSynth'          // Voodoo Supreme Synthesizer (WASM replayer)
   | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';

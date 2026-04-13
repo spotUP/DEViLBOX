@@ -66,6 +66,17 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setInstrumentParam': {
+        if (this.module && this.module._sym_set_instrument_param) {
+          var pLen = this.module.lengthBytesUTF8(data.param) + 1;
+          var pPtr = this.module._malloc(pLen);
+          this.module.stringToUTF8(data.param, pPtr, pLen);
+          this.module._sym_set_instrument_param(data.instrument, pPtr, data.value);
+          this.module._free(pPtr);
+        }
+        break;
+      }
+
       case 'dispose':
         this.cleanup();
         break;
