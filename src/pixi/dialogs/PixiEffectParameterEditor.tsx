@@ -348,50 +348,26 @@ export const PixiEffectParameterEditor: React.FC<PixiEffectParameterEditorProps>
             </layoutContainer>
           )}
 
-          {/* ── Unimplemented (coming soon) parameters ────────────────── */}
+          {/* ── Unimplemented parameters (listed, not interactive) ──────── */}
           {unimplementedParams.length > 0 && (
             <layoutContainer
               layout={{
                 width: CONTENT_W - 26,
                 flexDirection: 'column',
-                gap: 6,
+                gap: 4,
                 padding: SECTION_PAD,
                 borderRadius: 6,
                 borderWidth: 1,
                 backgroundColor: theme.bgSecondary.color,
                 borderColor: theme.border.color,
               }}
+              alpha={0.5}
             >
               <PixiLabel
-                text="COMING SOON"
+                text={`${unimplementedParams.length} more parameters planned`}
                 size="xs"
-                weight="bold"
-                color="warning"
+                color="textMuted"
               />
-              <layoutContainer
-                layout={{
-                  width: CONTENT_W - 26 - SECTION_PAD * 2,
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  justifyContent: 'flex-start',
-                  gap: ROW_GAP,
-                }}
-              >
-                {unimplementedParams.map((param) => (
-                  <PixiKnob
-                    key={param.key}
-                    value={getParamValue(param)}
-                    min={param.min}
-                    max={param.max}
-                    onChange={() => {}}
-                    label={param.name}
-                    size="sm"
-                    color={theme.textMuted.color}
-                    disabled
-                    formatValue={(v) => `${Math.round(v)}${param.unit}`}
-                  />
-                ))}
-              </layoutContainer>
             </layoutContainer>
           )}
 

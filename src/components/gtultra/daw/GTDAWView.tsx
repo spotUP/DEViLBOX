@@ -937,9 +937,21 @@ const DAWBottomPanel: React.FC = () => {
         {dawBottomPanel === 'mixer' && <DAWMixer />}
         {dawBottomPanel === 'steps' && <DAWStepSequencer />}
         {dawBottomPanel === 'presets' && <DAWPresetBrowser />}
-        {dawBottomPanel === 'tables' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Table editor -- coming soon</div>}
-        {dawBottomPanel === 'monitor' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>SID Monitor -- coming soon</div>}
-        {dawBottomPanel === 'clips' && <div style={{ padding: 16, color: DAW_CSS.textMuted }}>Clip Grid -- coming soon</div>}
+        {dawBottomPanel === 'tables' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: DAW_CSS.textMuted }}>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', opacity: 0.5 }}>Table Editor</span>
+          </div>
+        )}
+        {dawBottomPanel === 'monitor' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: DAW_CSS.textMuted }}>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', opacity: 0.5 }}>SID Monitor</span>
+          </div>
+        )}
+        {dawBottomPanel === 'clips' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: DAW_CSS.textMuted }}>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', opacity: 0.5 }}>Clip Grid</span>
+          </div>
+        )}
         {dawBottomPanel === 'scope' && <Oscilloscope width="auto" height={180} />}
       </div>
     </div>
