@@ -516,9 +516,18 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const trackOffsetsOffset = info.trackOffsetsOffset;
   const tracksOffset = info.tracksOffset;
 
-  if (trackOffsetsOffset < 0 || tracksOffset < 0 || tracksOffset <= trackOffsetsOffset) return null;
+  if (trackOffsetsOffset < 0 || tracksOffset < 0) return null;
 
-  const numberOfTracks = Math.floor((tracksOffset - trackOffsetsOffset) / 2);
+  // Track offset table size: use distance to next section (envelopes or instruments).
+  // The track data may come before OR after the offset table depending on the variant.
+  const nextSectionAfterOffsets = info.envelopesOffset > trackOffsetsOffset
+    ? info.envelopesOffset
+    : info.instrumentsOffset > trackOffsetsOffset
+      ? info.instrumentsOffset
+      : tracksOffset > trackOffsetsOffset
+        ? tracksOffset
+        : len;
+  const numberOfTracks = Math.floor((nextSectionAfterOffsets - trackOffsetsOffset) / 2);
   const trackOffsets: number[] = [];
   for (let i = 0; i < numberOfTracks; i++) {
     const off = trackOffsetsOffset + i * 2;
@@ -668,6 +677,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // Determine max position count across all 4 channels
   const maxPositions = Math.max(...primarySong.positionLists.map(pl => countPositions(pl)));
 
+
   for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
     const channelRows: TrackerCell[][] = [[], [], [], []];
     const patOffsets: number[][] = [[], [], [], []];
@@ -769,6 +779,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    activisionProFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,
   };
 }

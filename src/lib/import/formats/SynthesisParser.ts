@@ -567,6 +567,7 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     numChannels:     4,
     initialSpeed:    song.startSpeed || 6,
     initialBPM:      125,
+    synthesisFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,
   };
 }

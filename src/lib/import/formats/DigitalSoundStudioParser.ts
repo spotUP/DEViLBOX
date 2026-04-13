@@ -564,7 +564,6 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
       initialBPM,
       linearPeriods: false,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    uadeEditableFileName: filename,
       // uadePatternLayout omitted: native Sampler instruments handle audio directly.
       // UADE audio is silent for DSS — samples are extracted as PCM Samplers.
     };
