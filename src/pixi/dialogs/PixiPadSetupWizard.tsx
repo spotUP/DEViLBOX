@@ -257,6 +257,14 @@ const PixiStepScratch: React.FC<Props> = ({ wizard }) => (
 
 const PixiStepConfig: React.FC<Props & { theme: ReturnType<typeof usePixiTheme> }> = ({ wizard, theme }) => (
   <Div layout={{ flexDirection: 'column', gap: 12 }}>
+    {/* Pad name (read-only display — set by step 2 selection) */}
+    {wizard.padName && (
+      <Div layout={{ flexDirection: 'column', gap: 2 }}>
+        <PixiLabel text="Assigned" size="xs" color="textMuted" />
+        <Txt className="text-sm font-bold text-text-primary">{wizard.padName}</Txt>
+      </Div>
+    )}
+
     {/* Color swatches */}
     <Div layout={{ flexDirection: 'column', gap: 4 }}>
       <PixiLabel text="Color" size="xs" color="textMuted" />
