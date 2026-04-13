@@ -64,13 +64,38 @@ class UADEProcessor extends AudioWorkletProcessor {
       case 'reinit':
         // Preemptive reinit — called from import dialog to avoid delay during playback
         if ((this._hasRendered || this._lastLoadFailed || this._wasmCorrupted) && this._wasmBinary) {
-          console.log('[UADE.worklet] Preemptive reinit requested');
-          this._wasm = null;
-          this._ready = false;
-          this._hasRendered = false;
-          this._lastLoadFailed = false;
-          this._wasmCorrupted = false;
-          await this._init(this._sampleRate, this._wasmBinary, null);
+          if (this._wasmCorrupted) {
+            // True corruption — hard reinit
+            console.log('[UADE.worklet] Preemptive hard reinit (corrupted)');
+            this._wasm = null;
+            this._ready = false;
+            this._hasRendered = false;
+            this._lastLoadFailed = false;
+            this._wasmCorrupted = false;
+            await this._init(this._sampleRate, this._wasmBinary, null);
+          } else {
+            // Soft reset — no new memory
+            console.log('[UADE.worklet] Preemptive soft reset');
+            try {
+              const ret = this._wasm._uade_wasm_full_reset();
+              if (ret !== 0) {
+                console.warn('[UADE.worklet] Soft reset failed, falling back to hard reinit');
+                this._wasm = null;
+                this._ready = false;
+                await this._init(this._sampleRate, this._wasmBinary, null);
+              }
+              this._hasRendered = false;
+              this._lastLoadFailed = false;
+            } catch (e) {
+              console.warn('[UADE.worklet] Soft reset threw, hard reinit');
+              this._wasm = null;
+              this._ready = false;
+              this._hasRendered = false;
+              this._lastLoadFailed = false;
+              this._wasmCorrupted = false;
+              await this._init(this._sampleRate, this._wasmBinary, null);
+            }
+          }
         }
         break;
 
@@ -769,37 +794,86 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      // Reinit WASM when needed. UADE's protocol state machine gets stuck after
-      // "score died" errors — _uade_wasm_stop() alone is NOT enough to reset it.
-      // Always do a full reinit, but explicitly dispose the old instance first
-      // to prevent memory accumulation.
-      const needsReinit = this._wasmCorrupted || this._lastLoadFailed || this._hasRendered;
-      if (needsReinit && this._wasmBinary) {
-        const reason = this._wasmCorrupted ? 'corrupted' : this._lastLoadFailed ? 'load-failed' : 'rendered';
-        console.log('[UADE.worklet] Reinitializing WASM (' + reason + ')...');
-        try {
-          // Explicitly free WASM heap buffers before dropping the instance
-          if (this._wasm) {
-            try { if (this._ptrL) this._wasm._free(this._ptrL); } catch { /* */ }
-            try { if (this._ptrR) this._wasm._free(this._ptrR); } catch { /* */ }
-            this._ptrL = null;
-            this._ptrR = null;
-          }
-          this._wasm = null;
-          this._ready = false;
-          this._hasRendered = false;
-          this._wasmCorrupted = false;
-          this._lastLoadFailed = false;
-          await this._init(this._sampleRate, this._wasmBinary, null);
-          if (!this._wasm || !this._ready) {
-            this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+      // Reset UADE state when needed. UADE's protocol state machine gets stuck
+      // after "score died" errors — _uade_wasm_stop() alone is NOT enough.
+      //
+      // Two reset strategies:
+      //   1. Soft reset (preferred): _uade_wasm_full_reset() — destroys and
+      //      recreates the UADE engine state within the SAME Emscripten module.
+      //      Zero new memory allocation. Handles load failures + normal reloads.
+      //   2. Hard reinit (fallback): create entirely new Emscripten instance.
+      //      Only needed after true WASM corruption (abort/malloc failure).
+      //      Each instance is ~2.5MB that can't be GC'd from the worklet thread.
+      const needsReset = this._wasmCorrupted || this._lastLoadFailed || this._hasRendered;
+      if (needsReset) {
+        if (this._wasmCorrupted) {
+          // True corruption (WASM abort/malloc failure) — must recreate module
+          console.log('[UADE.worklet] Hard reinit (WASM corrupted)...');
+          try {
+            if (this._wasm) {
+              try { if (this._ptrL) this._wasm._free(this._ptrL); } catch { /* */ }
+              try { if (this._ptrR) this._wasm._free(this._ptrR); } catch { /* */ }
+              this._ptrL = null;
+              this._ptrR = null;
+            }
+            this._wasm = null;
+            this._ready = false;
+            this._hasRendered = false;
+            this._wasmCorrupted = false;
+            this._lastLoadFailed = false;
+            await this._init(this._sampleRate, this._wasmBinary, null);
+            if (!this._wasm || !this._ready) {
+              this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+              return;
+            }
+            this._restoreCompanionFiles();
+          } catch (reinitErr) {
+            console.error('[UADE.worklet] Hard reinit failed:', reinitErr.message);
+            this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
             return;
           }
-          this._restoreCompanionFiles();
-        } catch (reinitErr) {
-          console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
-          this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
-          return;
+        } else {
+          // Normal case: soft reset — reuse same WASM module, zero new memory
+          const reason = this._lastLoadFailed ? 'load-failed' : 'rendered';
+          console.log('[UADE.worklet] Soft reset (' + reason + ')...');
+          try {
+            const resetRet = this._wasm._uade_wasm_full_reset();
+            if (resetRet !== 0) {
+              console.error('[UADE.worklet] Soft reset failed (ret=' + resetRet + '), falling back to hard reinit');
+              // Fall back to hard reinit
+              this._wasm = null;
+              this._ready = false;
+              await this._init(this._sampleRate, this._wasmBinary, null);
+              if (!this._wasm || !this._ready) {
+                this.port.postMessage({ type: 'error', message: 'WASM reinit failed after soft reset failure' });
+                return;
+              }
+            }
+            this._hasRendered = false;
+            this._lastLoadFailed = false;
+            // Companion files survive soft reset (same MEMFS instance)
+          } catch (softErr) {
+            console.error('[UADE.worklet] Soft reset threw:', softErr.message || softErr);
+            // Soft reset exception = corruption, fall back to hard reinit
+            this._wasmCorrupted = true;
+            try {
+              this._wasm = null;
+              this._ready = false;
+              this._hasRendered = false;
+              this._wasmCorrupted = false;
+              this._lastLoadFailed = false;
+              await this._init(this._sampleRate, this._wasmBinary, null);
+              if (!this._wasm || !this._ready) {
+                this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+                return;
+              }
+              this._restoreCompanionFiles();
+            } catch (reinitErr) {
+              console.error('[UADE.worklet] Hard reinit after soft reset failure:', reinitErr.message);
+              this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
+              return;
+            }
+          }
         }
       }
 
@@ -906,18 +980,26 @@ class UADEProcessor extends AudioWorkletProcessor {
             }
           }
 
-          // Full WASM reinit for clean playback
-          console.log('[UADE.worklet] Short scan: reinitializing WASM for clean playback...');
-          this._wasm = null;
-          this._ready = false;
+          // Soft reset for clean playback (no new WASM memory)
+          console.log('[UADE.worklet] Short scan: soft reset for clean playback...');
+          let resetOk = false;
+          try {
+            const resetRet = this._wasm._uade_wasm_full_reset();
+            resetOk = (resetRet === 0);
+          } catch { /* fall through to hard reinit */ }
+          if (!resetOk) {
+            console.warn('[UADE.worklet] Soft reset failed after short scan, hard reinit');
+            this._wasm = null;
+            this._ready = false;
+            await this._init(this._sampleRate, this._wasmBinary, null);
+            if (!this._wasm || !this._ready) {
+              this.port.postMessage({ type: 'error', message: 'WASM reinit after short scan failed' });
+              return;
+            }
+            this._restoreCompanionFiles();
+          }
           this._hasRendered = false;
           this._lastLoadFailed = false;
-          await this._init(this._sampleRate, this._wasmBinary, null);
-          if (!this._wasm || !this._ready) {
-            this.port.postMessage({ type: 'error', message: 'WASM reinit after short scan failed' });
-            return;
-          }
-          this._restoreCompanionFiles();
 
           const ret2 = this._loadIntoWasm(data, filenameHint);
           if (ret2 !== 0) {
@@ -972,7 +1054,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         };
       }
 
-      // Include tick snapshots from short scan (ring buffer was lost during reinit)
+      // Include tick snapshots from short scan (captured before reset)
       if (shortScanTickData && shortScanTickData.length > 0) {
         msg.shortScanTicks = shortScanTickData;
       }

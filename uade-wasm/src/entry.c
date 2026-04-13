@@ -745,6 +745,64 @@ void uade_wasm_cleanup(void) {
     s_playing = 0;
 }
 
+/*
+ * Full in-place reset — destroys and recreates UADE state without
+ * allocating a new Emscripten/WASM module instance.
+ *
+ * This is the preferred way to recover from "score died" / load failures.
+ * Unlike creating a new createUADE() instance (~2.5 MB WebAssembly.Memory
+ * that can't be GC'd from the AudioWorklet thread), this reuses the
+ * existing WASM memory and just reinitializes the UADE engine.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_full_reset(void) {
+    /* Stop playback */
+    s_playing = 0;
+    s_paused  = 0;
+    s_looping = 0;
+
+    /* Destroy old UADE state (frees all resources, resets shim IPC) */
+    if (s_state) {
+        uade_cleanup_state(s_state);
+        s_state = NULL;
+    }
+
+    /* Reset all entry.c counters and ring buffers */
+    s_total_frames = 0;
+    s_pcm_read  = 0;
+    s_pcm_write = 0;
+    g_uade_tick_count   = 0;
+    g_paula_log_read    = 0;
+    g_paula_log_write   = 0;
+    g_paula_log_enabled = 0;
+    g_tick_snap_write   = 0;
+    g_tick_snap_read    = 0;
+    g_tick_snap_enabled = 0;
+    memset(g_prev_lc,     0, sizeof(g_prev_lc));
+    memset(g_prev_dma,    0, sizeof(g_prev_dma));
+    memset(g_prev_period, 0, sizeof(g_prev_period));
+    memset(g_prev_volume, 0, sizeof(g_prev_volume));
+
+    /* Create fresh UADE state — virtual FS is already populated from
+     * the initial uade_wasm_init() call, no need to redo it. */
+    struct uade_config *cfg = uade_new_config();
+    if (!cfg) return -1;
+
+    uade_config_set_option(cfg, UC_BASE_DIR, "/uade");
+    uade_config_set_option(cfg, UC_FREQUENCY,
+        s_sample_rate == 44100 ? "44100" : "48000");
+    uade_config_set_option(cfg, UC_PANNING_VALUE, "1.0");
+
+    if (guarded_new_state(cfg) != 0) {
+        free(cfg);
+        return -1;
+    }
+    free(cfg);
+    return 0;
+}
+
 /* ── CIA-A tick counter exports ──────────────────────────────────────────── */
 
 /*
