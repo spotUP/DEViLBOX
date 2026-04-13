@@ -10,8 +10,6 @@ import { useUIStore } from '@stores/useUIStore';
 
 const EXPOSE_VIEWS = [
   { id: 'tracker',     label: 'Tracker',  icon: '♫', color: '#60a5fa' },
-  { id: 'arrangement', label: 'Arrange',  icon: '≡', color: '#34d399' },
-  { id: 'pianoroll',   label: 'Piano',    icon: '♬', color: '#c084fc' },
   { id: 'mixer',       label: 'Mixer',    icon: '☰', color: '#a78bfa' },
   { id: 'dj',          label: 'DJ',       icon: '◎', color: '#fb923c' },
   { id: 'vj',          label: 'VJ',       icon: '◈', color: '#f472b6' },

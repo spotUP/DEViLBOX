@@ -444,7 +444,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   setIsRendering={ex.setIsRendering}
                   renderProgress={ex.renderProgress}
                   setRenderProgress={ex.setRenderProgress}
-                  initialScope={ex.modalData?.audioScope === 'arrangement' ? 'arrangement' : undefined}
+                  initialScope={ex.modalData?.audioScope as 'pattern' | 'song' | undefined}
                 />
               )}
 

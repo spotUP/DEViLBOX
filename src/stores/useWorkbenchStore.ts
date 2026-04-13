@@ -35,8 +35,6 @@ export interface WorkspaceSnapshot {
 
 export type WindowId =
   | 'tracker'
-  | 'pianoroll'
-  | 'arrangement'
   | 'dj'
   | 'vj'
   | 'instrument'
@@ -95,10 +93,9 @@ function computeDefaultWindows(): Record<WindowId, WindowState> {
   const row2Y = trackerH + gap * 2;
   const row2H = Math.max(250, workbenchH - trackerH - gap * 3);
   const instrW = 700;
-  const pianoW = 900;
   const mixerW = Math.min(900, ww - gap * 2);
 
-  // Row 3: Arrangement (full width below row 2)
+  // Row 3 (below row 2)
   const row3Y = row2Y + row2H + gap;
   const arrH = 300;
 
@@ -108,9 +105,7 @@ function computeDefaultWindows(): Record<WindowId, WindowState> {
   return {
     tracker:     { x: gap,                    y: gap,   width: trackerW,  height: trackerH,  zIndex: 1, visible: true,  minimized: false, maximized: false },
     instrument:  { x: gap,                    y: row2Y, width: instrW,    height: row2H,     zIndex: 6, visible: true,  minimized: false, maximized: false },
-    pianoroll:   { x: instrW + gap * 2,       y: row2Y, width: pianoW,    height: row2H,     zIndex: 2, visible: false, minimized: false, maximized: false },
-    arrangement: { x: gap,                    y: row3Y, width: trackerW,  height: arrH,      zIndex: 3, visible: false, minimized: false, maximized: false },
-    mixer:       { x: gap,                    y: row3Y + arrH + gap, width: mixerW, height: 220, zIndex: 7, visible: false, minimized: false, maximized: false },
+    mixer:       { x: gap,                    y: row3Y, width: mixerW, height: 220, zIndex: 7, visible: false, minimized: false, maximized: false },
     'master-fx': { x: mixerW + gap * 2,       y: row3Y + arrH + gap, width: 280,  height: 360,  zIndex: 8, visible: false, minimized: false, maximized: false },
     dj:          { x: trackerW + gap * 2,     y: gap,   width: djW,       height: 500,       zIndex: 4, visible: false, minimized: false, maximized: false },
     vj:          { x: trackerW + gap * 2,     y: gap,   width: vjW,       height: vjH,       zIndex: 5, visible: false, minimized: false, maximized: false },

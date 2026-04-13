@@ -33,7 +33,6 @@ export type EditorAction =
   | 'edit.undo'
   | 'edit.redo'
   // View
-  | 'view.togglePianoRoll'
   | 'view.toggleGrid'
   // Automation
   | 'automation.toggleRecord'
@@ -416,7 +415,6 @@ export const ACTION_DISPLAY_NAMES: Record<string, string> = {
   'edit.undo': 'Undo',
   'edit.redo': 'Redo',
   // View
-  'view.togglePianoRoll': 'Toggle Piano Roll',
   'view.toggleGrid': 'Toggle Grid View',
   // Automation
   'automation.toggleRecord': 'Toggle Automation Record',
@@ -467,7 +465,7 @@ export const ACTIONS_BY_CATEGORY: Record<string, EditorAction[]> = {
   Pattern: ['pattern.next', 'pattern.previous', 'pattern.first', 'pattern.last'],
   Navigation: ['octave.up', 'octave.down', 'channel.next', 'channel.previous'],
   Edit: ['edit.undo', 'edit.redo'],
-  View: ['view.togglePianoRoll', 'view.toggleGrid'],
+  View: ['view.toggleGrid'],
   Automation: ['automation.toggleRecord'],
   'DJ Transport': [
     'dj.deckA.play', 'dj.deckA.pause', 'dj.deckA.stop', 'dj.deckA.cue',
