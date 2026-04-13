@@ -771,42 +771,37 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._lastHint = filenameHint;
       // Reinit WASM when needed. UADE's protocol state machine gets stuck after
       // "score died" errors — _uade_wasm_stop() alone is NOT enough to reset it.
-      // Full reinit is required, but each reinit allocates a new ~2.5MB instance.
-      // Limit consecutive reinits to prevent OOM on rapid failure sequences.
+      // Always do a full reinit, but explicitly dispose the old instance first
+      // to prevent memory accumulation.
       const needsReinit = this._wasmCorrupted || this._lastLoadFailed || this._hasRendered;
       if (needsReinit && this._wasmBinary) {
-        if (!this._reinitCount) this._reinitCount = 0;
-        // Allow up to 20 consecutive reinits, then throttle (1 per 5 loads)
-        const throttled = this._reinitCount > 20 && (this._reinitCount % 5 !== 0);
-        if (throttled) {
-          // Skip reinit — try loading into the existing (possibly broken) instance.
-          // If it fails, _lastLoadFailed stays true for next attempt.
-          try { this._wasm._uade_wasm_stop(); } catch { /* */ }
+        const reason = this._wasmCorrupted ? 'corrupted' : this._lastLoadFailed ? 'load-failed' : 'rendered';
+        console.log('[UADE.worklet] Reinitializing WASM (' + reason + ')...');
+        try {
+          // Explicitly free WASM heap buffers before dropping the instance
+          if (this._wasm) {
+            try { if (this._ptrL) this._wasm._free(this._ptrL); } catch { /* */ }
+            try { if (this._ptrR) this._wasm._free(this._ptrR); } catch { /* */ }
+            this._ptrL = null;
+            this._ptrR = null;
+          }
+          this._wasm = null;
+          this._ready = false;
           this._hasRendered = false;
-        } else {
-          const reason = this._wasmCorrupted ? 'corrupted' : this._lastLoadFailed ? 'load-failed' : 'rendered';
-          console.log('[UADE.worklet] Reinitializing WASM (' + reason + ', #' + this._reinitCount + ')...');
-          try {
-            this._wasm = null;
-            this._ready = false;
-            this._hasRendered = false;
-            this._wasmCorrupted = false;
-            this._lastLoadFailed = false;
-            await this._init(this._sampleRate, this._wasmBinary, null);
-            if (!this._wasm || !this._ready) {
-              this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
-              return;
-            }
-            this._restoreCompanionFiles();
-          } catch (reinitErr) {
-            console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
-            this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
+          this._wasmCorrupted = false;
+          this._lastLoadFailed = false;
+          await this._init(this._sampleRate, this._wasmBinary, null);
+          if (!this._wasm || !this._ready) {
+            this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
             return;
           }
+          this._restoreCompanionFiles();
+        } catch (reinitErr) {
+          console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
+          this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
+          return;
         }
-        this._reinitCount++;
       }
-      // Reset counter on successful load (set at end of _load)
 
 
       let ret = this._loadIntoWasm(data, filenameHint);
