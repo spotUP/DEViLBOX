@@ -106,6 +106,12 @@ export async function withNativeThenUADE(
             (result as any).uadeEditableFileName = ctx.originalFileName;
           }
           if (hasDedicatedEngine) {
+            // Dedicated WASM engine handles all audio — set instruments to
+            // 'Sampler' so ToneEngine doesn't try to instantiate unknown
+            // synth types (e.g. 'SynthesisWasmSynth') and show error dialogs.
+            for (const inst of result.instruments) {
+              inst.synthType = 'Sampler';
+            }
             return result;
           }
           // UADE handles ALL audio — tag every instrument as UADEEditableSynth
