@@ -520,6 +520,19 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
       }, 500);
     },
   },
+  {
+    key: 'V2M',
+    synthType: 'V2MSynth',
+    suppressNotes: true,
+    fileDataKey: 'v2mFileData',
+    formats: null, // activate whenever v2mFileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/v2m/V2MEngine')).V2MEngine as unknown as WASMSingletonStatic,
+  },
 ];
 
 /** Synth types routed through the stereo separation chain */

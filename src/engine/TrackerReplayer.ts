@@ -342,6 +342,8 @@ export interface TrackerSong {
   uadeEditableFileName?: string;
   /** Raw MDX binary for mdxmini WASM playback (Sharp X68000 YM2151) */
   mdxminiFileData?: ArrayBuffer;
+  /** Raw V2M binary for V2MEngine WASM playback (Farbrausch V2 Synthesizer Music) */
+  v2mFileData?: ArrayBuffer;
   /** Raw file binary for AdPlug streaming playback (patterns displayed, AdPlug renders audio) */
   adplugFileData?: ArrayBuffer;
   /** Original filename for AdPlug format detection */
