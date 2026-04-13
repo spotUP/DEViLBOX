@@ -181,8 +181,8 @@ const cyanLineartTheme: Theme = {
 // Body: bold matte red #c4282e, knobs: brushed silver #b0b0b0,
 // labels: cream silk #e8e0d8, keys: charcoal #2a2a2a, shadow: burgundy #6e1418
 const devilboxTheme: Theme = {
-  id: 'devilbox',
-  name: 'DEViLBOX',
+  id: 'red-devil',
+  name: 'Red Devil',
   colors: {
     // Backgrounds — IT'S A RED THEME. The TD-3 body IS the background.
     bg: '#6e1418',            // deep burgundy — darkest shadow on the body
@@ -1703,7 +1703,7 @@ const applyTheme = (theme: Theme) => {
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
-      currentThemeId: 'devilbox', // DEViLBOX is the default
+      currentThemeId: 'modern',
       customThemeColors: null,
 
       setTheme: (themeId: string) => {
@@ -1728,7 +1728,7 @@ export const useThemeStore = create<ThemeStore>()(
 
       getCurrentTheme: () => {
         const { currentThemeId } = get();
-        return themes.find(t => t.id === currentThemeId) || devilboxTheme;
+        return themes.find(t => t.id === currentThemeId) || modernTheme;
       },
 
       setCustomColor: (key: ThemeColorKey, value: string) => {
@@ -1772,9 +1772,13 @@ export const useThemeStore = create<ThemeStore>()(
         if (state?.customThemeColors) {
           rebuildThemesList(state.customThemeColors);
         }
+        // Migrate old 'devilbox' theme ID to 'red-devil'
+        if (state && state.currentThemeId === 'devilbox') {
+          state.currentThemeId = 'red-devil';
+        }
         // Apply theme after rehydration
         if (state) {
-          const theme = themes.find(t => t.id === state.currentThemeId) || devilboxTheme;
+          const theme = themes.find(t => t.id === state.currentThemeId) || modernTheme;
           applyTheme(theme);
         }
       },
@@ -1785,18 +1789,20 @@ export const useThemeStore = create<ThemeStore>()(
 // Initialize theme on load
 if (typeof window !== 'undefined') {
   const stored = localStorage.getItem('devilbox-theme');
-  let themeId = 'devilbox';
+  let themeId = 'modern';
   let customColors: ThemeColors | null = null;
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      themeId = parsed.state?.currentThemeId || 'devilbox';
+      themeId = parsed.state?.currentThemeId || 'modern';
+      // Migrate old 'devilbox' theme ID to 'red-devil'
+      if (themeId === 'devilbox') themeId = 'red-devil';
       customColors = parsed.state?.customThemeColors || null;
     } catch {
       // Use default
     }
   }
   if (customColors) rebuildThemesList(customColors);
-  const theme = themes.find(t => t.id === themeId) || devilboxTheme;
+  const theme = themes.find(t => t.id === themeId) || modernTheme;
   applyTheme(theme);
 }
