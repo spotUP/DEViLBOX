@@ -12,7 +12,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import type { EffectConfig } from '@typedefs/instrument';
 
 const CATEGORY_ORDER: MasterFxPreset['category'][] = [
-  'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl',
+  'Amiga', 'C64', 'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl',
 ];
 
 const USER_PRESETS_KEY = 'master-fx-user-presets';

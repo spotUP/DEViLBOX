@@ -32,7 +32,7 @@ const USER_PRESETS_KEY = 'master-fx-user-presets';
 // ── Category order (DJ first for DJ view) ────────────────────────────────────
 
 const CATEGORY_ORDER: MasterFxPreset['category'][] = [
-  'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl', 'Neural',
+  'Amiga', 'C64', 'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl', 'Neural',
 ];
 
 // Effects where wet should default to 100% (not 50%)
