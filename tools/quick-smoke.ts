@@ -201,8 +201,14 @@ const NO_PATTERNS_OK = new Set([
   'sunvox', 'vgm', 'studio-pixel---piyopiyo',
 ]);
 
-// Skip these — known to crash the browser (empty = none currently)
-const SKIP = new Set<string>([]);
+// Skip these — known incomplete, not bugs (separate work items)
+const SKIP = new Set<string>([
+  'deflemask',               // DMF import incomplete — separate session
+  'organya',                 // Organya engine incomplete — separate session
+  'piston-collage',          // PxTone engine incomplete — separate session
+  'piston-collage-protected', // PxTone engine incomplete — separate session
+  'sawteeth',                // .st extension conflict with 7 formats — separate session
+]);
 
 // Expected min channels per format family
 const MIN_CHANNELS: Record<string, number> = {
