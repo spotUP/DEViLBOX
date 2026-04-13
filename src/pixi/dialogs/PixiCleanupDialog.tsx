@@ -110,11 +110,13 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
   // Selection state
   const [selectedInstruments, setSelectedInstruments] = useState<Set<number>>(new Set());
   const [selectedPatterns, setSelectedPatterns] = useState<Set<number>>(new Set());
+  const [selectedLoopTails, setSelectedLoopTails] = useState<Set<number>>(new Set());
   // Reset selections when dialog opens
   useEffect(() => {
     if (isOpen) {
       setSelectedInstruments(new Set());
       setSelectedPatterns(new Set());
+      setSelectedLoopTails(new Set());
     }
   }, [isOpen]);
 
@@ -159,8 +161,23 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
 
   const deselectAllPatterns = useCallback(() => setSelectedPatterns(new Set()), []);
 
+  // ── Loop tail helpers ───────────────────────────────────────────────────────
+  const toggleLoopTail = useCallback((instrumentIndex: number) => {
+    setSelectedLoopTails((prev) => {
+      const next = new Set(prev);
+      if (next.has(instrumentIndex)) next.delete(instrumentIndex); else next.add(instrumentIndex);
+      return next;
+    });
+  }, []);
+
+  const selectAllLoopTails = useCallback(() => {
+    setSelectedLoopTails(new Set(report.loopTails.map((t) => t.instrumentIndex)));
+  }, [report.loopTails]);
+
+  const deselectAllLoopTails = useCallback(() => setSelectedLoopTails(new Set()), []);
+
   // ── Remove selected ───────────────────────────────────────────────────────
-  const totalSelected = selectedInstruments.size + selectedPatterns.size;
+  const totalSelected = selectedInstruments.size + selectedPatterns.size + selectedLoopTails.size;
 
   const handleRemoveSelected = useCallback(() => {
     const instrStore = useInstrumentStore.getState();
@@ -178,10 +195,25 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
       trackerStore.deletePattern(idx);
     }
 
-    // Loop tail truncation not yet implemented — acknowledged but not acted upon.
+    // Truncate loop tails — slice audioBuffer at loopEnd frame boundary
+    if (selectedLoopTails.size > 0) {
+      for (const instrumentId of selectedLoopTails) {
+        const inst = instrStore.instruments.find((i) => i.id === instrumentId);
+        if (!inst?.sample?.audioBuffer || !inst.sample.loopEnd) continue;
+        const loopEndBytes = inst.sample.loopEnd * 2;
+        if (loopEndBytes > 0 && loopEndBytes < inst.sample.audioBuffer.byteLength) {
+          instrStore.updateInstrument(instrumentId, {
+            sample: {
+              ...inst.sample,
+              audioBuffer: inst.sample.audioBuffer.slice(0, loopEndBytes),
+            },
+          });
+        }
+      }
+    }
 
     onClose();
-  }, [selectedInstruments, selectedPatterns, onClose]);
+  }, [selectedInstruments, selectedPatterns, selectedLoopTails, onClose]);
 
   if (!isOpen) return null;
 
@@ -299,45 +331,47 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
             count={report.loopTails.length}
             collapsed={collapsedSections.has('looptails')}
             onToggle={() => toggleSection('looptails')}
+            allSelected={report.loopTails.length > 0 && selectedLoopTails.size === report.loopTails.length}
+            onSelectAll={selectAllLoopTails}
+            onDeselectAll={deselectAllLoopTails}
           />
           {!collapsedSections.has('looptails') && (
             <layoutContainer layout={{ flexDirection: 'column', paddingLeft: 8, paddingBottom: 4 }}>
               {report.loopTails.length === 0 ? (
                 <PixiLabel text="None found" size="xs" color="textMuted" font="sans" />
               ) : (
-                <>
-                  <PixiLabel
-                    text="Detected loop tail data (informational only)."
-                    size="xs"
-                    color="textMuted"
-                    font="sans"
-                  />
-                  {report.loopTails.map((t) => (
-                    <layoutContainer
-                      key={t.instrumentIndex}
-                      layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 3, paddingBottom: 3, width: 432 }}
-                    >
-                      <pixiBitmapText
-                        text={String(t.instrumentIndex).padStart(2, '0')}
-                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
-                        tint={theme.textMuted.color}
-                        layout={{ width: 24 }}
-                      />
-                      <pixiBitmapText
-                        text={t.name || '(unnamed)'}
-                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-                        tint={theme.textSecondary.color}
-                        layout={{ flex: 1 }}
-                      />
-                      <pixiBitmapText
-                        text={`${formatBytes(t.tailBytes)} reclaimable`}
-                        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                        tint={theme.textMuted.color}
-                        layout={{}}
-                      />
-                    </layoutContainer>
-                  ))}
-                </>
+                report.loopTails.map((t) => (
+                  <layoutContainer
+                    key={t.instrumentIndex}
+                    eventMode="static"
+                    cursor="pointer"
+                    onPointerUp={() => toggleLoopTail(t.instrumentIndex)}
+                    layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 3, paddingBottom: 3, width: 432 }}
+                  >
+                    <PixiCheckbox
+                      checked={selectedLoopTails.has(t.instrumentIndex)}
+                      onChange={() => toggleLoopTail(t.instrumentIndex)}
+                    />
+                    <pixiBitmapText
+                      text={String(t.instrumentIndex).padStart(2, '0')}
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+                      tint={theme.textMuted.color}
+                      layout={{ width: 24 }}
+                    />
+                    <pixiBitmapText
+                      text={t.name || '(unnamed)'}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                      tint={theme.textSecondary.color}
+                      layout={{ flex: 1 }}
+                    />
+                    <pixiBitmapText
+                      text={formatBytes(t.tailBytes)}
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                      tint={theme.textMuted.color}
+                      layout={{}}
+                    />
+                  </layoutContainer>
+                ))
               )}
             </layoutContainer>
           )}
