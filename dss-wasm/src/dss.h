@@ -24,4 +24,22 @@ size_t dss_render_multi(DssModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool dss_has_ended(const DssModule* module);
 
+// Edit API
+int dss_get_instrument_count(const DssModule* module);
+int dss_get_num_patterns(const DssModule* module);
+int dss_get_num_positions(const DssModule* module);
 
+void dss_get_cell(const DssModule* module, int pattern, int row, int channel,
+                   uint8_t* sample, uint16_t* period, uint8_t* effect, uint8_t* effect_arg);
+void dss_set_cell(DssModule* module, int pattern, int row, int channel,
+                   uint8_t sample, uint16_t period, uint8_t effect, uint8_t effect_arg);
+
+float dss_get_instrument_param(const DssModule* module, int inst, const char* param);
+void dss_set_instrument_param(DssModule* module, int inst, const char* param, float value);
+
+size_t dss_export(const DssModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

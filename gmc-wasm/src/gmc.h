@@ -27,4 +27,18 @@ size_t gmc_render_multi(GmcModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool gmc_has_ended(const GmcModule* module);
 
+// Edit API
+int gmc_get_instrument_count(const GmcModule* module);
+int gmc_get_num_patterns(const GmcModule* module);
+void gmc_get_cell(const GmcModule* module, int pattern, int row, int channel,
+                  uint16_t* period, uint8_t* sample, uint8_t* effect, uint8_t* effect_arg);
+void gmc_set_cell(GmcModule* module, int pattern, int row, int channel,
+                  uint16_t period, uint8_t sample, uint8_t effect, uint8_t effect_arg);
+float gmc_get_instrument_param(const GmcModule* module, int inst, const char* param);
+void gmc_set_instrument_param(GmcModule* module, int inst, const char* param, float value);
+size_t gmc_export(const GmcModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

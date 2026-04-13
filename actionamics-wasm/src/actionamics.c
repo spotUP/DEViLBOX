@@ -1876,9 +1876,76 @@ bool act_has_ended(const ActModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int act_get_instrument_count(const ActModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_instruments : 0;
+}
+
+int act_get_sample_count(const ActModule* module) {
+    return module ? module->num_samples : 0;
+}
+
+const char* act_get_sample_name(const ActModule* module, int samp) {
+    if (!module || samp < 0 || samp >= module->num_samples) return "";
+    return module->samples[samp].name;
+}
+
+float act_get_instrument_param(const ActModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return -1.0f;
+    const ActInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "sampleNumberListNumber") == 0)          return (float)in->sample_number_list.list_number;
+    if (strcmp(param, "sampleNumberListValues") == 0)          return (float)in->sample_number_list.number_of_values_in_list;
+    if (strcmp(param, "sampleNumberListStartDelta") == 0)      return (float)in->sample_number_list.start_counter_delta_value;
+    if (strcmp(param, "sampleNumberListCounterEnd") == 0)      return (float)in->sample_number_list.counter_end_value;
+    if (strcmp(param, "arpeggioListNumber") == 0)              return (float)in->arpeggio_list.list_number;
+    if (strcmp(param, "arpeggioListValues") == 0)              return (float)in->arpeggio_list.number_of_values_in_list;
+    if (strcmp(param, "arpeggioListStartDelta") == 0)          return (float)in->arpeggio_list.start_counter_delta_value;
+    if (strcmp(param, "arpeggioListCounterEnd") == 0)          return (float)in->arpeggio_list.counter_end_value;
+    if (strcmp(param, "frequencyListNumber") == 0)             return (float)in->frequency_list.list_number;
+    if (strcmp(param, "frequencyListValues") == 0)             return (float)in->frequency_list.number_of_values_in_list;
+    if (strcmp(param, "frequencyListStartDelta") == 0)         return (float)in->frequency_list.start_counter_delta_value;
+    if (strcmp(param, "frequencyListCounterEnd") == 0)         return (float)in->frequency_list.counter_end_value;
+    if (strcmp(param, "portamentoIncrement") == 0)             return (float)in->portamento_increment;
+    if (strcmp(param, "portamentoDelay") == 0)                 return (float)in->portamento_delay;
+    if (strcmp(param, "noteTranspose") == 0)                   return (float)in->note_transpose;
+    if (strcmp(param, "attackEndVolume") == 0)                 return (float)in->attack_end_volume;
+    if (strcmp(param, "attackSpeed") == 0)                     return (float)in->attack_speed;
+    if (strcmp(param, "decayEndVolume") == 0)                  return (float)in->decay_end_volume;
+    if (strcmp(param, "decaySpeed") == 0)                      return (float)in->decay_speed;
+    if (strcmp(param, "sustainDelay") == 0)                    return (float)in->sustain_delay;
+    if (strcmp(param, "releaseEndVolume") == 0)                return (float)in->release_end_volume;
+    if (strcmp(param, "releaseSpeed") == 0)                    return (float)in->release_speed;
+
+    return -1.0f;
+}
+
+void act_set_instrument_param(ActModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return;
+    ActInstrument* in = &module->instruments[inst];
+    uint8_t v8 = (uint8_t)value;
+    int8_t sv8 = (int8_t)value;
+
+    if (strcmp(param, "sampleNumberListNumber") == 0)          { in->sample_number_list.list_number = v8; return; }
+    if (strcmp(param, "sampleNumberListValues") == 0)          { in->sample_number_list.number_of_values_in_list = v8; return; }
+    if (strcmp(param, "sampleNumberListStartDelta") == 0)      { in->sample_number_list.start_counter_delta_value = v8; return; }
+    if (strcmp(param, "sampleNumberListCounterEnd") == 0)      { in->sample_number_list.counter_end_value = v8; return; }
+    if (strcmp(param, "arpeggioListNumber") == 0)              { in->arpeggio_list.list_number = v8; return; }
+    if (strcmp(param, "arpeggioListValues") == 0)              { in->arpeggio_list.number_of_values_in_list = v8; return; }
+    if (strcmp(param, "arpeggioListStartDelta") == 0)          { in->arpeggio_list.start_counter_delta_value = v8; return; }
+    if (strcmp(param, "arpeggioListCounterEnd") == 0)          { in->arpeggio_list.counter_end_value = v8; return; }
+    if (strcmp(param, "frequencyListNumber") == 0)             { in->frequency_list.list_number = v8; return; }
+    if (strcmp(param, "frequencyListValues") == 0)             { in->frequency_list.number_of_values_in_list = v8; return; }
+    if (strcmp(param, "frequencyListStartDelta") == 0)         { in->frequency_list.start_counter_delta_value = v8; return; }
+    if (strcmp(param, "frequencyListCounterEnd") == 0)         { in->frequency_list.counter_end_value = v8; return; }
+    if (strcmp(param, "portamentoIncrement") == 0)             { in->portamento_increment = sv8; return; }
+    if (strcmp(param, "portamentoDelay") == 0)                 { in->portamento_delay = v8; return; }
+    if (strcmp(param, "noteTranspose") == 0)                   { in->note_transpose = sv8; return; }
+    if (strcmp(param, "attackEndVolume") == 0)                 { in->attack_end_volume = v8; return; }
+    if (strcmp(param, "attackSpeed") == 0)                     { in->attack_speed = v8; return; }
+    if (strcmp(param, "decayEndVolume") == 0)                  { in->decay_end_volume = v8; return; }
+    if (strcmp(param, "decaySpeed") == 0)                      { in->decay_speed = v8; return; }
+    if (strcmp(param, "sustainDelay") == 0)                    { in->sustain_delay = v8; return; }
+    if (strcmp(param, "releaseEndVolume") == 0)                { in->release_end_volume = v8; return; }
+    if (strcmp(param, "releaseSpeed") == 0)                    { in->release_speed = v8; return; }
 }
 
 size_t act_export(const ActModule* module, uint8_t* out, size_t max_size) {

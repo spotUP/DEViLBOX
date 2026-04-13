@@ -30,4 +30,23 @@ size_t okt_render_multi(OktModule* module,
 
 bool okt_has_ended(const OktModule* module);
 
+// Edit API
+int okt_get_instrument_count(const OktModule* module);
+int okt_get_num_patterns(const OktModule* module);
+int okt_get_pattern_rows(const OktModule* module, int pattern);
+int okt_get_num_positions(const OktModule* module);
 
+void okt_get_cell(const OktModule* module, int pattern, int row, int channel,
+                   uint8_t* note, uint8_t* sample_num, uint8_t* effect, uint8_t* effect_arg);
+void okt_set_cell(OktModule* module, int pattern, int row, int channel,
+                   uint8_t note, uint8_t sample_num, uint8_t effect, uint8_t effect_arg);
+
+float okt_get_instrument_param(const OktModule* module, int inst, const char* param);
+void okt_set_instrument_param(OktModule* module, int inst, const char* param, float value);
+
+size_t okt_export(const OktModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

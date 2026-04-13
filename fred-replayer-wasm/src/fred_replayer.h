@@ -24,4 +24,14 @@ size_t fred_render_multi(FredModule* module, float* ch0, float* ch1, float* ch2,
 
 bool fred_has_ended(const FredModule* module);
 
+// Edit API
+int fred_get_instrument_count(const FredModule* module);
+const char* fred_get_instrument_name(const FredModule* module, int inst);
+float fred_get_instrument_param(const FredModule* module, int inst, const char* param);
+void fred_set_instrument_param(FredModule* module, int inst, const char* param, float value);
+size_t fred_export(const FredModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

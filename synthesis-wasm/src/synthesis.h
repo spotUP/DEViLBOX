@@ -27,4 +27,29 @@ size_t syn_render_multi(SynModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool syn_has_ended(const SynModule* module);
 
+// Edit API
+int syn_get_instrument_count(const SynModule* module);
+int syn_get_num_track_lines(const SynModule* module);
+int syn_get_num_positions(const SynModule* module);
 
+void syn_get_cell(const SynModule* module, int idx,
+                   uint8_t* note, uint8_t* instrument, uint8_t* arpeggio,
+                   uint8_t* effect, uint8_t* effect_arg);
+void syn_set_cell(SynModule* module, int idx,
+                   uint8_t note, uint8_t instrument, uint8_t arpeggio,
+                   uint8_t effect, uint8_t effect_arg);
+
+void syn_get_position(const SynModule* module, int pos, int channel,
+                       uint16_t* start_track_row, int8_t* sound_transpose, int8_t* note_transpose);
+void syn_set_position(SynModule* module, int pos, int channel,
+                       uint16_t start_track_row, int8_t sound_transpose, int8_t note_transpose);
+
+float syn_get_instrument_param(const SynModule* module, int inst, const char* param);
+void syn_set_instrument_param(SynModule* module, int inst, const char* param, float value);
+
+size_t syn_export(const SynModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

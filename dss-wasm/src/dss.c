@@ -1191,9 +1191,72 @@ bool dss_has_ended(const DssModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int dss_get_instrument_count(const DssModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? 31 : 0;
+}
+
+int dss_get_num_patterns(const DssModule* module) {
+    return module ? module->num_patterns : 0;
+}
+
+int dss_get_num_positions(const DssModule* module) {
+    return module ? module->num_positions : 0;
+}
+
+void dss_get_cell(const DssModule* module, int pattern, int row, int channel,
+                   uint8_t* sample, uint16_t* period, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->num_patterns ||
+        row < 0 || row >= 64 || channel < 0 || channel >= 4) {
+        if (sample) *sample = 0; if (period) *period = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const DssTrackLine* tl = &module->patterns[pattern].tracks[channel][row];
+    if (sample) *sample = tl->sample;
+    if (period) *period = tl->period;
+    if (effect) *effect = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void dss_set_cell(DssModule* module, int pattern, int row, int channel,
+                   uint8_t sample, uint16_t period, uint8_t effect, uint8_t effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->num_patterns ||
+        row < 0 || row >= 64 || channel < 0 || channel >= 4) return;
+    DssTrackLine* tl = &module->patterns[pattern].tracks[channel][row];
+    tl->sample = sample;
+    tl->period = period;
+    tl->effect = (DssEffect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+float dss_get_instrument_param(const DssModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= 31 || !param) return -1.0f;
+    const DssSample* s = &module->samples[inst];
+
+    if (strcmp(param, "startOffset") == 0)   return (float)s->start_offset;
+    if (strcmp(param, "length") == 0)        return (float)s->length;
+    if (strcmp(param, "loopStart") == 0)     return (float)s->loop_start;
+    if (strcmp(param, "loopLength") == 0)    return (float)s->loop_length;
+    if (strcmp(param, "fineTune") == 0)      return (float)s->fine_tune;
+    if (strcmp(param, "volume") == 0)        return (float)s->volume;
+    if (strcmp(param, "frequency") == 0)     return (float)s->frequency;
+
+    return -1.0f;
+}
+
+void dss_set_instrument_param(DssModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= 31 || !param) return;
+    DssSample* s = &module->samples[inst];
+    uint32_t v32 = (uint32_t)value;
+    uint16_t v16 = (uint16_t)value;
+    uint8_t v8 = (uint8_t)value;
+
+    if (strcmp(param, "startOffset") == 0)   { s->start_offset = v32; return; }
+    if (strcmp(param, "length") == 0)        { s->length = v16; return; }
+    if (strcmp(param, "loopStart") == 0)     { s->loop_start = v32; return; }
+    if (strcmp(param, "loopLength") == 0)    { s->loop_length = v16; return; }
+    if (strcmp(param, "fineTune") == 0)      { s->fine_tune = v8; return; }
+    if (strcmp(param, "volume") == 0)        { s->volume = v8; return; }
+    if (strcmp(param, "frequency") == 0)     { s->frequency = v16; return; }
 }
 
 size_t dss_export(const DssModule* module, uint8_t* out, size_t max_size) {

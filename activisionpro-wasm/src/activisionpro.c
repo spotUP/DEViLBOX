@@ -1781,9 +1781,59 @@ bool avp_has_ended(const AvpModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int avp_get_instrument_count(const AvpModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_instruments : 0;
+}
+
+float avp_get_instrument_param(const AvpModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return -1.0f;
+    const AvpInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "sampleNumber") == 0)            return (float)in->sample_number;
+    if (strcmp(param, "envelopeNumber") == 0)           return (float)in->envelope_number;
+    if (strcmp(param, "volume") == 0)                   return (float)in->volume;
+    if (strcmp(param, "enabledEffectFlags") == 0)       return (float)in->enabled_effect_flags;
+    if (strcmp(param, "portamentoAdd") == 0)            return (float)in->portamento_add;
+    if (strcmp(param, "fineTune") == 0)                 return (float)in->fine_tune;
+    if (strcmp(param, "stopResetEffectDelay") == 0)     return (float)in->stop_reset_effect_delay;
+    if (strcmp(param, "sampleNumber2") == 0)            return (float)in->sample_number2;
+    if (strcmp(param, "sampleStartOffset") == 0)        return (float)in->sample_start_offset;
+    if (strcmp(param, "arpeggioTable0") == 0)           return (float)in->arpeggio_table[0];
+    if (strcmp(param, "arpeggioTable1") == 0)           return (float)in->arpeggio_table[1];
+    if (strcmp(param, "arpeggioTable2") == 0)           return (float)in->arpeggio_table[2];
+    if (strcmp(param, "arpeggioTable3") == 0)           return (float)in->arpeggio_table[3];
+    if (strcmp(param, "fixedOrTransposedNote") == 0)    return (float)in->fixed_or_transposed_note;
+    if (strcmp(param, "transpose") == 0)                return (float)in->transpose;
+    if (strcmp(param, "vibratoNumber") == 0)            return (float)in->vibrato_number;
+    if (strcmp(param, "vibratoDelay") == 0)             return (float)in->vibrato_delay;
+
+    return -1.0f;
+}
+
+void avp_set_instrument_param(AvpModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return;
+    AvpInstrument* in = &module->instruments[inst];
+    uint8_t v8 = (uint8_t)value;
+    int8_t sv8 = (int8_t)value;
+    uint16_t v16 = (uint16_t)value;
+    int16_t sv16 = (int16_t)value;
+
+    if (strcmp(param, "sampleNumber") == 0)            { in->sample_number = v8; return; }
+    if (strcmp(param, "envelopeNumber") == 0)           { in->envelope_number = v8; return; }
+    if (strcmp(param, "volume") == 0)                   { in->volume = v8; return; }
+    if (strcmp(param, "enabledEffectFlags") == 0)       { in->enabled_effect_flags = v8; return; }
+    if (strcmp(param, "portamentoAdd") == 0)            { in->portamento_add = v8; return; }
+    if (strcmp(param, "fineTune") == 0)                 { in->fine_tune = sv16; return; }
+    if (strcmp(param, "stopResetEffectDelay") == 0)     { in->stop_reset_effect_delay = v8; return; }
+    if (strcmp(param, "sampleNumber2") == 0)            { in->sample_number2 = v8; return; }
+    if (strcmp(param, "sampleStartOffset") == 0)        { in->sample_start_offset = v16; return; }
+    if (strcmp(param, "arpeggioTable0") == 0)           { in->arpeggio_table[0] = sv8; return; }
+    if (strcmp(param, "arpeggioTable1") == 0)           { in->arpeggio_table[1] = sv8; return; }
+    if (strcmp(param, "arpeggioTable2") == 0)           { in->arpeggio_table[2] = sv8; return; }
+    if (strcmp(param, "arpeggioTable3") == 0)           { in->arpeggio_table[3] = sv8; return; }
+    if (strcmp(param, "fixedOrTransposedNote") == 0)    { in->fixed_or_transposed_note = v8; return; }
+    if (strcmp(param, "transpose") == 0)                { in->transpose = sv8; return; }
+    if (strcmp(param, "vibratoNumber") == 0)            { in->vibrato_number = v8; return; }
+    if (strcmp(param, "vibratoDelay") == 0)             { in->vibrato_delay = v8; return; }
 }
 
 size_t avp_export(const AvpModule* module, uint8_t* out, size_t max_size) {

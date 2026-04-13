@@ -743,9 +743,60 @@ bool gmc_has_ended(const GmcModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int gmc_get_instrument_count(const GmcModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? 15 : 0;
+}
+
+int gmc_get_num_patterns(const GmcModule* module) {
+    return module ? module->num_patterns : 0;
+}
+
+void gmc_get_cell(const GmcModule* module, int pattern, int row, int channel,
+                  uint16_t* period, uint8_t* sample, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->num_patterns ||
+        row < 0 || row >= 64 || channel < 0 || channel >= 4 || !module->patterns) {
+        if (period) *period = 0; if (sample) *sample = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const GmcTrackLine* tl = &module->patterns[pattern].tracks[channel][row];
+    if (period)     *period     = tl->period;
+    if (sample)     *sample     = tl->sample;
+    if (effect)     *effect     = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void gmc_set_cell(GmcModule* module, int pattern, int row, int channel,
+                  uint16_t period, uint8_t sample, uint8_t effect, uint8_t effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->num_patterns ||
+        row < 0 || row >= 64 || channel < 0 || channel >= 4 || !module->patterns) return;
+    GmcTrackLine* tl = &module->patterns[pattern].tracks[channel][row];
+    tl->period     = period;
+    tl->sample     = sample;
+    tl->effect     = (GmcEffect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+float gmc_get_instrument_param(const GmcModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= 15 || !param) return -1.0f;
+    const GmcSample* s = &module->samples[inst];
+
+    if (strcmp(param, "length") == 0)      return (float)s->length;
+    if (strcmp(param, "loopStart") == 0)   return (float)s->loop_start;
+    if (strcmp(param, "loopLength") == 0)  return (float)s->loop_length;
+    if (strcmp(param, "volume") == 0)      return (float)s->volume;
+
+    return -1.0f;
+}
+
+void gmc_set_instrument_param(GmcModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= 15 || !param) return;
+    GmcSample* s = &module->samples[inst];
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "length") == 0)      { s->length = v; return; }
+    if (strcmp(param, "loopStart") == 0)   { s->loop_start = v; return; }
+    if (strcmp(param, "loopLength") == 0)  { s->loop_length = v; return; }
+    if (strcmp(param, "volume") == 0)      { s->volume = v; return; }
 }
 
 size_t gmc_export(const GmcModule* module, uint8_t* out, size_t max_size) {

@@ -27,4 +27,17 @@ size_t act_render_multi(ActModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool act_has_ended(const ActModule* module);
 
+// Edit API
+int act_get_instrument_count(const ActModule* module);
+int act_get_sample_count(const ActModule* module);
+const char* act_get_sample_name(const ActModule* module, int samp);
 
+float act_get_instrument_param(const ActModule* module, int inst, const char* param);
+void act_set_instrument_param(ActModule* module, int inst, const char* param, float value);
+
+size_t act_export(const ActModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

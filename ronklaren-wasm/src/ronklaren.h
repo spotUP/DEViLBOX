@@ -27,4 +27,15 @@ size_t rk_render_multi(RkModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool rk_has_ended(const RkModule* module);
 
+// Edit API
+int rk_get_instrument_count(const RkModule* module);
 
+float rk_get_instrument_param(const RkModule* module, int inst, const char* param);
+void rk_set_instrument_param(RkModule* module, int inst, const char* param, float value);
+
+size_t rk_export(const RkModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

@@ -1869,9 +1869,86 @@ bool fred_has_ended(const FredModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int fred_get_instrument_count(const FredModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? (int)module->inst_num : 0;
+}
+
+const char* fred_get_instrument_name(const FredModule* module, int inst) {
+    (void)module; (void)inst;
+    return "";  // Fred instruments have no names
+}
+
+float fred_get_instrument_param(const FredModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= (int)module->inst_num || !param || !module->instruments) return -1.0f;
+    const FredInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "instrumentNumber") == 0)  return (float)in->instrument_number;
+    if (strcmp(param, "repeatLen") == 0)          return (float)in->repeat_len;
+    if (strcmp(param, "length") == 0)             return (float)in->length;
+    if (strcmp(param, "period") == 0)             return (float)in->period;
+    if (strcmp(param, "vibDelay") == 0)           return (float)in->vib_delay;
+    if (strcmp(param, "vibSpeed") == 0)           return (float)in->vib_speed;
+    if (strcmp(param, "vibAmpl") == 0)            return (float)in->vib_ampl;
+    if (strcmp(param, "envVol") == 0)             return (float)in->env_vol;
+    if (strcmp(param, "attackSpeed") == 0)        return (float)in->attack_speed;
+    if (strcmp(param, "attackVolume") == 0)       return (float)in->attack_volume;
+    if (strcmp(param, "decaySpeed") == 0)         return (float)in->decay_speed;
+    if (strcmp(param, "decayVolume") == 0)        return (float)in->decay_volume;
+    if (strcmp(param, "sustainDelay") == 0)       return (float)in->sustain_delay;
+    if (strcmp(param, "releaseSpeed") == 0)       return (float)in->release_speed;
+    if (strcmp(param, "releaseVolume") == 0)      return (float)in->release_volume;
+    if (strcmp(param, "arpSpeed") == 0)           return (float)in->arp_speed;
+    if (strcmp(param, "instType") == 0)           return (float)in->inst_type;
+    if (strcmp(param, "pulseRateMin") == 0)       return (float)in->pulse_rate_min;
+    if (strcmp(param, "pulseRatePlus") == 0)      return (float)in->pulse_rate_plus;
+    if (strcmp(param, "pulseSpeed") == 0)         return (float)in->pulse_speed;
+    if (strcmp(param, "pulseStart") == 0)         return (float)in->pulse_start;
+    if (strcmp(param, "pulseEnd") == 0)           return (float)in->pulse_end;
+    if (strcmp(param, "pulseDelay") == 0)         return (float)in->pulse_delay;
+    if (strcmp(param, "instSync") == 0)           return (float)in->inst_sync;
+    if (strcmp(param, "blend") == 0)              return (float)in->blend;
+    if (strcmp(param, "blendDelay") == 0)         return (float)in->blend_delay;
+    if (strcmp(param, "pulseShotCounter") == 0)   return (float)in->pulse_shot_counter;
+    if (strcmp(param, "blendShotCounter") == 0)   return (float)in->blend_shot_counter;
+    if (strcmp(param, "arpCount") == 0)           return (float)in->arp_count;
+    if (strcmp(param, "sampleSize") == 0)         return (float)in->sample_size;
+
+    return -1.0f;
+}
+
+void fred_set_instrument_param(FredModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= (int)module->inst_num || !param || !module->instruments) return;
+    FredInstrument* in = &module->instruments[inst];
+    uint8_t b = (uint8_t)value;
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "repeatLen") == 0)          { in->repeat_len = v; return; }
+    if (strcmp(param, "length") == 0)             { in->length = v; return; }
+    if (strcmp(param, "period") == 0)             { in->period = v; return; }
+    if (strcmp(param, "vibDelay") == 0)           { in->vib_delay = b; return; }
+    if (strcmp(param, "vibSpeed") == 0)           { in->vib_speed = (int8_t)value; return; }
+    if (strcmp(param, "vibAmpl") == 0)            { in->vib_ampl = (int8_t)value; return; }
+    if (strcmp(param, "envVol") == 0)             { in->env_vol = b; return; }
+    if (strcmp(param, "attackSpeed") == 0)        { in->attack_speed = b; return; }
+    if (strcmp(param, "attackVolume") == 0)       { in->attack_volume = b; return; }
+    if (strcmp(param, "decaySpeed") == 0)         { in->decay_speed = b; return; }
+    if (strcmp(param, "decayVolume") == 0)        { in->decay_volume = b; return; }
+    if (strcmp(param, "sustainDelay") == 0)       { in->sustain_delay = b; return; }
+    if (strcmp(param, "releaseSpeed") == 0)       { in->release_speed = b; return; }
+    if (strcmp(param, "releaseVolume") == 0)      { in->release_volume = b; return; }
+    if (strcmp(param, "arpSpeed") == 0)           { in->arp_speed = b; return; }
+    if (strcmp(param, "instType") == 0)           { in->inst_type = (FredInstrumentType)(int)value; return; }
+    if (strcmp(param, "pulseRateMin") == 0)       { in->pulse_rate_min = (int8_t)value; return; }
+    if (strcmp(param, "pulseRatePlus") == 0)      { in->pulse_rate_plus = (int8_t)value; return; }
+    if (strcmp(param, "pulseSpeed") == 0)         { in->pulse_speed = b; return; }
+    if (strcmp(param, "pulseStart") == 0)         { in->pulse_start = b; return; }
+    if (strcmp(param, "pulseEnd") == 0)           { in->pulse_end = b; return; }
+    if (strcmp(param, "pulseDelay") == 0)         { in->pulse_delay = b; return; }
+    if (strcmp(param, "instSync") == 0)           { in->inst_sync = b; return; }
+    if (strcmp(param, "blend") == 0)              { in->blend = b; return; }
+    if (strcmp(param, "blendDelay") == 0)         { in->blend_delay = b; return; }
+    if (strcmp(param, "pulseShotCounter") == 0)   { in->pulse_shot_counter = b; return; }
+    if (strcmp(param, "blendShotCounter") == 0)   { in->blend_shot_counter = b; return; }
+    if (strcmp(param, "arpCount") == 0)           { in->arp_count = b; return; }
 }
 
 size_t fred_export(const FredModule* module, uint8_t* out, size_t max_size) {

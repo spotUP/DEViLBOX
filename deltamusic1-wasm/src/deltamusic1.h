@@ -27,4 +27,19 @@ size_t dm1_render_multi(Dm1Module* module, float* ch0, float* ch1, float* ch2, f
 
 bool dm1_has_ended(const Dm1Module* module);
 
+// Edit API
+int dm1_get_instrument_count(const Dm1Module* module);
+int dm1_get_num_blocks(const Dm1Module* module);
+void dm1_get_cell(const Dm1Module* module, int block_idx, int row,
+                  uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg);
+void dm1_set_cell(Dm1Module* module, int block_idx, int row,
+                  uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg);
+const char* dm1_get_instrument_name(const Dm1Module* module, int inst);
+float dm1_get_instrument_param(const Dm1Module* module, int inst, const char* param);
+void dm1_set_instrument_param(Dm1Module* module, int inst, const char* param, float value);
+size_t dm1_export(const Dm1Module* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

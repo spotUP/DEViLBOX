@@ -1859,9 +1859,61 @@ bool rk_has_ended(const RkModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int rk_get_instrument_count(const RkModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_instruments : 0;
+}
+
+float rk_get_instrument_param(const RkModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return -1.0f;
+    const RkInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "sampleNumber") == 0)        return (float)in->sample_number;
+    if (strcmp(param, "vibratoNumber") == 0)        return (float)in->vibrato_number;
+    if (strcmp(param, "type") == 0)                 return (float)in->type;
+    if (strcmp(param, "phaseSpeed") == 0)           return (float)in->phase_speed;
+    if (strcmp(param, "phaseLengthInWords") == 0)   return (float)in->phase_length_in_words;
+    if (strcmp(param, "vibratoSpeed") == 0)         return (float)in->vibrato_speed;
+    if (strcmp(param, "vibratoDepth") == 0)         return (float)in->vibrato_depth;
+    if (strcmp(param, "vibratoDelay") == 0)         return (float)in->vibrato_delay;
+    if (strcmp(param, "adsrPoint0") == 0)           return (float)in->adsr[0].point;
+    if (strcmp(param, "adsrIncrement0") == 0)       return (float)in->adsr[0].increment;
+    if (strcmp(param, "adsrPoint1") == 0)           return (float)in->adsr[1].point;
+    if (strcmp(param, "adsrIncrement1") == 0)       return (float)in->adsr[1].increment;
+    if (strcmp(param, "adsrPoint2") == 0)           return (float)in->adsr[2].point;
+    if (strcmp(param, "adsrIncrement2") == 0)       return (float)in->adsr[2].increment;
+    if (strcmp(param, "adsrPoint3") == 0)           return (float)in->adsr[3].point;
+    if (strcmp(param, "adsrIncrement3") == 0)       return (float)in->adsr[3].increment;
+    if (strcmp(param, "phaseValue") == 0)           return (float)in->phase_value;
+    if (strcmp(param, "phaseDirection") == 0)       return in->phase_direction ? 1.0f : 0.0f;
+    if (strcmp(param, "phasePosition") == 0)        return (float)in->phase_position;
+
+    return -1.0f;
+}
+
+void rk_set_instrument_param(RkModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return;
+    RkInstrument* in = &module->instruments[inst];
+    uint8_t v8 = (uint8_t)value;
+    int8_t sv8 = (int8_t)value;
+
+    if (strcmp(param, "sampleNumber") == 0)        { in->sample_number = (int)value; return; }
+    if (strcmp(param, "vibratoNumber") == 0)        { in->vibrato_number = (int)value; return; }
+    if (strcmp(param, "type") == 0)                 { in->type = (RkInstrumentType)(int)value; return; }
+    if (strcmp(param, "phaseSpeed") == 0)           { in->phase_speed = v8; return; }
+    if (strcmp(param, "phaseLengthInWords") == 0)   { in->phase_length_in_words = v8; return; }
+    if (strcmp(param, "vibratoSpeed") == 0)         { in->vibrato_speed = v8; return; }
+    if (strcmp(param, "vibratoDepth") == 0)         { in->vibrato_depth = v8; return; }
+    if (strcmp(param, "vibratoDelay") == 0)         { in->vibrato_delay = v8; return; }
+    if (strcmp(param, "adsrPoint0") == 0)           { in->adsr[0].point = v8; return; }
+    if (strcmp(param, "adsrIncrement0") == 0)       { in->adsr[0].increment = v8; return; }
+    if (strcmp(param, "adsrPoint1") == 0)           { in->adsr[1].point = v8; return; }
+    if (strcmp(param, "adsrIncrement1") == 0)       { in->adsr[1].increment = v8; return; }
+    if (strcmp(param, "adsrPoint2") == 0)           { in->adsr[2].point = v8; return; }
+    if (strcmp(param, "adsrIncrement2") == 0)       { in->adsr[2].increment = v8; return; }
+    if (strcmp(param, "adsrPoint3") == 0)           { in->adsr[3].point = v8; return; }
+    if (strcmp(param, "adsrIncrement3") == 0)       { in->adsr[3].increment = v8; return; }
+    if (strcmp(param, "phaseValue") == 0)           { in->phase_value = sv8; return; }
+    if (strcmp(param, "phaseDirection") == 0)       { in->phase_direction = value != 0.0f; return; }
+    if (strcmp(param, "phasePosition") == 0)        { in->phase_position = v8; return; }
 }
 
 size_t rk_export(const RkModule* module, uint8_t* out, size_t max_size) {
