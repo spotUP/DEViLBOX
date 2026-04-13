@@ -307,7 +307,7 @@ export const PixiCleanupDialog: React.FC<PixiCleanupDialogProps> = ({ isOpen, on
               ) : (
                 <>
                   <PixiLabel
-                    text="Informational — automatic loop tail truncation coming soon."
+                    text="Detected loop tail data (informational only)."
                     size="xs"
                     color="textMuted"
                     font="sans"

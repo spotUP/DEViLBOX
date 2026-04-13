@@ -796,7 +796,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
     // Block operations (if selection active)
     if (hasSelection) {
-      items.push({ label: 'BLOCK OPERATIONS', disabled: true });
+      items.push({ label: '', separator: true });
       items.push({ label: 'Copy Block', action: () => ts.copySelection() });
       items.push({ label: 'Cut Block', action: () => ts.cutSelection() });
       items.push({ label: 'Paste Block', action: () => ts.paste() });
@@ -959,7 +959,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     items.push({ separator: true, label: '' });
 
     // Single cell operations
-    items.push({ label: 'CELL OPERATIONS', disabled: true });
+    items.push({ label: '', separator: true });
     items.push({
       label: 'Cut Cell',
       action: () => {
