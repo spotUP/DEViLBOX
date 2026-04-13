@@ -108,6 +108,15 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
       this.cleanup();
 
       // Install Emscripten polyfills for AudioWorkletGlobalScope
+      if (!globalThis.self) {
+        globalThis.self = globalThis;
+      }
+      if (typeof globalThis.importScripts === 'undefined') {
+        globalThis.importScripts = function() {};
+      }
+      if (!globalThis.WorkerGlobalScope) {
+        globalThis.WorkerGlobalScope = true;
+      }
       if (typeof globalThis.document === 'undefined') {
         globalThis.document = {
           createElement: () => ({ relList: { supports: () => false }, tagName: 'DIV', rel: '', addEventListener: () => {}, removeEventListener: () => {} }),
