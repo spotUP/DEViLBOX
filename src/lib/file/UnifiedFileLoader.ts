@@ -626,7 +626,7 @@ function isSongFormat(filename: string): boolean {
  * Check if a file is an audio sample.
  */
 function isAudioFile(filename: string): boolean {
-  return /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx)$/i.test(filename);
+  return /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx|vag|vb|spu)$/i.test(filename);
 }
 
 /**
@@ -1416,11 +1416,26 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
     const { getDevilboxAudioContext } = await import('@/utils/audio-context');
     const audioCtx = getDevilboxAudioContext();
     const arrayBuf = await file.arrayBuffer();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
 
-    const name = file.name.replace(/\.[^.]+$/, '').slice(0, 22);
+    let audioBuffer: AudioBuffer;
+    let sampleName = file.name.replace(/\.[^.]+$/, '').slice(0, 22);
+
+    // PS1 SPU ADPCM formats need custom decoding (browser can't decode natively)
+    const { isSpuFormat, decodeSpuAdpcm } = await import('@/lib/import/formats/SpuAdpcmDecoder');
+    if (isSpuFormat(file.name, arrayBuf)) {
+      const decoded = decodeSpuAdpcm(arrayBuf, file.name);
+      if (decoded.pcm.length === 0) {
+        return { success: false, error: `SPU ADPCM file is empty: ${file.name}` };
+      }
+      audioBuffer = audioCtx.createBuffer(1, decoded.pcm.length, decoded.sampleRate);
+      audioBuffer.copyToChannel(new Float32Array(decoded.pcm), 0);
+      if (decoded.name) sampleName = decoded.name.slice(0, 22);
+    } else {
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+    }
+
     const newId = useInstrumentStore.getState().createInstrument({
-      name,
+      name: sampleName,
       synthType: 'Sampler',
       sample: {
         audioBuffer: arrayBuf,
@@ -1437,11 +1452,11 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
     });
 
     useInstrumentStore.getState().setCurrentInstrument(newId);
-    notify.success(`Created sample instrument: ${name}`);
+    notify.success(`Created sample instrument: ${sampleName}`);
 
     return {
       success: true,
-      message: `Imported audio sample as instrument ${newId}: ${name}`
+      message: `Imported audio sample as instrument ${newId}: ${sampleName}`
     };
   } catch (_error) {
     notify.info(`Audio sample: ${file.name} — Could not auto-import. Open instrument editor to add manually.`);
