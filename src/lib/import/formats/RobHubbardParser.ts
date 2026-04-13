@@ -753,6 +753,7 @@ export async function parseRobHubbardFile(
     initialSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    robHubbardFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout,
