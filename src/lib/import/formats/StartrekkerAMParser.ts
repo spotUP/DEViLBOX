@@ -323,7 +323,6 @@ export function parseStartrekkerAMFile(
     linearPeriods: false,
     uadeEditableFileData: modBuffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    // Attach binary data for the WASM engine
     startrekkerAMFileData: modBuffer.slice(0),
     startrekkerAMNtData: ntBuffer ? ntBuffer.slice(0) : undefined,
   };
