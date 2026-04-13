@@ -77,19 +77,21 @@ export class BassEnhancerEffect extends Tone.ToneAudioNode {
           }
           this.pendingParams = [];
           // Connect WASM first, then disconnect passthrough (avoids silent gap)
+          // CRITICAL: use native disconnect to avoid Tone.js/standardized-audio-context
+          // clobbering other connections on the input node.
           try {
             const rawInput = getNativeAudioNode(this.input)!;
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            // Now safe to disconnect passthrough
-            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            // Disconnect passthrough using native API
+            try { rawInput.disconnect(rawWet); } catch { /* */ }
             // Keepalive: ensure Chrome schedules the worklet
-            const rawCtx = Tone.getContext().rawContext as AudioContext;
-            const keepalive = rawCtx.createGain();
+            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
+            const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;
             this.workletNode!.connect(keepalive);
-            keepalive.connect(rawCtx.destination);
+            keepalive.connect(rawCtx2.destination);
           } catch (swapErr) {
             console.warn('[BassEnhancer] WASM swap failed, staying on passthrough:', swapErr);
           }
