@@ -229,8 +229,10 @@ export async function tryRouteFormat(
     return withNativeThenUADE('soundmon', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundMonFile(buf as ArrayBuffer, name), 'SoundMonParser', { injectUADE: true });
   }
 
-  // ── SidMon 1.0 / SidMon II (.smn can be either) ─────────────────────────
-  if (matchesExt(filename, ['smn'])) {
+  // ── SidMon 1.0 / SidMon II (.smn/.sid — .sid disambiguated by magic) ──
+  // .sid files: try SidMon1 magic → if no match, fall through to C64 SID handler
+  // .smn files: try SidMon1 → SidMon2 (no C64 ambiguity)
+  if (matchesExt(filename, ['smn', 'sid'])) {
     // Try SidMon1 magic first
     if (prefs.sidmon1 !== 'uade') {
       try {
@@ -246,11 +248,12 @@ export async function tryRouteFormat(
         console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back:`, err);
       }
     }
-    // Then try SidMon2 — dedicated Sd2Engine WASM replayer handles playback
-    {
+    // For .smn only: try SidMon2. For .sid: fall through to C64 SID handler below.
+    if (matchesExt(filename, ['smn'])) {
       const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
       return parseSidMon2File(buffer, originalFileName);
     }
+    // .sid files that aren't SidMon1: fall through to rest of dispatch (C64 SID, etc.)
   }
 
   // ── SidMon II (.sid2 / .sd2 — unambiguous SidMon 2) ──────────────────────

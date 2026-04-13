@@ -207,9 +207,52 @@ async function main() {
       await call('clear_console_errors').catch(() => {});
       await sleep(400);
 
-      // Load
+      // Load — with companion file discovery
       const fileData = readFileSync(filePath);
-      await call('load_file', { filename: file, data: fileData.toString('base64') });
+      const loadParams: Record<string, any> = { filename: file, data: fileData.toString('base64') };
+
+      // Auto-discover companion files in the same directory
+      const dirFiles = readdirSync(join(TEST_DIR, dir)).filter(f => !f.startsWith('.'));
+      if (dirFiles.length > 1) {
+        const companionFiles: Record<string, string> = {};
+        const lowerFile = file.toLowerCase();
+        const prefixPairs: [string, string][] = [
+          ['mdat.', 'smpl.'], ['smpl.', 'mdat.'],
+          ['jpn.', 'smp.'], ['smp.', 'jpn.'],
+          ['midi.', 'smpl.'], ['smpl.', 'midi.'],
+        ];
+        // Extension pairs: .sng↔.ins, .dum↔.ins
+        const extPairs: [string, string][] = [
+          ['.sng', '.ins'], ['.ins', '.sng'],
+          ['.dum', '.ins'], ['.ins', '.dum'],
+        ];
+        for (const other of dirFiles) {
+          if (other === file) continue;
+          // Prefix-based companion
+          for (const [myPrefix, pairPrefix] of prefixPairs) {
+            if (lowerFile.startsWith(myPrefix)) {
+              const suffix = file.slice(myPrefix.length);
+              if (other.toLowerCase() === `${pairPrefix}${suffix.toLowerCase()}`) {
+                companionFiles[other] = readFileSync(join(TEST_DIR, dir, other)).toString('base64');
+              }
+            }
+          }
+          // Extension-based companion (same basename, different ext)
+          for (const [myExt, pairExt] of extPairs) {
+            if (lowerFile.endsWith(myExt)) {
+              const base = file.slice(0, -myExt.length);
+              if (other.toLowerCase() === `${base.toLowerCase()}${pairExt}`) {
+                companionFiles[other] = readFileSync(join(TEST_DIR, dir, other)).toString('base64');
+              }
+            }
+          }
+        }
+        if (Object.keys(companionFiles).length > 0) {
+          loadParams.companionFiles = companionFiles;
+        }
+      }
+
+      await call('load_file', loadParams);
 
       // ── Song info ──
       const song = await call('get_song_info').catch(() => null);
