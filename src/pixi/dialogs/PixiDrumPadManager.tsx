@@ -32,6 +32,12 @@ import { PixiCheckbox } from '../components';
 import { PixiViewHeader } from '../components/PixiViewHeader';
 import { PixiSlider } from '../components/PixiSlider';
 import { PixiPadEditor } from './PixiPadEditor';
+import { PixiPadSetupWizard } from './PixiPadSetupWizard';
+import { PixiContextMenu, type ContextMenuItem } from '../input/PixiContextMenu';
+import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
+import { usePadSetupWizard } from '@/hooks/drumpad/usePadSetupWizard';
+import type { MenuItemType, MenuItem } from '@/components/common/ContextMenu';
+import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import { usePixiTheme } from '../theme';
 import { Div, Txt } from '../layout';
 import type { Container, FederatedPointerEvent } from 'pixi.js';
@@ -113,10 +119,12 @@ interface PadCellProps {
   onSelect: () => void;
   onTrigger: (padId: number, velocity: number) => void;
   onRelease: (padId: number) => void;
+  onRightClick: (padId: number, x: number, y: number) => void;
+  onEmptyClick: (padId: number) => void;
   size: number;
 }
 
-const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, velocity, onSelect, onTrigger, onRelease, size }) => {
+const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, velocity, onSelect, onTrigger, onRelease, onRightClick, onEmptyClick, size }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -160,7 +168,11 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
       ? theme.accent.color
       : theme.border.color;
 
+  const isLoaded = !!(pad.sample || pad.synthConfig || (pad as { instrumentId?: number }).instrumentId != null || pad.scratchAction || (pad as { djFxAction?: string }).djFxAction);
+
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    if (e.button === 2) { onRightClick(pad.id, e.globalX, e.globalY); return; }
+    if (!isLoaded) { onEmptyClick(pad.id); return; }
     const local = e.getLocalPosition(e.currentTarget as Container);
     const relativeY = local.y / size;
     const vel = Math.max(1, Math.min(127, Math.floor((1 - relativeY) * 127)));
@@ -168,7 +180,7 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
     onSelect();
     startFlash(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, size, onSelect, onTrigger, startFlash]);
+  }, [pad.id, size, isLoaded, onSelect, onTrigger, onRightClick, onEmptyClick, startFlash]);
 
   const handlePointerUp = useCallback(() => {
     setPressed(false);
@@ -310,6 +322,10 @@ export const PixiDrumPadManager: React.FC = () => {
   const [showPadEditor, setShowPadEditor] = useState(false);
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
   const [focusedPadId, setFocusedPadId] = useState<number>(1);
+  const [ctxMenuPadId, setCtxMenuPadId] = useState<number | null>(null);
+  const [ctxMenuPos, setCtxMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [ctxMenuOpen, setCtxMenuOpen] = useState(false);
+  const padWizard = usePadSetupWizard();
   const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
   const noteRepeatEnabledRef = useRef(false);
   const heldPadsRef = useRef<Set<number>>(new Set());
@@ -427,6 +443,44 @@ export const PixiDrumPadManager: React.FC = () => {
       }
     }
   }, [currentProgram]);
+
+  const handleEmptyPadClick = useCallback((padId: number) => {
+    setSelectedPadId(padId);
+    padWizard.open(padId);
+  }, [padWizard]);
+
+  const handlePadRightClick = useCallback((padId: number, x: number, y: number) => {
+    setCtxMenuPadId(padId);
+    setCtxMenuPos({ x, y });
+    setCtxMenuOpen(true);
+  }, []);
+
+  const ctxMenuCallbacks = useMemo(() => ({
+    onEdit: (id: number) => { setSelectedPadId(id); setShowPadEditor(true); },
+    onWizard: (id: number) => { setSelectedPadId(id); padWizard.open(id); },
+    onPreview: (id: number) => {
+      const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
+      const p = prog?.pads.find(pp => pp.id === id);
+      if (p && engineRef.current) engineRef.current.triggerPad(p, 100);
+    },
+  }), [padWizard]);
+
+  const ctxMenuItemsDOM = usePadContextMenu(ctxMenuPadId, ctxMenuCallbacks);
+  const ctxMenuItems: ContextMenuItem[] = useMemo(() => {
+    function mapItems(items: MenuItemType[]): ContextMenuItem[] {
+      return items.map((item) => {
+        if (item.type === 'divider') return { label: '', separator: true };
+        const mi = item as MenuItem;
+        return {
+          label: mi.label + (mi.checked ? ' \u2713' : ''),
+          action: mi.onClick,
+          disabled: mi.disabled,
+          submenu: mi.submenu ? mapItems(mi.submenu) : undefined,
+        };
+      });
+    }
+    return mapItems(ctxMenuItemsDOM);
+  }, [ctxMenuItemsDOM]);
 
   const handleStopAll = useCallback(() => {
     engineRef.current?.stopAll();
@@ -859,6 +913,8 @@ export const PixiDrumPadManager: React.FC = () => {
                 onSelect={() => setSelectedPadId(pad.id)}
                 onTrigger={handlePadTrigger}
                 onRelease={handlePadRelease}
+                onRightClick={handlePadRightClick}
+                onEmptyClick={handleEmptyPadClick}
                 size={padSize}
               />
             ))}
@@ -962,155 +1018,151 @@ export const PixiDrumPadManager: React.FC = () => {
             </Div>
           </Div>
 
-          {/* Kit source */}
-          <Div className="flex-col gap-2">
-            <SectionHeader>KIT SOURCE</SectionHeader>
-            <PixiSelect
-              options={kitSourceOptions}
-              value={selectedKitSourceId}
-              onChange={setSelectedKitSourceId}
-              width={RIGHT_W - 32}
-            />
-            <PixiButton
-              label="Load to Pads"
-              size="sm"
-              color="green"
-              onClick={handleLoadKit}
-              width={RIGHT_W - 32}
-            />
-          </Div>
-
-          {/* Import from project */}
-          <Div className="flex-col gap-2">
-            <SectionHeader>IMPORT FROM PROJECT</SectionHeader>
-            <PixiSelect
-              options={importInstrumentOptions}
-              value={importInstrumentId != null ? String(importInstrumentId) : ''}
-              onChange={(v) => setImportInstrumentId(Number(v))}
-              width={RIGHT_W - 32}
-            />
-            <PixiButton
-              label="Import to Pad"
-              size="sm"
-              color="blue"
-              onClick={handleImportFromProject}
-              disabled={selectedPadId == null || importInstrumentOptions.length === 0}
-              width={RIGHT_W - 32}
-            />
-          </Div>
-
-          {/* Master controls */}
-          <Div className="flex-col gap-2">
-            <SectionHeader>MASTER</SectionHeader>
-            <Div className="flex-row items-center gap-2">
-              <Txt className="text-xs text-text-muted">{`Level: ${masterLevel}`}</Txt>
-            </Div>
-            <PixiSlider
-              value={masterLevel}
-              min={0}
-              max={127}
-              orientation="horizontal"
-              length={RIGHT_W - 32}
-              onChange={handleMasterLevelChange}
-            />
-            <Div className="flex-row items-center gap-2">
-              <Txt className="text-xs text-text-muted">{`Tune: ${masterTune} st`}</Txt>
-            </Div>
-            <PixiSlider
-              value={masterTune}
-              min={-12}
-              max={12}
-              step={1}
-              orientation="horizontal"
-              length={RIGHT_W - 32}
-              onChange={handleMasterTuneChange}
-              defaultValue={0}
-              detent={0}
-            />
-          </Div>
-
-          {/* Output buses */}
-          {busesInUse.length > 0 && (
-            <Div className="flex-col gap-2">
-              <SectionHeader>OUTPUT BUSES</SectionHeader>
-              {busesInUse.map((bus) => (
-                <Div key={bus} className="flex-col gap-1">
-                  <Txt className="text-xs text-text-muted">{`${bus}: ${busLevels[bus] ?? 100}`}</Txt>
-                  <PixiSlider
-                    value={busLevels[bus] ?? 100}
-                    min={0}
-                    max={127}
-                    orientation="horizontal"
-                    length={RIGHT_W - 32}
-                    onChange={(v) => setBusLevel(bus, v)}
-                  />
-                </Div>
-              ))}
-            </Div>
-          )}
-
-          {/* Settings */}
-          <Div className="flex-col gap-2">
-            <SectionHeader>SETTINGS</SectionHeader>
-            <Txt className="text-xs text-text-muted">
-              {`Velocity Sensitivity: ${preferences.velocitySensitivity.toFixed(1)}x`}
-            </Txt>
-            <PixiSlider
-              value={preferences.velocitySensitivity}
-              min={0}
-              max={2}
-              step={0.1}
-              orientation="horizontal"
-              length={RIGHT_W - 32}
-              onChange={(v) => setPreference('velocitySensitivity', v)}
-            />
-          </Div>
-
-          {/* Note repeat */}
-          <Div className="flex-col gap-2">
-            <SectionHeader>NOTE REPEAT</SectionHeader>
-            <PixiCheckbox
-              checked={noteRepeatEnabled}
-              onChange={setNoteRepeatEnabled}
-              label="Enable"
-            />
-            <Div className="flex-row gap-1" layout={{ flexWrap: 'wrap' }}>
-              {NOTE_REPEAT_RATES.map((rate) => (
-                <PixiButton
-                  key={rate}
-                  label={rate}
-                  size="sm"
-                  variant={noteRepeatRate === rate ? 'primary' : 'ghost'}
-                  onClick={() => setNoteRepeatRate(rate)}
-                  width={44}
-                />
-              ))}
-            </Div>
-          </Div>
-
-          {/* MPC resampling */}
-          <Div className="flex-col gap-2">
-            <SectionHeader>MPC RESAMPLING</SectionHeader>
-            <PixiCheckbox
-              checked={mpcEnabled}
-              onChange={handleMpcToggle}
-              label="Enable on sample load"
-            />
-            {mpcEnabled && (
-              <Div className="flex-col gap-1">
-                <Txt className="text-xs text-text-muted">Model</Txt>
-                <PixiSelect
-                  options={mpcModelOptions}
-                  value={mpcModel}
-                  onChange={handleMpcModelChange}
-                  width={RIGHT_W - 32}
-                />
+          {/* ── Inline Pad Quick-Edit ──────────────────────────────── */}
+          <Div className="flex-col gap-3" layout={{ backgroundColor: theme.bg.color, borderWidth: 1, borderColor: theme.border.color, borderRadius: 6, padding: 8 }}>
+            {selectedPadId != null && selectedPad ? (() => {
+              const { updatePad: updPad, clearPad: clrPad } = useDrumPadStore.getState();
+              const sliderW = RIGHT_W - 48;
+              return (
+                <>
+                  <Div className="flex-row items-center gap-2">
+                    <Txt className="text-[10px] text-text-muted">{`PAD ${selectedPadId}`}</Txt>
+                    {selectedPad.synthConfig && <Txt className="text-[9px] text-blue-400">{selectedPad.synthConfig.synthType}</Txt>}
+                    {selectedPad.sample && <Txt className="text-[9px] text-emerald-400">{selectedPad.sample.name}</Txt>}
+                  </Div>
+                  <Div className="flex-col gap-1">
+                    <Txt className="text-[10px] text-text-muted">{`Level: ${selectedPad.level}`}</Txt>
+                    <PixiSlider value={selectedPad.level} min={0} max={127} orientation="horizontal" length={sliderW}
+                      onChange={(v) => updPad(selectedPadId, { level: v })} />
+                  </Div>
+                  <Div className="flex-col gap-1">
+                    <Txt className="text-[10px] text-text-muted">{`Tune: ${(selectedPad.tune / 10).toFixed(1)} st`}</Txt>
+                    <PixiSlider value={selectedPad.tune} min={-120} max={120} step={1} orientation="horizontal" length={sliderW}
+                      onChange={(v) => updPad(selectedPadId, { tune: v })} defaultValue={0} detent={0} />
+                  </Div>
+                  <Div className="flex-col gap-1">
+                    <Txt className="text-[10px] text-text-muted">Mode</Txt>
+                    <Div className="flex-row gap-2">
+                      <PixiButton label="One-shot" size="sm" variant={selectedPad.playMode === 'oneshot' ? 'primary' : 'default'} height={22} width={70}
+                        onClick={() => updPad(selectedPadId, { playMode: 'oneshot' })} />
+                      <PixiButton label="Sustain" size="sm" variant={selectedPad.playMode === 'sustain' ? 'primary' : 'default'} height={22} width={70}
+                        onClick={() => updPad(selectedPadId, { playMode: 'sustain' })} />
+                    </Div>
+                  </Div>
+                  <Div className="flex-col gap-1">
+                    <Txt className="text-[10px] text-text-muted">Mute Group</Txt>
+                    <Div className="flex-row gap-2">
+                      {[0,1,2,3,4,5,6,7,8].map(g => (
+                        <PixiButton key={g} label={g === 0 ? '-' : String(g)} size="sm" variant={selectedPad.muteGroup === g ? 'primary' : 'default'} height={20} width={20}
+                          onClick={() => updPad(selectedPadId, { muteGroup: g })} />
+                      ))}
+                    </Div>
+                  </Div>
+                  <Div className="flex-col gap-1">
+                    <Txt className="text-[10px] text-text-muted">Color</Txt>
+                    <Div className="flex-row gap-2" layout={{ flexWrap: 'wrap' }}>
+                      <Div eventMode="static" cursor="pointer" onPointerUp={() => updPad(selectedPadId, { color: undefined })}
+                        layout={{ width: 16, height: 16, backgroundColor: theme.bgTertiary.color, borderWidth: !selectedPad.color ? 2 : 1, borderColor: !selectedPad.color ? theme.accent.color : theme.borderLight.color, borderRadius: 3 }} />
+                      {PAD_COLOR_PRESETS.map(c => {
+                        const num = parseInt(c.hex.slice(1), 16);
+                        const sel = selectedPad.color === c.hex;
+                        return (
+                          <Div key={c.id} eventMode="static" cursor="pointer" onPointerUp={() => updPad(selectedPadId, { color: c.hex })}
+                            layout={{ width: 16, height: 16, backgroundColor: num, borderWidth: sel ? 2 : 1, borderColor: sel ? 0xffffff : theme.borderLight.color, borderRadius: 3 }} />
+                        );
+                      })}
+                    </Div>
+                  </Div>
+                  <Div className="flex-row gap-2">
+                    <PixiButton label="Full Editor" size="sm" color="blue" height={24} width={90} onClick={() => setShowPadEditor(true)} />
+                    <PixiButton label="Clear" size="sm" variant="danger" height={24} width={56} onClick={() => clrPad(selectedPadId)} />
+                  </Div>
+                </>
+              );
+            })() : (
+              <Div layout={{ height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                <Txt className="text-[10px] text-text-muted">Click a pad to edit</Txt>
               </Div>
             )}
           </Div>
+
+          {/* ── Advanced Toggle ──────────────────────────────────────── */}
+          <PixiCheckbox
+            checked={preferences.showAdvanced}
+            onChange={(v) => setPreference('showAdvanced', v)}
+            label="Advanced"
+          />
+
+          {/* ── Advanced Sections ────────────────────────────────────── */}
+          {preferences.showAdvanced && (<>
+            <Div className="flex-col gap-2">
+              <SectionHeader>KIT SOURCE</SectionHeader>
+              <PixiSelect options={kitSourceOptions} value={selectedKitSourceId} onChange={setSelectedKitSourceId} width={RIGHT_W - 32} />
+              <PixiButton label="Load to Pads" size="sm" color="green" onClick={handleLoadKit} width={RIGHT_W - 32} />
+            </Div>
+            <Div className="flex-col gap-2">
+              <SectionHeader>IMPORT FROM PROJECT</SectionHeader>
+              <PixiSelect options={importInstrumentOptions} value={importInstrumentId != null ? String(importInstrumentId) : ''} onChange={(v) => setImportInstrumentId(Number(v))} width={RIGHT_W - 32} />
+              <PixiButton label="Import to Pad" size="sm" color="blue" onClick={handleImportFromProject} disabled={selectedPadId == null || importInstrumentOptions.length === 0} width={RIGHT_W - 32} />
+            </Div>
+            <Div className="flex-col gap-2">
+              <SectionHeader>MASTER</SectionHeader>
+              <Txt className="text-xs text-text-muted">{`Level: ${masterLevel}`}</Txt>
+              <PixiSlider value={masterLevel} min={0} max={127} orientation="horizontal" length={RIGHT_W - 32} onChange={handleMasterLevelChange} />
+              <Txt className="text-xs text-text-muted">{`Tune: ${masterTune} st`}</Txt>
+              <PixiSlider value={masterTune} min={-12} max={12} step={1} orientation="horizontal" length={RIGHT_W - 32} onChange={handleMasterTuneChange} defaultValue={0} detent={0} />
+            </Div>
+            {busesInUse.length > 0 && (
+              <Div className="flex-col gap-2">
+                <SectionHeader>OUTPUT BUSES</SectionHeader>
+                {busesInUse.map((bus) => (
+                  <Div key={bus} className="flex-col gap-1">
+                    <Txt className="text-xs text-text-muted">{`${bus}: ${busLevels[bus] ?? 100}`}</Txt>
+                    <PixiSlider value={busLevels[bus] ?? 100} min={0} max={127} orientation="horizontal" length={RIGHT_W - 32} onChange={(v) => setBusLevel(bus, v)} />
+                  </Div>
+                ))}
+              </Div>
+            )}
+            <Div className="flex-col gap-2">
+              <SectionHeader>SETTINGS</SectionHeader>
+              <Txt className="text-xs text-text-muted">{`Velocity Sensitivity: ${preferences.velocitySensitivity.toFixed(1)}x`}</Txt>
+              <PixiSlider value={preferences.velocitySensitivity} min={0} max={2} step={0.1} orientation="horizontal" length={RIGHT_W - 32} onChange={(v) => setPreference('velocitySensitivity', v)} />
+            </Div>
+            <Div className="flex-col gap-2">
+              <SectionHeader>NOTE REPEAT</SectionHeader>
+              <PixiCheckbox checked={noteRepeatEnabled} onChange={setNoteRepeatEnabled} label="Enable" />
+              <Div className="flex-row gap-1" layout={{ flexWrap: 'wrap' }}>
+                {NOTE_REPEAT_RATES.map((rate) => (
+                  <PixiButton key={rate} label={rate} size="sm" variant={noteRepeatRate === rate ? 'primary' : 'ghost'} onClick={() => setNoteRepeatRate(rate)} width={44} />
+                ))}
+              </Div>
+            </Div>
+            <Div className="flex-col gap-2">
+              <SectionHeader>MPC RESAMPLING</SectionHeader>
+              <PixiCheckbox checked={mpcEnabled} onChange={handleMpcToggle} label="Enable on sample load" />
+              {mpcEnabled && (
+                <Div className="flex-col gap-1">
+                  <Txt className="text-xs text-text-muted">Model</Txt>
+                  <PixiSelect options={mpcModelOptions} value={mpcModel} onChange={handleMpcModelChange} width={RIGHT_W - 32} />
+                </Div>
+              )}
+            </Div>
+          </>)}
           </Div>
         )}
       </Div>
+
+      {/* ── Pad Setup Wizard ── */}
+      <PixiPadSetupWizard wizard={padWizard} />
+
+      {/* ── Context menu ── */}
+      <PixiContextMenu
+        items={ctxMenuItems}
+        x={ctxMenuPos.x}
+        y={ctxMenuPos.y}
+        isOpen={ctxMenuOpen}
+        onClose={() => { setCtxMenuOpen(false); setCtxMenuPadId(null); }}
+      />
 
       {/* ── Alert overlay ── */}
       {alertMsg && (
