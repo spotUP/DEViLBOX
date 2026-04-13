@@ -27,6 +27,7 @@ export type ActionType =
   | 'PASTE_MIX'
   | 'PASTE_FLOOD'
   | 'PASTE_PUSH_FORWARD'
+  | 'SWAP_SELECTION'
   | 'CUT_TRACK'
   | 'PASTE_TRACK'
   | 'CUT_PATTERN'
@@ -355,6 +356,7 @@ export const getActionTypeName = (type: ActionType): string => {
     PASTE_MIX: 'Mix Paste',
     PASTE_FLOOD: 'Flood Paste',
     PASTE_PUSH_FORWARD: 'Push-Forward Paste',
+    SWAP_SELECTION: 'Swap Selection',
     CUT_TRACK: 'Cut Track',
     PASTE_TRACK: 'Paste Track',
     CUT_PATTERN: 'Cut Pattern',
@@ -413,6 +415,7 @@ export const getActionTypeColor = (type: ActionType): string => {
     case 'PASTE_MIX':
     case 'PASTE_FLOOD':
     case 'PASTE_PUSH_FORWARD':
+    case 'SWAP_SELECTION':
     case 'PASTE_TRACK':
     case 'PASTE_PATTERN':
       return 'text-green-400';

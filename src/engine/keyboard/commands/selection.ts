@@ -68,6 +68,25 @@ export function pasteSelection(): boolean {
 }
 
 /**
+ * Swap clipboard with current selection
+ */
+export function swapSelection(): boolean {
+  const { selection } = useCursorStore.getState();
+  const { clipboard, swapSelection: swap } = useTrackerStore.getState();
+  if (!selection) {
+    useUIStore.getState().setStatusMessage('No selection to swap', false, 1000);
+    return true;
+  }
+  if (!clipboard) {
+    useUIStore.getState().setStatusMessage('Nothing in clipboard to swap', false, 1000);
+    return true;
+  }
+  swap();
+  useUIStore.getState().setStatusMessage('Selection swapped with clipboard', false, 1000);
+  return true;
+}
+
+/**
  * Select entire pattern
  */
 export function selectAll(): boolean {

@@ -1457,8 +1457,6 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
 
   // Visualizer mode cycling
   const [vizMode, setVizMode] = useState<VizMode>('spectrum');
-  // cycleVizPrev available if needed (right-click on label)
-  // const cycleVizPrev = () => setVizMode(prev => VIZ_MODES[(VIZ_MODES.indexOf(prev) - 1 + VIZ_MODES.length) % VIZ_MODES.length]);
   const cycleVizNext = useCallback(() => {
     setVizMode(prev => VIZ_MODES[(VIZ_MODES.indexOf(prev) + 1) % VIZ_MODES.length]);
   }, []);

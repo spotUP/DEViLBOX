@@ -8,6 +8,7 @@
     "type": "git",
     "url": "https://github.com/spotUP/DEViLBOX.git"
   },
+  "license": "GPL-3.0-or-later",
   "author": {
     "name": "spotUP",
     "email": "spotup@gmail.com"

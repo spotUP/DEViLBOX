@@ -416,7 +416,8 @@ export class XMHandler extends BaseFormatHandler {
 
       case XM_EFFECTS.SET_SPEED:
         if (param === 0) {
-          // F00 = stop
+          // F00 = stop song
+          result.stopSong = true;
         } else if (param < 0x20) {
           this.speed = param;
           result.setSpeed = param;
