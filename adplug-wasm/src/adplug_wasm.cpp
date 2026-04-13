@@ -24,6 +24,9 @@
 
 #include "adplug.h"
 #include "emuopl.h"
+extern "C" {
+#include "nukedopl.h"
+}
 #include "fprovide.h"
 #include "player.h"
 #include "players.h"
@@ -2284,6 +2287,50 @@ float adplug_get_refresh_rate() {
 EMSCRIPTEN_KEEPALIVE
 uint32_t adplug_get_player_type() {
     return (uint32_t)g_playerType;
+}
+
+// ── Per-Channel Scope Capture ─────────────────────────────────────────────
+
+/**
+ * Enable or disable per-channel oscilloscope capture for both OPL backends.
+ * Call with enable=1 before playback to start capturing.
+ */
+EMSCRIPTEN_KEEPALIVE
+void adplug_enable_scope(int enable) {
+    FMOPL_EnableScopeCapture(enable);
+    // Note: Nuked OPL3 scope would need the opl3_chip* pointer.
+    // FMOPL is the primary backend used by CEmuopl/AdPlug.
+}
+
+/**
+ * Retrieve per-channel scope data (float samples from ring buffer).
+ *
+ * @param chip_index  OPL chip index (0 or 1 for dual OPL2)
+ * @param channel     Channel index (0-8 for OPL2, 0-17 for OPL3)
+ * @param buffer      WASM heap pointer for output float samples
+ * @param num_samples Maximum number of samples to retrieve
+ * @return Number of samples written to buffer
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_scope_data(int chip_index, int channel,
+                                float* buffer, uint32_t num_samples) {
+    return FMOPL_GetScopeData(chip_index, channel, buffer, num_samples);
+}
+
+/**
+ * Get the scope buffer size (number of samples in ring buffer).
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_scope_buffer_size() {
+    return FMOPL_SCOPE_BUFFER_SIZE;
+}
+
+/**
+ * Get the number of scope channels per chip.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t adplug_get_scope_num_channels() {
+    return FMOPL_SCOPE_NUM_CHANNELS;
 }
 
 } // extern "C"
