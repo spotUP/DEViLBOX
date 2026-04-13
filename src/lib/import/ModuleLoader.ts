@@ -132,20 +132,11 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
         const isDefleMask = ext === '.dmf';
         if (isDefleMask) {
           try {
-            // Pre-decompress zlib before passing to Furnace WASM — the WASM's
-            // internal zlib aborts on DMF files with corrupted adler32 checksums
-            const dmfHdr = new Uint8Array(arrayBuffer, 0, 2);
-            let dmfBuffer = arrayBuffer;
-            if (dmfHdr[0] === 0x78 && (dmfHdr[1] === 0x9c || dmfHdr[1] === 0x01 || dmfHdr[1] === 0xDA)) {
-              const pako = await import('pako');
-              const inflated = pako.inflateRaw(new Uint8Array(arrayBuffer).slice(2));
-              dmfBuffer = inflated.buffer.byteLength === inflated.byteLength
-                ? inflated.buffer as ArrayBuffer
-                : inflated.buffer.slice(inflated.byteOffset, inflated.byteOffset + inflated.byteLength) as ArrayBuffer;
-              console.log(`[ModuleLoader] Pre-decompressed DMF zlib → ${dmfBuffer.byteLength} bytes`);
-            }
+            // Pass raw file data directly to Furnace WASM — the patched
+            // fileOpsCommon handles zlib decompression internally with
+            // tolerance for bad adler32 checksums (common in DefleMask files)
             const { parseFurnaceFile } = await import('./parsers/FurnaceToSong');
-            const song = await parseFurnaceFile(dmfBuffer, file.name);
+            const song = await parseFurnaceFile(arrayBuffer, file.name);
             const metadata: ModuleMetadata = {
               title: song.name || file.name.replace(/\.dmf$/i, ''),
               type: 'DefleMask',

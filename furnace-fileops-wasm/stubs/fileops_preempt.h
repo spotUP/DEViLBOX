@@ -30,7 +30,7 @@ enum LogLevel {
   LOGLEVEL_ERROR
 };
 
-// No-op logging for WASM file ops
+// No-op logging for WASM file ops (Furnace passes std::string to %s varargs, incompatible with fprintf)
 #define logD(...)
 #define logV(...)
 #define logI(...)

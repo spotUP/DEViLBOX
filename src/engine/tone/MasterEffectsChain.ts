@@ -21,6 +21,32 @@ export interface MasterEffectsContext {
 
 // Track previous external sidechain sources so we can disconnect them cleanly
 const scExternalSources = new WeakMap<Tone.ToneAudioNode, AudioNode>();
+// Track which sidechain effects use isolation taps (for cleanup on source change)
+const scIsolationChannels = new WeakMap<Tone.ToneAudioNode, { channel: number; scInput: AudioNode }>();
+
+// Lazy resolver for ToneEngine — avoids circular import deadlock
+// (MasterEffectsChain is imported by ToneEngine, so dynamic import hangs)
+type ChannelOutputGetter = (index: number) => { channel: Tone.Channel } | null;
+type GainGetter = () => Tone.Gain;
+let _getChannelOutput: ChannelOutputGetter | null = null;
+let _getMasterEffectsInput: GainGetter | null = null;
+let _getPostEffectsInput: GainGetter | null = null;
+
+/** Called by ToneEngine during init to provide channel output access without circular import. */
+export function registerSidechainResolver(
+  getChannelOutput: ChannelOutputGetter,
+  getMasterEffectsInput: GainGetter,
+  getPostEffectsInput: GainGetter,
+): void {
+  _getChannelOutput = getChannelOutput;
+  _getMasterEffectsInput = getMasterEffectsInput;
+  _getPostEffectsInput = getPostEffectsInput;
+}
+
+/** Get the post-effects merge point (blepInput) for sidechain tap passthrough. */
+export function getPostEffectsInput(): Tone.Gain | null {
+  return _getPostEffectsInput?.() ?? null;
+}
 
 async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
   if (!('getSidechainInput' in node)) return;
@@ -28,11 +54,19 @@ async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: numb
   const rawScInput = getNativeAudioNode(scInput);
   if (!rawScInput) return;
 
-  // Disconnect previous external source (if any)
+  // Disconnect previous external source (Tone.js channel output)
   const prevSource = scExternalSources.get(node);
   if (prevSource) {
     try { prevSource.disconnect(rawScInput); } catch { /* already disconnected */ }
     scExternalSources.delete(node);
+  }
+
+  // Release previous isolation tap (WASM channel isolation)
+  const prevIso = scIsolationChannels.get(node);
+  if (prevIso) {
+    const { getChannelRoutedEffectsManager: getMgr } = await import('./ChannelRoutedEffects');
+    getMgr()?.removeSidechainTap(prevIso.channel, prevIso.scInput);
+    scIsolationChannels.delete(node);
   }
 
   // Enable/disable self-route (input→sidechain) based on mode
@@ -43,10 +77,30 @@ async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: numb
   if (sourceChannel < 0 || isNaN(sourceChannel)) return;
 
   let connected = false;
-  try {
-    const { getToneEngine } = await import('../ToneEngine');
-    const engine = getToneEngine();
-    const sourceOutput = engine.getChannelOutputByIndex(sourceChannel);
+  const editorMode = useFormatStore.getState().editorMode;
+  const isoSupported = supportsChannelIsolation(editorMode);
+
+  // Try 1: WASM isolation system (preferred — libopenmpt, Furnace, Hively, UADE)
+  // WASM engines mix all channels inside the worklet. Tone.js channel outputs exist
+  // but carry no audio. Use the isolation system to get actual per-channel audio.
+  if (isoSupported) {
+    try {
+      const { getChannelRoutedEffectsManager: getMgr } = await import('./ChannelRoutedEffects');
+      const masterIn = _getMasterEffectsInput?.();
+      const manager = masterIn ? getMgr(masterIn) : getMgr();
+      if (manager) {
+        const success = await manager.addSidechainTap(sourceChannel, rawScInput);
+        if (success) {
+          scIsolationChannels.set(node, { channel: sourceChannel, scInput: rawScInput });
+          connected = true;
+        }
+      }
+    } catch { /* isolation not available */ }
+  }
+
+  // Try 2: Tone.js channel outputs (fallback — sampler-based playback)
+  if (!connected && _getChannelOutput) {
+    const sourceOutput = _getChannelOutput(sourceChannel);
     if (sourceOutput) {
       const rawSource = getNativeAudioNode(sourceOutput.channel);
       if (rawSource) {
@@ -55,12 +109,11 @@ async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: numb
         connected = true;
       }
     }
-  } catch { /* Engine not ready */ }
+  }
 
-  // If external connection failed (e.g. WASM playback has no per-channel outputs),
-  // fall back to self-routing so the compressor still works
+  // Fallback: self-routing so the compressor still works
   if (!connected && 'setSelfSidechain' in node) {
-    console.warn('[SidechainCompressor] Channel', sourceChannel, 'not available — falling back to self-routing');
+    console.warn('[wireMasterSidechain] Channel', sourceChannel, 'not available — falling back to self-routing');
     (node as any).setSelfSidechain(true);
   }
 }

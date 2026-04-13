@@ -846,13 +846,11 @@ export async function tryRouteFormat(
   }
 
   // ── Sawteeth (.st — magic "SWTD" required to disambiguate) ───────────────
-  // Fully synthesized format (no PCM samples). Native parser available (metadata only).
+  // Fully synthesized format (no PCM samples). Native WASM engine.
   if (matchesExt(filename, ['st'])) {
     const { isSawteethFormat, parseSawteethFile } = await import('@lib/import/formats/SawteethParser');
     if (isSawteethFormat(new Uint8Array(buffer))) {
-      return withNativeThenUADE('sawteeth', ctx,
-        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSawteethFormat(new Uint8Array(buf as ArrayBuffer))) return parseSawteethFile(new Uint8Array(buf as ArrayBuffer), name) ?? null; return null; },
-        'SawteethParser', { injectUADE: true });
+      return parseSawteethFile(new Uint8Array(buffer), originalFileName) ?? null;
     }
     const { parseUADEFile: parseUADE_st } = await import('@lib/import/formats/UADEParser');
     return parseUADE_st(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);

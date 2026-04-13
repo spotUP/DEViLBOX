@@ -131,4 +131,9 @@ export class EffectRegistry {
     const desc = EffectRegistry.get(type);
     return desc?.presets ?? [];
   }
+
+  static getDefaultParameters(type: string): Record<string, number | string> {
+    const desc = EffectRegistry.get(type);
+    return desc?.getDefaultParameters?.() ?? {};
+  }
 }

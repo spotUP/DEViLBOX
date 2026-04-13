@@ -890,11 +890,9 @@ export async function startNativeEngines(
   activeSilenceDetectors.clear();
 
   // --- Singleton WASM engines (registry-driven) ---
-  console.warn('[NativeEngineRouting] song.format:', song.format, 'sawteethFileData:', !!(song as any).sawteethFileData, 'uadeEditableFileData:', !!(song as any).uadeEditableFileData);
   const startedEngineKeys = new Set<string>();
   for (const desc of WASM_ENGINES) {
     if (!shouldActivate(desc, song)) continue;
-    console.warn('[NativeEngineRouting] activating engine:', desc.key);
 
     // Skip engines already running — prevents double-start when startNativeEngines
     // is called twice in quick succession (e.g. FT2Toolbar play + usePatternPlayback

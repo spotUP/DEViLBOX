@@ -662,6 +662,7 @@ export function getFormatState(): Record<string, unknown> {
       format.sonixFileData && 'sonix',
       format.pxtoneFileData && 'pxtone',
       format.organyaFileData && 'organya',
+      format.sawteethFileData && 'sawteeth',
       format.eupFileData && 'eupmini',
       format.ixsFileData && 'ixalance',
       format.psycleFileData && 'psycle',

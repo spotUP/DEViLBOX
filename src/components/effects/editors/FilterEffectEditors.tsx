@@ -434,6 +434,9 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const knee = getParam(effect, 'knee', 6);
   const sidechainGain = getParam(effect, 'sidechainGain', 100);
   const sidechainSource = getParam(effect, 'sidechainSource', -1);
+  const scFreq = getParam(effect, 'scFreq', 0);
+  const scQ = getParam(effect, 'scQ', 1);
+  const scFilterType = String(effect.parameters?.scFilterType ?? 'lowpass');
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 8);
@@ -521,6 +524,42 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
             label="SC Gain"
             color="#34d399"
             formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader size="lg" color="#059669" title="SC Filter" />
+        <div className="flex justify-around items-end">
+          <div className="flex flex-col items-center gap-1">
+            <CustomSelect
+              value={scFilterType}
+              onChange={(v) => onUpdateParameter('scFilterType', v)}
+              options={[
+                { value: 'lowpass', label: 'Low Pass' },
+                { value: 'highpass', label: 'High Pass' },
+                { value: 'bandpass', label: 'Band Pass' },
+              ]}
+              className="w-24 bg-black/60 border border-dark-border rounded-lg px-2 py-1 text-[10px] text-text-primary"
+            />
+            <span className="text-[8px] text-text-muted">Type</span>
+          </div>
+          <Knob
+            value={scFreq}
+            min={0}
+            max={8000}
+            onChange={(v) => onUpdateParameter('scFreq', v)}
+            label="SC Freq"
+            color="#059669"
+            formatValue={(v) => v === 0 ? 'OFF' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} Hz`}
+          />
+          <Knob
+            value={scQ}
+            min={0.1}
+            max={10}
+            onChange={(v) => onUpdateParameter('scQ', v)}
+            label="SC Q"
+            color="#059669"
+            formatValue={(v) => v.toFixed(1)}
           />
         </div>
       </section>

@@ -23,7 +23,7 @@ target_include_directories(V2MPlayer PRIVATE src)
 set(EMSCRIPTEN_FLAGS
     "-s MODULARIZE=1"
     "-s EXPORT_NAME='createV2MPlayer'"
-    "-s EXPORTED_FUNCTIONS=['_v2m_init','_v2m_shutdown','_v2m_load','_v2m_play','_v2m_stop','_v2m_render','_v2m_is_playing','_v2m_get_length','_v2m_alloc','_v2m_free','_malloc','_free']"
+    "-s EXPORTED_FUNCTIONS=['_v2m_init','_v2m_shutdown','_v2m_load','_v2m_play','_v2m_stop','_v2m_render','_v2m_is_playing','_v2m_get_length','_v2m_alloc','_v2m_free','_v2m_set_channel_gain','_malloc','_free']"
     "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPF32']"
     "-s ALLOW_MEMORY_GROWTH=1"
     "-s INITIAL_MEMORY=16777216"

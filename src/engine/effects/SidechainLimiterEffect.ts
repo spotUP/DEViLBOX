@@ -199,6 +199,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
       this.workletNode = null;
     }
     this.dryGain.dispose(); this.wetGain.dispose(); this.sidechainInput.dispose();
+    this.selfRouteGain.dispose();
     this.input.dispose(); this.output.dispose();
     super.dispose();
     return this;

@@ -13,6 +13,7 @@
 #include "v2mplayer.h"
 #include "v2mconv.h"
 #include "sounddef.h"
+#include "synth.h"
 
 // Global state
 static V2MPlayer* g_player = nullptr;
@@ -194,12 +195,26 @@ uint8_t* v2m_alloc(uint32_t size) {
 
 /**
  * Free memory allocated with v2m_alloc.
- * 
+ *
  * @param ptr Pointer to free
  */
 EMSCRIPTEN_KEEPALIVE
 void v2m_free(uint8_t* ptr) {
     free(ptr);
+}
+
+/**
+ * Set the gain override for a single V2 synth channel (0-15).
+ * 1.0 = passthrough, 0.0 = mute.
+ *
+ * @param channel Channel index (0..15)
+ * @param gain    Linear gain multiplier
+ */
+EMSCRIPTEN_KEEPALIVE
+void v2m_set_channel_gain(int channel, float gain) {
+    if (g_player) {
+        synthSetChannelGain(g_player->GetSynth(), channel, gain);
+    }
 }
 
 } // extern "C"

@@ -111,6 +111,7 @@ import {
   getMasterEffectAnalysers as _getMasterEffectAnalysers,
   updateMasterEffectParams as _updateMasterEffectParams,
   updateInstrumentEffectParams as _updateInstrumentEffectParams,
+  registerSidechainResolver,
 } from './tone/MasterEffectsChain';
 import { captureLiveAudio, mixAndNormalize, MONO_WASM_SYNTHS } from '@/lib/audio/LiveCapture';
 import { notifyInstrumentAttack } from './instrumentPlaybackTracker';
@@ -170,7 +171,7 @@ export class ToneEngine {
   private masterMeter: Tone.Meter; // Level meter at masterEffectsInput merge point
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
-  private blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
+  public blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
   private masterLimiter: DynamicsCompressorNode | null = null; // Soft limiter on master bus
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
@@ -382,6 +383,14 @@ export class ToneEngine {
     // BLEP insertion point — sits between effects chain end and masterChannel.
     // This node is never disconnected by rebuildMasterEffects, so BLEP routing stays stable.
     this.blepInput = new Tone.Gain(1);
+
+    // Register sidechain resolver so wireMasterSidechain can access channel outputs
+    // without a circular dynamic import (this module imports MasterEffectsChain)
+    registerSidechainResolver(
+      (index: number) => this.getChannelOutputByIndex(index),
+      () => this.masterEffectsInput,
+      () => this.blepInput,
+    );
 
     // Default routing:
     //   masterInput → amigaFilter → masterEffectsInput → blepInput → masterLimiter → masterChannel
