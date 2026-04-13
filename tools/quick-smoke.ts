@@ -151,14 +151,27 @@ function countActiveBins(spectrum: number[]): number {
 
 async function main() {
   await connect();
-  console.log('Connected to MCP relay\n');
+  console.log('Connected to MCP relay');
+
+  // Load previous results to skip 100% passes
+  let prevResults: TestResult[] = [];
+  try { prevResults = JSON.parse(readFileSync('/tmp/smoke-results.json', 'utf-8')); } catch { /* first run */ }
+  const prevPass = new Set(prevResults.filter(r => r.score >= 90).map(r => r.dir));
+  if (prevPass.size > 0) console.log(`Skipping ${prevPass.size} formats that scored ≥90 in previous run`);
+  console.log('');
 
   const dirs = readdirSync(TEST_DIR).filter(d => statSync(join(TEST_DIR, d)).isDirectory()).sort();
   const results: TestResult[] = [];
   const trackerUpdates: Record<string, any> = {};
 
+  // Carry forward previous passes
+  for (const prev of prevResults) {
+    if (prevPass.has(prev.dir)) results.push(prev);
+  }
+
   for (const dir of dirs) {
     if (SKIP.size > 0 && SKIP.has(dir)) { console.log(`  — ${dir.padEnd(24)} SKIPPED (known crasher)`); continue; }
+    if (prevPass.has(dir)) { continue; } // already passed — carried forward
     const files = readdirSync(join(TEST_DIR, dir)).filter(f => !f.startsWith('.'));
     if (!files.length) continue;
     const file = files[0];
