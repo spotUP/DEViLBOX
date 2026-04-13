@@ -43,7 +43,7 @@ export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
  * so UADE can handle playback while the native parser provides pattern display.
  */
 export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
-  if ((result as any).uadePatternLayout && !(result as any).uadeEditableFileData) {
+  if ((result as any).uadePatternLayout && !(result as any).uadeEditableFileData && !(result as any).sonicArrangerFileData) {
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
   }
@@ -96,9 +96,14 @@ export async function withNativeThenUADE(
         const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
         const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
         if (result) {
-          if (!(result as any).uadeEditableFileData) {
+          // Skip UADE injection if a dedicated WASM engine handles audio
+          const hasDedicatedEngine = (result as any).sonicArrangerFileData;
+          if (!(result as any).uadeEditableFileData && !hasDedicatedEngine) {
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;
+          }
+          if (hasDedicatedEngine) {
+            return result;
           }
           // UADE handles ALL audio — tag every instrument as UADEEditableSynth
           // so the replayer's suppressNotes path works and no basic-synth audio

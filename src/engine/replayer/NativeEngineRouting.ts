@@ -489,11 +489,22 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/asap/AsapEngine')).AsapEngine as unknown as WASMSingletonStatic,
     getLoadArgs: (song: TrackerSong) => [song.asapFilename || 'tune.sap'],
   },
-  // SoundMon, SonicArranger, RobHubbard, DigitalMugician, CoreDesign,
-  // DavidWhittaker, StartrekkerAM — dedicated WASM engines exist (public/*/
-  // + src/engine/*/) but crash or produce near-silent output. All fall through
-  // to UADE until the individual engines are debugged. The WASM assets and
-  // Engine.ts files are preserved for future work.
+  // SoundMon, RobHubbard, DigitalMugician, CoreDesign, DavidWhittaker,
+  // StartrekkerAM — dedicated WASM engines exist but crash or produce
+  // near-silent output. Fall through to UADE until debugged.
+  {
+    key: 'SonicArranger',
+    synthType: 'SonicArrangerWasmSynth',
+    suppressNotes: true,
+    fileDataKey: 'sonicArrangerFileData',
+    formats: null,
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/sonic-arranger/SonicArrangerEngine')).SonicArrangerEngine as unknown as WASMSingletonStatic,
+  },
   {
     key: 'UADEEditable',
     synthType: 'UADEEditableSynth',

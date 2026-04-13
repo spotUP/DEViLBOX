@@ -986,6 +986,7 @@ export async function parseSonicArrangerFile(
     initialSpeed:    Math.max(1, song.startSpeed),
     initialBPM,
     linearPeriods:   false,
+    sonicArrangerFileData: buffer.slice(0) as ArrayBuffer,
     uadePatternLayout,
   };
 }
