@@ -25,12 +25,13 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
   readonly name = 'SidechainCompressor';
 
   // Main signal chain — gain ducking
-  private duckGain: GainNode;
+  private duckGain: Tone.Gain;
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
 
   // Sidechain detection
   private sidechainInput: Tone.Gain;
+  private selfRouteGain: Tone.Gain;
   private sidechainGainNode: Tone.Gain;
   private analyser: AnalyserNode;
   private analyserBuffer: Float32Array;
@@ -68,10 +69,7 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.output = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
-
-    // Gain node for ducking (audio-rate parameter automation)
-    this.duckGain = rawCtx.createGain();
-    this.duckGain.gain.value = 1;
+    this.duckGain = new Tone.Gain(1);
 
     // Sidechain chain
     this.sidechainInput = new Tone.Gain(1);
@@ -80,11 +78,9 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.analyser.fftSize = 256;
     this.analyserBuffer = new Float32Array(this.analyser.fftSize);
 
-    // Main signal: input → duckGain → wetGain → output
-    const rawInputNode = getNativeAudioNode(this.input);
-    const rawWetNode = getNativeAudioNode(this.wetGain);
-    if (rawInputNode) rawInputNode.connect(this.duckGain);
-    if (rawWetNode) this.duckGain.connect(rawWetNode);
+    // Wet path: input → duckGain → wetGain → output (all Tone.js connections)
+    this.input.connect(this.duckGain);
+    this.duckGain.connect(this.wetGain);
     this.wetGain.connect(this.output);
 
     // Dry path: input → dryGain → output
@@ -96,12 +92,23 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.sidechainInput.connect(this.sidechainGainNode);
     if (rawScGain) rawScGain.connect(this.analyser);
 
+    // Self-route: main input feeds sidechain for self-detection mode.
+    // Controlled by selfRouteGain — set to 0 when external source is wired.
+    this.selfRouteGain = new Tone.Gain(1);
+    this.input.connect(this.selfRouteGain);
+    this.selfRouteGain.connect(this.sidechainInput);
+
     // Fast polling at 4ms (~250Hz) for responsive dynamics
     this.pollTimer = setInterval(this.updateDucking, 4);
   }
 
   getSidechainInput(): Tone.Gain {
     return this.sidechainInput;
+  }
+
+  /** Enable/disable self-route (input→sidechain). Called by wireMasterSidechain. */
+  setSelfSidechain(enabled: boolean): void {
+    this.selfRouteGain.gain.value = enabled ? 1 : 0;
   }
 
   private updateDucking = (): void => {
@@ -141,10 +148,9 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
       }
     }
 
-    // Apply gain with fast ramp to avoid clicks
+    // Apply gain — direct value set for immediate response
     const gainLin = Math.pow(10, gainDb / 20);
-    const now = Tone.getContext().rawContext!.currentTime;
-    this.duckGain.gain.setTargetAtTime(gainLin, now, 0.003);
+    this.duckGain.gain.value = gainLin;
   };
 
   get threshold(): number { return this._threshold; }
@@ -195,7 +201,7 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
       this.pollTimer = null;
     }
 
-    try { this.duckGain.disconnect(); } catch { /* */ }
+    this.duckGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.sidechainInput.dispose();

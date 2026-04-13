@@ -19,19 +19,50 @@ export interface MasterEffectsContext {
   updateBpmSyncedEffects: (bpm: number) => Promise<void>;
 }
 
+// Track previous external sidechain sources so we can disconnect them cleanly
+const scExternalSources = new WeakMap<Tone.ToneAudioNode, AudioNode>();
+
 async function wireMasterSidechain(node: Tone.ToneAudioNode, sourceChannel: number): Promise<void> {
   if (!('getSidechainInput' in node)) return;
   const scInput = (node as any).getSidechainInput() as Tone.Gain;
-  try { scInput.disconnect(); } catch { /* nothing connected */ }
+  const rawScInput = getNativeAudioNode(scInput);
+  if (!rawScInput) return;
+
+  // Disconnect previous external source (if any)
+  const prevSource = scExternalSources.get(node);
+  if (prevSource) {
+    try { prevSource.disconnect(rawScInput); } catch { /* already disconnected */ }
+    scExternalSources.delete(node);
+  }
+
+  // Enable/disable self-route (input→sidechain) based on mode
+  if ('setSelfSidechain' in node) {
+    (node as any).setSelfSidechain(sourceChannel < 0);
+  }
+
   if (sourceChannel < 0 || isNaN(sourceChannel)) return;
+
+  let connected = false;
   try {
     const { getToneEngine } = await import('../ToneEngine');
     const engine = getToneEngine();
     const sourceOutput = engine.getChannelOutputByIndex(sourceChannel);
     if (sourceOutput) {
-      sourceOutput.channel.connect(scInput);
+      const rawSource = getNativeAudioNode(sourceOutput.channel);
+      if (rawSource) {
+        rawSource.connect(rawScInput);
+        scExternalSources.set(node, rawSource);
+        connected = true;
+      }
     }
   } catch { /* Engine not ready */ }
+
+  // If external connection failed (e.g. WASM playback has no per-channel outputs),
+  // fall back to self-routing so the compressor still works
+  if (!connected && 'setSelfSidechain' in node) {
+    console.warn('[SidechainCompressor] Channel', sourceChannel, 'not available — falling back to self-routing');
+    (node as any).setSelfSidechain(true);
+  }
 }
 
 /**
@@ -165,8 +196,10 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     ctx.masterEffectConfigs.set(config.id, { node, config });
     chainNodes.push(node);
 
-    if (typeof config.sidechainSource === 'number' && config.sidechainSource >= 0) {
-      void wireMasterSidechain(node, config.sidechainSource);
+    // Sidechain source can be at top-level or in parameters (UI stores it in parameters)
+    const scSource = config.sidechainSource ?? Number(config.parameters?.sidechainSource);
+    if (typeof scSource === 'number' && scSource >= 0 && !isNaN(scSource)) {
+      void wireMasterSidechain(node, scSource);
     }
 
     const compLinear = getEffectGainCompensation(config.type);
