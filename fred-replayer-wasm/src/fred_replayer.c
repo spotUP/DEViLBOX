@@ -1245,6 +1245,481 @@ size_t fred_render_multi(FredModule* module, float* ch0, float* ch1, float* ch2,
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Amiga hunk stripping — extract first CODE section from AmigaOS HUNK executable
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static uint16_t rd16(const uint8_t* p) {
+    return (uint16_t)((p[0] << 8) | p[1]);
+}
+
+static int16_t rds16(const uint8_t* p) {
+    return (int16_t)rd16(p);
+}
+
+static uint32_t rd32(const uint8_t* p) {
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+static void wr16(uint8_t* p, uint16_t v) {
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)(v);
+}
+
+static void wr32(uint8_t* p, uint32_t v) {
+    p[0] = (uint8_t)(v >> 24);
+    p[1] = (uint8_t)(v >> 16);
+    p[2] = (uint8_t)(v >> 8);
+    p[3] = (uint8_t)(v);
+}
+
+// Returns pointer into `data` at start of first CODE section, sets *out_size.
+// Returns NULL if not a valid HUNK file.
+static const uint8_t* strip_amiga_hunk(const uint8_t* data, size_t size, size_t* out_size) {
+    if (size < 24) return nullptr;
+    if (rd32(data) != 0x000003F3) return nullptr;  // HUNK_HEADER
+
+    size_t pos = 4;
+    uint32_t res_libs = rd32(data + pos); pos += 4;
+    if (res_libs != 0) return nullptr;
+
+    uint32_t num_hunks = rd32(data + pos); pos += 4;
+    if (num_hunks == 0 || num_hunks > 100) return nullptr;
+
+    pos += 4; // firstHunk
+    pos += 4; // lastHunk
+
+    // Skip hunk size table
+    for (uint32_t i = 0; i < num_hunks; i++) {
+        if (pos + 4 > size) return nullptr;
+        pos += 4;
+    }
+
+    // Walk hunks to find first CODE section
+    while (pos + 8 <= size) {
+        uint32_t hunk_type = rd32(data + pos) & 0x3FFFFFFF;
+        pos += 4;
+
+        if (hunk_type == 0x000003E9 || hunk_type == 0x000003EA) { // HUNK_CODE or HUNK_DATA
+            uint32_t size_longs = rd32(data + pos); pos += 4;
+            size_t size_bytes = (size_t)size_longs * 4;
+            if (pos + size_bytes > size) return nullptr;
+            *out_size = size_bytes;
+            return data + pos;
+        }
+
+        if (hunk_type == 0x000003EB) { // HUNK_BSS
+            pos += 4;
+            continue;
+        }
+
+        if (hunk_type == 0x000003EC) { // HUNK_RELOC32
+            while (pos + 4 <= size) {
+                uint32_t count = rd32(data + pos); pos += 4;
+                if (count == 0) break;
+                pos += 4; // target hunk
+                pos += (size_t)count * 4;
+            }
+            continue;
+        }
+
+        if (hunk_type == 0x000003F2) { // HUNK_END
+            continue;
+        }
+
+        break; // unknown hunk
+    }
+
+    return nullptr;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Fred Editor Final (0x4EFA) → clean "Fred Editor" format converter
+//
+// Port of NostalgicPlayer FredEditorFinalFormat.cs Identify + Convert.
+// Scans 68k code patterns to locate module data, then serializes as clean format.
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Dynamic buffer for building the converted output
+typedef struct ConvertBuf {
+    uint8_t* data;
+    size_t   size;
+    size_t   capacity;
+} ConvertBuf;
+
+static void cbuf_init(ConvertBuf* cb) {
+    cb->capacity = 16384;
+    cb->data = (uint8_t*)malloc(cb->capacity);
+    cb->size = 0;
+}
+
+static void cbuf_ensure(ConvertBuf* cb, size_t extra) {
+    while (cb->size + extra > cb->capacity) {
+        cb->capacity *= 2;
+        cb->data = (uint8_t*)realloc(cb->data, cb->capacity);
+    }
+}
+
+static void cbuf_write(ConvertBuf* cb, const void* src, size_t n) {
+    cbuf_ensure(cb, n);
+    memcpy(cb->data + cb->size, src, n);
+    cb->size += n;
+}
+
+static void cbuf_write_u8(ConvertBuf* cb, uint8_t v) {
+    cbuf_ensure(cb, 1);
+    cb->data[cb->size++] = v;
+}
+
+static void cbuf_write_u16(ConvertBuf* cb, uint16_t v) {
+    cbuf_ensure(cb, 2);
+    wr16(cb->data + cb->size, v);
+    cb->size += 2;
+}
+
+static void cbuf_write_u32(ConvertBuf* cb, uint32_t v) {
+    cbuf_ensure(cb, 4);
+    wr32(cb->data + cb->size, v);
+    cb->size += 4;
+}
+
+static void cbuf_write_s32(ConvertBuf* cb, int32_t v) {
+    cbuf_write_u32(cb, (uint32_t)v);
+}
+
+static void cbuf_write_zeros(ConvertBuf* cb, size_t n) {
+    cbuf_ensure(cb, n);
+    memset(cb->data + cb->size, 0, n);
+    cb->size += n;
+}
+
+static void cbuf_free(ConvertBuf* cb) {
+    free(cb->data);
+    cb->data = nullptr;
+    cb->size = cb->capacity = 0;
+}
+
+// Convert Fred Editor Final (0x4EFA format) to clean "Fred Editor " format.
+// Returns a malloc'd buffer and sets *out_size. Returns NULL on failure.
+static uint8_t* convert_fred_final(const uint8_t* mod, size_t mod_len, size_t* out_size) {
+    if (mod_len < 0xB0E) return nullptr;
+
+    // Verify 4x JMP instructions at 4-byte intervals
+    for (int i = 0; i < 16; i += 4) {
+        if (rd16(mod + i) != 0x4EFA) return nullptr;
+    }
+
+    // Get initOffset from first JMP displacement
+    int16_t init_offset = (int16_t)(rds16(mod + 2) + 2);
+    if (init_offset < 0 || (size_t)init_offset + 128 > mod_len) return nullptr;
+
+    // Read 64 words of the init routine
+    uint16_t init_func[64];
+    for (int i = 0; i < 64 && (size_t)init_offset + i * 2 + 1 < mod_len; i++) {
+        init_func[i] = rd16(mod + init_offset + i * 2);
+    }
+
+    // Find moduleOffset: pattern 0x123A ... 0xB001
+    int module_offset = -1;
+    int pattern_pos = -1;
+    for (int i = 0; i < 4; i++) {
+        if (init_func[i] == 0x123A && init_func[i + 2] == 0xB001) {
+            module_offset = (int)init_func[i + 1] + init_offset + i * 2 + 1;
+            pattern_pos = i;
+            break;
+        }
+    }
+    if (module_offset < 0 || (size_t)module_offset >= mod_len) return nullptr;
+
+    // Find offsetDiff: pattern 0x47FA ... 0xD7FA
+    int offset_diff = -1;
+    for (int i = pattern_pos; i < 60; i++) {
+        if (init_func[i] == 0x47FA && init_func[i + 2] == 0xD7FA) {
+            offset_diff = init_offset + (i + 1) * 2 + (int16_t)init_func[i + 1];
+            break;
+        }
+    }
+    if (offset_diff < 0) return nullptr;
+
+    // Read module header at moduleOffset
+    size_t mpos = (size_t)module_offset;
+    if (mpos + 14 > mod_len) return nullptr;
+
+    // Skip played song (1 byte)
+    mpos += 1;
+
+    // subSongs = byte + 1
+    uint8_t sub_songs = mod[mpos++] + 1;
+    if (sub_songs > 10) return nullptr;
+
+    // Skip current tempo (1 byte)
+    mpos += 1;
+
+    // Start tempos (10 bytes)
+    uint8_t start_tempos[10];
+    if (mpos + 10 > mod_len) return nullptr;
+    memcpy(start_tempos, mod + mpos, 10);
+    mpos += 10;
+
+    // Skip 1 byte
+    mpos += 1;
+
+    // Get instOffset and trackOffset (relative, add offsetDiff to get absolute)
+    if (mpos + 8 > mod_len) return nullptr;
+    uint32_t inst_offset = (uint32_t)((int32_t)rd32(mod + mpos) + offset_diff);
+    mpos += 4;
+    uint32_t track_offset = (uint32_t)((int32_t)rd32(mod + mpos) + offset_diff);
+    mpos += 4;
+
+    if (inst_offset >= mod_len || track_offset >= mod_len) return nullptr;
+
+    // Skip replay data: 100 + 128*4 = 612 bytes
+    mpos += 100 + 128 * 4;
+
+    // Read sub-song start sequence numbers
+    if (mpos + (size_t)sub_songs * 8 > mod_len) return nullptr;
+
+    uint16_t start_positions[10][4];
+    for (int i = 0; i < sub_songs; i++) {
+        for (int j = 0; j < 4; j++) {
+            uint16_t raw = rd16(mod + mpos); mpos += 2;
+            start_positions[i][j] = (uint16_t)((raw - sub_songs * 4 * 2) / 2);
+        }
+    }
+
+    // Load position offsets
+    uint32_t min_offset = inst_offset < track_offset ? inst_offset : track_offset;
+    if (mpos > min_offset) return nullptr;
+    int position_size = (int)((min_offset - mpos) / 2);
+    if (position_size <= 0 || position_size > 65536) return nullptr;
+
+    int16_t* position_offsets = (int16_t*)calloc((size_t)position_size, sizeof(int16_t));
+    if (!position_offsets) return nullptr;
+
+    for (int i = 0; i < position_size; i++) {
+        if (mpos + 2 > mod_len) { free(position_offsets); return nullptr; }
+        position_offsets[i] = rds16(mod + mpos);
+        mpos += 2;
+    }
+
+    // Load all track data
+    int track_size = (int)(inst_offset > track_offset ? inst_offset - track_offset : track_offset - inst_offset);
+    if (track_size <= 0 || (size_t)track_offset + (size_t)track_size > mod_len) {
+        free(position_offsets);
+        return nullptr;
+    }
+
+    const uint8_t* track_data = mod + track_offset;
+
+    // Split track data into individual tracks by scanning for 0x80 end markers
+    typedef struct { int start; int length; } TrackSpan;
+    TrackSpan* track_spans = (TrackSpan*)calloc(256, sizeof(TrackSpan));
+    int* offset_to_track = (int*)calloc((size_t)track_size, sizeof(int));
+    int num_tracks = 0;
+
+    if (!track_spans || !offset_to_track) {
+        free(position_offsets); free(track_spans); free(offset_to_track);
+        return nullptr;
+    }
+
+    // Initialize offset_to_track to -1
+    for (int i = 0; i < track_size; i++) offset_to_track[i] = -1;
+
+    for (int i = 0; i < track_size && num_tracks < 256; ) {
+        int start_idx = i;
+
+        while (i < track_size && track_data[i] != 0x80) i++;
+
+        // Include the 0x80 end marker
+        if (i < track_size) i++;
+
+        // If last track doesn't end with 0x80, skip it
+        if (i == track_size && (i == 0 || track_data[i - 1] != 0x80)) break;
+
+        track_spans[num_tracks].start = start_idx;
+        track_spans[num_tracks].length = i - start_idx;
+        offset_to_track[start_idx] = num_tracks;
+        num_tracks++;
+    }
+
+    // Pad to 128 tracks minimum
+    if (num_tracks > 128) num_tracks = 128;
+
+    // Build output buffer
+    ConvertBuf cb;
+    cbuf_init(&cb);
+    if (!cb.data) {
+        free(position_offsets); free(track_spans); free(offset_to_track);
+        return nullptr;
+    }
+
+    // Write header: "Fred Editor " + version 0x0000
+    cbuf_write(&cb, "Fred Editor ", 12);
+    cbuf_write_u16(&cb, 0x0000);
+
+    // Write sub-song count
+    cbuf_write_u16(&cb, (uint16_t)sub_songs);
+
+    // Write start tempos
+    cbuf_write(&cb, start_tempos, (size_t)sub_songs);
+
+    // Write position tables (subSongs * 4 channels * 256 bytes each)
+    for (int i = 0; i < sub_songs; i++) {
+        for (int j = 0; j < 4; j++) {
+            uint16_t pos = start_positions[i][j];
+            int written = 0;
+
+            while (written < 255 && pos < (uint16_t)position_size && position_offsets[pos] >= 0) {
+                int track_off = (int)position_offsets[pos];
+                int track_num = (track_off < track_size) ? offset_to_track[track_off] : -1;
+                if (track_num < 0) track_num = 0;  // fallback
+                cbuf_write_u8(&cb, (uint8_t)track_num);
+                pos++;
+                written++;
+            }
+
+            // Write end mark
+            if (pos < (uint16_t)position_size) {
+                uint8_t end_val = (uint8_t)(((position_offsets[pos] & 0x7FFF) / 2) | 0x80);
+                cbuf_write_u8(&cb, end_val);
+                written++;
+            } else {
+                cbuf_write_u8(&cb, 0x80);
+                written++;
+            }
+
+            // Pad to 256 bytes
+            if (written < 256) {
+                int pad = 255 - written;
+                if (pad > 0) cbuf_write_zeros(&cb, (size_t)pad);
+                cbuf_write_u8(&cb, 0x80);
+            }
+        }
+    }
+
+    // Write tracks (up to 128, each with length prefix)
+    for (int i = 0; i < 128; i++) {
+        if (i < num_tracks) {
+            cbuf_write_s32(&cb, track_spans[i].length);
+            cbuf_write(&cb, track_data + track_spans[i].start, (size_t)track_spans[i].length);
+        } else {
+            // Empty track: just end marker
+            cbuf_write_s32(&cb, 1);
+            cbuf_write_u8(&cb, 0x80);
+        }
+    }
+
+    // Count instruments at instOffset
+    // Instruments in the 68k format: 64 bytes each
+    // Structure: sampleOffset(4) + synthField(2) + 33bytes + instType(1) + remaining(24) = 64
+    size_t inst_pos = inst_offset;
+    uint16_t inst_num = 0;
+    int min_sample_offset = 0x7FFFFFFF;
+
+    for (;;) {
+        if (inst_pos + 64 > mod_len) break;
+
+        int32_t sample_off = (int32_t)rd32(mod + inst_pos);
+        // int16_t test_synth = rds16(mod + inst_pos + 4);
+        uint8_t test_inst = mod[inst_pos + 39]; // 4 + 2 + 33 = 39
+
+        if (inst_pos + 64 >= (size_t)min_sample_offset) break;
+
+        if (test_inst != 0xFF) {
+            if (sample_off != 0) {
+                int abs_off = sample_off + offset_diff;
+                if (abs_off < min_sample_offset) min_sample_offset = abs_off;
+            }
+        }
+
+        inst_pos += 64;
+        inst_num++;
+    }
+
+    // Write instrument count
+    cbuf_write_u16(&cb, inst_num);
+
+    // Write instrument data
+    typedef struct { uint16_t key; int offset; uint16_t length; } SampleEntry;
+    SampleEntry* sample_entries = (SampleEntry*)calloc(inst_num + 1, sizeof(SampleEntry));
+    int num_sample_entries = 0;
+
+    inst_pos = inst_offset;
+    for (uint16_t i = 0; i < inst_num; i++) {
+        // Write instrument name (32 bytes)
+        char name_buf[32];
+        memset(name_buf, 0, 32);
+        if (inst_num < 100)
+            snprintf(name_buf, sizeof(name_buf), "instr%02d", i);
+        else
+            snprintf(name_buf, sizeof(name_buf), "instr%03d", i);
+        cbuf_write(&cb, (const uint8_t*)name_buf, 32);
+
+        // Write instrument index (sequential)
+        cbuf_write_u32(&cb, (uint32_t)(i + 1));
+
+        uint8_t inst_type = mod[inst_pos + 39];
+
+        if (inst_type == 0x00) {
+            // Sample instrument: read from offset 0
+            int32_t sample_off = (int32_t)rd32(mod + inst_pos);
+            uint16_t repeat_len = rd16(mod + inst_pos + 4);
+            uint16_t length = rd16(mod + inst_pos + 6);
+
+            if (sample_off != 0 && (size_t)sample_off < mod_len) {
+                sample_entries[num_sample_entries].key = i + 1;
+                sample_entries[num_sample_entries].offset = sample_off + offset_diff;
+                sample_entries[num_sample_entries].length = (uint16_t)(length * 2);
+                num_sample_entries++;
+            } else {
+                repeat_len = 0xFFFF;
+                length = 0;
+            }
+
+            // Write repeatLen + length
+            cbuf_write_u16(&cb, repeat_len);
+            cbuf_write_u16(&cb, length);
+            // Copy remaining 56 bytes (from offset 8 in the 68k inst)
+            cbuf_write(&cb, mod + inst_pos + 8, 56);
+        } else {
+            // Synth instrument: skip sampleOffset(4), write from offset 4
+            cbuf_write(&cb, mod + inst_pos + 4, 60);
+        }
+
+        inst_pos += 64;
+    }
+
+    // Write sample data
+    cbuf_write_u16(&cb, (uint16_t)num_sample_entries);
+
+    for (int i = 0; i < num_sample_entries; i++) {
+        cbuf_write_u16(&cb, sample_entries[i].key);
+        cbuf_write_u16(&cb, sample_entries[i].length);
+
+        size_t samp_off = (size_t)sample_entries[i].offset;
+        size_t samp_len = sample_entries[i].length;
+        if (samp_off + samp_len <= mod_len) {
+            cbuf_write(&cb, mod + samp_off, samp_len);
+        } else {
+            // Partial or missing — write what we can + zeros
+            size_t avail = (samp_off < mod_len) ? mod_len - samp_off : 0;
+            if (avail > 0) cbuf_write(&cb, mod + samp_off, avail);
+            if (avail < samp_len) cbuf_write_zeros(&cb, samp_len - avail);
+        }
+    }
+
+    // Write end marker
+    cbuf_write_u32(&cb, 0x12345678);
+
+    free(position_offsets);
+    free(track_spans);
+    free(offset_to_track);
+    free(sample_entries);
+
+    *out_size = cb.size;
+    return cb.data;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public API
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1252,37 +1727,60 @@ FredModule* fred_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!data || size < 20)
         return nullptr;
 
-    // Check the mark
-    if (memcmp(data, "Fred Editor ", 12) != 0)
-        return nullptr;
+    const uint8_t* mod_data = data;
+    size_t mod_size = size;
+    uint8_t* converted = nullptr;
 
-    // Check the version
-    if (data[12] != 0x00 || data[13] != 0x00)
-        return nullptr;
+    // If wrapped in an Amiga HUNK executable, strip the hunk header
+    if (size >= 4 && rd32(data) == 0x000003F3) {
+        size_t code_size = 0;
+        const uint8_t* code = strip_amiga_hunk(data, size, &code_size);
+        if (code && code_size >= 16) {
+            mod_data = code;
+            mod_size = code_size;
+        }
+    }
 
-    // Check the number of songs
-    uint16_t num_songs = (uint16_t)((data[14] << 8) | data[15]);
-    if (num_songs > 10)
-        return nullptr;
+    // Try clean "Fred Editor " format first
+    if (mod_size >= 20 && memcmp(mod_data, "Fred Editor ", 12) == 0 &&
+        mod_data[12] == 0x00 && mod_data[13] == 0x00) {
+        uint16_t num_songs = (uint16_t)((mod_data[14] << 8) | mod_data[15]);
+        if (num_songs <= 10 && mod_size >= 4) {
+            uint32_t end_mark = rd32(mod_data + mod_size - 4);
+            if (end_mark == 0x12345678) {
+                goto do_load;
+            }
+        }
+    }
 
-    // Check the end mark
-    if (size < 4)
-        return nullptr;
-    uint32_t end_mark = ((uint32_t)data[size-4] << 24) | ((uint32_t)data[size-3] << 16) |
-                         ((uint32_t)data[size-2] << 8) | (uint32_t)data[size-1];
-    if (end_mark != 0x12345678)
-        return nullptr;
+    // Try Fred Editor Final (0x4EFA) format — convert to clean format
+    if (mod_size >= 0xB0E && rd16(mod_data) == 0x4EFA) {
+        size_t conv_size = 0;
+        converted = convert_fred_final(mod_data, mod_size, &conv_size);
+        if (converted) {
+            mod_data = converted;
+            mod_size = conv_size;
+            goto do_load;
+        }
+    }
 
+    return nullptr;
+
+do_load:
+    ;
     FredModule* m = (FredModule*)calloc(1, sizeof(FredModule));
-    if (!m) return nullptr;
+    if (!m) { free(converted); return nullptr; }
 
     m->sample_rate = sample_rate;
     m->ticks_per_frame = sample_rate / 50.0f;
 
-    if (!load_module(m, data, size)) {
+    if (!load_module(m, mod_data, mod_size)) {
         fred_destroy(m);
+        free(converted);
         return nullptr;
     }
+
+    free(converted);
 
     if (m->sub_song_num > 0)
         initialize_sound(m, 0);
