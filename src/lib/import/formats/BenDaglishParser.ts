@@ -31,7 +31,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, ChannelData, TrackerCell } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { benDaglishEncoder } from '@/engine/uade/encoders/BenDaglishEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -44,7 +46,6 @@ import { createSamplerInstrument } from './AmigaUtils';
  */
 const DEFAULT_INSTRUMENTS = 8;
 
-const ROWS_PER_PATTERN = 64;
 const MAX_PATTERNS = 256;
 const MAX_POSITION_LIST_LEN = 4096;
 const MAX_TRACK_LEN = 4096;
@@ -550,100 +551,7 @@ function bdNoteToTrackerNote(note: number): number {
   return (n >= 1 && n <= 96) ? n : 0;
 }
 
-/**
- * Walk a single channel's position list and all referenced tracks,
- * producing a flat list of timed events.
- */
-function bdExtractChannelEvents(
-  posListData: number[],
-  tracks: Uint8Array[],
-  f: BDFeatures,
-): BDEvent[] {
-  const events: BDEvent[] = [];
-  let tick = 0;
-  let transpose = 0;
-  let currentInstrument = 1;
-  let posIdx = 0;
-  const maxEvents = 32768;
-  const maxTicks = 65536;
-
-  while (posIdx < posListData.length && events.length < maxEvents && tick < maxTicks) {
-    const cmd = posListData[posIdx++];
-
-    if (cmd === 0xFF) break; // end of position list
-
-    if (cmd < f.maxTrackValue) {
-      // Track number to play
-      const trackIdx = cmd;
-      if (trackIdx >= tracks.length) break;
-      const track = tracks[trackIdx];
-
-      // Parse this track's byte stream
-      tick = bdParseTrackEvents(track, f, events, tick, transpose, currentInstrument);
-      continue;
-    }
-
-    if (cmd === 0xFE) {
-      // Transpose command
-      if (posIdx >= posListData.length) break;
-      const val = posListData[posIdx++];
-      transpose = val < 128 ? val : val - 256; // signed
-      continue;
-    }
-
-    if (cmd === 0xFD && f.masterVolumeFadeVersion > 0) {
-      posIdx++; // skip fade speed arg
-      continue;
-    }
-
-    // Sample mapping commands
-    if (f.enableC0TrackLoop && cmd >= 0xA0 && cmd < 0xC0) {
-      // Track loop count — ignore for pattern purposes
-      continue;
-    }
-    if (f.enableC0TrackLoop && cmd >= 0xC0 && cmd < 0xC8) {
-      // Sample mapping (c0 version) — next byte is sample index
-      if (posIdx >= posListData.length) break;
-      const sampleIdx = Math.floor(posListData[posIdx++] / 4);
-      const mapIndex = cmd & 0x07;
-      // We track instrument change from mapping[0] for simplicity
-      if (mapIndex === 0) currentInstrument = sampleIdx + 1;
-      continue;
-    }
-    if (f.enableF0TrackLoop && cmd >= 0xF0 && cmd < 0xF8) {
-      // Sample mapping (f0 version)
-      if (posIdx >= posListData.length) break;
-      const sampleIdx = Math.floor(posListData[posIdx++] / 4);
-      const mapIndex = cmd - 0xF0;
-      if (mapIndex === 0) currentInstrument = sampleIdx + 1;
-      continue;
-    }
-
-    // Non-loop sample mapping for set_sample_mapping_version variants
-    if (!f.enableC0TrackLoop && !f.enableF0TrackLoop) {
-      if (f.setSampleMappingVersion === 1 && cmd >= 0xC0 && cmd < 0xC8) {
-        if (posIdx >= posListData.length) break;
-        const sampleIdx = Math.floor(posListData[posIdx++] / 4);
-        const mapIndex = cmd & 0x07;
-        if (mapIndex === 0) currentInstrument = sampleIdx + 1;
-        continue;
-      }
-      if (f.setSampleMappingVersion === 2 && cmd >= 0xF0 && cmd < 0xF8) {
-        if (posIdx >= posListData.length) break;
-        const sampleIdx = Math.floor(posListData[posIdx++] / 4);
-        const mapIndex = cmd - 0xF0;
-        if (mapIndex === 0) currentInstrument = sampleIdx + 1;
-        continue;
-      }
-    }
-
-    // Loop count commands (non-mapping)
-    if (f.enableF0TrackLoop && cmd < 0xF0) continue;
-    if (f.enableC0TrackLoop && cmd < 0xA0) continue;
-  }
-
-  return events;
-}
+// (Channel events are now extracted via bdExtractTrackSteps + bdDecodeTrackRows)
 
 /**
  * Parse a single track byte stream, appending events.
@@ -771,82 +679,202 @@ function bdParseTrackEvents(
   return tick;
 }
 
-// ── Pattern builder ─────────────────────────────────────────────────────────
+// (Track-aligned pattern builder is above — bdBuildTrackAlignedPatterns)
 
-function bdBuildPatterns(
-  channelEvents: BDEvent[][],
-): { patterns: Pattern[]; songPositions: number[] } {
-  let maxTick = 0;
-  for (const events of channelEvents) {
-    for (const ev of events) {
-      if (ev.tick > maxTick) maxTick = ev.tick;
+// ── Track-step extraction ──────────────────────────────────────────────────
+// Walks a channel's position list and extracts the ordered sequence of track
+// references. Each track reference becomes one "step" (= one tracker pattern).
+
+interface BDTrackStep {
+  trackIndex: number;
+  transpose: number;
+  instrument: number; // 1-based, 0 = none
+}
+
+/**
+ * Extract ordered track references from a position list.
+ * Handles transpose, sample mapping, and loop commands.
+ */
+function bdExtractTrackSteps(posListData: number[], f: BDFeatures): BDTrackStep[] {
+  const steps: BDTrackStep[] = [];
+  let transpose = 0;
+  let currentInstrument = 1;
+  let posIdx = 0;
+
+  while (posIdx < posListData.length && steps.length < MAX_PATTERNS) {
+    const cmd = posListData[posIdx++];
+    if (cmd === 0xFF) break;
+
+    if (cmd < f.maxTrackValue) {
+      steps.push({ trackIndex: cmd, transpose, instrument: currentInstrument });
+      continue;
+    }
+
+    if (cmd === 0xFE) {
+      if (posIdx >= posListData.length) break;
+      const val = posListData[posIdx++];
+      transpose = val < 128 ? val : val - 256;
+      continue;
+    }
+
+    if (cmd === 0xFD && f.masterVolumeFadeVersion > 0) { posIdx++; continue; }
+
+    // Sample mapping commands
+    if (f.enableC0TrackLoop && cmd >= 0xA0 && cmd < 0xC0) continue;
+    if (f.enableC0TrackLoop && cmd >= 0xC0 && cmd < 0xC8) {
+      if (posIdx >= posListData.length) break;
+      const si = Math.floor(posListData[posIdx++] / 4);
+      if ((cmd & 0x07) === 0) currentInstrument = si + 1;
+      continue;
+    }
+    if (f.enableF0TrackLoop && cmd >= 0xF0 && cmd < 0xF8) {
+      if (posIdx >= posListData.length) break;
+      const si = Math.floor(posListData[posIdx++] / 4);
+      if ((cmd - 0xF0) === 0) currentInstrument = si + 1;
+      continue;
+    }
+    if (!f.enableC0TrackLoop && !f.enableF0TrackLoop) {
+      if (f.setSampleMappingVersion === 1 && cmd >= 0xC0 && cmd < 0xC8) {
+        if (posIdx >= posListData.length) break;
+        const si = Math.floor(posListData[posIdx++] / 4);
+        if ((cmd & 0x07) === 0) currentInstrument = si + 1;
+        continue;
+      }
+      if (f.setSampleMappingVersion === 2 && cmd >= 0xF0 && cmd < 0xF8) {
+        if (posIdx >= posListData.length) break;
+        const si = Math.floor(posListData[posIdx++] / 4);
+        if ((cmd - 0xF0) === 0) currentInstrument = si + 1;
+        continue;
+      }
     }
   }
 
-  const totalRows = maxTick + 1;
-  const numPatterns = Math.max(1, Math.ceil(totalRows / ROWS_PER_PATTERN));
-  const patternLimit = Math.min(numPatterns, MAX_PATTERNS);
+  return steps;
+}
 
+/**
+ * Decode a single track's events into rows (tick-local, 0-based).
+ */
+function bdDecodeTrackRows(
+  track: Uint8Array, f: BDFeatures, transpose: number, instrument: number,
+): { rows: TrackerCell[]; rowCount: number } {
+  const events: BDEvent[] = [];
+  bdParseTrackEvents(track, f, events, 0, transpose, instrument);
+
+  const maxTick = events.reduce((m, e) => Math.max(m, e.tick), 0);
+  const rowCount = Math.max(maxTick + 1, 1);
+  const rows: TrackerCell[] = Array.from({ length: rowCount }, () => ({
+    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  }));
+
+  for (const ev of events) {
+    if (ev.tick < rowCount) {
+      rows[ev.tick] = {
+        note: ev.note, instrument: ev.instrument, volume: 0,
+        effTyp: ev.effTyp, eff: ev.eff, effTyp2: 0, eff2: 0,
+      };
+    }
+  }
+
+  return { rows, rowCount };
+}
+
+// ── Track-aligned pattern builder ──────────────────────────────────────────
+
+interface BDExtractResult {
+  patterns: Pattern[];
+  songPositions: number[];
+  /** File offset of each track (index = track number from offset table). */
+  trackFileOffsets: number[];
+  /** Byte size of each track. */
+  trackFileSizes: number[];
+  /** trackMap[patternIdx][channel] = file-level track index (or -1 if unused). */
+  trackMap: number[][];
+}
+
+function bdBuildTrackAlignedPatterns(
+  buf: Uint8Array,
+  offsets: BDOffsets,
+  tracks: Uint8Array[],
+  channelSteps: BDTrackStep[][],
+): BDExtractResult {
+  const numSteps = Math.max(...channelSteps.map(s => s.length), 1);
   const patterns: Pattern[] = [];
+  const songPositions: number[] = [];
+  const trackMap: number[][] = [];
+  const f = offsets.features;
 
-  // Pre-index events by tick for efficient lookup
-  const channelEventMaps: Map<number, BDEvent>[] = channelEvents.map(events => {
-    const map = new Map<number, BDEvent>();
-    for (const ev of events) map.set(ev.tick, ev);
-    return map;
-  });
+  // Compute track file offsets and sizes
+  const tablePos = offsets.trackOffsetTableOffset;
+  const trackFileOffsets: number[] = [];
+  const trackFileSizes: number[] = [];
+  for (let i = 0; i < tracks.length; i++) {
+    const trackOffset = u16BE(buf, tablePos + i * 2);
+    trackFileOffsets.push(offsets.tracksOffset + trackOffset);
+    trackFileSizes.push(tracks[i].length);
+  }
 
-  for (let p = 0; p < patternLimit; p++) {
-    const startTick = p * ROWS_PER_PATTERN;
+  for (let step = 0; step < numSteps && patterns.length < MAX_PATTERNS; step++) {
     const channels: ChannelData[] = [];
+    let maxRows = 1;
+    const stepTrackMap: number[] = [];
 
+    // First pass: compute max row count
     for (let ch = 0; ch < 4; ch++) {
-      const rows: TrackerCell[] = [];
-      const eventMap = channelEventMaps[ch];
+      const s = channelSteps[ch][step];
+      if (s && s.trackIndex < tracks.length) {
+        const { rowCount } = bdDecodeTrackRows(tracks[s.trackIndex], f, s.transpose, s.instrument);
+        maxRows = Math.max(maxRows, rowCount);
+        stepTrackMap.push(s.trackIndex);
+      } else {
+        stepTrackMap.push(-1);
+      }
+    }
+    // Cap pattern length
+    maxRows = Math.min(maxRows, 512);
 
-      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
-        const ev = eventMap?.get(startTick + r);
-        rows.push({
-          note: ev?.note ?? 0,
-          instrument: ev?.instrument ?? 0,
-          volume: 0,
-          effTyp: ev?.effTyp ?? 0,
-          eff: ev?.eff ?? 0,
-          effTyp2: 0,
-          eff2: 0,
-        });
+    // Second pass: build channel data
+    for (let ch = 0; ch < 4; ch++) {
+      const s = channelSteps[ch][step];
+      let rows: TrackerCell[];
+
+      if (s && s.trackIndex < tracks.length) {
+        const decoded = bdDecodeTrackRows(tracks[s.trackIndex], f, s.transpose, s.instrument);
+        rows = decoded.rows;
+        // Pad or truncate to match pattern length
+        while (rows.length < maxRows) {
+          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+        }
+        if (rows.length > maxRows) rows = rows.slice(0, maxRows);
+      } else {
+        rows = Array.from({ length: maxRows }, () => ({
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        }));
       }
 
       channels.push({
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows,
+        id: `channel-${ch}`, name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null, color: null, rows,
       });
     }
 
     patterns.push({
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: ROWS_PER_PATTERN,
-      channels,
+      id: `pattern-${step}`, name: `Pattern ${step}`, length: maxRows, channels,
     });
+    songPositions.push(step);
+    trackMap.push(stepTrackMap);
   }
 
-  return { patterns, songPositions: patterns.map((_, i) => i) };
+  return { patterns, songPositions, trackFileOffsets, trackFileSizes, trackMap };
 }
 
 // ── Main pattern extraction entry point ─────────────────────────────────────
 
 function extractBDPatterns(
   buf: Uint8Array,
-): { patterns: Pattern[]; songPositions: number[] } | null {
+): BDExtractResult | null {
   const offsets = bdFindOffsets(buf);
   if (!offsets) return null;
 
@@ -859,25 +887,24 @@ function extractBDPatterns(
   // Use first sub-song
   const song = subSongs[0];
   const f = offsets.features;
-  const channelEvents: BDEvent[][] = [];
 
+  // Extract track-step sequences per channel
+  const channelSteps: BDTrackStep[][] = [];
   for (let ch = 0; ch < 4; ch++) {
     const plOffset = offsets.subSongListOffset + song.positionLists[ch];
     const posListData = bdLoadPositionList(buf, plOffset, f);
     if (!posListData) {
-      channelEvents.push([]);
+      channelSteps.push([]);
       continue;
     }
-
-    const events = bdExtractChannelEvents(posListData, tracks, f);
-    channelEvents.push(events);
+    channelSteps.push(bdExtractTrackSteps(posListData, f));
   }
 
-  // Check if we got any meaningful events
-  const totalEvents = channelEvents.reduce((s, e) => s + e.length, 0);
-  if (totalEvents === 0) return null;
+  // Check we have any steps
+  const totalSteps = channelSteps.reduce((s, steps) => s + steps.length, 0);
+  if (totalSteps === 0) return null;
 
-  return bdBuildPatterns(channelEvents);
+  return bdBuildTrackAlignedPatterns(buf, offsets, tracks, channelSteps);
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -1089,37 +1116,37 @@ export async function parseBenDaglishFile(
 
   let patterns: Pattern[];
   let songPositions: number[];
+  let uadeVariableLayout: UADEVariablePatternLayout | undefined;
 
   if (patternResult) {
     patterns = patternResult.patterns;
     songPositions = patternResult.songPositions;
+
+    // Build variable layout for chip RAM editing
+    uadeVariableLayout = {
+      formatId: 'benDaglish',
+      numChannels: 4,
+      numFilePatterns: patternResult.trackFileOffsets.length,
+      rowsPerPattern: patterns.map(p => p.length),
+      moduleSize: buf.length,
+      encoder: benDaglishEncoder,
+      filePatternAddrs: patternResult.trackFileOffsets,
+      filePatternSizes: patternResult.trackFileSizes,
+      trackMap: patternResult.trackMap,
+    };
   } else {
     // Fallback: single empty pattern
     const emptyRows: TrackerCell[] = Array.from({ length: 64 }, () => ({
-      note: 0,
-      instrument: 0,
-      volume: 0,
-      effTyp: 0,
-      eff: 0,
-      effTyp2: 0,
-      eff2: 0,
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
     }));
 
     patterns = [{
-      id: 'pattern-0',
-      name: 'Pattern 0',
-      length: 64,
+      id: 'pattern-0', name: 'Pattern 0', length: 64,
       channels: Array.from({ length: 4 }, (_, ch) => ({
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows: emptyRows,
+        id: `channel-${ch}`, name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null, color: null, rows: emptyRows,
       })),
     }];
     songPositions = [0];
@@ -1137,7 +1164,7 @@ export async function parseBenDaglishFile(
     };
   }
 
-  return {
+  const result: TrackerSong = {
     name: `${moduleName} [Ben Daglish]`,
     format: 'MOD' as TrackerFormat,
     patterns,
@@ -1153,4 +1180,8 @@ export async function parseBenDaglishFile(
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
   };
+  if (uadeVariableLayout) {
+    (result as any).uadeVariableLayout = uadeVariableLayout;
+  }
+  return result;
 }
