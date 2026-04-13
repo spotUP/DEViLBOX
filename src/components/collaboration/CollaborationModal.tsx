@@ -131,7 +131,7 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({ isOpen, 
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                placeholder="XXXXXX"
+                placeholder="e.g. ABC123"
                 maxLength={6}
                 className="w-full px-4 py-3 rounded-lg bg-dark-bgSecondary border border-dark-border text-text-primary font-mono text-xl text-center tracking-widest focus:outline-none focus:border-accent-primary transition-colors"
                 autoFocus

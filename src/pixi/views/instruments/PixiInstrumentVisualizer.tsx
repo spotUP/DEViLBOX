@@ -249,16 +249,23 @@ export const PixiInstrumentVisualizer: React.FC<PixiInstrumentVisualizerProps> =
 
 // ─── Render functions ────────────────────────────────────────────────────────
 
+// Canvas2D visualizer colors — intentional decorative palette (not theme tokens)
+const VIS_BG = '#0a0a0a';
+const VIS_GRID = 'rgba(255,255,255,0.06)';
+const VIS_WAVE = '#34d399';       // emerald-400
+const VIS_SPECTRUM_LO = '#f97316'; // orange-500
+const VIS_SPECTRUM_HI = '#34d399'; // emerald-400
+
 function renderOscilloscope(
   ctx: CanvasRenderingContext2D, w: number, h: number,
   analyser: ReturnType<ReturnType<typeof getToneEngine>['getInstrumentAnalyser']>,
   hasAudio: boolean,
 ) {
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = VIS_BG;
   ctx.fillRect(0, 0, w, h);
 
   // Center line
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.strokeStyle = VIS_GRID;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, h / 2);
@@ -268,7 +275,7 @@ function renderOscilloscope(
   if (!analyser || !hasAudio) return;
 
   const waveform = analyser.getWaveform();
-  ctx.strokeStyle = '#4ade80';
+  ctx.strokeStyle = VIS_WAVE;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   const sliceW = w / waveform.length;
@@ -279,7 +286,7 @@ function renderOscilloscope(
   ctx.stroke();
 
   // Glow
-  ctx.shadowColor = '#4ade80';
+  ctx.shadowColor = VIS_WAVE;
   ctx.shadowBlur = 4;
   ctx.stroke();
   ctx.shadowBlur = 0;
@@ -290,7 +297,7 @@ function renderSpectrum(
   analyser: ReturnType<ReturnType<typeof getToneEngine>['getInstrumentAnalyser']>,
   hasAudio: boolean,
 ) {
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = VIS_BG;
   ctx.fillRect(0, 0, w, h);
 
   if (!analyser || !hasAudio) return;
@@ -303,9 +310,9 @@ function renderSpectrum(
 
   // Gradient
   const grad = ctx.createLinearGradient(0, h, 0, 0);
-  grad.addColorStop(0, '#ef4444');
-  grad.addColorStop(0.5, '#22c55e');
-  grad.addColorStop(1, '#22c55e');
+  grad.addColorStop(0, VIS_SPECTRUM_LO);
+  grad.addColorStop(0.5, VIS_SPECTRUM_HI);
+  grad.addColorStop(1, VIS_SPECTRUM_HI);
   ctx.fillStyle = grad;
 
   for (let i = 0; i < barCount; i++) {

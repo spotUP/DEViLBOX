@@ -285,7 +285,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
               ) : (
                 <>
                   <p className="px-3 py-1.5 text-xs text-text-muted italic">
-                    Informational — automatic loop tail truncation coming soon.
+                    Detected loop tail data (informational only).
                   </p>
                   {report.loopTails.map((t) => (
                     <div

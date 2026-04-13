@@ -723,51 +723,6 @@ const PixiVinylDisplay: React.FC<{
   );
 };
 
-/* ─── Tonearm overlay for turntable mode (reserved, not yet wired) ─── */
-
-// @ts-expect-error — reserved component, will be used when tonearm is wired
-const _PixiTonearm: React.FC<{
-  size: number;
-  isPlaying: boolean;
-}> = ({ size, isPlaying }) => {
-  const theme = usePixiTheme();
-  const drawArm = useCallback((g: GraphicsType) => {
-    g.clear();
-
-    const baseX = size - 14;
-    const baseY = 14;
-    const armAngle = isPlaying ? Math.PI * 0.78 : Math.PI * 0.88;
-    const armLen = size * 0.55;
-    const endX = baseX - Math.cos(armAngle) * armLen;
-    const endY = baseY + Math.sin(armAngle) * armLen;
-
-    // Counterweight
-    g.circle(baseX + Math.cos(armAngle) * 16, baseY - Math.sin(armAngle) * 16, 4)
-      .fill({ color: theme.textMuted.color });
-
-    // Arm shaft
-    g.moveTo(baseX, baseY).lineTo(endX, endY)
-      .stroke({ color: theme.textSecondary.color, width: 2 });
-
-    // Headshell
-    const sa = armAngle + 0.3;
-    g.moveTo(endX, endY)
-      .lineTo(endX - Math.cos(sa) * 12, endY + Math.sin(sa) * 12)
-      .stroke({ color: theme.text.color, width: 3 });
-
-    // Pivot
-    g.circle(baseX, baseY, 6).fill({ color: theme.border.color });
-    g.circle(baseX, baseY, 2).fill({ color: theme.textSecondary.color });
-  }, [size, isPlaying]);
-
-  return (
-    <pixiGraphics
-      draw={drawArm}
-      layout={{ width: size, height: size, position: 'absolute', left: 0, top: 0 }}
-    />
-  );
-};
-
 /* ─── Full 2D top-down turntable deck ───────────────────────────────── */
 
 const PixiTurntable2D: React.FC<{
