@@ -80,9 +80,15 @@ interface FormatStore {
   soundFxFileData: ArrayBuffer | null;
   gmcFileData: ArrayBuffer | null;
   voodooFileData: ArrayBuffer | null;
-  bdFileData: ArrayBuffer | null;
+  fredReplayerFileData: ArrayBuffer | null;
+  oktalyzerFileData: ArrayBuffer | null;
+  inStereo1FileData: ArrayBuffer | null;
+  futureComposerFileData: ArrayBuffer | null;
+  inStereo2FileData: ArrayBuffer | null;
+  quadraComposerFileData: ArrayBuffer | null;  bdFileData: ArrayBuffer | null;
   sd2FileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
+  sawteethFileData: ArrayBuffer | null;
   v2mFileData: ArrayBuffer | null;
   uadeEditableFileData: ArrayBuffer | null;
   uadeEditableFileName: string | null;
@@ -193,7 +199,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -352,8 +358,14 @@ export const useFormatStore = create<FormatStore>()(
     soundFxFileData: null,
     gmcFileData: null,
     voodooFileData: null,    bdFileData: null,
-    sd2FileData: null,
+    fredReplayerFileData: null,
+    oktalyzerFileData: null,
+    inStereo1FileData: null,
+    futureComposerFileData: null,
+    inStereo2FileData: null,
+    quadraComposerFileData: null,    sd2FileData: null,
     symphonieFileData: null,
+    sawteethFileData: null,
     v2mFileData: null,
     uadeEditableFileData: null,
     adplugFileData: null,
@@ -773,8 +785,14 @@ export const useFormatStore = create<FormatStore>()(
         state.soundFxFileData = (song as any).soundFxFileData ?? null;
         state.gmcFileData = (song as any).gmcFileData ?? null;
         state.voodooFileData = (song as any).voodooFileData ?? null;        state.bdFileData = (song as any).bdFileData ?? null;
-        state.sd2FileData = (song as any).sd2FileData ?? null;
+        state.fredReplayerFileData = (song as any).fredReplayerFileData ?? null;
+        state.oktalyzerFileData = (song as any).oktalyzerFileData ?? null;
+        state.inStereo1FileData = (song as any).inStereo1FileData ?? null;
+        state.futureComposerFileData = (song as any).futureComposerFileData ?? null;
+        state.inStereo2FileData = (song as any).inStereo2FileData ?? null;
+        state.quadraComposerFileData = (song as any).quadraComposerFileData ?? null;        state.sd2FileData = (song as any).sd2FileData ?? null;
         state.symphonieFileData = (song as any).symphonieFileData ?? null;
+        state.sawteethFileData = (song as any).sawteethFileData ?? null;
         state.v2mFileData = (song as any).v2mFileData ?? null;
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
@@ -1036,8 +1054,14 @@ export const useFormatStore = create<FormatStore>()(
       state.soundFxFileData = null;
       state.gmcFileData = null;
       state.voodooFileData = null;      state.bdFileData = null;
-      state.sd2FileData = null;
+      state.fredReplayerFileData = null;
+      state.oktalyzerFileData = null;
+      state.inStereo1FileData = null;
+      state.futureComposerFileData = null;
+      state.inStereo2FileData = null;
+      state.quadraComposerFileData = null;      state.sd2FileData = null;
       state.symphonieFileData = null;
+      state.sawteethFileData = null;
       state.v2mFileData = null;
       state.uadeEditableFileData = null;
       state.uadeEditableFileName = null;
