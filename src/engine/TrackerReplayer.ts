@@ -302,6 +302,8 @@ export interface TrackerSong {
   pxtoneFileData?: ArrayBuffer;
   /** Raw Organya (.org) binary for loading into the OrganyaEngine WASM */
   organyaFileData?: ArrayBuffer;
+  /** Raw Sawteeth (.st) binary for loading into the SawteethEngine WASM */
+  sawteethFileData?: ArrayBuffer;
   /** Raw FM Towns EUP binary for loading into the EupminiEngine WASM */
   eupFileData?: ArrayBuffer;
   /** Raw IXS binary for loading into the IxalanceEngine WASM */
@@ -360,7 +362,12 @@ export interface TrackerSong {
   gmcFileData?: ArrayBuffer;
   /** Raw Voodoo Supreme binary for VoodooEngine WASM playback */
   voodooFileData?: ArrayBuffer;  /** Raw file binary for UADE playback of editable formats (native parser provides patterns, UADE provides audio) */
-  uadeEditableFileData?: ArrayBuffer;
+  fredReplayerFileData?: ArrayBuffer;
+  oktalyzerFileData?: ArrayBuffer;
+  inStereo1FileData?: ArrayBuffer;
+  futureComposerFileData?: ArrayBuffer;
+  inStereo2FileData?: ArrayBuffer;
+  quadraComposerFileData?: ArrayBuffer;  uadeEditableFileData?: ArrayBuffer;
   /** Original filename hint for UADE format detection */
   uadeEditableFileName?: string;
   /** Raw MDX binary for mdxmini WASM playback (Sharp X68000 YM2151) */
