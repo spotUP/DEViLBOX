@@ -13,7 +13,7 @@ export type MIDIContext = 'tracker' | 'dj' | 'global';
 export function getMIDIContext(): MIDIContext {
   const { activeView } = useUIStore.getState();
   if (activeView === 'dj') return 'dj';
-  return 'tracker'; // tracker + arrangement both use tracker context
+  return 'tracker'; // all non-DJ views use tracker MIDI context
 }
 
 /** Check if DJ mode is active for MIDI routing */

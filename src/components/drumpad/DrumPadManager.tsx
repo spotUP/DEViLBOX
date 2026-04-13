@@ -413,9 +413,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                   options={[
                     { value: 'tracker', label: 'Tracker' },
                     { value: 'grid', label: 'Grid' },
-                    { value: 'pianoroll', label: 'Piano Roll' },
                     { value: 'tb303', label: 'TB-303' },
-                    { value: 'arrangement', label: 'Arrangement' },
                     { value: 'dj', label: 'DJ Mixer' },
                     { value: 'drumpad', label: 'Drum Pads' },
                     { value: 'vj', label: 'VJ View' },

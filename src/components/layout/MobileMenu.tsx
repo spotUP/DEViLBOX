@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User, LayoutGrid, Piano, Radio, Disc3, Monitor, Columns, Grid2x2, Music4 } from 'lucide-react';
+import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User, LayoutGrid, Radio, Disc3, Monitor, Columns, Grid2x2, Music4 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
@@ -32,8 +32,6 @@ interface MobileMenuProps {
 // Icons for mobile menu views (keyed by view value)
 const VIEW_ICONS: Record<string, React.ReactNode> = {
   tracker: <LayoutGrid size={18} />,
-  arrangement: <List size={18} />,
-  pianoroll: <Piano size={18} />,
   mixer: <Sliders size={18} />,
   dj: <Radio size={18} />,
   drumpad: <Disc3 size={18} />,

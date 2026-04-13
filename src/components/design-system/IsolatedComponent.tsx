@@ -97,11 +97,6 @@ export const IsolatedComponent: React.FC<Props> = ({ name }) => {
               Mixer — available in DAW mode bottom panel or Mixer view.
             </div>
           )}
-          {name === 'arrangement' && (
-            <div style={{ padding: 16, color: '#6b6b80', fontFamily: 'monospace', fontSize: 11 }}>
-              Arrangement — available in DAW mode. Load a GT Ultra .sng and switch to DAW view.
-            </div>
-          )}
         </Suspense>
       </div>
     </div>

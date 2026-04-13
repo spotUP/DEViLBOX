@@ -163,9 +163,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
 
   // ── Effects ─────────────────────────────────────────────────────────────────
 
-  // Auto-select audio scope when opened from arrangement toolbar
+  // Auto-select audio scope when opened with audioScope hint
   useEffect(() => {
-    if (isOpen && modalData?.audioScope === 'arrangement') {
+    if (isOpen && modalData?.audioScope) {
       setExportMode('audio');
     }
   }, [isOpen, modalData]);
