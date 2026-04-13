@@ -1011,6 +1011,30 @@ export async function parseUADEFile(
         const { parseDavidHanneyFile } = await import('./DavidHanneyParser');
         return parseDavidHanneyFile(buffer, filename);
       },
+      'BeathovenSynthesizer': async () => {
+        const { parseBeathovenSynthesizerFile } = await import('./BeathovenSynthesizerParser');
+        return parseBeathovenSynthesizerFile(buffer, filename);
+      },
+      'RiffRaff': async () => {
+        const { parseRiffRaffFile } = await import('./RiffRaffParser');
+        return parseRiffRaffFile(buffer, filename);
+      },
+      'HowieDavies': async () => {
+        const { parseHowieDaviesFile } = await import('./HowieDaviesParser');
+        return parseHowieDaviesFile(buffer, filename);
+      },
+      'DynamicSynthesizer': async () => {
+        const { parseDynamicSynthesizerFile } = await import('./DynamicSynthesizerParser');
+        return parseDynamicSynthesizerFile(buffer, filename);
+      },
+      'SoundImages': async () => {
+        const { parseSoundImagesFile } = await import('./SoundImagesParser');
+        return parseSoundImagesFile(buffer, filename);
+      },
+      'Silmarils': async () => {
+        const { parseSilmarilsFile } = await import('./SilmarilsParser');
+        return parseSilmarilsFile(buffer, filename);
+      },
     };
     let route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
     // Prefix fallback: UADE may report variants like "TFMX Professional", "TFMX 1.5", etc.
