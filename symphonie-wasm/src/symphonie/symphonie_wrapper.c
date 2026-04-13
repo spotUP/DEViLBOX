@@ -63,6 +63,15 @@ void player_set_interp_mode(int mode) {
     s_song.interpMode = (mode < 0) ? 0 : (mode > 2) ? 2 : mode;
 }
 
+EMSCRIPTEN_KEEPALIVE
+void player_set_sample_diff(int diff) {
+    /* Stereo sample offset: R channel sample start is offset by this many bytes.
+     * ASM clamps to 0-2000. */
+    if (diff < 0) diff = 0;
+    if (diff > 2000) diff = 2000;
+    s_song.sampleDiff = diff;
+}
+
 /* ---- Instrument setup ---- */
 
 EMSCRIPTEN_KEEPALIVE

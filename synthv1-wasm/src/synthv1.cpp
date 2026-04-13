@@ -1226,9 +1226,12 @@ float synthv1_impl::tempo (void) const
 }
 
 
-// allocate local buffers
+// allocate local buffers — only reallocate when size actually increases
 void synthv1_impl::alloc_sfxs ( uint32_t nsize )
 {
+	if (m_sfxs && m_nsize >= nsize)
+		return; // existing buffers are large enough
+
 	if (m_sfxs) {
 		for (uint16_t k = 0; k < m_nchannels; ++k)
 			delete [] m_sfxs[k];
@@ -1237,7 +1240,7 @@ void synthv1_impl::alloc_sfxs ( uint32_t nsize )
 		m_nsize = 0;
 	}
 
-	if (m_nsize < nsize) {
+	if (nsize > 0) {
 		m_nsize = nsize;
 		m_sfxs = new float * [m_nchannels];
 		for (uint16_t k = 0; k < m_nchannels; ++k)
@@ -2358,7 +2361,6 @@ void synthv1_impl::process ( float **ins, float **outs, uint32_t nframes )
 	float *v_outs[m_nchannels];
 	float *v_sfxs[m_nchannels];
 
-	// FIXME: fx-send buffer reallocation... seriously?
 	if (m_nsize < nframes) alloc_sfxs(nframes);
 
 	uint16_t k;

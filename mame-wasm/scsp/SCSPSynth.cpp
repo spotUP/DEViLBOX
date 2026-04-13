@@ -123,6 +123,7 @@ struct SCSPSlot {
     bool active = false;
     bool keyOn = false;
     s16 prevSample = 0;      // For interpolation
+    int midiNote = 0;
 };
 
 /**
@@ -217,9 +218,8 @@ public:
         // Compute playback step from MIDI note frequency.
         // Default waveform is DEFAULT_WAVE_SAMPLES samples (DEFAULT_WAVE_BYTES bytes) per cycle.
         // step (24.8 fixed point) = freq * bytesPerCycle / sampleRate * 256
-        double freq = 440.0 * pow(2.0, (midiNote - 69.0) / 12.0);
-        s.step = static_cast<u32>(freq * DEFAULT_WAVE_BYTES * 256.0 / m_sampleRate);
-        if (s.step == 0) s.step = 1;  // Ensure non-zero step
+        s.midiNote = midiNote;
+        computeSlotStep(s);
 
         // Set envelope based on velocity
         s.totalLevel = 255 - (velocity * 2);
@@ -298,7 +298,12 @@ public:
     }
 
     void pitchBend(int value) {
-        // TODO: Apply pitch bend to active slots
+        m_pitchBend = value; // -8192 to +8192
+        for (int i = 0; i < SCSP_SLOTS; i++) {
+            if (m_slots[i].active) {
+                computeSlotStep(m_slots[i]);
+            }
+        }
     }
 
     void programChange(int program) {
@@ -418,6 +423,13 @@ private:
         s.step = static_cast<u32>(freq / m_sampleRate * 256.0);
     }
 
+    void computeSlotStep(SCSPSlot& s) {
+        double bendFactor = pow(2.0, (m_pitchBend / 8192.0) * (2.0 / 12.0));
+        double freq = 440.0 * pow(2.0, (s.midiNote - 69.0) / 12.0);
+        s.step = static_cast<u32>(freq * bendFactor * DEFAULT_WAVE_BYTES * 256.0 / m_sampleRate);
+        if (s.step == 0) s.step = 1;
+    }
+
     int findFreeSlot() {
         for (int i = 0; i < SCSP_SLOTS; i++) {
             if (!m_slots[i].active) return i;
@@ -527,6 +539,7 @@ private:
     int m_sampleRate;
     bool m_isInitialized;
     float m_masterVolume;
+    int m_pitchBend = 0;
 
     std::vector<u8> m_sampleRAM;
     SCSPSlot m_slots[SCSP_SLOTS];

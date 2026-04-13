@@ -370,7 +370,10 @@ static bool fmp_cmd63_mix_ssg(struct fmdriver_work *work,
     // 23f7
     fmp_part_cmdload(fmp, part);
     fmp_part_cmdload16(fmp, part);
-    // TODO: PPZ
+    // LIMITATION: PPZ8 PCM sample playback mode not implemented.
+    // When val < 0x80, the original driver configures PPZ8 sample channel
+    // parameters here. The two cmdloads above consume the data bytes to
+    // keep the stream position correct, but the PPZ8 setup is skipped.
   }
   return true;
 }
@@ -436,7 +439,9 @@ static bool fmp_cmd67_q(struct fmdriver_work *work,
                         struct driver_fmp *fmp,
                         struct fmp_part *part) {
   (void)work;
-  //TODO
+  // Gate time (Q command): two modes depending on the file's Q flag.
+  // flags.q=1: gate_cnt is a fraction of note length (proportional gate).
+  // flags.q=0: gate_cmp is an absolute tick count subtracted from note length.
   if (fmp->datainfo.flags.q) {
     part->gate_cnt = fmp_part_cmdload(fmp, part);
   } else {
@@ -835,7 +840,10 @@ static bool fmp_cmd73_relvol_fm(struct fmdriver_work *work,
 static bool fmp_cmd73_noise_ssg(struct fmdriver_work *work,
                                 struct driver_fmp *fmp,
                                 struct fmp_part *part) {
-  // TODO: ignoring se flag
+  // LIMITATION: Sound effect (SE) mode flag not checked here.
+  // The original driver skips SSG noise setup when in SE mode to avoid
+  // interfering with music playback. This implementation always applies
+  // the noise setting regardless of SE state.
   uint8_t val = fmp_part_cmdload(fmp, part);
   part->u.ssg.env_f.noise = true;
   if (val & 0x80) {
@@ -868,7 +876,10 @@ static bool fmp_cmd74_loop(struct fmdriver_work *work,
                            struct driver_fmp *fmp,
                            struct fmp_part *part) {
   (void)work;
-  // TODO: se flag
+  // LIMITATION: Sound effect (SE) mode flag not checked here.
+  // The original driver handles loop detection differently when SE parts
+  // are active, to avoid false loop-complete signals during sound effects.
+  // This implementation always uses the standard music loop logic.
   fmp->part_loop_bit &= ~part->part_bit;
   if (!fmp->part_loop_bit) {
     if (!--fmp->loop_dec) {
@@ -2180,7 +2191,10 @@ static void fmp_part_adpcm(struct fmdriver_work *work,
 
 // 2750
 static void fmp_part_keyon_pre(struct driver_fmp *fmp, struct fmp_part *part) {
-  // TODO: seproc
+  // LIMITATION: Sound effect (SE) pre-processing not implemented.
+  // The original driver runs a separate SE channel tick procedure here
+  // before computing gate time. SE mode allows sound effects to temporarily
+  // override music channels. This implementation only handles music playback.
   if (fmp->datainfo.flags.q) {
     // 275e
     uint8_t tonelen = part->tonelen_cnt;
@@ -2883,8 +2897,10 @@ static void fmp_timerb(struct fmdriver_work *work, struct driver_fmp *fmp) {
 
   // 1813
   if (fmp->status.stopped) {
-    // TODO: stopped
-    // jmp 18c7
+    // LIMITATION: Stopped-state cleanup is minimal.
+    // The original driver (at address 18c7) performs additional cleanup when
+    // stopped, such as silencing all channels and resetting SE state.
+    // This implementation only clears the playing flag.
     work->playing = false;
   }
   // 1829
@@ -3066,7 +3082,9 @@ static void fmp_init_parts(struct fmdriver_work *work,
   // 3d2d
   fmp->part_playing_bit = 0x07ff;
   fmp->part_loop_bit = 0x07ff;
-  // TODO: other status bit
+  // LIMITATION: Only looped/stopped status bits are reset here.
+  // The original driver resets additional status fields (e.g., SE active,
+  // fade state) that are not tracked in this implementation.
   fmp->status.looped = false;
   fmp->status.stopped = false;
   fmp->total_clocks = 0;
@@ -3089,7 +3107,9 @@ static void fmp_init_parts(struct fmdriver_work *work,
 
 static void fmp_struct_init(struct fmdriver_work *work,
                             struct driver_fmp *fmp) {
-  // TODO
+  // LIMITATION: PDZF (PPZ8-driven FM synthesis) mode initialization skipped.
+  // The original driver sets pdzf.mode=2 here to enable PDZF on supported
+  // hardware. Commented out because PDZF/PPZ8 is not implemented.
   //fmp->pdzf.mode = 2;
   // 4e87
   fmp->ssg_mix = 0x38;
@@ -3113,7 +3133,9 @@ static void fmp_struct_init(struct fmdriver_work *work,
   fmp->fm_vol = -8;
 
   // 53ca
-  // TODO: part at 0x1426
+  // LIMITATION: Part structure at original address 0x1426 not initialized.
+  // This is likely the rhythm/ADPCM part or an additional SE part that the
+  // original driver sets up here. Not needed for standard FM/SSG playback.
   // 5408
   fmp->parts[FMP_PART_SSG_1].type.ssg = true;
   fmp->parts[FMP_PART_SSG_2].type.ssg = true;

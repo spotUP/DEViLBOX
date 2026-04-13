@@ -60,6 +60,7 @@ private:
 
     HighPass *highPass;
     StereoPan *stereoPan;
+    HighPass *highPassR;
 
     DelayEngine *delayEngine;
     ChorusEngine *chorusEngine;
@@ -87,6 +88,7 @@ public:
         delete envelopeEditor;
         delete envelopeEditorHandler;
         delete highPass;
+        delete highPassR;
         delete stereoPan;
         delete denormalNoise;
         delete lfoHandler1;
@@ -120,6 +122,7 @@ private:
         envelopeEditorHandler = new EnvelopeEditorHandler(this->envelopeEditor);
 
         highPass = new HighPass();
+        highPassR = new HighPass();
         this->stereoPan = new StereoPan(lfoHandler2);
 
         this->denormalNoise = new OscNoise(sampleRate);
@@ -605,6 +608,7 @@ public:
 	void setHighPass(float value)
 	{
         highPass->setCutoff(audioUtils.getLogScaledValue(value));
+        highPassR->setCutoff(audioUtils.getLogScaledValue(value));
 	}
 
 	void setMastertune(float value)
@@ -878,7 +882,7 @@ public:
 		}
 
         highPass->tick(sampleL);
-        *sampleR = *sampleL;
+        highPassR->tick(sampleR);
 
 		if (playingNotes)
 		{
@@ -888,9 +892,9 @@ public:
             lfoHandler2->setRateMultiplier(this->lfoHandler1->getLfo2());
 		    lfoHandler2->process();
 
-            // FIXME: loose stereo information here of a voice
-            *sampleL *= this->lfoHandler2->getVolume();
-            *sampleR = *sampleL;
+            float lfoVol = this->lfoHandler2->getVolume();
+            *sampleL *= lfoVol;
+            *sampleR *= lfoVol;
 
             this->stereoPan->process(sampleL, sampleR);
 		}

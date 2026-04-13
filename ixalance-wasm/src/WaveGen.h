@@ -139,5 +139,6 @@ namespace IXS {
 
   // "public methods"
   int IXS__WAVEGEN__createSampleCacheFile(char *filename, byte *dataBuf1, byte *dataBuf2, FileSFXI *destSFXI);
+  void IXS__WAVEGEN__freeCacheFileBuf(void);
 }
 #endif //IXS_WAVEGEN_H

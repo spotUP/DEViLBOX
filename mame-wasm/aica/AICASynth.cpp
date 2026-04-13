@@ -133,6 +133,7 @@ struct AICASlot {
     bool active = false;
     bool keyOn = false;
     s16 prevSample = 0;
+    int midiNote = 0;
 };
 
 /**
@@ -241,6 +242,7 @@ public:
             s.adpcmNibble = 0;
         }
 
+        s.midiNote = midiNote;
         s.keyOn = true;
         s.active = true;
 
@@ -302,7 +304,13 @@ public:
     }
 
     void pitchBend(int value) {
-        // TODO: Apply pitch bend
+        m_pitchBend = value; // -8192 to +8192
+        double bendFactor = pow(2.0, (value / 8192.0) * (2.0 / 12.0));
+        for (int i = 0; i < AICA_SLOTS; i++) {
+            if (m_slots[i].active) {
+                computeStepWithBend(m_slots[i], bendFactor);
+            }
+        }
     }
 
     void programChange(int program) {
@@ -379,10 +387,15 @@ private:
     }
 
     void computeStep(AICASlot& s) {
+        double bendFactor = pow(2.0, (m_pitchBend / 8192.0) * (2.0 / 12.0));
+        computeStepWithBend(s, bendFactor);
+    }
+
+    void computeStepWithBend(AICASlot& s, double bendFactor) {
         int octave = (s.octave ^ 8) - 8;
         int fns = s.fns;
         double freq = 440.0 * pow(2.0, (octave * 12 + fns / 85.33 - 69) / 12.0);
-        s.step = static_cast<u32>(freq / m_sampleRate * 256.0);
+        s.step = static_cast<u32>(freq * bendFactor / m_sampleRate * 256.0);
     }
 
     int findFreeSlot() {
@@ -528,6 +541,7 @@ private:
     int m_sampleRate;
     bool m_isInitialized;
     float m_masterVolume;
+    int m_pitchBend = 0;
 
     std::vector<u8> m_sampleRAM;
     AICASlot m_slots[AICA_SLOTS];

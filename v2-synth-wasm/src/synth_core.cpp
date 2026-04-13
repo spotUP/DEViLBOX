@@ -5,9 +5,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-// TODO:
-// - VU meters?
-
 // Ye olde original V2 bugs you can turn on and off :)
 #define BUG_V2_FM_RANGE 1     // Broken sine range reduction for FM oscis
 

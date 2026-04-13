@@ -12,7 +12,8 @@
 #include "../../detail/portable.h"
 #include "plugin_interface.h"
 
-// TODO: change will break songfile load/save
+// Changing DUPLICATOR_NUMOUTPUTS will break songfile load/save compatibility
+// (the file format serializes exactly this many entries per array).
 #define DUPLICATOR_NUMOUTPUTS 8
 
 static void dispose(psy_audio_Duplicator*);
@@ -237,7 +238,7 @@ int loadspecific(psy_audio_Duplicator* self, psy_audio_SongFile* songfile,
 	if (status = psyfile_read(songfile->file, &size, sizeof(size))) {
 		return status;
 	}
-	// TODO: endianess
+	// Endianness: WASM target is always little-endian, no byte swap needed
 	if (status = psyfile_read(songfile->file, &macoutput[0],
 		DUPLICATOR_NUMOUTPUTS * sizeof(int16_t))) {
 		return status;
@@ -281,7 +282,7 @@ int savespecific(psy_audio_Duplicator* self, psy_audio_SongFile* songfile,
 	if (status = psyfile_write(songfile->file, &size, sizeof(size))) {
 		return status;
 	}
-	// TODO: endianess
+	// Endianness: WASM target is always little-endian, no byte swap needed
 	if (status = psyfile_write(songfile->file, &macoutput[0], DUPLICATOR_NUMOUTPUTS *
 			sizeof(int16_t))) {
 		return status;

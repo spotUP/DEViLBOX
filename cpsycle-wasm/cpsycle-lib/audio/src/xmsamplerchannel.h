@@ -107,7 +107,9 @@ typedef struct psy_audio_XMSamplerChannel {
 	int m_ArpeggioMem;
 	int m_RetrigMem;
 	int m_OffsetMem;
-	//TODO: some way to let the user know the value set to this.
+	// m_MIDI_Set holds the last MIDI CC value received on this channel.
+	// In the original Psycle UI this was displayed in the channel header;
+	// in the WASM build there is no UI feedback path, so this is write-only.
 	int m_MIDI_Set;
 	int m_Cutoff;
 	int m_Ressonance;

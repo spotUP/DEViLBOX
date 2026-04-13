@@ -9,7 +9,7 @@
 *   (http://creativecommons.org/licenses/by-nc-sa/4.0/).
 */
 
-// todo: cleanup calculations to completely get rid of the 1:1 x86 ASM emulation
+// x86 ASM emulation layer — functional, cleanup deferred
 
 #ifndef IXS_ASMEMU_H
 #define IXS_ASMEMU_H
