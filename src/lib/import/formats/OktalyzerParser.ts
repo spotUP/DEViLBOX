@@ -297,8 +297,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
+    oktalyzerFileData: buffer.slice(0) as ArrayBuffer,
     uadePatternLayout,
   };
 }
