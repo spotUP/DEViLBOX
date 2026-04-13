@@ -177,7 +177,16 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   if (!ptr) throw new Error('WASM malloc failed');
   m.HEAPU8.set(data, ptr);
 
-  const result = api.fur_load(ptr, data.length);
+  let result: number;
+  try {
+    result = api.fur_load(ptr, data.length);
+  } catch (wasmErr) {
+    m._free(ptr);
+    // WASM abort throws a raw number (heap pointer). Try to read the error string.
+    let errDetail = String(wasmErr);
+    try { errDetail = api.fur_get_error() || errDetail; } catch { /* WASM may be dead */ }
+    throw new Error(`Furnace WASM abort during fur_load: ${errDetail}`);
+  }
   m._free(ptr);
 
   if (result !== 0) {
