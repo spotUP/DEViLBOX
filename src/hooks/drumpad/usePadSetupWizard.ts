@@ -19,6 +19,10 @@ import { DJ_FX_CATEGORY_COLORS, ONE_SHOT_CATEGORY_COLORS } from '@/constants/djP
 import { colorToHex } from '@/pixi/colors';
 import { SYNTH_QUICK_PRESETS, type SynthQuickPreset } from './useDJQuickAssignData';
 import { SAMPLE_CATEGORY_LABELS, type SampleCategory } from '@/types/samplePack';
+import type { SampleData } from '@/types/drumpad';
+import { SAMPLE_PACKS } from '@/constants/samplePacks';
+import { normalizeUrl } from '@/utils/urlUtils';
+import { getAudioContext } from '@/audio/AudioContextSingleton';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -139,12 +143,43 @@ export function usePadSetupWizard() {
 
   // ── Step 2: Select sound ────────────────────────────────────────────────
 
-  const selectSampleCategory = useCallback((category: SampleCategory) => {
+  const selectSampleCategory = useCallback(async (category: SampleCategory) => {
     if (padId === null) return;
-    // Assign the category as the pad name and color; actual sample will be
-    // loaded when the user opens the full PadEditor → SamplePackBrowser
-    const label = SAMPLE_CATEGORY_LABELS[category];
-    setPadName(label);
+
+    // Find first sample from any pack that has this category
+    let sampleUrl: string | null = null;
+    let sampleName = SAMPLE_CATEGORY_LABELS[category];
+    for (const pack of SAMPLE_PACKS) {
+      const samples = pack.samples[category];
+      if (samples && samples.length > 0) {
+        sampleUrl = samples[0].url;
+        sampleName = samples[0].name;
+        break;
+      }
+    }
+
+    if (sampleUrl) {
+      try {
+        const resp = await fetch(normalizeUrl(sampleUrl));
+        const arrayBuffer = await resp.arrayBuffer();
+        const audioContext = getAudioContext();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const sampleData: SampleData = {
+          id: `wiz_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          name: sampleName,
+          audioBuffer,
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+        };
+        await useDrumPadStore.getState().loadSampleToPad(padId, sampleData);
+      } catch (err) {
+        console.error('[PadSetupWizard] Failed to load sample:', err);
+        // Fallback: just set the name
+        useDrumPadStore.getState().updatePad(padId, { name: sampleName });
+      }
+    }
+
+    setPadName(sampleName);
     setStep(3);
   }, [padId]);
 
