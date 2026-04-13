@@ -43,7 +43,9 @@ export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
  * so UADE can handle playback while the native parser provides pattern display.
  */
 export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
-  if ((result as any).uadePatternLayout && !(result as any).uadeEditableFileData && !(result as any).sonicArrangerFileData) {
+  const ra = result as any;
+  const hasDedicatedWasm = ra.sonicArrangerFileData || ra.soundMonFileData || ra.digMugFileData || ra.davidWhittakerFileData;
+  if (ra.uadePatternLayout && !ra.uadeEditableFileData && !hasDedicatedWasm) {
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
   }
@@ -97,8 +99,9 @@ export async function withNativeThenUADE(
         const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
         if (result) {
           // Skip UADE injection if a dedicated WASM engine handles audio
-          const hasDedicatedEngine = (result as any).sonicArrangerFileData;
-          if (!(result as any).uadeEditableFileData && !hasDedicatedEngine) {
+          const r = result as any;
+          const hasDedicatedEngine = r.sonicArrangerFileData || r.soundMonFileData || r.digMugFileData || r.davidWhittakerFileData;
+          if (!r.uadeEditableFileData && !hasDedicatedEngine) {
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;
           }

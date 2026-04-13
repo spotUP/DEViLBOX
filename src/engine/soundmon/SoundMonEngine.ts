@@ -1,11 +1,7 @@
 /**
- * SoundMonEngine.ts — Singleton AudioWorklet wrapper for SoundMon WASM synth
- *
- * Manages loading SoundMon.wasm + SoundMon.worklet.js and creating/communicating
- * with the AudioWorklet. Follows the HivelyEngine singleton pattern exactly.
- *
- * Usage: call SoundMonEngine.getInstance() to get (or create) the singleton.
- * Multiple SoundMonSynth instances share this single engine.
+ * SoundMonEngine.ts — Singleton WASM engine wrapper for SoundMon replayer
+ * Whole-song replayer: loads entire file, WASM handles sequencing + audio.
+ * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
@@ -23,27 +19,26 @@ export class SoundMonEngine {
 
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
-  private _playerHandleResolvers: Array<(handle: number) => void> = [];
   private _disposed = false;
+  private _songEndCallback: (() => void) | null = null;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
+    this._initPromise = new Promise<void>((resolve) => { this._resolveInit = resolve; });
     this.initialize();
   }
 
   static getInstance(): SoundMonEngine {
-    const currentCtx = getDevilboxAudioContext();
-    if (!SoundMonEngine.instance || SoundMonEngine.instance._disposed ||
-        SoundMonEngine.instance.audioContext !== currentCtx) {
-      if (SoundMonEngine.instance && !SoundMonEngine.instance._disposed) {
-        SoundMonEngine.instance.dispose();
-      }
+    if (SoundMonEngine.instance && !SoundMonEngine.instance._disposed) {
+      try {
+        const currentCtx = getDevilboxAudioContext();
+        if (SoundMonEngine.instance.audioContext !== currentCtx) {
+          SoundMonEngine.instance.dispose();
+        }
+      } catch { /* context not yet set */ }
+    }
+    if (!SoundMonEngine.instance || SoundMonEngine.instance._disposed) {
       SoundMonEngine.instance = new SoundMonEngine();
     }
     return SoundMonEngine.instance;
@@ -64,42 +59,32 @@ export class SoundMonEngine {
 
   private static async ensureInitialized(context: AudioContext): Promise<void> {
     if (this.loadedContexts.has(context)) return;
-
     const existingPromise = this.initPromises.get(context);
     if (existingPromise) return existingPromise;
 
     const initPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}soundmon/SoundMon.worklet.js`);
-      } catch {
-        /* Module might already be registered */
-      }
+      try { await context.audioWorklet.addModule(`${baseUrl}soundmon/SoundMon.worklet.js?v=${Date.now()}`); } catch { /* already registered */ }
 
       if (!this.wasmBinary || !this.jsCode) {
         const [wasmResponse, jsResponse] = await Promise.all([
           fetch(`${baseUrl}soundmon/SoundMon.wasm`),
           fetch(`${baseUrl}soundmon/SoundMon.js`),
         ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
+        if (wasmResponse.ok) this.wasmBinary = await wasmResponse.arrayBuffer();
         if (jsResponse.ok) {
           let code = await jsResponse.text();
-          // Transform Emscripten ESM output for worklet Function() execution
           code = code
             .replace(/import\.meta\.url/g, "'.'")
             .replace(/export\s+default\s+\w+;?/g, '')
+            .replace(/self\.location\.href/g, "'.'")
+            .replace(/_scriptName=globalThis\.document\?\.currentScript\?\.src/, '_scriptName="."')
             .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            // Expose heap views on Module so worklet can access them as this.wasm.HEAPU8 / HEAPF32
             .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
             .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
           this.jsCode = code;
         }
       }
-
       this.loadedContexts.add(context);
     })();
 
@@ -109,82 +94,59 @@ export class SoundMonEngine {
 
   private createNode(): void {
     const ctx = this.audioContext;
-
     this.workletNode = new AudioWorkletNode(ctx, 'soundmon-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
+      outputChannelCount: [2], numberOfOutputs: 1,
     });
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
         case 'ready':
-          if (this._resolveInit) {
-            this._resolveInit();
-            this._resolveInit = null;
-          }
+          console.log('[SoundMonEngine] WASM ready');
+          if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
-
+        case 'moduleLoaded':
+          console.log('[SoundMonEngine] Module loaded, subsongs:', data.subsongCount);
+          break;
+        case 'songEnd':
+          this._songEndCallback?.();
+          break;
         case 'error':
           console.error('[SoundMonEngine]', data.message);
-          // Unblock any pending waitForPlayerHandle() callers (e.g. pool-full) with sentinel -1
-          if (this._playerHandleResolvers.length > 0) {
-            const resolve = this._playerHandleResolvers.shift()!;
-            resolve(-1);
-          }
-          break;
-
-        case 'playerCreated':
-          if (this._playerHandleResolvers.length > 0) {
-            const resolve = this._playerHandleResolvers.shift()!;
-            resolve(data.handle);
-          }
           break;
       }
     };
 
     this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: ctx.sampleRate,
-      wasmBinary: SoundMonEngine.wasmBinary,
-      jsCode: SoundMonEngine.jsCode,
+      type: 'init', sampleRate: ctx.sampleRate,
+      wasmBinary: SoundMonEngine.wasmBinary, jsCode: SoundMonEngine.jsCode,
     });
-
     this.workletNode.connect(this.output);
   }
 
-  async ready(): Promise<void> {
-    return this._initPromise;
+  async ready(): Promise<void> { return this._initPromise; }
+
+  async loadTune(buffer: ArrayBuffer): Promise<void> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('SoundMonEngine not initialized');
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
-  sendMessage(msg: Record<string, unknown>, transfers?: Transferable[]): void {
-    if (!this.workletNode) return;
-    if (transfers) {
-      this.workletNode.port.postMessage(msg, transfers);
-    } else {
-      this.workletNode.port.postMessage(msg);
-    }
-  }
+  play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
+  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 
-  waitForPlayerHandle(): Promise<number> {
-    return new Promise<number>((resolve) => {
-      this._playerHandleResolvers.push(resolve);
-    });
-  }
-
-  /** Set per-channel mute mask. Bit N=1 means channel N is active, 0=muted. */
   setMuteMask(mask: number): void {
-    if (!this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+    this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
   }
+
+  onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });
     this.workletNode?.disconnect();
     this.workletNode = null;
-    if (SoundMonEngine.instance === this) {
-      SoundMonEngine.instance = null;
-    }
+    if (SoundMonEngine.instance === this) SoundMonEngine.instance = null;
   }
 }
