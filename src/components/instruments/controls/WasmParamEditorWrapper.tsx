@@ -61,6 +61,18 @@ const ENGINE_MAP: Record<string, () => Promise<EngineAccessor>> = {
     const { OktalyzerEngine } = await import('@/engine/oktalyzer/OktalyzerEngine');
     return { getEngine: () => OktalyzerEngine.hasInstance() ? getWorkletPort(OktalyzerEngine.getInstance()) : null };
   },
+  ArtOfNoiseSynth: async () => {
+    const { ArtOfNoiseEngine } = await import('@/engine/artofnoise/ArtOfNoiseEngine');
+    return { getEngine: () => ArtOfNoiseEngine.hasInstance() ? getWorkletPort(ArtOfNoiseEngine.getInstance()) : null };
+  },
+  MusicAssemblerSynth: async () => {
+    const { MaEngine } = await import('@/engine/ma/MaEngine');
+    return { getEngine: () => MaEngine.hasInstance() ? getWorkletPort(MaEngine.getInstance()) : null };
+  },
+  BenDaglishSynth: async () => {
+    const { BdEngine } = await import('@/engine/bd/BdEngine');
+    return { getEngine: () => BdEngine.hasInstance() ? getWorkletPort(BdEngine.getInstance()) : null };
+  },
 };
 
 // Helper: engines store workletNode privately, but we need the port.

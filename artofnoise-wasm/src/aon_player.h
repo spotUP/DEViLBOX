@@ -66,6 +66,10 @@ const AonSongMetadata* aon_song_get_metadata(const AonSong* song);
 // Returns instrument name for index (0-based), or NULL if out of range
 const char* aon_song_get_instrument_name(const AonSong* song, uint8_t index);
 
+// Instrument parameter access (0-based index). Returns -1 on invalid index/param.
+float aon_song_get_instrument_param(const AonSong* song, int index, const char* param);
+void aon_song_set_instrument_param(AonSong* song, int index, const char* param, float value);
+
 // Pattern data types
 typedef struct AonPatternCell {
     uint8_t note;        // 0=none, 1-63=chromatic note

@@ -26,6 +26,9 @@ void bd_set_channel_mask(BdModule* module, uint32_t mask);
 size_t bd_render(BdModule* module, float* interleaved_stereo, size_t frames);
 bool bd_has_ended(const BdModule* module);
 
+int bd_sample_count(const BdModule* module);
+void* bd_get_sample(BdModule* module, int index);
+
 #ifdef __cplusplus
 }
 #endif

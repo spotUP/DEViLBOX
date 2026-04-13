@@ -181,9 +181,9 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SoundControlWasmSynth') return 'wasm-param';
   if (synthType === 'FaceTheMusicWasmSynth') return 'wasm-param';
   if (synthType === 'QuadraComposerWasmSynth') return 'wasm-param';
-  if (synthType === 'MusicAssemblerSynth') return 'wasm-info';
-  if (synthType === 'BenDaglishSynth') return 'wasm-info';
-  if (synthType === 'ArtOfNoiseSynth') return 'wasm-info';
+  if (synthType === 'MusicAssemblerSynth') return 'wasm-param';
+  if (synthType === 'BenDaglishSynth') return 'wasm-param';
+  if (synthType === 'ArtOfNoiseSynth') return 'wasm-param';
   if (synthType === 'SonixSynth') return 'wasm-info';
   if (synthType === 'PxtoneSynth') return 'wasm-info';
   if (synthType === 'OrganyaSynth') return 'wasm-info';

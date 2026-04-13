@@ -23,6 +23,7 @@ if(EMSCRIPTEN)
         "_ma_get_num_tracks" "_ma_get_track_length" "_ma_get_cell" "_ma_set_cell"
         "_ma_note_on_preview" "_ma_note_off_preview" "_ma_render_preview_buf"
         "_ma_get_instrument_count"
+        "_ma_get_instrument_param" "_ma_set_instrument_param"
         "_ma_save" "_ma_save_ptr" "_ma_save_free"
     )
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})

@@ -301,19 +301,70 @@ export const WASM_FORMAT_DESCRIPTORS: Record<string, WasmFormatDescriptor> = {
   MusicAssemblerSynth: {
     name: 'Music-Assembler',
     brandColor: '#aaaa44',
-    params: [],  // No param API — placeholder
+    params: [
+      { key: 'sampleNumber', label: 'Sample #', min: 0, max: 255, section: 'Sample' },
+      { key: 'attack', label: 'Attack', min: 0, max: 255, section: 'ADSR' },
+      { key: 'decaySustain', label: 'Decay/Sus', min: 0, max: 255 },
+      { key: 'release', label: 'Release', min: 0, max: 255 },
+      { key: 'hold', label: 'Hold', min: 0, max: 255 },
+      { key: 'vibratoDelay', label: 'Vib Delay', min: 0, max: 255, section: 'Vibrato' },
+      { key: 'vibratoSpeed', label: 'Vib Speed', min: 0, max: 255 },
+      { key: 'vibratoLevel', label: 'Vib Level', min: 0, max: 255 },
+      { key: 'arpeggio', label: 'Arpeggio', min: 0, max: 255, section: 'Effects' },
+      { key: 'fxArpSpdlp', label: 'FX/Arp Spd', min: 0, max: 255 },
+      { key: 'keyWaveRate', label: 'Key/Wave', min: 0, max: 255 },
+      { key: 'waveLevelSpeed', label: 'Wave Lvl/Spd', min: 0, max: 255 },
+    ],
   },
 
   BenDaglishSynth: {
     name: 'Ben Daglish',
     brandColor: '#44aaaa',
-    params: [],  // No param API — placeholder
+    params: [
+      { key: 'sampleNumber', label: 'Sample #', min: -32768, max: 32767, section: 'Sample' },
+      { key: 'length', label: 'Length', min: 0, max: 65535 },
+      { key: 'loopOffset', label: 'Loop Ofs', min: 0, max: 131072 },
+      { key: 'loopLength', label: 'Loop Len', min: 0, max: 65535 },
+      { key: 'volume', label: 'Volume', min: 0, max: 64 },
+      { key: 'volumeFadeSpeed', label: 'Vol Fade', min: -32768, max: 32767, section: 'Volume' },
+      { key: 'portamentoDuration', label: 'Porta Dur', min: -32768, max: 32767, section: 'Portamento' },
+      { key: 'portamentoAddValue', label: 'Porta Add', min: -32768, max: 32767 },
+      { key: 'vibratoDepth', label: 'Vib Depth', min: 0, max: 65535, section: 'Vibrato' },
+      { key: 'vibratoAddValue', label: 'Vib Add', min: 0, max: 65535 },
+      { key: 'noteTranspose', label: 'Transpose', min: -32768, max: 32767, section: 'Pitch' },
+      { key: 'fineTunePeriod', label: 'Fine Tune', min: 0, max: 65535 },
+    ],
   },
 
   ArtOfNoiseSynth: {
     name: 'Art of Noise',
     brandColor: '#aa44aa',
-    params: [],  // No param API — placeholder
+    params: [
+      { key: 'type', label: 'Type', min: 0, max: 1, type: 'select', section: 'General',
+        options: [{ value: 0, label: 'Sample' }, { value: 1, label: 'Synth' }] },
+      { key: 'volume', label: 'Volume', min: 0, max: 64 },
+      { key: 'fineTune', label: 'Fine Tune', min: 0, max: 15 },
+      { key: 'waveform', label: 'Waveform', min: 0, max: 255 },
+      { key: 'envelopeStart', label: 'Env Start', min: 0, max: 255, section: 'Envelope' },
+      { key: 'envelopeAdd', label: 'Env Add', min: 0, max: 255 },
+      { key: 'envelopeEnd', label: 'Env End', min: 0, max: 255 },
+      { key: 'envelopeSub', label: 'Env Sub', min: 0, max: 255 },
+      { key: 'startOffset', label: 'Start Ofs', min: 0, max: 131072, section: 'Sample' },
+      { key: 'length', label: 'Length', min: 0, max: 131072 },
+      { key: 'loopStart', label: 'Loop Start', min: 0, max: 131072 },
+      { key: 'loopLength', label: 'Loop Len', min: 0, max: 131072 },
+      { key: 'synthLength', label: 'Synth Len', min: 0, max: 255, section: 'Synth' },
+      { key: 'vibParam', label: 'Vib Param', min: 0, max: 255 },
+      { key: 'vibDelay', label: 'Vib Delay', min: 0, max: 255 },
+      { key: 'vibWave', label: 'Vib Wave', min: 0, max: 3, type: 'select',
+        options: [{ value: 0, label: 'Sine' }, { value: 1, label: 'Triangle' }, { value: 2, label: 'Rectangle' }, { value: 3, label: 'Off' }] },
+      { key: 'waveSpeed', label: 'Wave Speed', min: 0, max: 255, section: 'Wavetable' },
+      { key: 'waveLength', label: 'Wave Len', min: 0, max: 255 },
+      { key: 'waveLoopStart', label: 'Wave Loop', min: 0, max: 255 },
+      { key: 'waveLoopLength', label: 'Wave Rpt', min: 0, max: 255 },
+      { key: 'waveLoopControl', label: 'Loop Ctrl', min: 0, max: 2, type: 'select',
+        options: [{ value: 0, label: 'Normal' }, { value: 1, label: 'Backwards' }, { value: 2, label: 'Ping-Pong' }] },
+    ],
   },
 
   DssWasmSynth: {
