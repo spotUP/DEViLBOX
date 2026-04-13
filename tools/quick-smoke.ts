@@ -1,17 +1,80 @@
 #!/usr/bin/env npx tsx
 /**
- * Quick smoke test — comprehensive format health check.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DEViLBOX Format Smoke Test — comprehensive health check for all 173+ formats
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Per format checks:
+ * THIS IS THE CANONICAL FORMAT SMOKE TEST. DO NOT CREATE A NEW ONE.
+ * If it needs fixing, fix THIS file. If it needs new features, add them HERE.
+ *
+ * === WHAT IT CHECKS (per format) ===
  *   1. Audio: non-silent, not clipping, spectral spread (not beeps/drones)
  *   2. Format: detected correctly (not generic "Amiga Format")
  *   3. Patterns: non-empty pattern 0 with actual note data
- *   4. Instruments: named instruments with real synthTypes + sample data
+ *   4. Instruments: named instruments with real synthTypes + sample/synth data
  *   5. Editability: editable flag, editor mode
  *   6. Playback: position advancing through patterns
- *   7. Song structure: reasonable position list, channel count
- *   8. Export: native export round-trip (where supported)
- *   9. Errors: no console errors during load/play
+ *   7. Per-channel oscilloscope: visualizer data flowing
+ *   8. Song structure: reasonable position list, channel count
+ *   9. Export: native export round-trip (where supported)
+ *  10. Errors: no console errors/WASM crashes during load/play
+ *  11. Streamed detection: formats with no patterns that need stream visualizer
+ *
+ * === HOW IT WORKS ===
+ * Connects to the MCP WS relay (ws://localhost:4003/mcp) and sends commands
+ * to the DEViLBOX browser instance. For each test-song directory, it:
+ *   stop → clear errors → load file (with companion discovery) → play →
+ *   wait 2.5s → measure audio + spectral + instruments + patterns +
+ *   oscilloscope + position + export → score 0-100
+ *
+ * === PREREQUISITES ===
+ *   1. Dev server running: `./dev.sh` (starts Vite:5173 + Express:3001 + WS:4003)
+ *   2. DEViLBOX open in browser at http://localhost:5173
+ *   3. AudioContext unlocked (click anywhere in the browser window)
+ *   4. Format tracker optional: `npx tsx tools/format-server.ts &` (port 4444)
+ *
+ * === USAGE ===
+ *   npx tsx tools/quick-smoke.ts          # Run all formats
+ *   # On subsequent runs, formats scoring ≥90 are skipped (cached in /tmp/smoke-results.json)
+ *   # Delete /tmp/smoke-results.json to force a full re-run
+ *
+ * === OUTPUT ===
+ * Per-format line:
+ *   ✓/~/✗/!  format-name  ♪∅?  ▶■  ◎○  ED/--  EX/ex  ST  fmt=  ch=  p=  n=  i=  rms=  sp=  sc=  [issues]
+ *
+ *   ♪ = audio OK    ∅ = silent      ? = suspect (beep/drone)
+ *   ▶ = pos moving  ■ = pos stuck
+ *   ◎ = osc data    ○ = no osc
+ *   ED = editable   -- = not editable
+ *   EX = exportable ex = export failed
+ *   ST = streamed format (needs stream visualizer, not pattern editor)
+ *
+ * Summary pushed to localhost:4444 format tracker (if running).
+ * Full JSON results saved to /tmp/smoke-results.json.
+ *
+ * === TEST FILES ===
+ * One file per format in public/data/test-songs/<format-slug>/
+ * Companion files (.sng+.ins, .dum+.ins, mdat/smpl, jpn/smp) are auto-discovered.
+ * Sourced from /Users/spot/Code/Reference Music/ collection.
+ *
+ * === INCREMENTAL RUNS ===
+ * Results are saved to /tmp/smoke-results.json after each run.
+ * On the next run, formats that scored ≥90 are skipped and their previous
+ * results carried forward. This makes iterative fix-and-test cycles fast.
+ * Delete the file to force a full re-test of all formats.
+ *
+ * === KNOWN ISSUES ===
+ * - get_instruments_list, get_audio_analysis, get_format_state return limited
+ *   data via the WS bridge compared to MCP stdio. Instrument/spectral/editable
+ *   checks may show 0 even when the data exists in the app.
+ * - UADE formats can cascade-fail if a format crashes UADE's state machine.
+ *   The WASM reinit fix (2026-04-13) mitigates this but rapid loading can
+ *   still cause transient silence.
+ *
+ * === HISTORY ===
+ * Created: 2026-04-12
+ * Major rewrite: 2026-04-13 (added 11 quality checks, scoring, tracker push,
+ *   companion discovery, incremental runs, streamed detection, oscilloscope check)
  *
  * Reports results to localhost:4444 format tracker (if running).
  */
