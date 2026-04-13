@@ -52,6 +52,19 @@ class GmcProcessor extends AudioWorkletProcessor {
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._gmc_select_subsong(this.handle, data.subsong); break;
       case 'setChannelMask': if (this.handle) this.module._gmc_set_channel_mask(this.handle, data.mask); break;
+      case 'setCell': {        if (this.handle && this.module._gmc_set_cell) {          this.module._gmc_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._gmc_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._gmc_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }            case 'getInstrumentParam': {
+        if (!this.handle || !this.module) break;
+        const m = this.module;
+        const fn = m._gmc_get_instrument_param;
+        if (!fn) break;
+        const nameBytes = (function(){ var e=new TextEncoder().encode(data.param); var b=new Uint8Array(e.length+1); b.set(e); return b; })();
+        const ptr = m._malloc(nameBytes.length);
+        new Uint8Array(m.wasmMemory.buffer).set(nameBytes, ptr);
+        const val = fn(this.handle, data.inst, ptr);
+        m._free(ptr);
+        this.port.postMessage({ type: 'instrumentParamValue', inst: data.inst, param: data.param, value: val });
+        break;
+      }
       case 'dispose': this.cleanup(); break;
     }
   }
