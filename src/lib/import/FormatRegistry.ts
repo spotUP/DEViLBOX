@@ -653,7 +653,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'soundFactory',
     label: 'Sound Factory',
-    description: 'Sound Factory Pro — native parser or UADE',
+    description: 'Sound Factory Pro — psf.* prefix or .psf extension (disambiguated by detectFn from PlayStation PSF)',
     family: 'amiga-native',
     matchMode: 'both',
     extRegex: /\.psf$/i,
