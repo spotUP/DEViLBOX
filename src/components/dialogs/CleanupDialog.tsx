@@ -48,11 +48,13 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
   // Selection state — sets of indices/instrumentIds selected for removal
   const [selectedInstruments, setSelectedInstruments] = useState<Set<number>>(new Set());
   const [selectedPatterns, setSelectedPatterns] = useState<Set<number>>(new Set());
+  const [selectedLoopTails, setSelectedLoopTails] = useState<Set<number>>(new Set());
   // Reset selections whenever dialog opens
   useEffect(() => {
     if (isOpen) {
       setSelectedInstruments(new Set());
       setSelectedPatterns(new Set());
+      setSelectedLoopTails(new Set());
     }
   }, [isOpen]);
 
@@ -97,9 +99,23 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
   };
   const deselectAllPatterns = () => setSelectedPatterns(new Set());
 
+  // ── Loop tail helpers ──────────────────────────────────────────────────────
+  const toggleLoopTail = (instrumentIndex: number) => {
+    setSelectedLoopTails((prev) => {
+      const next = new Set(prev);
+      if (next.has(instrumentIndex)) next.delete(instrumentIndex);
+      else next.add(instrumentIndex);
+      return next;
+    });
+  };
+  const selectAllLoopTails = () => {
+    setSelectedLoopTails(new Set(report.loopTails.map((t) => t.instrumentIndex)));
+  };
+  const deselectAllLoopTails = () => setSelectedLoopTails(new Set());
+
   // ── Remove selected ─────────────────────────────────────────────────────────
   const totalSelected =
-    selectedInstruments.size + selectedPatterns.size;
+    selectedInstruments.size + selectedPatterns.size + selectedLoopTails.size;
 
   const handleRemoveSelected = () => {
     const instrStore = useInstrumentStore.getState();
@@ -118,9 +134,22 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
       trackerStore.deletePattern(idx);
     }
 
-    // NOTE: Loop tail truncation not yet implemented — requires slicing audioBuffer at loopEnd
-    // and writing it back through the instrument store. Skipped for now.
-    // Selected loop tails are acknowledged but not acted upon.
+    // Truncate loop tails — slice audioBuffer at loopEnd frame boundary
+    if (selectedLoopTails.size > 0) {
+      for (const instrumentId of selectedLoopTails) {
+        const inst = instrStore.instruments.find((i) => i.id === instrumentId);
+        if (!inst?.sample?.audioBuffer || !inst.sample.loopEnd) continue;
+        const loopEndBytes = inst.sample.loopEnd * 2; // Int16 = 2 bytes per frame
+        if (loopEndBytes > 0 && loopEndBytes < inst.sample.audioBuffer.byteLength) {
+          instrStore.updateInstrument(instrumentId, {
+            sample: {
+              ...inst.sample,
+              audioBuffer: inst.sample.audioBuffer.slice(0, loopEndBytes),
+            },
+          });
+        }
+      }
+    }
 
     onClose();
   };
@@ -284,14 +313,25 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
                 <p className="px-3 py-2 text-xs text-text-muted italic">None found</p>
               ) : (
                 <>
-                  <p className="px-3 py-1.5 text-xs text-text-muted italic">
-                    Detected loop tail data (informational only).
-                  </p>
+                  <div className="flex items-center gap-2 px-3 py-1">
+                    <button onClick={selectAllLoopTails} className="text-[10px] text-accent-primary hover:underline">Select all</button>
+                    <button onClick={deselectAllLoopTails} className="text-[10px] text-text-muted hover:underline">Deselect</button>
+                    <span className="text-[10px] text-text-muted ml-auto">
+                      {formatBytes(report.loopTails.reduce((s, t) => s + t.tailBytes, 0))} reclaimable
+                    </span>
+                  </div>
                   {report.loopTails.map((t) => (
                     <div
                       key={t.instrumentIndex}
-                      className="flex items-center gap-3 px-3 py-1.5"
+                      className="flex items-center gap-3 px-3 py-1.5 cursor-pointer hover:bg-dark-bgHover"
+                      onClick={() => toggleLoopTail(t.instrumentIndex)}
                     >
+                      <input
+                        type="checkbox"
+                        checked={selectedLoopTails.has(t.instrumentIndex)}
+                        onChange={() => toggleLoopTail(t.instrumentIndex)}
+                        className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
+                      />
                       <span className="font-mono text-xs text-text-muted w-8 flex-shrink-0">
                         {String(t.instrumentIndex).padStart(2, '0')}
                       </span>
@@ -299,7 +339,7 @@ export const CleanupDialog: React.FC<CleanupDialogProps> = ({ isOpen, onClose })
                         {t.name || '(unnamed)'}
                       </span>
                       <span className="text-xs text-text-muted flex-shrink-0">
-                        {formatBytes(t.tailBytes)} reclaimable
+                        {formatBytes(t.tailBytes)}
                       </span>
                     </div>
                   ))}

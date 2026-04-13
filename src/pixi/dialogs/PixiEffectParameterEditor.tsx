@@ -348,26 +348,44 @@ export const PixiEffectParameterEditor: React.FC<PixiEffectParameterEditorProps>
             </layoutContainer>
           )}
 
-          {/* ── Unimplemented parameters (listed, not interactive) ──────── */}
+          {/* ── Unimplemented parameters (displayed as disabled knobs) ──── */}
           {unimplementedParams.length > 0 && (
             <layoutContainer
               layout={{
                 width: CONTENT_W - 26,
                 flexDirection: 'column',
-                gap: 4,
+                gap: 6,
                 padding: SECTION_PAD,
                 borderRadius: 6,
                 borderWidth: 1,
                 backgroundColor: theme.bgSecondary.color,
                 borderColor: theme.border.color,
               }}
-              alpha={0.5}
             >
-              <PixiLabel
-                text={`${unimplementedParams.length} more parameters planned`}
-                size="xs"
-                color="textMuted"
-              />
+              <layoutContainer
+                layout={{
+                  width: CONTENT_W - 26 - SECTION_PAD * 2,
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-start',
+                  gap: ROW_GAP,
+                }}
+              >
+                {unimplementedParams.map((param) => (
+                  <PixiKnob
+                    key={param.key}
+                    value={getParamValue(param)}
+                    min={param.min}
+                    max={param.max}
+                    onChange={() => {}}
+                    label={param.name}
+                    size="sm"
+                    color={theme.textMuted.color}
+                    disabled
+                    formatValue={(v) => `${Math.round(v)}${param.unit}`}
+                  />
+                ))}
+              </layoutContainer>
             </layoutContainer>
           )}
 
