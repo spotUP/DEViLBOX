@@ -234,7 +234,9 @@ static void reader_init(SmReader* r, const uint8_t* data, size_t size) {
 }
 
 static bool reader_eof(const SmReader* r) {
-    return r->pos >= r->size;
+    // Match NostalgicPlayer EndOfStream: only true when a read overshot the end,
+    // NOT when we're exactly at the end after a complete read.
+    return r->pos > r->size;
 }
 
 static uint8_t read_u8(SmReader* r) {
@@ -351,9 +353,6 @@ static bool load_module(SmModule* m, SmReader* r, SmModuleType type) {
 
     // Get number of positions (steps)
     m->step_num = read_b_u16(r);
-
-    fprintf(stderr, "[SM] name='%s' wave_num=%d step_num=%d pos=%zu/%zu\n",
-        m->module_name, m->wave_num, m->step_num, r->pos, r->size);
 
     if (reader_eof(r))
         return false;
@@ -479,6 +478,7 @@ static bool load_module(SmModule* m, SmReader* r, SmModuleType type) {
             return false;
     }
 
+
     // Allocate tracks
     m->tracks = (SmTrack**)calloc(m->track_num, sizeof(SmTrack*));
     if (!m->tracks) return false;
@@ -500,6 +500,7 @@ static bool load_module(SmModule* m, SmReader* r, SmModuleType type) {
             return false;
     }
 
+
     // Allocate and read wave tables
     int wave_table_size = m->wave_num * 64;
     m->wave_tables = (int8_t*)calloc(wave_table_size, 1);
@@ -509,6 +510,7 @@ static bool load_module(SmModule* m, SmReader* r, SmModuleType type) {
 
     if (reader_eof(r))
         return false;
+
 
     // Read samples
     for (int i = 0; i < 15; i++) {
