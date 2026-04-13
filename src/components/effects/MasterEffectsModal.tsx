@@ -57,6 +57,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const [editingEffectId, setEditingEffectId] = useState<string | null>(null);
   const [previewEffectId, setPreviewEffectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
   const {
     masterEffects,
@@ -280,16 +281,26 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
   // Group effects by category for the add menu, filtered by search
   const effectsByGroup = getEffectsByGroup();
+  const allGroupNames = useMemo(() => Object.keys(effectsByGroup).sort(), [effectsByGroup]);
   const filteredEffectsByGroup = useMemo(() => {
-    if (!searchQuery.trim()) return effectsByGroup;
+    let source = effectsByGroup;
+    // Filter by selected group
+    if (selectedGroup !== 'all') {
+      source = {};
+      if (effectsByGroup[selectedGroup]) {
+        source[selectedGroup] = effectsByGroup[selectedGroup];
+      }
+    }
+    // Filter by search query
+    if (!searchQuery.trim()) return source;
     const q = searchQuery.toLowerCase();
     const filtered: Record<string, typeof effectsByGroup[string]> = {};
-    for (const [group, effects] of Object.entries(effectsByGroup)) {
+    for (const [group, effects] of Object.entries(source)) {
       const matched = effects.filter(e => e.label.toLowerCase().includes(q));
       if (matched.length > 0) filtered[group] = matched;
     }
     return filtered;
-  }, [effectsByGroup, searchQuery]);
+  }, [effectsByGroup, searchQuery, selectedGroup]);
 
   if (!isOpen) return null;
 
@@ -588,11 +599,21 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
           {/* Right: Effect Browser (20%) */}
           <div className="w-[20%] flex flex-col">
-            <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-3">
+            <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-2">
               <div>
                 <h3 className="text-sm font-bold text-text-primary">Effect Browser</h3>
-                <p className="text-xs text-text-muted">Click to preview</p>
               </div>
+              <select
+                value={selectedGroup}
+                onChange={(e) => setSelectedGroup(e.target.value)}
+                className="w-full py-1.5 px-2 text-xs bg-dark-bg border border-dark-border rounded-lg text-text-primary
+                         focus:outline-none focus:border-accent-primary transition-colors cursor-pointer"
+              >
+                <option value="all">All Categories</option>
+                {allGroupNames.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                 <input

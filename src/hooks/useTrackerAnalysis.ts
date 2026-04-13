@@ -74,6 +74,7 @@ export function useTrackerAnalysis(): void {
     s.sonixFileData ??
     s.pxtoneFileData ??
     s.organyaFileData ??
+    s.sawteethFileData ??
     s.eupFileData ??
     s.ixsFileData ??
     s.psycleFileData ??

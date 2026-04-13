@@ -26,6 +26,24 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdat
     if (open) setUserPresets(getUserPresets(effectType));
   }, [open, effectType]);
 
+  // Detect which preset matches current parameters
+  const activePresetName = React.useMemo(() => {
+    const params = effect.parameters;
+    const allPresets = [...factoryPresets, ...userPresets];
+    for (const p of allPresets) {
+      const match = Object.entries(p.params).every(([key, val]) => {
+        const cur = params[key];
+        if (cur === undefined) return false;
+        // Compare with tolerance for floating point
+        return typeof val === 'number' && typeof cur === 'number'
+          ? Math.abs(val - Number(cur)) < 0.001
+          : val === cur;
+      });
+      if (match) return p.name;
+    }
+    return null;
+  }, [effect.parameters, factoryPresets, userPresets]);
+
   // Close on click outside
   useEffect(() => {
     if (!open) return;
@@ -42,10 +60,15 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdat
   const hasPresets = factoryPresets.length > 0 || userPresets.length > 0;
 
   const applyPreset = (params: Record<string, number | string>) => {
+    // Merge preset over defaults so all params are reset — prevents stale values
+    // from a previously applied preset leaking through (e.g. scFilterType: 'highpass'
+    // persisting when switching to a preset that doesn't specify it)
+    const defaults = EffectRegistry.getDefaultParameters(effectType);
+    const merged = { ...defaults, ...params };
     if (onApply) {
-      onApply(params);
+      onApply(merged);
     } else if (onUpdateParameter) {
-      for (const [key, value] of Object.entries(params)) {
+      for (const [key, value] of Object.entries(merged)) {
         onUpdateParameter(key, value);
       }
     }
@@ -69,9 +92,9 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdat
       <button
         onClick={() => setOpen(!open)}
         className="px-2 py-0.5 text-[9px] uppercase font-bold rounded-full border transition-colors"
-        style={{ color, borderColor: `${color}60`, background: open ? `${color}15` : 'transparent' }}
+        style={{ color, borderColor: `${color}60`, background: activePresetName ? `${color}20` : open ? `${color}15` : 'transparent' }}
       >
-        Presets ▾
+        {activePresetName ?? 'Presets'} ▾
       </button>
       {open && (
         <div className="absolute top-full left-0 mt-1 w-52 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 overflow-hidden max-h-[60vh] overflow-y-auto">
@@ -83,8 +106,10 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdat
               </div>
               {factoryPresets.map(p => (
                 <button key={p.name} onClick={() => { applyPreset(p.params); setOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 text-[11px] text-text-primary hover:bg-dark-bgHover transition-colors">
-                  {p.name}
+                  className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+                    p.name === activePresetName ? 'text-accent-primary bg-accent-primary/10 font-bold' : 'text-text-primary hover:bg-dark-bgHover'
+                  }`}>
+                  {p.name === activePresetName ? `● ${p.name}` : p.name}
                 </button>
               ))}
             </>
@@ -98,8 +123,10 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdat
               {userPresets.map(p => (
                 <div key={p.name} className="flex items-center hover:bg-dark-bgHover group">
                   <button onClick={() => { applyPreset(p.params); setOpen(false); }}
-                    className="flex-1 text-left px-3 py-1.5 text-[11px] text-text-primary">
-                    {p.name}
+                    className={`flex-1 text-left px-3 py-1.5 text-[11px] ${
+                      p.name === activePresetName ? 'text-accent-primary font-bold' : 'text-text-primary'
+                    }`}>
+                    {p.name === activePresetName ? `● ${p.name}` : p.name}
                   </button>
                   <button onClick={() => handleDelete(p.name)}
                     className="px-2 text-text-muted hover:text-accent-error opacity-0 group-hover:opacity-100 transition-opacity">

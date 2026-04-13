@@ -21,6 +21,9 @@ class HippelCoSoProcessor extends AudioWorkletProcessor {
     // Per-player state: { outPtrL, outPtrR }
     this.players = {};
 
+    // Bitmask of muted player handles (bit N set = handle N muted)
+    this.muteMask = 0;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -89,6 +92,17 @@ class HippelCoSoProcessor extends AudioWorkletProcessor {
       case 'setParam':
         if (this.wasm && this.ctx) {
           this.wasm._hc_set_param(this.ctx, data.handle, data.paramId, data.value);
+        }
+        break;
+
+      case 'setMuteMask':
+        this.muteMask = data.mask;
+        break;
+
+      case 'setChannelGain':
+        if (this.wasm && this.ctx) {
+          // paramId 0 = volume, value range 0..63 (matches hc_set_param convention)
+          this.wasm._hc_set_param(this.ctx, data.handle, 0, Math.round(data.gain * 63));
         }
         break;
 
@@ -187,6 +201,9 @@ class HippelCoSoProcessor extends AudioWorkletProcessor {
 
     for (const h of Object.keys(this.players)) {
       const hi = parseInt(h);
+      // Skip muted handles
+      if (this.muteMask & (1 << hi)) continue;
+
       const ptrs = this.players[hi];
       if (!ptrs) continue;
 

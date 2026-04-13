@@ -27,6 +27,9 @@ public:
     // call this instead of a constructor
     void Init(uint32_t a_tickspersec=1000) { m_tpc=a_tickspersec; /* m_base.valid=0; */ memset(&m_base, 0, sizeof(V2MBase)); }
 
+    // Access the raw synth instance for per-channel control
+    void* GetSynth() { return m_synth; }
+
     // opens a v2m file for playing
     //
     // a_v2mptr            : ptr to v2m data

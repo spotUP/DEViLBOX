@@ -179,8 +179,8 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   'mc', 'mcr', 'mco',
   // MarkII
   'mk2', 'mkii',
-  // MartinWalker
-  'avp', 'mw',
+  // MartinWalker — routed through AmigaFormatParsers for native ActivisionProParser
+  // 'avp', 'mw',
   // Maximum Effect
   'max',
   // MaxTrax
@@ -255,8 +255,8 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   'spl',
   // SoundControl
   'sc', 'sct',
-  // SoundFactory
-  'psf',
+  // SoundFactory — handled by native SoundFactoryParser
+  // 'psf',
   // Sound-FX
   'sfx', 'sfx13',
   // SoundImages

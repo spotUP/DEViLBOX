@@ -389,6 +389,9 @@ export function applyEffectParametersDiff(
         if ('release' in changed) node.release = changed.release as number;
         if ('knee' in changed) node.knee = changed.knee as number;
         if ('sidechainGain' in changed) node.sidechainGain = Number(changed.sidechainGain) / 100; // UI 0-100 → internal 0-1
+        if ('scFreq' in changed) node.scFreq = changed.scFreq as number;
+        if ('scQ' in changed) node.scQ = changed.scQ as number;
+        if ('scFilterType' in changed) node.scFilterType = changed.scFilterType as string;
       }
       break;
 

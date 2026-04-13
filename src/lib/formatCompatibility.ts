@@ -240,7 +240,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
       fmt.klysFileData || fmt.c64SidFileData || fmt.musiclineFileData ||
       fmt.jamCrackerFileData || fmt.futurePlayerFileData || fmt.preTrackerFileData ||
       fmt.maFileData || fmt.hippelFileData || fmt.sonixFileData || fmt.pxtoneFileData ||
-      fmt.organyaFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
+      fmt.organyaFileData || fmt.sawteethFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
       fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
       fmt.sd2FileData || fmt.symphonieFileData || fmt.v2mFileData
     );

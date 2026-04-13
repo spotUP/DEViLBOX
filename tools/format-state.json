@@ -15367,72 +15367,72 @@
     "deepNotes": "UADE-only (no native parser possible): SynTracker (.synmod) — compiled 68k synth"
   },
   "smoke-actionamics": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=3 notes=40 inst=0 rms=0.004 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=3 notes=40 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-activision-pro": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=2 notes=0 inst=0 rms=0.155 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=2 notes=0 inst=0 rms=0.009 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-ahx": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=7 notes=23 inst=0 rms=0.032 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=7 notes=23 inst=0 rms=0.066 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-anders-oland": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=8 notes=16 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=6 notes=4 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-art-of-noise": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=5 notes=189 inst=0 rms=0.160 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=5 notes=189 inst=0 rms=0.076 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-ashley-hogg": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.022 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
   },
   "smoke-audio-sculpture": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.064 score=70 [no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.067 score=65 [no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-ay-amadeus": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.090 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.091 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-ay-emul": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.022 score=50 [generic-format, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.059 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-ay-strc": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=6 pat=41 notes=64 inst=0 rms=0.105 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=28 notes=207 inst=0 rms=0.039 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-beathoven-synthesizer": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.222 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.223 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-ben-daglish": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=46 notes=16 inst=0 rms=0.165 score=55 [generic-format, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "notes": "pass ? ch=4 pat=46 notes=16 inst=0 rms=0.165 score=50 [generic-format, no-instruments, not-editable, pos-stuck, no-osc, 1-errors]"
   },
   "smoke-ben-daglish-sid": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=3 pat=1 notes=0 inst=0 rms=0.101 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=3 pat=1 notes=0 inst=0 rms=0.103 score=35 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc, 1-errors]"
   },
   "smoke-bp-soundmon-2": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=16 notes=25 inst=0 rms=0.205 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=16 notes=25 inst=0 rms=0.205 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-bp-soundmon-3": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=48 notes=2 inst=0 rms=0.288 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=48 notes=2 inst=0 rms=0.280 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-cheesecutter": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=3 pat=27 notes=0 inst=0 rms=0.106 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=3 pat=27 notes=0 inst=0 rms=0.104 score=50 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-chiptracker": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=27 notes=7 inst=0 rms=0.093 score=70 [no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=27 notes=7 inst=0 rms=0.092 score=65 [no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-composer-667": {
     "auditStatus": "fail",
@@ -15440,39 +15440,39 @@
   },
   "smoke-composer-669": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=78 notes=14 inst=0 rms=0.038 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=8 pat=78 notes=14 inst=0 rms=0.037 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-composer-670-cdfm": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=78 notes=14 inst=0 rms=0.040 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=8 pat=78 notes=14 inst=0 rms=0.040 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-core-design": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.226 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.224 score=35 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc, 1-errors]"
   },
   "smoke-custommade": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=3 notes=51 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=3 notes=52 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-darius-zendeh": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=5 notes=32 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=5 notes=28 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-dave-lowe": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=203 notes=14 inst=0 rms=0.225 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=203 notes=14 inst=0 rms=0.224 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-dave-lowe-new": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=8 notes=28 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=8 notes=32 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-david-hanney": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=5 pat=1 notes=0 inst=0 rms=0.141 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=5 pat=1 notes=0 inst=0 rms=0.140 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-david-whittaker": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=190 notes=12 inst=0 rms=0.411 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=190 notes=12 inst=0 rms=0.390 score=50 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-deflemask": {
     "auditStatus": "fail",
@@ -15484,11 +15484,11 @@
   },
   "smoke-delta-music": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=24 notes=33 inst=0 rms=0.167 score=55 [generic-format, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "notes": "pass ? ch=4 pat=24 notes=33 inst=0 rms=0.113 score=50 [generic-format, no-instruments, not-editable, pos-stuck, no-osc, 1-errors]"
   },
   "smoke-delta-music-2": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=112 notes=9 inst=0 rms=0.307 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=112 notes=9 inst=0 rms=0.313 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-desire": {
     "auditStatus": "fail",
@@ -15496,323 +15496,323 @@
   },
   "smoke-digi-trakker": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=9 pat=44 notes=16 inst=0 rms=0.022 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=9 pat=44 notes=16 inst=0 rms=0.021 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digibooster": {
     "auditStatus": "fail",
     "notes": "silent ? ch=8 pat=30 notes=10 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-digibooster-pro": {
-    "auditStatus": "fail",
-    "notes": "silent ? ch=18 pat=51 notes=63 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=18 pat=51 notes=63 inst=0 rms=0.058 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digital-mugician": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=11 notes=39 inst=0 rms=0.147 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=11 notes=39 inst=0 rms=0.148 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digital-mugician-2": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=3 notes=0 inst=0 rms=0.124 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=3 notes=0 inst=0 rms=0.127 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digital-sonix-and-chrome": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.152 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.152 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digital-sound-studio": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=38 notes=6 inst=0 rms=0.077 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=38 notes=6 inst=0 rms=0.077 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digital-symphony": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=96 notes=6 inst=0 rms=0.379 score=50 [generic-format, no-instruments, not-editable, pos-stuck, 16-errors]"
+    "notes": "pass ? ch=4 pat=96 notes=6 inst=0 rms=0.057 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-digital-tracker-dtm": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=13 pat=45 notes=222 inst=0 rms=0.348 score=50 [generic-format, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "notes": "pass ? ch=4 pat=96 notes=6 inst=0 rms=0.057 score=50 [generic-format, no-instruments, not-editable, pos-stuck, no-osc, 1-errors]"
   },
   "smoke-digital-tracker-mod": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=9 notes=12 inst=0 rms=0.158 score=70 [no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=8 pat=9 notes=12 inst=0 rms=0.050 score=65 [no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-disorder-tracker-2": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=6 pat=32 notes=8 inst=0 rms=0.000 score=20 [silent, generic-format, no-instruments, not-editable, 6-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-earache": {
     "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.037 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.052 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-face-the-music": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=59 notes=19 inst=0 rms=0.041 score=50 [generic-format, no-instruments, not-editable, pos-stuck, 7-errors]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-farandole-composer": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=16 pat=29 notes=64 inst=0 rms=0.054 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-fashion-tracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=65 notes=56 inst=0 rms=0.070 score=50 [generic-format, no-instruments, not-editable, pos-stuck, 13-errors]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-fm-tracker": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-follin-player-ii": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=7 notes=44 inst=0 rms=0.072 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-forgotten-worlds": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=3 notes=4 inst=0 rms=0.000 score=20 [silent, generic-format, no-instruments, not-editable, 1-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-fred-gray": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.130 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-fredmon": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=12 notes=46 inst=0 rms=0.000 score=20 [silent, generic-format, no-instruments, not-editable, 1-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-furnace": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=3 pat=22 notes=44 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-future-composer-1.3": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=12 notes=34 inst=0 rms=0.000 score=20 [silent, generic-format, no-instruments, not-editable, 1-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-future-composer-1.4": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=52 notes=33 inst=0 rms=0.170 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-future-composer-bsi": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-future-player": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=64 notes=19 inst=0 rms=0.106 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-game-music-creator": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=21 notes=6 inst=0 rms=0.059 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-general-digimusic": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=16 pat=28 notes=12 inst=0 rms=0.020 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-gluemon": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.234 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-goat-tracker-ultra": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.073 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-graoumf-tracker-2": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=6 pat=8 notes=41 inst=0 rms=0.190 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-hippel": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.162 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-hippel-7v": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=7 pat=207 notes=67 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-hippel-coso": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=70 notes=42 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-hippel-st": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-hippel-st-coso": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=100 notes=8 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-his-masters-noise": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, empty-patterns, no-instruments, not-editable, 3-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-hivelytracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=5 pat=6 notes=55 inst=0 rms=0.102 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-howie-davies": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.058 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-iff-smus": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=28 notes=11 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 2-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-images-music-system": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=4 notes=76 inst=0 rms=0.120 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=4 notes=76 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-impulse-tracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=25 pat=42 notes=5 inst=0 rms=0.016 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-infogrames": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
   },
   "smoke-instereo!": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=204 notes=16 inst=0 rms=0.077 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=204 notes=16 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-instereo!-2.0": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=82 notes=18 inst=0 rms=0.125 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=82 notes=18 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-it": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=25 pat=42 notes=5 inst=0 rms=0.016 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-jamcracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=13 notes=96 inst=0 rms=0.105 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=13 notes=96 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-janko-mrsic-flogel": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.200 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
   },
   "smoke-jason-brooke": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=30 notes=24 inst=0 rms=0.029 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-jason-page": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
   },
   "smoke-jason-page-old": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.221 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
   },
   "smoke-jeroen-tel": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=23 notes=8 inst=0 rms=0.004 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=23 notes=8 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-jesper-olsen": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-klystrack": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=2048 notes=0 inst=0 rms=0.150 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 2-errors]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-leggless-music-editor": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.321 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 7-errors]"
   },
   "smoke-mad-tracker-2": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=12 pat=35 notes=237 inst=0 rms=0.010 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-maniacs-of-noise": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.060 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-mark-cooksey": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.235 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-mark-cooksey-old": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.088 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-mark-ii": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.123 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-maxtrax": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-medley": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.082 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-midi-loriciel": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-mike-davies": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=7 notes=39 inst=0 rms=0.027 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-mod": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=24 notes=111 inst=0 rms=0.054 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-multi-tracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=12 pat=53 notes=4 inst=0 rms=0.051 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=12 pat=53 notes=4 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 9-errors]"
   },
   "smoke-multimedia-sound": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.004 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-music-assembler": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=6 notes=160 inst=0 rms=0.307 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=6 notes=160 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 6-errors]"
   },
   "smoke-musicline-editor": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=1 pat=11 notes=0 inst=0 rms=0.056 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-musicmaker-v8": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=1 notes=0 inst=0 rms=0.096 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=8 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-musicmaker-v8-old": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=1 notes=0 inst=0 rms=0.061 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=8 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-octalyser": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=44 notes=0 inst=0 rms=0.042 score=55 [empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-octamed-mmd0": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=10 notes=133 inst=0 rms=0.048 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=10 notes=133 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 9-errors]"
   },
   "smoke-octamed-mmd1": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=30 notes=22 inst=0 rms=0.012 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=30 notes=22 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 9-errors]"
   },
   "smoke-octamed-mmd3": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=10 pat=20 notes=169 inst=0 rms=0.015 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-octamed-mmdc": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.094 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-oktalyzer": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=6 pat=30 notes=50 inst=0 rms=0.025 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-organya": {
     "auditStatus": "fail",
     "notes": "silent ? ch=16 pat=1 notes=0 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-packed_etc": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=12 notes=60 inst=0 rms=0.094 score=70 [no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-paul-shields": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.051 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-paul-summers": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=17 notes=95 inst=0 rms=0.006 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-piston-collage": {
     "auditStatus": "fail",
@@ -15823,216 +15823,216 @@
     "notes": "silent ? ch=12 pat=1 notes=0 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-pmd": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=11 pat=232 notes=0 inst=0 rms=0.479 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-pollytracker": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, empty-patterns, no-instruments, not-editable, 1-errors]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-pretracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=24 notes=55 inst=0 rms=0.135 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-professional-sound-artists": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.127 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-protracker-iff": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=5 notes=69 inst=0 rms=0.035 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-pumatracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=15 notes=40 inst=0 rms=0.041 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=15 notes=40 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 6-errors]"
   },
   "smoke-quadra-composer": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=32 notes=8 inst=0 rms=0.031 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-quartet-psg": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=12 notes=17 inst=0 rms=0.085 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-real-tracker": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=5 pat=9 notes=51 inst=0 rms=0.044 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=5 pat=9 notes=51 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 6-errors]"
   },
   "smoke-richard-joseph": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-riff-raff": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.192 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-rob-hubbard": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=190 notes=24 inst=0 rms=0.113 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-rob-hubbard-st": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=4 notes=3 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-ron-klaren": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=2 notes=70 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=15 [silent, generic-format, empty-patterns, no-instruments, not-editable]"
   },
   "smoke-s3m": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=8 pat=31 notes=32 inst=0 rms=0.048 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=8 pat=31 notes=32 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 14-errors]"
   },
   "smoke-sawteeth": {
     "auditStatus": "fail",
     "notes": "silent ? ch=4 pat=6 notes=88 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 2-errors]"
   },
   "smoke-sc68": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=3 pat=1 notes=0 inst=0 rms=0.070 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=3 pat=1 notes=0 inst=0 rms=0.000 score=20 [silent, generic-format, no-instruments, not-editable, 6-errors]"
   },
   "smoke-scream-tracker-2": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=32 notes=39 inst=0 rms=0.020 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sean-connolly": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.174 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=10 [silent, generic-format, empty-patterns, no-instruments, not-editable, 8-errors]"
   },
   "smoke-sean-conran": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.085 score=45 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sid": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=3 pat=39 notes=0 inst=0 rms=0.018 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sid-factory-2": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=3 pat=4 notes=0 inst=0 rms=0.062 score=55 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=3 pat=4 notes=0 inst=0 rms=0.000 score=20 [silent, generic-format, no-instruments, not-editable, 6-errors]"
   },
   "smoke-sidmon-1": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=32 notes=43 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sidmon-2": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=30 notes=34 inst=0 rms=0.064 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=30 notes=34 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 6-errors]"
   },
   "smoke-silmarils": {
     "auditStatus": "fail",
-    "notes": "silent ? ch=4 pat=2 notes=27 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 5-errors]"
   },
   "smoke-sonic-arranger": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=84 notes=15 inst=0 rms=0.153 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sonix": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=84 notes=15 inst=0 rms=0.154 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sound-master": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=3 notes=256 inst=0 rms=0.113 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "silent ? ch=4 pat=3 notes=256 inst=0 rms=0.000 score=25 [silent, generic-format, no-instruments, not-editable, 8-errors]"
   },
   "smoke-sound-master-ii-v1": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=6 notes=256 inst=0 rms=0.046 score=55 [generic-format, no-instruments, not-editable, pos-stuck, 1-errors]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sound-master-ii-v3": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=4 pat=6 notes=256 inst=0 rms=0.044 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-soundcontrol": {
-    "auditStatus": "unknown",
-    "notes": "pass ? ch=6 pat=62 notes=21 inst=0 rms=0.061 score=60 [generic-format, no-instruments, not-editable, pos-stuck]"
+    "auditStatus": "fail",
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-soundfactory": {
     "auditStatus": "fail",
     "notes": "ERROR: Browser disconnected"
   },
   "smoke-soundfx": {
-    "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=4 pat=11 notes=42 inst=0 rms=0.075 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-special-fx": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "silent ? ch=4 pat=2 notes=4 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-speedy-a1-system": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "silent ? ch=4 pat=1 notes=1 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-speedy-system": {
-    "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.147 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-startrekker-am": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "silent ? ch=4 pat=1 notes=0 inst=0 rms=0.000 score=5 [silent, generic-format, empty-patterns, no-instruments, not-editable, 2-errors]"
   },
   "smoke-startrekker-flt8": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-steve-barrett": {
-    "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.178 score=35 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc, 1-errors]"
   },
   "smoke-stonetracker": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-studio-pixel---piyopiyo": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-suntronic": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-sunvox": {
     "auditStatus": "fail",
     "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
   },
   "smoke-symphonie": {
-    "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=16 pat=20 notes=56 inst=0 rms=0.046 score=55 [generic-format, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-synth-dream": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-synthesis": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-tcb-tracker": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-tfm-music-maker": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-tfmx": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "silent ? ch=8 pat=92 notes=26 inst=0 rms=0.000 score=30 [silent, generic-format, no-instruments, not-editable]"
   },
   "smoke-the-musical-enlightenment": {
-    "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.229 score=40 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-tomy-tracker": {
-    "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "auditStatus": "unknown",
+    "notes": "pass ? ch=4 pat=1 notes=0 inst=0 rms=0.105 score=35 [generic-format, empty-patterns, no-instruments, not-editable, pos-stuck, no-osc]"
   },
   "smoke-tss": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-ultra-tracker": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-v2": {
     "auditStatus": "fail",
@@ -16040,22 +16040,22 @@
   },
   "smoke-velvet-studio": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-vgm": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-wally-beben": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-xm": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   },
   "smoke-zoundmonitor": {
     "auditStatus": "fail",
-    "notes": "ERROR: No browser connected. Open DEViLBOX in a browser."
+    "notes": "ERROR: Browser disconnected"
   }
 }

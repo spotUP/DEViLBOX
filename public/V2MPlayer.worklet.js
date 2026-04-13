@@ -32,6 +32,12 @@ class V2MPlayerProcessor extends AudioWorkletProcessor {
       case 'seek':
         this.seek(msg.timeMs);
         break;
+      case 'setChannelGain':
+        this.setChannelGain(msg.channel, msg.gain);
+        break;
+      case 'setMuteMask':
+        this.setMuteMask(msg.mask);
+        break;
     }
   }
   
@@ -113,7 +119,20 @@ class V2MPlayerProcessor extends AudioWorkletProcessor {
     this.module._v2m_play(timeMs);
     this.playing = true;
   }
-  
+
+  setChannelGain(channel, gain) {
+    if (!this.initialized) return;
+    this.module._v2m_set_channel_gain(channel, gain);
+  }
+
+  setMuteMask(mask) {
+    if (!this.initialized) return;
+    for (let ch = 0; ch < 16; ch++) {
+      const gain = (mask & (1 << ch)) ? 0.0 : 1.0;
+      this.module._v2m_set_channel_gain(ch, gain);
+    }
+  }
+
   process(inputs, outputs, parameters) {
     const output = outputs[0];
     if (!output || output.length === 0) return true;

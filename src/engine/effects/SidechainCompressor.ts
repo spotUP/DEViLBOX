@@ -18,6 +18,9 @@ export interface SidechainCompressorOptions {
   release?: number;         // 0.01 to 1 seconds
   knee?: number;            // 0 to 40 dB
   sidechainGain?: number;   // Sidechain sensitivity 0-2
+  scFreq?: number;          // Sidechain filter frequency 20-20000 Hz (0 = off)
+  scQ?: number;             // Sidechain filter Q 0.1-10
+  scFilterType?: string;    // 'lowpass' | 'highpass' | 'bandpass' (default: lowpass)
   wet?: number;             // 0 to 1
 }
 
@@ -33,6 +36,7 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
   private sidechainInput: Tone.Gain;
   private selfRouteGain: Tone.Gain;
   private sidechainGainNode: Tone.Gain;
+  private scFilter: BiquadFilterNode;
   private analyser: AnalyserNode;
   private analyserBuffer: Float32Array;
 
@@ -43,10 +47,13 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
   private _release: number;
   private _knee: number;
   private _sidechainGain: number;
+  private _scFreq: number;
+  private _scQ: number;
+  private _scFilterType: BiquadFilterType;
   private _wet: number;
 
-  // Envelope state
-  private envelope = 0;
+  // Envelope state — start at -100 dB (silence) to avoid false ducking on first enable
+  private envelope = -100;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly input: Tone.Gain;
@@ -61,6 +68,9 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this._release = options.release ?? 0.25;
     this._knee = options.knee ?? 6;
     this._sidechainGain = options.sidechainGain ?? 1;
+    this._scFreq = options.scFreq ?? 0;
+    this._scQ = options.scQ ?? 1;
+    this._scFilterType = (options.scFilterType as BiquadFilterType) ?? 'lowpass';
     this._wet = options.wet ?? 1;
 
     const rawCtx = Tone.getContext().rawContext as AudioContext;
@@ -71,9 +81,13 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.wetGain = new Tone.Gain(this._wet);
     this.duckGain = new Tone.Gain(1);
 
-    // Sidechain chain
+    // Sidechain chain with optional frequency filter
     this.sidechainInput = new Tone.Gain(1);
     this.sidechainGainNode = new Tone.Gain(this._sidechainGain);
+    this.scFilter = rawCtx.createBiquadFilter();
+    this.scFilter.type = this._scFilterType;
+    this.scFilter.frequency.value = this._scFreq > 0 ? this._scFreq : 20000;
+    this.scFilter.Q.value = this._scQ;
     this.analyser = rawCtx.createAnalyser();
     this.analyser.fftSize = 256;
     this.analyserBuffer = new Float32Array(this.analyser.fftSize);
@@ -87,10 +101,11 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // Sidechain detection: sidechainInput → gain → analyser
+    // Sidechain detection: sidechainInput → gain → filter → analyser
     const rawScGain = getNativeAudioNode(this.sidechainGainNode);
     this.sidechainInput.connect(this.sidechainGainNode);
-    if (rawScGain) rawScGain.connect(this.analyser);
+    if (rawScGain) rawScGain.connect(this.scFilter);
+    this.scFilter.connect(this.analyser);
 
     // Self-route: main input feeds sidechain for self-detection mode.
     // Controlled by selfRouteGain — set to 0 when external source is wired.
@@ -184,6 +199,35 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.sidechainGainNode.gain.value = this._sidechainGain;
   }
 
+  get scFreq(): number { return this._scFreq; }
+  set scFreq(value: number) {
+    this._scFreq = Math.max(0, Math.min(20000, value));
+    if (this._scFreq <= 0) {
+      // Filter off — force lowpass at 20kHz (transparent regardless of scFilterType)
+      this.scFilter.type = 'lowpass';
+      this.scFilter.frequency.value = 20000;
+    } else {
+      this.scFilter.type = this._scFilterType;
+      this.scFilter.frequency.value = this._scFreq;
+    }
+  }
+
+  get scQ(): number { return this._scQ; }
+  set scQ(value: number) {
+    this._scQ = Math.max(0.1, Math.min(10, value));
+    this.scFilter.Q.value = this._scQ;
+  }
+
+  get scFilterType(): string { return this._scFilterType; }
+  set scFilterType(value: string) {
+    const valid: BiquadFilterType[] = ['lowpass', 'highpass', 'bandpass'];
+    this._scFilterType = valid.includes(value as BiquadFilterType) ? value as BiquadFilterType : 'lowpass';
+    // Only apply filter type when filter is active (scFreq > 0)
+    if (this._scFreq > 0) {
+      this.scFilter.type = this._scFilterType;
+    }
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = Math.max(0, Math.min(1, value));
@@ -205,7 +249,9 @@ export class SidechainCompressor extends Tone.ToneAudioNode {
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.sidechainInput.dispose();
+    this.selfRouteGain.dispose();
     this.sidechainGainNode.dispose();
+    try { this.scFilter.disconnect(); } catch { /* */ }
     try { this.analyser.disconnect(); } catch { /* */ }
     this.input.dispose();
     this.output.dispose();

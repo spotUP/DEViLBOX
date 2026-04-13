@@ -139,21 +139,21 @@ EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
     if (!g_pxtn) return -2;
 
     pxtnERR err = g_pxtn->init();
-    if (err != pxtnERR_VOID) {
+    if (err != pxtnOK) {
         delete g_pxtn;
         g_pxtn = nullptr;
         return -3;
     }
 
     err = g_pxtn->read(&g_memfile);
-    if (err != pxtnERR_VOID) {
+    if (err != pxtnOK) {
         delete g_pxtn;
         g_pxtn = nullptr;
         return -4;
     }
 
     err = g_pxtn->tones_ready();
-    if (err != pxtnERR_VOID) {
+    if (err != pxtnOK) {
         delete g_pxtn;
         g_pxtn = nullptr;
         return -5;
