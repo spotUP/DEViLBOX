@@ -200,10 +200,9 @@ function scanModuleCode(bytes: Uint8Array): ScanResult | null {
 
   // ── Find number of sub-songs ───────────────────────────────────────────
   // Skip leading JMP ($4e $f9) instructions (6 bytes each), then count MOVE.W #n,D0 (0x30 0x3c ... 8 bytes each)
-  let index = HEADER_SIZE - AMIGA_HUNK_SIZE; // HeaderSize=32 relative to code start
-  // HEADER_SIZE is 32 from start of file, but search buffer starts at AMIGA_HUNK_SIZE=32
-  // So relative to search buffer: index = HEADER_SIZE - AMIGA_HUNK_SIZE = 0
-  index = 0;
+  // HeaderSize=32 is an offset within the search buffer (the player code header within the hunk),
+  // NOT a file offset. NostalgicPlayer scans from searchBuffer[HeaderSize].
+  let index = HEADER_SIZE;
 
   // Skip JMPs
   while (index + 6 <= bufLen && buf[index] === 0x4e && buf[index + 1] === 0xf9) {
@@ -220,7 +219,7 @@ function scanModuleCode(bytes: Uint8Array): ScanResult | null {
 
   // ── Find song speed (CIA value) and IRQ routine offset ─────────────────
   // Re-scan from header start to find init function (either 0x61 0x00 BSR or 0x33 0xfc MOVE.W)
-  index = 0;
+  index = HEADER_SIZE;
   let ciaLoValue = 0, ciaHiValue = 0;
   let irqOffset = 0;
   let initOffset = 0;
@@ -238,8 +237,8 @@ function scanModuleCode(bytes: Uint8Array): ScanResult | null {
   }
 
   if (!foundInit) {
-    // Try VBlank player fallback: third JMP (index 12)
-    index = 6; // second JMP
+    // Try VBlank player fallback: third JMP (HeaderSize + 6 per NostalgicPlayer)
+    index = HEADER_SIZE + 6; // second JMP
     if (index + 6 <= bufLen && buf[index] === 0x4e && buf[index + 1] === 0xf9) {
       const playOffset = (buf[index + 2] << 24) | (buf[index + 3] << 16) | (buf[index + 4] << 8) | buf[index + 5];
       if (playOffset >= 0 && playOffset < bufLen && buf[playOffset] === 0x41 && buf[playOffset + 1] === 0xfa) {
@@ -311,7 +310,7 @@ function scanModuleCode(bytes: Uint8Array): ScanResult | null {
   // ── Find instrument and arpeggio offsets ───────────────────────────────
   let instrumentOffset = 0, arpeggioOffset = 0;
 
-  for (let i = 0; i + 4 <= bufLen; i += 2) {
+  for (let i = HEADER_SIZE; i + 4 <= bufLen; i += 2) {
     if (buf[i] === 0x0c && buf[i + 1] === 0x12 && buf[i + 2] === 0x00) {
       if (buf[i + 3] === 0x82) {
         // Look for LEA (0x49 0xfa) nearby
@@ -339,7 +338,7 @@ function scanModuleCode(bytes: Uint8Array): ScanResult | null {
 
   // ── Check clearAdsrStateOnPortamento ────────────────────────────────────
   let clearAdsrStateOnPortamento = false;
-  for (let i = 0; i + 10 <= bufLen; i += 2) {
+  for (let i = HEADER_SIZE; i + 10 <= bufLen; i += 2) {
     if (buf[i] === 0x0c && buf[i + 1] === 0x12 && buf[i + 2] === 0x00 && buf[i + 3] === 0x81) {
       if (i + 10 <= bufLen && buf[i + 8] === 0x42 && buf[i + 9] === 0x68) {
         clearAdsrStateOnPortamento = true;
@@ -712,7 +711,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   }
 
   // ── Decode tracks into note rows ───────────────────────────────────────
-  interface RkRow { noteIdx: number; instrNum: number; }
+  interface RkRow { noteIdx: number; instrNum: number; hasNote: boolean; }
 
   function decodeTrackToRows(data: Uint8Array, numRows: number, transpose: number): { rows: RkRow[]; notePositions: number[] } {
     const rows: RkRow[] = [];
@@ -721,14 +720,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     let currentInstr = 0;
     let pendingRows = 0;
 
-    function emitRow(noteIdx: number, instrId: number, dataPos: number): void {
-      rows.push({ noteIdx, instrNum: instrId });
+    function emitRow(noteIdx: number, instrId: number, dataPos: number, hasNote: boolean): void {
+      rows.push({ noteIdx, instrNum: instrId, hasNote });
       notePositions.push(dataPos);
     }
 
     while (pos < data.length && rows.length < numRows) {
       if (pendingRows > 0) {
-        emitRow(0, 0, -1); // duration-hold rows have no file position
+        emitRow(0, 0, -1, false); // duration-hold rows have no file position
         pendingRows--;
         continue;
       }
@@ -757,7 +756,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
           // Portamento: emit note row with current period and wait
           const transposedEnd = Math.min(endNote + transpose, RK_PERIODS.length - 1);
           if (waitCount > 0) {
-            emitRow(transposedEnd, currentInstr, cmdPos);
+            emitRow(transposedEnd, currentInstr, cmdPos, true);
             pendingRows = waitCount * 4 - 2; // -1 for current row, -1 for trigger
             if (pendingRows < 0) pendingRows = 0;
           }
@@ -794,9 +793,9 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         if (waitCount === 0) {
           // No wait — don't emit row, keep processing
           // This means the note is set but we continue reading (per NostalgicPlayer: return true)
-          emitRow(clampedNote, currentInstr, cmdPos);
+          emitRow(clampedNote, currentInstr, cmdPos, true);
         } else {
-          emitRow(clampedNote, currentInstr, cmdPos);
+          emitRow(clampedNote, currentInstr, cmdPos, true);
           pendingRows = waitCount * 4 - 2;
           if (pendingRows < 0) pendingRows = 0;
         }
@@ -806,7 +805,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
     // Pad to numRows
     while (rows.length < numRows) {
-      rows.push({ noteIdx: 0, instrNum: 0 });
+      rows.push({ noteIdx: 0, instrNum: 0, hasNote: false });
       notePositions.push(-1);
     }
     return { rows: rows.slice(0, numRows), notePositions: notePositions.slice(0, numRows) };
@@ -850,7 +849,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
       for (let ri = 0; ri < decodedRows.length; ri++) {
         const row = decodedRows[ri];
-        const xmNoteFixed = row.noteIdx === 0 ? 0 : rkNoteToXM(row.noteIdx);
+        const xmNoteFixed = row.hasNote ? rkNoteToXM(row.noteIdx) : 0;
         const instrId = row.instrNum;
 
         channelRows[ch].push({
