@@ -1431,14 +1431,16 @@ static uint8_t* convert_fred_final(const uint8_t* mod, size_t mod_len, size_t* o
     if (module_offset < 0 || (size_t)module_offset >= mod_len) return nullptr;
 
     // Find offsetDiff: pattern 0x47FA ... 0xD7FA
-    int offset_diff = -1;
+    int offset_diff = 0;
+    bool found_offset_diff = false;
     for (int i = pattern_pos; i < 60; i++) {
         if (init_func[i] == 0x47FA && init_func[i + 2] == 0xD7FA) {
             offset_diff = init_offset + (i + 1) * 2 + (int16_t)init_func[i + 1];
+            found_offset_diff = true;
             break;
         }
     }
-    if (offset_diff < 0) return nullptr;
+    if (!found_offset_diff) return nullptr;
 
     // Read module header at moduleOffset
     size_t mpos = (size_t)module_offset;
