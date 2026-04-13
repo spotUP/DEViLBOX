@@ -341,8 +341,8 @@ const tr808Theme: Theme = {
     currentRowText: '#f6edc6',
     panelShadow: '#111111',
     pianoKeyColors: [
-      '#d03933', '#e98e2f', '#dfd442', '#e9e8e7', '#d03933', '#e98e2f', '#dfd442',
-    ],
+      '#d03933', '#e98e2f', '#dfd442', '#e9e8e7', '#d03933', '#e98e2f', '#dfd442'
+],
     // TR-808: Clean Swiss/Japanese design — Helvetica-inspired, warm analog feel
     fontFamily: "'Chakra Petch', 'Helvetica Neue', 'Helvetica', sans-serif",
     monoFontFamily: "'Share Tech Mono', 'Consolas', monospace",
@@ -397,8 +397,8 @@ const tr909Theme: Theme = {
     currentRowText: '#FFFFFF',
     panelShadow: '#1a1e28',
     pianoKeyColors: [
-      '#FB9250', '#DFDBDA', '#FB9250', '#DFDBDA', '#FB9250', '#DFDBDA', '#FB9250',
-    ],
+      '#FB9250', '#DFDBDA', '#FB9250', '#DFDBDA', '#FB9250', '#DFDBDA', '#FB9250'
+],
     // TR-909: Industrial precision — geometric sans, cold metallic
     fontFamily: "'Rajdhani', 'Futura', 'Century Gothic', sans-serif",
     monoFontFamily: "'IBM Plex Mono', 'Consolas', monospace",
@@ -453,8 +453,8 @@ const dmxTheme: Theme = {
     currentRowText: '#F8FCFB',
     panelShadow: '#0a0a10',
     pianoKeyColors: [
-      '#4785B4', '#D00E0E', '#F8FCFB', '#613614', '#4785B4', '#D00E0E', '#F8FCFB',
-    ],
+      '#4785B4', '#D00E0E', '#F8FCFB', '#613614', '#4785B4', '#D00E0E', '#F8FCFB'
+],
     // DMX: Early digital sampling era — bold monospace, clinical
     fontFamily: "'Orbitron', 'Arial Black', 'Impact', sans-serif",
     monoFontFamily: "'VT323', 'Courier New', monospace",
@@ -509,8 +509,8 @@ const linnLm1Theme: Theme = {
     currentRowText: '#FFFFFF',
     panelShadow: '#080808',
     pianoKeyColors: [
-      '#FC650C', '#424242', '#CA1B20', '#513B2E', '#FC650C', '#424242', '#CA1B20',
-    ],
+      '#FC650C', '#424242', '#CA1B20', '#513B2E', '#FC650C', '#424242', '#CA1B20'
+],
     // Linn LM-1: First sample drum machine — warm analog, woody character
     fontFamily: "'Chakra Petch', 'Helvetica', 'Arial', sans-serif",
     monoFontFamily: "'DM Mono', 'Monaco', monospace",
@@ -565,8 +565,8 @@ const mpc60Theme: Theme = {
     currentRowText: '#E6E4E7',
     panelShadow: '#2a2830',
     pianoKeyColors: [
-      '#8AAAC3', '#E0635D', '#B6B4B7', '#E6E4E7', '#8AAAC3', '#E0635D', '#B6B4B7',
-    ],
+      '#8AAAC3', '#E0635D', '#B6B4B7', '#E6E4E7', '#8AAAC3', '#E0635D', '#B6B4B7'
+],
     // MPC 60: J Dilla's weapon — utilitarian Japanese design, LCD blue feel
     fontFamily: "'Rajdhani', 'Arial', 'Helvetica', sans-serif",
     monoFontFamily: "'IBM Plex Mono', 'Menlo', monospace",
@@ -621,8 +621,8 @@ const cr78Theme: Theme = {
     currentRowText: '#FFFFFF',
     panelShadow: '#0a0c0e',
     pianoKeyColors: [
-      '#FFC631', '#5E9CD9', '#2FB270', '#C91611', '#FFC631', '#5E9CD9', '#2FB270',
-    ],
+      '#FFC631', '#5E9CD9', '#2FB270', '#C91611', '#FFC631', '#5E9CD9', '#2FB270'
+],
     // CR-78: First programmable drum machine — retro-futuristic, space age
     fontFamily: "'Space Mono', 'Courier New', monospace",
     monoFontFamily: "'Space Mono', 'Courier New', monospace",
@@ -630,62 +630,6 @@ const cr78Theme: Theme = {
     knobStyle: 'vintage',
     buttonRadius: '6px',
     buttonStyle: 'raised',
-  },
-};
-
-/**
- * E-mu SP-12 (1985)
- * Grey metal sampling drum machine. BLUE buttons. Hip-hop legend.
- * CLINICAL, INDUSTRIAL, BLUE STEEL.
- */
-const emuSp12Theme: Theme = {
-  id: 'emu-sp12',
-  name: 'E-mu SP-12',
-  colors: {
-    bg: '#1e2028',
-    bgSecondary: '#262830',
-    bgTertiary: '#30323c',
-    bgHover: '#3a3c48',
-    bgActive: '#444652',
-    border: '#404450',
-    borderLight: '#505462',
-    accent: '#144F9D',
-    accentSecondary: '#448ABD',
-    accentHighlight: '#FFFFFF',
-    accentGlow: 'rgba(20, 79, 157, 0.3)',
-    text: '#EAE6E5',
-    textSecondary: '#A5A3A6',
-    textMuted: '#606268',
-    textInverse: '#1e2028',
-    error: '#c44040',
-    success: '#448ABD',
-    warning: '#A5A3A6',
-    trackerRowEven: '#202430',
-    trackerRowOdd: '#282c36',
-    trackerRowHighlight: '#303440',
-    trackerRowCurrent: '#1a2c50',
-    trackerRowCursor: '#102860',
-    trackerBorder: '#303440',
-    cellNote: '#EAE6E5',
-    cellInstrument: '#448ABD',
-    cellVolume: '#A5A3A6',
-    cellEffect: '#144F9D',
-    cellAccent: '#448ABD',
-    cellSlide: '#144F9D',
-    cellEmpty: '#3a3c48',
-    playbackCursor: '#144F9D',
-    currentRowText: '#FFFFFF',
-    panelShadow: '#101218',
-    pianoKeyColors: [
-      '#144F9D', '#448ABD', '#A5A3A6', '#EAE6E5', '#144F9D', '#448ABD', '#A5A3A6',
-    ],
-    // SP-12: Digital sampling precision — clean corporate, blue-tinted
-    fontFamily: "'IBM Plex Mono', 'Menlo', monospace",
-    monoFontFamily: "'IBM Plex Mono', 'Menlo', monospace",
-    fontSize: '12px',
-    knobStyle: 'rubber',
-    buttonRadius: '3px',
-    buttonStyle: 'flat',
   },
 };
 
@@ -733,8 +677,8 @@ const maestroRhythmKingTheme: Theme = {
     currentRowText: '#F2ECEE',
     panelShadow: '#080610',
     pianoKeyColors: [
-      '#D94C45', '#F7BE29', '#ACE0F8', '#D94C45', '#F7BE29', '#ACE0F8', '#D94C45',
-    ],
+      '#D94C45', '#F7BE29', '#ACE0F8', '#D94C45', '#F7BE29', '#ACE0F8', '#D94C45'
+],
     // Maestro Rhythm King: 70s funk machine — warm soulful typography
     fontFamily: "'Chakra Petch', 'Georgia', 'Palatino', serif",
     monoFontFamily: "'DM Mono', 'Courier New', monospace",
@@ -789,8 +733,8 @@ const maestroRhythmSoundTheme: Theme = {
     currentRowText: '#FEFCFF',
     panelShadow: '#060410',
     pianoKeyColors: [
-      '#F97101', '#FBE900', '#B8E9E3', '#F97101', '#FBE900', '#B8E9E3', '#F97101',
-    ],
+      '#F97101', '#FBE900', '#B8E9E3', '#F97101', '#FBE900', '#B8E9E3', '#F97101'
+],
     // Maestro Rhythm & Sound: Psychedelic — vivid, electric, high contrast
     fontFamily: "'Orbitron', 'Impact', 'Arial Black', sans-serif",
     monoFontFamily: "'VT323', 'Courier New', monospace",
@@ -798,118 +742,6 @@ const maestroRhythmSoundTheme: Theme = {
     knobStyle: 'vintage',
     buttonRadius: '4px',
     buttonStyle: 'beveled',
-  },
-};
-
-/**
- * Ace Tone Rhythm Ace FR-8L (1967)
- * Grandfather of Roland. Warm WOODEN cabinet.
- * Gold, green, deep red buttons. VINTAGE, ORGANIC.
- */
-const aceToneTheme: Theme = {
-  id: 'ace-tone',
-  name: 'Ace Tone Rhythm Ace',
-  colors: {
-    bg: '#1e1408',
-    bgSecondary: '#28200e',
-    bgTertiary: '#342a16',
-    bgHover: '#3e3220',
-    bgActive: '#483c2a',
-    border: '#54421e',
-    borderLight: '#6a5830',
-    accent: '#E19907',
-    accentSecondary: '#4F8632',
-    accentHighlight: '#FBE6AF',
-    accentGlow: 'rgba(225, 153, 7, 0.25)',
-    text: '#FBE6AF',
-    textSecondary: '#c4a870',
-    textMuted: '#7a6438',
-    textInverse: '#1e1408',
-    error: '#8E0402',
-    success: '#4F8632',
-    warning: '#E19907',
-    trackerRowEven: '#201608',
-    trackerRowOdd: '#28200e',
-    trackerRowHighlight: '#322814',
-    trackerRowCurrent: '#342408',
-    trackerRowCursor: '#3a1406',
-    trackerBorder: '#322814',
-    cellNote: '#FBE6AF',
-    cellInstrument: '#E19907',
-    cellVolume: '#4F8632',
-    cellEffect: '#8E0402',
-    cellAccent: '#E19907',
-    cellSlide: '#4F8632',
-    cellEmpty: '#3e3218',
-    playbackCursor: '#E19907',
-    currentRowText: '#FBE6AF',
-    panelShadow: '#100c04',
-    pianoKeyColors: [
-      '#E19907', '#4F8632', '#8E0402', '#FBE6AF', '#E19907', '#4F8632', '#8E0402',
-    ],
-    // Ace Tone: Japanese craftsmanship, warm wooden feel — elegant serif
-    fontFamily: "'Chakra Petch', 'Optima', 'Palatino', serif",
-    monoFontFamily: "'DM Mono', 'Menlo', monospace",
-    fontSize: '13px',
-    knobStyle: 'vintage',
-    buttonRadius: '8px',
-    buttonStyle: 'raised',
-  },
-};
-
-/**
- * Hammond Auto-Vari 64 (1976)
- * Elegant cream/beige organ rhythm unit. WARM, LIGHT, ELEGANT.
- * Cream body, peach/salmon and orange buttons.
- */
-const hammondAutoVariTheme: Theme = {
-  id: 'hammond-av64',
-  name: 'Hammond Auto-Vari 64',
-  colors: {
-    bg: '#2c2820',
-    bgSecondary: '#363228',
-    bgTertiary: '#403c30',
-    bgHover: '#4a4638',
-    bgActive: '#545040',
-    border: '#5e5844',
-    borderLight: '#706850',
-    accent: '#FBA02E',
-    accentSecondary: '#E1806D',
-    accentHighlight: '#F1F0EC',
-    accentGlow: 'rgba(251, 160, 46, 0.25)',
-    text: '#F1F0EC',
-    textSecondary: '#EAE4C4',
-    textMuted: '#908870',
-    textInverse: '#2c2820',
-    error: '#E1806D',
-    success: '#FBA02E',
-    warning: '#EAE4C4',
-    trackerRowEven: '#2e2a22',
-    trackerRowOdd: '#363228',
-    trackerRowHighlight: '#3e3a2e',
-    trackerRowCurrent: '#3e3418',
-    trackerRowCursor: '#402c18',
-    trackerBorder: '#3e3a2e',
-    cellNote: '#F1F0EC',
-    cellInstrument: '#FBA02E',
-    cellVolume: '#E1806D',
-    cellEffect: '#EAE4C4',
-    cellAccent: '#FBA02E',
-    cellSlide: '#E1806D',
-    cellEmpty: '#504a3a',
-    playbackCursor: '#FBA02E',
-    currentRowText: '#F1F0EC',
-    panelShadow: '#1e1c14',
-    pianoKeyColors: [
-      '#FBA02E', '#E1806D', '#EAE4C4', '#FBA02E', '#E1806D', '#EAE4C4', '#FBA02E',
-    ],
-    // Hammond: 60s/70s organ company elegance — warm serif corporate
-    fontFamily: "'Georgia', 'Palatino Linotype', 'Book Antiqua', serif",
-    monoFontFamily: "'DM Mono', 'Courier New', monospace",
-    fontSize: '13px',
-    knobStyle: 'vintage',
-    buttonRadius: '6px',
-    buttonStyle: 'raised',
   },
 };
 
@@ -957,8 +789,8 @@ const bossHc2Theme: Theme = {
     currentRowText: '#e8f4ff',
     panelShadow: '#060608',
     pianoKeyColors: [
-      '#329BD4', '#496F9C', '#BDBEB8', '#5bbfe8', '#329BD4', '#496F9C', '#BDBEB8',
-    ],
+      '#329BD4', '#496F9C', '#BDBEB8', '#5bbfe8', '#329BD4', '#496F9C', '#BDBEB8'
+],
     // Boss HC-2: Clean 80s Japanese digital — sharp, readable, precise
     fontFamily: "'Rajdhani', 'Verdana', 'Tahoma', sans-serif",
     monoFontFamily: "'Share Tech Mono', 'Consolas', monospace",
@@ -966,64 +798,6 @@ const bossHc2Theme: Theme = {
     knobStyle: 'rubber',
     buttonRadius: '3px',
     buttonStyle: 'flat',
-  },
-};
-
-/**
- * Wurlitzer Side Man (1959)
- * The first commercially successful drum machine. Wood-grain cabinet, warm cream/ivory
- * control panel, amber VU meter glow, dark mahogany brown structural elements.
- * Warm, analogue, tube-era 1950s styling — like a living room hi-fi, not a studio machine.
- * WARM WOOD, IVORY CREAM, AMBER GLOW.
- */
-const wurlitzerSideManTheme: Theme = {
-  id: 'wurlitzer-sideman',
-  name: 'Wurlitzer Side Man',
-  colors: {
-    bg: '#1c1008',               // dark mahogany — the cabinet wood
-    bgSecondary: '#251608',      // slightly lighter wood grain
-    bgTertiary: '#2e1e0a',       // mid-tone walnut
-    bgHover: '#3a2810',
-    bgActive: '#4a3418',
-    border: '#5c3e18',           // warm brown border
-    borderLight: '#7a5428',      // lighter warm wood
-    accent: '#C88B30',           // amber VU meter glow
-    accentSecondary: '#8C6020',  // darker amber / brass
-    accentHighlight: '#E8A840',  // bright warm gold
-    accentGlow: 'rgba(200, 139, 48, 0.35)',
-    text: '#F0E0C0',             // warm ivory / cream
-    textSecondary: '#C0A878',    // aged parchment
-    textMuted: '#7a6040',        // faded brown
-    textInverse: '#1c1008',
-    error: '#c04040',
-    success: '#C88B30',
-    warning: '#8C6020',
-    trackerRowEven: '#1e1108',
-    trackerRowOdd: '#261508',
-    trackerRowHighlight: '#301c08',
-    trackerRowCurrent: '#3c2408',
-    trackerRowCursor: '#4e2e00',
-    trackerBorder: '#301c08',
-    cellNote: '#F0E0C0',         // ivory text
-    cellInstrument: '#C88B30',   // amber
-    cellVolume: '#8C6020',       // brass
-    cellEffect: '#E8A840',       // bright gold
-    cellAccent: '#C88B30',
-    cellSlide: '#8C6020',
-    cellEmpty: '#302010',
-    playbackCursor: '#C88B30',
-    currentRowText: '#fff8e8',
-    panelShadow: '#0c0804',
-    pianoKeyColors: [
-      '#C88B30', '#8C6020', '#F0E0C0', '#E8A840', '#C88B30', '#8C6020', '#F0E0C0',
-    ],
-    // Wurlitzer Side Man: Warm 50s hi-fi serif — like a console television
-    fontFamily: "'Georgia', 'Palatino', serif",
-    monoFontFamily: "'Courier New', 'Courier', monospace",
-    fontSize: '12px',
-    knobStyle: 'vintage',
-    buttonRadius: '4px',
-    buttonStyle: 'raised',
   },
 };
 
@@ -1128,52 +902,6 @@ const tr707Theme: Theme = {
 
 // Roland TR-77 CompuRhythm (1972)
 // Olive/tan brushed metal, cream labels, brown housing. Early-70s Japanese analogue warmth.
-const tr77Theme: Theme = {
-  id: 'tr-77',
-  name: 'Roland TR-77',
-  colors: {
-    bg: '#141208',
-    bgSecondary: '#1C1A0C',
-    bgTertiary: '#262210',
-    bgHover: '#322C14',
-    bgActive: '#3E3618',
-    border: '#342E10',
-    borderLight: '#4A4018',
-    accent: '#A8901C',
-    accentSecondary: '#7A6810',
-    accentHighlight: '#D4B828',
-    accentGlow: 'rgba(168, 144, 28, 0.25)',
-    text: '#E0D8B0',
-    textSecondary: '#A89870',
-    textMuted: '#686040',
-    textInverse: '#141208',
-    error: '#C84020',
-    success: '#608020',
-    warning: '#A8901C',
-    trackerRowEven: '#161408',
-    trackerRowOdd: '#1C1A0C',
-    trackerRowHighlight: '#222010',
-    trackerRowCurrent: '#302808',
-    trackerRowCursor: '#3C3000',
-    trackerBorder: '#222010',
-    cellNote: '#E0D8B0',
-    cellInstrument: '#A8901C',
-    cellVolume: '#7A6810',
-    cellEffect: '#D4B828',
-    cellAccent: '#A8901C',
-    cellSlide: '#685808',
-    cellEmpty: '#302C10',
-    playbackCursor: '#D4B828',
-    currentRowText: '#FFFFF0',
-    panelShadow: '#080600',
-    fontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
-    monoFontFamily: "'Courier New', 'Courier', monospace",
-    fontSize: '12px',
-    knobStyle: 'vintage',
-    buttonRadius: '4px',
-    buttonStyle: 'raised',
-  },
-};
 
 // Linn LM-2 LinnDrum (1982)
 // Dark charcoal panel, multicolored velocity pads. Prince, MJ, Bowie.
@@ -1277,52 +1005,6 @@ const simmonsSdsVTheme: Theme = {
 
 // Korg KR-55 (1979)
 // All-black body, warm amber LED display, orange buttons. Japanese analogue minimalism.
-const korgKr55Theme: Theme = {
-  id: 'korg-kr55',
-  name: 'Korg KR-55',
-  colors: {
-    bg: '#0C0C0A',
-    bgSecondary: '#141412',
-    bgTertiary: '#1C1C18',
-    bgHover: '#282820',
-    bgActive: '#343428',
-    border: '#2A2820',
-    borderLight: '#3C3828',
-    accent: '#D47820',
-    accentSecondary: '#C05010',
-    accentHighlight: '#F09030',
-    accentGlow: 'rgba(212, 120, 32, 0.30)',
-    text: '#F0E8D0',
-    textSecondary: '#B09060',
-    textMuted: '#706040',
-    textInverse: '#0C0C0A',
-    error: '#C84020',
-    success: '#608020',
-    warning: '#D47820',
-    trackerRowEven: '#0E0E0C',
-    trackerRowOdd: '#141412',
-    trackerRowHighlight: '#1A1A16',
-    trackerRowCurrent: '#281E08',
-    trackerRowCursor: '#342400',
-    trackerBorder: '#1A1A16',
-    cellNote: '#F0E8D0',
-    cellInstrument: '#D47820',
-    cellVolume: '#C05010',
-    cellEffect: '#F09030',
-    cellAccent: '#D47820',
-    cellSlide: '#885020',
-    cellEmpty: '#302820',
-    playbackCursor: '#F09030',
-    currentRowText: '#FFF8E8',
-    panelShadow: '#040402',
-    fontFamily: "'Rajdhani', 'Helvetica Neue', 'Helvetica', sans-serif",
-    monoFontFamily: "'Share Tech Mono', 'Courier New', monospace",
-    fontSize: '12px',
-    knobStyle: 'vintage',
-    buttonRadius: '3px',
-    buttonStyle: 'raised',
-  },
-};
 
 // Boss DR-55 Dr. Rhythm (1979)
 // Pale cream body, orange/red/green accent buttons. First Boss drum machine.
@@ -1475,61 +1157,12 @@ const casioRz1Theme: Theme = {
 
 // Sequential Circuits Tom (1985)
 // Matte black, red accents, cream legends. Dave Smith's last drum machine.
-const sequentialTomTheme: Theme = {
-  id: 'sequential-tom',
-  name: 'Sequential Tom',
-  colors: {
-    bg: '#0A0A0C',
-    bgSecondary: '#121214',
-    bgTertiary: '#1A1A1C',
-    bgHover: '#252528',
-    bgActive: '#303034',
-    border: '#282828',
-    borderLight: '#383840',
-    accent: '#C81818',
-    accentSecondary: '#904040',
-    accentHighlight: '#E83018',
-    accentGlow: 'rgba(200, 24, 24, 0.20)',
-    text: '#E8E4DC',
-    textSecondary: '#A09890',
-    textMuted: '#686058',
-    textInverse: '#0A0A0C',
-    error: '#E83018',
-    success: '#40A860',
-    warning: '#C08020',
-    trackerRowEven: '#0C0C0E',
-    trackerRowOdd: '#121214',
-    trackerRowHighlight: '#181818',
-    trackerRowCurrent: '#280808',
-    trackerRowCursor: '#340808',
-    trackerBorder: '#181818',
-    cellNote: '#E8E4DC',
-    cellInstrument: '#C81818',
-    cellVolume: '#904040',
-    cellEffect: '#E83018',
-    cellAccent: '#C81818',
-    cellSlide: '#804040',
-    cellEmpty: '#383030',
-    playbackCursor: '#E83018',
-    currentRowText: '#FFFFFF',
-    panelShadow: '#040404',
-    fontFamily: "'Rajdhani', 'Roboto Condensed', 'Helvetica Neue', sans-serif",
-    monoFontFamily: "'Share Tech Mono', 'Consolas', monospace",
-    fontSize: '12px',
-    knobStyle: 'metallic',
-    buttonRadius: '2px',
-    buttonStyle: 'beveled',
-  },
-};
 
 // Built-in themes (immutable)
 const builtinThemes: Theme[] = [
   devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme,
-  tr808Theme, tr909Theme, dmxTheme, linnLm1Theme, mpc60Theme, cr78Theme,
-  emuSp12Theme, maestroRhythmKingTheme, maestroRhythmSoundTheme,
-  aceToneTheme, hammondAutoVariTheme, bossHc2Theme, wurlitzerSideManTheme,
-  tr606Theme, tr707Theme, tr77Theme, linnDrumTheme, simmonsSdsVTheme,
-  korgKr55Theme, bossDr55Theme, emuDrumulatorTheme, casioRz1Theme, sequentialTomTheme,
+  tr808Theme, tr909Theme, dmxTheme, linnLm1Theme, mpc60Theme, cr78Theme, maestroRhythmKingTheme, maestroRhythmSoundTheme, bossHc2Theme,
+  tr606Theme, tr707Theme, linnDrumTheme, simmonsSdsVTheme, bossDr55Theme, emuDrumulatorTheme, casioRz1Theme
 ];
 
 // Placeholder custom theme (uses NeoDark colors until user customizes)
@@ -1560,15 +1193,15 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: ThemeColorKey; 
       { key: 'bgSecondary', label: 'Secondary' },
       { key: 'bgTertiary', label: 'Tertiary' },
       { key: 'bgHover', label: 'Hover' },
-      { key: 'bgActive', label: 'Active' },
-    ],
+      { key: 'bgActive', label: 'Active' }
+],
   },
   {
     label: 'Borders',
     tokens: [
       { key: 'border', label: 'Border' },
-      { key: 'borderLight', label: 'Border Light' },
-    ],
+      { key: 'borderLight', label: 'Border Light' }
+],
   },
   {
     label: 'Accent',
@@ -1576,8 +1209,8 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: ThemeColorKey; 
       { key: 'accent', label: 'Primary' },
       { key: 'accentSecondary', label: 'Secondary' },
       { key: 'accentHighlight', label: 'Highlight' },
-      { key: 'accentGlow', label: 'Glow' },
-    ],
+      { key: 'accentGlow', label: 'Glow' }
+],
   },
   {
     label: 'Text',
@@ -1585,16 +1218,16 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: ThemeColorKey; 
       { key: 'text', label: 'Primary' },
       { key: 'textSecondary', label: 'Secondary' },
       { key: 'textMuted', label: 'Muted' },
-      { key: 'textInverse', label: 'Inverse' },
-    ],
+      { key: 'textInverse', label: 'Inverse' }
+],
   },
   {
     label: 'Status',
     tokens: [
       { key: 'error', label: 'Error' },
       { key: 'success', label: 'Success' },
-      { key: 'warning', label: 'Warning' },
-    ],
+      { key: 'warning', label: 'Warning' }
+],
   },
   {
     label: 'Tracker Rows',
@@ -1603,8 +1236,8 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: ThemeColorKey; 
       { key: 'trackerRowOdd', label: 'Odd' },
       { key: 'trackerRowHighlight', label: 'Highlight' },
       { key: 'trackerRowCurrent', label: 'Current' },
-      { key: 'trackerRowCursor', label: 'Cursor' },
-    ],
+      { key: 'trackerRowCursor', label: 'Cursor' }
+],
   },
   {
     label: 'Cell Colors',
@@ -1615,17 +1248,17 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: ThemeColorKey; 
       { key: 'cellEffect', label: 'Effect' },
       { key: 'cellAccent', label: 'Accent' },
       { key: 'cellSlide', label: 'Slide' },
-      { key: 'cellEmpty', label: 'Empty' },
-    ],
+      { key: 'cellEmpty', label: 'Empty' }
+],
   },
   {
     label: 'Playback / Chrome',
     tokens: [
       { key: 'playbackCursor', label: 'Playback Cursor' },
       { key: 'currentRowText', label: 'Current Row Text' },
-      { key: 'panelShadow', label: 'Panel Shadow' },
-    ],
-  },
+      { key: 'panelShadow', label: 'Panel Shadow' }
+],
+  }
 ];
 
 /** Keys in ThemeColors that are actual color values (excludes arrays, fonts, and style fields) */
