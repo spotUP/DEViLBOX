@@ -27,7 +27,7 @@ import { usePixiTheme } from '../theme';
 import { useMixerStore } from '@stores/useMixerStore';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { CHANNEL_FX_PRESETS } from '@constants/channelFxPresets';
+import { CHANNEL_FX_PRESETS } from '@constants/fxPresets';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 import {
