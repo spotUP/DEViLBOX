@@ -50,6 +50,9 @@ interface TestRunnerWindow {
 
 declare const window: Window & TestRunnerWindow;
 
+/** Set to true to enable verbose diagnostic logging from the test harness */
+const TEST_DEBUG = false;
+
 // ============================================
 // SYNTH TEST CONFIGURATIONS
 // ============================================
@@ -898,7 +901,7 @@ async function preWarmEngines(synthNames?: string[]): Promise<void> {
       );
       // Test write to verify messages reach the worklet
       if (engineStatus.Furnace) {
-        console.log('[PreWarm] Testing Furnace write capability...');
+        if (TEST_DEBUG) console.log('[PreWarm] Testing Furnace write capability...');
         furnaceEngine.testPing();
         const eng = furnaceEngine as unknown as Record<string, unknown>;
         if (typeof eng.testWrite === 'function') eng.testWrite();
@@ -941,7 +944,7 @@ async function preWarmEngines(synthNames?: string[]): Promise<void> {
           10000, 'BuzzmachineEngine'
         );
       } else {
-        console.log('[PreWarm] Buzzmachine: AudioWorklet not available in this context');
+        if (TEST_DEBUG) console.log('[PreWarm] Buzzmachine: AudioWorklet not available in this context');
         engineStatus.Buzzmachine = false;
       }
     } catch (e) {
@@ -1625,7 +1628,7 @@ async function testVolumeLevels(skipPreWarm = false) {
   const furnaceSynths = allSynths.filter(s => s.startsWith('Furnace'));
   const otherSynths = allSynths.filter(s => !s.startsWith('Furnace'));
   const synthsToTest = [...furnaceSynths, ...otherSynths];
-  console.log('[VolumeTest] Reordered synths - Furnace first:', furnaceSynths);
+  if (TEST_DEBUG) console.log('[VolumeTest] Reordered synths - Furnace first:', furnaceSynths);
 
   // Target peak level in dB (we want all synths to hit roughly this level)
   const TARGET_PEAK = -10;
@@ -1828,7 +1831,7 @@ async function testVolumeLevels(skipPreWarm = false) {
           // Connect to destination so audio is audible during test
           nativeGain.connect(nativeGain.context.destination);
           dispatchNativeGain = nativeGain;
-          console.log(`[VolumeTest] ${name}: Created native AnalyserNode for dispatch metering`);
+          if (TEST_DEBUG) console.log(`[VolumeTest] ${name}: Created native AnalyserNode for dispatch metering`);
         }
       }
 
@@ -1859,7 +1862,7 @@ async function testVolumeLevels(skipPreWarm = false) {
           furnaceNativeMeter.fftSize = 256;
           output.connect(furnaceNativeMeter);
           furnaceNativeMeter.connect(output.context.destination);
-          console.log(`[VolumeTest] ${name}: Created native AnalyserNode for DevilboxSynth metering`);
+          if (TEST_DEBUG) console.log(`[VolumeTest] ${name}: Created native AnalyserNode for DevilboxSynth metering`);
         }
       }
 
@@ -1873,7 +1876,7 @@ async function testVolumeLevels(skipPreWarm = false) {
           const resp = await fetch(config.songUrl as string);
           const buf = await resp.arrayBuffer();
           await HivelyEngine.getInstance().loadTune(buf);
-          console.log(`[Test] HivelySynth: loaded AHX from ${config.songUrl}`);
+          if (TEST_DEBUG) console.log(`[Test] HivelySynth: loaded AHX from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] HivelySynth: failed to load song', err); }
       }
       if (name === 'UADESynth' && config.songUrl && typeof synthObj.setInstrument === 'function') {
@@ -1886,7 +1889,7 @@ async function testVolumeLevels(skipPreWarm = false) {
             subsongCount: 1, currentSubsong: 0,
             metadata: { player: 'ProTracker', formatName: 'ProTracker Module', minSubsong: 0, maxSubsong: 0 },
           });
-          console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
+          if (TEST_DEBUG) console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
       }
       if (name === 'JamCrackerSynth' && config.songUrl) {
@@ -1895,7 +1898,7 @@ async function testVolumeLevels(skipPreWarm = false) {
           const buf = await resp.arrayBuffer();
           const { JamCrackerEngine } = await import('./engine/jamcracker/JamCrackerEngine');
           await JamCrackerEngine.getInstance().loadTune(buf);
-          console.log(`[Test] JamCrackerSynth: loaded JAM from ${config.songUrl}`);
+          if (TEST_DEBUG) console.log(`[Test] JamCrackerSynth: loaded JAM from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] JamCrackerSynth: failed to load song', err); }
       }
 
@@ -1986,7 +1989,7 @@ async function testVolumeLevels(skipPreWarm = false) {
         }
         furnaceNativeMeter = null;
         mameOutputNode = null;
-        console.log(`[VolumeTest] ${name}: Cleaned up native meter, final peakDb=${peakDb.toFixed(2)}`);
+        if (TEST_DEBUG) console.log(`[VolumeTest] ${name}: Cleaned up native meter, final peakDb=${peakDb.toFixed(2)}`);
       }
 
       // Drain meter before next synth to avoid residual readings
@@ -2065,7 +2068,7 @@ async function testVolumeLevels(skipPreWarm = false) {
     for (let chipType = 0; chipType < 75; chipType++) {
       furnaceEngine.deactivate(chipType as unknown as Parameters<typeof furnaceEngine.deactivate>[0]);
     }
-    console.log('[VolumeTest] Deactivated all Furnace chips');
+    if (TEST_DEBUG) console.log('[VolumeTest] Deactivated all Furnace chips');
   } catch (e) {
     console.warn('[VolumeTest] Furnace cleanup error:', e);
   }
@@ -2308,7 +2311,7 @@ async function testVolumeInteractive() {
           const resp = await fetch(config.songUrl as string);
           const buf = await resp.arrayBuffer();
           await HivelyEngine.getInstance().loadTune(buf);
-          console.log(`[Test] HivelySynth: loaded AHX from ${config.songUrl}`);
+          if (TEST_DEBUG) console.log(`[Test] HivelySynth: loaded AHX from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] HivelySynth: failed to load song', err); }
       }
       if (name === 'UADESynth' && config.songUrl && typeof synthObj.setInstrument === 'function') {
@@ -2321,7 +2324,7 @@ async function testVolumeInteractive() {
             subsongCount: 1, currentSubsong: 0,
             metadata: { player: 'ProTracker', formatName: 'ProTracker Module', minSubsong: 0, maxSubsong: 0 },
           });
-          console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
+          if (TEST_DEBUG) console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
       }
       if (name === 'JamCrackerSynth' && config.songUrl) {
@@ -2330,7 +2333,7 @@ async function testVolumeInteractive() {
           const buf = await resp.arrayBuffer();
           const { JamCrackerEngine } = await import('./engine/jamcracker/JamCrackerEngine');
           await JamCrackerEngine.getInstance().loadTune(buf);
-          console.log(`[Test] JamCrackerSynth: loaded JAM from ${config.songUrl}`);
+          if (TEST_DEBUG) console.log(`[Test] JamCrackerSynth: loaded JAM from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] JamCrackerSynth: failed to load song', err); }
       }
 
