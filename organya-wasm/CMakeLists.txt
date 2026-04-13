@@ -16,7 +16,7 @@ if(EMSCRIPTEN)
     "SHELL:-s WASM=1"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createOrganya'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_organya_init','_organya_stop','_organya_render','_organya_set_sample_rate','_organya_get_tempo','_organya_get_num_channels','_malloc','_free']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_organya_init','_organya_stop','_organya_render','_organya_set_sample_rate','_organya_get_tempo','_organya_get_num_channels','_organya_load_soundbank','_organya_set_channel_gain','_malloc','_free']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPF32']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=4194304"
