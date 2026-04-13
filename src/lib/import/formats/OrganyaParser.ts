@@ -75,7 +75,7 @@ export async function parseOrganyaFile(
       rows: emptyRows,
     })),
     importMetadata: {
-      sourceFormat: 'MOD' as const,
+      sourceFormat: 'Organya' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,

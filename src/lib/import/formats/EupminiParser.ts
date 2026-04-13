@@ -78,7 +78,7 @@ export async function parseEupFile(
       rows: emptyRows,
     })),
     importMetadata: {
-      sourceFormat: 'MOD' as const,
+      sourceFormat: 'EUP' as const,
       sourceFile: fileName,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,
