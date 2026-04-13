@@ -44,7 +44,7 @@ export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
  */
 export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
   const ra = result as any;
-  const hasDedicatedWasm = ra.sonicArrangerFileData || ra.soundMonFileData || ra.digMugFileData || ra.davidWhittakerFileData;
+  const hasDedicatedWasm = ra.sonicArrangerFileData || ra.soundMonFileData || ra.digMugFileData || ra.davidWhittakerFileData || ra.soundControlFileData || ra.deltaMusic1FileData || ra.deltaMusic2FileData || ra.soundFxFileData || ra.gmcFileData || ra.voodooFileData;
   if (ra.uadePatternLayout && !ra.uadeEditableFileData && !hasDedicatedWasm) {
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
@@ -100,7 +100,7 @@ export async function withNativeThenUADE(
         if (result) {
           // Skip UADE injection if a dedicated WASM engine handles audio
           const r = result as any;
-          const hasDedicatedEngine = r.sonicArrangerFileData || r.soundMonFileData || r.digMugFileData || r.davidWhittakerFileData;
+          const hasDedicatedEngine = r.sonicArrangerFileData || r.soundMonFileData || r.digMugFileData || r.davidWhittakerFileData || r.soundControlFileData || r.deltaMusic1FileData || r.deltaMusic2FileData || r.soundFxFileData || r.gmcFileData || r.voodooFileData;
           if (!r.uadeEditableFileData && !hasDedicatedEngine) {
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;

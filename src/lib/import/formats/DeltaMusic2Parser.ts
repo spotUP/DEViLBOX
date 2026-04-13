@@ -713,8 +713,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
-    uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    uadeEditableFileName: filename,
+    deltaMusic2FileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,
   };
 }
