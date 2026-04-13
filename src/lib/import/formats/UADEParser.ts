@@ -924,6 +924,85 @@ export async function parseUADEFile(
         const { parseQuartetFile } = await import('./QuartetParser');
         return parseQuartetFile(buffer, filename);
       },
+      // ── Compiled 68k replayer formats (previously FORCE_CLASSIC-only) ──────
+      // These formats already have full parsers with uadePatternLayout + encodeCell.
+      // Wiring them here lets native parsing run BEFORE the FORCE_CLASSIC fallback,
+      // enabling chip RAM pattern editing while UADE streams the audio.
+      'CoreDesign': async () => {
+        const { parseCoreDesignFile } = await import('./CoreDesignParser');
+        return parseCoreDesignFile(buffer, filename);
+      },
+      'Mark_Cooksey': async () => {
+        const { parseMarkCookseyFile } = await import('./MarkCookseyParser');
+        return parseMarkCookseyFile(buffer, filename);
+      },
+      'Mark_Cooksey_Old': async () => {
+        const { parseMarkCookseyFile } = await import('./MarkCookseyParser');
+        return parseMarkCookseyFile(buffer, filename);
+      },
+      'JankoMrsicFlogel': async () => {
+        const { parseJankoMrsicFlogelFile } = await import('./JankoMrsicFlogelParser');
+        return parseJankoMrsicFlogelFile(buffer, filename);
+      },
+      'ThomasHermann': async () => {
+        const { parseThomasHermannFile } = await import('./ThomasHermannParser');
+        return parseThomasHermannFile(buffer, filename);
+      },
+      'SteveBarrett': async () => {
+        const { parseSteveBarrettFile } = await import('./SteveBarrettParser');
+        return parseSteveBarrettFile(buffer, filename);
+      },
+      'SoundPlayer': async () => {
+        const { parseSoundPlayerFile } = await import('./SoundPlayerParser');
+        return parseSoundPlayerFile(buffer, filename);
+      },
+      'JasonPage': async () => {
+        const { parseJasonPageFile } = await import('./JasonPageParser');
+        return parseJasonPageFile(buffer, filename, companionFiles);
+      },
+      'SeanConnolly': async () => {
+        const { parseSeanConnollyFile } = await import('./SeanConnollyParser');
+        return parseSeanConnollyFile(buffer, filename);
+      },
+      'SCUMM': async () => {
+        const { parseSCUMMFile } = await import('./SCUMMParser');
+        return parseSCUMMFile(buffer, filename);
+      },
+      'ManiacsOfNoise': async () => {
+        const { parseManiacsOfNoiseFile } = await import('./ManiacsOfNoiseParser');
+        return parseManiacsOfNoiseFile(buffer, filename);
+      },
+      'CustomMade': async () => {
+        const { parseCustomMadeFile } = await import('./CustomMadeParser');
+        return parseCustomMadeFile(buffer, filename);
+      },
+      'ZoundMonitor': async () => {
+        const { parseZoundMonitorFile } = await import('./ZoundMonitorParser');
+        return parseZoundMonitorFile(buffer, filename);
+      },
+      // ── Compiled 68k replayer formats — parsers extract samples/metadata ───
+      // These don't have uadePatternLayout yet but are still better than
+      // classic mode stubs (they extract real PCM samples and format metadata).
+      'SteveTurner': async () => {
+        const { parseSteveTurnerFile } = await import('./SteveTurnerParser');
+        return parseSteveTurnerFile(buffer, filename);
+      },
+      'BenDaglish': async () => {
+        const { parseBenDaglishFile } = await import('./BenDaglishParser');
+        return parseBenDaglishFile(buffer, filename);
+      },
+      'BenDaglish-SID': async () => {
+        const { parseBenDaglishFile } = await import('./BenDaglishParser');
+        return parseBenDaglishFile(buffer, filename);
+      },
+      'KrisHatlelid': async () => {
+        const { parseKrisHatlelidFile } = await import('./KrisHatlelidParser');
+        return parseKrisHatlelidFile(buffer, filename);
+      },
+      'DavidHanney': async () => {
+        const { parseDavidHanneyFile } = await import('./DavidHanneyParser');
+        return parseDavidHanneyFile(buffer, filename);
+      },
     };
     let route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
     // Prefix fallback: UADE may report variants like "TFMX Professional", "TFMX 1.5", etc.
