@@ -85,6 +85,7 @@ export function useTrackerAnalysis(): void {
     s.bdFileData ??
     s.sd2FileData ??
     s.symphonieFileData ??
+    s.v2mFileData ??
     null
   );
   

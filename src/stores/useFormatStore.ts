@@ -71,6 +71,7 @@ interface FormatStore {
   bdFileData: ArrayBuffer | null;
   sd2FileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
+  v2mFileData: ArrayBuffer | null;
   uadeEditableFileData: ArrayBuffer | null;
   uadeEditableFileName: string | null;
   adplugFileData: ArrayBuffer | null;
@@ -330,6 +331,7 @@ export const useFormatStore = create<FormatStore>()(
     bdFileData: null,
     sd2FileData: null,
     symphonieFileData: null,
+    v2mFileData: null,
     uadeEditableFileData: null,
     adplugFileData: null,
     adplugFileName: null,
@@ -739,6 +741,7 @@ export const useFormatStore = create<FormatStore>()(
         state.bdFileData = (song as any).bdFileData ?? null;
         state.sd2FileData = (song as any).sd2FileData ?? null;
         state.symphonieFileData = (song as any).symphonieFileData ?? null;
+        state.v2mFileData = (song as any).v2mFileData ?? null;
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
         state.adplugFileData = (song as any).adplugFileData ?? null;
@@ -990,6 +993,7 @@ export const useFormatStore = create<FormatStore>()(
       state.bdFileData = null;
       state.sd2FileData = null;
       state.symphonieFileData = null;
+      state.v2mFileData = null;
       state.uadeEditableFileData = null;
       state.uadeEditableFileName = null;
       state.adplugFileData = null;

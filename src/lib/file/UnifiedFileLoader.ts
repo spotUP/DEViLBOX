@@ -1525,7 +1525,10 @@ async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<
     for (const inst of result.instruments) {
       addInstrument(inst);
     }
-    
+
+    // Store raw V2M data for WASM streaming playback
+    useFormatStore.setState({ v2mFileData: arrayBuffer.slice(0) });
+
     notify.success(`Imported V2M: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
     
     return {
