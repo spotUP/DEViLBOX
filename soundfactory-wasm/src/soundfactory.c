@@ -806,8 +806,13 @@ static void sf_modulator(SfModule* m, SfVoiceInfo* v, SfChannel* ch, SfInstrumen
 
 static void sf_next_note(SfModule* m, SfVoiceInfo* v, SfChannel* ch, SfInstrument* instr) {
     uint8_t opcode;
+    int safety = 10000;
 
     do {
+        if (--safety <= 0) {
+            v->voice_enabled = false;
+            return;
+        }
         opcode = sf_fetch_code(m, v);
 
         if ((opcode & 0x80) == 0) {
