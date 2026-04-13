@@ -4,7 +4,7 @@
  * These are native-only formats with no UADE fallback — they each have
  * dedicated parsers that handle the chip register dump playback.
  *
- * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PMD, S98, SNDH
+ * Supported: VGM, YM, NSF, SAP, AY, KSS, HES, GBS, SPC, MDX, PMD, S98, SNDH, QSF
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -90,6 +90,12 @@ export async function tryChipDumpParse(
     return parsePMDFile(buffer);
   }
 
+  // ── FMP (PLAY6) — PC-98 FMP music driver (YM2608 OPNA) ─────────────────
+  if (/\.(opi|ovi|ozi)$/.test(filename)) {
+    const { parseFmplayerFile } = await import('@lib/import/formats/FmplayerParser');
+    return parseFmplayerFile(buffer, filename);
+  }
+
   // ── S98 — Japanese computer FM register dumps ────────────────────────────
   if (/\.s98$/.test(filename)) {
     const { parseS98File } = await import('@lib/import/formats/S98Parser');
@@ -100,6 +106,14 @@ export async function tryChipDumpParse(
   if (/\.sndh$/.test(filename)) {
     const { parseSNDHFile } = await import('@lib/import/formats/SNDHParser');
     return parseSNDHFile(buffer);
+  }
+
+  // ── QSF — Capcom QSound (CPS1/CPS2 arcade) ───────────────────────────────
+  if (/\.(qsf|miniqsf)$/.test(filename)) {
+    const { isQsfFormat, parseQsfFile } = await import('@lib/import/formats/QsfParser');
+    if (isQsfFormat(filename, buffer)) {
+      return parseQsfFile(buffer, filename);
+    }
   }
 
   return null;

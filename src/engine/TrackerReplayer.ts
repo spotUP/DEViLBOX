@@ -111,6 +111,7 @@ export type TrackerFormat =
   | 'JamCracker'       // JamCracker Pro (.jam, .jc)
   | 'FuturePlayer'     // Future Player (Wanted Team, .fp)
   | 'PMD'              // PC-98 Professional Music Driver (YM2608/OPNA)
+  | 'FMP'              // PC-98 FMP/PLAY6 music driver (YM2608/OPNA)
   | 'AdPlug'           // PC AdLib/OPL formats (RAD, HSC, DRO, IMF, CMF)
   | 'KT'              // Klystrack chiptune tracker (.kt)
   | 'Organya'         // Cave Story / Organya (.org)
@@ -321,8 +322,12 @@ export interface TrackerSong {
   fredEditorWasmFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
+  /** Raw QSF (.qsf/.miniqsf) binary for QsfEngine WASM playback (Capcom QSound) */
+  qsfFileData?: ArrayBuffer;
   /** Raw PMD (.m/.m2) binary for PmdminiEngine WASM playback (PC-98 YM2608) */
   pmdFileData?: ArrayBuffer;
+  /** Raw FMP (.opi/.ovi/.ozi) binary for FmplayerEngine WASM playback (PC-98 YM2608 PLAY6) */
+  fmplayerFileData?: ArrayBuffer;
   /** Raw Ben Daglish (.bd) binary for BdEngine WASM playback */
   bdFileData?: ArrayBuffer;
   /** Raw SidMon 2.0 (.sid2) binary for Sd2Engine WASM playback */

@@ -81,6 +81,7 @@ export function useTrackerAnalysis(): void {
     s.zxtuneFileData ??
     s.pumaTrackerFileData ??
     s.artOfNoiseFileData ??
+    s.qsfFileData ??
     s.bdFileData ??
     s.sd2FileData ??
     s.symphonieFileData ??

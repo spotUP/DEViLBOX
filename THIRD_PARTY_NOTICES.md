@@ -1,7 +1,13 @@
 # Third-Party Notices
 
+DEViLBOX is licensed under the **GNU General Public License v3.0 or later** (GPL-3.0-or-later).
+See the [LICENSE](LICENSE) file for the full license text.
+
+Copyright (C) 2025-2026 spotUP
+
 DEViLBOX incorporates code, libraries, and assets from many open-source projects.
 This document gives credit to their authors and lists applicable licenses.
+All third-party components are compatible with GPL-3.0-or-later.
 
 ---
 

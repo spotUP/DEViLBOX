@@ -264,6 +264,8 @@ export type SynthType =
   | 'Sc68Synth'         // SC68/SNDH (Atari ST YM2149 + 68000 replayer)
   // ZXTune ZX Spectrum replayer
   | 'ZxtuneSynth'       // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
+  // QSF Capcom QSound replayer
+  | 'QsfSynth'          // QSF (Capcom CPS1/CPS2 Z80 + QSound DSP)
   | 'MAMEFZPCM'         // Casio FZ-1 8-Voice 16-bit PCM Sampler
   | 'MAMEPS1SPU'        // PlayStation 1 CXD2922BQ SPU (24-voice ADPCM)
   | 'MAMEZSG2'          // ZOOM ZSG-2 (48-channel ROM sampler)
@@ -279,6 +281,7 @@ export type SynthType =
   | 'StartrekkerAMSynth' // Startrekker AM synth (WASM replayer)
   | 'Geonkick'        // Geonkick percussion synth (Quamplex, GPL-3 WASM port)
   | 'AsapSynth'       // ASAP (Another Slight Atari Player) - Atari 8-bit POKEY music
+  | 'FmplayerSynth'   // 98fmplayer FMP/PLAY6 (PC-98 YM2608 OPNA)
   | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
