@@ -103,6 +103,12 @@ interface TestResult {
   positionAdvanced: boolean;
   startPos: number;
   endPos: number;
+  // Per-channel visualizer
+  oscActive: boolean;
+  oscChannels: number;
+  oscHasData: boolean;
+  // Streamed format (no pattern editor — should show stream visualizer)
+  streamed: boolean;
   // Song structure
   songLength: number;
   channels: number;
@@ -186,6 +192,8 @@ async function main() {
       instruments: 0, namedInstruments: 0, synthTypes: [], hasSampleData: false, instrumentsOk: false,
       editable: false, editorMode: '',
       positionAdvanced: false, startPos: 0, endPos: 0,
+      oscActive: false, oscChannels: 0, oscHasData: false,
+      streamed: false,
       songLength: 0, channels: 0, channelsOk: false,
       exportOk: null,
       errors: [], errorsOk: true,
@@ -301,6 +309,21 @@ async function main() {
         r.positionAdvanced = r.endPos !== r.startPos || r.endPos > 0;
       } catch { /* */ }
 
+      // ── Per-channel oscilloscope/visualizer check ──
+      try {
+        const osc = await call('get_oscilloscope_info');
+        r.oscActive = osc?.active ?? false;
+        r.oscChannels = osc?.channelCount ?? 0;
+        // Check if any channel has non-zero waveform data
+        r.oscHasData = r.oscActive && r.oscChannels > 0;
+        if (osc?.channels && Array.isArray(osc.channels)) {
+          const hasWaveform = osc.channels.some((ch: any) =>
+            ch.waveform && Array.isArray(ch.waveform) && ch.waveform.some((v: number) => v !== 0)
+          );
+          r.oscHasData = hasWaveform;
+        }
+      } catch { /* */ }
+
       // ── Export round-trip (quick check — just try export, don't reimport) ──
       try {
         const exportResult = await call('export_native');
@@ -312,8 +335,29 @@ async function main() {
       // ── Console errors ──
       const errs = await call('get_console_errors').catch(() => ({ entries: [] }));
       r.errors = (errs.entries ?? [])
-        .filter((e: any) => e.level === 'error' && !e.message.includes('Failed to load resource'))
-        .map((e: any) => e.message.slice(0, 120));
+        .filter((e: any) => {
+          const msg = e.message ?? '';
+          // Always include: actual errors, WASM aborts, unhandled rejections
+          if (e.level === 'error') {
+            // Filter out noise
+            if (msg.includes('Failed to load resource')) return false;
+            if (msg.includes('disposeAllInstruments')) return false;
+            if (msg.includes('loadInstruments called')) return false;
+            if (msg.includes('setPatternOrder called')) return false;
+            return true;
+          }
+          // Include critical warnings: WASM crashes, score died, protocol errors
+          if (e.level === 'warn') {
+            if (msg.includes('Aborted(')) return true;
+            if (msg.includes('score died')) return true;
+            if (msg.includes('score crashed')) return true;
+            if (msg.includes('module check failed')) return true;
+            if (msg.includes('protocol error')) return true;
+            if (msg.includes('player_load returned 0')) return true;
+          }
+          return false;
+        })
+        .map((e: any) => `[${e.level}] ${(e.message ?? '').slice(0, 120)}`);
       r.errorsOk = r.errors.length === 0;
 
       // ── Classify audio ──
@@ -324,6 +368,11 @@ async function main() {
       } else {
         r.audio = 'pass';
       }
+
+      // ── Streamed detection ──
+      // A format is "streamed" if: audio plays but no pattern data exists.
+      // These should show a stream visualizer instead of the pattern editor.
+      r.streamed = r.audio === 'pass' && r.noteCells === 0 && (r.patterns <= 1 || NO_PATTERNS_OK.has(dir));
 
       // ── Issues ──
       r.issues = [];
@@ -336,11 +385,12 @@ async function main() {
       if (!r.positionAdvanced && r.audio === 'pass') r.issues.push('pos-stuck');
       if (!r.channelsOk) r.issues.push(`channels(${r.channels}<${minCh})`);
       if (r.songLength <= 1 && r.patterns > 1) r.issues.push('short-songlist');
+      if (!r.oscHasData && r.audio === 'pass') r.issues.push('no-osc');
       if (!r.errorsOk) r.issues.push(`${r.errors.length}-errors`);
 
       // ── Score (0-100) ──
       let score = 0;
-      if (r.audio === 'pass') score += 30;
+      if (r.audio === 'pass') score += 25;
       else if (r.audio === 'suspect') score += 10;
       if (r.formatOk) score += 10;
       if (r.patternsOk) score += 15;
@@ -350,6 +400,7 @@ async function main() {
       if (r.editable) score += 5;
       if (r.positionAdvanced) score += 5;
       if (r.channelsOk) score += 5;
+      if (r.oscHasData) score += 5;
       if (r.errorsOk) score += 5;
       if (r.exportOk === true) score += 5;
       r.score = score;
@@ -367,7 +418,9 @@ async function main() {
       const ed = r.editable ? 'ED' : '--';
       const ex = r.exportOk === true ? 'EX' : r.exportOk === false ? 'ex' : '  ';
       const pos = r.positionAdvanced ? '▶' : '■';
-      const detail = `${aud}${pos}${ed} ${ex} ${r.format.slice(0, 16).padEnd(16)} ch=${String(r.channels).padStart(2)} p=${String(r.patterns).padStart(3)} n=${String(r.noteCells).padStart(4)} i=${String(r.instruments).padStart(2)}/${String(r.namedInstruments).padStart(2)} rms=${r.rms.toFixed(3)} sp=${String(r.spectralSpread).padStart(2)} sc=${String(r.score).padStart(3)}`;
+      const osc = r.oscHasData ? '◎' : '○';
+      const str = r.streamed ? 'ST' : '  ';
+      const detail = `${aud}${pos}${osc}${ed} ${ex} ${str} ${r.format.slice(0, 16).padEnd(16)} ch=${String(r.channels).padStart(2)} p=${String(r.patterns).padStart(3)} n=${String(r.noteCells).padStart(4)} i=${String(r.instruments).padStart(2)}/${String(r.namedInstruments).padStart(2)} rms=${r.rms.toFixed(3)} sp=${String(r.spectralSpread).padStart(2)} sc=${String(r.score).padStart(3)}`;
       const iss = r.issues.length > 0 ? ` [${r.issues.join(', ')}]` : '';
       console.log(`${icon} ${label} ${detail}${iss}`);
 
@@ -406,9 +459,18 @@ async function main() {
   console.log(`\n═══════════════════════════════════════════════════════════`);
   console.log(`  Pass: ${pass}  Warn: ${warn}  Fail: ${fail}  Error: ${err}  Total: ${results.length}`);
   console.log(`  Audio OK: ${results.filter(r => r.audio === 'pass').length}  Silent: ${results.filter(r => r.audio === 'silent').length}  Suspect: ${suspect}`);
-  console.log(`  Patterns: ${hasPatterns}  Instruments: ${hasInstruments}  Editable: ${editable}  Exportable: ${exported}`);
-  console.log(`  Avg score: ${avgScore.toFixed(1)}/100  Pass rate: ${((pass + warn) / results.length * 100).toFixed(1)}%`);
+  const hasOsc = results.filter(r => r.oscHasData).length;
+  console.log(`  Patterns: ${hasPatterns}  Instruments: ${hasInstruments}  Editable: ${editable}  Exportable: ${exported}  Oscilloscope: ${hasOsc}`);
+  const streamed = results.filter(r => r.streamed).length;
+  console.log(`  Streamed: ${streamed}  Avg score: ${avgScore.toFixed(1)}/100  Pass rate: ${((pass + warn) / results.length * 100).toFixed(1)}%`);
   console.log(`═══════════════════════════════════════════════════════════`);
+
+  // Streamed formats — need stream visualizer instead of pattern editor
+  if (streamed > 0) {
+    console.log(`\n── Streamed formats (${streamed}) — need stream visualizer ──`);
+    results.filter(r => r.streamed).forEach(r =>
+      console.log(`  ${r.dir.padEnd(24)} fmt=${r.format.slice(0, 20)} ch=${r.channels} osc=${r.oscHasData ? 'yes' : 'no'}`));
+  }
 
   if (fail > 0) {
     console.log(`\n── Failures (${fail}) ──`);
