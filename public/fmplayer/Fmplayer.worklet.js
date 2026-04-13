@@ -78,6 +78,79 @@ class FmplayerProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setMuteMask':
+        if (this.module && typeof this.module._fmplayer_wasm_set_mute_mask === 'function') {
+          this.module._fmplayer_wasm_set_mute_mask(data.mask >>> 0);
+        }
+        break;
+
+      case 'setFmSlotParam':
+        if (this.module && typeof this.module._fmplayer_wasm_set_fm_slot_param === 'function') {
+          this.module._fmplayer_wasm_set_fm_slot_param(data.ch, data.slot, data.paramId, data.value);
+        }
+        break;
+
+      case 'setFmChParam':
+        if (this.module && typeof this.module._fmplayer_wasm_set_fm_ch_param === 'function') {
+          this.module._fmplayer_wasm_set_fm_ch_param(data.ch, data.paramId, data.value);
+        }
+        break;
+
+      case 'setSsgParam':
+        if (this.module && typeof this.module._fmplayer_wasm_set_ssg_param === 'function') {
+          this.module._fmplayer_wasm_set_ssg_param(data.ch, data.paramId, data.value);
+        }
+        break;
+
+      case 'getFmChannel': {
+        if (!this.module || typeof this.module._fmplayer_wasm_get_fm_channel !== 'function') break;
+        const m = this.module;
+        const ch = data.ch;
+        const malloc = m._malloc || m.malloc;
+        const free = m._free || m.free;
+        if (!malloc || !free) break;
+        // 42 ints: 6 ch params + 4 slots * 9 params
+        const ptr = malloc(42 * 4);
+        m._fmplayer_wasm_get_fm_channel(ch, ptr);
+        const heap32 = new Int32Array(m.wasmMemory.buffer);
+        const base = ptr >> 2;
+        const result = {
+          ch,
+          alg: heap32[base], fb: heap32[base + 1],
+          fnum: heap32[base + 2], blk: heap32[base + 3],
+          panL: heap32[base + 4], panR: heap32[base + 5],
+          slots: [],
+        };
+        for (let s = 0; s < 4; s++) {
+          const sb = base + 6 + s * 9;
+          result.slots.push({
+            tl: heap32[sb], ar: heap32[sb + 1], dr: heap32[sb + 2],
+            sr: heap32[sb + 3], rr: heap32[sb + 4], sl: heap32[sb + 5],
+            mul: heap32[sb + 6], det: heap32[sb + 7], ks: heap32[sb + 8],
+          });
+        }
+        free(ptr);
+        this.port.postMessage({ type: 'fmChannelData', data: result });
+        break;
+      }
+
+      case 'getSsgChannel': {
+        if (!this.module || typeof this.module._fmplayer_wasm_get_ssg_param !== 'function') break;
+        const m = this.module;
+        const ch = data.ch;
+        const result = {
+          ch,
+          toneL: m._fmplayer_wasm_get_ssg_param(ch, 0),
+          toneH: m._fmplayer_wasm_get_ssg_param(ch, 1),
+          volume: m._fmplayer_wasm_get_ssg_param(ch, 2),
+          noise: m._fmplayer_wasm_get_ssg_param(ch, 3),
+          toneEn: m._fmplayer_wasm_get_ssg_param(ch, 4),
+          noiseEn: m._fmplayer_wasm_get_ssg_param(ch, 5),
+        };
+        this.port.postMessage({ type: 'ssgChannelData', data: result });
+        break;
+      }
+
       case 'dispose':
         this.cleanup();
         break;

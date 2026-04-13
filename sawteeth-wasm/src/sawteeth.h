@@ -219,6 +219,22 @@ typedef struct {
   int           tick_buf_len;         /* = sps_pal */
 } st_engine_t;
 
+/* ── Instrument parameter IDs (for get/set API) ── */
+enum {
+  ST_PARAM_FILTER_MODE   = 0,
+  ST_PARAM_CLIP_MODE     = 1,
+  ST_PARAM_BOOST         = 2,
+  ST_PARAM_VIB_S         = 3,
+  ST_PARAM_VIB_D         = 4,
+  ST_PARAM_PWM_S         = 5,
+  ST_PARAM_PWM_D         = 6,
+  ST_PARAM_RES           = 7,
+  ST_PARAM_SPS           = 8,
+  ST_PARAM_LEN           = 9,
+  ST_PARAM_LOOP          = 10,
+  ST_PARAM_COUNT         = 11,
+};
+
 /* ── API ── */
 int  sawteeth_init(const uint8_t *data, int len);
 void sawteeth_stop(void);
@@ -226,5 +242,19 @@ int  sawteeth_render(float *out, int num_samples);
 void sawteeth_set_sample_rate(int rate);
 int  sawteeth_get_num_channels(void);
 void sawteeth_set_channel_gain(int ch, float gain);
+
+/* Instrument query/edit API */
+int  sawteeth_get_num_instruments(void);
+int  sawteeth_get_param(int ins, int param_id);
+void sawteeth_set_param(int ins, int param_id, int value);
+int  sawteeth_get_amp_points(int ins);
+int  sawteeth_get_filter_points(int ins);
+void sawteeth_get_amp_env(int ins, uint8_t *out_times, uint8_t *out_levs, int max_points);
+void sawteeth_get_filter_env(int ins, uint8_t *out_times, uint8_t *out_levs, int max_points);
+void sawteeth_set_amp_env(int ins, const uint8_t *times, const uint8_t *levs, int count);
+void sawteeth_set_filter_env(int ins, const uint8_t *times, const uint8_t *levs, int count);
+int  sawteeth_get_step_count(int ins);
+void sawteeth_get_steps(int ins, uint8_t *out_notes, uint8_t *out_wforms, uint8_t *out_relative, int max);
+void sawteeth_set_step(int ins, int step_idx, uint8_t note, uint8_t wform, uint8_t relative);
 
 #endif /* SAWTEETH_H */

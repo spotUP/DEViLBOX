@@ -175,3 +175,171 @@ EXPORT void eupmini_set_channel_mute(int channel, int muted) {
     /* enable(ch, true) = unmuted, enable(ch, false) = muted */
     g_device->enable(channel, muted ? false : true);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  FM Instrument parameter read/write API
+ *
+ *  FM instrument data is 48 bytes. The operator layout (4 ops at offsets 0,4,8,12):
+ *    byte[op*4+0]: (DT<<4) | MUL
+ *    byte[op*4+4]: unused
+ *    byte[op*4+8]: unused (aliased by 4-byte stride)
+ *    byte[op*4+12]: TL & 0x7f
+ *    byte[op*4+16]: (KS<<6) | (AR & 0x1f)
+ *    byte[op*4+20]: DR & 0x1f
+ *    byte[op*4+24]: SR & 0x1f
+ *    byte[op*4+28]: (SL<<4) | (RR & 0x0f)
+ *  Actually the layout uses stride 4 per operator within each register group:
+ *    Offsets 8,9,10,11: DT/MUL for op 0,1,2,3
+ *    Offsets 12,13,14,15: TL for op 0,1,2,3
+ *    Offsets 16,17,18,19: KS/AR for op 0,1,2,3
+ *    Offsets 20,21,22,23: DR for op 0,1,2,3
+ *    Offsets 24,25,26,27: SR for op 0,1,2,3
+ *    Offsets 28,29,30,31: SL/RR for op 0,1,2,3
+ *    Offset 32: (FB<<3) | ALG
+ *    Offset 33: LR panning
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* Slot param IDs */
+enum {
+    EUP_SLOT_TL  = 0,
+    EUP_SLOT_AR  = 1,
+    EUP_SLOT_DR  = 2,
+    EUP_SLOT_SR  = 3,
+    EUP_SLOT_RR  = 4,
+    EUP_SLOT_SL  = 5,
+    EUP_SLOT_MUL = 6,
+    EUP_SLOT_DET = 7,
+    EUP_SLOT_KS  = 8,
+};
+
+/* Channel param IDs */
+enum {
+    EUP_CH_ALG   = 0,
+    EUP_CH_FB    = 1,
+    EUP_CH_PAN_L = 2,
+    EUP_CH_PAN_R = 3,
+};
+
+EXPORT int eupmini_get_num_fm_instruments(void) {
+    if (!g_device) return 0;
+    return g_device->getMaxFmInstruments();
+}
+
+EXPORT int eupmini_get_fm_slot_param(int inst, int op, int param_id) {
+    if (!g_device || op < 0 || op > 3) return -1;
+    uint8_t *data = g_device->getFmInstrumentData(inst);
+    if (!data) return -1;
+
+    switch (param_id) {
+        case EUP_SLOT_DET: return (data[8 + op] >> 4) & 7;
+        case EUP_SLOT_MUL: return data[8 + op] & 15;
+        case EUP_SLOT_TL:  return data[12 + op] & 127;
+        case EUP_SLOT_KS:  return (data[16 + op] >> 6) & 3;
+        case EUP_SLOT_AR:  return data[16 + op] & 31;
+        case EUP_SLOT_DR:  return data[20 + op] & 31;
+        case EUP_SLOT_SR:  return data[24 + op] & 31;
+        case EUP_SLOT_SL:  return (data[28 + op] >> 4) & 15;
+        case EUP_SLOT_RR:  return data[28 + op] & 15;
+        default: return -1;
+    }
+}
+
+EXPORT void eupmini_set_fm_slot_param(int inst, int op, int param_id, int value) {
+    if (!g_device || op < 0 || op > 3) return;
+    uint8_t *data = g_device->getFmInstrumentData(inst);
+    if (!data) return;
+
+    switch (param_id) {
+        case EUP_SLOT_DET:
+            data[8 + op] = (uint8_t)(((value & 7) << 4) | (data[8 + op] & 0x0f));
+            break;
+        case EUP_SLOT_MUL:
+            data[8 + op] = (uint8_t)((data[8 + op] & 0xf0) | (value & 15));
+            break;
+        case EUP_SLOT_TL:
+            data[12 + op] = (uint8_t)(value & 127);
+            break;
+        case EUP_SLOT_KS:
+            data[16 + op] = (uint8_t)(((value & 3) << 6) | (data[16 + op] & 0x3f));
+            break;
+        case EUP_SLOT_AR:
+            data[16 + op] = (uint8_t)((data[16 + op] & 0xc0) | (value & 31));
+            break;
+        case EUP_SLOT_DR:
+            data[20 + op] = (uint8_t)(value & 31);
+            break;
+        case EUP_SLOT_SR:
+            data[24 + op] = (uint8_t)(value & 31);
+            break;
+        case EUP_SLOT_SL:
+            data[28 + op] = (uint8_t)(((value & 15) << 4) | (data[28 + op] & 0x0f));
+            break;
+        case EUP_SLOT_RR:
+            data[28 + op] = (uint8_t)((data[28 + op] & 0xf0) | (value & 15));
+            break;
+    }
+}
+
+EXPORT int eupmini_get_fm_ch_param(int inst, int param_id) {
+    if (!g_device) return -1;
+    uint8_t *data = g_device->getFmInstrumentData(inst);
+    if (!data) return -1;
+
+    switch (param_id) {
+        case EUP_CH_ALG:   return data[32] & 7;
+        case EUP_CH_FB:    return (data[32] >> 3) & 7;
+        case EUP_CH_PAN_L: return (data[33] >> 7) & 1;
+        case EUP_CH_PAN_R: return (data[33] >> 6) & 1;
+        default: return -1;
+    }
+}
+
+EXPORT void eupmini_set_fm_ch_param(int inst, int param_id, int value) {
+    if (!g_device) return;
+    uint8_t *data = g_device->getFmInstrumentData(inst);
+    if (!data) return;
+
+    switch (param_id) {
+        case EUP_CH_ALG:
+            data[32] = (uint8_t)((data[32] & 0xf8) | (value & 7));
+            break;
+        case EUP_CH_FB:
+            data[32] = (uint8_t)((data[32] & 0xc7) | ((value & 7) << 3));
+            break;
+        case EUP_CH_PAN_L:
+            data[33] = (uint8_t)((data[33] & 0x7f) | ((value & 1) << 7));
+            break;
+        case EUP_CH_PAN_R:
+            data[33] = (uint8_t)((data[33] & 0xbf) | ((value & 1) << 6));
+            break;
+    }
+}
+
+/**
+ * Bulk read all FM instrument data for one instrument.
+ * Writes 42 ints: [alg, fb, panL, panR, slot0(tl,ar,dr,sr,rr,sl,mul,det,ks) × 4]
+ * = 4 + 4*9 = 40 ints
+ */
+EXPORT void eupmini_get_fm_instrument(int inst, int *out) {
+    if (!g_device || !out) return;
+    uint8_t *data = g_device->getFmInstrumentData(inst);
+    if (!data) { memset(out, 0, 40 * sizeof(int)); return; }
+
+    out[0] = data[32] & 7;           /* ALG */
+    out[1] = (data[32] >> 3) & 7;    /* FB */
+    out[2] = (data[33] >> 7) & 1;    /* Pan L */
+    out[3] = (data[33] >> 6) & 1;    /* Pan R */
+
+    for (int op = 0; op < 4; op++) {
+        int base = 4 + op * 9;
+        out[base + 0] = data[12 + op] & 127;        /* TL */
+        out[base + 1] = data[16 + op] & 31;          /* AR */
+        out[base + 2] = data[20 + op] & 31;          /* DR */
+        out[base + 3] = data[24 + op] & 31;          /* SR */
+        out[base + 4] = data[28 + op] & 15;          /* RR */
+        out[base + 5] = (data[28 + op] >> 4) & 15;   /* SL */
+        out[base + 6] = data[8 + op] & 15;           /* MUL */
+        out[base + 7] = (data[8 + op] >> 4) & 7;     /* DET */
+        out[base + 8] = (data[16 + op] >> 6) & 3;    /* KS */
+    }
+}

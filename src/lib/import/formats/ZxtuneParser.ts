@@ -114,7 +114,7 @@ export async function parseZxtuneFile(
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    synthType: 'ZxtuneSynth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig];
 
   return {

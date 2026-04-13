@@ -247,7 +247,7 @@ export async function parseQuadraComposerFile(
         id: i + 1,
         name: inst.name,
         type: 'sample' as const,
-        synthType: 'Sampler' as const,
+        synthType: 'QuadraComposerWasmSynth' as const,
         effects: [],
         volume: -60,
         pan: 0,

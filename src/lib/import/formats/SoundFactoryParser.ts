@@ -469,7 +469,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         id,
         name: `Instrument ${id}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'SoundFactory2WasmSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,
@@ -687,7 +687,9 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
   function eventsToRows(events: NoteEvent[]): { rows: TrackerCell[]; offsets: number[] } {
     const rows: TrackerCell[] = [];
     const offsets: number[] = [];
+    const MAX_ROWS = 16384; // safety cap to prevent browser freeze
     for (const ev of events) {
+      if (rows.length >= MAX_ROWS) break;
       // First row has the note, remaining rows are empty
       rows.push({
         note: ev.note,
@@ -699,7 +701,8 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         eff2: 0,
       });
       offsets.push(ev.fileOffset);
-      for (let d = 1; d < ev.duration; d++) {
+      const durCap = Math.min(ev.duration, MAX_ROWS - rows.length + 1);
+      for (let d = 1; d < durCap; d++) {
         rows.push(emptyCell());
         offsets.push(-1); // duration-hold rows have no independent file offset
       }
@@ -812,10 +815,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    // UADE eagleplayer routes by filename — .psf is ambiguous (also PlayStation Sound Format).
-    // Ensure the hint uses psf.* prefix so UADE picks the correct Sound Factory player.
-    uadeEditableFileName: filename.toLowerCase().startsWith('psf.') ? filename : `psf.${filename.replace(/\.psf$/i, '')}`,
+    soundFactoryFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,
   };
 }

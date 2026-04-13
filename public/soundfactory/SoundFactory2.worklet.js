@@ -52,7 +52,7 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._sf_select_subsong(this.handle, data.subsong); break;
       case 'setChannelMask': if (this.handle) this.module._sf_set_channel_mask(this.handle, data.mask); break;
-      case 'setCell': {        if (this.handle && this.module._sf_set_cell) {          this.module._sf_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._sf_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._sf_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
+      case 'setCell': {        if (this.handle && this.module._sf_set_cell) {          this.module._sf_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._sf_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._sf_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'getInstrumentParam': {        if (this.handle && this.module._sf_get_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          var val = this.module._sf_get_instrument_param(this.handle, data.inst, pPtr);          this.module._free(pPtr);          this.port.postMessage({ type: 'instrumentParamValue', inst: data.inst, param: data.param, value: val });        }        break;      }      case 'dispose': this.cleanup(); break;
     }
   }
 
@@ -77,14 +77,14 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
       if (typeof globalThis.MutationObserver === 'undefined') globalThis.MutationObserver = class { constructor() {} observe() {} disconnect() {} };
       if (typeof globalThis.DOMParser === 'undefined') globalThis.DOMParser = class { parseFromString() { return { querySelector: () => null, querySelectorAll: () => [] }; } };
       if (typeof globalThis.URL === 'undefined') globalThis.URL = class { constructor(path) { this.href = path; } };
-      if (jsCode && !globalThis.createSoundFactory2) {
-        const wrappedCode = jsCode + '\nreturn createSoundFactory2;';
+      if (jsCode && !globalThis.createSoundFactory) {
+        const wrappedCode = jsCode + '\nreturn createSoundFactory;';
         const factory = new Function(wrappedCode);
         const result = factory();
-        if (typeof result === 'function') globalThis.createSoundFactory2 = result;
+        if (typeof result === 'function') globalThis.createSoundFactory = result;
         else { this.port.postMessage({ type: 'error', message: 'Failed to load JS module' }); return; }
       }
-      if (typeof globalThis.createSoundFactory2 !== 'function') { this.port.postMessage({ type: 'error', message: 'createSoundFactory2 factory not available' }); return; }
+      if (typeof globalThis.createSoundFactory !== 'function') { this.port.postMessage({ type: 'error', message: 'createSoundFactory factory not available' }); return; }
       let capturedMemory = null;
       const origInstantiate = WebAssembly.instantiate;
       WebAssembly.instantiate = async function(...args) {
@@ -95,7 +95,7 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
       };
       const config = {};
       if (wasmBinary) config.wasmBinary = wasmBinary;
-      try { this.module = await globalThis.createSoundFactory2(config); } finally { WebAssembly.instantiate = origInstantiate; }
+      try { this.module = await globalThis.createSoundFactory(config); } finally { WebAssembly.instantiate = origInstantiate; }
       if (!this.module.wasmMemory && capturedMemory) this.module.wasmMemory = capturedMemory;
       // Allocate interleaved stereo + 4 per-channel mono buffers
       const frameBytes = this.bufferSize * 4; // float32

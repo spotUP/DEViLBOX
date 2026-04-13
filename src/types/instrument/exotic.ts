@@ -712,6 +712,84 @@ export interface RonKlarenConfig {
   waveformData?: number[];
 }
 
+// ── FmPlayer (PC-98 YM2608 OPNA) Configuration ───────────────────────────
+
+export interface FmplayerSlotConfig {
+  tl: number;   // Total Level 0-127 (lower = louder)
+  ar: number;   // Attack Rate 0-31
+  dr: number;   // Decay Rate 0-31
+  sr: number;   // Sustain Rate 0-31
+  rr: number;   // Release Rate 0-15
+  sl: number;   // Sustain Level 0-15
+  mul: number;  // Frequency Multiplier 0-15
+  det: number;  // Detune 0-7
+  ks: number;   // Key Scale 0-3
+}
+
+export interface FmplayerChannelConfig {
+  alg: number;  // Algorithm 0-7
+  fb: number;   // Feedback 0-7
+  panL: number; // Left output 0-1
+  panR: number; // Right output 0-1
+  slots: FmplayerSlotConfig[];
+}
+
+export interface FmplayerSsgConfig {
+  toneL: number;   // Tone period low 0-255
+  toneH: number;   // Tone period high 0-15
+  volume: number;  // Volume 0-15 (or 16=envelope)
+  noise: number;   // Noise period 0-31
+  toneEn: number;  // Tone enable 0-1
+  noiseEn: number; // Noise enable 0-1
+}
+
+export interface FmplayerConfig {
+  fmChannels: FmplayerChannelConfig[];
+  ssgChannels: FmplayerSsgConfig[];
+  title: string;
+}
+
+// ── Sawteeth Configuration ────────────────────────────────────────────────
+// Sawteeth by Stansen/Sanity — Amiga/PC software synth tracker with 8 waveforms,
+// state-variable filter, multi-point envelopes, vibrato/PWM LFOs, and
+// arpeggio/waveform step sequences.
+
+export interface SawteethEnvPoint {
+  time: number;   // 0-255
+  lev: number;    // 0-255
+}
+
+export interface SawteethInsStep {
+  note: number;      // 0-96
+  wForm: number;     // 0-7 (hold, saw, sqr, tri, noise, sin, triU, sinU)
+  relative: boolean; // relative vs absolute note
+}
+
+export interface SawteethInstrumentConfig {
+  filterMode: number;   // 0-6 (OFF, SLP, OLP, LP, HP, BP, BS)
+  clipMode: number;     // 0-2 (OFF, HARD, SIN)
+  boost: number;        // 0-15
+  vibS: number;         // vibrato speed 0-255
+  vibD: number;         // vibrato depth 0-255
+  pwmS: number;         // PWM speed 0-255
+  pwmD: number;         // PWM depth 0-255
+  res: number;          // resonance 0-255
+  sps: number;          // ticks per instrument step (>=1)
+  len: number;          // step sequence length (>=1)
+  loop: number;         // loop point in step sequence
+  ampEnv: SawteethEnvPoint[];
+  filterEnv: SawteethEnvPoint[];
+  steps: SawteethInsStep[];
+}
+
+export interface SawteethConfig {
+  instruments: SawteethInstrumentConfig[];
+  instrumentNames: string[];
+  title: string;
+  author: string;
+  numChannels: number;
+}
+
 // ── PreTracker Configuration ───────────────────────────────────────────────
 // PreTracker by Pink/Abyss — 4-channel Amiga synth tracker with wavetable
 // oscillators, filters, ADSR envelopes, chord support, and instrument command

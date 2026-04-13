@@ -102,6 +102,142 @@ class SawteethProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setParam':
+        if (this.module && typeof this.module._sawteeth_set_param === 'function') {
+          this.module._sawteeth_set_param(data.ins, data.paramId, data.value);
+        }
+        break;
+
+      case 'getInstrument': {
+        if (!this.module) break;
+        const m = this.module;
+        const idx = data.ins;
+        const result = { ins: idx };
+
+        // Scalar params
+        if (typeof m._sawteeth_get_param === 'function') {
+          result.filterMode = m._sawteeth_get_param(idx, 0);
+          result.clipMode   = m._sawteeth_get_param(idx, 1);
+          result.boost      = m._sawteeth_get_param(idx, 2);
+          result.vibS       = m._sawteeth_get_param(idx, 3);
+          result.vibD       = m._sawteeth_get_param(idx, 4);
+          result.pwmS       = m._sawteeth_get_param(idx, 5);
+          result.pwmD       = m._sawteeth_get_param(idx, 6);
+          result.res        = m._sawteeth_get_param(idx, 7);
+          result.sps        = m._sawteeth_get_param(idx, 8);
+          result.len        = m._sawteeth_get_param(idx, 9);
+          result.loop       = m._sawteeth_get_param(idx, 10);
+        }
+
+        // Amp envelope
+        const ampPts = typeof m._sawteeth_get_amp_points === 'function' ? m._sawteeth_get_amp_points(idx) : 0;
+        if (ampPts > 0) {
+          const malloc = m._malloc || m.malloc;
+          const free = m._free || m.free;
+          if (malloc && free) {
+            const tPtr = malloc(ampPts);
+            const lPtr = malloc(ampPts);
+            m._sawteeth_get_amp_env(idx, tPtr, lPtr, ampPts);
+            const heapU8 = m.HEAPU8 || new Uint8Array(m.wasmMemory.buffer);
+            result.ampEnv = [];
+            for (let i = 0; i < ampPts; i++) {
+              result.ampEnv.push({ time: heapU8[tPtr + i], lev: heapU8[lPtr + i] });
+            }
+            free(tPtr); free(lPtr);
+          }
+        }
+
+        // Filter envelope
+        const fltPts = typeof m._sawteeth_get_filter_points === 'function' ? m._sawteeth_get_filter_points(idx) : 0;
+        if (fltPts > 0) {
+          const malloc = m._malloc || m.malloc;
+          const free = m._free || m.free;
+          if (malloc && free) {
+            const tPtr = malloc(fltPts);
+            const lPtr = malloc(fltPts);
+            m._sawteeth_get_filter_env(idx, tPtr, lPtr, fltPts);
+            const heapU8 = m.HEAPU8 || new Uint8Array(m.wasmMemory.buffer);
+            result.filterEnv = [];
+            for (let i = 0; i < fltPts; i++) {
+              result.filterEnv.push({ time: heapU8[tPtr + i], lev: heapU8[lPtr + i] });
+            }
+            free(tPtr); free(lPtr);
+          }
+        }
+
+        // Steps (arpeggio/waveform sequence)
+        const stepCount = typeof m._sawteeth_get_step_count === 'function' ? m._sawteeth_get_step_count(idx) : 0;
+        if (stepCount > 0) {
+          const malloc = m._malloc || m.malloc;
+          const free = m._free || m.free;
+          if (malloc && free) {
+            const nPtr = malloc(stepCount);
+            const wPtr = malloc(stepCount);
+            const rPtr = malloc(stepCount);
+            m._sawteeth_get_steps(idx, nPtr, wPtr, rPtr, stepCount);
+            const heapU8 = m.HEAPU8 || new Uint8Array(m.wasmMemory.buffer);
+            result.steps = [];
+            for (let i = 0; i < stepCount; i++) {
+              result.steps.push({
+                note: heapU8[nPtr + i],
+                wForm: heapU8[wPtr + i],
+                relative: heapU8[rPtr + i] !== 0,
+              });
+            }
+            free(nPtr); free(wPtr); free(rPtr);
+          }
+        }
+
+        this.port.postMessage({ type: 'instrumentData', data: result });
+        break;
+      }
+
+      case 'setAmpEnv': {
+        if (!this.module || typeof this.module._sawteeth_set_amp_env !== 'function') break;
+        const m = this.module;
+        const malloc = m._malloc || m.malloc;
+        const free = m._free || m.free;
+        if (!malloc || !free) break;
+        const { ins, times, levs } = data;
+        const count = times.length;
+        const tPtr = malloc(count);
+        const lPtr = malloc(count);
+        const heapU8 = m.HEAPU8 || new Uint8Array(m.wasmMemory.buffer);
+        for (let i = 0; i < count; i++) {
+          heapU8[tPtr + i] = times[i];
+          heapU8[lPtr + i] = levs[i];
+        }
+        m._sawteeth_set_amp_env(ins, tPtr, lPtr, count);
+        free(tPtr); free(lPtr);
+        break;
+      }
+
+      case 'setFilterEnv': {
+        if (!this.module || typeof this.module._sawteeth_set_filter_env !== 'function') break;
+        const m = this.module;
+        const malloc = m._malloc || m.malloc;
+        const free = m._free || m.free;
+        if (!malloc || !free) break;
+        const { ins, times, levs } = data;
+        const count = times.length;
+        const tPtr = malloc(count);
+        const lPtr = malloc(count);
+        const heapU8 = m.HEAPU8 || new Uint8Array(m.wasmMemory.buffer);
+        for (let i = 0; i < count; i++) {
+          heapU8[tPtr + i] = times[i];
+          heapU8[lPtr + i] = levs[i];
+        }
+        m._sawteeth_set_filter_env(ins, tPtr, lPtr, count);
+        free(tPtr); free(lPtr);
+        break;
+      }
+
+      case 'setStep': {
+        if (!this.module || typeof this.module._sawteeth_set_step !== 'function') break;
+        this.module._sawteeth_set_step(data.ins, data.stepIdx, data.note, data.wForm, data.relative ? 1 : 0);
+        break;
+      }
+
       case 'dispose':
         this.cleanup();
         break;

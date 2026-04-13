@@ -1064,3 +1064,136 @@ int sawteeth_render(float *out, int num_samples) {
 
   return written;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  Instrument query/edit API
+ * ══════════════════════════════════════════════════════════════════════ */
+
+int sawteeth_get_num_instruments(void) {
+  return g_engine.song.num_instruments;
+}
+
+static st_ins_t *get_ins(int idx) {
+  if (idx < 0 || idx >= g_engine.song.num_instruments) return NULL;
+  return &g_engine.song.instruments[idx];
+}
+
+int sawteeth_get_param(int ins, int param_id) {
+  st_ins_t *p = get_ins(ins);
+  if (!p) return -1;
+  switch (param_id) {
+    case ST_PARAM_FILTER_MODE: return p->filter_mode;
+    case ST_PARAM_CLIP_MODE:   return p->clip_mode;
+    case ST_PARAM_BOOST:       return p->boost;
+    case ST_PARAM_VIB_S:       return p->vib_s;
+    case ST_PARAM_VIB_D:       return p->vib_d;
+    case ST_PARAM_PWM_S:       return p->pwm_s;
+    case ST_PARAM_PWM_D:       return p->pwm_d;
+    case ST_PARAM_RES:         return p->res;
+    case ST_PARAM_SPS:         return p->sps;
+    case ST_PARAM_LEN:         return p->len;
+    case ST_PARAM_LOOP:        return p->loop;
+    default: return -1;
+  }
+}
+
+void sawteeth_set_param(int ins, int param_id, int value) {
+  st_ins_t *p = get_ins(ins);
+  if (!p) return;
+  switch (param_id) {
+    case ST_PARAM_FILTER_MODE: p->filter_mode = (uint8_t)(value & 0x07); break;
+    case ST_PARAM_CLIP_MODE:   p->clip_mode   = (uint8_t)(value & 0x03); break;
+    case ST_PARAM_BOOST:       p->boost       = (uint8_t)(value & 0x0F); break;
+    case ST_PARAM_VIB_S:       p->vib_s       = (uint8_t)value; break;
+    case ST_PARAM_VIB_D:       p->vib_d       = (uint8_t)value; break;
+    case ST_PARAM_PWM_S:       p->pwm_s       = (uint8_t)value; break;
+    case ST_PARAM_PWM_D:       p->pwm_d       = (uint8_t)value; break;
+    case ST_PARAM_RES:         p->res         = (uint8_t)value; break;
+    case ST_PARAM_SPS:         p->sps         = (uint8_t)(value < 1 ? 1 : value); break;
+    case ST_PARAM_LEN:         p->len         = (uint8_t)(value < 1 ? 1 : value); break;
+    case ST_PARAM_LOOP:        if (value < p->len) p->loop = (uint8_t)value; break;
+    default: break;
+  }
+}
+
+int sawteeth_get_amp_points(int ins) {
+  st_ins_t *p = get_ins(ins);
+  return p ? p->amp_points : 0;
+}
+
+int sawteeth_get_filter_points(int ins) {
+  st_ins_t *p = get_ins(ins);
+  return p ? p->filter_points : 0;
+}
+
+void sawteeth_get_amp_env(int ins, uint8_t *out_times, uint8_t *out_levs, int max_points) {
+  st_ins_t *p = get_ins(ins);
+  if (!p) return;
+  int n = p->amp_points < max_points ? p->amp_points : max_points;
+  for (int i = 0; i < n; i++) {
+    out_times[i] = p->amp[i].time;
+    out_levs[i]  = p->amp[i].lev;
+  }
+}
+
+void sawteeth_get_filter_env(int ins, uint8_t *out_times, uint8_t *out_levs, int max_points) {
+  st_ins_t *p = get_ins(ins);
+  if (!p) return;
+  int n = p->filter_points < max_points ? p->filter_points : max_points;
+  for (int i = 0; i < n; i++) {
+    out_times[i] = p->filter[i].time;
+    out_levs[i]  = p->filter[i].lev;
+  }
+}
+
+void sawteeth_set_amp_env(int ins, const uint8_t *times, const uint8_t *levs, int count) {
+  st_ins_t *p = get_ins(ins);
+  if (!p || count < 1 || count > 255) return;
+  st_timelev_t *new_env = (st_timelev_t *)malloc(count * sizeof(st_timelev_t));
+  if (!new_env) return;
+  for (int i = 0; i < count; i++) {
+    new_env[i].time = times[i];
+    new_env[i].lev  = levs[i];
+  }
+  free(p->amp);
+  p->amp = new_env;
+  p->amp_points = (uint8_t)count;
+}
+
+void sawteeth_set_filter_env(int ins, const uint8_t *times, const uint8_t *levs, int count) {
+  st_ins_t *p = get_ins(ins);
+  if (!p || count < 1 || count > 255) return;
+  st_timelev_t *new_env = (st_timelev_t *)malloc(count * sizeof(st_timelev_t));
+  if (!new_env) return;
+  for (int i = 0; i < count; i++) {
+    new_env[i].time = times[i];
+    new_env[i].lev  = levs[i];
+  }
+  free(p->filter);
+  p->filter = new_env;
+  p->filter_points = (uint8_t)count;
+}
+
+int sawteeth_get_step_count(int ins) {
+  st_ins_t *p = get_ins(ins);
+  return p ? p->len : 0;
+}
+
+void sawteeth_get_steps(int ins, uint8_t *out_notes, uint8_t *out_wforms, uint8_t *out_relative, int max) {
+  st_ins_t *p = get_ins(ins);
+  if (!p) return;
+  int n = p->len < max ? p->len : max;
+  for (int i = 0; i < n; i++) {
+    out_notes[i]    = p->steps[i].note;
+    out_wforms[i]   = p->steps[i].wform;
+    out_relative[i] = p->steps[i].relative ? 1 : 0;
+  }
+}
+
+void sawteeth_set_step(int ins, int step_idx, uint8_t note, uint8_t wform, uint8_t relative) {
+  st_ins_t *p = get_ins(ins);
+  if (!p || step_idx < 0 || step_idx >= p->len) return;
+  p->steps[step_idx].note     = note;
+  p->steps[step_idx].wform    = wform & 0x07;
+  p->steps[step_idx].relative = relative != 0;
+}

@@ -1102,7 +1102,7 @@ export async function parseBenDaglishFile(
         id: i + 1,
         name: `BD Sample ${i + 1}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'BenDaglishSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,

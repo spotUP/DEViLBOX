@@ -467,7 +467,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         id,
         name: sample.name || `Sample ${i + 1}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'ActionamicsWasmSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,
