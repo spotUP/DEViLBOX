@@ -260,3 +260,6 @@ third-party/retromulator/
 adplug-wasm/adplug-adplug-2.4/
 adplug-wasm/libbinio-libbinio-1.5/
 adplug-wasm/build/
+sonic-arranger-wasm/test_sa
+sonic-arranger-wasm/test_sa.dSYM/
+sonic-arranger-wasm/test_sa.c
