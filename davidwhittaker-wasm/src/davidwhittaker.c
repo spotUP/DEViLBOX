@@ -2415,9 +2415,32 @@ bool dw_has_ended(const DwModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int dw_get_instrument_count(const DwModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->number_of_samples : 0;
+}
+
+float dw_get_instrument_param(const DwModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->number_of_samples || !param || !module->samples) return -1.0f;
+    const DwSample* s = &module->samples[inst];
+
+    if (strcmp(param, "sampleNumber") == 0)    return (float)s->sample_number;
+    if (strcmp(param, "length") == 0)           return (float)s->length;
+    if (strcmp(param, "loopStart") == 0)        return (float)s->loop_start;
+    if (strcmp(param, "volume") == 0)           return (float)s->volume;
+    if (strcmp(param, "fineTunePeriod") == 0)   return (float)s->fine_tune_period;
+    if (strcmp(param, "transpose") == 0)        return (float)s->transpose;
+
+    return -1.0f;
+}
+
+void dw_set_instrument_param(DwModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->number_of_samples || !param || !module->samples) return;
+    DwSample* s = &module->samples[inst];
+
+    if (strcmp(param, "length") == 0)           { s->length = (uint32_t)value; return; }
+    if (strcmp(param, "loopStart") == 0)        { s->loop_start = (int32_t)value; return; }
+    if (strcmp(param, "volume") == 0)           { s->volume = (uint16_t)value; return; }
+    if (strcmp(param, "fineTunePeriod") == 0)   { s->fine_tune_period = (uint16_t)value; return; }
+    if (strcmp(param, "transpose") == 0)        { s->transpose = (int8_t)value; return; }
 }
 
 size_t dw_export(const DwModule* module, uint8_t* out, size_t max_size) {

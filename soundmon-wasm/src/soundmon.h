@@ -27,4 +27,19 @@ size_t sm_render_multi(SmModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool sm_has_ended(const SmModule* module);
 
+// Edit API
+int sm_get_instrument_count(const SmModule* module);
+int sm_get_num_tracks(const SmModule* module);
+void sm_get_cell(const SmModule* module, int track_idx, int row,
+                 uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg);
+void sm_set_cell(SmModule* module, int track_idx, int row,
+                 uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg);
+const char* sm_get_instrument_name(const SmModule* module, int inst);
+float sm_get_instrument_param(const SmModule* module, int inst, const char* param);
+void sm_set_instrument_param(SmModule* module, int inst, const char* param, float value);
+size_t sm_export(const SmModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

@@ -27,4 +27,18 @@ size_t dm_render_multi(DmModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool dm_has_ended(const DmModule* module);
 
+// Edit API
+int dm_get_instrument_count(const DmModule* module);
+int dm_get_num_tracks(const DmModule* module);
+void dm_get_cell(const DmModule* module, int track_idx, int row,
+                 uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg);
+void dm_set_cell(DmModule* module, int track_idx, int row,
+                 uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg);
+float dm_get_instrument_param(const DmModule* module, int inst, const char* param);
+void dm_set_instrument_param(DmModule* module, int inst, const char* param, float value);
+size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

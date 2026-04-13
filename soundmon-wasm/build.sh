@@ -6,7 +6,7 @@ echo "=== SoundMon WASM Build ==="
 mkdir -p "$OUT_DIR"
 emcc -O2 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/soundmon.c" \
-    -sEXPORTED_FUNCTIONS="['_sm_create','_sm_destroy','_sm_subsong_count','_sm_select_subsong','_sm_channel_count','_sm_set_channel_mask','_sm_render','_sm_render_multi','_sm_has_ended','_sm_get_instrument_count','_sm_export','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_sm_create','_sm_destroy','_sm_subsong_count','_sm_select_subsong','_sm_channel_count','_sm_set_channel_mask','_sm_render','_sm_render_multi','_sm_has_ended','_sm_get_instrument_count','_sm_get_num_tracks','_sm_get_cell','_sm_set_cell','_sm_get_instrument_name','_sm_get_instrument_param','_sm_set_instrument_param','_sm_export','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createSoundMon -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=4194304 -sMAXIMUM_MEMORY=16777216 \

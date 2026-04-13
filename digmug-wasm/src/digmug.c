@@ -1735,9 +1735,85 @@ bool dm_has_ended(const DmModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int dm_get_instrument_count(const DmModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? (int)module->number_of_instruments : 0;
+}
+
+int dm_get_num_tracks(const DmModule* module) {
+    return module ? (int)module->number_of_tracks : 0;
+}
+
+void dm_get_cell(const DmModule* module, int track_idx, int row,
+                 uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || track_idx < 0 || track_idx >= (int)module->number_of_tracks ||
+        row < 0 || row >= 64 || !module->tracks) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const DmTrackRow* r = &module->tracks[track_idx].rows[row];
+    if (note)       *note       = r->note;
+    if (instrument) *instrument = r->instrument;
+    if (effect)     *effect     = r->effect;
+    if (effect_arg) *effect_arg = r->effect_param;
+}
+
+void dm_set_cell(DmModule* module, int track_idx, int row,
+                 uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg) {
+    if (!module || track_idx < 0 || track_idx >= (int)module->number_of_tracks ||
+        row < 0 || row >= 64 || !module->tracks) return;
+    DmTrackRow* r = &module->tracks[track_idx].rows[row];
+    r->note        = note;
+    r->instrument  = instrument;
+    r->effect      = effect;
+    r->effect_param = effect_arg;
+}
+
+float dm_get_instrument_param(const DmModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= (int)module->number_of_instruments || !param || !module->instruments) return -1.0f;
+    const DmInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "waveformNumber") == 0)  return (float)in->waveform_number;
+    if (strcmp(param, "loopLength") == 0)       return (float)in->loop_length;
+    if (strcmp(param, "finetune") == 0)         return (float)in->finetune;
+    if (strcmp(param, "arpeggioNumber") == 0)   return (float)in->arpeggio_number;
+    if (strcmp(param, "volume") == 0)           return (float)in->volume;
+    if (strcmp(param, "volumeSpeed") == 0)      return (float)in->volume_speed;
+    if (strcmp(param, "volumeLoop") == 0)       return (float)in->volume_loop;
+    if (strcmp(param, "pitch") == 0)            return (float)in->pitch;
+    if (strcmp(param, "pitchSpeed") == 0)       return (float)in->pitch_speed;
+    if (strcmp(param, "pitchLoop") == 0)        return (float)in->pitch_loop;
+    if (strcmp(param, "delay") == 0)            return (float)in->delay;
+    if (strcmp(param, "effect") == 0)           return (float)in->effect;
+    if (strcmp(param, "effectSpeed") == 0)      return (float)in->effect_speed;
+    if (strcmp(param, "effectIndex") == 0)      return (float)in->effect_index;
+    if (strcmp(param, "sourceWave1") == 0)      return (float)in->source_wave1;
+    if (strcmp(param, "sourceWave2") == 0)      return (float)in->source_wave2;
+
+    return -1.0f;
+}
+
+void dm_set_instrument_param(DmModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= (int)module->number_of_instruments || !param || !module->instruments) return;
+    DmInstrument* in = &module->instruments[inst];
+    uint8_t b = (uint8_t)value;
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "waveformNumber") == 0)  { in->waveform_number = b; return; }
+    if (strcmp(param, "loopLength") == 0)       { in->loop_length = v; return; }
+    if (strcmp(param, "finetune") == 0)         { in->finetune = b; return; }
+    if (strcmp(param, "arpeggioNumber") == 0)   { in->arpeggio_number = b; return; }
+    if (strcmp(param, "volume") == 0)           { in->volume = b; return; }
+    if (strcmp(param, "volumeSpeed") == 0)      { in->volume_speed = b; return; }
+    if (strcmp(param, "volumeLoop") == 0)       { in->volume_loop = (bool)(int)value; return; }
+    if (strcmp(param, "pitch") == 0)            { in->pitch = b; return; }
+    if (strcmp(param, "pitchSpeed") == 0)       { in->pitch_speed = b; return; }
+    if (strcmp(param, "pitchLoop") == 0)        { in->pitch_loop = b; return; }
+    if (strcmp(param, "delay") == 0)            { in->delay = b; return; }
+    if (strcmp(param, "effect") == 0)           { in->effect = (DmInstrumentEffect)(int)value; return; }
+    if (strcmp(param, "effectSpeed") == 0)      { in->effect_speed = b; return; }
+    if (strcmp(param, "effectIndex") == 0)      { in->effect_index = b; return; }
+    if (strcmp(param, "sourceWave1") == 0)      { in->source_wave1 = b; return; }
+    if (strcmp(param, "sourceWave2") == 0)      { in->source_wave2 = b; return; }
 }
 
 size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size) {

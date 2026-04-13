@@ -1984,9 +1984,35 @@ bool vs_has_ended(const VsModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int vs_get_instrument_count(const VsModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    // Voodoo Supreme uses waveforms as "instruments"
+    return module ? module->num_all_samples : 0;
+}
+
+float vs_get_instrument_param(const VsModule* module, int inst, const char* param) {
+    if (!module || !module->current_song || inst < 0 || inst >= module->num_all_samples || !param) return -1.0f;
+    int data_idx = module->all_sample_indices[inst];
+    if (data_idx < 0 || data_idx >= module->current_song->data_count) return -1.0f;
+    const VsModuleData* md = &module->current_song->data[data_idx];
+    if (md->type != VS_DATA_WAVEFORM) return -1.0f;
+    const VsWaveform* wf = &md->u.waveform;
+
+    if (strcmp(param, "isSample") == 0)     return (float)wf->is_sample;
+    if (strcmp(param, "dataLength") == 0)   return (float)wf->data_length;
+    if (strcmp(param, "sampleLength") == 0) return (float)wf->sample_length;
+    if (strcmp(param, "offset") == 0)       return (float)wf->offset;
+
+    return -1.0f;
+}
+
+void vs_set_instrument_param(VsModule* module, int inst, const char* param, float value) {
+    if (!module || !module->current_song || inst < 0 || inst >= module->num_all_samples || !param) return;
+    int data_idx = module->all_sample_indices[inst];
+    if (data_idx < 0 || data_idx >= module->current_song->data_count) return;
+    VsModuleData* md = &module->current_song->data[data_idx];
+    if (md->type != VS_DATA_WAVEFORM) return;
+    VsWaveform* wf = &md->u.waveform;
+
+    if (strcmp(param, "sampleLength") == 0) { wf->sample_length = (uint16_t)value; return; }
 }
 
 size_t vs_export(const VsModule* module, uint8_t* out, size_t max_size) {

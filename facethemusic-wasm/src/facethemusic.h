@@ -24,4 +24,22 @@ size_t ftm_render_multi(FtmModule* module, float** channel_buffers, int num_chan
 
 bool ftm_has_ended(const FtmModule* module);
 
+// Edit API
+int ftm_get_instrument_count(const FtmModule* module);
+int ftm_get_num_measures(const FtmModule* module);
+int ftm_get_rows_per_measure(const FtmModule* module);
 
+void ftm_get_cell(const FtmModule* module, int channel, int row,
+                   uint8_t* note, uint8_t* effect, uint16_t* effect_arg);
+void ftm_set_cell(FtmModule* module, int channel, int row,
+                   uint8_t note, uint8_t effect, uint16_t effect_arg);
+
+float ftm_get_instrument_param(const FtmModule* module, int inst, const char* param);
+void ftm_set_instrument_param(FtmModule* module, int inst, const char* param, float value);
+
+size_t ftm_export(const FtmModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

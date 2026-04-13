@@ -6,7 +6,7 @@ echo "=== FaceTheMusic WASM Build ==="
 mkdir -p "$OUT_DIR"
 emcc -O2 -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-tautological-constant-out-of-range-compare \
     "$SCRIPT_DIR/src/facethemusic.c" \
-    -sEXPORTED_FUNCTIONS="['_ftm_create','_ftm_destroy','_ftm_subsong_count','_ftm_select_subsong','_ftm_channel_count','_ftm_set_channel_mask','_ftm_render','_ftm_render_multi','_ftm_has_ended','_ftm_get_instrument_count','_ftm_export','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_ftm_create','_ftm_destroy','_ftm_subsong_count','_ftm_select_subsong','_ftm_channel_count','_ftm_set_channel_mask','_ftm_render','_ftm_render_multi','_ftm_has_ended','_ftm_get_instrument_count','_ftm_get_num_measures','_ftm_get_rows_per_measure','_ftm_get_cell','_ftm_set_cell','_ftm_get_instrument_param','_ftm_set_instrument_param','_ftm_export','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createFaceTheMusic -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=4194304 -sMAXIMUM_MEMORY=16777216 \

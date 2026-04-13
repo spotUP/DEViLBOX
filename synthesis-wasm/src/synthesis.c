@@ -1758,9 +1758,129 @@ bool syn_has_ended(const SynModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int syn_get_instrument_count(const SynModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_instruments : 0;
+}
+
+int syn_get_num_track_lines(const SynModule* module) {
+    return module ? module->num_track_lines : 0;
+}
+
+int syn_get_num_positions(const SynModule* module) {
+    return module ? module->num_positions : 0;
+}
+
+void syn_get_cell(const SynModule* module, int idx,
+                   uint8_t* note, uint8_t* instrument, uint8_t* arpeggio,
+                   uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || idx < 0 || idx >= module->num_track_lines) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (arpeggio) *arpeggio = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const SynTrackLine* tl = &module->track_lines[idx];
+    if (note) *note = tl->note;
+    if (instrument) *instrument = tl->instrument;
+    if (arpeggio) *arpeggio = tl->arpeggio;
+    if (effect) *effect = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void syn_set_cell(SynModule* module, int idx,
+                   uint8_t note, uint8_t instrument, uint8_t arpeggio,
+                   uint8_t effect, uint8_t effect_arg) {
+    if (!module || idx < 0 || idx >= module->num_track_lines) return;
+    SynTrackLine* tl = &module->track_lines[idx];
+    tl->note = note;
+    tl->instrument = instrument;
+    tl->arpeggio = arpeggio;
+    tl->effect = (SynEffect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+void syn_get_position(const SynModule* module, int pos, int channel,
+                       uint16_t* start_track_row, int8_t* sound_transpose, int8_t* note_transpose) {
+    if (!module || pos < 0 || pos >= module->num_positions || channel < 0 || channel >= 4) {
+        if (start_track_row) *start_track_row = 0;
+        if (sound_transpose) *sound_transpose = 0;
+        if (note_transpose) *note_transpose = 0;
+        return;
+    }
+    const SynSinglePositionInfo* pi = &module->positions[pos][channel];
+    if (start_track_row) *start_track_row = pi->start_track_row;
+    if (sound_transpose) *sound_transpose = pi->sound_transpose;
+    if (note_transpose) *note_transpose = pi->note_transpose;
+}
+
+void syn_set_position(SynModule* module, int pos, int channel,
+                       uint16_t start_track_row, int8_t sound_transpose, int8_t note_transpose) {
+    if (!module || pos < 0 || pos >= module->num_positions || channel < 0 || channel >= 4) return;
+    SynSinglePositionInfo* pi = &module->positions[pos][channel];
+    pi->start_track_row = start_track_row;
+    pi->sound_transpose = sound_transpose;
+    pi->note_transpose = note_transpose;
+}
+
+float syn_get_instrument_param(const SynModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return -1.0f;
+    const SynInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "waveformNumber") == 0)       return (float)in->waveform_number;
+    if (strcmp(param, "synthesisEnabled") == 0)      return in->synthesis_enabled ? 1.0f : 0.0f;
+    if (strcmp(param, "waveformLength") == 0)        return (float)in->waveform_length;
+    if (strcmp(param, "repeatLength") == 0)          return (float)in->repeat_length;
+    if (strcmp(param, "volume") == 0)                return (float)in->volume;
+    if (strcmp(param, "portamentoSpeed") == 0)       return (float)in->portamento_speed;
+    if (strcmp(param, "adsrEnabled") == 0)           return in->adsr_enabled ? 1.0f : 0.0f;
+    if (strcmp(param, "adsrTableNumber") == 0)       return (float)in->adsr_table_number;
+    if (strcmp(param, "adsrTableLength") == 0)       return (float)in->adsr_table_length;
+    if (strcmp(param, "arpeggioStart") == 0)         return (float)in->arpeggio_start;
+    if (strcmp(param, "arpeggioLength") == 0)        return (float)in->arpeggio_length;
+    if (strcmp(param, "arpeggioRepeatLength") == 0)  return (float)in->arpeggio_repeat_length;
+    if (strcmp(param, "effect") == 0)                return (float)in->effect;
+    if (strcmp(param, "effectArg1") == 0)            return (float)in->effect_arg1;
+    if (strcmp(param, "effectArg2") == 0)            return (float)in->effect_arg2;
+    if (strcmp(param, "effectArg3") == 0)            return (float)in->effect_arg3;
+    if (strcmp(param, "vibratoDelay") == 0)          return (float)in->vibrato_delay;
+    if (strcmp(param, "vibratoSpeed") == 0)          return (float)in->vibrato_speed;
+    if (strcmp(param, "vibratoLevel") == 0)          return (float)in->vibrato_level;
+    if (strcmp(param, "egcOffset") == 0)             return (float)in->egc_offset;
+    if (strcmp(param, "egcMode") == 0)               return (float)in->egc_mode;
+    if (strcmp(param, "egcTableNumber") == 0)        return (float)in->egc_table_number;
+    if (strcmp(param, "egcTableLength") == 0)        return (float)in->egc_table_length;
+
+    return -1.0f;
+}
+
+void syn_set_instrument_param(SynModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return;
+    SynInstrument* in = &module->instruments[inst];
+    uint16_t v = (uint16_t)value;
+    uint8_t v8 = (uint8_t)value;
+    int8_t sv8 = (int8_t)value;
+
+    if (strcmp(param, "waveformNumber") == 0)       { in->waveform_number = v8; return; }
+    if (strcmp(param, "synthesisEnabled") == 0)      { in->synthesis_enabled = value != 0.0f; return; }
+    if (strcmp(param, "waveformLength") == 0)        { in->waveform_length = v; return; }
+    if (strcmp(param, "repeatLength") == 0)          { in->repeat_length = v; return; }
+    if (strcmp(param, "volume") == 0)                { in->volume = v8; return; }
+    if (strcmp(param, "portamentoSpeed") == 0)       { in->portamento_speed = sv8; return; }
+    if (strcmp(param, "adsrEnabled") == 0)           { in->adsr_enabled = value != 0.0f; return; }
+    if (strcmp(param, "adsrTableNumber") == 0)       { in->adsr_table_number = v8; return; }
+    if (strcmp(param, "adsrTableLength") == 0)       { in->adsr_table_length = v; return; }
+    if (strcmp(param, "arpeggioStart") == 0)         { in->arpeggio_start = v8; return; }
+    if (strcmp(param, "arpeggioLength") == 0)        { in->arpeggio_length = v8; return; }
+    if (strcmp(param, "arpeggioRepeatLength") == 0)  { in->arpeggio_repeat_length = v8; return; }
+    if (strcmp(param, "effect") == 0)                { in->effect = (SynSynthEffect)(int)value; return; }
+    if (strcmp(param, "effectArg1") == 0)            { in->effect_arg1 = v8; return; }
+    if (strcmp(param, "effectArg2") == 0)            { in->effect_arg2 = v8; return; }
+    if (strcmp(param, "effectArg3") == 0)            { in->effect_arg3 = v8; return; }
+    if (strcmp(param, "vibratoDelay") == 0)          { in->vibrato_delay = v8; return; }
+    if (strcmp(param, "vibratoSpeed") == 0)          { in->vibrato_speed = v8; return; }
+    if (strcmp(param, "vibratoLevel") == 0)          { in->vibrato_level = v8; return; }
+    if (strcmp(param, "egcOffset") == 0)             { in->egc_offset = v8; return; }
+    if (strcmp(param, "egcMode") == 0)               { in->egc_mode = (SynEgcMode)(int)value; return; }
+    if (strcmp(param, "egcTableNumber") == 0)        { in->egc_table_number = v8; return; }
+    if (strcmp(param, "egcTableLength") == 0)        { in->egc_table_length = v; return; }
 }
 
 size_t syn_export(const SynModule* module, uint8_t* out, size_t max_size) {

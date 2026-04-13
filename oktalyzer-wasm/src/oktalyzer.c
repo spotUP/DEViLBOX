@@ -1195,9 +1195,80 @@ bool okt_has_ended(const OktModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int okt_get_instrument_count(const OktModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? (int)module->samp_num : 0;
+}
+
+int okt_get_num_patterns(const OktModule* module) {
+    return module ? (int)module->patt_num : 0;
+}
+
+int okt_get_pattern_rows(const OktModule* module, int pattern) {
+    if (!module || pattern < 0 || pattern >= module->patt_num) return 0;
+    return module->patterns[pattern].line_num;
+}
+
+int okt_get_num_positions(const OktModule* module) {
+    return module ? (int)module->song_length : 0;
+}
+
+void okt_get_cell(const OktModule* module, int pattern, int row, int channel,
+                   uint8_t* note, uint8_t* sample_num, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->patt_num ||
+        channel < 0 || channel >= module->chan_num) {
+        if (note) *note = 0; if (sample_num) *sample_num = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const OktPattern* pat = &module->patterns[pattern];
+    if (row < 0 || row >= pat->line_num) {
+        if (note) *note = 0; if (sample_num) *sample_num = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const OktPatternLine* line = &pat->lines[row * module->chan_num + channel];
+    if (note) *note = line->note;
+    if (sample_num) *sample_num = line->sample_num;
+    if (effect) *effect = line->effect;
+    if (effect_arg) *effect_arg = line->effect_arg;
+}
+
+void okt_set_cell(OktModule* module, int pattern, int row, int channel,
+                   uint8_t note, uint8_t sample_num, uint8_t effect, uint8_t effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->patt_num ||
+        channel < 0 || channel >= module->chan_num) return;
+    OktPattern* pat = &module->patterns[pattern];
+    if (row < 0 || row >= pat->line_num) return;
+    OktPatternLine* line = &pat->lines[row * module->chan_num + channel];
+    line->note = note;
+    line->sample_num = sample_num;
+    line->effect = effect;
+    line->effect_arg = effect_arg;
+}
+
+float okt_get_instrument_param(const OktModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= (int)module->samp_num || !param) return -1.0f;
+    const OktSample* s = &module->samples[inst];
+
+    if (strcmp(param, "length") == 0)        return (float)s->length;
+    if (strcmp(param, "repeatStart") == 0)    return (float)s->repeat_start;
+    if (strcmp(param, "repeatLength") == 0)   return (float)s->repeat_length;
+    if (strcmp(param, "volume") == 0)         return (float)s->volume;
+    if (strcmp(param, "mode") == 0)           return (float)s->mode;
+
+    return -1.0f;
+}
+
+void okt_set_instrument_param(OktModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= (int)module->samp_num || !param) return;
+    OktSample* s = &module->samples[inst];
+    uint16_t v = (uint16_t)value;
+    uint32_t v32 = (uint32_t)value;
+
+    if (strcmp(param, "length") == 0)        { s->length = v32; return; }
+    if (strcmp(param, "repeatStart") == 0)    { s->repeat_start = v; return; }
+    if (strcmp(param, "repeatLength") == 0)   { s->repeat_length = v; return; }
+    if (strcmp(param, "volume") == 0)         { s->volume = v; return; }
+    if (strcmp(param, "mode") == 0)           { s->mode = v; return; }
 }
 
 size_t okt_export(const OktModule* module, uint8_t* out, size_t max_size) {

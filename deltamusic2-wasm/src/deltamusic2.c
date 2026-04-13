@@ -1076,9 +1076,135 @@ bool dm2_has_ended(const Dm2Module* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int dm2_get_instrument_count(const Dm2Module* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_instruments : 0;
+}
+
+int dm2_get_num_blocks(const Dm2Module* module) {
+    return module ? (int)module->num_blocks : 0;
+}
+
+void dm2_get_cell(const Dm2Module* module, int block_idx, int row,
+                  uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || block_idx < 0 || block_idx >= (int)module->num_blocks ||
+        row < 0 || row >= 16 || !module->blocks || !module->blocks[block_idx]) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const Dm2BlockLine* bl = &module->blocks[block_idx][row];
+    if (note)       *note       = bl->note;
+    if (instrument) *instrument = bl->instrument;
+    if (effect)     *effect     = (uint8_t)bl->effect;
+    if (effect_arg) *effect_arg = bl->effect_arg;
+}
+
+void dm2_set_cell(Dm2Module* module, int block_idx, int row,
+                  uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg) {
+    if (!module || block_idx < 0 || block_idx >= (int)module->num_blocks ||
+        row < 0 || row >= 16 || !module->blocks || !module->blocks[block_idx]) return;
+    Dm2BlockLine* bl = &module->blocks[block_idx][row];
+    bl->note       = note;
+    bl->instrument = instrument;
+    bl->effect     = (Dm2Effect)effect;
+    bl->effect_arg = effect_arg;
+}
+
+float dm2_get_instrument_param(const Dm2Module* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param || !module->instruments) return -1.0f;
+    const Dm2Instrument* in = module->instruments[inst];
+    if (!in) return -1.0f;
+
+    if (strcmp(param, "number") == 0)          return (float)in->number;
+    if (strcmp(param, "sampleLength") == 0)    return (float)in->sample_length;
+    if (strcmp(param, "repeatStart") == 0)     return (float)in->repeat_start;
+    if (strcmp(param, "repeatLength") == 0)    return (float)in->repeat_length;
+    if (strcmp(param, "pitchBend") == 0)       return (float)in->pitch_bend;
+    if (strcmp(param, "isSample") == 0)        return (float)in->is_sample;
+    if (strcmp(param, "sampleNumber") == 0)    return (float)in->sample_number;
+
+    // Volume table entries (5)
+    if (strcmp(param, "volSpeed0") == 0)   return (float)in->volume_table[0].speed;
+    if (strcmp(param, "volLevel0") == 0)   return (float)in->volume_table[0].level;
+    if (strcmp(param, "volSustain0") == 0) return (float)in->volume_table[0].sustain;
+    if (strcmp(param, "volSpeed1") == 0)   return (float)in->volume_table[1].speed;
+    if (strcmp(param, "volLevel1") == 0)   return (float)in->volume_table[1].level;
+    if (strcmp(param, "volSustain1") == 0) return (float)in->volume_table[1].sustain;
+    if (strcmp(param, "volSpeed2") == 0)   return (float)in->volume_table[2].speed;
+    if (strcmp(param, "volLevel2") == 0)   return (float)in->volume_table[2].level;
+    if (strcmp(param, "volSustain2") == 0) return (float)in->volume_table[2].sustain;
+    if (strcmp(param, "volSpeed3") == 0)   return (float)in->volume_table[3].speed;
+    if (strcmp(param, "volLevel3") == 0)   return (float)in->volume_table[3].level;
+    if (strcmp(param, "volSustain3") == 0) return (float)in->volume_table[3].sustain;
+    if (strcmp(param, "volSpeed4") == 0)   return (float)in->volume_table[4].speed;
+    if (strcmp(param, "volLevel4") == 0)   return (float)in->volume_table[4].level;
+    if (strcmp(param, "volSustain4") == 0) return (float)in->volume_table[4].sustain;
+
+    // Vibrato table entries (5)
+    if (strcmp(param, "vibSpeed0") == 0)   return (float)in->vibrato_table[0].speed;
+    if (strcmp(param, "vibDelay0") == 0)   return (float)in->vibrato_table[0].delay;
+    if (strcmp(param, "vibSustain0") == 0) return (float)in->vibrato_table[0].sustain;
+    if (strcmp(param, "vibSpeed1") == 0)   return (float)in->vibrato_table[1].speed;
+    if (strcmp(param, "vibDelay1") == 0)   return (float)in->vibrato_table[1].delay;
+    if (strcmp(param, "vibSustain1") == 0) return (float)in->vibrato_table[1].sustain;
+    if (strcmp(param, "vibSpeed2") == 0)   return (float)in->vibrato_table[2].speed;
+    if (strcmp(param, "vibDelay2") == 0)   return (float)in->vibrato_table[2].delay;
+    if (strcmp(param, "vibSustain2") == 0) return (float)in->vibrato_table[2].sustain;
+    if (strcmp(param, "vibSpeed3") == 0)   return (float)in->vibrato_table[3].speed;
+    if (strcmp(param, "vibDelay3") == 0)   return (float)in->vibrato_table[3].delay;
+    if (strcmp(param, "vibSustain3") == 0) return (float)in->vibrato_table[3].sustain;
+    if (strcmp(param, "vibSpeed4") == 0)   return (float)in->vibrato_table[4].speed;
+    if (strcmp(param, "vibDelay4") == 0)   return (float)in->vibrato_table[4].delay;
+    if (strcmp(param, "vibSustain4") == 0) return (float)in->vibrato_table[4].sustain;
+
+    return -1.0f;
+}
+
+void dm2_set_instrument_param(Dm2Module* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param || !module->instruments) return;
+    Dm2Instrument* in = module->instruments[inst];
+    if (!in) return;
+    uint8_t b = (uint8_t)value;
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "sampleLength") == 0)    { in->sample_length = v; return; }
+    if (strcmp(param, "repeatStart") == 0)     { in->repeat_start = v; return; }
+    if (strcmp(param, "repeatLength") == 0)    { in->repeat_length = v; return; }
+    if (strcmp(param, "pitchBend") == 0)       { in->pitch_bend = v; return; }
+    if (strcmp(param, "sampleNumber") == 0)    { in->sample_number = b; return; }
+
+    // Volume table
+    if (strcmp(param, "volSpeed0") == 0)   { in->volume_table[0].speed = b; return; }
+    if (strcmp(param, "volLevel0") == 0)   { in->volume_table[0].level = b; return; }
+    if (strcmp(param, "volSustain0") == 0) { in->volume_table[0].sustain = b; return; }
+    if (strcmp(param, "volSpeed1") == 0)   { in->volume_table[1].speed = b; return; }
+    if (strcmp(param, "volLevel1") == 0)   { in->volume_table[1].level = b; return; }
+    if (strcmp(param, "volSustain1") == 0) { in->volume_table[1].sustain = b; return; }
+    if (strcmp(param, "volSpeed2") == 0)   { in->volume_table[2].speed = b; return; }
+    if (strcmp(param, "volLevel2") == 0)   { in->volume_table[2].level = b; return; }
+    if (strcmp(param, "volSustain2") == 0) { in->volume_table[2].sustain = b; return; }
+    if (strcmp(param, "volSpeed3") == 0)   { in->volume_table[3].speed = b; return; }
+    if (strcmp(param, "volLevel3") == 0)   { in->volume_table[3].level = b; return; }
+    if (strcmp(param, "volSustain3") == 0) { in->volume_table[3].sustain = b; return; }
+    if (strcmp(param, "volSpeed4") == 0)   { in->volume_table[4].speed = b; return; }
+    if (strcmp(param, "volLevel4") == 0)   { in->volume_table[4].level = b; return; }
+    if (strcmp(param, "volSustain4") == 0) { in->volume_table[4].sustain = b; return; }
+
+    // Vibrato table
+    if (strcmp(param, "vibSpeed0") == 0)   { in->vibrato_table[0].speed = b; return; }
+    if (strcmp(param, "vibDelay0") == 0)   { in->vibrato_table[0].delay = b; return; }
+    if (strcmp(param, "vibSustain0") == 0) { in->vibrato_table[0].sustain = b; return; }
+    if (strcmp(param, "vibSpeed1") == 0)   { in->vibrato_table[1].speed = b; return; }
+    if (strcmp(param, "vibDelay1") == 0)   { in->vibrato_table[1].delay = b; return; }
+    if (strcmp(param, "vibSustain1") == 0) { in->vibrato_table[1].sustain = b; return; }
+    if (strcmp(param, "vibSpeed2") == 0)   { in->vibrato_table[2].speed = b; return; }
+    if (strcmp(param, "vibDelay2") == 0)   { in->vibrato_table[2].delay = b; return; }
+    if (strcmp(param, "vibSustain2") == 0) { in->vibrato_table[2].sustain = b; return; }
+    if (strcmp(param, "vibSpeed3") == 0)   { in->vibrato_table[3].speed = b; return; }
+    if (strcmp(param, "vibDelay3") == 0)   { in->vibrato_table[3].delay = b; return; }
+    if (strcmp(param, "vibSustain3") == 0) { in->vibrato_table[3].sustain = b; return; }
+    if (strcmp(param, "vibSpeed4") == 0)   { in->vibrato_table[4].speed = b; return; }
+    if (strcmp(param, "vibDelay4") == 0)   { in->vibrato_table[4].delay = b; return; }
+    if (strcmp(param, "vibSustain4") == 0) { in->vibrato_table[4].sustain = b; return; }
 }
 
 size_t dm2_export(const Dm2Module* module, uint8_t* out, size_t max_size) {

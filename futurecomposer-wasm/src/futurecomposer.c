@@ -1374,9 +1374,84 @@ bool fc_has_ended(const FcModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int fc_get_instrument_count(const FcModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? (int)module->vol_num : 0;
+}
+
+int fc_get_num_patterns(const FcModule* module) {
+    return module ? (int)module->pat_num : 0;
+}
+
+int fc_get_num_sequences(const FcModule* module) {
+    return module ? (int)module->seq_num : 0;
+}
+
+void fc_get_cell(const FcModule* module, int pattern, int row,
+                  uint8_t* note, uint8_t* info) {
+    if (!module || pattern < 0 || pattern >= module->pat_num || row < 0 || row >= 32) {
+        if (note) *note = 0; if (info) *info = 0;
+        return;
+    }
+    const FcPatternRow* pr = &module->patterns[pattern].rows[row];
+    if (note) *note = pr->note;
+    if (info) *info = pr->info;
+}
+
+void fc_set_cell(FcModule* module, int pattern, int row,
+                  uint8_t note, uint8_t info) {
+    if (!module || pattern < 0 || pattern >= module->pat_num || row < 0 || row >= 32) return;
+    FcPatternRow* pr = &module->patterns[pattern].rows[row];
+    pr->note = note;
+    pr->info = info;
+}
+
+void fc_get_sequence(const FcModule* module, int seq, int channel,
+                      uint8_t* pattern, int8_t* transpose, int8_t* sound_transpose, uint8_t* speed) {
+    if (!module || seq < 0 || seq >= module->seq_num || channel < 0 || channel >= 4) {
+        if (pattern) *pattern = 0; if (transpose) *transpose = 0;
+        if (sound_transpose) *sound_transpose = 0; if (speed) *speed = 0;
+        return;
+    }
+    const FcSequence* s = &module->sequences[seq];
+    if (pattern) *pattern = s->voice_seq[channel].pattern;
+    if (transpose) *transpose = s->voice_seq[channel].transpose;
+    if (sound_transpose) *sound_transpose = s->voice_seq[channel].sound_transpose;
+    if (speed) *speed = s->speed;
+}
+
+void fc_set_sequence(FcModule* module, int seq, int channel,
+                      uint8_t pattern, int8_t transpose, int8_t sound_transpose, uint8_t speed) {
+    if (!module || seq < 0 || seq >= module->seq_num || channel < 0 || channel >= 4) return;
+    FcSequence* s = &module->sequences[seq];
+    s->voice_seq[channel].pattern = pattern;
+    s->voice_seq[channel].transpose = transpose;
+    s->voice_seq[channel].sound_transpose = sound_transpose;
+    s->speed = speed;
+}
+
+float fc_get_instrument_param(const FcModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->vol_num || !param) return -1.0f;
+    const FcVolSequence* vs = &module->vol_sequences[inst];
+
+    if (strcmp(param, "speed") == 0)       return (float)vs->speed;
+    if (strcmp(param, "frqNumber") == 0)   return (float)vs->frq_number;
+    if (strcmp(param, "vibSpeed") == 0)    return (float)vs->vib_speed;
+    if (strcmp(param, "vibDepth") == 0)    return (float)vs->vib_depth;
+    if (strcmp(param, "vibDelay") == 0)    return (float)vs->vib_delay;
+
+    return -1.0f;
+}
+
+void fc_set_instrument_param(FcModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->vol_num || !param) return;
+    FcVolSequence* vs = &module->vol_sequences[inst];
+    uint8_t v8 = (uint8_t)value;
+    int8_t sv8 = (int8_t)value;
+
+    if (strcmp(param, "speed") == 0)       { vs->speed = v8; return; }
+    if (strcmp(param, "frqNumber") == 0)   { vs->frq_number = v8; return; }
+    if (strcmp(param, "vibSpeed") == 0)    { vs->vib_speed = sv8; return; }
+    if (strcmp(param, "vibDepth") == 0)    { vs->vib_depth = sv8; return; }
+    if (strcmp(param, "vibDelay") == 0)    { vs->vib_delay = v8; return; }
 }
 
 size_t fc_export(const FcModule* module, uint8_t* out, size_t max_size) {
