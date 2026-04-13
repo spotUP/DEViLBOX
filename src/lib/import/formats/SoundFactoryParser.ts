@@ -813,7 +813,9 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    uadeEditableFileName: filename,
+    // UADE eagleplayer routes by filename — .psf is ambiguous (also PlayStation Sound Format).
+    // Ensure the hint uses psf.* prefix so UADE picks the correct Sound Factory player.
+    uadeEditableFileName: filename.toLowerCase().startsWith('psf.') ? filename : `psf.${filename.replace(/\.psf$/i, '')}`,
     uadePatternLayout,
   };
 }

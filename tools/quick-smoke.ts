@@ -132,6 +132,9 @@ const NO_PATTERNS_OK = new Set([
   'sunvox', 'vgm', 'studio-pixel---piyopiyo',
 ]);
 
+// Skip these — known to crash the browser (empty = none currently)
+const SKIP = new Set<string>([]);
+
 // Expected min channels per format family
 const MIN_CHANNELS: Record<string, number> = {
   'mod': 4, 'protracker': 4, 'pollytracker': 4, 'chiptracker': 4,
@@ -155,6 +158,7 @@ async function main() {
   const trackerUpdates: Record<string, any> = {};
 
   for (const dir of dirs) {
+    if (SKIP.size > 0 && SKIP.has(dir)) { console.log(`  — ${dir.padEnd(24)} SKIPPED (known crasher)`); continue; }
     const files = readdirSync(join(TEST_DIR, dir)).filter(f => !f.startsWith('.'));
     if (!files.length) continue;
     const file = files[0];
