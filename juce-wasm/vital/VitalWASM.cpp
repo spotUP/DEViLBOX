@@ -156,7 +156,8 @@ public:
     }
 
     bool handleCommand(const char* commandType, const uint8_t* data, int length) override {
-        // TODO: Implement wavetable loading, preset loading via handleCommand
+        // Wavetable and preset loading not implemented via handleCommand — parameters are set
+        // individually through setParameter(); full preset recall uses parameter enumeration
         return false;
     }
 

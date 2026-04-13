@@ -276,7 +276,7 @@ void sym_reset_voices(SymSong* song) {
 /* ---- StartSample (ASM lines 39425-39514) ---- */
 
 static void start_sample(SymSong* song, SymVoice* v, SymInstrument* inst,
-                          int32_t freq, uint8_t vol) {
+                          int32_t freq, uint8_t vol, int doSampleDiff) {
     /* ASM: tst.w INSTR_TYPE(a4); bmi StartSample_FASTX */
     if (inst->type < 0) return;
     if (!inst->sampleData || inst->numSamples <= 0) return;
@@ -326,10 +326,32 @@ static void start_sample(SymSong* song, SymVoice* v, SymInstrument* inst,
     /* Set instrument (ASM lines 39458-39469) */
     v->instrument = inst;
     v->instrType = inst->type;
-    v->samplePtr = inst->sampleData;
-    v->retrigPtr = inst->sampleData;
-    v->sampleStartPtr = inst->sampleData;
-    v->sampleEndPtr = inst->sampleData + inst->numSamples;
+
+    if (doSampleDiff && song->sampleDiff > 0) {
+        /* ASM StartSampleSet_DIFFSTART: offset R channel sample start by SAMPLEDIFF.
+         * sampleDiff is in sample units (module stores value, Pro doubles for 16-bit bytes;
+         * our pointers are int16_t* so arithmetic is already in sample units). */
+        int32_t diff = song->sampleDiff;
+        int16_t* offsetPtr = inst->sampleData + diff;
+        int32_t remainingSamples = inst->numSamples - diff;
+        if (remainingSamples > 0) {
+            v->samplePtr = offsetPtr;
+            v->retrigPtr = offsetPtr;
+            v->sampleStartPtr = offsetPtr;
+            v->sampleEndPtr = offsetPtr + remainingSamples;
+        } else {
+            /* ASM BAK_DIFFSTARTERR: fallback to normal start */
+            v->samplePtr = inst->sampleData;
+            v->retrigPtr = inst->sampleData;
+            v->sampleStartPtr = inst->sampleData;
+            v->sampleEndPtr = inst->sampleData + inst->numSamples;
+        }
+    } else {
+        v->samplePtr = inst->sampleData;
+        v->retrigPtr = inst->sampleData;
+        v->sampleStartPtr = inst->sampleData;
+        v->sampleEndPtr = inst->sampleData + inst->numSamples;
+    }
 
     /* ASM: move.b #FALSE,SAMPLE_ENDREACHED */
     v->endReached = 0;
@@ -501,7 +523,7 @@ static void fx_replay_from(SymSong* song, SymVoice* v, uint8_t vol, uint8_t inst
         if (instr_idx < song->numInstruments) {
             SymInstrument* inst = &song->instruments[instr_idx];
             int32_t freq = get_note_freq(song, inst->tune);
-            start_sample(song, v, inst, freq, SYM_VOLUME_MAX);
+            start_sample(song, v, inst, freq, SYM_VOLUME_MAX, 0);
         }
         if (!v->sampleStartPtr || !v->sampleEndPtr) return;
     }
@@ -565,7 +587,7 @@ static void fx_dsp_echo(SymSong* song, uint8_t pitch, uint8_t vol, uint8_t instr
 
 /* ---- Note processing (ASM PlayLineNote, lines 32517-32732) ---- */
 
-static void play_line_note(SymSong* song, int channel, const SymNote* note) {
+static void play_line_note(SymSong* song, int channel, const SymNote* note, int doSampleDiff) {
     SymVoice* v = get_voice(song, channel);
     if (!v) return;
 
@@ -685,7 +707,7 @@ static void play_line_note(SymSong* song, int channel, const SymNote* note) {
         uint8_t vol = note->volume;
         if (vol == 0) vol = SYM_VOLUME_MAX;
 
-        start_sample(song, v, inst, freq, vol);
+        start_sample(song, v, inst, freq, vol, doSampleDiff);
     }
 }
 
@@ -715,7 +737,7 @@ static void play_stereo_pat_line(SymSong* song) {
      * The worklet sends only L channels (even), mapped to pair indices 0..numPairs-1.
      * So our pattern data has numPairs notes per row (one per stereo pair).
      * Both L and R voice channels in a pair play the same note.
-     * TODO: DOSAMPLEDIFF for stereo sample offset on R channel.
+     * R channel gets DOSAMPLEDIFF: sample start offset by song->sampleDiff (ASM lines 32467-32469).
      */
     int numChannels = song->numChannels;
     if (numChannels < 2) numChannels = 2;
@@ -729,11 +751,11 @@ static void play_stereo_pat_line(SymSong* song) {
 
         const SymNote* note = &pat->data[noteIdx];
 
-        /* Play note into left channel */
-        play_line_note(song, lCh, note);
+        /* Play note into left channel (no sample diff) */
+        play_line_note(song, lCh, note, 0);
 
-        /* Play same note into right channel (stereo pair) */
-        play_line_note(song, rCh, note);
+        /* Play same note into right channel with DOSAMPLEDIFF offset */
+        play_line_note(song, rCh, note, 1);
     }
 }
 

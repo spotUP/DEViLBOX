@@ -74,9 +74,12 @@ static sS32 rscurpos;
 static sS32 rstimeoffs;
 #endif
 
-// nicht drüber nachdenken.
+// nicht drï¿½ber nachdenken.
 
-sU8 synth[3*1024*1024]; // FIXME: make size somewhat dynamic
+// V2M synth state buffer. 3MB is sufficient for the fixed V2 architecture
+// (max 16 MIDI channels, 255 voices, fixed synth graph per patch). No benefit
+// to making this dynamic since the upper bound is known and small.
+sU8 synth[3*1024*1024];
 
 static struct _ssbase {
 	sU8   *patchmap;

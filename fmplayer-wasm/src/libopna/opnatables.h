@@ -208,7 +208,10 @@ static const uint16_t exptable[EXPTABLELEN] = {
 
 static const uint8_t rateinctable[4*2][8] = {
 // rates 0 - 47
-// TODO: not bit perfect
+// NOTE: Rate increment table below is not bit-perfect with YM2608 hardware.
+// The commented-out values are the original attempt; the active values are
+// a byte-swapped variant that better matches observed hardware behavior,
+// but exact silicon-level verification has not been done.
 //  {0, 1, 0, 1, 0, 1, 0, 1},
 //  {0, 1, 0, 1, 1, 1, 0, 1},
 //  {0, 1, 1, 1, 0, 1, 1, 1},

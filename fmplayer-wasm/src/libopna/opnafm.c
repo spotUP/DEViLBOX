@@ -118,8 +118,9 @@ static unsigned blkfnum2keycode(unsigned blk, unsigned fnum) {
 #undef F
 
 static void opna_fm_slot_phase(struct opna_fm_slot *slot, unsigned freq) {
-// TODO: detune
-//  freq += slot->dt;
+// Detune: the commented-out simple addition (freq += slot->dt) was an earlier
+// placeholder. The correct detune implementation below uses the hardware detune
+// table (dettable) indexed by detune parameter and keycode, with sign from bit 2.
   unsigned det = dettable[slot->det & 0x3][slot->keycode];
   if (slot->det & 0x4) det = -det;
   freq += det;
@@ -683,7 +684,10 @@ void opna_fm_mix(struct opna_fm *fm, int16_t *buf, unsigned samples,
 #ifdef LIBOPNA_ENABLE_OSCILLO
       if (oscillo) oscillo[c].buf[offset+i] = o.data[0] + o.data[1];
 #endif
-      // TODO: CSM
+      // LIMITATION: CSM (Composite Sine Mode) not implemented.
+      // In CSM mode, TimerA overflow triggers key-on for all ch3 operators,
+      // enabling hardware-timed speech synthesis effects. This code only handles
+      // ch3 special frequency mode (per-operator frequencies), not CSM triggering.
       if (c == 2 && fm->ch3.mode != CH3_MODE_NORMAL) {
         opna_fm_chan_phase_se(&fm->channel[c], fm);
       } else {

@@ -54,14 +54,7 @@ namespace IXS {
       if (numSmpls > 0) {
         while (true) {
           int pos = buf0->pos_0x0;
-          if (buf0->int_0x8 == -1) {
-
-            int loopStart = buf0->smplLoopStart_0x1c;
-            if (pos <= loopStart) {
-              buf0->int_0x8 = 1;
-              buf0->pos_0x0 = 2 * loopStart - pos;
-            }
-          } else {
+          {
             int loopEnd = buf0->smplLoopEnd_0x20;
             if (pos >= loopEnd) {
               int forwardsLoop = buf0->smplForwardLoopFlag_0x18;
@@ -81,11 +74,7 @@ namespace IXS {
           int bn;
           uint hi;
           uint lo;
-          if (buf0->int_0x8 == -1) {
-            bn = -b;
-            hi = (uint64) (((b + (int64) (buf0->pos_0x0 - buf0->smplLoopStart_0x1c)) << 8) - b) >> 32;
-            lo = ((b + buf0->pos_0x0 - buf0->smplLoopStart_0x1c) << 8) - b;
-          } else {
+          {
             bn = b;
             hi = (uint64) (((b + (int64) (buf0->smplLoopEnd_0x20 - buf0->pos_0x0)) << 8) - b) >> 32;
             lo = ((b + buf0->smplLoopEnd_0x20 - buf0->pos_0x0) << 8) - b;
@@ -164,10 +153,6 @@ namespace IXS {
   }
 
   void __thiscall IXS__Mixer2__virt3_2_0040a590(MixerBase *mixer, Buf0x40 *buf) {
-// FIXME: "buf0->int_0x8 == -1" checks seem to be dead code - not one song that seems to be triggering those
-// branches!! is there some 255 vs -1 mismatch? where is this actually updated? in here it is only ever set to
-// 1 or to 255.. ()
-
 // testcase: "Paranoia" uses buf->int_0x8 != 1
 
     Buf0x40 *buf0 = buf;
@@ -193,14 +178,7 @@ namespace IXS {
       for (; numSmpls > 0; ) {
         int pos = buf0->pos_0x0;
 
-        if (buf0->int_0x8 == -1) {
-          // dead code..? todo: might be a sign that something is still wrong with the player logic..
-          int loopStart = buf0->smplLoopStart_0x1c;
-          if (pos <= loopStart) {
-            buf0->int_0x8 = 1;
-            buf0->pos_0x0 = 2 * loopStart - pos;
-          }
-        } else {
+        {
           int loopEnd = buf0->smplLoopEnd_0x20;
           if (pos >= loopEnd) {
             int forwardsLoop = buf0->smplForwardLoopFlag_0x18;
@@ -221,12 +199,7 @@ namespace IXS {
         uint hi;
         uint lo;
 
-        if (buf0->int_0x8 == -1) {
-          // still dead code.. like above
-          bn = -b;
-          hi = (uint64) (((b + (int64) (buf0->pos_0x0 - buf0->smplLoopStart_0x1c)) << 8) - b) >> 32;
-          lo = ((b + buf0->pos_0x0 - buf0->smplLoopStart_0x1c) << 8) - b;
-        } else {
+        {
           bn = b;
           hi = (uint64) (((b + (int64) (buf0->smplLoopEnd_0x20 - buf0->pos_0x0)) << 8) - b) >> 32;
           lo = ((b + buf0->smplLoopEnd_0x20 - buf0->pos_0x0) << 8) - b;

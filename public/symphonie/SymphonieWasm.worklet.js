@@ -314,6 +314,11 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
 
     if (data.cycle) m._player_set_speed(data.cycle);
 
+    // Stereo phase (DOSAMPLEDIFF): R channel sample start offset
+    if (data.sampleDiff > 0 && m._player_set_sample_diff) {
+      m._player_set_sample_diff(data.sampleDiff);
+    }
+
     // Debug: report what we loaded
     const numInst = data.instruments ? data.instruments.length : 0;
     const numPat = data.patterns ? data.patterns.length : 0;
