@@ -112,62 +112,6 @@ const PatternGridMock: React.FC = () => {
   return <canvas ref={ref} width={500} height={240} style={{ width: 500, height: 240, borderRadius: 4 }} />;
 };
 
-const PianoRollMock: React.FC = () => {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = ref.current; if (!c) return;
-    const ctx = c.getContext('2d'); if (!ctx) return;
-    const w = 500, h = 200, keysW = 36;
-    ctx.fillStyle = '#121218'; ctx.fillRect(0, 0, w, h);
-    const BLACK = [1,3,6,8,10];
-    // Piano keys + grid
-    for (let n = 0; n < 24; n++) {
-      const y = n * (h / 24);
-      const noteH = h / 24;
-      const isBlack = BLACK.includes((23 - n) % 12);
-      ctx.fillStyle = isBlack ? '#0a0a0a' : '#141414';
-      ctx.fillRect(0, y, keysW, noteH);
-      ctx.fillStyle = isBlack ? '#161620' : '#1a1a24';
-      ctx.fillRect(keysW, y, w - keysW, noteH);
-      if ((23 - n) % 12 === 0) {
-        ctx.fillStyle = '#44445a'; ctx.font = '7px "JetBrains Mono"';
-        ctx.fillText(`C${Math.floor((23 - n) / 12) + 3}`, 2, y + noteH - 1);
-        ctx.fillStyle = '#2a2a3a'; ctx.fillRect(keysW, y, w - keysW, 1);
-      }
-    }
-    // Beat lines
-    for (let col = 0; col < 32; col++) {
-      const x = keysW + col * ((w - keysW) / 32);
-      ctx.fillStyle = col % 4 === 0 ? '#2a2a3a' : '#1e1e28';
-      ctx.globalAlpha = col % 4 === 0 ? 0.6 : 0.3;
-      ctx.fillRect(x, 0, 1, h - 30); ctx.globalAlpha = 1;
-    }
-    // Notes
-    const notes = [{r:0,n:12,l:4},{r:4,n:16,l:2},{r:8,n:19,l:4},{r:12,n:12,l:3},{r:16,n:14,l:2},{r:20,n:17,l:4},{r:24,n:21,l:3},{r:28,n:19,l:4}];
-    const cellW = (w - keysW) / 32;
-    const noteH = h / 24;
-    notes.forEach(({ r, n, l }) => {
-      const x = keysW + r * cellW, y2 = (23 - n) * noteH, nw = l * cellW - 1;
-      ctx.fillStyle = '#6366f1'; ctx.globalAlpha = 0.7;
-      ctx.beginPath(); ctx.roundRect(x, y2 + 1, nw, noteH - 2, 2); ctx.fill(); ctx.globalAlpha = 1;
-      ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(x, y2 + 1, nw, noteH - 2, 2); ctx.stroke();
-    });
-    // Velocity lane
-    ctx.fillStyle = '#2a2a3a'; ctx.fillRect(keysW, h - 30, w - keysW, 1);
-    notes.forEach(({ r, l }) => {
-      const x = keysW + r * cellW;
-      const vel = 0.4 + Math.random() * 0.5;
-      const velColor = vel > 0.7 ? '#ef4444' : vel > 0.5 ? '#f59e0b' : '#10b981';
-      ctx.fillStyle = velColor; ctx.globalAlpha = 0.6;
-      ctx.fillRect(x, h - vel * 28 - 1, Math.max(2, l * cellW - 2), vel * 28);
-      ctx.globalAlpha = 1;
-    });
-    // Playhead
-    ctx.fillStyle = '#f59e0b'; ctx.fillRect(keysW + 12 * cellW, 0, 2, h);
-  }, []);
-  return <canvas ref={ref} width={500} height={200} style={{ width: 500, height: 200, borderRadius: 4 }} />;
-};
 
 const OrderMatrixMock: React.FC = () => {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -518,8 +462,6 @@ const ProViewMock: React.FC = () => (
 const SPLIT_VIEWS = [
   { id: 'tracker', label: 'Tracker' },
   { id: 'mixer', label: 'Mixer' },
-  { id: 'arrangement', label: 'Arrangement' },
-  { id: 'pianoroll', label: 'Piano Roll' },
   { id: 'dj', label: 'DJ' },
   { id: 'studio', label: 'Studio' },
   { id: 'drumpad', label: 'Pads' },
@@ -845,12 +787,6 @@ export const DesignSystemPage: React.FC = () => {
         <Section title="Pattern Editor" description="Hex-based tracker pattern grid — the core editing surface">
           <Card label="Pattern Grid (DOM — PatternEditorCanvas)" width={520} height={260}>
             <PatternGridMock />
-          </Card>
-        </Section>
-
-        <Section title="Piano Roll" description="DAW-style note editor with velocity lane">
-          <Card label="Piano Roll (DOM + Pixi — PixiGTPianoRoll)" width={520} height={220}>
-            <PianoRollMock />
           </Card>
         </Section>
 

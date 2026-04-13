@@ -1916,7 +1916,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
-      // Global push-to-talk: hold T (any view except tracker/arrangement/pianoroll)
+      // Global push-to-talk: hold T (any view except tracker)
       // or hold Space in DJ/VJ views (Space is play_stop_toggle in tracker but
       // irrelevant in DJ/VJ where deck buttons control playback).
       {

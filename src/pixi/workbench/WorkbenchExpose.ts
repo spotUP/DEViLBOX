@@ -189,10 +189,8 @@ export const BUILTIN_WORKSPACES: Record<string, WorkspaceSnapshot> = {
     windows: {
       tracker:    { x: 40,  y: 40,  width: 900, height: 600, zIndex: 1, visible: true,  minimized: false, maximized: false },
       instrument: { x: 980, y: 40,  width: 700, height: 260, zIndex: 2, visible: true,  minimized: false, maximized: false },
-      pianoroll:  { x: 980, y: 320, width: 700, height: 340, zIndex: 3, visible: false, minimized: false, maximized: false },
-      arrangement:{ x: 40,  y: 680, width: 900, height: 300, zIndex: 4, visible: false, minimized: false, maximized: false },
-      dj:         { x: 40,  y: 40,  width: 1100,height: 500, zIndex: 5, visible: false, minimized: false, maximized: false },
-      vj:         { x: 800, y: 40,  width: 600, height: 400, zIndex: 6, visible: false, minimized: false, maximized: false },
+      dj:         { x: 40,  y: 40,  width: 1100,height: 500, zIndex: 3, visible: false, minimized: false, maximized: false },
+      vj:         { x: 800, y: 40,  width: 600, height: 400, zIndex: 4, visible: false, minimized: false, maximized: false },
     },
   },
   Mix: {
@@ -201,9 +199,7 @@ export const BUILTIN_WORKSPACES: Record<string, WorkspaceSnapshot> = {
       dj:         { x: 40,  y: 40,  width: 1100,height: 500, zIndex: 1, visible: true,  minimized: false, maximized: false },
       tracker:    { x: 40,  y: 580, width: 900, height: 400, zIndex: 2, visible: true,  minimized: false, maximized: false },
       instrument: { x: 980, y: 580, width: 700, height: 260, zIndex: 3, visible: false, minimized: false, maximized: false },
-      pianoroll:  { x: 980, y: 300, width: 700, height: 340, zIndex: 4, visible: false, minimized: false, maximized: false },
-      arrangement:{ x: 40,  y: 980, width: 900, height: 300, zIndex: 5, visible: false, minimized: false, maximized: false },
-      vj:         { x: 800, y: 40,  width: 600, height: 400, zIndex: 6, visible: false, minimized: false, maximized: false },
+      vj:         { x: 800, y: 40,  width: 600, height: 400, zIndex: 4, visible: false, minimized: false, maximized: false },
     },
   },
   Full: {
@@ -211,10 +207,8 @@ export const BUILTIN_WORKSPACES: Record<string, WorkspaceSnapshot> = {
     windows: {
       tracker:    { x: 40,  y: 40,  width: 900, height: 600, zIndex: 1, visible: true, minimized: false, maximized: false },
       instrument: { x: 980, y: 40,  width: 700, height: 260, zIndex: 2, visible: true, minimized: false, maximized: false },
-      pianoroll:  { x: 980, y: 320, width: 700, height: 340, zIndex: 3, visible: true, minimized: false, maximized: false },
-      arrangement:{ x: 40,  y: 680, width: 900, height: 300, zIndex: 4, visible: true, minimized: false, maximized: false },
-      dj:         { x: 980, y: 680, width: 700, height: 300, zIndex: 5, visible: true, minimized: false, maximized: false },
-      vj:         { x: 40,  y: 1020,width: 600, height: 400, zIndex: 6, visible: false, minimized: false, maximized: false },
+      dj:         { x: 980, y: 320, width: 700, height: 300, zIndex: 3, visible: true, minimized: false, maximized: false },
+      vj:         { x: 40,  y: 680, width: 600, height: 400, zIndex: 4, visible: false, minimized: false, maximized: false },
     },
   },
 };

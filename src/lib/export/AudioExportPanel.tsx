@@ -12,7 +12,7 @@ interface AudioExportPanelProps {
   setIsRendering: (v: boolean) => void;
   renderProgress: number;
   setRenderProgress: (v: number) => void;
-  initialScope?: AudioExportScope | 'arrangement';
+  initialScope?: AudioExportScope;
 }
 
 export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
@@ -30,10 +30,10 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
-  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope === 'arrangement' ? 'song' : (initialScope || 'pattern'));
+  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope || 'pattern');
 
   useEffect(() => {
-    if (initialScope) setAudioExportScope(initialScope === 'arrangement' ? 'song' : initialScope);
+    if (initialScope) setAudioExportScope(initialScope);
   }, [initialScope]);
 
   // Register export handler (assigned during render — always has fresh closure)

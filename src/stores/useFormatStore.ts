@@ -834,7 +834,7 @@ export const useFormatStore = create<FormatStore>()(
       });
       // Ensure the tracker window is in tracker sub-view for all custom editor
       // modes — they render inside viewMode === 'tracker'. Without this, loading
-      // a GoatTracker file while on 'grid' or 'pianoroll' would leave the custom
+      // a GoatTracker file while on 'grid' would leave the custom
       // editor invisible until the user manually switched views.
       if (newEditorMode !== 'classic') {
         useUIStore.getState().setTrackerViewMode('tracker');
