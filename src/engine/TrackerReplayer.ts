@@ -348,7 +348,18 @@ export interface TrackerSong {
   coreDesignFileData?: ArrayBuffer;
   /** Raw David Whittaker binary for DavidWhittakerEngine WASM playback */
   davidWhittakerFileData?: ArrayBuffer;
-  /** Raw file binary for UADE playback of editable formats (native parser provides patterns, UADE provides audio) */
+  /** Raw Sound Control binary for SoundControlEngine WASM playback */
+  soundControlFileData?: ArrayBuffer;
+  /** Raw Delta Music 1.0 binary for DeltaMusic1Engine WASM playback */
+  deltaMusic1FileData?: ArrayBuffer;
+  /** Raw Delta Music 2.0 binary for DeltaMusic2Engine WASM playback */
+  deltaMusic2FileData?: ArrayBuffer;
+  /** Raw SoundFx binary for SoundFxEngine WASM playback */
+  soundFxFileData?: ArrayBuffer;
+  /** Raw Game Music Creator binary for GmcEngine WASM playback */
+  gmcFileData?: ArrayBuffer;
+  /** Raw Voodoo Supreme binary for VoodooEngine WASM playback */
+  voodooFileData?: ArrayBuffer;  /** Raw file binary for UADE playback of editable formats (native parser provides patterns, UADE provides audio) */
   uadeEditableFileData?: ArrayBuffer;
   /** Original filename hint for UADE format detection */
   uadeEditableFileName?: string;

@@ -74,6 +74,12 @@ interface FormatStore {
   digMugFileData: ArrayBuffer | null;
   coreDesignFileData: ArrayBuffer | null;
   davidWhittakerFileData: ArrayBuffer | null;
+  soundControlFileData: ArrayBuffer | null;
+  deltaMusic1FileData: ArrayBuffer | null;
+  deltaMusic2FileData: ArrayBuffer | null;
+  soundFxFileData: ArrayBuffer | null;
+  gmcFileData: ArrayBuffer | null;
+  voodooFileData: ArrayBuffer | null;
   bdFileData: ArrayBuffer | null;
   sd2FileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
@@ -340,7 +346,12 @@ export const useFormatStore = create<FormatStore>()(
     digMugFileData: null,
     coreDesignFileData: null,
     davidWhittakerFileData: null,
-    bdFileData: null,
+    soundControlFileData: null,
+    deltaMusic1FileData: null,
+    deltaMusic2FileData: null,
+    soundFxFileData: null,
+    gmcFileData: null,
+    voodooFileData: null,    bdFileData: null,
     sd2FileData: null,
     symphonieFileData: null,
     v2mFileData: null,
@@ -756,7 +767,12 @@ export const useFormatStore = create<FormatStore>()(
         state.digMugFileData = (song as any).digMugFileData ?? null;
         state.coreDesignFileData = (song as any).coreDesignFileData ?? null;
         state.davidWhittakerFileData = (song as any).davidWhittakerFileData ?? null;
-        state.bdFileData = (song as any).bdFileData ?? null;
+        state.soundControlFileData = (song as any).soundControlFileData ?? null;
+        state.deltaMusic1FileData = (song as any).deltaMusic1FileData ?? null;
+        state.deltaMusic2FileData = (song as any).deltaMusic2FileData ?? null;
+        state.soundFxFileData = (song as any).soundFxFileData ?? null;
+        state.gmcFileData = (song as any).gmcFileData ?? null;
+        state.voodooFileData = (song as any).voodooFileData ?? null;        state.bdFileData = (song as any).bdFileData ?? null;
         state.sd2FileData = (song as any).sd2FileData ?? null;
         state.symphonieFileData = (song as any).symphonieFileData ?? null;
         state.v2mFileData = (song as any).v2mFileData ?? null;
@@ -1014,7 +1030,12 @@ export const useFormatStore = create<FormatStore>()(
       state.digMugFileData = null;
       state.coreDesignFileData = null;
       state.davidWhittakerFileData = null;
-      state.bdFileData = null;
+      state.soundControlFileData = null;
+      state.deltaMusic1FileData = null;
+      state.deltaMusic2FileData = null;
+      state.soundFxFileData = null;
+      state.gmcFileData = null;
+      state.voodooFileData = null;      state.bdFileData = null;
       state.sd2FileData = null;
       state.symphonieFileData = null;
       state.v2mFileData = null;
