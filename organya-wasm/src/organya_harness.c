@@ -97,7 +97,21 @@ EXPORT void organya_set_channel_gain(int ch, float gain) {
     }
 }
 
+/* ---- Soundbank state ---- */
+static uint8_t *g_soundbank_data = NULL;
+static uint32_t g_soundbank_size = 0;
+
 /* ---- Public API ---- */
+
+EXPORT int organya_load_soundbank(const uint8_t *data, uint32_t size) {
+    /* Cache the soundbank so it can be applied on each init */
+    if (g_soundbank_data) { free(g_soundbank_data); g_soundbank_data = NULL; }
+    g_soundbank_data = (uint8_t *)malloc(size);
+    if (!g_soundbank_data) return -1;
+    memcpy(g_soundbank_data, data, size);
+    g_soundbank_size = size;
+    return 0;
+}
 
 EXPORT int organya_init(const uint8_t *data, uint32_t size) {
     if (g_song_loaded) {
@@ -115,7 +129,16 @@ EXPORT int organya_init(const uint8_t *data, uint32_t size) {
 
     organya_context_set_sample_rate(&g_ctx, g_sample_rate);
     organya_context_set_interpolation(&g_ctx, ORG_INTERPOLATION_LAGRANGE);
-    generate_default_wavetable(&g_ctx);
+
+    /* Load soundbank if available, otherwise use procedural waveforms */
+    if (g_soundbank_data && g_soundbank_size > 0) {
+        res = organya_context_read_soundbank(&g_ctx, g_soundbank_data, g_soundbank_size);
+        if (res != ORG_RESULT_SUCCESS) {
+            generate_default_wavetable(&g_ctx);
+        }
+    } else {
+        generate_default_wavetable(&g_ctx);
+    }
 
     res = organya_context_read_song(&g_ctx, data, size);
     if (res != ORG_RESULT_SUCCESS) return -2;

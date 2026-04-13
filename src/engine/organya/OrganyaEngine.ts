@@ -11,6 +11,7 @@ export class OrganyaEngine {
   private static instance: OrganyaEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
   private static jsCode: string | null = null;
+  private static soundbankData: ArrayBuffer | null = null;
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
@@ -74,9 +75,10 @@ export class OrganyaEngine {
       }
 
       if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
+        const [wasmResponse, jsResponse, sbResponse] = await Promise.all([
           fetch(`${baseUrl}organya/Organya.wasm`),
           fetch(`${baseUrl}organya/Organya.js`),
+          !this.soundbankData ? fetch(`${baseUrl}organya/wave100.wdb`) : Promise.resolve(null),
         ]);
 
         if (wasmResponse.ok) {
@@ -91,6 +93,10 @@ export class OrganyaEngine {
             .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
             .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
           this.jsCode = code;
+        }
+        if (sbResponse && sbResponse.ok && !this.soundbankData) {
+          this.soundbankData = await sbResponse.arrayBuffer();
+          console.log('[OrganyaEngine] Loaded wave100.wdb soundbank:', this.soundbankData.byteLength, 'bytes');
         }
       }
 
@@ -114,6 +120,12 @@ export class OrganyaEngine {
       switch (data.type) {
         case 'ready':
           console.log('[OrganyaEngine] WASM ready');
+          // Send soundbank before resolving init so loadTune() can use it
+          if (OrganyaEngine.soundbankData && this.workletNode) {
+            this.workletNode.port.postMessage(
+              { type: 'loadSoundbank', soundbankData: OrganyaEngine.soundbankData },
+            );
+          }
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
