@@ -241,7 +241,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
       fmt.jamCrackerFileData || fmt.futurePlayerFileData || fmt.preTrackerFileData ||
       fmt.maFileData || fmt.hippelFileData || fmt.sonixFileData || fmt.pxtoneFileData ||
       fmt.organyaFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
-      fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.bdFileData ||
+      fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
       fmt.sd2FileData || fmt.symphonieFileData
     );
     if (!hasNative) return null;

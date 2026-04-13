@@ -18,7 +18,7 @@ const BINARY_FILE_DATA_FIELDS = [
   'maFileData', 'hippelFileData', 'sonixFileData', 'pxtoneFileData', 'organyaFileData',
   'eupFileData', 'ixsFileData', 'psycleFileData', 'sc68FileData', 'zxtuneFileData',
   'pumaTrackerFileData', 'steveTurnerFileData', 'sidmon1WasmFileData',
-  'fredEditorWasmFileData', 'artOfNoiseFileData', 'startrekkerAMFileData',
+  'fredEditorWasmFileData', 'artOfNoiseFileData', 'qsfFileData', 'startrekkerAMFileData',
   'bdFileData', 'sd2FileData', 'symphonieFileData', 'uadeEditableFileData',
   'libopenmptFileData',
 ] as const;

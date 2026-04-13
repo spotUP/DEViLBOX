@@ -1925,7 +1925,7 @@ export async function exportWav(params: Record<string, unknown>): Promise<Record
       fmt.sonixFileData || fmt.pxtoneFileData || fmt.organyaFileData ||
       fmt.eupFileData || fmt.ixsFileData || fmt.psycleFileData ||
       fmt.sc68FileData || fmt.zxtuneFileData || fmt.pumaTrackerFileData ||
-      fmt.artOfNoiseFileData || fmt.bdFileData || fmt.sd2FileData ||
+      fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData || fmt.sd2FileData ||
       fmt.symphonieFileData || fmt.goatTrackerData
     );
     const isToneOnly = !hasNativeEngine && instruments.every(

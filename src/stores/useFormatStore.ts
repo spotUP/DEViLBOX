@@ -65,6 +65,8 @@ interface FormatStore {
   sidmon1WasmFileData: ArrayBuffer | null;
   fredEditorWasmFileData: ArrayBuffer | null;
   artOfNoiseFileData: ArrayBuffer | null;
+  fmplayerFileData: ArrayBuffer | null;
+  qsfFileData: ArrayBuffer | null;
   startrekkerAMFileData: ArrayBuffer | null;
   bdFileData: ArrayBuffer | null;
   sd2FileData: ArrayBuffer | null;
@@ -322,6 +324,8 @@ export const useFormatStore = create<FormatStore>()(
     sidmon1WasmFileData: null,
     fredEditorWasmFileData: null,
     artOfNoiseFileData: null,
+    fmplayerFileData: null,
+    qsfFileData: null,
     startrekkerAMFileData: null,
     bdFileData: null,
     sd2FileData: null,
@@ -729,6 +733,8 @@ export const useFormatStore = create<FormatStore>()(
         state.sidmon1WasmFileData = (song as any).sidmon1WasmFileData ?? null;
         state.fredEditorWasmFileData = (song as any).fredEditorWasmFileData ?? null;
         state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
+        state.fmplayerFileData = (song as any).fmplayerFileData ?? null;
+        state.qsfFileData = (song as any).qsfFileData ?? null;
         state.startrekkerAMFileData = (song as any).startrekkerAMFileData ?? null;
         state.bdFileData = (song as any).bdFileData ?? null;
         state.sd2FileData = (song as any).sd2FileData ?? null;
@@ -978,6 +984,8 @@ export const useFormatStore = create<FormatStore>()(
       state.sidmon1WasmFileData = null;
       state.fredEditorWasmFileData = null;
       state.artOfNoiseFileData = null;
+      state.fmplayerFileData = null;
+      state.qsfFileData = null;
       state.startrekkerAMFileData = null;
       state.bdFileData = null;
       state.sd2FileData = null;
