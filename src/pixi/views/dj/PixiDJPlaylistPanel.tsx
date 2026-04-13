@@ -3,7 +3,8 @@
  *
  * GL port of src/components/dj/DJPlaylistPanel.tsx.
  * Features: playlist CRUD, track list with deck-load buttons, reorder controls,
- * multi-select, keyboard nav, search, sort, clone, undo/redo, confirmations.
+ * multi-select, keyboard nav (arrows/Enter/Delete/Cmd+A/Z), type-to-filter search,
+ * sort, clone, undo/redo, confirmations, move/copy between playlists.
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -33,6 +34,7 @@ const PANEL_H = 340;
 const HEADER_H = 30;
 const TABS_H = 28;
 const TOOLBAR_H = 28;
+const SEARCH_H = 22;
 const PAD = 6;
 const ACCEPT_AUDIO = 'audio/*,.mod,.xm,.s3m,.it,.mptm,.stm,.669,.med,.oct,.okt,.far,.ult,.dmf,.fur';
 
@@ -77,9 +79,15 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
   const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
   const clonePlaylist = useDJPlaylistStore((s) => s.clonePlaylist);
   const selectedTrackIndices = useDJPlaylistStore((s) => s.selectedTrackIndices);
+  const focusedTrackIndex = useDJPlaylistStore((s) => s.focusedTrackIndex);
   const selectTrack = useDJPlaylistStore((s) => s.selectTrack);
+  const selectTrackRange = useDJPlaylistStore((s) => s.selectTrackRange);
+  const selectAllTracks = useDJPlaylistStore((s) => s.selectAllTracks);
   const clearSelection = useDJPlaylistStore((s) => s.clearSelection);
+  const setFocusedTrack = useDJPlaylistStore((s) => s.setFocusedTrack);
   const removeSelectedTracks = useDJPlaylistStore((s) => s.removeSelectedTracks);
+  const moveSelectedTracks = useDJPlaylistStore((s) => s.moveSelectedTracks);
+  const copySelectedTracks = useDJPlaylistStore((s) => s.copySelectedTracks);
   const canUndo = useDJPlaylistStore((s) => s.canUndo);
   const canRedo = useDJPlaylistStore((s) => s.canRedo);
   const undo = useDJPlaylistStore((s) => s.undo);
@@ -92,7 +100,11 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [showSort, setShowSort] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showMoveMenu, setShowMoveMenu] = useState<'move' | 'copy' | null>(null);
   const lastClickedRef = useRef(-1);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTrackRef = useRef<((track: PlaylistTrack, deckId: DeckId) => Promise<void>) | undefined>(undefined);
 
   // Sync PixiList selection with store
   useEffect(() => {
@@ -104,6 +116,135 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
       }
     }
   }, [selectedTrackId, activePlaylist, selectedTrackIndices, selectTrack]);
+
+  // ── Search / filter ───────────────────────────────────────────────────────
+
+  const filteredTracks = useMemo(() => {
+    if (!activePlaylist || !searchQuery.trim()) return activePlaylist?.tracks ?? [];
+    const q = searchQuery.toLowerCase();
+    return activePlaylist.tracks.filter((t) =>
+      t.trackName.toLowerCase().includes(q) ||
+      t.fileName.toLowerCase().includes(q) ||
+      t.format.toLowerCase().includes(q) ||
+      (t.musicalKey && t.musicalKey.toLowerCase().includes(q))
+    );
+  }, [activePlaylist, searchQuery]);
+
+  const isFiltered = searchQuery.trim().length > 0;
+
+  // ── Keyboard navigation ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const handler = (e: KeyboardEvent) => {
+      // Don't capture when typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const tracks = filteredTracks;
+      const trackCount = tracks.length;
+      if (!activePlaylist || !activePlaylistId) return;
+
+      const isMeta = e.metaKey || e.ctrlKey;
+
+      switch (e.key) {
+        case 'ArrowDown': {
+          e.preventDefault();
+          const next = Math.min(focusedTrackIndex + 1, trackCount - 1);
+          if (e.shiftKey) {
+            selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, next);
+          } else {
+            selectTrack(next);
+            lastClickedRef.current = next;
+          }
+          setFocusedTrack(next);
+          // Sync PixiList selection
+          if (tracks[next]) setSelectedTrackId(tracks[next].id);
+          break;
+        }
+        case 'ArrowUp': {
+          e.preventDefault();
+          const prev = Math.max(focusedTrackIndex - 1, 0);
+          if (e.shiftKey) {
+            selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, prev);
+          } else {
+            selectTrack(prev);
+            lastClickedRef.current = prev;
+          }
+          setFocusedTrack(prev);
+          if (tracks[prev]) setSelectedTrackId(tracks[prev].id);
+          break;
+        }
+        case 'Enter': {
+          e.preventDefault();
+          if (focusedTrackIndex >= 0 && focusedTrackIndex < trackCount) {
+            const track = tracks[focusedTrackIndex];
+            if (track && loadTrackRef.current) {
+              const decks = useDJStore.getState().decks;
+              const deckId = !decks.A.isPlaying ? 'A' : !decks.B.isPlaying ? 'B' : 'A';
+              loadTrackRef.current(track, deckId as DeckId);
+            }
+          }
+          break;
+        }
+        case 'Delete':
+        case 'Backspace': {
+          if (selectedTrackIndices.length > 0 && trackCount > 0) {
+            e.preventDefault();
+            if (selectedTrackIndices.length > 3) {
+              showConfirm({
+                title: 'Remove Tracks',
+                message: `Remove ${selectedTrackIndices.length} selected tracks?`,
+                confirmLabel: 'Remove',
+                danger: true,
+              }).then((confirmed) => {
+                if (confirmed) removeSelectedTracks(activePlaylistId);
+              });
+            } else {
+              removeSelectedTracks(activePlaylistId);
+            }
+          }
+          break;
+        }
+        case 'a': {
+          if (isMeta) { e.preventDefault(); selectAllTracks(); }
+          break;
+        }
+        case 'z': {
+          if (isMeta) {
+            e.preventDefault();
+            if (e.shiftKey) { if (canRedo) redo(); }
+            else { if (canUndo) undo(); }
+          }
+          break;
+        }
+        case 'Escape': {
+          if (searchQuery) {
+            setSearchQuery('');
+          } else {
+            clearSelection();
+          }
+          break;
+        }
+        default: {
+          // Type-to-filter: single printable character starts/extends search
+          if (e.key.length === 1 && !isMeta && !e.altKey) {
+            setSearchQuery((prev) => prev + e.key);
+            // Clear search after 1.5s of no typing
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = setTimeout(() => setSearchQuery(''), 1500);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [visible, activePlaylist, activePlaylistId, filteredTracks, focusedTrackIndex, selectedTrackIndices, searchQuery, canUndo, canRedo, selectTrack, selectTrackRange, setFocusedTrack, selectAllTracks, clearSelection, removeSelectedTracks, undo, redo]);
 
   // ── Playlist CRUD ──────────────────────────────────────────────────────────
 
@@ -207,6 +348,7 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     [],
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const loadTrackToDeck = useCallback(
     async (track: PlaylistTrack, deckId: DeckId) => {
       const engine = getDJEngine();
@@ -253,6 +395,9 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     [loadSongToDeck],
   );
 
+  // Keep ref in sync for keyboard handler
+  loadTrackRef.current = loadTrackToDeck;
+
   // ── Reorder helpers ────────────────────────────────────────────────────────
 
   const handleMoveUp = useCallback(
@@ -293,6 +438,23 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     removeSelectedTracks(activePlaylistId);
   }, [activePlaylistId, selectedTrackIndices, removeSelectedTracks]);
 
+  // ── Move/Copy to playlist ─────────────────────────────────────────────────
+
+  const otherPlaylists = useMemo(
+    () => playlists.filter((p) => p.id !== activePlaylistId),
+    [playlists, activePlaylistId],
+  );
+
+  const handleMoveToPlaylist = useCallback((targetId: string) => {
+    if (activePlaylistId) moveSelectedTracks(activePlaylistId, targetId);
+    setShowMoveMenu(null);
+  }, [activePlaylistId, moveSelectedTracks]);
+
+  const handleCopyToPlaylist = useCallback((targetId: string) => {
+    if (activePlaylistId) copySelectedTracks(activePlaylistId, targetId);
+    setShowMoveMenu(null);
+  }, [activePlaylistId, copySelectedTracks]);
+
   // ── Sort ───────────────────────────────────────────────────────────────────
 
   const handleSort = useCallback((mode: 'smart' | 'bpm' | 'bpm-desc' | 'key' | 'energy' | 'name') => {
@@ -318,23 +480,27 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
 
   const trackListItems = useMemo(() => {
     if (!activePlaylist) return [];
-    return activePlaylist.tracks.map((t, i) => ({
-      id: t.id,
-      label: `${(i + 1).toString().padStart(2, ' ')}  ${t.played ? '[P] ' : ''}${t.trackName}`,
-      sublabel: trackSublabel(t),
-      iconName: 'diskio',
-      iconColor: t.played ? theme.success.color : undefined,
-      selected: selectedSet.has(i),
-      actions: [
-        { label: '1', color: DECK_A, onClick: () => loadTrackToDeck(t, 'A') },
-        { label: '2', color: DECK_B, onClick: () => loadTrackToDeck(t, 'B') },
-        ...(thirdDeckActive ? [{ label: '3', color: DECK_C, onClick: () => loadTrackToDeck(t, 'C' as DeckId) }] : []),
-        { label: '\u25b2', color: 0x666666, onClick: () => handleMoveUp(i) },
-        { label: '\u25bc', color: 0x666666, onClick: () => handleMoveDown(i) },
-        { label: 'X', color: 0x666666, onClick: () => handleRemoveTrack(i) },
-      ],
-    }));
-  }, [activePlaylist, thirdDeckActive, selectedSet, loadTrackToDeck, handleMoveUp, handleMoveDown, handleRemoveTrack, theme.success.color]);
+    const tracks = isFiltered ? filteredTracks : activePlaylist.tracks;
+    return tracks.map((t, i) => {
+      const realIndex = isFiltered ? activePlaylist.tracks.indexOf(t) : i;
+      return {
+        id: t.id,
+        label: `${(realIndex + 1).toString().padStart(2, ' ')}  ${t.played ? '[P] ' : ''}${t.trackName}`,
+        sublabel: trackSublabel(t),
+        iconName: 'diskio',
+        iconColor: t.played ? theme.success.color : undefined,
+        selected: selectedSet.has(realIndex),
+        actions: [
+          { label: '1', color: DECK_A, onClick: () => loadTrackToDeck(t, 'A') },
+          { label: '2', color: DECK_B, onClick: () => loadTrackToDeck(t, 'B') },
+          ...(thirdDeckActive ? [{ label: '3', color: DECK_C, onClick: () => loadTrackToDeck(t, 'C' as DeckId) }] : []),
+          { label: '\u25b2', color: 0x666666, onClick: () => handleMoveUp(realIndex) },
+          { label: '\u25bc', color: 0x666666, onClick: () => handleMoveDown(realIndex) },
+          { label: 'X', color: 0x666666, onClick: () => handleRemoveTrack(realIndex) },
+        ],
+      };
+    });
+  }, [activePlaylist, isFiltered, filteredTracks, thirdDeckActive, selectedSet, loadTrackToDeck, handleMoveUp, handleMoveDown, handleRemoveTrack, theme.success.color]);
 
   // Find selected track index
   const selectedIdx = useMemo(() => {
@@ -344,7 +510,8 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
 
   // ── Dimensions ─────────────────────────────────────────────────────────────
 
-  const listH = PANEL_H - HEADER_H - TABS_H - TOOLBAR_H - PAD * 4;
+  const extraRows = (showSort ? 24 : 0) + (isFiltered ? SEARCH_H : 0) + (showMoveMenu ? 80 : 0);
+  const listH = PANEL_H - HEADER_H - TABS_H - TOOLBAR_H - extraRows - PAD * 4;
 
   if (!visible) return null;
 
@@ -422,7 +589,7 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         </layoutContainer>
       )}
 
-      {/* ── Toolbar: Add + sort + selection actions ─────────────────────── */}
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       {activePlaylist && (
         <layoutContainer
           layout={{
@@ -441,20 +608,17 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
             disabled={isLoadingFile}
             onClick={handleAddTracks}
           />
-
-          {/* Sort buttons */}
-          <PixiButton
-            label="Sort"
-            variant="ghost"
-            size="sm"
-            width={40}
-            height={22}
-            onClick={() => setShowSort((v) => !v)}
-          />
+          <PixiButton label="Sort" variant="ghost" size="sm" width={40} height={22} onClick={() => setShowSort((v) => !v)} />
 
           {selectedTrackIndices.length > 1 && (
             <>
               <PixiLabel text={`${selectedTrackIndices.length} sel`} size="xs" color="accent" />
+              {otherPlaylists.length > 0 && (
+                <>
+                  <PixiButton label="Move" variant="ghost" size="sm" width={40} height={22} onClick={() => setShowMoveMenu((v) => v === 'move' ? null : 'move')} />
+                  <PixiButton label="Copy" variant="ghost" size="sm" width={40} height={22} onClick={() => setShowMoveMenu((v) => v === 'copy' ? null : 'copy')} />
+                </>
+              )}
               <PixiButton label="Del sel" variant="ghost" size="sm" width={50} height={22} color="red" onClick={handleRemoveSelected} />
               <PixiButton label="Clear" variant="ghost" size="sm" width={42} height={22} onClick={clearSelection} />
             </>
@@ -478,7 +642,7 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         </layoutContainer>
       )}
 
-      {/* ── Sort buttons row ────────────────────────────────────────────── */}
+      {/* ── Sort row ────────────────────────────────────────────────────── */}
       {showSort && activePlaylist && (
         <layoutContainer layout={{ height: 24, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
           <PixiButton label="Smart" variant="ft2" size="sm" width={48} height={20} onClick={() => handleSort('smart')} />
@@ -489,9 +653,36 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         </layoutContainer>
       )}
 
+      {/* ── Move/Copy target selector ───────────────────────────────────── */}
+      {showMoveMenu && otherPlaylists.length > 0 && (
+        <layoutContainer layout={{ height: 80, flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+          <PixiLabel text={showMoveMenu === 'move' ? 'Move to:' : 'Copy to:'} size="xs" color="textMuted" />
+          <layoutContainer layout={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap' as unknown as undefined }}>
+            {otherPlaylists.map((pl) => (
+              <PixiButton
+                key={pl.id}
+                label={pl.name}
+                variant="ft2"
+                size="sm"
+                height={20}
+                onClick={() => showMoveMenu === 'move' ? handleMoveToPlaylist(pl.id) : handleCopyToPlaylist(pl.id)}
+              />
+            ))}
+          </layoutContainer>
+        </layoutContainer>
+      )}
+
+      {/* ── Search indicator ────────────────────────────────────────────── */}
+      {isFiltered && (
+        <layoutContainer layout={{ height: SEARCH_H, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <PixiLabel text={`Filter: "${searchQuery}" \u2014 ${filteredTracks.length} of ${activePlaylist?.tracks.length ?? 0}`} size="xs" color="textMuted" />
+          <PixiButton label="Clear" variant="ghost" size="sm" width={36} height={18} onClick={() => setSearchQuery('')} />
+        </layoutContainer>
+      )}
+
       {/* ── Track list ──────────────────────────────────────────────────── */}
       {activePlaylist ? (
-        activePlaylist.tracks.length > 0 ? (
+        trackListItems.length > 0 ? (
           <PixiList
             items={trackListItems}
             width={600}
@@ -502,16 +693,12 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
             layout={{ flex: 1 }}
           />
         ) : (
-          <layoutContainer
-            layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-          >
-            <PixiLabel text="Empty playlist \u2014 add tracks above" size="xs" color="textMuted" />
+          <layoutContainer layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <PixiLabel text={isFiltered ? 'No tracks match' : 'Empty playlist \u2014 add tracks above'} size="xs" color="textMuted" />
           </layoutContainer>
         )
       ) : (
-        <layoutContainer
-          layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
+        <layoutContainer layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <PixiLabel text="Create a playlist to get started" size="xs" color="textMuted" />
         </layoutContainer>
       )}
