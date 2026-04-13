@@ -103,7 +103,7 @@ export async function parseZxtuneFile(
       rows: emptyRows,
     })),
     importMetadata: {
-      sourceFormat: 'MOD' as const,
+      sourceFormat: 'ZXTune' as const,
       sourceFile: fileName,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,

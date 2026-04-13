@@ -76,7 +76,7 @@ export async function parsePsycleFile(
       rows: emptyRows,
     })),
     importMetadata: {
-      sourceFormat: 'MOD' as const,
+      sourceFormat: 'Psycle' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,

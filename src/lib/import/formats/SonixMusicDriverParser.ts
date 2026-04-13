@@ -482,7 +482,7 @@ function buildPatterns(
       length: patLen,
       channels,
       importMetadata: {
-        sourceFormat:          'MOD' as const,
+        sourceFormat:          'Sonix' as const,
         sourceFile:            filename,
         importedAt:            new Date().toISOString(),
         originalChannelCount:  numChannels,

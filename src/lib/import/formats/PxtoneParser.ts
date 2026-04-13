@@ -266,7 +266,7 @@ export async function parsePxtoneFile(
       rows: emptyRows,
     })),
     importMetadata: {
-      sourceFormat: 'MOD' as const,
+      sourceFormat: 'PxTone' as const,
       sourceFile: fileName,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,
