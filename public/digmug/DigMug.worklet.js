@@ -1,12 +1,13 @@
 /**
  * DigMug.worklet.js — AudioWorklet processor for DigMug WASM replayer
- * Whole-song replayer: dm_create() loads module, dm_render() produces audio.
+ * Whole-song replayer with per-channel output for oscilloscope.
  */
 class DigMugProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.module = null;
     this.handle = 0;
+    this.chPtrs = [0, 0, 0, 0];
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
     this.initialized = false;
@@ -14,6 +15,7 @@ class DigMugProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this._oscCounter = 0;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
@@ -95,7 +97,10 @@ class DigMugProcessor extends AudioWorkletProcessor {
       if (wasmBinary) config.wasmBinary = wasmBinary;
       try { this.module = await globalThis.createDigMug(config); } finally { WebAssembly.instantiate = origInstantiate; }
       if (!this.module.wasmMemory && capturedMemory) this.module.wasmMemory = capturedMemory;
+      // Allocate interleaved stereo + 4 per-channel mono buffers
+      const frameBytes = this.bufferSize * 4; // float32
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
+      for (let i = 0; i < 4; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
       if (!this.interleavedPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' }); return; }
       this.updateBufferViews();
       this.initialized = true;
@@ -110,14 +115,21 @@ class DigMugProcessor extends AudioWorkletProcessor {
     if (!heapF32) return;
     if (this.lastHeapBuffer !== heapF32.buffer) {
       this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
+      this.chBufs = [];
+      for (let i = 0; i < 4; i++) {
+        this.chBufs[i] = new Float32Array(heapF32.buffer, this.chPtrs[i], this.bufferSize);
+      }
       this.lastHeapBuffer = heapF32.buffer;
     }
   }
 
   cleanup() {
     if (this.module && this.handle) { this.module._dm_destroy(this.handle); this.handle = 0; }
-    if (this.module && this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
-    this.interleavedBuf = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
+    if (this.module) {
+      if (this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
+      for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
+    }
+    this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
 
   process(inputs, outputs) {
@@ -128,11 +140,37 @@ class DigMugProcessor extends AudioWorkletProcessor {
     if (!outputL || !outputR) return true;
     const numSamples = Math.min(outputL.length, this.bufferSize);
     this.updateBufferViews();
-    if (this.interleavedBuf) {
-      const rendered = this.module._dm_render(this.handle, this.interleavedPtr, numSamples);
-      if (rendered > 0) { for (let i = 0; i < rendered; i++) { outputL[i] = this.interleavedBuf[i * 2]; outputR[i] = this.interleavedBuf[i * 2 + 1]; } }
-      if (this.module._dm_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
+    if (!this.chBufs) return true;
+
+    // Render per-channel
+    const rendered = this.module._dm_render_multi(
+      this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
+
+    if (rendered > 0) {
+      // Mix to stereo: channels 0,3 → left; channels 1,2 → right (Amiga panning)
+      for (let i = 0; i < rendered; i++) {
+        outputL[i] = this.chBufs[0][i] + this.chBufs[3][i];
+        outputR[i] = this.chBufs[1][i] + this.chBufs[2][i];
+      }
+
+      // Send oscilloscope data every ~8 renders (~23ms at 128 frames/48kHz)
+      this._oscCounter++;
+      if (this._oscCounter >= 8) {
+        this._oscCounter = 0;
+        const oscSize = Math.min(256, rendered);
+        const channels = [];
+        for (let ch = 0; ch < 4; ch++) {
+          const arr = new Int16Array(oscSize);
+          for (let i = 0; i < oscSize; i++) {
+            arr[i] = Math.max(-32768, Math.min(32767, Math.round(this.chBufs[ch][i] * 32767)));
+          }
+          channels.push(arr);
+        }
+        this.port.postMessage({ type: 'oscData', channels });
+      }
     }
+
+    if (this.module._dm_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });
     return true;
   }
 }

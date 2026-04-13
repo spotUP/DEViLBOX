@@ -6,7 +6,7 @@ echo "=== DavidWhittaker WASM Build ==="
 mkdir -p "$OUT_DIR"
 emcc -O2 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/davidwhittaker.c" \
-    -sEXPORTED_FUNCTIONS="['_dw_create','_dw_destroy','_dw_subsong_count','_dw_select_subsong','_dw_channel_count','_dw_set_channel_mask','_dw_render','_dw_has_ended','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_dw_create','_dw_destroy','_dw_subsong_count','_dw_select_subsong','_dw_channel_count','_dw_set_channel_mask','_dw_render','_dw_render_multi','_dw_has_ended','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createDavidWhittaker -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=4194304 -sMAXIMUM_MEMORY=16777216 \
