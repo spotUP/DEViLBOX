@@ -157,8 +157,21 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   if (!cachedAPI) cachedAPI = getAPI(m);
   const api = cachedAPI;
 
+  // Pre-decompress zlib data (e.g. DefleMask DMF) so the WASM receives raw data.
+  // This avoids relying on the WASM's internal zlib which can crash on files
+  // with corrupted adler32 checksums.
+  let data = new Uint8Array(buffer);
+  if (data[0] === 0x78 && (data[1] === 0x9c || data[1] === 0x01 || data[1] === 0xDA)) {
+    try {
+      const pako = await import('pako');
+      data = pako.inflateRaw(data.subarray(2));
+      console.log(`[FurnaceFileOps] Pre-decompressed zlib → ${data.length} bytes`);
+    } catch {
+      // Let WASM try its own decompression
+    }
+  }
+
   // Copy buffer to WASM heap
-  const data = new Uint8Array(buffer);
   const ptr = m._malloc(data.length);
   if (!ptr) throw new Error('WASM malloc failed');
   m.HEAPU8.set(data, ptr);
