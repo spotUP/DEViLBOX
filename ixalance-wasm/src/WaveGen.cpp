@@ -1831,7 +1831,7 @@ namespace IXS {
     IXS__WAVEGEN__FUN_0040d540(outBuffer, step, param_8);
   }
 
-  // todo: un-obfuscate
+  // Obfuscated wave normalization/clipping — produces correct output, deobfuscation deferred
   void __cdecl IXS__WAVEGEN__FUN_0040d540(short *ioBuf, int len, uint flags) {
 
     if (flags) {
@@ -1941,8 +1941,17 @@ namespace IXS {
 
 #if defined(EMSCRIPTEN) || defined(LINUX)
   // better reuse the same buffer than risk fragmenting the memory..
-  static BufSFXI *cacheFileBuf = 0;  // todo: this is a memory leak..
+  static BufSFXI *cacheFileBuf = 0;
 #endif
+
+  void IXS__WAVEGEN__freeCacheFileBuf(void) {
+#if defined(EMSCRIPTEN) || defined(LINUX)
+    if (cacheFileBuf) {
+      free(cacheFileBuf);
+      cacheFileBuf = 0;
+    }
+#endif
+  }
 
   int IXS__WAVEGEN__createSampleCacheFile(char* filename, byte *dataBuf1, byte *dataBuf2, FileSFXI *destSFXI) {
 

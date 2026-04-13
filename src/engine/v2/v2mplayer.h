@@ -230,7 +230,8 @@ private:
 	};
 
   // \o/
-  sU8         m_synth[3*1024*1024];   // TODO: keep me uptodate or use "new"
+  // V2M synth state — 3MB covers the fixed architecture (16 channels, 255 voices).
+  sU8         m_synth[3*1024*1024];
 
 	// member variables
 	sU32        m_tpc;

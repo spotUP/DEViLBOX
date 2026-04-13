@@ -82,7 +82,7 @@ void psy_dsp_quantize16(float *pin, int *piout, int c)
 /* In -> -8388608.0..8388608.0, out  -2147483648.0 to 2147483648.0 */
 void psy_dsp_quantize24in32bit(float *pin, int *piout, int c)
 {
-	// TODO Don't really know why, but the -100 is what made the clipping work correctly.
+	// Empirical offset (-100) for correct clipping behavior in 24-in-32-bit quantization
 /*	int const max((1u << ((sizeof(int32_t) << 3) - 1)) - 100);
 	int const min(-max - 1);
 	for(int i = 0; i < c; ++i) {

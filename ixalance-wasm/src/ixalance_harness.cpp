@@ -7,6 +7,7 @@
 
 #include "PlayerIXS.h"
 #include "PlayerCore.h"
+#include "WaveGen.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -102,6 +103,8 @@ EXPORT void ixalance_stop(void) {
         free(g_file_data);
         g_file_data = nullptr;
     }
+    /* Free the static sample-cache buffer in WaveGen (30 MB) */
+    IXS::IXS__WAVEGEN__freeCacheFileBuf();
     g_playing = false;
 }
 

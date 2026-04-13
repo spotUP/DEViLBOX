@@ -300,6 +300,9 @@ typedef struct {
     int8_t   playing;          /* 1 = playing */
     int8_t   finished;         /* 1 = song ended */
 
+    /* Stereo sample offset (ASM: SAMPLEDIFF — offset applied to R channel sample start) */
+    int32_t  sampleDiff;       /* byte offset for R channel (0-2000, from module header type 12) */
+
     /* Master volume / balance */
     int16_t  masterVolume;     /* 0-100 */
     int16_t  balance;          /* 0-100, 50 = center */

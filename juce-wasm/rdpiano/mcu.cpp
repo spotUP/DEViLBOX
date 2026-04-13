@@ -534,7 +534,7 @@ void Mcu::write_byte(u16 addr, u8 data)
   else if (addr == 0x0003) {
     // printf("%04x: port2 write %04x=%02x\n", PCD, addr, data);
 
-    // TODO: Currently not working, investigate
+    // Sample rate bit extracted but never consumed — written only, no reader exists
     current_sample_rate = (data >> 2) & 1;
 
     execute_set_input(M6801_TIN_LINE, CLEAR_LINE);

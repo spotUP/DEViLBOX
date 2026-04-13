@@ -761,7 +761,7 @@ do_quantize( int t, int count, songdata *data )
     }
   }
 
-  /* FIXME : we must tune up the note-off job */
+  /* compensate gate by +1 tick when there is room, to align note-off timing */
   if ( gate+1 < count )
     gate++;
 

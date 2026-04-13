@@ -64,7 +64,9 @@ static void adpcm_calc(struct opna_adpcm *adpcm) {
         adpcm->adpcmd = 127;
         adpcm->prev_acc = 0;
       } else {
-        // TODO: set EOS
+        // LIMITATION: EOS (End Of Sample) status flag not set in the status register.
+        // Real YM2608 hardware sets the EOS bit so the driver can poll for completion.
+        // This implementation stops playback directly without signaling the status register.
         adpcm->control1 = 0;
         adpcm->out = 0;
         adpcm->prev_acc = 0;
@@ -125,7 +127,9 @@ void opna_adpcm_writereg(struct opna_adpcm *adpcm, unsigned reg, unsigned val) {
     }
     if (adpcm->control1 & C1_RESET) {
       adpcm->control1 = 0;
-      // TODO: set BRDY
+      // LIMITATION: BRDY (Buffer Ready) status flag not set in the status register.
+      // Real YM2608 hardware sets BRDY after a reset to indicate the ADPCM unit
+      // is ready to accept new data. Drivers that poll BRDY before writing may stall.
     }
     break;
   case 0x01:
@@ -157,7 +161,10 @@ void opna_adpcm_writereg(struct opna_adpcm *adpcm, unsigned reg, unsigned val) {
         }
         adpcm->ramptr += 2;
       } else {
-        // TODO: set EOS
+        // LIMITATION: EOS (End Of Sample) status flag not set when the write
+        // pointer reaches the end address during external memory writes.
+        // Real YM2608 hardware would signal EOS so the driver knows the
+        // write buffer is full.
       }
     }
     break;

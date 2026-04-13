@@ -418,7 +418,10 @@ void psy_audio_xmsampler_tick(psy_audio_XMSampler* self,
 	pData = &transform_event;
 	if (pData->note == psy_audio_NOTECOMMANDS_MIDICC && pData->inst < MAX_TRACKS)
 	{
-		//TODO: This has one problem, it requires a non-mcm command to trigger the memory.				
+		// Limitation: Multi-command (MCM) events are stored in multicmdMem but only
+		// get replayed when a subsequent non-MCM event triggers processing on this
+		// channel. MCM events arriving with no following note/command are deferred
+		// indefinitely. This matches the original Psycle behavior.
 		psy_audio_PatternEvent* cmdmem;
 
 		cmdmem = psy_audio_patternevent_clone(pData);
