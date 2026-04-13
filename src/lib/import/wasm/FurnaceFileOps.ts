@@ -164,10 +164,10 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   if (data[0] === 0x78 && (data[1] === 0x9c || data[1] === 0x01 || data[1] === 0xDA)) {
     try {
       const pako = await import('pako');
-      data = pako.inflateRaw(data.subarray(2));
+      data = pako.inflateRaw(data.slice(2));
       console.log(`[FurnaceFileOps] Pre-decompressed zlib → ${data.length} bytes`);
-    } catch {
-      // Let WASM try its own decompression
+    } catch (e) {
+      console.warn('[FurnaceFileOps] JS zlib pre-decompress failed, letting WASM try:', e);
     }
   }
 
