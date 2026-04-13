@@ -36,6 +36,10 @@ void ma_note_off(MaModule* module);
 size_t ma_render_preview(MaModule* module, float* interleaved_stereo, size_t frames);
 int ma_instrument_count(const MaModule* module);
 
+/* Instrument parameter get/set by name */
+float ma_instrument_get_param(const MaModule* module, int index, const char* param);
+void ma_instrument_set_param(MaModule* module, int index, const char* param, float value);
+
 #ifdef __cplusplus
 }
 #endif

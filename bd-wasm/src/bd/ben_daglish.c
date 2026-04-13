@@ -2504,3 +2504,13 @@ bool bd_has_ended(const BdModule* module) {
     return p->voices[0].reached_end && p->voices[1].reached_end
            && p->voices[2].reached_end && p->voices[3].reached_end;
 }
+
+int bd_sample_count(const BdModule* module) {
+    if (module == nullptr) return 0;
+    return (int)module->sample_count;
+}
+
+void* bd_get_sample(BdModule* module, int index) {
+    if (module == nullptr || index < 0 || (size_t)index >= module->sample_count) return nullptr;
+    return &module->samples[index];
+}

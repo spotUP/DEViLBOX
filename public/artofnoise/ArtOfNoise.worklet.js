@@ -96,6 +96,33 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
         this.muteMask = data.mask;
         break;
 
+      case 'getInstrumentParam': {
+        if (!this.module || typeof this.module._player_get_instrument_param !== 'function') break;
+        var m = this.module;
+        var pLen = m.lengthBytesUTF8(data.param) + 1;
+        var pPtr = m._malloc(pLen);
+        m.stringToUTF8(data.param, pPtr, pLen);
+        var val = m._player_get_instrument_param(data.inst, pPtr);
+        m._free(pPtr);
+        this.port.postMessage({ type: 'instrumentParamValue', inst: data.inst, param: data.param, value: val });
+        break;
+      }
+      case 'setInstrumentParam': {
+        if (!this.module || typeof this.module._player_set_instrument_param !== 'function') break;
+        var m = this.module;
+        var pLen = m.lengthBytesUTF8(data.param) + 1;
+        var pPtr = m._malloc(pLen);
+        m.stringToUTF8(data.param, pPtr, pLen);
+        m._player_set_instrument_param(data.inst, pPtr, data.value);
+        m._free(pPtr);
+        break;
+      }
+      case 'getInstrumentCount': {
+        if (!this.module || typeof this.module._player_get_instrument_count !== 'function') break;
+        var count = this.module._player_get_instrument_count();
+        this.port.postMessage({ type: 'instrumentCount', count: count });
+        break;
+      }
       case 'dispose':
         this.cleanup();
         break;

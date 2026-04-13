@@ -74,3 +74,65 @@ EXPORT void player_set_channel_gain(int ch, float gain) {
     }
     bd_set_channel_mask(g_module, mask);
 }
+
+/* ── Instrument parameter API ─────────────────────────────────────────── */
+
+typedef struct {
+    int16_t sample_number;
+    int8_t* sample_data;
+    uint16_t length;
+    uint32_t loop_offset;
+    uint16_t loop_length;
+    uint16_t volume;
+    int16_t volume_fade_speed;
+    int16_t portamento_duration;
+    int16_t portamento_add_value;
+    uint16_t vibrato_depth;
+    uint16_t vibrato_add_value;
+    int16_t note_transpose;
+    uint16_t fine_tune_period;
+} BdSampleLayout;
+
+EXPORT int bd_get_instrument_count(void) {
+    if (!g_module) return 0;
+    return bd_sample_count(g_module);
+}
+
+EXPORT float bd_get_instrument_param(int inst, const char *param) {
+    if (!g_module) return 0.0f;
+    BdSampleLayout *s = (BdSampleLayout *)bd_get_sample(g_module, inst);
+    if (!s) return 0.0f;
+
+    if (strcmp(param, "sampleNumber") == 0)       return (float)s->sample_number;
+    if (strcmp(param, "length") == 0)              return (float)s->length;
+    if (strcmp(param, "loopOffset") == 0)          return (float)s->loop_offset;
+    if (strcmp(param, "loopLength") == 0)          return (float)s->loop_length;
+    if (strcmp(param, "volume") == 0)              return (float)s->volume;
+    if (strcmp(param, "volumeFadeSpeed") == 0)     return (float)s->volume_fade_speed;
+    if (strcmp(param, "portamentoDuration") == 0)  return (float)s->portamento_duration;
+    if (strcmp(param, "portamentoAddValue") == 0)  return (float)s->portamento_add_value;
+    if (strcmp(param, "vibratoDepth") == 0)        return (float)s->vibrato_depth;
+    if (strcmp(param, "vibratoAddValue") == 0)     return (float)s->vibrato_add_value;
+    if (strcmp(param, "noteTranspose") == 0)       return (float)s->note_transpose;
+    if (strcmp(param, "fineTunePeriod") == 0)      return (float)s->fine_tune_period;
+    return 0.0f;
+}
+
+EXPORT void bd_set_instrument_param(int inst, const char *param, float value) {
+    if (!g_module) return;
+    BdSampleLayout *s = (BdSampleLayout *)bd_get_sample(g_module, inst);
+    if (!s) return;
+
+    if (strcmp(param, "sampleNumber") == 0)        { s->sample_number       = (int16_t)value; return; }
+    if (strcmp(param, "length") == 0)               { s->length              = (uint16_t)value; return; }
+    if (strcmp(param, "loopOffset") == 0)           { s->loop_offset         = (uint32_t)value; return; }
+    if (strcmp(param, "loopLength") == 0)           { s->loop_length         = (uint16_t)value; return; }
+    if (strcmp(param, "volume") == 0)               { s->volume              = (uint16_t)value; return; }
+    if (strcmp(param, "volumeFadeSpeed") == 0)      { s->volume_fade_speed   = (int16_t)value; return; }
+    if (strcmp(param, "portamentoDuration") == 0)   { s->portamento_duration = (int16_t)value; return; }
+    if (strcmp(param, "portamentoAddValue") == 0)   { s->portamento_add_value = (int16_t)value; return; }
+    if (strcmp(param, "vibratoDepth") == 0)         { s->vibrato_depth       = (uint16_t)value; return; }
+    if (strcmp(param, "vibratoAddValue") == 0)      { s->vibrato_add_value   = (uint16_t)value; return; }
+    if (strcmp(param, "noteTranspose") == 0)        { s->note_transpose      = (int16_t)value; return; }
+    if (strcmp(param, "fineTunePeriod") == 0)       { s->fine_tune_period    = (uint16_t)value; return; }
+}

@@ -2255,6 +2255,66 @@ const char* aon_song_get_instrument_name(const AonSong* song, uint8_t index) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+float aon_song_get_instrument_param(const AonSong* song, int index, const char* param) {
+    if (!song || index < 0 || index >= song->num_instruments || !param) return -1.0f;
+    const AonInstrument* ins = &song->instruments[index];
+
+    if (strcmp(param, "type") == 0)            return (float)ins->type;
+    if (strcmp(param, "volume") == 0)          return (float)ins->volume;
+    if (strcmp(param, "fineTune") == 0)        return (float)ins->fine_tune;
+    if (strcmp(param, "waveform") == 0)        return (float)ins->waveform;
+    if (strcmp(param, "envelopeStart") == 0)   return (float)ins->envelope_start;
+    if (strcmp(param, "envelopeAdd") == 0)     return (float)ins->envelope_add;
+    if (strcmp(param, "envelopeEnd") == 0)     return (float)ins->envelope_end;
+    if (strcmp(param, "envelopeSub") == 0)     return (float)ins->envelope_sub;
+    if (strcmp(param, "startOffset") == 0)     return (float)ins->start_offset;
+    if (strcmp(param, "length") == 0)          return (float)ins->length;
+    if (strcmp(param, "loopStart") == 0)       return (float)ins->loop_start;
+    if (strcmp(param, "loopLength") == 0)      return (float)ins->loop_length;
+    if (strcmp(param, "synthLength") == 0)     return (float)ins->synth_length;
+    if (strcmp(param, "vibParam") == 0)        return (float)ins->vib_param;
+    if (strcmp(param, "vibDelay") == 0)        return (float)ins->vib_delay;
+    if (strcmp(param, "vibWave") == 0)         return (float)ins->vib_wave;
+    if (strcmp(param, "waveSpeed") == 0)       return (float)ins->wave_speed;
+    if (strcmp(param, "waveLength") == 0)      return (float)ins->wave_length;
+    if (strcmp(param, "waveLoopStart") == 0)   return (float)ins->wave_loop_start;
+    if (strcmp(param, "waveLoopLength") == 0)  return (float)ins->wave_loop_length;
+    if (strcmp(param, "waveLoopControl") == 0) return (float)ins->wave_loop_control;
+
+    return -1.0f;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void aon_song_set_instrument_param(AonSong* song, int index, const char* param, float value) {
+    if (!song || index < 0 || index >= song->num_instruments || !param) return;
+    AonInstrument* ins = &song->instruments[index];
+
+    if (strcmp(param, "type") == 0)            { ins->type = (AonInstrumentType)(int)value; return; }
+    if (strcmp(param, "volume") == 0)          { ins->volume = (u8)value; return; }
+    if (strcmp(param, "fineTune") == 0)        { ins->fine_tune = (u8)value; return; }
+    if (strcmp(param, "waveform") == 0)        { ins->waveform = (u8)value; return; }
+    if (strcmp(param, "envelopeStart") == 0)   { ins->envelope_start = (u8)value; return; }
+    if (strcmp(param, "envelopeAdd") == 0)     { ins->envelope_add = (u8)value; return; }
+    if (strcmp(param, "envelopeEnd") == 0)     { ins->envelope_end = (u8)value; return; }
+    if (strcmp(param, "envelopeSub") == 0)     { ins->envelope_sub = (u8)value; return; }
+    if (strcmp(param, "startOffset") == 0)     { ins->start_offset = (u32)value; return; }
+    if (strcmp(param, "length") == 0)          { ins->length = (u32)value; return; }
+    if (strcmp(param, "loopStart") == 0)       { ins->loop_start = (u32)value; return; }
+    if (strcmp(param, "loopLength") == 0)      { ins->loop_length = (u32)value; return; }
+    if (strcmp(param, "synthLength") == 0)     { ins->synth_length = (u8)value; return; }
+    if (strcmp(param, "vibParam") == 0)        { ins->vib_param = (u8)value; return; }
+    if (strcmp(param, "vibDelay") == 0)        { ins->vib_delay = (u8)value; return; }
+    if (strcmp(param, "vibWave") == 0)         { ins->vib_wave = (u8)value; return; }
+    if (strcmp(param, "waveSpeed") == 0)       { ins->wave_speed = (u8)value; return; }
+    if (strcmp(param, "waveLength") == 0)      { ins->wave_length = (u8)value; return; }
+    if (strcmp(param, "waveLoopStart") == 0)   { ins->wave_loop_start = (u8)value; return; }
+    if (strcmp(param, "waveLoopLength") == 0)  { ins->wave_loop_length = (u8)value; return; }
+    if (strcmp(param, "waveLoopControl") == 0) { ins->wave_loop_control = (u8)value; return; }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void aon_song_enable_scope_capture(AonSong* song, int enable) {
     if (!song) {
         return;

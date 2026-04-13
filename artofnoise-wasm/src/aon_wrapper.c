@@ -131,3 +131,19 @@ void player_set_channel_gain(int channel, float gain) {
     (void)channel;
     (void)gain;
 }
+
+int player_get_instrument_count(void) {
+    if (!g_song) return 0;
+    const AonSongMetadata* meta = aon_song_get_metadata(g_song);
+    return meta ? meta->num_instruments : 0;
+}
+
+float player_get_instrument_param(int inst, const char* param) {
+    if (!g_song) return -1.0f;
+    return aon_song_get_instrument_param(g_song, inst, param);
+}
+
+void player_set_instrument_param(int inst, const char* param, float value) {
+    if (!g_song) return;
+    aon_song_set_instrument_param(g_song, inst, param, value);
+}
