@@ -1549,9 +1549,116 @@ bool is2_has_ended(const Is2Module* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int is2_get_instrument_count(const Is2Module* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_instruments : 0;
+}
+
+int is2_get_num_track_lines(const Is2Module* module) {
+    return module ? module->num_track_lines : 0;
+}
+
+int is2_get_num_positions(const Is2Module* module) {
+    return module ? module->num_positions : 0;
+}
+
+void is2_get_cell(const Is2Module* module, int idx,
+                   uint8_t* note, uint8_t* instrument, uint8_t* arpeggio,
+                   uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || idx < 0 || idx >= module->num_track_lines) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (arpeggio) *arpeggio = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const Is2TrackLine* tl = &module->track_lines[idx];
+    if (note) *note = tl->note;
+    if (instrument) *instrument = tl->instrument;
+    if (arpeggio) *arpeggio = tl->arpeggio;
+    if (effect) *effect = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void is2_set_cell(Is2Module* module, int idx,
+                   uint8_t note, uint8_t instrument, uint8_t arpeggio,
+                   uint8_t effect, uint8_t effect_arg) {
+    if (!module || idx < 0 || idx >= module->num_track_lines) return;
+    Is2TrackLine* tl = &module->track_lines[idx];
+    tl->note = note;
+    tl->instrument = instrument;
+    tl->arpeggio = arpeggio;
+    tl->effect = (Is2Effect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+void is2_get_position(const Is2Module* module, int pos, int channel,
+                       uint16_t* start_track_row, int8_t* sound_transpose, int8_t* note_transpose) {
+    if (!module || pos < 0 || pos >= module->num_positions || channel < 0 || channel >= 4) {
+        if (start_track_row) *start_track_row = 0;
+        if (sound_transpose) *sound_transpose = 0;
+        if (note_transpose) *note_transpose = 0;
+        return;
+    }
+    const Is2SinglePositionInfo* pi = &module->positions[pos][channel];
+    if (start_track_row) *start_track_row = pi->start_track_row;
+    if (sound_transpose) *sound_transpose = pi->sound_transpose;
+    if (note_transpose) *note_transpose = pi->note_transpose;
+}
+
+void is2_set_position(Is2Module* module, int pos, int channel,
+                       uint16_t start_track_row, int8_t sound_transpose, int8_t note_transpose) {
+    if (!module || pos < 0 || pos >= module->num_positions || channel < 0 || channel >= 4) return;
+    Is2SinglePositionInfo* pi = &module->positions[pos][channel];
+    pi->start_track_row = start_track_row;
+    pi->sound_transpose = sound_transpose;
+    pi->note_transpose = note_transpose;
+}
+
+float is2_get_instrument_param(const Is2Module* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return -1.0f;
+    const Is2Instrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "waveformLength") == 0)    return (float)in->waveform_length;
+    if (strcmp(param, "volume") == 0)            return (float)in->volume;
+    if (strcmp(param, "vibratoDelay") == 0)      return (float)in->vibrato_delay;
+    if (strcmp(param, "vibratoSpeed") == 0)      return (float)in->vibrato_speed;
+    if (strcmp(param, "vibratoLevel") == 0)      return (float)in->vibrato_level;
+    if (strcmp(param, "portamentoSpeed") == 0)   return (float)in->portamento_speed;
+    if (strcmp(param, "adsrLength") == 0)        return (float)in->adsr_length;
+    if (strcmp(param, "adsrRepeat") == 0)        return (float)in->adsr_repeat;
+    if (strcmp(param, "sustainPoint") == 0)      return (float)in->sustain_point;
+    if (strcmp(param, "sustainSpeed") == 0)      return (float)in->sustain_speed;
+    if (strcmp(param, "amfLength") == 0)         return (float)in->amf_length;
+    if (strcmp(param, "amfRepeat") == 0)         return (float)in->amf_repeat;
+    if (strcmp(param, "egMode") == 0)            return (float)in->eg_mode;
+    if (strcmp(param, "startLen") == 0)          return (float)in->start_len;
+    if (strcmp(param, "stopRep") == 0)           return (float)in->stop_rep;
+    if (strcmp(param, "speedUp") == 0)           return (float)in->speed_up;
+    if (strcmp(param, "speedDown") == 0)         return (float)in->speed_down;
+
+    return -1.0f;
+}
+
+void is2_set_instrument_param(Is2Module* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_instruments || !param) return;
+    Is2Instrument* in = &module->instruments[inst];
+    uint16_t v = (uint16_t)value;
+    uint8_t v8 = (uint8_t)value;
+
+    if (strcmp(param, "waveformLength") == 0)    { in->waveform_length = v; return; }
+    if (strcmp(param, "volume") == 0)            { in->volume = v8; return; }
+    if (strcmp(param, "vibratoDelay") == 0)      { in->vibrato_delay = v8; return; }
+    if (strcmp(param, "vibratoSpeed") == 0)      { in->vibrato_speed = v8; return; }
+    if (strcmp(param, "vibratoLevel") == 0)      { in->vibrato_level = v8; return; }
+    if (strcmp(param, "portamentoSpeed") == 0)   { in->portamento_speed = v8; return; }
+    if (strcmp(param, "adsrLength") == 0)        { in->adsr_length = v8; return; }
+    if (strcmp(param, "adsrRepeat") == 0)        { in->adsr_repeat = v8; return; }
+    if (strcmp(param, "sustainPoint") == 0)      { in->sustain_point = v8; return; }
+    if (strcmp(param, "sustainSpeed") == 0)      { in->sustain_speed = v8; return; }
+    if (strcmp(param, "amfLength") == 0)         { in->amf_length = v8; return; }
+    if (strcmp(param, "amfRepeat") == 0)         { in->amf_repeat = v8; return; }
+    if (strcmp(param, "egMode") == 0)            { in->eg_mode = (Is2EnvelopeGeneratorMode)(int)value; return; }
+    if (strcmp(param, "startLen") == 0)          { in->start_len = v8; return; }
+    if (strcmp(param, "stopRep") == 0)           { in->stop_rep = v8; return; }
+    if (strcmp(param, "speedUp") == 0)           { in->speed_up = v8; return; }
+    if (strcmp(param, "speedDown") == 0)         { in->speed_down = v8; return; }
 }
 
 size_t is2_export(const Is2Module* module, uint8_t* out, size_t max_size) {

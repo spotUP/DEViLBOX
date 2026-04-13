@@ -27,4 +27,27 @@ size_t fc_render_multi(FcModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool fc_has_ended(const FcModule* module);
 
+// Edit API
+int fc_get_instrument_count(const FcModule* module);
+int fc_get_num_patterns(const FcModule* module);
+int fc_get_num_sequences(const FcModule* module);
 
+void fc_get_cell(const FcModule* module, int pattern, int row,
+                  uint8_t* note, uint8_t* info);
+void fc_set_cell(FcModule* module, int pattern, int row,
+                  uint8_t note, uint8_t info);
+
+void fc_get_sequence(const FcModule* module, int seq, int channel,
+                      uint8_t* pattern, int8_t* transpose, int8_t* sound_transpose, uint8_t* speed);
+void fc_set_sequence(FcModule* module, int seq, int channel,
+                      uint8_t pattern, int8_t transpose, int8_t sound_transpose, uint8_t speed);
+
+float fc_get_instrument_param(const FcModule* module, int inst, const char* param);
+void fc_set_instrument_param(FcModule* module, int inst, const char* param, float value);
+
+size_t fc_export(const FcModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

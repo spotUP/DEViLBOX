@@ -27,4 +27,13 @@ size_t dw_render_multi(DwModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool dw_has_ended(const DwModule* module);
 
+// Edit API
+int dw_get_instrument_count(const DwModule* module);
+float dw_get_instrument_param(const DwModule* module, int inst, const char* param);
+void dw_set_instrument_param(DwModule* module, int inst, const char* param, float value);
+size_t dw_export(const DwModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

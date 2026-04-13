@@ -1510,9 +1510,80 @@ bool sf_has_ended(const SfModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int sf_get_instrument_count(const SfModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->num_original_instruments : 0;
+}
+
+float sf_get_instrument_param(const SfModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_original_instruments || !param) return -1.0f;
+    const SfInstrument* in = &module->original_instruments[inst];
+
+    if (strcmp(param, "instrumentNumber") == 0)  return (float)in->instrument_number;
+    if (strcmp(param, "sampleLength") == 0)      return (float)in->sample_length;
+    if (strcmp(param, "samplingPeriod") == 0)     return (float)in->sampling_period;
+    if (strcmp(param, "effectByte") == 0)         return (float)in->effect_byte;
+    if (strcmp(param, "tremoloSpeed") == 0)       return (float)in->tremolo_speed;
+    if (strcmp(param, "tremoloStep") == 0)        return (float)in->tremolo_step;
+    if (strcmp(param, "tremoloRange") == 0)       return (float)in->tremolo_range;
+    if (strcmp(param, "portamentoStep") == 0)     return (float)in->portamento_step;
+    if (strcmp(param, "portamentoSpeed") == 0)    return (float)in->portamento_speed;
+    if (strcmp(param, "arpeggioSpeed") == 0)      return (float)in->arpeggio_speed;
+    if (strcmp(param, "vibratoDelay") == 0)       return (float)in->vibrato_delay;
+    if (strcmp(param, "vibratoSpeed") == 0)       return (float)in->vibrato_speed;
+    if (strcmp(param, "vibratoStep") == 0)        return (float)in->vibrato_step;
+    if (strcmp(param, "vibratoAmount") == 0)      return (float)in->vibrato_amount;
+    if (strcmp(param, "attackTime") == 0)         return (float)in->attack_time;
+    if (strcmp(param, "decayTime") == 0)          return (float)in->decay_time;
+    if (strcmp(param, "sustainLevel") == 0)       return (float)in->sustain_level;
+    if (strcmp(param, "releaseTime") == 0)        return (float)in->release_time;
+    if (strcmp(param, "phasingStart") == 0)       return (float)in->phasing_start;
+    if (strcmp(param, "phasingEnd") == 0)         return (float)in->phasing_end;
+    if (strcmp(param, "phasingSpeed") == 0)       return (float)in->phasing_speed;
+    if (strcmp(param, "phasingStep") == 0)        return (float)in->phasing_step;
+    if (strcmp(param, "waveCount") == 0)          return (float)in->wave_count;
+    if (strcmp(param, "octave") == 0)             return (float)in->octave;
+    if (strcmp(param, "filterFrequency") == 0)    return (float)in->filter_frequency;
+    if (strcmp(param, "filterEnd") == 0)          return (float)in->filter_end;
+    if (strcmp(param, "filterSpeed") == 0)        return (float)in->filter_speed;
+    if (strcmp(param, "dasrSustainOffset") == 0)  return (float)in->dasr_sustain_offset;
+    if (strcmp(param, "dasrReleaseOffset") == 0)  return (float)in->dasr_release_offset;
+
+    return -1.0f;
+}
+
+void sf_set_instrument_param(SfModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_original_instruments || !param) return;
+    SfInstrument* in = &module->original_instruments[inst];
+    uint8_t b = (uint8_t)value;
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "sampleLength") == 0)      { in->sample_length = v; return; }
+    if (strcmp(param, "samplingPeriod") == 0)     { in->sampling_period = v; return; }
+    if (strcmp(param, "effectByte") == 0)         { in->effect_byte = b; return; }
+    if (strcmp(param, "tremoloSpeed") == 0)       { in->tremolo_speed = b; return; }
+    if (strcmp(param, "tremoloStep") == 0)        { in->tremolo_step = b; return; }
+    if (strcmp(param, "tremoloRange") == 0)       { in->tremolo_range = b; return; }
+    if (strcmp(param, "portamentoStep") == 0)     { in->portamento_step = v; return; }
+    if (strcmp(param, "portamentoSpeed") == 0)    { in->portamento_speed = b; return; }
+    if (strcmp(param, "arpeggioSpeed") == 0)      { in->arpeggio_speed = b; return; }
+    if (strcmp(param, "vibratoDelay") == 0)       { in->vibrato_delay = b; return; }
+    if (strcmp(param, "vibratoSpeed") == 0)       { in->vibrato_speed = b; return; }
+    if (strcmp(param, "vibratoStep") == 0)        { in->vibrato_step = (int8_t)value; return; }
+    if (strcmp(param, "vibratoAmount") == 0)      { in->vibrato_amount = b; return; }
+    if (strcmp(param, "attackTime") == 0)         { in->attack_time = b; return; }
+    if (strcmp(param, "decayTime") == 0)          { in->decay_time = b; return; }
+    if (strcmp(param, "sustainLevel") == 0)       { in->sustain_level = b; return; }
+    if (strcmp(param, "releaseTime") == 0)        { in->release_time = b; return; }
+    if (strcmp(param, "phasingStart") == 0)       { in->phasing_start = b; return; }
+    if (strcmp(param, "phasingEnd") == 0)         { in->phasing_end = b; return; }
+    if (strcmp(param, "phasingSpeed") == 0)       { in->phasing_speed = b; return; }
+    if (strcmp(param, "phasingStep") == 0)        { in->phasing_step = (int8_t)value; return; }
+    if (strcmp(param, "waveCount") == 0)          { in->wave_count = b; return; }
+    if (strcmp(param, "octave") == 0)             { in->octave = b; return; }
+    if (strcmp(param, "filterFrequency") == 0)    { in->filter_frequency = b; return; }
+    if (strcmp(param, "filterEnd") == 0)          { in->filter_end = b; return; }
+    if (strcmp(param, "filterSpeed") == 0)        { in->filter_speed = b; return; }
+    if (strcmp(param, "dasrSustainOffset") == 0)  { in->dasr_sustain_offset = v; return; }
+    if (strcmp(param, "dasrReleaseOffset") == 0)  { in->dasr_release_offset = v; return; }
 }
 
 size_t sf_export(const SfModule* module, uint8_t* out, size_t max_size) {

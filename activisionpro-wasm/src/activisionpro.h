@@ -27,4 +27,15 @@ size_t avp_render_multi(AvpModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool avp_has_ended(const AvpModule* module);
 
+// Edit API
+int avp_get_instrument_count(const AvpModule* module);
 
+float avp_get_instrument_param(const AvpModule* module, int inst, const char* param);
+void avp_set_instrument_param(AvpModule* module, int inst, const char* param, float value);
+
+size_t avp_export(const AvpModule* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

@@ -1463,9 +1463,82 @@ bool qc_has_ended(const QcModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int qc_get_instrument_count(const QcModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? (int)module->number_of_samples : 0;
+}
+
+int qc_get_num_patterns(const QcModule* module) {
+    return module ? (int)module->number_of_patterns : 0;
+}
+
+int qc_get_pattern_rows(const QcModule* module, int pattern) {
+    if (!module || pattern < 0 || pattern >= module->number_of_patterns) return 0;
+    return module->patterns[pattern].number_of_rows + 1;
+}
+
+int qc_get_num_positions(const QcModule* module) {
+    return module ? (int)module->number_of_positions : 0;
+}
+
+void qc_get_cell(const QcModule* module, int pattern, int row, int channel,
+                  uint8_t* sample, int8_t* note, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->number_of_patterns ||
+        channel < 0 || channel >= 4) {
+        if (sample) *sample = 0; if (note) *note = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const QcPattern* pat = &module->patterns[pattern];
+    if (row < 0 || row > pat->number_of_rows) {
+        if (sample) *sample = 0; if (note) *note = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const QcTrackLine* tl = &pat->tracks[channel * pat->tracks_stride + row];
+    if (sample) *sample = tl->sample;
+    if (note) *note = tl->note;
+    if (effect) *effect = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void qc_set_cell(QcModule* module, int pattern, int row, int channel,
+                  uint8_t sample, int8_t note, uint8_t effect, uint8_t effect_arg) {
+    if (!module || pattern < 0 || pattern >= module->number_of_patterns ||
+        channel < 0 || channel >= 4) return;
+    QcPattern* pat = &module->patterns[pattern];
+    if (row < 0 || row > pat->number_of_rows) return;
+    QcTrackLine* tl = &pat->tracks[channel * pat->tracks_stride + row];
+    tl->sample = sample;
+    tl->note = note;
+    tl->effect = (QcEffect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+float qc_get_instrument_param(const QcModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= (int)module->number_of_samples || !param) return -1.0f;
+    const QcSample* s = &module->samples[inst];
+
+    if (strcmp(param, "length") == 0)       return (float)s->length;
+    if (strcmp(param, "loopStart") == 0)    return (float)s->loop_start;
+    if (strcmp(param, "loopLength") == 0)   return (float)s->loop_length;
+    if (strcmp(param, "volume") == 0)       return (float)s->volume;
+    if (strcmp(param, "controlByte") == 0)  return (float)s->control_byte;
+    if (strcmp(param, "fineTune") == 0)     return (float)s->fine_tune;
+
+    return -1.0f;
+}
+
+void qc_set_instrument_param(QcModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= (int)module->number_of_samples || !param) return;
+    QcSample* s = &module->samples[inst];
+    uint32_t v32 = (uint32_t)value;
+    uint8_t v8 = (uint8_t)value;
+
+    if (strcmp(param, "length") == 0)       { s->length = v32; return; }
+    if (strcmp(param, "loopStart") == 0)    { s->loop_start = v32; return; }
+    if (strcmp(param, "loopLength") == 0)   { s->loop_length = v32; return; }
+    if (strcmp(param, "volume") == 0)       { s->volume = v8; return; }
+    if (strcmp(param, "controlByte") == 0)  { s->control_byte = v8; return; }
+    if (strcmp(param, "fineTune") == 0)     { s->fine_tune = v8; return; }
 }
 
 size_t qc_export(const QcModule* module, uint8_t* out, size_t max_size) {

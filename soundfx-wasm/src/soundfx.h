@@ -27,4 +27,18 @@ size_t sfx_render_multi(SfxModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool sfx_has_ended(const SfxModule* module);
 
+// Edit API
+int sfx_get_instrument_count(const SfxModule* module);
+int sfx_get_num_patterns(const SfxModule* module);
+void sfx_get_cell(const SfxModule* module, int pattern, int row, int channel,
+                  uint16_t* period, uint8_t* sample, uint8_t* effect, uint8_t* effect_arg);
+void sfx_set_cell(SfxModule* module, int pattern, int row, int channel,
+                  uint16_t period, uint8_t sample, uint8_t effect, uint8_t effect_arg);
+float sfx_get_instrument_param(const SfxModule* module, int inst, const char* param);
+void sfx_set_instrument_param(SfxModule* module, int inst, const char* param, float value);
+size_t sfx_export(const SfxModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

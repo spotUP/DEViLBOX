@@ -24,4 +24,13 @@ size_t sf_render_multi(SfModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool sf_has_ended(const SfModule* module);
 
+// Edit API
+int sf_get_instrument_count(const SfModule* module);
+float sf_get_instrument_param(const SfModule* module, int inst, const char* param);
+void sf_set_instrument_param(SfModule* module, int inst, const char* param, float value);
+size_t sf_export(const SfModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

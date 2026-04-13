@@ -1316,9 +1316,67 @@ bool ftm_has_ended(const FtmModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int ftm_get_instrument_count(const FtmModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? (int)module->num_samples : 0;
+}
+
+int ftm_get_num_measures(const FtmModule* module) {
+    return module ? (int)module->num_measures : 0;
+}
+
+int ftm_get_rows_per_measure(const FtmModule* module) {
+    return module ? (int)module->rows_per_measure : 0;
+}
+
+void ftm_get_cell(const FtmModule* module, int channel, int row,
+                   uint8_t* note, uint8_t* effect, uint16_t* effect_arg) {
+    if (!module || channel < 0 || channel >= module->active_channel_count) {
+        if (note) *note = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const FtmTrack* track = &module->tracks[channel];
+    if (row < 0 || row >= track->num_lines) {
+        if (note) *note = 0; if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const FtmTrackLine* tl = &track->lines[row];
+    if (note) *note = tl->note;
+    if (effect) *effect = (uint8_t)tl->effect;
+    if (effect_arg) *effect_arg = tl->effect_arg;
+}
+
+void ftm_set_cell(FtmModule* module, int channel, int row,
+                   uint8_t note, uint8_t effect, uint16_t effect_arg) {
+    if (!module || channel < 0 || channel >= module->active_channel_count) return;
+    FtmTrack* track = &module->tracks[channel];
+    if (row < 0 || row >= track->num_lines) return;
+    FtmTrackLine* tl = &track->lines[row];
+    tl->note = note;
+    tl->effect = (FtmTrackEffect)effect;
+    tl->effect_arg = effect_arg;
+}
+
+float ftm_get_instrument_param(const FtmModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= (int)module->num_samples || !param) return -1.0f;
+    const FtmSample* s = &module->samples[inst];
+
+    if (strcmp(param, "oneshotLength") == 0)  return (float)s->oneshot_length;
+    if (strcmp(param, "loopStart") == 0)      return (float)s->loop_start;
+    if (strcmp(param, "loopLength") == 0)     return (float)s->loop_length;
+    if (strcmp(param, "totalLength") == 0)    return (float)s->total_length;
+
+    return -1.0f;
+}
+
+void ftm_set_instrument_param(FtmModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= (int)module->num_samples || !param) return;
+    FtmSample* s = &module->samples[inst];
+    uint32_t v32 = (uint32_t)value;
+    uint16_t v16 = (uint16_t)value;
+
+    if (strcmp(param, "oneshotLength") == 0)  { s->oneshot_length = v16; return; }
+    if (strcmp(param, "loopStart") == 0)      { s->loop_start = v32; return; }
+    if (strcmp(param, "loopLength") == 0)     { s->loop_length = v16; return; }
+    if (strcmp(param, "totalLength") == 0)    { s->total_length = v32; return; }
 }
 
 size_t ftm_export(const FtmModule* module, uint8_t* out, size_t max_size) {

@@ -27,4 +27,13 @@ size_t vs_render_multi(VsModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool vs_has_ended(const VsModule* module);
 
+// Edit API
+int vs_get_instrument_count(const VsModule* module);
+float vs_get_instrument_param(const VsModule* module, int inst, const char* param);
+void vs_set_instrument_param(VsModule* module, int inst, const char* param, float value);
+size_t vs_export(const VsModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif

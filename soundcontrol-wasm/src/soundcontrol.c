@@ -1684,9 +1684,42 @@ bool sc_has_ended(const ScModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int sc_get_instrument_count(const ScModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? module->module_data.num_instruments : 0;
+}
+
+int sc_get_num_samples(const ScModule* module) {
+    return module ? module->module_data.num_samples : 0;
+}
+
+float sc_get_instrument_param(const ScModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->module_data.num_instruments || !param || !module->module_data.instruments) return -1.0f;
+    const ScInstrument* in = &module->module_data.instruments[inst];
+
+    if (strcmp(param, "attackSpeed") == 0)      return (float)in->envelope.attack_speed;
+    if (strcmp(param, "attackIncrement") == 0)   return (float)in->envelope.attack_increment;
+    if (strcmp(param, "decaySpeed") == 0)        return (float)in->envelope.decay_speed;
+    if (strcmp(param, "decayDecrement") == 0)    return (float)in->envelope.decay_decrement;
+    if (strcmp(param, "decayValue") == 0)        return (float)in->envelope.decay_value;
+    if (strcmp(param, "releaseSpeed") == 0)      return (float)in->envelope.release_speed;
+    if (strcmp(param, "releaseDecrement") == 0)  return (float)in->envelope.release_decrement;
+    if (strcmp(param, "sampleCommandCount") == 0) return (float)in->sample_command_count;
+
+    return -1.0f;
+}
+
+void sc_set_instrument_param(ScModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->module_data.num_instruments || !param || !module->module_data.instruments) return;
+    ScInstrument* in = &module->module_data.instruments[inst];
+    uint8_t b = (uint8_t)value;
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "attackSpeed") == 0)      { in->envelope.attack_speed = b; return; }
+    if (strcmp(param, "attackIncrement") == 0)   { in->envelope.attack_increment = b; return; }
+    if (strcmp(param, "decaySpeed") == 0)        { in->envelope.decay_speed = b; return; }
+    if (strcmp(param, "decayDecrement") == 0)    { in->envelope.decay_decrement = b; return; }
+    if (strcmp(param, "decayValue") == 0)        { in->envelope.decay_value = v; return; }
+    if (strcmp(param, "releaseSpeed") == 0)      { in->envelope.release_speed = b; return; }
+    if (strcmp(param, "releaseDecrement") == 0)  { in->envelope.release_decrement = b; return; }
 }
 
 size_t sc_export(const ScModule* module, uint8_t* out, size_t max_size) {

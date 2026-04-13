@@ -6,7 +6,7 @@ echo "=== Oktalyzer WASM Build ==="
 mkdir -p "$OUT_DIR"
 emcc -O2 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/oktalyzer.c" \
-    -sEXPORTED_FUNCTIONS="['_okt_create','_okt_destroy','_okt_subsong_count','_okt_select_subsong','_okt_channel_count','_okt_set_channel_mask','_okt_render','_okt_render_multi','_okt_has_ended','_okt_get_instrument_count','_okt_export','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_okt_create','_okt_destroy','_okt_subsong_count','_okt_select_subsong','_okt_channel_count','_okt_set_channel_mask','_okt_render','_okt_render_multi','_okt_has_ended','_okt_get_instrument_count','_okt_get_num_patterns','_okt_get_pattern_rows','_okt_get_num_positions','_okt_get_cell','_okt_set_cell','_okt_get_instrument_param','_okt_set_instrument_param','_okt_export','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createOktalyzer -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=4194304 -sMAXIMUM_MEMORY=16777216 \

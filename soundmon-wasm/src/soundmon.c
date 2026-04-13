@@ -1635,9 +1635,130 @@ bool sm_has_ended(const SmModule* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int sm_get_instrument_count(const SmModule* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? 15 : 0;
+}
+
+int sm_get_num_tracks(const SmModule* module) {
+    return module ? (int)module->track_num : 0;
+}
+
+void sm_get_cell(const SmModule* module, int track_idx, int row,
+                 uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || track_idx < 0 || track_idx >= (int)module->track_num ||
+        row < 0 || row >= 16 || !module->tracks || !module->tracks[track_idx]) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const SmTrack* t = &module->tracks[track_idx][row];
+    if (note)       *note       = (uint8_t)t->note;
+    if (instrument) *instrument = t->instrument;
+    if (effect)     *effect     = t->optional;
+    if (effect_arg) *effect_arg = t->optional_data;
+}
+
+void sm_set_cell(SmModule* module, int track_idx, int row,
+                 uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg) {
+    if (!module || track_idx < 0 || track_idx >= (int)module->track_num ||
+        row < 0 || row >= 16 || !module->tracks || !module->tracks[track_idx]) return;
+    SmTrack* t = &module->tracks[track_idx][row];
+    t->note          = (int8_t)note;
+    t->instrument    = instrument;
+    t->optional      = effect;
+    t->optional_data = effect_arg;
+}
+
+const char* sm_get_instrument_name(const SmModule* module, int inst) {
+    if (!module || inst < 0 || inst >= 15) return "";
+    if (!module->instruments[inst].is_synth)
+        return module->instruments[inst].sample.name;
+    return "";
+}
+
+float sm_get_instrument_param(const SmModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= 15 || !param) return -1.0f;
+    const SmInstrument* in = &module->instruments[inst];
+
+    if (strcmp(param, "isSynth") == 0) return (float)in->is_synth;
+
+    // Sample instrument params
+    if (strcmp(param, "length") == 0)     return (float)in->sample.length;
+    if (strcmp(param, "loopStart") == 0)  return (float)in->sample.loop_start;
+    if (strcmp(param, "loopLength") == 0) return (float)in->sample.loop_length;
+    if (strcmp(param, "volume") == 0)     return in->is_synth ? (float)in->synth.volume : (float)in->sample.volume;
+
+    // Synth instrument params
+    if (strcmp(param, "waveTable") == 0)    return (float)in->synth.wave_table;
+    if (strcmp(param, "waveLength") == 0)   return (float)in->synth.wave_length;
+    if (strcmp(param, "adsrControl") == 0)  return (float)in->synth.adsr_control;
+    if (strcmp(param, "adsrTable") == 0)    return (float)in->synth.adsr_table;
+    if (strcmp(param, "adsrLength") == 0)   return (float)in->synth.adsr_length;
+    if (strcmp(param, "adsrSpeed") == 0)    return (float)in->synth.adsr_speed;
+    if (strcmp(param, "lfoControl") == 0)   return (float)in->synth.lfo_control;
+    if (strcmp(param, "lfoTable") == 0)     return (float)in->synth.lfo_table;
+    if (strcmp(param, "lfoDepth") == 0)     return (float)in->synth.lfo_depth;
+    if (strcmp(param, "lfoLength") == 0)    return (float)in->synth.lfo_length;
+    if (strcmp(param, "lfoDelay") == 0)     return (float)in->synth.lfo_delay;
+    if (strcmp(param, "lfoSpeed") == 0)     return (float)in->synth.lfo_speed;
+    if (strcmp(param, "egControl") == 0)    return (float)in->synth.eg_control;
+    if (strcmp(param, "egTable") == 0)      return (float)in->synth.eg_table;
+    if (strcmp(param, "egLength") == 0)     return (float)in->synth.eg_length;
+    if (strcmp(param, "egDelay") == 0)      return (float)in->synth.eg_delay;
+    if (strcmp(param, "egSpeed") == 0)      return (float)in->synth.eg_speed;
+    if (strcmp(param, "fxControl") == 0)    return (float)in->synth.fx_control;
+    if (strcmp(param, "fxSpeed") == 0)      return (float)in->synth.fx_speed;
+    if (strcmp(param, "fxDelay") == 0)      return (float)in->synth.fx_delay;
+    if (strcmp(param, "modControl") == 0)   return (float)in->synth.mod_control;
+    if (strcmp(param, "modTable") == 0)     return (float)in->synth.mod_table;
+    if (strcmp(param, "modSpeed") == 0)     return (float)in->synth.mod_speed;
+    if (strcmp(param, "modDelay") == 0)     return (float)in->synth.mod_delay;
+    if (strcmp(param, "modLength") == 0)    return (float)in->synth.mod_length;
+
+    return -1.0f;
+}
+
+void sm_set_instrument_param(SmModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= 15 || !param) return;
+    SmInstrument* in = &module->instruments[inst];
+    uint16_t v = (uint16_t)value;
+    uint8_t b = (uint8_t)value;
+
+    // Sample instrument params
+    if (strcmp(param, "length") == 0)     { in->sample.length = v; return; }
+    if (strcmp(param, "loopStart") == 0)  { in->sample.loop_start = v; return; }
+    if (strcmp(param, "loopLength") == 0) { in->sample.loop_length = v; return; }
+    if (strcmp(param, "volume") == 0) {
+        if (in->is_synth) in->synth.volume = v;
+        else              in->sample.volume = v;
+        return;
+    }
+
+    // Synth instrument params
+    if (strcmp(param, "waveTable") == 0)    { in->synth.wave_table = b; return; }
+    if (strcmp(param, "waveLength") == 0)   { in->synth.wave_length = v; return; }
+    if (strcmp(param, "adsrControl") == 0)  { in->synth.adsr_control = b; return; }
+    if (strcmp(param, "adsrTable") == 0)    { in->synth.adsr_table = b; return; }
+    if (strcmp(param, "adsrLength") == 0)   { in->synth.adsr_length = v; return; }
+    if (strcmp(param, "adsrSpeed") == 0)    { in->synth.adsr_speed = b; return; }
+    if (strcmp(param, "lfoControl") == 0)   { in->synth.lfo_control = b; return; }
+    if (strcmp(param, "lfoTable") == 0)     { in->synth.lfo_table = b; return; }
+    if (strcmp(param, "lfoDepth") == 0)     { in->synth.lfo_depth = b; return; }
+    if (strcmp(param, "lfoLength") == 0)    { in->synth.lfo_length = v; return; }
+    if (strcmp(param, "lfoDelay") == 0)     { in->synth.lfo_delay = b; return; }
+    if (strcmp(param, "lfoSpeed") == 0)     { in->synth.lfo_speed = b; return; }
+    if (strcmp(param, "egControl") == 0)    { in->synth.eg_control = b; return; }
+    if (strcmp(param, "egTable") == 0)      { in->synth.eg_table = b; return; }
+    if (strcmp(param, "egLength") == 0)     { in->synth.eg_length = v; return; }
+    if (strcmp(param, "egDelay") == 0)      { in->synth.eg_delay = b; return; }
+    if (strcmp(param, "egSpeed") == 0)      { in->synth.eg_speed = b; return; }
+    if (strcmp(param, "fxControl") == 0)    { in->synth.fx_control = b; return; }
+    if (strcmp(param, "fxSpeed") == 0)      { in->synth.fx_speed = b; return; }
+    if (strcmp(param, "fxDelay") == 0)      { in->synth.fx_delay = b; return; }
+    if (strcmp(param, "modControl") == 0)   { in->synth.mod_control = b; return; }
+    if (strcmp(param, "modTable") == 0)     { in->synth.mod_table = b; return; }
+    if (strcmp(param, "modSpeed") == 0)     { in->synth.mod_speed = b; return; }
+    if (strcmp(param, "modDelay") == 0)     { in->synth.mod_delay = b; return; }
+    if (strcmp(param, "modLength") == 0)    { in->synth.mod_length = v; return; }
 }
 
 size_t sm_export(const SmModule* module, uint8_t* out, size_t max_size) {

@@ -27,4 +27,29 @@ size_t is2_render_multi(Is2Module* module, float* ch0, float* ch1, float* ch2, f
 
 bool is2_has_ended(const Is2Module* module);
 
+// Edit API
+int is2_get_instrument_count(const Is2Module* module);
+int is2_get_num_track_lines(const Is2Module* module);
+int is2_get_num_positions(const Is2Module* module);
 
+void is2_get_cell(const Is2Module* module, int idx,
+                   uint8_t* note, uint8_t* instrument, uint8_t* arpeggio,
+                   uint8_t* effect, uint8_t* effect_arg);
+void is2_set_cell(Is2Module* module, int idx,
+                   uint8_t note, uint8_t instrument, uint8_t arpeggio,
+                   uint8_t effect, uint8_t effect_arg);
+
+void is2_get_position(const Is2Module* module, int pos, int channel,
+                       uint16_t* start_track_row, int8_t* sound_transpose, int8_t* note_transpose);
+void is2_set_position(Is2Module* module, int pos, int channel,
+                       uint16_t start_track_row, int8_t sound_transpose, int8_t note_transpose);
+
+float is2_get_instrument_param(const Is2Module* module, int inst, const char* param);
+void is2_set_instrument_param(Is2Module* module, int inst, const char* param, float value);
+
+size_t is2_export(const Is2Module* module, uint8_t* out, size_t max_size);
+
+
+#ifdef __cplusplus
+}
+#endif

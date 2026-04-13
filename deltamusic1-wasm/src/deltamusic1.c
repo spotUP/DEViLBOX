@@ -1183,9 +1183,97 @@ bool dm1_has_ended(const Dm1Module* module) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int dm1_get_instrument_count(const Dm1Module* module) {
-    // TODO: return actual instrument count from format-specific field
-    (void)module;
-    return 0;
+    return module ? 20 : 0;
+}
+
+int dm1_get_num_blocks(const Dm1Module* module) {
+    return module ? (int)module->num_blocks : 0;
+}
+
+void dm1_get_cell(const Dm1Module* module, int block_idx, int row,
+                  uint8_t* note, uint8_t* instrument, uint8_t* effect, uint8_t* effect_arg) {
+    if (!module || block_idx < 0 || block_idx >= (int)module->num_blocks ||
+        row < 0 || row >= 16 || !module->blocks || !module->blocks[block_idx]) {
+        if (note) *note = 0; if (instrument) *instrument = 0;
+        if (effect) *effect = 0; if (effect_arg) *effect_arg = 0;
+        return;
+    }
+    const Dm1BlockLine* bl = &module->blocks[block_idx][row];
+    if (note)       *note       = bl->note;
+    if (instrument) *instrument = bl->instrument;
+    if (effect)     *effect     = (uint8_t)bl->effect;
+    if (effect_arg) *effect_arg = bl->effect_arg;
+}
+
+void dm1_set_cell(Dm1Module* module, int block_idx, int row,
+                  uint8_t note, uint8_t instrument, uint8_t effect, uint8_t effect_arg) {
+    if (!module || block_idx < 0 || block_idx >= (int)module->num_blocks ||
+        row < 0 || row >= 16 || !module->blocks || !module->blocks[block_idx]) return;
+    Dm1BlockLine* bl = &module->blocks[block_idx][row];
+    bl->note       = note;
+    bl->instrument = instrument;
+    bl->effect     = (Dm1Effect)effect;
+    bl->effect_arg = effect_arg;
+}
+
+const char* dm1_get_instrument_name(const Dm1Module* module, int inst) {
+    (void)module; (void)inst;
+    return "";  // DeltaMusic1 instruments have no names
+}
+
+float dm1_get_instrument_param(const Dm1Module* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= 20 || !param) return -1.0f;
+    // Instruments are stored via playing_info.instruments and backup_instruments
+    const Dm1Instrument* in = module->backup_instruments[inst];
+    if (!in) return -1.0f;
+
+    if (strcmp(param, "number") == 0)         return (float)in->number;
+    if (strcmp(param, "attackStep") == 0)      return (float)in->attack_step;
+    if (strcmp(param, "attackDelay") == 0)     return (float)in->attack_delay;
+    if (strcmp(param, "decayStep") == 0)       return (float)in->decay_step;
+    if (strcmp(param, "decayDelay") == 0)      return (float)in->decay_delay;
+    if (strcmp(param, "sustain") == 0)         return (float)in->sustain;
+    if (strcmp(param, "releaseStep") == 0)     return (float)in->release_step;
+    if (strcmp(param, "releaseDelay") == 0)    return (float)in->release_delay;
+    if (strcmp(param, "volume") == 0)          return (float)in->volume;
+    if (strcmp(param, "vibratoWait") == 0)     return (float)in->vibrato_wait;
+    if (strcmp(param, "vibratoStep") == 0)     return (float)in->vibrato_step;
+    if (strcmp(param, "vibratoLength") == 0)   return (float)in->vibrato_length;
+    if (strcmp(param, "bendRate") == 0)        return (float)in->bend_rate;
+    if (strcmp(param, "portamento") == 0)      return (float)in->portamento;
+    if (strcmp(param, "isSample") == 0)        return (float)in->is_sample;
+    if (strcmp(param, "tableDelay") == 0)      return (float)in->table_delay;
+    if (strcmp(param, "sampleLength") == 0)    return (float)in->sample_length;
+    if (strcmp(param, "repeatStart") == 0)     return (float)in->repeat_start;
+    if (strcmp(param, "repeatLength") == 0)    return (float)in->repeat_length;
+
+    return -1.0f;
+}
+
+void dm1_set_instrument_param(Dm1Module* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= 20 || !param) return;
+    Dm1Instrument* in = module->backup_instruments[inst];
+    if (!in) return;
+    uint8_t b = (uint8_t)value;
+    uint16_t v = (uint16_t)value;
+
+    if (strcmp(param, "attackStep") == 0)      { in->attack_step = b; return; }
+    if (strcmp(param, "attackDelay") == 0)     { in->attack_delay = b; return; }
+    if (strcmp(param, "decayStep") == 0)       { in->decay_step = b; return; }
+    if (strcmp(param, "decayDelay") == 0)      { in->decay_delay = b; return; }
+    if (strcmp(param, "sustain") == 0)         { in->sustain = v; return; }
+    if (strcmp(param, "releaseStep") == 0)     { in->release_step = b; return; }
+    if (strcmp(param, "releaseDelay") == 0)    { in->release_delay = b; return; }
+    if (strcmp(param, "volume") == 0)          { in->volume = b; return; }
+    if (strcmp(param, "vibratoWait") == 0)     { in->vibrato_wait = b; return; }
+    if (strcmp(param, "vibratoStep") == 0)     { in->vibrato_step = b; return; }
+    if (strcmp(param, "vibratoLength") == 0)   { in->vibrato_length = b; return; }
+    if (strcmp(param, "bendRate") == 0)        { in->bend_rate = (int8_t)value; return; }
+    if (strcmp(param, "portamento") == 0)      { in->portamento = b; return; }
+    if (strcmp(param, "tableDelay") == 0)      { in->table_delay = b; return; }
+    if (strcmp(param, "sampleLength") == 0)    { in->sample_length = v; return; }
+    if (strcmp(param, "repeatStart") == 0)     { in->repeat_start = v; return; }
+    if (strcmp(param, "repeatLength") == 0)    { in->repeat_length = v; return; }
 }
 
 size_t dm1_export(const Dm1Module* module, uint8_t* out, size_t max_size) {

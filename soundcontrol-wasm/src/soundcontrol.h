@@ -27,4 +27,14 @@ size_t sc_render_multi(ScModule* module, float* ch0, float* ch1, float* ch2, flo
 
 bool sc_has_ended(const ScModule* module);
 
+// Edit API
+int sc_get_instrument_count(const ScModule* module);
+int sc_get_num_samples(const ScModule* module);
+float sc_get_instrument_param(const ScModule* module, int inst, const char* param);
+void sc_set_instrument_param(ScModule* module, int inst, const char* param, float value);
+size_t sc_export(const ScModule* module, uint8_t* out, size_t max_size);
 
+
+#ifdef __cplusplus
+}
+#endif
