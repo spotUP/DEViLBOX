@@ -95,7 +95,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
       }
 
       // Determine file type
-      const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+      let ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
 
       try {
         // Check for GoatTracker .sng by magic bytes (before extension-based routing
@@ -123,25 +123,14 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           return;
         }
 
-        // DefleMask .dmf files are zlib-compressed — inflate before magic check
-        if (ext === '.dmf') {
-          const hdr = new Uint8Array(arrayBuffer, 0, 2);
-          if (hdr[0] === 0x78 && (hdr[1] === 0x9c || hdr[1] === 0x01 || hdr[1] === 0xDA)) {
-            try {
-              const pako = await import('pako');
-              const inflated = pako.inflateRaw(new Uint8Array(arrayBuffer).subarray(2));
-              arrayBuffer = inflated.buffer.byteLength === inflated.byteLength
-                ? inflated.buffer as ArrayBuffer
-                : inflated.buffer.slice(inflated.byteOffset, inflated.byteOffset + inflated.byteLength) as ArrayBuffer;
-              console.log(`[ModuleLoader] .dmf zlib inflated → ${arrayBuffer.byteLength} bytes`);
-            } catch (err) {
-              console.warn('[ModuleLoader] .dmf zlib inflate failed:', err);
-            }
-          }
+        // DefleMask .dmf → treat as Furnace (DivEngine::load() handles DMF natively,
+        // including zlib decompression, instrument parsing, and chip dispatch setup)
+        const isDefleMask = ext === '.dmf';
+        if (isDefleMask) {
+          // Remap ext so loadWithNativeParser routes to the Furnace parser
+          ext = '.fur';
         }
-        const isDefleMask = ext === '.dmf' && arrayBuffer.byteLength >= 16 &&
-          new TextDecoder().decode(new Uint8Array(arrayBuffer, 0, 16)).startsWith('.DelekDefleMask.');
-        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || isDefleMask || ext === '.xrns';
+        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.xrns';
         // Try native parser for XM/MOD/XRNS
         if (useNativeParser) {
           console.log('[ModuleLoader] Trying native parser for', ext);
@@ -156,7 +145,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               // Create metadata for compatibility
               const metadata: ModuleMetadata = {
                 title: nativeData.importMetadata.sourceFile,
-                type: ext === '.fur' ? 'Furnace' : isDefleMask ? 'DefleMask' : nativeData.format,
+                type: isDefleMask ? 'DefleMask' : ext === '.fur' ? 'Furnace' : nativeData.format,
                 channels: nativeData.importMetadata.originalChannelCount,
                 patterns: nativeData.importMetadata.originalPatternCount,
                 orders: nativeData.importMetadata.modData?.songLength || 1,

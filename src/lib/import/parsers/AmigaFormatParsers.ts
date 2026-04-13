@@ -100,25 +100,11 @@ export async function tryRouteFormat(
   // Must come BEFORE Furnace/DefleMask because both use .dmf extension.
   // DefleMask DMF starts with a different magic; X-Tracker starts with "DDMF".
   if (filename.endsWith('.dmf')) {
-    let bytes = new Uint8Array(buffer);
+    const bytes = new Uint8Array(buffer);
+    // Save original buffer — Furnace WASM does its own zlib decompression
+    const originalBuffer = buffer;
 
-    // DefleMask .dmf files are zlib-compressed (magic 0x78 0x9c / 0x78 0x01 / 0x78 0xDA)
-    if (bytes.length > 4 && bytes[0] === 0x78 && (bytes[1] === 0x9c || bytes[1] === 0x01 || bytes[1] === 0xDA)) {
-      try {
-        const pako = await import('pako');
-        // Use raw inflate (skip 2-byte zlib header) to avoid adler32 checksum failures
-        // on files with corrupted checksums but valid data (common in DefleMask exports)
-        const inflated = pako.inflateRaw(bytes.subarray(2));
-        buffer = inflated.buffer.byteLength === inflated.byteLength
-          ? inflated.buffer as ArrayBuffer
-          : inflated.buffer.slice(inflated.byteOffset, inflated.byteOffset + inflated.byteLength) as ArrayBuffer;
-        bytes = new Uint8Array(buffer);
-        console.log(`[AmigaFormatParsers] .dmf zlib inflated → ${buffer.byteLength} bytes`);
-      } catch (err) {
-        console.warn('[AmigaFormatParsers] .dmf zlib inflate failed:', err);
-      }
-    }
-
+    // Check for X-Tracker DMF (magic "DDMF") — different format, same extension
     if (prefs.xTracker === 'native') {
       try {
         const { isXTrackerFormat, parseXTrackerFile } = await import('@lib/import/formats/XTrackerParser');
@@ -130,15 +116,19 @@ export async function tryRouteFormat(
         console.warn(`[XTrackerParser] Native parse failed for ${filename}, falling back:`, err);
       }
     }
-    // Check for DefleMask magic ".DelekDefleMask." (16 bytes, DIV_DMF_MAGIC in Furnace)
-    const isDefleMask = bytes.length > 16 &&
+
+    // Detect DefleMask: either zlib-compressed (0x78 0x9c) or uncompressed (.Delek magic)
+    const isZlibCompressed = bytes.length > 4 && bytes[0] === 0x78 &&
+      (bytes[1] === 0x9c || bytes[1] === 0x01 || bytes[1] === 0xDA);
+    const isDefleMaskMagic = bytes.length > 16 &&
       bytes[0] === 0x2E && bytes[1] === 0x44 && bytes[2] === 0x65 && bytes[3] === 0x6C
       && bytes[4] === 0x65 && bytes[5] === 0x6B; // ".Delek"
     const isDDMF = bytes[0] === 0x44 && bytes[1] === 0x44 && bytes[2] === 0x4D && bytes[3] === 0x46;
-    if (isDefleMask) {
-      // DefleMask .dmf files → use TS parser directly (Furnace WASM can't handle DMF)
-      const { parseDefleMaskToTrackerSong } = await import('./DefleMaskToSong');
-      return parseDefleMaskToTrackerSong(buffer, originalFileName);
+    if (isZlibCompressed || isDefleMaskMagic) {
+      // Route DefleMask through Furnace WASM — DivEngine::load() handles DMF natively
+      // (zlib decompression, instrument parsing, chip dispatch setup)
+      const { parseFurnaceFile } = await import('./FurnaceToSong');
+      return parseFurnaceFile(originalBuffer, originalFileName, subsong);
     }
     if (!isDDMF) {
       // Unknown .dmf variant → try OpenMPT WASM first, then Furnace WASM
