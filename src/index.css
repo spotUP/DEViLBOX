@@ -20,40 +20,40 @@
     font-weight: 400;
     color-scheme: dark;
 
-    /* CSS Variables for easy theming - defaults to DEViLBOX red theme */
-    --color-bg: #6e1418;
-    --color-bg-secondary: #7c1a1e;
-    --color-bg-tertiary: #8c2028;
-    --color-bg-hover: #a02430;
-    --color-bg-active: #b52838;
-    --color-border: #581014;
-    --color-border-light: #9c2028;
-    --color-accent: #e84850;
-    --color-accent-secondary: #c4282e;
-    --color-accent-glow: rgba(232, 72, 80, 0.35);
-    --color-text: rgba(255,255,255,0.95);
-    --color-text-secondary: rgba(255,255,255,0.65);
-    --color-text-muted: rgba(255,255,255,0.35);
-    --color-text-inverse: #6e1418;
-    --color-error: #ff8888;
-    --color-success: #5eeaa0;
-    --color-warning: #ffd060;
+    /* CSS Variables for easy theming - defaults to Modern theme */
+    --color-bg: #1a1a1a;
+    --color-bg-secondary: #222222;
+    --color-bg-tertiary: #2c2c2c;
+    --color-bg-hover: #404040;
+    --color-bg-active: #4c4c4c;
+    --color-border: #383838;
+    --color-border-light: #505050;
+    --color-accent: #f59e0b;
+    --color-accent-secondary: #b45309;
+    --color-accent-glow: rgba(245, 158, 11, 0.25);
+    --color-text: #f0f0f0;
+    --color-text-secondary: #a0a0a0;
+    --color-text-muted: #606060;
+    --color-text-inverse: #1a1a1a;
+    --color-error: #ef4444;
+    --color-success: #22c55e;
+    --color-warning: #f59e0b;
 
-    /* Tracker row colors — darker red for recessed pattern editor */
-    --color-tracker-row-even: #4a0e12;
-    --color-tracker-row-odd: #521014;
-    --color-tracker-row-highlight: #601418;
-    --color-tracker-row-current: #8c2028;
-    --color-tracker-row-cursor: #721820;
+    /* Tracker row colors — warm amber-tinted backgrounds */
+    --color-tracker-row-even: #1e1e1e;
+    --color-tracker-row-odd: #222222;
+    --color-tracker-row-highlight: #282828;
+    --color-tracker-row-current: #2a2219;
+    --color-tracker-row-cursor: #f59e0b33;
 
     /* Cell colors */
-    --color-cell-note: rgba(255,255,255,0.92);
-    --color-cell-instrument: #ffd060;
-    --color-cell-volume: #5eeaa0;
-    --color-cell-effect: #ffb0b0;
-    --color-cell-accent: #ff6b6b;
-    --color-cell-slide: #ffb8c8;
-    --color-cell-empty: rgba(255,255,255,0.2);
+    --color-cell-note: #f0f0f0;
+    --color-cell-instrument: #fbbf24;
+    --color-cell-volume: #22c55e;
+    --color-cell-effect: #f59e0b;
+    --color-cell-accent: #fbbf24;
+    --color-cell-slide: #a0a0a0;
+    --color-cell-empty: #404040;
 
     /* Synth control group colors (for knobs/controls semantic grouping) */
     --color-synth-filter: #00d4aa;      /* Filter cutoff, resonance */
