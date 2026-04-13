@@ -13,6 +13,7 @@ import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel, SequenceEditor } from '@components/instruments/shared';
 import { UADEChipEditor } from '@engine/uade/UADEChipEditor';
 import { UADEEngine } from '@engine/uade/UADEEngine';
+import { OctaMEDEngine } from '@/engine/octamed/OctaMEDEngine';
 
 interface OctaMEDControlsProps {
   config: OctaMEDConfig;
@@ -107,6 +108,11 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
   const upd = useCallback(<K extends keyof OctaMEDConfig>(key: K, value: OctaMEDConfig[K]) => {
     onChange({ [key]: value } as Partial<OctaMEDConfig>);
+
+    // Push to WASM engine if running
+    if (OctaMEDEngine.hasInstance() && typeof value === 'number') {
+      OctaMEDEngine.getInstance().setInstrumentParam(0, key, value);
+    }
 
     // Write-back to chip RAM so edits take effect in the running UADE player
     const editor = getEditor();

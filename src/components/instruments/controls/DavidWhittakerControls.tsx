@@ -15,6 +15,7 @@ import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { DavidWhittakerEngine } from '@/engine/davidwhittaker/DavidWhittakerEngine';
 
 interface DavidWhittakerControlsProps {
   config: DavidWhittakerConfig;
@@ -71,6 +72,12 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
 
   const upd = useCallback(<K extends keyof DavidWhittakerConfig>(key: K, value: DavidWhittakerConfig[K]) => {
     onChange({ [key]: value } as Partial<DavidWhittakerConfig>);
+    // Push numeric params to WASM engine if running
+    if (typeof value === 'number' && DavidWhittakerEngine.hasInstance()) {
+      const paramMap: Record<string, string> = { defaultVolume: 'volume', vibratoSpeed: 'vibSpeed', vibratoDepth: 'vibDepth', relative: 'relative' };
+      const wasmKey = paramMap[key as string];
+      if (wasmKey) DavidWhittakerEngine.getInstance().setInstrumentParam(0, wasmKey, value);
+    }
   }, [onChange]);
 
   // ── MAIN TAB ──────────────────────────────────────────────────────────────

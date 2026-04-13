@@ -33,6 +33,7 @@ import { SectionLabel } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
+import { DeltaMusic2Engine } from '@/engine/deltamusic2/DeltaMusic2Engine';
 
 // ── DM2 instrument header byte offsets ─────────────────────────────────────
 
@@ -101,6 +102,11 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
           : e
       );
       onChange({ volTable: newTable });
+      // Push to WASM engine: param names are "volSpeed0".."volSpeed4", "volLevel0".."volLevel4", "volSustain0".."volSustain4"
+      if (DeltaMusic2Engine.hasInstance()) {
+        const fieldName = field === 0 ? 'volSpeed' : field === 1 ? 'volLevel' : 'volSustain';
+        DeltaMusic2Engine.getInstance().setInstrumentParam(0, `${fieldName}${entryIndex}`, value);
+      }
       if (uadeChipRam) {
         const byteOff = OFF_VOL_TABLE + entryIndex * 3 + field;
         void getEditor().writeU8(uadeChipRam.instrBase + byteOff, value & 0xFF);
@@ -128,6 +134,11 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
           : e
       );
       onChange({ vibTable: newTable });
+      // Push to WASM engine: param names are "vibSpeed0".."vibSpeed4", "vibDelay0".."vibDelay4", "vibSustain0".."vibSustain4"
+      if (DeltaMusic2Engine.hasInstance()) {
+        const fieldName = field === 0 ? 'vibSpeed' : field === 1 ? 'vibDelay' : 'vibSustain';
+        DeltaMusic2Engine.getInstance().setInstrumentParam(0, `${fieldName}${entryIndex}`, value);
+      }
       if (uadeChipRam) {
         const byteOff = OFF_VIB_TABLE + entryIndex * 3 + field;
         void getEditor().writeU8(uadeChipRam.instrBase + byteOff, value & 0xFF);
@@ -141,6 +152,9 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   const updatePitchBend = useCallback(
     (value: number) => {
       onChange({ pitchBend: value });
+      if (DeltaMusic2Engine.hasInstance()) {
+        DeltaMusic2Engine.getInstance().setInstrumentParam(0, 'pitchBend', value);
+      }
       if (uadeChipRam) {
         void getEditor().writeU16(uadeChipRam.instrBase + OFF_PITCH_BEND, value & 0xFFFF);
       }

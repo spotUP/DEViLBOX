@@ -28,6 +28,7 @@ import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { Download } from 'lucide-react';
 import { HippelCoSoSynth } from '@/engine/hippelcoso/HippelCoSoSynth';
+import { HippelCoSoEngine } from '@/engine/hippelcoso/HippelCoSoEngine';
 
 interface HippelCoSoControlsProps {
   config: HippelCoSoConfig;
@@ -168,6 +169,10 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   const updU8WithChipRam = useCallback(
     (key: keyof HippelCoSoConfig, value: HippelCoSoConfig[keyof HippelCoSoConfig], byteOffset: number) => {
       onChange({ [key]: value } as Partial<HippelCoSoConfig>);
+      // Push to WASM engine if running
+      if (HippelCoSoEngine.hasInstance() && typeof value === 'number') {
+        HippelCoSoEngine.getInstance().setInstrumentParam(0, key, value);
+      }
       if (uadeChipRam && typeof value === 'number') {
         const editor = getEditor();
         if (editor) {
@@ -185,6 +190,10 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   const updS8WithChipRam = useCallback(
     (key: keyof HippelCoSoConfig, value: HippelCoSoConfig[keyof HippelCoSoConfig], byteOffset: number) => {
       onChange({ [key]: value } as Partial<HippelCoSoConfig>);
+      // Push to WASM engine if running
+      if (HippelCoSoEngine.hasInstance() && typeof value === 'number') {
+        HippelCoSoEngine.getInstance().setInstrumentParam(0, key, value);
+      }
       if (uadeChipRam && typeof value === 'number') {
         const editor = getEditor();
         if (editor) {
@@ -198,6 +207,10 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
   const upd = useCallback(<K extends keyof HippelCoSoConfig>(key: K, value: HippelCoSoConfig[K]) => {
     onChange({ [key]: value } as Partial<HippelCoSoConfig>);
+    // Push to WASM engine if running (sequences are arrays, only push numeric scalars)
+    if (HippelCoSoEngine.hasInstance() && typeof value === 'number') {
+      HippelCoSoEngine.getInstance().setInstrumentParam(0, key, value);
+    }
   }, [onChange]);
 
   /**

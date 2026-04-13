@@ -43,6 +43,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { SidMon1Engine } from '@/engine/sidmon1/SidMon1Engine';
 
 interface SidMon1ControlsProps {
   config: SidMon1Config;
@@ -110,6 +111,10 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
 
   const upd = useCallback(<K extends keyof SidMon1Config>(key: K, value: SidMon1Config[K]) => {
     onChange({ [key]: value } as Partial<SidMon1Config>);
+    // Push to WASM engine if running
+    if (SidMon1Engine.hasInstance() && typeof value === 'number') {
+      SidMon1Engine.getInstance().setInstrumentParam(0, key, value);
+    }
   }, [onChange]);
 
   /**
