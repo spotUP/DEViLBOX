@@ -77,6 +77,11 @@ export const FuturePlayerControls: React.FC<FuturePlayerControlsProps> = ({
         FuturePlayerEngine.getInstance().writeByte(cur.detailPtr + FP_NEGATE_OFFSET.pitchMod2Negate, value ? 1 : 0);
       }
     }
+
+    // Also push via setInstrumentParam (no-op until C side handles it)
+    if (typeof value === 'number' && FuturePlayerEngine.hasInstance()) {
+      FuturePlayerEngine.getInstance().setInstrumentParam(0, key, value);
+    }
   }, [onChange]);
 
   // ── Tab buttons ─────────────────────────────────────────────────────────

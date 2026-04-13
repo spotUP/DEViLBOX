@@ -46,6 +46,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { FredEngine } from '@/engine/fred/FredEngine';
 import { Download } from 'lucide-react';
 
 interface FredControlsProps {
@@ -122,6 +123,10 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     const editor = getEditor();
     if (editor && uadeChipRam && chipWriter) {
       chipWriter(editor, uadeChipRam.instrBase).catch(console.error);
+    }
+    // Push to WASM engine if running
+    if (FredEngine.hasInstance() && typeof value === 'number') {
+      FredEngine.getInstance().setInstrumentParam(0, key, value);
     }
   }
 

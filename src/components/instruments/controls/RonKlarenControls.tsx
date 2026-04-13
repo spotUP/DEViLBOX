@@ -16,6 +16,7 @@ import type { RonKlarenConfig } from '@/types/instrument/exotic';
 import { Knob } from '@components/controls/Knob';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { SectionLabel } from '@components/instruments/shared';
+import { RonKlarenEngine } from '@/engine/ronklaren/RonKlarenEngine';
 
 interface RonKlarenControlsProps {
   config: RonKlarenConfig;
@@ -39,6 +40,14 @@ export const RonKlarenControls: React.FC<RonKlarenControlsProps> = ({
 
   const upd = useCallback(<K extends keyof RonKlarenConfig>(key: K, value: RonKlarenConfig[K]) => {
     onChange({ [key]: value } as Partial<RonKlarenConfig>);
+
+    // Push numeric values to the running WASM engine
+    if (typeof value === 'number' && RonKlarenEngine.hasInstance()) {
+      RonKlarenEngine.getInstance().setInstrumentParam(0, key, value);
+    }
+    if (typeof value === 'boolean' && RonKlarenEngine.hasInstance()) {
+      RonKlarenEngine.getInstance().setInstrumentParam(0, key, value ? 1 : 0);
+    }
   }, [onChange]);
 
   const updateAdsrEntry = useCallback((index: number, field: 'point' | 'increment', value: number) => {
@@ -46,6 +55,12 @@ export const RonKlarenControls: React.FC<RonKlarenControlsProps> = ({
       i === index ? { ...e, [field]: value } : { ...e }
     );
     onChange({ adsr: newAdsr });
+
+    // Push to WASM: C params are "adsrPoint0"-"adsrPoint3" / "adsrIncrement0"-"adsrIncrement3"
+    if (RonKlarenEngine.hasInstance()) {
+      const paramName = field === 'point' ? `adsrPoint${index}` : `adsrIncrement${index}`;
+      RonKlarenEngine.getInstance().setInstrumentParam(0, paramName, value);
+    }
   }, [onChange]);
 
   // -- MAIN TAB ---

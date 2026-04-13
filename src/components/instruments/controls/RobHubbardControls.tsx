@@ -12,6 +12,7 @@ import { SectionLabel, SequenceEditor, WaveformThumbnail } from '@components/ins
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { RobHubbardEngine } from '@/engine/robhubbard/RobHubbardEngine';
 
 interface RobHubbardControlsProps {
   config: RobHubbardConfig;
@@ -43,6 +44,12 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     // Write sampleVolume (byte at blob+4) back to chip RAM when loaded via UADE.
     if (key === 'sampleVolume' && uadeChipRam) {
       void getEditor().writeBytes(uadeChipRam.instrBase + 4, new Uint8Array([value as number]));
+    }
+    // Push numeric params to WASM engine if running
+    if (typeof value === 'number' && RobHubbardEngine.hasInstance()) {
+      const paramMap: Record<string, string> = { sampleVolume: 'volume', divider: 'divider', relative: 'relative' };
+      const wasmKey = paramMap[key as string];
+      if (wasmKey) RobHubbardEngine.getInstance().setInstrumentParam(0, wasmKey, value);
     }
   }, [onChange, uadeChipRam, getEditor]);
 

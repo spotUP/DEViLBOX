@@ -19,6 +19,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, FormatCell, OnCellChange } from '@/components/shared/format-editor-types';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { DigMugEngine } from '@/engine/digmug/DigMugEngine';
 import { writeWaveformByte } from '@/lib/jamcracker/waveformDraw';
 
 interface DigMugControlsProps {
@@ -114,6 +115,15 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
 
   const upd = useCallback(<K extends keyof DigMugConfig>(key: K, value: DigMugConfig[K]) => {
     onChange({ [key]: value } as Partial<DigMugConfig>);
+    // Push numeric params to WASM engine if running
+    if (typeof value === 'number' && DigMugEngine.hasInstance()) {
+      const paramMap: Record<string, string> = {
+        volume: 'volume', vibSpeed: 'vibSpeed', vibDepth: 'vibDepth',
+        waveBlend: 'waveBlend', waveSpeed: 'waveSpeed', arpSpeed: 'arpSpeed',
+      };
+      const wasmKey = paramMap[key as string];
+      if (wasmKey) DigMugEngine.getInstance().setInstrumentParam(0, wasmKey, value);
+    }
   }, [onChange]);
 
   const updWithChipRam = useCallback(
