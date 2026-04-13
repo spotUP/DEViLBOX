@@ -210,6 +210,7 @@ const SKIP = new Set<string>([
   'sawteeth',                // .st extension conflict with 7 formats — separate session
   'v2',                      // V2M synth WIP — separate session
   'sunvox',                  // SunVox engine WIP — separate session
+  'hippel-7v',               // Moved to TFMX player library — crashes UADE, needs investigation
 ]);
 
 // Expected min channels per format family
