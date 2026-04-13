@@ -27,6 +27,13 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.isoRings = [null, null, null, null]; // { ringL, ringR, ringWritePos, ringReadPos, ringAvailable }
     this.savedChannelGains = null; // saved gains during isolation render
 
+    // Per-channel oscilloscope
+    this.oscEnabled = false;
+    this.oscSnapshots = null;   // Int16Array[] per channel, each 256 samples
+    this.oscWritePos = null;    // number[] per channel write cursor
+    this.oscLastSendTime = 0;
+    this.oscNumChannels = 0;
+
     // WASM float buffers for decode output
     this.decodePtrL = 0;
     this.decodePtrR = 0;
@@ -192,6 +199,27 @@ class HivelyProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'enableOsc': {
+        const nc = this.wasm?._hively_get_channels ? this.wasm._hively_get_channels() : 4;
+        this.oscEnabled = true;
+        this.oscNumChannels = nc;
+        this.oscSnapshots = new Array(nc);
+        this.oscWritePos = new Array(nc);
+        for (let i = 0; i < nc; i++) {
+          this.oscSnapshots[i] = new Int16Array(256);
+          this.oscWritePos[i] = 0;
+        }
+        this.oscLastSendTime = 0;
+        break;
+      }
+
+      case 'disableOsc':
+        this.oscEnabled = false;
+        this.oscSnapshots = null;
+        this.oscWritePos = null;
+        this.oscNumChannels = 0;
+        break;
+
       case 'setTrackStep':
         if (this.wasm) {
           this.wasm._hively_set_track_step(
@@ -346,9 +374,10 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
     const hasIsolation = this.isolationSlots.some(s => s !== null);
     const hasSplitApi = typeof this.wasm._hively_tick_frame === 'function';
+    const needsSplit = hasIsolation || this.oscEnabled;
 
-    if (!hasIsolation || !hasSplitApi) {
-      // Fast path: no isolation, use combined decode
+    if (!needsSplit || !hasSplitApi) {
+      // Fast path: no isolation or oscilloscope, use combined decode
       const samples = this.wasm._hively_decode_frame(this.decodePtrL, this.decodePtrR);
       if (samples <= 0) return;
       this._writeToMainRing(samples);
@@ -414,7 +443,51 @@ class HivelyProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // 6. Restore all channel gains to unity
+    // 6. Per-channel oscilloscope capture
+    if (this.oscEnabled && this.oscSnapshots) {
+      const nc = this.oscNumChannels;
+      for (let ch = 0; ch < nc; ch++) {
+        // Solo this channel
+        this.wasm._hively_restore_voice_positions();
+        for (let c = 0; c < numChannels; c++) {
+          this.wasm._hively_set_channel_gain(c, c === ch ? 1.0 : 0.0);
+        }
+        const oscSamples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
+        if (oscSamples > 0) {
+          const heapF32 = this.wasm.HEAPF32;
+          const offL = this.decodePtrL >> 2;
+          const offR = this.decodePtrR >> 2;
+          const snap = this.oscSnapshots[ch];
+          let wp = this.oscWritePos[ch];
+          // Sample at most 256 samples from the frame
+          const step = Math.max(1, Math.floor(oscSamples / 256));
+          for (let i = 0; i < oscSamples; i += step) {
+            const mono = (heapF32[offL + i] + heapF32[offR + i]) * 0.5;
+            snap[wp] = Math.max(-32768, Math.min(32767, (mono * 32767) | 0));
+            wp = (wp + 1) & 255;
+          }
+          this.oscWritePos[ch] = wp;
+        }
+      }
+
+      // Send at ~30fps
+      if (currentTime - this.oscLastSendTime > 0.033) {
+        this.oscLastSendTime = currentTime;
+        const out = new Array(nc);
+        for (let ch = 0; ch < nc; ch++) {
+          const snap = this.oscSnapshots[ch];
+          const wp = this.oscWritePos[ch];
+          const copy = new Int16Array(256);
+          for (let j = 0; j < 256; j++) {
+            copy[j] = snap[(wp + j) & 255];
+          }
+          out[ch] = copy;
+        }
+        this.port.postMessage({ type: 'oscData', channels: out }, out.map(a => a.buffer));
+      }
+    }
+
+    // 7. Restore all channel gains to unity
     for (let ch = 0; ch < numChannels; ch++) {
       this.wasm._hively_set_channel_gain(ch, 1.0);
     }

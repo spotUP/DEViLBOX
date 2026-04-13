@@ -17,6 +17,7 @@ import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 export interface UADEScanRow {
   period: number;
@@ -384,6 +385,10 @@ export class UADEEngine implements IsolationCapableEngine {
           } catch { /* ToneEngine not ready */ }
           break;
 
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels);
+          break;
+
         case 'songEnd':
           for (const cb of this._songEndCallbacks) {
             cb();
@@ -682,10 +687,15 @@ export class UADEEngine implements IsolationCapableEngine {
     // Restore gain (muted by stop())
     try { this.output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
     this.workletNode?.port.postMessage({ type: 'play' });
+    // Enable per-channel oscilloscope capture (4 Paula channels)
+    useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
+    this.workletNode?.port.postMessage({ type: 'enableOsc' });
   }
 
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
+    this.workletNode?.port.postMessage({ type: 'disableOsc' });
+    useOscilloscopeStore.getState().clear();
     // Immediately mute the output GainNode to prevent audio leaking while
     // the async stop message is processed by the worklet thread.
     // The gain is restored on next loadTune/play.
