@@ -986,7 +986,9 @@ export async function parseSonicArrangerFile(
     initialSpeed:    Math.max(1, song.startSpeed),
     initialBPM,
     linearPeriods:   false,
-    sonicArrangerFileData: buffer.slice(0) as ArrayBuffer,
+    // Only use dedicated WASM replayer for SOARV1.0 chunk format;
+    // 4EFA player binaries need UADE's 68k emulation
+    ...(useOffsetTable ? {} : { sonicArrangerFileData: buffer.slice(0) as ArrayBuffer }),
     uadePatternLayout,
   };
 }
