@@ -995,10 +995,6 @@ export async function parseUADEFile(
         const { parseBenDaglishFile } = await import('./BenDaglishParser');
         return parseBenDaglishFile(buffer, filename);
       },
-      'KrisHatlelid': async () => {
-        const { parseKrisHatlelidFile } = await import('./KrisHatlelidParser');
-        return parseKrisHatlelidFile(buffer, filename);
-      },
       'Ashley_Hogg': async () => {
         const { parseAshleyHoggFile } = await import('./AshleyHoggParser');
         return parseAshleyHoggFile(buffer, filename);
@@ -1007,53 +1003,55 @@ export async function parseUADEFile(
         const { parseSoundMasterFile } = await import('./SoundMasterParser');
         return parseSoundMasterFile(buffer, filename);
       },
-      'DavidHanney': async () => {
-        const { parseDavidHanneyFile } = await import('./DavidHanneyParser');
-        return parseDavidHanneyFile(buffer, filename);
-      },
+      // ── Stub formats: return null → fall through to FORCE_CLASSIC tick reconstruction ──
+      // These parsers have no pattern decoding, only empty 64-row placeholders.
+      // Returning null lets the FORCE_CLASSIC path build tick-reconstructed patterns
+      // from live UADE playback, which is far more useful than blank patterns.
+      'DavidHanney': async () => null,
+      'DynamicSynthesizer': async () => null,
+      'SoundImages': async () => null,
+      'Silmarils': async () => null,
+      'VoodooSupremeSynthesizer': async () => null,
+      'AProSys': async () => null,
+      'SoundProgrammingLanguage': async () => null,
+      'SynTracker': async () => null,
+      'MarkII': async () => null,
+
+      // ── Hybrid formats: native parser for samples + deferred tick reconstruction ──
+      // These parsers extract real PCM samples and metadata from the module binary.
+      // We keep that data but augment with UADE audio streaming and enable deferred
+      // tick capture so patterns get reconstructed during playback (~15s).
       'BeathovenSynthesizer': async () => {
         const { parseBeathovenSynthesizerFile } = await import('./BeathovenSynthesizerParser');
-        return parseBeathovenSynthesizerFile(buffer, filename);
+        const nativeSong = await parseBeathovenSynthesizerFile(buffer, filename);
+        if (!nativeSong) return null;
+        const augmented = augmentWithUADEAudio(nativeSong, filename, buffer, metadata);
+        (augmented as any).uadeDeferredCapture = true;
+        return augmented;
       },
       'RiffRaff': async () => {
         const { parseRiffRaffFile } = await import('./RiffRaffParser');
-        return parseRiffRaffFile(buffer, filename);
+        const nativeSong = await parseRiffRaffFile(buffer, filename);
+        if (!nativeSong) return null;
+        const augmented = augmentWithUADEAudio(nativeSong, filename, buffer, metadata);
+        (augmented as any).uadeDeferredCapture = true;
+        return augmented;
       },
       'HowieDavies': async () => {
         const { parseHowieDaviesFile } = await import('./HowieDaviesParser');
-        return parseHowieDaviesFile(buffer, filename);
+        const nativeSong = await parseHowieDaviesFile(buffer, filename);
+        if (!nativeSong) return null;
+        const augmented = augmentWithUADEAudio(nativeSong, filename, buffer, metadata);
+        (augmented as any).uadeDeferredCapture = true;
+        return augmented;
       },
-      'DynamicSynthesizer': async () => {
-        const { parseDynamicSynthesizerFile } = await import('./DynamicSynthesizerParser');
-        return parseDynamicSynthesizerFile(buffer, filename);
-      },
-      'SoundImages': async () => {
-        const { parseSoundImagesFile } = await import('./SoundImagesParser');
-        return parseSoundImagesFile(buffer, filename);
-      },
-      'Silmarils': async () => {
-        const { parseSilmarilsFile } = await import('./SilmarilsParser');
-        return parseSilmarilsFile(buffer, filename);
-      },
-      'VoodooSupremeSynthesizer': async () => {
-        const { parseVoodooSupremeSynthesizerFile } = await import('./VoodooSupremeSynthesizerParser');
-        return parseVoodooSupremeSynthesizerFile(buffer, filename);
-      },
-      'AProSys': async () => {
-        const { parseAProSysFile } = await import('./AProSysParser');
-        return parseAProSysFile(buffer, filename);
-      },
-      'SoundProgrammingLanguage': async () => {
-        const { parseSoundProgrammingLanguageFile } = await import('./SoundProgrammingLanguageParser');
-        return parseSoundProgrammingLanguageFile(buffer, filename);
-      },
-      'SynTracker': async () => {
-        const { parseSynTrackerFile } = await import('./SynTrackerParser');
-        return parseSynTrackerFile(buffer, filename);
-      },
-      'MarkII': async () => {
-        const { parseMarkIIFile } = await import('./MarkIIParser');
-        return parseMarkIIFile(buffer, filename);
+      'KrisHatlelid': async () => {
+        const { parseKrisHatlelidFile } = await import('./KrisHatlelidParser');
+        const nativeSong = await parseKrisHatlelidFile(buffer, filename);
+        if (!nativeSong) return null;
+        const augmented = augmentWithUADEAudio(nativeSong, filename, buffer, metadata);
+        (augmented as any).uadeDeferredCapture = true;
+        return augmented;
       },
     };
     let route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
