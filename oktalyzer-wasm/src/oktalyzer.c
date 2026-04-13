@@ -24,6 +24,7 @@ static const int16_t okt_periods[36] = {
     856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
     428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
     214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113
+
 };
 
 // Panning: 0=left, 1=right
@@ -32,10 +33,12 @@ static const uint8_t okt_pan_pos[8] = { 0, 0, 1, 1, 1, 1, 0, 0 };
 
 static const int8_t okt_arp10[16] = {
     0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0
+
 };
 
 static const int8_t okt_arp12[16] = {
     0, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +90,9 @@ typedef struct OktMixChannel {
 struct OktModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     uint32_t samp_num;
     uint16_t patt_num;
     uint16_t song_length;
@@ -122,6 +128,7 @@ struct OktModule {
 
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1118,6 +1125,10 @@ OktModule* okt_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->ticks_per_frame = sample_rate / 50.0f;
 
     if (!load_module(m, data, size)) {
@@ -1145,6 +1156,7 @@ void okt_destroy(OktModule* module) {
         free(module->patterns);
     }
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1176,4 +1188,23 @@ void okt_set_channel_mask(OktModule* module, uint32_t mask) {
 bool okt_has_ended(const OktModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int okt_get_instrument_count(const OktModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t okt_export(const OktModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

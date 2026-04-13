@@ -60,6 +60,7 @@ static const uint16_t act_periods[73] = {
      428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
      214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
      107,  101,   95
+
 };
 
 static const uint8_t act_sinus[32] = {
@@ -67,6 +68,7 @@ static const uint8_t act_sinus[32] = {
     180, 197, 212, 224, 235, 244, 250, 253,
     255, 253, 250, 244, 235, 224, 212, 197,
     180, 161, 141, 120,  97,  74,  49,  24
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -314,7 +316,10 @@ static void act_reader_read_string(ActReader* r, char* buf, int max_len) {
 
 typedef struct ActModule {
     float sample_rate;
-    bool has_ended;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    bool has_ended;
 
     uint16_t tempo;
 
@@ -1709,6 +1714,10 @@ ActModule* act_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->tempo = tempo;
 
     long start_offset = reader.pos;
@@ -1829,6 +1838,7 @@ void act_destroy(ActModule* module) {
     }
 
     free(module->song_info_list);
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1859,4 +1869,23 @@ void act_set_channel_mask(ActModule* module, uint32_t mask) {
 bool act_has_ended(const ActModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int act_get_instrument_count(const ActModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t act_export(const ActModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

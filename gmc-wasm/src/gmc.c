@@ -22,6 +22,7 @@ static const int16_t gmc_periods[36] = {
     856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
     428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
     214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,6 +95,9 @@ typedef struct GmcMixChannel {
 struct GmcModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     // Module data
     int          num_positions;
     uint8_t*     position_list;
@@ -115,6 +119,7 @@ struct GmcModule {
     // Tick timing
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -673,6 +678,10 @@ GmcModule* gmc_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!load_module(m, data, size)) {
         gmc_destroy(m);
         return nullptr;
@@ -695,6 +704,7 @@ void gmc_destroy(GmcModule* module) {
     free(module->patterns);
     free(module->position_list);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -726,4 +736,23 @@ void gmc_set_channel_mask(GmcModule* module, uint32_t mask) {
 bool gmc_has_ended(const GmcModule* module) {
     if (!module) return true;
     return module->end_reached;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int gmc_get_instrument_count(const GmcModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t gmc_export(const GmcModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

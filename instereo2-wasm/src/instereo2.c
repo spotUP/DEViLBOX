@@ -61,6 +61,7 @@ static const uint16_t is2_periods[109] = {
       214,   202,   190,   180,   170,   160,   151,   143,   135,   127,   120,   113,
       107,   101,    95,    90,    85,    80,    75,    71,    67,    63,    60,    56,
        53,    50,    47,    45,    42,    40,    37,    35,    33,    31,    30,    28
+
 };
 
 #define IS2_PERIODS_LEN 109
@@ -82,6 +83,7 @@ static const int8_t is2_vibrato[256] = {
     -116, -115, -113, -112, -110, -109, -107, -105, -104, -102, -100,  -98,  -96,  -94,  -92,  -90,
      -87,  -85,  -83,  -80,  -78,  -75,  -73,  -70,  -68,  -65,  -62,  -60,  -57,  -54,  -51,  -48,
      -45,  -42,  -39,  -37,  -34,  -30,  -27,  -24,  -21,  -18,  -15,  -12,   -9,   -6,   -3,    0
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -235,7 +237,10 @@ typedef struct Is2Reader {
 
 typedef struct Is2Module {
     float sample_rate;
-    float playing_frequency;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    float playing_frequency;
 
     Is2SongInfo* sub_songs;
     int num_sub_songs;
@@ -1460,6 +1465,10 @@ Is2Module* is2_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     Is2Reader reader;
     is2_reader_init(&reader, data + 8, size - 8);
 
@@ -1500,6 +1509,7 @@ void is2_destroy(Is2Module* module) {
 
     if (module->instruments) free(module->instruments);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1532,4 +1542,23 @@ void is2_set_channel_mask(Is2Module* module, uint32_t mask) {
 bool is2_has_ended(const Is2Module* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int is2_get_instrument_count(const Is2Module* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t is2_export(const Is2Module* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct AvpModule AvpModule;
 
@@ -30,6 +27,4 @@ size_t avp_render_multi(AvpModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool avp_has_ended(const AvpModule* module);
 
-#ifdef __cplusplus
-}
-#endif
+

@@ -59,6 +59,7 @@ static const uint32_t fred_period_table[72] = {
     1024,  966,  912,  861,  813,  767,  724,  683,  645,  609,  575,  542,
      512,  483,  456,  430,  406,  383,  362,  341,  322,  304,  287,  271,
      256,  241,  228,  215,  203,  191,  181,  170,  161,  152,  143,  135
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,6 +169,9 @@ typedef struct FredMixChannel {
 struct FredModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     uint16_t sub_song_num;
     uint16_t inst_num;
 
@@ -190,6 +194,7 @@ struct FredModule {
 
     float tick_accumulator;
     float ticks_per_frame;       // sample_rate / 50.0 (PAL)
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1774,6 +1779,10 @@ do_load:
     if (!m) { free(converted); return nullptr; }
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->ticks_per_frame = sample_rate / 50.0f;
 
     if (!load_module(m, mod_data, mod_size)) {
@@ -1821,6 +1830,7 @@ void fred_destroy(FredModule* module) {
 
     if (module->has_notes) free(module->has_notes);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1852,4 +1862,23 @@ void fred_set_channel_mask(FredModule* module, uint32_t mask) {
 bool fred_has_ended(const FredModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int fred_get_instrument_count(const FredModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t fred_export(const FredModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

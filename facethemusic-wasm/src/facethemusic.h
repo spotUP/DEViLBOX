@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct FtmModule FtmModule;
 
@@ -27,6 +24,4 @@ size_t ftm_render_multi(FtmModule* module, float** channel_buffers, int num_chan
 
 bool ftm_has_ended(const FtmModule* module);
 
-#ifdef __cplusplus
-}
-#endif
+

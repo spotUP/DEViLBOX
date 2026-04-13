@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct OktModule OktModule;
 
@@ -33,6 +30,4 @@ size_t okt_render_multi(OktModule* module,
 
 bool okt_has_ended(const OktModule* module);
 
-#ifdef __cplusplus
-}
-#endif
+

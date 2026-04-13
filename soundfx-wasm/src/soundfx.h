@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct SfxModule SfxModule;
 
@@ -30,6 +27,4 @@ size_t sfx_render_multi(SfxModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool sfx_has_ended(const SfxModule* module);
 
-#ifdef __cplusplus
-}
-#endif
+
