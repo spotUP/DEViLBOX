@@ -100,7 +100,7 @@ export async function withNativeThenUADE(
         if (result) {
           // Skip UADE injection if a dedicated WASM engine handles audio
           const r = result as any;
-          const hasDedicatedEngine = r.sonicArrangerFileData || r.soundMonFileData || r.digMugFileData || r.davidWhittakerFileData || r.soundControlFileData || r.deltaMusic1FileData || r.deltaMusic2FileData || r.soundFxFileData || r.gmcFileData || r.voodooFileData || r.fredReplayerFileData || r.oktalyzerFileData || r.inStereo1FileData || r.futureComposerFileData || r.inStereo2FileData || r.quadraComposerFileData;
+          const hasDedicatedEngine = r.sonicArrangerFileData || r.soundMonFileData || r.digMugFileData || r.davidWhittakerFileData || r.soundControlFileData || r.deltaMusic1FileData || r.deltaMusic2FileData || r.soundFxFileData || r.gmcFileData || r.voodooFileData || r.fredReplayerFileData || r.oktalyzerFileData || r.inStereo1FileData || r.futureComposerFileData || r.inStereo2FileData || r.quadraComposerFileData || r.ronKlarenFileData || r.actionamicsFileData || r.activisionProFileData || r.synthesisFileData || r.dssFileData || r.soundFactoryFileData || r.faceTheMusicFileData;
           if (!r.uadeEditableFileData && !hasDedicatedEngine) {
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;

@@ -86,7 +86,13 @@ interface FormatStore {
   futureComposerFileData: ArrayBuffer | null;
   inStereo2FileData: ArrayBuffer | null;
   quadraComposerFileData: ArrayBuffer | null;  bdFileData: ArrayBuffer | null;
-  sd2FileData: ArrayBuffer | null;
+  ronKlarenFileData: ArrayBuffer | null;
+  actionamicsFileData: ArrayBuffer | null;
+  activisionProFileData: ArrayBuffer | null;
+  synthesisFileData: ArrayBuffer | null;
+  dssFileData: ArrayBuffer | null;
+  soundFactoryFileData: ArrayBuffer | null;
+  faceTheMusicFileData: ArrayBuffer | null;  sd2FileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
   sawteethFileData: ArrayBuffer | null;
   v2mFileData: ArrayBuffer | null;
@@ -364,7 +370,13 @@ export const useFormatStore = create<FormatStore>()(
     futureComposerFileData: null,
     inStereo2FileData: null,
     quadraComposerFileData: null,    sd2FileData: null,
-    symphonieFileData: null,
+    ronKlarenFileData: null,
+    actionamicsFileData: null,
+    activisionProFileData: null,
+    synthesisFileData: null,
+    dssFileData: null,
+    soundFactoryFileData: null,
+    faceTheMusicFileData: null,    symphonieFileData: null,
     sawteethFileData: null,
     v2mFileData: null,
     uadeEditableFileData: null,
@@ -791,7 +803,13 @@ export const useFormatStore = create<FormatStore>()(
         state.futureComposerFileData = (song as any).futureComposerFileData ?? null;
         state.inStereo2FileData = (song as any).inStereo2FileData ?? null;
         state.quadraComposerFileData = (song as any).quadraComposerFileData ?? null;        state.sd2FileData = (song as any).sd2FileData ?? null;
-        state.symphonieFileData = (song as any).symphonieFileData ?? null;
+        state.ronKlarenFileData = (song as any).ronKlarenFileData ?? null;
+        state.actionamicsFileData = (song as any).actionamicsFileData ?? null;
+        state.activisionProFileData = (song as any).activisionProFileData ?? null;
+        state.synthesisFileData = (song as any).synthesisFileData ?? null;
+        state.dssFileData = (song as any).dssFileData ?? null;
+        state.soundFactoryFileData = (song as any).soundFactoryFileData ?? null;
+        state.faceTheMusicFileData = (song as any).faceTheMusicFileData ?? null;        state.symphonieFileData = (song as any).symphonieFileData ?? null;
         state.sawteethFileData = (song as any).sawteethFileData ?? null;
         state.v2mFileData = (song as any).v2mFileData ?? null;
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
@@ -1060,7 +1078,13 @@ export const useFormatStore = create<FormatStore>()(
       state.futureComposerFileData = null;
       state.inStereo2FileData = null;
       state.quadraComposerFileData = null;      state.sd2FileData = null;
-      state.symphonieFileData = null;
+      state.ronKlarenFileData = null;
+      state.actionamicsFileData = null;
+      state.activisionProFileData = null;
+      state.synthesisFileData = null;
+      state.dssFileData = null;
+      state.soundFactoryFileData = null;
+      state.faceTheMusicFileData = null;      state.symphonieFileData = null;
       state.sawteethFileData = null;
       state.v2mFileData = null;
       state.uadeEditableFileData = null;
