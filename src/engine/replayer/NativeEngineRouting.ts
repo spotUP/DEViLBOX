@@ -582,6 +582,11 @@ export async function startNativeEngines(
   muted: boolean,
   routedNativeEngines: Set<string>,
 ): Promise<NativeEngineStartResult> {
+  // Wait for any pending async engine stops from the previous song to complete.
+  // Prevents race conditions during rapid song switching where the old engine's
+  // stop messages collide with the new engine's initialization.
+  await _pendingStopPromise;
+
   const toneEngine = getToneEngine();
   let suppressNotes = false;
   let c64SidEngine: C64SIDEngine | null = null;
@@ -1024,6 +1029,10 @@ export async function startNativeEngines(
 }
 
 // ---------------------------------------------------------------------------
+// Promise that resolves when all async engine stops from the last stopNativeEngines() complete.
+// startNativeEngines() awaits this to prevent race conditions during rapid song switching.
+let _pendingStopPromise: Promise<void> = Promise.resolve();
+
 // Stop native engines (called from TrackerReplayer.stop())
 // ---------------------------------------------------------------------------
 
@@ -1054,6 +1063,9 @@ export function stopNativeEngines(
     }
   }
 
+  // Collect async stop promises so startNativeEngines can await them
+  const asyncStops: Promise<void>[] = [];
+
   // Stop ALL WASM engines that were running — not just ones matching the current song.
   // The current song may have already been replaced by a new load, so shouldActivate()
   // would miss the previous engine. Use wasRunning to stop everything that was started.
@@ -1077,39 +1089,39 @@ export function stopNativeEngines(
     // If not synchronously resolvable but was started this session, stop via
     // cached dynamic resolver. This handles TFMXModule and other dynamicResolver engines.
     if (!ref && desc.dynamicResolver && wasRunning.has(desc.key)) {
-      desc.dynamicResolver().then(cls => {
+      asyncStops.push(desc.dynamicResolver().then(cls => {
         try { if (cls.hasInstance()) cls.getInstance().stop(); } catch { /* ignored */ }
-      }).catch(() => {});
+      }).catch(() => {}));
     }
   }
 
   // Force-stop UADEEngine regardless of song state — generic UADE files
   // (unrecognized extensions) activate UADEEngine but aren't tracked in WASM_ENGINES.
-  import('../uade/UADEEngine').then(({ UADEEngine: UE }) => {
+  asyncStops.push(import('../uade/UADEEngine').then(({ UADEEngine: UE }) => {
     if (UE.hasInstance()) {
       const inst = UE.getInstance();
       inst.stop();
       try { inst.output.gain.setValueAtTime(0, 0); } catch { /* best effort */ }
     }
-  }).catch(() => {});
+  }).catch(() => {}));
 
   // Force-stop LibopenmptEngine — not in WASM_ENGINES but manages its own worklet
-  import('../libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine: LE }) => {
+  asyncStops.push(import('../libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine: LE }) => {
     if (LE.hasInstance()) {
       LE.getInstance().stop();
     }
-  }).catch(() => {});
+  }).catch(() => {}));
 
   // Stop SymphonieEngine if active
   if (song?.symphonieFileData) {
-    import('../symphonie/SymphonieEngine').then(({ SymphonieEngine }) => {
+    asyncStops.push(import('../symphonie/SymphonieEngine').then(({ SymphonieEngine }) => {
       if (SymphonieEngine.hasInstance()) {
         const engine = SymphonieEngine.getInstance();
         engine.stop();
         const node = engine.getNode();
         if (node) { try { node.disconnect(); } catch { /* ignored */ } }
       }
-    }).catch(() => {});
+    }).catch(() => {}));
   }
 
   // Stop SunVox song-mode instances
@@ -1135,14 +1147,17 @@ export function stopNativeEngines(
   }
 
   // Stop CheeseCutterEngine if active (singleton — always check, song may already be null)
-  import('../cheesecut/CheeseCutterEngine').then(({ CheeseCutterEngine }) => {
+  asyncStops.push(import('../cheesecut/CheeseCutterEngine').then(({ CheeseCutterEngine }) => {
     if (CheeseCutterEngine.hasInstance()) {
       const engine = CheeseCutterEngine.getInstance();
       engine.stop();
       const node = engine.output;
       if (node) { try { node.disconnect(); } catch { /* ignored */ } }
     }
-  }).catch(() => {});
+  }).catch(() => {}));
+
+  // Store pending stop promise so startNativeEngines() can await it
+  _pendingStopPromise = Promise.allSettled(asyncStops).then(() => {});
 
   // Stop C64SIDEngine (instance-based)
   if (c64SidEngine) {

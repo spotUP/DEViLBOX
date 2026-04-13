@@ -63,7 +63,7 @@ export type {
 } from './furnace/FurnaceInstrumentParser';
 
 // Format version constants
-const DIV_ENGINE_VERSION = 231;
+const DIV_ENGINE_VERSION = 245;
 
 /**
  * Furnace instrument type (DIV_INS_*) to DEViLBOX SynthType mapping
