@@ -20,7 +20,7 @@ const BINARY_FILE_DATA_FIELDS = [
   'pumaTrackerFileData', 'steveTurnerFileData', 'sidmon1WasmFileData',
   'fredEditorWasmFileData', 'artOfNoiseFileData', 'qsfFileData', 'startrekkerAMFileData',
   'bdFileData', 'sd2FileData', 'symphonieFileData', 'uadeEditableFileData',
-  'libopenmptFileData',
+  'libopenmptFileData', 'v2mFileData',
 ] as const;
 
 /** Encode an ArrayBuffer or Uint8Array to base64 */

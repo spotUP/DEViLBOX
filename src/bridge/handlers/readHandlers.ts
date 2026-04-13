@@ -672,6 +672,7 @@ export function getFormatState(): Record<string, unknown> {
       format.qsfFileData && 'qsf',
       format.bdFileData && 'bendaglish',
       format.sd2FileData && 'sidmon2',
+      format.v2mFileData && 'v2m',
       format.uadeEditableFileData && 'uade-editable',
       format.libopenmptFileData && 'libopenmpt',
       format.musiclineFileData && 'musicline',
