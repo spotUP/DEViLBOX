@@ -208,10 +208,18 @@ export async function tryRouteFormat(
   // FCParser handles FC 1.3 (magic "FC13"/"SMOD") and FC 1.4 (magic "FC14").
   // Future Composer 2 and other FC variants have different magic bytes and
   // fall through to UADE automatically when the native parser rejects them.
-  // injectUADE: native parser always runs for editable patterns; UADE handles audio.
+  // Audio routed to Hippel WASM engine (libtfmxaudiodecoder auto-detects FC sub-format).
   if (isFCFormat(filename)) {
-    const { parseFCFile } = await import('@lib/import/formats/FCParser');
-    return withNativeThenUADE('fc', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFCFile(buf as ArrayBuffer, name), 'FCParser', { injectUADE: true });
+    if (prefs.fc !== 'uade') {
+      try {
+        const { parseFCFile } = await import('@lib/import/formats/FCParser');
+        return parseFCFile(buffer, originalFileName);
+      } catch (err) {
+        console.warn(`[FCParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
@@ -2072,19 +2080,37 @@ export async function tryRouteFormat(
   }
 
   // ── Jochen Hippel 7V (HIP7.* / S7G.* prefix) ─────────────────────────────
+  // Audio routed to Hippel WASM engine (libtfmxaudiodecoder auto-detects 7V sub-format).
   if (matchesExt(filename, ['hip7', 's7g'])) {
-    const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
-    return withNativeThenUADE('jochenHippel7V', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippel7VParser', { injectUADE: true });
+    if (prefs.jochenHippel7V !== 'uade') {
+      try {
+        const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
+        if (isJochenHippel7VFormat(buffer)) {
+          return parseJochenHippel7VFile(buffer, originalFileName);
+        }
+      } catch (err) {
+        console.warn(`[JochenHippel7VParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
-  // ── Jochen Hippel ST (.sog / .hst / .hip extension or HST.* prefix) ──────
-  if (matchesExt(filename, ['sog', 'hst', 'hip'])) {
-    const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
-    return withNativeThenUADE('jochenHippelST', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippelSTParser', { injectUADE: true });
+  // ── Jochen Hippel ST (.sog / .hst / .hip / .mcmd extension or HST.* / MCMD.* prefix) ──
+  // Audio routed to Hippel WASM engine (libtfmxaudiodecoder auto-detects ST/MCMD sub-format).
+  if (matchesExt(filename, ['sog', 'hst', 'hip', 'mcmd'])) {
+    if (prefs.jochenHippelST !== 'uade') {
+      try {
+        const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
+        if (isJochenHippelSTFormat(buffer)) {
+          return parseJochenHippelSTFile(buffer, originalFileName);
+        }
+      } catch (err) {
+        console.warn(`[JochenHippelSTParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── MaxTrax (.mxtx) ──────────────────────────────────────────────────────────
@@ -2346,12 +2372,20 @@ export async function tryRouteFormat(
 
   // ── Jochen Hippel ST (MDST.* prefix) ─────────────────────────────────────
   // Amiga compiled music format by Jochen Hippel (ST version, not 7V or CoSo).
-  // Magic: scan first 256 bytes for Hippel-ST opcode signature.
+  // Audio routed to Hippel WASM engine (libtfmxaudiodecoder auto-detects ST sub-format).
   if (matchesExt(filename, ['mdst'])) {
-    const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
-    return withNativeThenUADE('jochenHippelST', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippelSTParser', { injectUADE: true });
+    if (prefs.jochenHippelST !== 'uade') {
+      try {
+        const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
+        if (isJochenHippelSTFormat(buffer)) {
+          return parseJochenHippelSTFile(buffer, originalFileName);
+        }
+      } catch (err) {
+        console.warn(`[JochenHippelSTParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Special FX ST (DODA.* prefix) ────────────────────────────────────────
