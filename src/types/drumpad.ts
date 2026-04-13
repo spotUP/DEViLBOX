@@ -129,6 +129,7 @@ export interface DrumPadState {
     defaultProgram: string;
     velocitySensitivity: number;  // 0.0-2.0
     padColors: Record<number, string>;
+    showAdvanced: boolean;
   };
 }
 

@@ -4,7 +4,8 @@
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from './PadButton';
-import { QuickAssignPanel } from './QuickAssignPanel';
+import { ContextMenu, useContextMenu } from '@components/common/ContextMenu';
+import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
@@ -72,8 +73,9 @@ export const PadGrid: React.FC<PadGridProps> = ({
   selectedPadId,
   performanceMode = false,
 }) => {
-  // Quick assign panel state
-  const [quickAssign, setQuickAssign] = useState<{ padId: number; rect: DOMRect } | null>(null);
+  // Context menu state
+  const contextMenu = useContextMenu();
+  const [contextMenuPadId, setContextMenuPadId] = useState<number | null>(null);
 
   // Pad mode from store
   const padMode = useDrumPadStore(s => s.padMode);
@@ -442,9 +444,26 @@ export const PadGrid: React.FC<PadGridProps> = ({
     );
   }
 
-  const handleQuickAssign = useCallback((padId: number, rect: DOMRect) => {
-    setQuickAssign({ padId, rect });
-  }, []);
+  const handleQuickAssign = useCallback((padId: number, _rect: DOMRect) => {
+    setContextMenuPadId(padId);
+    const event = { clientX: _rect.left + _rect.width / 2, clientY: _rect.top + _rect.height / 2, preventDefault: () => {}, stopPropagation: () => {} } as unknown as React.MouseEvent;
+    contextMenu.open(event);
+  }, [contextMenu]);
+
+  const contextMenuCallbacks = useMemo(() => ({
+    onEdit: (id: number) => onPadSelect(id),
+    onWizard: (id: number) => onEmptyPadClick?.(id),
+    onPreview: (id: number) => {
+      const engine = engineRef.current;
+      if (engine) {
+        const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
+        const p = prog?.pads.find(pp => pp.id === id);
+        if (p) engine.triggerPad(p, 100);
+      }
+    },
+  }), [onPadSelect, onEmptyPadClick]);
+
+  const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 
   const bankButtons: PadBank[] = ['A', 'B', 'C', 'D'];
   const bankLoadedCount = bankPads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
@@ -561,14 +580,12 @@ export const PadGrid: React.FC<PadGridProps> = ({
         </div>
       )}
 
-      {/* Quick assign panel */}
-      {quickAssign && (
-        <QuickAssignPanel
-          padId={quickAssign.padId}
-          anchorRect={quickAssign.rect}
-          onClose={() => setQuickAssign(null)}
-        />
-      )}
+      {/* Context menu */}
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenu.position}
+        onClose={() => { contextMenu.close(); setContextMenuPadId(null); }}
+      />
     </div>
   );
 };
