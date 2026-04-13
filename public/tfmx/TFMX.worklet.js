@@ -208,6 +208,24 @@ class TFMXProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setInstrumentParam': {
+        // Write a single byte into the miniMod buffer of a player handle.
+        // data.handle: player handle
+        // data.section: 0 = VolModSeq, 1 = SndModSeq
+        // data.byteIdx: byte index within the section
+        // data.value: byte value (0-255)
+        if (this.wasm && this.ctx && this.wasm._tfmx_set_instrument_param) {
+          this.wasm._tfmx_set_instrument_param(
+            this.ctx,
+            data.handle | 0,
+            data.section | 0,
+            data.byteIdx | 0,
+            data.value | 0,
+          );
+        }
+        break;
+      }
+
       case 'dispose':
         if (this.wasm && this.ctx) {
           for (const h of Object.keys(this.players)) {

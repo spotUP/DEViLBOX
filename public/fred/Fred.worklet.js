@@ -60,6 +60,17 @@ class FredProcessor extends AudioWorkletProcessor {
         if (!this._ready) break;
         this._module._fred_set_param(data.handle, data.paramId, data.value);
         break;
+      case 'setInstrumentParam': {
+        if (!this._ready) break;
+        // Fred synth only has paramId 0 = volume (0-64 → 0-1)
+        if (data.param === 'volume' || data.param === 'envVol') {
+          var normalized = data.value / 64;
+          for (var h in this.players) {
+            this._module._fred_set_param(parseInt(h), 0, normalized);
+          }
+        }
+        break;
+      }
       case 'setMuteMask':
         this.muteMask = data.mask;
         break;

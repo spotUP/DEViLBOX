@@ -61,6 +61,22 @@ const ENGINE_MAP: Record<string, () => Promise<EngineAccessor>> = {
     const { OktalyzerEngine } = await import('@/engine/oktalyzer/OktalyzerEngine');
     return { getEngine: () => OktalyzerEngine.hasInstance() ? getWorkletPort(OktalyzerEngine.getInstance()) : null };
   },
+  FredReplayerWasmSynth2: async () => {
+    const { FredReplayerEngine } = await import('@/engine/fred-replayer/FredReplayerEngine');
+    return { getEngine: () => FredReplayerEngine.hasInstance() ? getWorkletPort(FredReplayerEngine.getInstance()) : null };
+  },
+  GmcWasmSynth: async () => {
+    const { GmcEngine } = await import('@/engine/gmc/GmcEngine');
+    return { getEngine: () => GmcEngine.hasInstance() ? getWorkletPort(GmcEngine.getInstance()) : null };
+  },
+  SoundFxWasmSynth: async () => {
+    const { SoundFxEngine } = await import('@/engine/soundfx/SoundFxEngine');
+    return { getEngine: () => SoundFxEngine.hasInstance() ? getWorkletPort(SoundFxEngine.getInstance()) : null };
+  },
+  VoodooWasmSynth: async () => {
+    const { VoodooEngine } = await import('@/engine/voodoo/VoodooEngine');
+    return { getEngine: () => VoodooEngine.hasInstance() ? getWorkletPort(VoodooEngine.getInstance()) : null };
+  },
   ArtOfNoiseSynth: async () => {
     const { ArtOfNoiseEngine } = await import('@/engine/artofnoise/ArtOfNoiseEngine');
     return { getEngine: () => ArtOfNoiseEngine.hasInstance() ? getWorkletPort(ArtOfNoiseEngine.getInstance()) : null };

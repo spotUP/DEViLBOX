@@ -196,6 +196,32 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'setInstrumentParam': {
+        if (!this.wasm) break;
+        // Map string param names to (offset, size) for ml_write_inst_u8/u16
+        var ML_PARAMS = {
+          volume:[58,2], transpose:[60,1], slideSpeed:[61,1],
+          atkLength:[64,2], atkSpeed:[66,2], atkVolume:[68,2],
+          decLength:[70,2], decSpeed:[72,2], decVolume:[74,2],
+          susLength:[76,2], susSpeed:[78,2], susVolume:[80,2],
+          relLength:[82,2], relSpeed:[84,2], relVolume:[86,2],
+          vibDir:[88,1], vibWaveNum:[89,1], vibSpeed:[90,2], vibDelay:[92,2],
+          vibAtkSpd:[94,2], vibAttack:[96,2], vibDepth:[98,2],
+          tremDir:[100,1], tremWaveNum:[101,1], tremSpeed:[102,2], tremDelay:[104,2],
+          tremAtkSpd:[106,2], tremAttack:[108,2], tremDepth:[110,2],
+          arpTable:[112,2], arpSpeed:[114,1], arpGroove:[115,1],
+          trfWave0:[116,1], trfWave1:[117,1], trfWave2:[118,1], trfWave3:[119,1], trfWave4:[120,1],
+          trfStart:[122,2], trfRepeat:[124,2], trfSpeed:[126,2], trfDelay:[128,2],
+          trfAtkSpd:[130,2], trfAttack:[132,2],
+        };
+        var mp = ML_PARAMS[data.param];
+        if (mp) {
+          if (mp[1] === 1) this.wasm._ml_write_inst_u8(data.instrument, mp[0], data.value);
+          else this.wasm._ml_write_inst_u16(data.instrument, mp[0], data.value);
+        }
+        break;
+      }
+
       case 'get-inst-arp-config': {
         if (!this.wasm || !this.songLoaded) break;
         const { instIdx: iaci } = data;

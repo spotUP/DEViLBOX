@@ -112,6 +112,23 @@ export class TFMXSynth implements DevilboxSynth {
     this.triggerRelease();
   }
 
+  /**
+   * Write a single byte into the instrument's miniMod buffer in the WASM engine.
+   * section: 0 = VolModSeq, 1 = SndModSeq
+   * byteIdx: byte offset within the section
+   * value: byte value (0-255)
+   */
+  setInstrumentParam(section: number, byteIdx: number, value: number): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    this.engine.sendMessage({
+      type: 'setInstrumentParam',
+      handle: this._playerHandle,
+      section,
+      byteIdx,
+      value,
+    });
+  }
+
   set(param: string, value: number): void {
     switch (param) {
       case 'volume':
