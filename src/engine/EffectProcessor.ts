@@ -48,7 +48,7 @@ export function parseEffect(effectString: string | null): ParsedEffect | null {
  * E-effect types (FT2 standard)
  */
 export const EEffect = {
-  // E0x - Set filter (Amiga only, not implemented)
+  // E0x - Set Amiga LED filter on/off — only meaningful for Amiga playback via UADE
   SET_FILTER: 0x0,
 
   // E1x - Fine porta up
@@ -93,7 +93,7 @@ export const EEffect = {
   // EEx - Pattern delay X rows
   PATTERN_DELAY: 0xE,
 
-  // EFx - Invert loop (Amiga only, not implemented)
+  // EFx - Invert loop (Amiga hardware effect) — destructive sample manipulation, not supported
   INVERT_LOOP: 0xF,
 } as const;
 

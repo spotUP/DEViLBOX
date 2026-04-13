@@ -973,8 +973,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
       this._pendingCalls.push({ method: 'setParam', args: [param, value] });
       return;
     }
-    // Subclasses should override to map param names to IDs
-    console.log(`[${this.chipName}] setParam not implemented: ${param} = ${value}`);
+    // Subclasses override to map param names to IDs — unhandled params are expected
   }
 
   /**
