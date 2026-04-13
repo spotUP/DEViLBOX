@@ -885,13 +885,40 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
         // Use the standard import pipeline for libopenmpt formats AND formats
         // with native parsers in ModuleLoader (Furnace, DefleMask, XRNS).
         const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
-        const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
         const moduleInfo = await loadModuleFile(file);
-        await importTrackerModule(moduleInfo, {
-          useLibopenmpt: canUseLibopenmpt,
-          subsong,
-          companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
-        });
+
+        // DefleMask: parseFurnaceFile already produced a full TrackerSong — load it directly
+        if (moduleInfo.dmfSong) {
+          const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
+          const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
+          const { useTransportStore: trs } = await import('../../stores/useTransportStore');
+          const { useProjectStore: ps } = await import('../../stores/useProjectStore');
+          const { useFormatStore: fs } = await import('../../stores/useFormatStore');
+          const { getToneEngine } = await import('../../engine/ToneEngine');
+          const engine = getToneEngine();
+          if (trs.getState().isPlaying) trs.getState().stop();
+          engine.releaseAll();
+          trs.getState().reset();
+          ts.getState().reset();
+          is.getState().reset();
+          engine.disposeAllInstruments();
+          const song = moduleInfo.dmfSong;
+          is.getState().loadInstruments(song.instruments);
+          ts.getState().loadPatterns(song.patterns);
+          ts.getState().setCurrentPattern(0);
+          if (song.songPositions?.length) ts.getState().setPatternOrder(song.songPositions);
+          ps.getState().setMetadata({ name: song.name || filename, author: '', description: `Imported DefleMask: ${filename}` });
+          trs.getState().setBPM(song.initialBPM || 125);
+          trs.getState().setSpeed(song.initialSpeed || 6);
+          fs.getState().applyEditorMode(song);
+        } else {
+          const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
+          await importTrackerModule(moduleInfo, {
+            useLibopenmpt: canUseLibopenmpt,
+            subsong,
+            companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
+          });
+        }
       } else if (format?.nativeParser?.parseFn === 'parseAdPlugFile') {
         // Direct AdPlug OPL parser path — only for formats whose registered
         // nativeParser is explicitly the AdPlug parser. Other formats with
