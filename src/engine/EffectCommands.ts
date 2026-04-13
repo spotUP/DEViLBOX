@@ -191,6 +191,9 @@ export interface EffectResult {
   // Sample
   sampleOffset?: number;
 
+  // Song stop
+  stopSong?: boolean;
+
   // Amiga Filter
   setAmigaFilter?: boolean;
 
@@ -494,7 +497,8 @@ export class EffectProcessor {
       // ========== Fxx - Set Speed/BPM ==========
       case 0xF:
         if (param === 0) {
-          // F00 = stop song (not implemented)
+          // F00 = stop song
+          result.stopSong = true;
         } else if (param < 0x20) {
           // 01-1F: Set speed (ticks per row)
           this.ticksPerRow = param;

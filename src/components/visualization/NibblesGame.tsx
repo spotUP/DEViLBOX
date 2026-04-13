@@ -1014,14 +1014,6 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       const offsetX = 0;
       const offsetY = 0;
 
-      // Background tiles disabled per user request
-      // if (musicReactive) {
-      //   ctx.save();
-      //   ctx.translate(offsetX, offsetY);
-      //   renderBackgroundTiles(ctx, cellSize);
-      //   ctx.restore();
-      // }
-
       // Draw playfield border only in surround mode (walls visible)
       if (surround) {
         ctx.strokeStyle = PALETTE[11]; // Cyan
@@ -1060,13 +1052,6 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
           } else {
             // Worm segments (val 1-15)
             let segmentColor = PALETTE[val] || '#fff';
-
-            // Frequency-based colors disabled - use default PALETTE colors
-            // if (val >= 1 && val <= 15) {
-            //   const isPlayer2 = val === 7; // P2 head is 7, P1 head is 6
-            //   const segmentIndex = getSegmentIndex(x, y, isPlayer2);
-            //   segmentColor = getFrequencyColor(segmentIndex, val);
-            // }
 
             if (grid) {
               ctx.fillStyle = '#000';
