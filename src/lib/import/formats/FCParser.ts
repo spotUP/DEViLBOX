@@ -1323,8 +1323,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     // FC speed maps directly to MOD ticks-per-row; VBlank is always 50 Hz
     initialBPM: 125,
     linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
-    uadeEditableFileName: filename,
+    hippelFileData: buffer.slice(0),
     uadePatternLayout,
   };
 }
