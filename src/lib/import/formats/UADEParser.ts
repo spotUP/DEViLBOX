@@ -999,6 +999,14 @@ export async function parseUADEFile(
         const { parseKrisHatlelidFile } = await import('./KrisHatlelidParser');
         return parseKrisHatlelidFile(buffer, filename);
       },
+      'Ashley_Hogg': async () => {
+        const { parseAshleyHoggFile } = await import('./AshleyHoggParser');
+        return parseAshleyHoggFile(buffer, filename);
+      },
+      'SoundMaster': async () => {
+        const { parseSoundMasterFile } = await import('./SoundMasterParser');
+        return parseSoundMasterFile(buffer, filename);
+      },
       'DavidHanney': async () => {
         const { parseDavidHanneyFile } = await import('./DavidHanneyParser');
         return parseDavidHanneyFile(buffer, filename);
