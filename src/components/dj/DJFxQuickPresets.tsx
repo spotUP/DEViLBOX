@@ -31,10 +31,6 @@ const USER_PRESETS_KEY = 'master-fx-user-presets';
 
 // ── Category order (DJ first for DJ view) ────────────────────────────────────
 
-const CATEGORY_ORDER: MasterFxPreset['category'][] = [
-  'Amiga', 'C64', 'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl', 'Neural',
-];
-
 // Effects where wet should default to 100% (not 50%)
 const DYNAMICS_EFFECTS = new Set<string>(['Compressor', 'EQ3']);
 
@@ -45,11 +41,15 @@ const effectsByGroup = AVAILABLE_EFFECTS.reduce((acc, effect) => {
   return acc;
 }, {} as Record<string, AvailableEffect[]>);
 
-// Group factory presets by category
-const groupedPresets = CATEGORY_ORDER.map((cat) => ({
-  category: cat,
-  presets: MASTER_FX_PRESETS.filter((p) => p.category === cat),
-})).filter((g) => g.presets.length > 0);
+// Group factory presets by category — derived from presets, sorted alphabetically
+const groupedPresets = (() => {
+  const byCategory: Record<string, MasterFxPreset[]> = {};
+  for (const p of MASTER_FX_PRESETS) {
+    if (!byCategory[p.category]) byCategory[p.category] = [];
+    byCategory[p.category].push(p);
+  }
+  return Object.keys(byCategory).sort().map(cat => ({ category: cat, presets: byCategory[cat] }));
+})();
 
 // ── Component ────────────────────────────────────────────────────────────────
 
