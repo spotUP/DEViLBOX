@@ -52,7 +52,7 @@ class FredReplayerProcessor extends AudioWorkletProcessor {
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._fred_select_subsong(this.handle, data.subsong); break;
       case 'setChannelMask': if (this.handle) this.module._fred_set_channel_mask(this.handle, data.mask); break;
-      case 'dispose': this.cleanup(); break;
+      case 'setCell': {        if (this.handle && this.module._fred_set_cell) {          this.module._fred_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._fred_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._fred_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
     }
   }
 

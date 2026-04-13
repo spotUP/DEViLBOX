@@ -555,6 +555,47 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* PreTracker not active */ }
+      // Sync edit to NostalgicPlayer WASM replayer engines (SA, SM, DM, etc.)
+      // These engines have setCell() that directly modifies the internal pattern data.
+      try {
+        const fmt = require('./useFormatStore').useFormatStore.getState();
+        const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+        if (fullCell) {
+          const fileDataKeys: [string, string, () => Promise<{ getInstance(): { setCell: (...args: number[]) => void }, hasInstance(): boolean }>][] = [
+            ['sonicArrangerFileData', 'SonicArranger', () => import('@engine/sonic-arranger/SonicArrangerEngine').then(m => m.SonicArrangerEngine as any)],
+            ['soundMonFileData', 'SoundMon', () => import('@engine/soundmon/SoundMonEngine').then(m => m.SoundMonEngine as any)],
+            ['digMugFileData', 'DigMug', () => import('@engine/digmug/DigMugEngine').then(m => m.DigMugEngine as any)],
+            ['davidWhittakerFileData', 'DavidWhittaker', () => import('@engine/davidwhittaker/DavidWhittakerEngine').then(m => m.DavidWhittakerEngine as any)],
+            ['soundControlFileData', 'SoundControl', () => import('@engine/soundcontrol/SoundControlEngine').then(m => m.SoundControlEngine as any)],
+            ['deltaMusic1FileData', 'DeltaMusic1', () => import('@engine/deltamusic1/DeltaMusic1Engine').then(m => m.DeltaMusic1Engine as any)],
+            ['deltaMusic2FileData', 'DeltaMusic2', () => import('@engine/deltamusic2/DeltaMusic2Engine').then(m => m.DeltaMusic2Engine as any)],
+            ['gmcFileData', 'Gmc', () => import('@engine/gmc/GmcEngine').then(m => m.GmcEngine as any)],
+            ['soundFxFileData', 'SoundFx', () => import('@engine/soundfx/SoundFxEngine').then(m => m.SoundFxEngine as any)],
+            ['oktalyzerFileData', 'Oktalyzer', () => import('@engine/oktalyzer/OktalyzerEngine').then(m => m.OktalyzerEngine as any)],
+            ['inStereo1FileData', 'InStereo1', () => import('@engine/instereo1/InStereo1Engine').then(m => m.InStereo1Engine as any)],
+            ['futureComposerFileData', 'FutureComposer', () => import('@engine/futurecomposer/FutureComposerEngine').then(m => m.FutureComposerEngine as any)],
+            ['inStereo2FileData', 'InStereo2', () => import('@engine/instereo2/InStereo2Engine').then(m => m.InStereo2Engine as any)],
+            ['quadraComposerFileData', 'QuadraComposer', () => import('@engine/quadracomposer/QuadraComposerEngine').then(m => m.QuadraComposerEngine as any)],
+            ['synthesisFileData', 'Synthesis', () => import('@engine/synthesis/SynthesisEngine').then(m => m.SynthesisEngine as any)],
+            ['dssFileData', 'Dss', () => import('@engine/dss/DssEngine').then(m => m.DssEngine as any)],
+            ['faceTheMusicFileData', 'FaceTheMusic', () => import('@engine/facethemusic/FaceTheMusicEngine').then(m => m.FaceTheMusicEngine as any)],
+          ];
+          for (const [key, , loader] of fileDataKeys) {
+            if ((fmt as any)[key]) {
+              loader().then(Engine => {
+                if (Engine.hasInstance()) {
+                  Engine.getInstance().setCell(
+                    patternIndex, rowIndex, channelIndex,
+                    fullCell.note ?? 0, fullCell.instrument ?? 0,
+                    fullCell.effTyp ?? 0, fullCell.eff ?? 0
+                  );
+                }
+              });
+              break; // Only one NP engine active at a time
+            }
+          }
+        }
+      } catch { /* NostalgicPlayer engine not active */ }
       // Sync edit to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
 
