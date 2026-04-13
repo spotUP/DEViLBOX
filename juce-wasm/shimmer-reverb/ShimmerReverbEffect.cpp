@@ -18,38 +18,29 @@ namespace devilbox {
 
 static constexpr float PI = 3.14159265358979323846f;
 
-// --- Hann window LUT ---
-static constexpr int GRAIN_SIZE = 512;
-static constexpr int HOP_SIZE = 128;   // 4x overlap
-static constexpr int NUM_GRAINS = GRAIN_SIZE / HOP_SIZE; // 4
-static constexpr int MAX_BUFFER = 2048;
+// --- Crossfade Pitch Shifter ---
+// Two read heads advance at pitchRatio speed through a circular buffer.
+// Each head has a full-cycle raised-cosine envelope (0→1→0) over its
+// lifetime. Heads are staggered by half a lifetime so they always sum
+// to exactly 1.0 — no clicks, no amplitude modulation.
+static constexpr int PS_BUF_SIZE = 8192; // must be power of 2
+static constexpr int PS_BUF_MASK = PS_BUF_SIZE - 1;
+static constexpr int HALF_LIFE = 2048;   // half a head's lifetime (~42ms at 48kHz)
 
-static float hannWindow[GRAIN_SIZE];
-static bool hannInitialized = false;
-
-static void initHann() {
-    if (hannInitialized) return;
-    for (int i = 0; i < GRAIN_SIZE; ++i) {
-        hannWindow[i] = 0.5f * (1.0f - cosf(2.0f * PI * static_cast<float>(i) / static_cast<float>(GRAIN_SIZE)));
-    }
-    hannInitialized = true;
-}
-
-// --- GrainPitchShifter ---
-class GrainPitchShifter {
+class CrossfadePitchShifter {
 public:
-    GrainPitchShifter() {
-        initHann();
-        reset();
-    }
+    CrossfadePitchShifter() { reset(); }
 
     void reset() {
-        std::memset(inputBuf_, 0, sizeof(inputBuf_));
-        std::memset(outputBuf_, 0, sizeof(outputBuf_));
+        std::memset(buf_, 0, sizeof(buf_));
         writePos_ = 0;
-        readPos_ = 0;
-        hopCounter_ = 0;
-        pitchRatio_ = 2.0f; // default +12 semitones
+        pitchRatio_ = 2.0f;
+        // Head 0 starts at beginning of its lifetime, head 1 is staggered by half
+        phase_[0] = 0.0f;
+        phase_[1] = 0.5f;
+        // Both start reading from well behind writePos
+        readPos_[0] = -static_cast<float>(HALF_LIFE * 2);
+        readPos_[1] = -static_cast<float>(HALF_LIFE * 3);
     }
 
     void setPitchSemitones(float semi) {
@@ -57,52 +48,61 @@ public:
     }
 
     float process(float input) {
-        // Write to circular input buffer
-        inputBuf_[writePos_ & (MAX_BUFFER - 1)] = input;
-        writePos_++;
+        buf_[writePos_ & PS_BUF_MASK] = input;
 
-        // Every HOP_SIZE samples, start a new grain
-        hopCounter_++;
-        if (hopCounter_ >= HOP_SIZE) {
-            hopCounter_ = 0;
-            synthesizeGrain();
+        // Phase increment: one full cycle (0→1) = 2 * HALF_LIFE samples of drift.
+        // drift per sample = |pitchRatio - 1|, full cycle when drift accumulates
+        // to 2 * HALF_LIFE. So phaseInc = |ratio-1| / (2 * HALF_LIFE).
+        float drift = fabsf(pitchRatio_ - 1.0f);
+        float phaseInc = drift / static_cast<float>(2 * HALF_LIFE);
+
+        // For ratio ≈ 1.0, barely any pitch shift — just pass through
+        if (drift < 0.001f) {
+            writePos_++;
+            return input;
         }
 
-        // Read from output buffer
-        float out = outputBuf_[readPos_ & (MAX_BUFFER - 1)];
-        outputBuf_[readPos_ & (MAX_BUFFER - 1)] = 0.0f; // clear after read
-        readPos_++;
+        float output = 0.0f;
 
-        return out;
+        for (int t = 0; t < 2; ++t) {
+            // Advance read position at pitchRatio speed
+            readPos_[t] += pitchRatio_;
+
+            // Advance phase (sawtooth 0→1)
+            phase_[t] += phaseInc;
+
+            // When phase wraps, reset read position to safe distance behind write
+            if (phase_[t] >= 1.0f) {
+                phase_[t] -= 1.0f;
+                readPos_[t] = static_cast<float>(writePos_) - static_cast<float>(HALF_LIFE * 2);
+            }
+
+            // Read with linear interpolation
+            int idx0 = static_cast<int>(floorf(readPos_[t]));
+            float frac = readPos_[t] - floorf(readPos_[t]);
+            float s0 = buf_[idx0 & PS_BUF_MASK];
+            float s1 = buf_[(idx0 + 1) & PS_BUF_MASK];
+            float sample = s0 + frac * (s1 - s0);
+
+            // Full-cycle raised cosine: 0.5*(1 - cos(2π*phase))
+            // Goes 0 → 1 → 0 over one lifetime.
+            // Two heads at phase offset 0.5: sum is ALWAYS 1.0.
+            // (cos²(πp) + sin²(πp) = 1 rewritten as raised cosines)
+            float env = 0.5f * (1.0f - cosf(2.0f * PI * phase_[t]));
+
+            output += sample * env;
+        }
+
+        writePos_++;
+        return output;
     }
 
 private:
-    float inputBuf_[MAX_BUFFER];
-    float outputBuf_[MAX_BUFFER];
+    float buf_[PS_BUF_SIZE];
+    float readPos_[2];
+    float phase_[2]; // 0-1 sawtooth, staggered by 0.5 between heads
     int writePos_;
-    int readPos_;
-    int hopCounter_;
     float pitchRatio_;
-
-    void synthesizeGrain() {
-        // Read position: center grain around current write position
-        float grainStart = static_cast<float>(writePos_) - static_cast<float>(GRAIN_SIZE);
-
-        for (int i = 0; i < GRAIN_SIZE; ++i) {
-            // Resample with pitch ratio using linear interpolation
-            float srcPos = grainStart + static_cast<float>(i) * pitchRatio_;
-            int idx0 = static_cast<int>(floorf(srcPos));
-            float frac = srcPos - floorf(srcPos);
-
-            float s0 = inputBuf_[idx0 & (MAX_BUFFER - 1)];
-            float s1 = inputBuf_[(idx0 + 1) & (MAX_BUFFER - 1)];
-            float sample = s0 + frac * (s1 - s0);
-
-            // Overlap-add with Hann window
-            int outIdx = (readPos_ + i) & (MAX_BUFFER - 1);
-            outputBuf_[outIdx] += sample * hannWindow[i];
-        }
-    }
 };
 
 // --- Allpass diffuser ---
@@ -259,11 +259,11 @@ public:
 
         const float mix = params_[PARAM_MIX];
         const float dry = 1.0f - mix;
-        const float decay = 0.2f + params_[PARAM_DECAY] * 0.35f; // map 0-1 -> 0.2-0.55
+        const float decay = 0.3f + params_[PARAM_DECAY] * 0.55f; // map 0-1 -> 0.3-0.85 (longer tail)
         const float shimmer = params_[PARAM_SHIMMER];
         const float damping = params_[PARAM_DAMPING];
-        const float modDepth = params_[PARAM_MOD_DEPTH] * 16.0f * srScale_;
-        const float lfoInc = (0.1f + params_[PARAM_MOD_RATE] * 2.9f) / static_cast<float>(sampleRate_);
+        const float modDepth = params_[PARAM_MOD_DEPTH] * 200.0f * srScale_; // up to ~4ms — obvious chorus
+        const float lfoInc = (0.05f + params_[PARAM_MOD_RATE] * 5.95f) / static_cast<float>(sampleRate_); // 0.05-6 Hz
         const int predelaySamples = static_cast<int>(params_[PARAM_PREDELAY] * static_cast<float>(sampleRate_));
 
         for (int i = 0; i < numSamples; ++i) {
@@ -310,14 +310,20 @@ public:
             float shiftedL = pitchL_.process(tankOutL);
             float shiftedR = pitchR_.process(tankOutR);
 
-            // Mix clean tank + shimmer for feedback, with soft clip to prevent runaway
-            float shimAmt = shimmer * 0.4f; // scale down shimmer to prevent instability
-            feedbackL_ = tanhf(tankOutL * (1.0f - shimAmt) + shiftedL * shimAmt) * 0.8f;
-            feedbackR_ = tanhf(tankOutR * (1.0f - shimAmt) + shiftedR * shimAmt) * 0.8f;
+            // Mix clean tank + shimmer for feedback
+            // shimmer 0 = pure reverb, shimmer 1 = fully pitch-shifted feedback
+            float shimAmt = shimmer; // full 0-1 range — user controls it directly
+            feedbackL_ = tanhf(tankOutL * (1.0f - shimAmt) + shiftedL * shimAmt) * 0.7f;
+            feedbackR_ = tanhf(tankOutR * (1.0f - shimAmt) + shiftedR * shimAmt) * 0.7f;
 
-            // Output: wet L/R mixed with dry input (soft clip + attenuate wet signal)
-            outputL[i] = inputL[i] * dry + tanhf(tankOutL) * mix * 0.7f;
-            outputR[i] = inputR[i] * dry + tanhf(tankOutR) * mix * 0.7f;
+            // Output: crossfade between clean reverb and pitch-shifted reverb
+            // shimmer 0 = pure plate reverb, shimmer 1 = fully pitch-shifted output
+            float cleanL = tankOutL;
+            float cleanR = tankOutR;
+            float outL = cleanL * (1.0f - shimAmt) + shiftedL * shimAmt;
+            float outR = cleanR * (1.0f - shimAmt) + shiftedR * shimAmt;
+            outputL[i] = inputL[i] * dry + tanhf(outL) * mix * 0.7f;
+            outputR[i] = inputR[i] * dry + tanhf(outR) * mix * 0.7f;
         }
     }
 
@@ -370,7 +376,7 @@ private:
     int scaledTankDelay_[2];
 
     // Pitch shifters for shimmer feedback
-    GrainPitchShifter pitchL_, pitchR_;
+    CrossfadePitchShifter pitchL_, pitchR_;
 
     // Feedback state
     float feedbackL_, feedbackR_;
