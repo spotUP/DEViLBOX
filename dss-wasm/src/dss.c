@@ -147,6 +147,9 @@ typedef struct DssChannel {
 struct DssModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     uint8_t start_tempo;
     uint8_t start_speed;
 
@@ -165,6 +168,7 @@ struct DssModule {
     float ticks_per_frame;
 
     uint8_t visited[DSS_MAX_VISITED / 8];
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -284,6 +288,7 @@ static const uint16_t dss_periods[16][48] = {
          431,  407,  384,  363,  342,  323,  305,  288,  272,  256,  242,  228,
          216,  203,  192,  181,  171,  161,  152,  144,  136,  128,  121,  114
     }
+
 };
 
 static const uint16_t dss_period_limits[16][2] = {
@@ -291,6 +296,7 @@ static const uint16_t dss_period_limits[16][2] = {
     { 1664, 110 }, { 1652, 109 }, { 1640, 109 }, { 1628, 108 },
     { 1814, 120 }, { 1800, 119 }, { 1788, 118 }, { 1774, 118 },
     { 1762, 117 }, { 1750, 116 }, { 1736, 115 }, { 1724, 114 }
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1131,6 +1137,10 @@ DssModule* dss_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!dss_load(m, data, size)) {
         dss_destroy(m);
         return nullptr;
@@ -1149,6 +1159,7 @@ void dss_destroy(DssModule* module) {
     if (module->patterns) free(module->patterns);
     for (int i = 0; i < 31; i++)
         if (module->samples[i].data) free(module->samples[i].data);
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1173,4 +1184,23 @@ void dss_set_channel_mask(DssModule* module, uint32_t mask) {
 bool dss_has_ended(const DssModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int dss_get_instrument_count(const DssModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t dss_export(const DssModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

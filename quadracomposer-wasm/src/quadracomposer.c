@@ -155,6 +155,7 @@ static const uint16_t qc_periods[16][36] = {
          431, 407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228,
          216, 203, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114
     }
+
 };
 
 static const int8_t qc_arpeggio_offsets[3] = { -1, 0, 1 };
@@ -190,6 +191,7 @@ static const int16_t qc_vibrato[3][64] = {
         -32767, -32767, -32767, -32767, -32767, -32767, -32767, -32767,
         -32767, -32767, -32767, -32767, -32767, -32767, -32767, -32767
     }
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -294,7 +296,10 @@ typedef struct QcReader {
 
 typedef struct QcModule {
     float sample_rate;
-    float playing_frequency;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    float playing_frequency;
 
     uint8_t start_tempo;
 
@@ -1380,6 +1385,10 @@ QcModule* qc_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!qc_load_module(m, data, size)) {
         qc_destroy(m);
         return nullptr;
@@ -1414,6 +1423,7 @@ void qc_destroy(QcModule* module) {
 
     if (module->position_list) free(module->position_list);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1446,4 +1456,23 @@ void qc_set_channel_mask(QcModule* module, uint32_t mask) {
 bool qc_has_ended(const QcModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int qc_get_instrument_count(const QcModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t qc_export(const QcModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

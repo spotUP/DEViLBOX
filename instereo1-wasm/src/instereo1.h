@@ -7,9 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct Is1Module Is1Module;
 
@@ -27,6 +24,4 @@ size_t is1_render_multi(Is1Module* module, float* ch0, float* ch1, float* ch2, f
 
 bool is1_has_ended(const Is1Module* module);
 
-#ifdef __cplusplus
-}
-#endif
+

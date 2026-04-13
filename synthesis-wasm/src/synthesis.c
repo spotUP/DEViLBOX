@@ -221,6 +221,9 @@ typedef struct SynChannel {
 struct SynModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     int start_offset;
 
     SynSongInfo* sub_songs;
@@ -264,6 +267,7 @@ struct SynModule {
 
     // visited positions for end detection
     uint8_t visited[SYN_MAX_VISITED / 8];
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,6 +285,7 @@ static const uint16_t syn_periods[] = {
       214,   202,   190,   180,   170,   160,   151,   143,   135,   127,   120,   113,
       107,   101,    95,    90,    85,    80,    75,    71,    67,    63,    60,    56,
        53,    50,    47,    45,    42,    40,    37,    35,    33,    31,    30,    28
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1660,6 +1665,10 @@ SynModule* syn_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->start_offset = start_offset;
 
     SynReader reader;
@@ -1709,6 +1718,7 @@ void syn_destroy(SynModule* module) {
     if (module->egc_tables) free(module->egc_tables);
     if (module->adsr_tables) free(module->adsr_tables);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1741,4 +1751,23 @@ void syn_set_channel_mask(SynModule* module, uint32_t mask) {
 bool syn_has_ended(const SynModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int syn_get_instrument_count(const SynModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t syn_export(const SynModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

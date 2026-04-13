@@ -64,6 +64,7 @@ static const uint16_t is1_periods[109] = {
       214,   202,   190,   180,   170,   160,   151,   143,   135,   127,   120,   113,
       107,   101,    95,    90,    85,    80,    75,    71,    67,    63,    60,    56,
        53,    50,    47,    45,    42,    40,    37,    35,    33,    31,    30,    28
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -175,6 +176,9 @@ typedef struct Is1MixChannel {
 struct Is1Module {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     Is1SongInfo* sub_songs;
     uint8_t num_sub_songs;
 
@@ -223,6 +227,7 @@ struct Is1Module {
 
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1244,6 +1249,10 @@ Is1Module* is1_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
 
     m->sample_rate = sample_rate;
+
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
     m->ticks_per_frame = sample_rate / 50.0f;
 
     if (!load_module(m, data, size)) {
@@ -1288,6 +1297,7 @@ void is1_destroy(Is1Module* module) {
     if (module->eg_tables) free(module->eg_tables);
     if (module->adsr_tables) free(module->adsr_tables);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1319,4 +1329,23 @@ void is1_set_channel_mask(Is1Module* module, uint32_t mask) {
 bool is1_has_ended(const Is1Module* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int is1_get_instrument_count(const Is1Module* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t is1_export(const Is1Module* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

@@ -56,10 +56,12 @@ static const uint16_t sm_periods[84] = {
      428,  404,  380,  360,  340,  320,  302,  286,  270,  254,  240,  226,
      214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
      107,  101,   95,   90,   85,   80,   76,   72,   68,   64,   60,   57
+
 };
 
 static const int16_t sm_vibrato_table[8] = {
     0, 64, 128, 64, 0, -64, -128, -64
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -212,9 +214,13 @@ struct SmModule {
     // Mixer
     SmChannel channels[4];
     float sample_rate;
-    float ticks_per_frame;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    float ticks_per_frame;
     float tick_accumulator;
     bool has_ended;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1538,6 +1544,10 @@ SmModule* sm_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     SmReader reader;
     reader_init(&reader, data, size);
 
@@ -1584,6 +1594,7 @@ void sm_destroy(SmModule* module) {
     if (module->playing_info.wave_tables)
         free(module->playing_info.wave_tables);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1617,4 +1628,23 @@ void sm_set_channel_mask(SmModule* module, uint32_t mask) {
 bool sm_has_ended(const SmModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sm_get_instrument_count(const SmModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t sm_export(const SmModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

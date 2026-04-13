@@ -28,6 +28,7 @@ static const uint16_t dm2_periods[] = {
      428,  404,  381,  360,  339,  320,  302,  285,  269,  254,  240,  226,
      214,  202,  190,  180,  170,  160,  151,  143,  135,  127,  120,  113,
      113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113
+
 };
 
 #define DM2_PERIODS_COUNT (sizeof(dm2_periods) / sizeof(dm2_periods[0]))
@@ -222,6 +223,9 @@ static void reader_read_signed(Dm2Reader* r, int8_t* dst, size_t count) {
 struct Dm2Module {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     int8_t** arpeggios;       // 64 arrays of 16 sbytes
     Dm2Instrument** instruments;  // 128 instruments (some may be NULL)
     int num_instruments;
@@ -244,6 +248,7 @@ struct Dm2Module {
     // Mixer state
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -984,6 +989,10 @@ Dm2Module* dm2_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!dm2_load(m, data, size)) {
         dm2_destroy(m);
         return nullptr;
@@ -1028,6 +1037,7 @@ void dm2_destroy(Dm2Module* module) {
         free(module->waveforms);
     }
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1059,4 +1069,23 @@ void dm2_set_channel_mask(Dm2Module* module, uint32_t mask) {
 bool dm2_has_ended(const Dm2Module* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int dm2_get_instrument_count(const Dm2Module* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t dm2_export(const Dm2Module* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

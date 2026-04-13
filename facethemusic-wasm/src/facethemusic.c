@@ -196,11 +196,15 @@ static const int8_t ftm_quiet_data[4] = { 0, 0, 0, 0 };
 static FtmSample ftm_quiet_sample = {
     .sample_data = (int8_t*)ftm_quiet_data,
     .oneshot_length = 2, .loop_start = 0, .loop_length = 0, .total_length = 4
+
 };
 
 struct FtmModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     uint16_t num_measures;
     uint8_t rows_per_measure;
     uint16_t start_cia;
@@ -227,6 +231,7 @@ struct FtmModule {
     float playing_frequency;
 
     uint8_t visited[FTM_MAX_VISITED / 8];
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,6 +258,7 @@ static const uint16_t ftm_periods[272] = {
     170, 168, 167, 166, 165, 164, 162, 161, 160, 159, 158, 157, 156, 154, 153, 152,
     151, 150, 149, 148, 147, 146, 145, 144, 143, 142, 141, 140, 139, 138, 137, 136,
     135, 134, 133, 132, 131, 130, 129, 128, 127, 126, 125, 124, 123, 123, 122, 121
+
 };
 
 static const int8_t ftm_lfo_sine[192] = {
@@ -268,6 +274,7 @@ static const int8_t ftm_lfo_sine[192] = {
     -126, -126, -126, -126, -125, -124, -123, -122, -121, -120, -119, -117, -115, -114, -112, -110,
     -108, -105, -103, -101,  -98,  -95,  -93,  -90,  -87,  -84,  -80,  -77,  -74,  -70,  -67,  -63,
      -60,  -56,  -52,  -48,  -44,  -41,  -37,  -33,  -28,  -24,  -20,  -16,  -12,   -8,   -4,    0
+
 };
 
 static const int8_t ftm_lfo_square[192] = {
@@ -283,6 +290,7 @@ static const int8_t ftm_lfo_square[192] = {
     -128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,
     -128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,
     -128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128,-128
+
 };
 
 static const int8_t ftm_lfo_triangle[192] = {
@@ -298,6 +306,7 @@ static const int8_t ftm_lfo_triangle[192] = {
     -127, -127, -125, -122, -119, -117, -114, -111, -109, -106, -103, -101,  -98,  -95,  -93,  -90,
      -87,  -85,  -82,  -79,  -77,  -74,  -71,  -69,  -66,  -64,  -61,  -58,  -56,  -53,  -50,  -47,
      -45,  -42,  -39,  -37,  -34,  -31,  -29,  -26,  -23,  -21,  -18,  -15,  -13,  -10,   -7,   -5
+
 };
 
 static const int8_t ftm_lfo_saw_up[192] = {
@@ -313,6 +322,7 @@ static const int8_t ftm_lfo_saw_up[192] = {
      -65,  -66,  -67,  -69,  -70,  -71,  -73,  -74,  -75,  -77,  -78,  -79,  -81,  -82,  -83,  -85,
      -86,  -87,  -89,  -90,  -91,  -93,  -94,  -95,  -97,  -98,  -99, -101, -102, -103, -105, -106,
     -107, -109, -110, -111, -113, -114, -115, -117, -118, -119, -121, -122, -123, -125, -126, -128
+
 };
 
 static const int8_t ftm_lfo_saw_down[192] = {
@@ -328,10 +338,12 @@ static const int8_t ftm_lfo_saw_down[192] = {
       64,   65,   66,   68,   69,   70,   72,   73,   74,   76,   77,   78,   80,   81,   82,   84,
       85,   86,   88,   89,   90,   92,   93,   94,   96,   97,   98,  100,  101,  102,  104,  105,
      106,  108,  109,  110,  112,  113,  114,  116,  117,  118,  120,  121,  122,  124,  125,  127
+
 };
 
 static const int8_t* ftm_lfo_shapes[5] = {
     ftm_lfo_sine, ftm_lfo_square, ftm_lfo_triangle, ftm_lfo_saw_up, ftm_lfo_saw_down
+
 };
 
 // Panning: 0=left, 1=right
@@ -1244,6 +1256,10 @@ FtmModule* ftm_create(const uint8_t* data, size_t size, float sample_rate) {
     if (!m) return nullptr;
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!ftm_load(m, data, size)) { ftm_destroy(m); return nullptr; }
 
     ftm_clear_visited(m);
@@ -1266,6 +1282,7 @@ void ftm_destroy(FtmModule* module) {
         if (module->samples[i].sample_data && module->samples[i].sample_data != ftm_quiet_sample.sample_data)
             free(module->samples[i].sample_data);
     }
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1292,4 +1309,23 @@ void ftm_set_channel_mask(FtmModule* module, uint32_t mask) {
 bool ftm_has_ended(const FtmModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int ftm_get_instrument_count(const FtmModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t ftm_export(const FtmModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

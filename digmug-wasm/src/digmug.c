@@ -217,7 +217,10 @@ typedef struct DmModule {
 
     // Mixer
     float sample_rate;
-    float tick_accumulator;
+
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;    float tick_accumulator;
     float ticks_per_frame;
 
     // Amiga filter state (low-pass)
@@ -344,6 +347,7 @@ static const uint16_t dm_periods[] = {
      900,  850,  802,  757,  715,  675,  637,  601,  567,  535,  505,  477,
      450,  425,  401,  379,  357,  337,  318,  300,  284,  268,  253,  238,
      225,  212,  201,  189,  179,  169,  159,  150,  142,  134
+
 };
 
 static const int DM_PERIODS_COUNT = (int)(sizeof(dm_periods) / sizeof(dm_periods[0]));
@@ -1636,6 +1640,10 @@ DmModule* dm_create(const uint8_t* data, size_t size, float sample_rate) {
     m->module_type = type;
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!load_module(m, data, size)) {
         dm_destroy(m);
         return nullptr;
@@ -1688,6 +1696,7 @@ void dm_destroy(DmModule* module) {
         free(module->samples);
     }
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1719,4 +1728,23 @@ void dm_set_channel_mask(DmModule* module, uint32_t mask) {
 bool dm_has_ended(const DmModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int dm_get_instrument_count(const DmModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

@@ -28,6 +28,7 @@ static const short note_table[] = {
      113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,
      113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,  113,
      113,  113,   -1
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,6 +144,9 @@ static size_t reader_read(SfxReader* r, void* dst, size_t count) {
 struct SfxModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     SfxSample samples[31];
 
     uint8_t orders[128];
@@ -164,6 +168,7 @@ struct SfxModule {
     // Mixer state
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -839,6 +844,10 @@ SfxModule* sfx_create(const uint8_t* data, size_t size, float sample_rate) {
 
     m->sample_rate = sample_rate;
 
+    // Keep original data for export
+    m->original_data = (uint8_t*)malloc(size);
+    if (m->original_data) { memcpy(m->original_data, data, size); m->original_size = size; }
+
     if (!sfx_load(m, data, size)) {
         sfx_destroy(m);
         return nullptr;
@@ -862,6 +871,7 @@ void sfx_destroy(SfxModule* module) {
     for (int i = 0; i < 31; i++)
         free(module->samples[i].sample_addr);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -894,4 +904,23 @@ void sfx_set_channel_mask(SfxModule* module, uint32_t mask) {
 bool sfx_has_ended(const SfxModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sfx_get_instrument_count(const SfxModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t sfx_export(const SfxModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }

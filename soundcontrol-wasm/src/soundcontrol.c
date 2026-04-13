@@ -21,6 +21,7 @@
 static const uint16_t sc_base_period[16] = {
     0xd600, 0xca00, 0xbe80, 0xb400, 0xa980, 0xa000, 0x9700, 0x8e80,
     0x8680, 0x7f00, 0x7800, 0x7100, 0x6b00, 0x0000, 0x0000, 0x0000
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -237,6 +238,7 @@ static const ScModuleInfo3x sc_known_3x_modules[] = {
     { 154704, true, 2, { { 0, 28 }, { 28, 62 } } },
     // Eleven6
     { 103808, true, 1, { { 0, 0 } } }  // songInfoList null -> filled from position list
+
 };
 #define SC_KNOWN_3X_COUNT 4
 
@@ -255,12 +257,16 @@ static const ScModuleInfo40_50 sc_known_40_modules[] = {
     { 95960, 2, { { 24, 25, 0 }, { 0, 24, 0 } } },
     // Hot number deluxe title
     { 54544, 1, { { 0, 22, 0 } } }
+
 };
 #define SC_KNOWN_40_COUNT 3
 
 struct ScModule {
     float sample_rate;
 
+    // Original file data for export
+    uint8_t* original_data;
+    size_t original_size;
     ScModuleType module_type;
     ScModuleData module_data;
 
@@ -294,6 +300,7 @@ struct ScModule {
     // Tick timing
     float tick_accumulator;
     float ticks_per_frame;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1635,6 +1642,7 @@ void sc_destroy(ScModule* module) {
     free(module->song_info_3x);
     free(module->song_info_40_50);
 
+    if (module->original_data) free(module->original_data);
     free(module);
 }
 
@@ -1669,4 +1677,23 @@ void sc_set_channel_mask(ScModule* module, uint32_t mask) {
 bool sc_has_ended(const ScModule* module) {
     if (!module) return true;
     return module->has_ended;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Edit API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sc_get_instrument_count(const ScModule* module) {
+    // TODO: return actual instrument count from format-specific field
+    (void)module;
+    return 0;
+}
+
+size_t sc_export(const ScModule* module, uint8_t* out, size_t max_size) {
+    if (!module || !module->original_data) return 0;
+    size_t total = module->original_size;
+    if (!out) return total;
+    if (max_size < total) return 0;
+    memcpy(out, module->original_data, total);
+    return total;
 }
