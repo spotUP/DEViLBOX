@@ -1035,6 +1035,26 @@ export async function parseUADEFile(
         const { parseSilmarilsFile } = await import('./SilmarilsParser');
         return parseSilmarilsFile(buffer, filename);
       },
+      'VoodooSupremeSynthesizer': async () => {
+        const { parseVoodooSupremeSynthesizerFile } = await import('./VoodooSupremeSynthesizerParser');
+        return parseVoodooSupremeSynthesizerFile(buffer, filename);
+      },
+      'AProSys': async () => {
+        const { parseAProSysFile } = await import('./AProSysParser');
+        return parseAProSysFile(buffer, filename);
+      },
+      'SoundProgrammingLanguage': async () => {
+        const { parseSoundProgrammingLanguageFile } = await import('./SoundProgrammingLanguageParser');
+        return parseSoundProgrammingLanguageFile(buffer, filename);
+      },
+      'SynTracker': async () => {
+        const { parseSynTrackerFile } = await import('./SynTrackerParser');
+        return parseSynTrackerFile(buffer, filename);
+      },
+      'MarkII': async () => {
+        const { parseMarkIIFile } = await import('./MarkIIParser');
+        return parseMarkIIFile(buffer, filename);
+      },
     };
     let route = NATIVE_ROUTES[fmt] || NATIVE_ROUTES[fmt?.trim()];
     // Prefix fallback: UADE may report variants like "TFMX Professional", "TFMX 1.5", etc.
