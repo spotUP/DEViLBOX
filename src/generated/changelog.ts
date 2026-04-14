@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-14T12:49:29.268Z
+ * Generated: 2026-04-14T13:13:13.953Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5238';
-export const BUILD_NUMBER = '5238';
-export const BUILD_HASH = 'c6623212e';
+export const BUILD_VERSION = '1.0.5242';
+export const BUILD_NUMBER = '5242';
+export const BUILD_HASH = '14cec4470';
 export const BUILD_DATE = '2026-04-14';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5238',
+    version: '1.0.5242',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "DJ vocoder race conditions, error boundary recovery, drumpad keyboard dedup + voice cleanup"
+      },
+      {
+        type: 'fix',
+        "description": "WebSID init regex for nested braces in spp_backend_state_SID"
+      },
+      {
+        type: 'fix',
+        "description": "Route HVSC SIDs to WebSID pipeline, not UADE, when loading to DJ deck"
+      },
+      {
+        type: 'fix',
+        "description": "Move SID_PLAYLIST_KEYWORDS before store creation to avoid TDZ"
+      },
       {
         type: 'feature',
         "description": "Auto-repair SID playlists on store load"
@@ -216,22 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Derive effect preset categories from data instead of hardcoding"
-      },
-      {
-        type: 'fix',
-        "description": "Add Amiga and C64 to effect preset category order"
-      },
-      {
-        type: 'feature',
-        "description": "Add 18 Amiga & C64 SID effect chain presets for live gig"
-      },
-      {
-        type: 'feature',
-        "description": "Wire existing instrument editors to WASM param APIs"
-      },
-      {
-        type: 'feature',
-        "description": "Add instrument param APIs to ArtOfNoise, MusicAssembler, BenDaglish"
       }
     ]
   }

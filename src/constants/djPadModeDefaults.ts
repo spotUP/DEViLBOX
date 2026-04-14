@@ -103,8 +103,8 @@ export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
   osPad('Air Horn',      'Horns',       DJ_ONESHOT,     0),   // DJ_AIR_HORN
   osPad('Reggae Horn',   'Horns',       DJ_ONESHOT,     1),   // REGGAETON_HORN
   // Sirens x2
-  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  20),  // DUB_SIREN
-  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  21),  // RAVE_SIREN
+  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  21),  // DUB_SIREN (was 20, corrected to 21)
+  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  22),  // RAVE_SIREN (was 21, corrected to 22)
   // Impacts x2
   osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),  // SUB_DROP
   osPad('Boom',          'Impacts',     DJ_MODULATION,  12),  // BOOM
