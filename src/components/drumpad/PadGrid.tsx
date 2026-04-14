@@ -17,8 +17,6 @@ import { useTransportStore } from '../../stores/useTransportStore';
 import { useOrientation } from '@hooks/useOrientation';
 import type { ScratchActionId, PadBank } from '../../types/drumpad';
 import { getBankPads, applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
-import { DEFAULT_DJFX_PADS, DEFAULT_ONESHOT_PADS, DEFAULT_SCRATCH_PADS } from '../../constants/djPadModeDefaults';
-import { DJ_ONE_SHOT_PRESETS } from '../../constants/djOneShotPresets';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
@@ -78,7 +76,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const [contextMenuPadId, setContextMenuPadId] = useState<number | null>(null);
 
   // Pad mode from store
-  const padMode = useDrumPadStore(s => s.padMode);
   const setFxPadActive = useDrumPadStore(s => s.setFxPadActive);
 
   // Track velocity for each pad (for visual feedback)
@@ -191,128 +188,88 @@ export const PadGrid: React.FC<PadGridProps> = ({
       ctx.resume();
     }
 
-    const currentPadMode = useDrumPadStore.getState().padMode;
+    // Always use actual pad data (no more mode mappings)
+    if (currentProgram && engineRef.current) {
+      const pad = currentProgram.pads.find(p => p.id === padId);
+      if (pad) {
+        const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
 
-    // Mode-aware pad trigger
-    if (currentPadMode === 'djfx') {
-      const padIndex = (padId - 1) % 16;
-      const mapping = DEFAULT_DJFX_PADS[padIndex];
-      if (mapping) {
-        DJ_FX_ACTION_MAP[mapping.actionId]?.engage();
-        setFxPadActive(padId, true);
-        heldPadsRef.current.add(padId);
-      }
-    } else if (currentPadMode === 'oneshots') {
-      const padIndex = (padId - 1) % 16;
-      const mapping = DEFAULT_ONESHOT_PADS[padIndex];
-      if (mapping) {
-        const preset = DJ_ONE_SHOT_PRESETS[mapping.presetIndex];
-        if (preset) {
+        if (pad.scratchAction) {
+          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
+        }
+        if (pad.djFxAction) {
+          DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
+          setFxPadActive(padId, true);
+          heldPadsRef.current.add(padId);
+        }
+        if (pad.sample) {
+          engineRef.current.triggerPad(pad, curvedVelocity);
+        }
+        if (pad.synthConfig) {
           try {
             const engine = getToneEngine();
-            const padInstId = PAD_INSTRUMENT_BASE + padId;
-            const config = { ...preset, id: padInstId, name: preset.name ?? mapping.label } as import('../../types/instrument/defaults').InstrumentConfig;
-            engine.triggerNoteAttack(padInstId, 'C3', 0, velocity / 127, config);
-            const existingTimer = pendingReleasesRef.current.get(padInstId);
-            if (existingTimer) clearTimeout(existingTimer);
-            const timer = setTimeout(() => {
-              try { engine.triggerNoteRelease(padInstId, 'C3', 0, config); } catch { /* ignore */ }
-              pendingReleasesRef.current.delete(padInstId);
-            }, 2000);
-            pendingReleasesRef.current.set(padInstId, timer);
+            const note = pad.instrumentNote || 'C3';
+            const normalizedVel = curvedVelocity / 127;
+            const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+            const config = { ...pad.synthConfig, id: padInstId };
+            
+            // Debug logging
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[PadGrid] Triggering pad ${pad.id} "${pad.name}":`, {
+                note,
+                synthType: config.synthType,
+                drumType: config.drumMachine?.drumType,
+                io808Type: config.parameters?.io808Type,
+                tr909Type: config.parameters?.tr909Type,
+                velocity: normalizedVel,
+              });
+            }
+            
+            engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
+            if (pad.playMode === 'oneshot') {
+              const releaseDelayMs = Math.max(pad.decay, 100);
+              const existingTimer = pendingReleasesRef.current.get(padInstId);
+              if (existingTimer) clearTimeout(existingTimer);
+              const timer = setTimeout(() => {
+                try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
+                pendingReleasesRef.current.delete(padInstId);
+              }, releaseDelayMs);
+              pendingReleasesRef.current.set(padInstId, timer);
+            }
           } catch (err) {
-            console.warn('[PadGrid] One-shot trigger failed:', err);
+            console.warn('[PadGrid] Pad synth trigger failed:', err);
           }
-        }
-      }
-    } else if (currentPadMode === 'scratch') {
-      const padIndex = (padId - 1) % 16;
-      const mapping = DEFAULT_SCRATCH_PADS[padIndex];
-      if (mapping) {
-        SCRATCH_ACTION_HANDLERS[mapping.actionId]?.();
-      }
-    } else {
-      // Samples mode: original behavior
-      if (currentProgram && engineRef.current) {
-        const pad = currentProgram.pads.find(p => p.id === padId);
-        if (pad) {
-          const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
-
-          if (pad.scratchAction) {
-            SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
-          }
-          if (pad.djFxAction) {
-            DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
-          }
-          if (pad.sample) {
-            engineRef.current.triggerPad(pad, curvedVelocity);
-          }
-          if (pad.synthConfig) {
-            try {
+        } else if (pad.instrumentId != null) {
+          try {
+            const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
+            if (config) {
               const engine = getToneEngine();
               const note = pad.instrumentNote || 'C3';
               const normalizedVel = curvedVelocity / 127;
-              const padInstId = PAD_INSTRUMENT_BASE + pad.id;
-              const config = { ...pad.synthConfig, id: padInstId };
-              
-              // Debug logging
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[PadGrid] Triggering pad ${pad.id} "${pad.name}":`, {
-                  note,
-                  synthType: config.synthType,
-                  drumType: config.drumMachine?.drumType,
-                  io808Type: config.parameters?.io808Type,
-                  tr909Type: config.parameters?.tr909Type,
-                  velocity: normalizedVel,
-                });
-              }
-              
-              engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
+              engine.triggerNoteAttack(pad.instrumentId, note, 0, normalizedVel, config);
               if (pad.playMode === 'oneshot') {
                 const releaseDelayMs = Math.max(pad.decay, 100);
-                const existingTimer = pendingReleasesRef.current.get(padInstId);
+                const existingTimer = pendingReleasesRef.current.get(pad.instrumentId);
                 if (existingTimer) clearTimeout(existingTimer);
                 const timer = setTimeout(() => {
-                  try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
-                  pendingReleasesRef.current.delete(padInstId);
+                  try {
+                    engine.triggerNoteRelease(pad.instrumentId!, note, 0, config);
+                  } catch { /* ignore release errors */ }
+                  pendingReleasesRef.current.delete(pad.instrumentId!);
                 }, releaseDelayMs);
-                pendingReleasesRef.current.set(padInstId, timer);
+                pendingReleasesRef.current.set(pad.instrumentId, timer);
               }
-            } catch (err) {
-              console.warn('[PadGrid] Pad synth trigger failed:', err);
             }
-          } else if (pad.instrumentId != null) {
-            try {
-              const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
-              if (config) {
-                const engine = getToneEngine();
-                const note = pad.instrumentNote || 'C3';
-                const normalizedVel = curvedVelocity / 127;
-                engine.triggerNoteAttack(pad.instrumentId, note, 0, normalizedVel, config);
-                if (pad.playMode === 'oneshot') {
-                  const releaseDelayMs = Math.max(pad.decay, 100);
-                  const existingTimer = pendingReleasesRef.current.get(pad.instrumentId);
-                  if (existingTimer) clearTimeout(existingTimer);
-                  const timer = setTimeout(() => {
-                    try {
-                      engine.triggerNoteRelease(pad.instrumentId!, note, 0, config);
-                    } catch { /* ignore release errors */ }
-                    pendingReleasesRef.current.delete(pad.instrumentId!);
-                  }, releaseDelayMs);
-                  pendingReleasesRef.current.set(pad.instrumentId, timer);
-                }
-              }
-            } catch (err) {
-              console.warn('[PadGrid] Synth trigger failed:', err);
-            }
+          } catch (err) {
+            console.warn('[PadGrid] Synth trigger failed:', err);
           }
-          if (pad.playMode === 'sustain') {
-            heldPadsRef.current.add(padId);
-          }
-          if (noteRepeatEnabledRef.current && noteRepeatRef.current) {
-            noteRepeatRef.current.startRepeat(pad, velocity);
-            heldPadsRef.current.add(padId);
-          }
+        }
+        if (pad.playMode === 'sustain') {
+          heldPadsRef.current.add(padId);
+        }
+        if (noteRepeatEnabledRef.current && noteRepeatRef.current) {
+          noteRepeatRef.current.startRepeat(pad, velocity);
+          heldPadsRef.current.add(padId);
         }
       }
     }
@@ -334,28 +291,16 @@ export const PadGrid: React.FC<PadGridProps> = ({
     if (!heldPadsRef.current.has(padId)) return;
     heldPadsRef.current.delete(padId);
 
-    const currentPadMode = useDrumPadStore.getState().padMode;
-
-    // DJ FX mode: disengage the FX
-    if (currentPadMode === 'djfx') {
-      const padIndex = (padId - 1) % 16;
-      const mapping = DEFAULT_DJFX_PADS[padIndex];
-      if (mapping) {
-        DJ_FX_ACTION_MAP[mapping.actionId]?.disengage();
-        setFxPadActive(padId, false);
-      }
-      return;
-    }
-
     // Stop note repeat
     noteRepeatRef.current?.stopRepeat(padId);
 
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
       if (pad) {
-        // Disengage DJ FX on release (always, regardless of play mode)
+        // Disengage DJ FX on release
         if (pad.djFxAction) {
           DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+          setFxPadActive(padId, false);
         }
         if (pad.playMode === 'sustain') {
           // Release sample voice
@@ -621,7 +566,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
             onSelect={onPadSelect}
             onEmptyPadClick={onEmptyPadClick}
             onFocus={() => setFocusedPadId(pad.id)}
-            padMode={padMode}
             onQuickAssign={handleQuickAssign}
           />
         ))}
