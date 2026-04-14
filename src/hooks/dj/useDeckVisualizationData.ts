@@ -31,7 +31,10 @@ const deckCaches = new Map<string, DeckCacheEntry>();
 
 function startLoop(deckId: DeckId, entry: DeckCacheEntry): void {
   const tick = () => {
-    if (entry.refCount <= 0) return;
+    if (entry.refCount <= 0) {
+      // Don't schedule another frame — loop is done
+      return;
+    }
 
     try {
       const deck = getDJEngine().getDeck(deckId);

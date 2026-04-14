@@ -49,14 +49,16 @@ export const DeckCuePoints: React.FC<DeckCuePointsProps> = ({ deckId }) => {
       }
 
       if (cue) {
-        // Jump to cue position
-        const seconds = cue.position / 1000;
+        // Jump to cue position (clamped to track duration)
+        const maxMs = store.decks[deckId].durationMs;
+        const clampedMs = maxMs > 0 ? Math.max(0, Math.min(cue.position, maxMs - 10)) : cue.position;
+        const seconds = clampedMs / 1000;
         if (deck.playbackMode === 'audio') {
           markSeek(deckId);
           deck.audioPlayer.seek(seconds);
           store.setDeckState(deckId, {
             audioPosition: seconds,
-            elapsedMs: cue.position,
+            elapsedMs: clampedMs,
           });
         } else {
           // Tracker mode: compute song position from ms

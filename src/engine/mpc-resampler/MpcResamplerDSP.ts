@@ -193,7 +193,7 @@ function nearestNeighborResample(
   targetRate: number
 ): AudioBuffer {
   const ratio = buffer.sampleRate / targetRate;
-  const newLength = Math.floor(buffer.length / ratio);
+  const newLength = Math.max(1, Math.floor(buffer.length / ratio));
 
   // Create new buffer at target rate using OfflineAudioContext
   // (avoids memory leak from unclosed AudioContext)

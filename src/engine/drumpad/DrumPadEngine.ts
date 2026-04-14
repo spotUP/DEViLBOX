@@ -24,6 +24,8 @@ export class DrumPadEngine {
   private outputs: Map<string, GainNode> = new Map();
   private muteGroups: Map<number, number> = new Map(); // padId -> muteGroup
   private reversedBufferCache: WeakMap<AudioBuffer, AudioBuffer> = new WeakMap();
+  private pendingCleanupTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
+  private _disposed = false;
 
   constructor(context: AudioContext, outputDestination?: AudioNode) {
     this.context = context;
@@ -277,9 +279,11 @@ export class DrumPadEngine {
     voice.gainNode.gain.linearRampToValueAtTime(0, now + fadeTime);
 
     // Cleanup after fade completes
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      this.pendingCleanupTimers.delete(padId);
       this.cleanupVoice(padId);
     }, (fadeTime + 0.05) * 1000);
+    this.pendingCleanupTimers.set(padId, timer);
   }
 
   /**
@@ -309,6 +313,7 @@ export class DrumPadEngine {
    * Clean up voice resources (now race-condition safe)
    */
   private cleanupVoice(padId: number): void {
+    if (this._disposed) return;
     const voice = this.voices.get(padId);
     if (!voice) {
       return;
@@ -356,10 +361,23 @@ export class DrumPadEngine {
    * Cleanup and release resources
    */
   dispose(): void {
-    this.stopAll();
+    this._disposed = true;
+    // Cancel all pending async cleanup timers
+    this.pendingCleanupTimers.forEach(t => clearTimeout(t));
+    this.pendingCleanupTimers.clear();
+    // Synchronously disconnect all voices
+    for (const [, voice] of this.voices) {
+      try {
+        voice.source?.disconnect();
+        voice.gainNode.disconnect();
+        voice.filterNode?.disconnect();
+        voice.panNode.disconnect();
+        voice.source?.stop();
+      } catch { /* ignore */ }
+    }
+    this.voices.clear();
     this.masterGain.disconnect();
     this.outputs.forEach(output => output.disconnect());
     this.outputs.clear();
-    this.voices.clear();
   }
 }
