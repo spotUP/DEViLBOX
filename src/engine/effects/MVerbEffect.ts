@@ -152,7 +152,7 @@ export class MVerbEffect extends Tone.ToneAudioNode {
             console.log('[MVerb] ⚡ rawInput:', !!rawInput, 'rawWet:', !!rawWet);
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            try { rawInput.disconnect(rawWet); } catch { /* */ }
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;

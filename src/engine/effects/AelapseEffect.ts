@@ -311,7 +311,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      try { this.input.disconnect(this.wetGain); } catch { /* */ }
+      try { rawInput.disconnect(rawWet); } catch { /* */ }
 
       // Keepalive silent connection so the worklet stays scheduled even when
       // no downstream consumer is active yet.
