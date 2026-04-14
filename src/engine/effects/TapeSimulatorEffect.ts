@@ -44,6 +44,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ param: string; value: number }> = [];
@@ -68,6 +69,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
 
     this.dryGain = new Tone.Gain(1 - this._options.wet);
     this.wetGain = new Tone.Gain(this._options.wet);
+    this.passthroughGain = new Tone.Gain(1);
 
     // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
@@ -75,7 +77,8 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
 
     // Wet path: passthrough until WASM is ready
     this.wetGain.connect(this.output);
-    this.input.connect(this.wetGain);
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
 
     void this._initWorklet();
   }
@@ -107,7 +110,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            try { rawInput.disconnect(rawWet); } catch { /* */ }
+            this.passthroughGain.gain.value = 0;
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
@@ -225,6 +228,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
       try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
+    this.passthroughGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.input.dispose();

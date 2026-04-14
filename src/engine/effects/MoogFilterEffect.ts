@@ -61,6 +61,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
   // Internal routing
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain;
 
   // WASM worklet
   private workletNode: AudioWorkletNode | null = null;
@@ -94,6 +95,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     // Dry/wet mixing
     this.dryGain = new Tone.Gain(1 - this._options.wet);
     this.wetGain = new Tone.Gain(this._options.wet);
+    this.passthroughGain = new Tone.Gain(1);
 
     // Dry path: input → dryGain → output (Tone.js connections)
     this.input.connect(this.dryGain);
@@ -103,7 +105,8 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
     this.wetGain.connect(this.output);
 
     // Passthrough until WASM loads, then hot-swap to worklet
-    this.input.connect(this.wetGain);
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
     void this._initWorklet();
   }
 
@@ -189,7 +192,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            try { rawInput.disconnect(rawWet); } catch { /* */ }
+            this.passthroughGain.gain.value = 0;
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;
@@ -253,6 +256,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
       this.workletNode = null;
     }
 
+    this.passthroughGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.input.dispose();

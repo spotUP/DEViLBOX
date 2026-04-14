@@ -137,6 +137,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ paramId: number; value: number }> = [];
@@ -162,6 +163,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
     this.output = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._options.wet);
     this.wetGain = new Tone.Gain(this._options.wet);
+    this.passthroughGain = new Tone.Gain(1);
 
     // Dry path is always live. Wet path swaps in once the worklet is ready.
     this.input.connect(this.dryGain);
@@ -169,7 +171,8 @@ export class AelapseEffect extends Tone.ToneAudioNode {
     this.wetGain.connect(this.output);
 
     // Passthrough the input to the wet path until the worklet swaps in.
-    this.input.connect(this.wetGain);
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
 
     void this._initWorklet();
   }
@@ -311,7 +314,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
 
       rawInput.connect(this.workletNode);
       this.workletNode.connect(rawWet);
-      try { rawInput.disconnect(rawWet); } catch { /* */ }
+      this.passthroughGain.gain.value = 0;
 
       // Keepalive silent connection so the worklet stays scheduled even when
       // no downstream consumer is active yet.
@@ -363,6 +366,7 @@ export class AelapseEffect extends Tone.ToneAudioNode {
       try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
+    this.passthroughGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.input.dispose();
