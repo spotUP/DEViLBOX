@@ -219,8 +219,10 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   // ── Click / drag to seek ─────────────────────────────────────────────────
 
   const seekToFraction = useCallback((fraction: number) => {
+    const durationMs = useDJStore.getState().decks[deckId].durationMs;
+    if (!durationMs || durationMs <= 0) return;
     const f = Math.max(0, Math.min(1, fraction));
-    const seekSec = f * (useDJStore.getState().decks[deckId].durationMs / 1000);
+    const seekSec = f * (durationMs / 1000);
     markSeek(deckId);
     seekDeckAudio(deckId, seekSec);
     useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });

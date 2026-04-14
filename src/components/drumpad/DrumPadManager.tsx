@@ -232,8 +232,24 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     const preset = DJ_PAD_PRESETS.find(p => p.id === presetId);
     if (!preset) return;
     const program = preset.create();
+    
+    // Debug logging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[handleLoadDJPreset]', {
+        presetId,
+        presetName: preset.name,
+        programId: program.id,
+        programName: program.name,
+        padCount: program.pads.filter(p => p.djFxAction || p.synthConfig || p.scratchAction || p.sample).length,
+        firstPad: program.pads[0],
+      });
+    }
+    
     useDrumPadStore.getState().saveProgram(program);
     loadProgram(program.id);
+    
+    // Auto-switch to Bank A since presets load into Bank A
+    useDrumPadStore.getState().setBank('A');
   }, [loadProgram]);
 
   const handleMasterLevelChange = useCallback((level: number) => {
