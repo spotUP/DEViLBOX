@@ -1,8 +1,23 @@
+/**
+ * ExciterEffect — Harmonic exciter using native Web Audio nodes.
+ *
+ * Signal chain: HP filter → drive → waveshaper (tanh) → LP ceiling → mix with dry.
+ * Pure Web Audio — no WASM worklet, no async init, no disconnect issues.
+ */
 import * as Tone from 'tone';
 import { getNativeAudioNode } from '@utils/audio-context';
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
+}
+
+function buildTanhCurve(samples: number, drive: number): Float32Array {
+  const curve = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) {
+    const x = (2 * i) / (samples - 1) - 1;
+    curve[i] = Math.tanh(x * drive);
+  }
+  return curve;
 }
 
 export interface ExciterOptions {
@@ -21,10 +36,13 @@ export class ExciterEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
-  private passthroughGain: Tone.Gain; // Muted when WASM takes over
-  private workletNode: AudioWorkletNode | null = null;
-  private isWasmReady = false;
-  private pendingParams: Array<{ param: string; value: number }> = [];
+
+  // Native Web Audio nodes for the exciter sidechain
+  private hpFilter: BiquadFilterNode;
+  private driveGain: GainNode;
+  private shaper: WaveShaperNode;
+  private lpFilter: BiquadFilterNode;
+  private excitedGain: GainNode;
 
   private _frequency: number;
   private _amount: number;
@@ -32,11 +50,6 @@ export class ExciterEffect extends Tone.ToneAudioNode {
   private _ceil: number;
   private _mix: number;
   private _wet: number;
-
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts = new Set<BaseAudioContext>();
-  private static initPromises = new Map<BaseAudioContext, Promise<void>>();
 
   constructor(options: ExciterOptions = {}) {
     super();
@@ -47,114 +60,86 @@ export class ExciterEffect extends Tone.ToneAudioNode {
     this._mix = options.mix ?? 1;
     this._wet = options.wet ?? 1.0;
 
+    const rawCtx = Tone.getContext().rawContext as AudioContext;
+
+    // Tone.js gain nodes for dry/wet mix
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
-    this.passthroughGain = new Tone.Gain(1); // Unity until WASM ready
 
     // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // Wet passthrough: input → passthroughGain → wetGain → output
-    // When WASM is ready, passthroughGain is zeroed and worklet feeds wetGain instead.
-    this.input.connect(this.passthroughGain);
-    this.passthroughGain.connect(this.wetGain);
+    // Wet path (clean signal): input → wetGain → output
+    this.input.connect(this.wetGain);
     this.wetGain.connect(this.output);
 
-    void this._initWorklet();
-  }
+    // Exciter sidechain (native Web Audio): input → HP → drive → shaper → LP → excitedGain → output
+    // This ADDS harmonic content on top — the wet signal passes through clean,
+    // and the exciter sidechain generates and adds high-frequency harmonics.
+    this.hpFilter = rawCtx.createBiquadFilter();
+    this.hpFilter.type = 'highpass';
+    this.hpFilter.frequency.value = this._frequency;
+    this.hpFilter.Q.value = 0.707;
 
-  private async _initWorklet(): Promise<void> {
-    try {
-      const rawCtx = Tone.getContext().rawContext as AudioContext;
-      await ExciterEffect.ensureInitialized(rawCtx);
-      this.workletNode = new AudioWorkletNode(rawCtx, 'exciter-processor', {
-        numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
-      });
-      this.workletNode.port.onmessage = (ev) => {
-        if (ev.data.type === 'ready') {
-          this.isWasmReady = true;
-          for (const p of this.pendingParams)
-            this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
-          this.pendingParams = [];
-          // Wire worklet into the wet path, then mute passthrough — NO disconnect needed.
-          try {
-            const rawInput = getNativeAudioNode(this.input)!;
-            const rawWet = getNativeAudioNode(this.wetGain)!;
-            rawInput.connect(this.workletNode!);
-            this.workletNode!.connect(rawWet);
-            // Mute passthrough instead of disconnecting — avoids clobbering the chain
-            this.passthroughGain.gain.value = 0;
-            // Keepalive: ensure Chrome schedules the worklet
-            const rawCtx2 = Tone.getContext().rawContext as AudioContext;
-            const keepalive = rawCtx2.createGain();
-            keepalive.gain.value = 0;
-            this.workletNode!.connect(keepalive);
-            keepalive.connect(rawCtx2.destination);
-          } catch (swapErr) {
-            console.warn('[Exciter] WASM swap failed, staying on passthrough:', swapErr);
-          }
-        }
-      };
-      this.workletNode.port.postMessage(
-        { type: 'init', wasmBinary: ExciterEffect.wasmBinary!, jsCode: ExciterEffect.jsCode! },
-        [ExciterEffect.wasmBinary!.slice(0)],
-      );
-      this.sendParam('frequency', this._frequency);
-      this.sendParam('amount', this._amount);
-      this.sendParam('blend', this._blend);
-      this.sendParam('ceil', this._ceil);
-      this.sendParam('mix', this._mix);
-    } catch (err) {
-      console.warn('[Exciter] Worklet init failed:', err);
-    }
-  }
+    this.driveGain = rawCtx.createGain();
+    this.driveGain.gain.value = 1 + this._amount * 20;
 
-  private static async ensureInitialized(ctx: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(ctx)) return;
-    const existing = this.initPromises.get(ctx);
-    if (existing) return existing;
-    const p = (async () => {
-      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
-      const [wasmResp, jsResp] = await Promise.all([
-        fetch(`${base}exciter/Exciter.wasm`), fetch(`${base}exciter/Exciter.js`),
-      ]);
-      this.wasmBinary = await wasmResp.arrayBuffer();
-      let js = await jsResp.text();
-      js = js.replace(/if\s*\(typeof exports\s*===\s*"object".*$/s, '');
-      this.jsCode = js;
-      await ctx.audioWorklet.addModule(`${base}exciter/Exciter.worklet.js`);
-      this.loadedContexts.add(ctx);
-    })();
-    this.initPromises.set(ctx, p);
-    return p;
-  }
+    this.shaper = rawCtx.createWaveShaper();
+    this.shaper.curve = buildTanhCurve(4096, 1 + this._blend * 3) as Float32Array<ArrayBuffer>;
+    this.shaper.oversample = '2x';
 
-  private sendParam(param: string, value: number): void {
-    if (this.workletNode && this.isWasmReady) {
-      this.workletNode.port.postMessage({ type: 'parameter', param, value });
-    } else {
-      this.pendingParams = this.pendingParams.filter(p => p.param !== param);
-      this.pendingParams.push({ param, value });
-    }
+    this.lpFilter = rawCtx.createBiquadFilter();
+    this.lpFilter.type = 'lowpass';
+    this.lpFilter.frequency.value = this._ceil;
+    this.lpFilter.Q.value = 0.707;
+
+    this.excitedGain = rawCtx.createGain();
+    this.excitedGain.gain.value = this._mix;
+
+    // Wire the native sidechain: nativeInput → HP → drive → shaper → LP → excitedGain → nativeOutput
+    const nativeIn = getNativeAudioNode(this.input)!;
+    const nativeOut = getNativeAudioNode(this.output)!;
+
+    nativeIn.connect(this.hpFilter);
+    this.hpFilter.connect(this.driveGain);
+    this.driveGain.connect(this.shaper);
+    this.shaper.connect(this.lpFilter);
+    this.lpFilter.connect(this.excitedGain);
+    this.excitedGain.connect(nativeOut);
   }
 
   get frequency(): number { return this._frequency; }
-  set frequency(v: number) { this._frequency = clamp(v, 1000, 10000); this.sendParam('frequency', this._frequency); }
+  set frequency(v: number) {
+    this._frequency = clamp(v, 1000, 10000);
+    this.hpFilter.frequency.value = this._frequency;
+  }
 
   get amount(): number { return this._amount; }
-  set amount(v: number) { this._amount = clamp(v, 0, 1); this.sendParam('amount', this._amount); }
+  set amount(v: number) {
+    this._amount = clamp(v, 0, 1);
+    this.driveGain.gain.value = 1 + this._amount * 20;
+  }
 
   get blend(): number { return this._blend; }
-  set blend(v: number) { this._blend = clamp(v, 0, 1); this.sendParam('blend', this._blend); }
+  set blend(v: number) {
+    this._blend = clamp(v, 0, 1);
+    this.shaper.curve = buildTanhCurve(4096, 1 + this._blend * 3) as Float32Array<ArrayBuffer>;
+  }
 
   get ceil(): number { return this._ceil; }
-  set ceil(v: number) { this._ceil = clamp(v, 1000, 20000); this.sendParam('ceil', this._ceil); }
+  set ceil(v: number) {
+    this._ceil = clamp(v, 1000, 20000);
+    this.lpFilter.frequency.value = this._ceil;
+  }
 
   get mix(): number { return this._mix; }
-  set mix(v: number) { this._mix = clamp(v, 0, 1); this.sendParam('mix', this._mix); }
+  set mix(v: number) {
+    this._mix = clamp(v, 0, 1);
+    this.excitedGain.gain.value = this._mix;
+  }
 
   get wet(): number { return this._wet; }
   set wet(value: number) {
@@ -175,14 +160,15 @@ export class ExciterEffect extends Tone.ToneAudioNode {
   }
 
   dispose(): this {
-    if (this.workletNode) {
-      try { this.workletNode.port.postMessage({ type: 'dispose' }); } catch { /* */ }
-      try { this.workletNode.disconnect(); } catch { /* */ }
-      this.workletNode = null;
-    }
-    this.passthroughGain.dispose();
-    this.dryGain.dispose(); this.wetGain.dispose();
-    this.input.dispose(); this.output.dispose();
+    this.hpFilter.disconnect();
+    this.driveGain.disconnect();
+    this.shaper.disconnect();
+    this.lpFilter.disconnect();
+    this.excitedGain.disconnect();
+    this.dryGain.dispose();
+    this.wetGain.dispose();
+    this.input.dispose();
+    this.output.dispose();
     super.dispose();
     return this;
   }
