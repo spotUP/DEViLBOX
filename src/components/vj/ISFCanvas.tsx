@@ -92,8 +92,7 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
           const bus = audioBusRef.current;
           if (engine && !shaderError) {
             if (bus) {
-              bus.update();
-              const data = bus.getFrame();
+              const data = bus.update();
               const audioUniforms: AudioUniforms = {
                 audio_bass: data.subEnergy * 0.5 + data.bassEnergy * 0.5,
                 audio_mid: data.midEnergy,

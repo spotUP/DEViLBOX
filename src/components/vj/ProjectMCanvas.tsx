@@ -311,7 +311,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       // Pre-fetch next preset
       const nextIdx = Math.floor(Math.random() * names.length);
       fetchPresetContent(names[nextIdx]);
-    }, [onPresetChange, allPresetNames]);
+    }, [onPresetChange]); // allPresetNames is module-level, not React state
 
     // Render loop — runs continuously once ready; skips draw when not visible.
     // Stuck detection moved to separate 1Hz timer to avoid GPU→CPU stalls.
