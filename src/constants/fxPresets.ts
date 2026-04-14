@@ -672,9 +672,9 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 10, parameters: { drive: 55, level: 75, presence: 50 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 0.5, high: -0.5 } },
     ] },
-  { name: 'High Gain Mesa', description: 'Mesa Mini Rectifier — tight modern high gain', tags: ['Amp', 'Guitar', 'Loud'],
+  { name: 'High Gain Mesa', description: 'Splawn OD high gain — tight modern crunch', tags: ['Amp', 'Guitar', 'Loud'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 11, parameters: { drive: 55, level: 85, presence: 50 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 12, parameters: { drive: 40, level: 75, presence: 45 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
     ] },
   { name: 'Dumble Lead', description: 'Dumble — smooth singing lead tones', tags: ['Amp', 'Guitar'],
