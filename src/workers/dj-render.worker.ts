@@ -872,8 +872,9 @@ async function renderWithSID(
 
     if (numSamples <= 0) continue;
 
-    // WebSID uses 2 channels (stereo interleaved): [L, R, L, R, ...]
-    const framesThisChunk = numSamples >> 1; // numSamples is total Int16 values (L+R)
+    // numSamples = frames per channel (not total interleaved samples)
+    // Audio buffer is stereo interleaved Int16: [L0, R0, L1, R1, ...]
+    const framesThisChunk = numSamples;
     const chunkL = new Float32Array(framesThisChunk);
     const chunkR = new Float32Array(framesThisChunk);
 
