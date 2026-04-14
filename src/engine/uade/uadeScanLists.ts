@@ -29,6 +29,7 @@ export const SCAN_CRASH_EXTS = new Set([
   'thm',   // ThomasHermann — scan crashes browser
   'sb',    // SteveBarrett — scan crashes browser
   'ps',    // PaulShields — scan crashes browser
+  'cus', 'cust', 'custom',  // DelitrackerCustom — soft reset fails after scan → stutter
 ]);
 
 export const SCAN_CRASH_PREFIXES = new Set([
@@ -38,6 +39,7 @@ export const SCAN_CRASH_PREFIXES = new Set([
   'thm',   // ThomasHermann — scan crashes browser
   'sb',    // SteveBarrett — scan crashes browser
   'ps',    // PaulShields — scan crashes browser
+  'cus', 'cust', 'custom',  // DelitrackerCustom — soft reset fails after scan → stutter
 ]);
 
 // ── Formats that loop indefinitely but don't crash — safe for short 30s scan ─
@@ -47,7 +49,7 @@ export const SHORT_SCAN_EXTS = new Set([
   'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
   'rho', 'dln', 'core', 'hot', 'wb', 'dh',
   'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'dns', 'vss', 'synmod',
-  'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+  'cm', 'rk', 'rkb',
   'mc', 'mcr', 'mco',  // MarkCooksey
   'jmf',    // JankoMrsicFlogel
   'kh',     // KrisHatlelid
@@ -61,7 +63,7 @@ export const SHORT_SCAN_PREFIXES = new Set([
   'fw', 'spl', 'riff', 'hd', 'tw', 'dz', 'bss', 'scn', 'scumm',
   'dns', 'mk2', 'mkii', 'rho', 'core', 'hot', 'wb', 'dh',
   'bd', 'bds', 'ex', 'sm', 'mok', 'pvp', 'vss', 'synmod',
-  'cus', 'cust', 'custom', 'cm', 'rk', 'rkb',
+  'cm', 'rk', 'rkb',
   'mc', 'mcr', 'mco',  // MarkCooksey
   'jmf',    // JankoMrsicFlogel
   'kh',     // KrisHatlelid
