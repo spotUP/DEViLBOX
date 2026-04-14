@@ -183,6 +183,9 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       const handleContextLost = (e: Event) => {
         e.preventDefault(); // Signal browser we want context restore
         console.warn('[ProjectM] WebGL context lost — waiting for restore');
+        // Clear any pending fade/crossfade timers to prevent stale state
+        if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
+        fadeTimerRef.current = undefined;
         audioBusRef.current?.disable();
         audioBusRef.current = null;
         engineRef.current?.destroy();
@@ -227,7 +230,10 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       const name = names[wrappedIdx];
 
       const content = await fetchPresetContent(name);
-      if (!content || !engineRef.current || !mountedRef.current) return;
+      if (!content || !engineRef.current || !mountedRef.current) {
+        if (!content) console.warn('[ProjectM] Failed to fetch preset:', name);
+        return;
+      }
 
       // Cancel any in-progress fade
       if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
@@ -284,85 +290,95 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       }
     }, [doLoadPreset]);
 
-    // Render loop — only runs when visible (stops rAF entirely when hidden)
+    // Render loop — runs continuously once ready; skips draw when not visible.
+    // Stuck detection moved to separate 1Hz timer to avoid GPU→CPU stalls.
+    useEffect(() => {
+      if (!ready) return;
+      let cancelled = false;
+
+      const render = () => {
+        if (cancelled) return;
+        if (visibleRef.current) {
+          const engine = engineRef.current;
+          const bus = audioBusRef.current;
+          if (engine && bus) {
+            const frame = bus.update();
+            const waveform = frame.waveform;
+            const neededLen = waveform.length * 2;
+            if (stereoBufferLenRef.current !== neededLen || !stereoBufferRef.current) {
+              stereoBufferRef.current = new Float32Array(neededLen);
+              stereoBufferLenRef.current = neededLen;
+            }
+            const stereo = stereoBufferRef.current;
+            for (let i = 0; i < waveform.length; i++) {
+              stereo[i * 2] = waveform[i];
+              stereo[i * 2 + 1] = waveform[i];
+            }
+            engine.pushAudio(stereo, waveform.length);
+            engine.renderFrame();
+          }
+        }
+        rafRef.current = requestAnimationFrame(render);
+      };
+      rafRef.current = requestAnimationFrame(render);
+      return () => { cancelled = true; cancelAnimationFrame(rafRef.current); };
+    }, [ready]); // doLoadPreset accessed via ref to avoid restarting the loop
+
+    // Stuck detection — 1Hz timer (off the render loop to avoid GPU→CPU sync stalls).
+    // Samples center pixel from the WebGL canvas to detect frozen/alternating output.
     useEffect(() => {
       if (!ready || !visible) return;
-      // Stuck detection: sample a few center pixels to detect frozen output.
-      // We use a tiny offscreen canvas to read pixels from the WebGL canvas,
-      // since reading directly from the GL context after swap may return undefined data.
       let sampleCanvas: OffscreenCanvas | HTMLCanvasElement | null = null;
       let sampleCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
       try {
         sampleCanvas = new OffscreenCanvas(1, 1);
         sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
       } catch {
-        // OffscreenCanvas not supported — skip stuck detection
+        return; // OffscreenCanvas not supported — skip stuck detection
       }
-      let frameCount = 0;
+      if (!sampleCtx) return;
+
       let prevHash1 = 0;
       let prevHash2 = 0;
       let alternatingCount = 0;
+      let timerId: ReturnType<typeof setTimeout>;
 
-      const render = () => {
-        if (!visibleRef.current) return;
-        const engine = engineRef.current;
-        const bus = audioBusRef.current;
+      const check = () => {
         const canvas = canvasRef.current;
-        if (engine && bus) {
-          const frame = bus.update();
-          const waveform = frame.waveform;
-          const neededLen = waveform.length * 2;
-          // Reuse pre-allocated buffer; only reallocate if waveform size changed
-          if (stereoBufferLenRef.current !== neededLen || !stereoBufferRef.current) {
-            stereoBufferRef.current = new Float32Array(neededLen);
-            stereoBufferLenRef.current = neededLen;
+        if (!canvas || !engineRef.current || !visibleRef.current) {
+          timerId = setTimeout(check, 1000);
+          return;
+        }
+        const timeSinceLoad = performance.now() - presetLoadTimeRef.current;
+        if (timeSinceLoad > 5000) {
+          sampleCtx!.drawImage(canvas, canvas.width >> 1, canvas.height >> 1, 1, 1, 0, 0, 1, 1);
+          const px = sampleCtx!.getImageData(0, 0, 1, 1).data;
+          const hash = (px[0] << 16) | (px[1] << 8) | px[2];
+
+          if (hash === prevHash1 || hash === prevHash2) {
+            alternatingCount++;
+          } else {
+            prevHash2 = prevHash1;
+            prevHash1 = hash;
+            alternatingCount = 0;
           }
-          const stereo = stereoBufferRef.current;
-          for (let i = 0; i < waveform.length; i++) {
-            stereo[i * 2] = waveform[i];
-            stereo[i * 2 + 1] = waveform[i];
-          }
-          engine.pushAudio(stereo, waveform.length);
-          engine.renderFrame();
 
-          // Stuck detection — every ~31 frames (~0.5s), sample center pixel
-          // and detect alternation between exactly 2 hashes (the classic stuck/strobe symptom).
-          frameCount++;
-          if (sampleCtx && canvas && (frameCount & 63) === 0) {
-            const timeSinceLoad = performance.now() - presetLoadTimeRef.current;
-            if (timeSinceLoad > 5000) {
-              sampleCtx.drawImage(canvas, canvas.width >> 1, canvas.height >> 1, 1, 1, 0, 0, 1, 1);
-              const px = sampleCtx.getImageData(0, 0, 1, 1).data;
-              const hash = (px[0] << 16) | (px[1] << 8) | px[2];
-
-              // Detect alternation: hash keeps flipping between prevHash1 and prevHash2
-              if (hash === prevHash1 || hash === prevHash2) {
-                alternatingCount++;
-              } else {
-                // New hash breaks the pattern
-                prevHash2 = prevHash1;
-                prevHash1 = hash;
-                alternatingCount = 0;
-              }
-
-              // 6 consecutive matches = ~3 seconds stuck → force new preset
-              if (alternatingCount >= 12) {
-                alternatingCount = 0;
-                prevHash1 = 0;
-                prevHash2 = 0;
-                const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
-                if (names.length > 0) {
-                  doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), false);
-                }
-              }
+          // 6 consecutive matches at 1Hz = ~6 seconds stuck → force new preset
+          if (alternatingCount >= 6) {
+            alternatingCount = 0;
+            prevHash1 = 0;
+            prevHash2 = 0;
+            const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
+            if (names.length > 0) {
+              doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), false);
             }
           }
         }
-        rafRef.current = requestAnimationFrame(render);
+        timerId = setTimeout(check, 1000);
       };
-      rafRef.current = requestAnimationFrame(render);
-      return () => cancelAnimationFrame(rafRef.current);
-    }, [ready, visible]); // doLoadPreset accessed via ref to avoid restarting the loop
+      timerId = setTimeout(check, 2000); // Initial delay — let preset render a bit
+      return () => clearTimeout(timerId);
+    }, [ready, visible]);
 
     // Resize
     useEffect(() => {
