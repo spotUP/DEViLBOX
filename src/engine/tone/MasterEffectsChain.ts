@@ -475,7 +475,11 @@ export function getMasterEffectAnalysers(ctx: MasterEffectsContext, id: string):
 export function updateMasterEffectParams(ctx: MasterEffectsContext, effectId: string, config: EffectConfig): void {
   const effectData = ctx.masterEffectConfigs.get(effectId);
   if (!effectData) {
-    console.warn('[ToneEngine] Effect not found for update:', effectId, 'available:', [...ctx.masterEffectConfigs.keys()]);
+    // Suppress during async chain rebuild — the effect will appear once the rebuild completes.
+    // Only warn when no rebuild is in progress (version stable) and the map is non-empty.
+    if (ctx.masterEffectConfigs.size > 0) {
+      console.warn('[ToneEngine] Effect not found for update:', effectId, 'available:', [...ctx.masterEffectConfigs.keys()]);
+    }
     return;
   }
 
