@@ -291,9 +291,23 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         const cacheKey = `${file.source}:${file.key}`;
         const engine = getDJEngine();
 
-        // UADE/SID formats: use the dedicated pre-render path which handles
-        // the UADE render worker correctly (avoids main-thread UADE engine)
-        if (isUADEFormat(file.filename) || file.source === 'hvsc') {
+        // HVSC SIDs: render via WebSID in the pipeline (NOT UADE)
+        if (file.source === 'hvsc') {
+          useDJStore.getState().setDeckState(deckId, {
+            fileName: cacheKey,
+            trackName: file.filename.replace(/\.sid$/i, ''),
+            detectedBPM: 125,
+            effectiveBPM: 125,
+            analysisState: 'rendering',
+            isPlaying: false,
+          });
+          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, file.filename.replace(/\.sid$/i, ''), result.analysis?.bpm || 125);
+          if (useDJStore.getState().deckViewMode !== '3d') {
+            useDJStore.getState().setDeckViewMode('visualizer');
+          }
+        } else if (isUADEFormat(file.filename)) {
+          // Amiga formats: use UADE pre-render path
           await loadUADEToDeck(
             engine, deckId, buffer, file.filename, true, undefined, file.filename
           );
