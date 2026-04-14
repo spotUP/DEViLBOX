@@ -615,15 +615,18 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   // Auto-advance timer — always alternates between milkdrop and projectM
   // so two projectM presets never play back-to-back (avoids projectM crashes
   // caused by its native preset transition shader pipeline).
+  // Uses switchToLayerRef to avoid restarting the timer when the callback changes identity.
   useEffect(() => {
     if (!autoAdvance) return;
     if (presetCount === 0 && pmPresetCount === 0) return;
 
     const advance = () => {
+      const doSwitch = switchToLayerRef.current;
+      if (!doSwitch) return;
       if (activeLayer === 'projectm' && presetCount > 0) {
-        switchToLayer('milkdrop', () => canvasHandleRef.current?.randomPreset());
+        doSwitch('milkdrop', () => canvasHandleRef.current?.randomPreset());
       } else if (activeLayer === 'milkdrop' && pmPresetCount > 0) {
-        switchToLayer('projectm', () => projectmHandleRef.current?.randomPreset());
+        doSwitch('projectm', () => projectmHandleRef.current?.randomPreset());
       } else {
         // Only one engine available — stay on it and pick a new preset
         if (activeLayer === 'milkdrop') canvasHandleRef.current?.randomPreset();
@@ -633,7 +636,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     };
     autoAdvanceTimerRef.current = setTimeout(advance, 15000 + Math.random() * 15000);
     return () => { if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current); };
-  }, [autoAdvance, presetCount, pmPresetCount, activeLayer, switchToLayer]);
+  }, [autoAdvance, presetCount, pmPresetCount, activeLayer]);
 
   // Wheel listener — scratch whichever DJ deck is playing
   useEffect(() => {

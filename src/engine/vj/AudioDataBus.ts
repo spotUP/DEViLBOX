@@ -119,7 +119,9 @@ export class AudioDataBus {
   private smoothBass = 0;
   private smoothMid = 0;
   private smoothHigh = 0;
-  private energyHistory: number[] = [];
+  private energyHistory = new Float64Array(ENERGY_HISTORY_LEN);
+  private energyHistoryIdx = 0;
+  private energyHistoryCount = 0;
   private lastBeatTime = 0;
   private enabled = false;
   private waveformAnalyser: AnalyserNode | null = null;
@@ -260,20 +262,20 @@ export class AudioDataBus {
     this.smoothMid = this.smoothMid * (1 - s) + mid * s;
     this.smoothHigh = this.smoothHigh * (1 - s) + high * s;
 
-    // Beat detection: bass+sub energy vs running average
+    // Beat detection: bass+sub energy vs running average (ring buffer)
     const beatEnergy = sub + bass;
-    this.energyHistory.push(beatEnergy);
-    if (this.energyHistory.length > ENERGY_HISTORY_LEN) {
-      this.energyHistory.shift();
-    }
+    this.energyHistory[this.energyHistoryIdx] = beatEnergy;
+    this.energyHistoryIdx = (this.energyHistoryIdx + 1) % ENERGY_HISTORY_LEN;
+    if (this.energyHistoryCount < ENERGY_HISTORY_LEN) this.energyHistoryCount++;
+
     let avgEnergy = 0;
-    for (let i = 0; i < this.energyHistory.length; i++) {
+    for (let i = 0; i < this.energyHistoryCount; i++) {
       avgEnergy += this.energyHistory[i];
     }
-    avgEnergy /= this.energyHistory.length;
+    avgEnergy /= this.energyHistoryCount;
 
     const beat =
-      this.energyHistory.length >= 10 &&
+      this.energyHistoryCount >= 10 &&
       beatEnergy > avgEnergy * BEAT_THRESHOLD &&
       now - this.lastBeatTime > BEAT_COOLDOWN_MS;
 
