@@ -138,6 +138,14 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       return;
     }
 
+    // Cancel conflicting filter pads (HPF and LPF are mutually exclusive)
+    if (padId === 'hpf-sweep' || padId === 'lpf-sweep') {
+      const opposing = padId === 'hpf-sweep' ? 'lpf-sweep' : 'hpf-sweep';
+      if (cancelRefs.current.has(opposing)) {
+        cancelPad(opposing);
+      }
+    }
+
     cancelPad(padId);
     setActivePads((prev) => new Set(prev).add(padId));
 
@@ -191,7 +199,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
             if (progress < 1) {
               rafId = requestAnimationFrame(animate);
             } else {
-              deck.pause();
+              try { deck.pause(); } catch { /* engine may be gone */ }
               useDJStore.getState().setDeckPlaying(deckId, false);
               useDJStore.getState().setDeckPitch(deckId, 0);
               cancelPad(padId);

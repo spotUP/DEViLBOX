@@ -193,8 +193,7 @@ export const useDJSetStore = create<DJSetState & DJSetActions>()((set, get) => (
   },
 
   deleteSet: async (id: string) => {
-    const state = get();
-    if (state.currentSetId === id) state.stopSetPlayback();
+    if (get().currentSetId === id) get().stopSetPlayback();
 
     try {
       await deleteDJSet(id);
