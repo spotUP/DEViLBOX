@@ -72,10 +72,13 @@ import { SwedishChainsawEffect } from '../effects/SwedishChainsawEffect';
 export const EFFECT_RAMP_TIME = 0.02;
 
 export function applyEffectParametersDiff(
-  node: Tone.ToneAudioNode,
+  rawNode: Tone.ToneAudioNode,
   type: string,
   changed: Record<string, number | string>
 ): void {
+  // Unwrap gain-compensation wrapper from EffectFactory (the real effect is inside _innerEffect)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const node = ((rawNode as any)._innerEffect as Tone.ToneAudioNode | undefined) ?? rawNode;
   const R = EFFECT_RAMP_TIME;
 
   switch (type) {
@@ -1201,11 +1204,14 @@ export function applyEffectParametersDiff(
  * Routes via the correct setter per effect type.
  */
 export function applyBpmSyncedParam(
-  node: Tone.ToneAudioNode,
+  rawNode: Tone.ToneAudioNode,
   effectType: string,
   paramKey: string,
   value: number,
 ): void {
+  // Unwrap gain-compensation wrapper
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const node = ((rawNode as any)._innerEffect as Tone.ToneAudioNode | undefined) ?? rawNode;
   try {
     switch (effectType) {
       case 'Delay':

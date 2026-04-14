@@ -232,6 +232,13 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // New chain is fully built — atomically tear down old chain and connect new one.
   // This is the point where audio is momentarily re-routed; the gap is now a single
   // synchronous disconnect+connect block rather than the entire async creation period.
+  // Build new config map BEFORE teardown so updateMasterEffectParams never sees an empty map.
+  const newConfigs = new Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }>();
+  successNodes.forEach((node, index) => {
+    const config = successConfigs[index];
+    newConfigs.set(config.id, { node, config });
+  });
+  ctx.masterEffectConfigs = newConfigs;
   teardownOldChain();
 
   if (successNodes.length === 0) {
