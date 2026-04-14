@@ -21,6 +21,7 @@ export class ExciterEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain; // Muted when WASM takes over
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ param: string; value: number }> = [];
@@ -50,11 +51,17 @@ export class ExciterEffect extends Tone.ToneAudioNode {
     this.output = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
+    this.passthroughGain = new Tone.Gain(1); // Unity until WASM ready
 
+    // Dry path: input → dryGain → output
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
+
+    // Wet passthrough: input → passthroughGain → wetGain → output
+    // When WASM is ready, passthroughGain is zeroed and worklet feeds wetGain instead.
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
     this.wetGain.connect(this.output);
-    this.input.connect(this.wetGain);
 
     void this._initWorklet();
   }
@@ -72,18 +79,14 @@ export class ExciterEffect extends Tone.ToneAudioNode {
           for (const p of this.pendingParams)
             this.workletNode!.port.postMessage({ type: 'parameter', param: p.param, value: p.value });
           this.pendingParams = [];
-          // Connect WASM first, then disconnect passthrough (avoids silent gap)
-          // CRITICAL: use native disconnect to avoid Tone.js/standardized-audio-context
-          // clobbering other connections on the input node (the master effects chain
-          // has already wired previousEffect → this.input → this.output → nextEffect).
+          // Wire worklet into the wet path, then mute passthrough — NO disconnect needed.
           try {
             const rawInput = getNativeAudioNode(this.input)!;
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            // Disconnect passthrough using native API — Tone.js disconnect can
-            // clobber unrelated connections on the same node.
-            try { rawInput.disconnect(rawWet); } catch { /* */ }
+            // Mute passthrough instead of disconnecting — avoids clobbering the chain
+            this.passthroughGain.gain.value = 0;
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
@@ -177,6 +180,7 @@ export class ExciterEffect extends Tone.ToneAudioNode {
       try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
+    this.passthroughGain.dispose();
     this.dryGain.dispose(); this.wetGain.dispose();
     this.input.dispose(); this.output.dispose();
     super.dispose();
