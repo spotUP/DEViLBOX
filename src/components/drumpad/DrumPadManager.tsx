@@ -80,9 +80,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
   // Performance mode: fullscreen pads with minimal UI
   const [performanceMode, setPerformanceMode] = useState(false);
 
-  // DJ presets dropdown
-  const [showDJPresets, setShowDJPresets] = useState(false);
-  const djPresetsRef = useRef<HTMLDivElement>(null);
+  // DJ presets — action-only select (no persistent selection)
 
   // Local state for immediate UI updates (debounced save)
   const [localMasterLevel, setLocalMasterLevel] = useState<number | null>(null);
@@ -236,20 +234,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     const program = preset.create();
     useDrumPadStore.getState().saveProgram(program);
     loadProgram(program.id);
-    setShowDJPresets(false);
   }, [loadProgram]);
-
-  // Click outside DJ presets dropdown
-  useEffect(() => {
-    if (!showDJPresets) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (djPresetsRef.current && !djPresetsRef.current.contains(e.target as Node)) {
-        setShowDJPresets(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDJPresets]);
 
   const handleMasterLevelChange = useCallback((level: number) => {
     // Update UI immediately
@@ -478,7 +463,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors ${
                 padMode === mode.id
                   ? 'bg-accent-primary text-text-primary'
-                  : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'
+                  : 'bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary'
               }`}
               title={`${mode.label} (${i + 1})`}
             >
@@ -486,28 +471,13 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </button>
           ))}
           <div className="h-4 w-px bg-dark-border mx-1" />
-          <div className="relative" ref={djPresetsRef}>
-            <button
-              onClick={() => setShowDJPresets(!showDJPresets)}
-              className="px-2.5 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
-            >
-              DJ PRESETS
-            </button>
-            {showDJPresets && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-dark-surface border border-dark-border rounded-lg shadow-xl min-w-[200px]">
-                {DJ_PAD_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    onClick={() => handleLoadDJPreset(preset.id)}
-                    className="w-full text-left px-3 py-2 text-xs font-mono hover:bg-dark-bgHover transition-colors first:rounded-t-lg last:rounded-b-lg"
-                  >
-                    <div className="text-text-primary">{preset.name}</div>
-                    <div className="text-[10px] text-text-muted">{preset.description}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <CustomSelect
+            value=""
+            onChange={handleLoadDJPreset}
+            placeholder="DJ Presets"
+            options={DJ_PAD_PRESETS.map(p => ({ value: p.id, label: p.name }))}
+            className="px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary hover:border-accent-highlight/50 cursor-pointer"
+          />
         </div>
 
         {/* Main content area */}

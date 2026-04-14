@@ -18,14 +18,41 @@ namespace devilbox {
 
 static constexpr float PI = 3.14159265358979323846f;
 
+// --- Hermite interpolation (4-point, 3rd order) ---
+// Much smoother than linear — critical for pitch shifting to avoid aliasing.
+static inline float hermite(float frac, float sm1, float s0, float s1, float s2) {
+    float c0 = s0;
+    float c1 = 0.5f * (s1 - sm1);
+    float c2 = sm1 - 2.5f * s0 + 2.0f * s1 - 0.5f * s2;
+    float c3 = 0.5f * (s2 - sm1) + 1.5f * (s0 - s1);
+    return ((c3 * frac + c2) * frac + c1) * frac + c0;
+}
+
+// --- DC Blocker (1-pole highpass, ~5Hz cutoff at 48kHz) ---
+class DCBlocker {
+public:
+    DCBlocker() : x1_(0.0f), y1_(0.0f) {}
+    void reset() { x1_ = 0.0f; y1_ = 0.0f; }
+    float process(float x) {
+        // y[n] = x[n] - x[n-1] + R * y[n-1], R close to 1 = lower cutoff
+        static constexpr float R = 0.9995f; // ~5 Hz at 48kHz
+        float y = x - x1_ + R * y1_;
+        x1_ = x;
+        y1_ = y;
+        return y;
+    }
+private:
+    float x1_, y1_;
+};
+
 // --- Crossfade Pitch Shifter ---
 // Two read heads advance at pitchRatio speed through a circular buffer.
 // Each head has a full-cycle raised-cosine envelope (0→1→0) over its
 // lifetime. Heads are staggered by half a lifetime so they always sum
 // to exactly 1.0 — no clicks, no amplitude modulation.
-static constexpr int PS_BUF_SIZE = 8192; // must be power of 2
+static constexpr int PS_BUF_SIZE = 32768; // power of 2, large for safety margin
 static constexpr int PS_BUF_MASK = PS_BUF_SIZE - 1;
-static constexpr int HALF_LIFE = 2048;   // half a head's lifetime (~42ms at 48kHz)
+static constexpr int HALF_LIFE = 4096;   // half a head's lifetime (~85ms at 48kHz)
 
 class CrossfadePitchShifter {
 public:
@@ -35,12 +62,12 @@ public:
         std::memset(buf_, 0, sizeof(buf_));
         writePos_ = 0;
         pitchRatio_ = 2.0f;
-        // Head 0 starts at beginning of its lifetime, head 1 is staggered by half
         phase_[0] = 0.0f;
         phase_[1] = 0.5f;
-        // Both start reading from well behind writePos
         readPos_[0] = -static_cast<float>(HALF_LIFE * 2);
         readPos_[1] = -static_cast<float>(HALF_LIFE * 3);
+        dc_.reset();
+        lpZ1_ = 0.0f;
     }
 
     void setPitchSemitones(float semi) {
@@ -50,13 +77,9 @@ public:
     float process(float input) {
         buf_[writePos_ & PS_BUF_MASK] = input;
 
-        // Phase increment: one full cycle (0→1) = 2 * HALF_LIFE samples of drift.
-        // drift per sample = |pitchRatio - 1|, full cycle when drift accumulates
-        // to 2 * HALF_LIFE. So phaseInc = |ratio-1| / (2 * HALF_LIFE).
         float drift = fabsf(pitchRatio_ - 1.0f);
         float phaseInc = drift / static_cast<float>(2 * HALF_LIFE);
 
-        // For ratio ≈ 1.0, barely any pitch shift — just pass through
         if (drift < 0.001f) {
             writePos_++;
             return input;
@@ -65,47 +88,54 @@ public:
         float output = 0.0f;
 
         for (int t = 0; t < 2; ++t) {
-            // Advance read position at pitchRatio speed
             readPos_[t] += pitchRatio_;
-
-            // Advance phase (sawtooth 0→1)
             phase_[t] += phaseInc;
 
-            // When phase wraps, reset read position to safe distance behind write
             if (phase_[t] >= 1.0f) {
                 phase_[t] -= 1.0f;
-                readPos_[t] = static_cast<float>(writePos_) - static_cast<float>(HALF_LIFE * 2);
+                // Reset with extra margin: 2.5x HALF_LIFE behind write head
+                readPos_[t] = static_cast<float>(writePos_) - static_cast<float>(HALF_LIFE * 5 / 2);
             }
 
-            // Read with linear interpolation
-            int idx0 = static_cast<int>(floorf(readPos_[t]));
+            // Hermite interpolation (4-point cubic) — much smoother than linear
+            int idx = static_cast<int>(floorf(readPos_[t]));
             float frac = readPos_[t] - floorf(readPos_[t]);
-            float s0 = buf_[idx0 & PS_BUF_MASK];
-            float s1 = buf_[(idx0 + 1) & PS_BUF_MASK];
-            float sample = s0 + frac * (s1 - s0);
+            float sm1 = buf_[(idx - 1) & PS_BUF_MASK];
+            float s0  = buf_[idx & PS_BUF_MASK];
+            float s1  = buf_[(idx + 1) & PS_BUF_MASK];
+            float s2  = buf_[(idx + 2) & PS_BUF_MASK];
+            float sample = hermite(frac, sm1, s0, s1, s2);
 
-            // Full-cycle raised cosine: 0.5*(1 - cos(2π*phase))
-            // Goes 0 → 1 → 0 over one lifetime.
-            // Two heads at phase offset 0.5: sum is ALWAYS 1.0.
-            // (cos²(πp) + sin²(πp) = 1 rewritten as raised cosines)
             float env = 0.5f * (1.0f - cosf(2.0f * PI * phase_[t]));
-
             output += sample * env;
         }
 
         writePos_++;
-        return output;
+
+        // DC blocker removes offset accumulated by pitch shifting
+        output = dc_.process(output);
+
+        // Gentle 1-pole lowpass (~12kHz at 48kHz) to catch residual aliasing
+        static constexpr float LP_COEFF = 0.55f; // fc ≈ sampleRate * (1-coeff) / (2π)
+        lpZ1_ = output + LP_COEFF * (lpZ1_ - output);
+        return lpZ1_;
     }
 
 private:
     float buf_[PS_BUF_SIZE];
     float readPos_[2];
-    float phase_[2]; // 0-1 sawtooth, staggered by 0.5 between heads
+    float phase_[2];
     int writePos_;
     float pitchRatio_;
+    DCBlocker dc_;
+    float lpZ1_; // lowpass state
 };
 
-// --- Allpass diffuser ---
+// --- Allpass diffuser (Dattorro lattice form — TRUE allpass) ---
+// H(z) = (g + z^{-M}) / (1 + g·z^{-M}), |H| = 1 for all frequencies.
+// The Freeverb form (y = -x + d; buf = x + g*d) is NOT a true allpass —
+// it has frequency-dependent gain up to 1.67x per stage, compounding
+// to 21x across 6 stages, causing metallic/dirty buildup in feedback.
 class Allpass {
 public:
     Allpass() : pos_(0), size_(1) {
@@ -120,8 +150,9 @@ public:
 
     float process(float input, float coeff) {
         float delayed = buf_[pos_];
-        float output = -input + delayed;
-        buf_[pos_] = input + delayed * coeff;
+        float v = input - coeff * delayed;
+        float output = coeff * v + delayed;
+        buf_[pos_] = v;
         pos_ = (pos_ + 1) % size_;
         return output;
     }
@@ -177,15 +208,32 @@ public:
     float readInterp(float delaySamples) const {
         int intPart = static_cast<int>(delaySamples);
         float frac = delaySamples - static_cast<float>(intPart);
-        float s0 = buf_[(writePos_ - intPart) & (MAX_DELAY - 1)];
-        float s1 = buf_[(writePos_ - intPart - 1) & (MAX_DELAY - 1)];
-        return s0 + frac * (s1 - s0);
+        float sm1 = buf_[(writePos_ - intPart + 1) & (MAX_DELAY - 1)];
+        float s0  = buf_[(writePos_ - intPart)     & (MAX_DELAY - 1)];
+        float s1  = buf_[(writePos_ - intPart - 1) & (MAX_DELAY - 1)];
+        float s2  = buf_[(writePos_ - intPart - 2) & (MAX_DELAY - 1)];
+        return hermite(frac, sm1, s0, s1, s2);
     }
 
 private:
     float buf_[MAX_DELAY];
     int writePos_;
 };
+
+// --- Soft-knee limiter ---
+// Transparent below |x| < 0.95, gentle compression above, hard limit at 1.0.
+// With proper allpass and input scaling, this should RARELY engage.
+static inline float softLimit(float x) {
+    if (x > 0.95f) {
+        float excess = x - 0.95f;
+        return 0.95f + excess / (1.0f + excess * 20.0f); // asymptote → 1.0
+    }
+    if (x < -0.95f) {
+        float excess = -x - 0.95f;
+        return -(0.95f + excess / (1.0f + excess * 20.0f));
+    }
+    return x;
+}
 
 // ============================================================================
 // ShimmerReverbEffect
@@ -259,29 +307,42 @@ public:
 
         const float mix = params_[PARAM_MIX];
         const float dry = 1.0f - mix;
-        const float decay = 0.3f + params_[PARAM_DECAY] * 0.55f; // map 0-1 -> 0.3-0.85 (longer tail)
+        // Decay maps 0-1 → 0.2-0.88 — calibrated so tank stays below soft-clip
+        // with the 0.4 input scaling. Steady-state ≈ inputScale / (1 - decay).
+        const float decay = 0.2f + params_[PARAM_DECAY] * 0.68f;
         const float shimmer = params_[PARAM_SHIMMER];
         const float damping = params_[PARAM_DAMPING];
-        const float modDepth = params_[PARAM_MOD_DEPTH] * 200.0f * srScale_; // up to ~4ms — obvious chorus
-        const float lfoInc = (0.05f + params_[PARAM_MOD_RATE] * 5.95f) / static_cast<float>(sampleRate_); // 0.05-6 Hz
+        // Modulation depth: up to ~2ms for gentle chorus, not 4ms
+        const float modDepth = params_[PARAM_MOD_DEPTH] * 100.0f * srScale_;
+        const float lfoInc = (0.05f + params_[PARAM_MOD_RATE] * 2.95f) / static_cast<float>(sampleRate_); // 0.05-3 Hz
         const int predelaySamples = static_cast<int>(params_[PARAM_PREDELAY] * static_cast<float>(sampleRate_));
 
+        // Input scaling: attenuate input so tank levels stay controlled.
+        // With true allpass (unity gain), no frequency-dependent boost —
+        // steady-state is predictable: input_scale / (1 - decay).
+        // At 75% decay knob (internal 0.71): 0.25/0.29 ≈ 0.86 tank level.
+        static constexpr float INPUT_SCALE = 0.25f;
+        // Output gain compensates for input attenuation while keeping
+        // tank levels clean. TS wrapper's wetGain handles external mix.
+        static constexpr float OUTPUT_GAIN = 2.0f;
+
         for (int i = 0; i < numSamples; ++i) {
-            // Mono input sum
-            float mono = (inputL[i] + inputR[i]) * 0.5f;
+            // Mono input sum, attenuated for clean tank headroom
+            float mono = (inputL[i] + inputR[i]) * 0.5f * INPUT_SCALE;
 
             // Predelay
             predelay_.write(mono);
             float predelayed = predelay_.read(std::max(1, predelaySamples));
 
             // Input diffusion: 4 cascaded allpass stages
+            // Coefficients 0.6/0.5 — gentler than 0.75/0.625 to reduce metallic color
             float diffused = predelayed;
-            diffused = inputAP_[0].process(diffused, 0.75f);
-            diffused = inputAP_[1].process(diffused, 0.75f);
-            diffused = inputAP_[2].process(diffused, 0.625f);
-            diffused = inputAP_[3].process(diffused, 0.625f);
+            diffused = inputAP_[0].process(diffused, 0.60f);
+            diffused = inputAP_[1].process(diffused, 0.60f);
+            diffused = inputAP_[2].process(diffused, 0.50f);
+            diffused = inputAP_[3].process(diffused, 0.50f);
 
-            // LFO
+            // LFO for chorus modulation of tank delay times
             lfoPhase_ += lfoInc;
             if (lfoPhase_ >= 1.0f) lfoPhase_ -= 1.0f;
             float lfo = sinf(2.0f * PI * lfoPhase_) * modDepth;
@@ -310,20 +371,20 @@ public:
             float shiftedL = pitchL_.process(tankOutL);
             float shiftedR = pitchR_.process(tankOutR);
 
-            // Mix clean tank + shimmer for feedback
-            // shimmer 0 = pure reverb, shimmer 1 = fully pitch-shifted feedback
-            float shimAmt = shimmer; // full 0-1 range — user controls it directly
-            feedbackL_ = tanhf(tankOutL * (1.0f - shimAmt) + shiftedL * shimAmt) * 0.7f;
-            feedbackR_ = tanhf(tankOutR * (1.0f - shimAmt) + shiftedR * shimAmt) * 0.7f;
+            // Blend clean tank + shimmer for feedback
+            float shimAmt = shimmer;
+            float fbL = tankOutL * (1.0f - shimAmt) + shiftedL * shimAmt;
+            float fbR = tankOutR * (1.0f - shimAmt) + shiftedR * shimAmt;
 
-            // Output: crossfade between clean reverb and pitch-shifted reverb
-            // shimmer 0 = pure plate reverb, shimmer 1 = fully pitch-shifted output
-            float cleanL = tankOutL;
-            float cleanR = tankOutR;
-            float outL = cleanL * (1.0f - shimAmt) + shiftedL * shimAmt;
-            float outR = cleanR * (1.0f - shimAmt) + shiftedR * shimAmt;
-            outputL[i] = inputL[i] * dry + tanhf(outL) * mix * 0.7f;
-            outputR[i] = inputR[i] * dry + tanhf(outR) * mix * 0.7f;
+            // Feedback: DC-block then soft-limit as safety net
+            feedbackL_ = softLimit(fbDcL_.process(fbL));
+            feedbackR_ = softLimit(fbDcR_.process(fbR));
+
+            // Output: blend clean reverb + shimmer, compensate for input attenuation
+            float outL = (tankOutL * (1.0f - shimAmt) + shiftedL * shimAmt) * OUTPUT_GAIN;
+            float outR = (tankOutR * (1.0f - shimAmt) + shiftedR * shimAmt) * OUTPUT_GAIN;
+            outputL[i] = inputL[i] * dry + softLimit(outL) * mix;
+            outputR[i] = inputR[i] * dry + softLimit(outR) * mix;
         }
     }
 
@@ -378,6 +439,9 @@ private:
     // Pitch shifters for shimmer feedback
     CrossfadePitchShifter pitchL_, pitchR_;
 
+    // DC blockers on the feedback to prevent offset accumulation
+    DCBlocker fbDcL_, fbDcR_;
+
     // Feedback state
     float feedbackL_, feedbackR_;
 
@@ -399,6 +463,8 @@ private:
         dampR_.reset();
         pitchL_.reset();
         pitchR_.reset();
+        fbDcL_.reset();
+        fbDcR_.reset();
         feedbackL_ = 0.0f;
         feedbackR_ = 0.0f;
         lfoPhase_ = 0.0f;

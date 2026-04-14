@@ -106,6 +106,9 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
     }
 
     await this.guitarML.loadModel(this.modelIndex);
+
+    // Force worklet to 100% wet — dry/wet mixing is handled by this wrapper
+    this.guitarML.setDryWet(1.0);
   }
 
   /**
@@ -138,16 +141,19 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
         break;
       }
 
-      // Dry/wet mix
+      // Dry/wet mix — handled entirely by the wrapper (NeuralEffectWrapper).
+      // The worklet always outputs 100% wet; sending dryWet here is redundant
+      // and would cause double-attenuation. Ignore it.
       case 'dryWet':
-        this.guitarML.setDryWet(normalizedValue);
+        // no-op: wrapper's wet/dry mix handles this
         break;
 
-      // Output level — tracked separately so changing wet doesn't reset level
+      // Output level — controls the neural model's output amplitude.
+      // Applied to the wet path gain so it scales the processed signal.
       case 'level':
       case 'output':
         this._level = normalizedValue;
-        this.wetGain.gain.value = this._level * this._wet;
+        this.neuralOutputGain.gain.value = this._level;
         break;
 
       // Tone control (high-frequency roll-off)
@@ -196,7 +202,7 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
    */
   set wet(value: number) {
     this._wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._wet * this._level;  // preserve level
+    this.wetGain.gain.value = this._wet;
     this.dryGain.gain.value = 1 - this._wet;
   }
 

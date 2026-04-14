@@ -8,12 +8,11 @@ import type { DrumPad } from '../../types/drumpad';
 interface VoiceState {
   source: AudioBufferSourceNode | null;
   gainNode: GainNode;
-  filterNode: BiquadFilterNode;
+  filterNode: BiquadFilterNode | null;
   panNode: StereoPannerNode;
   startTime: number;
   noteOffTime: number | null;
   velocity: number;
-  cleanupSource?: AudioBufferSourceNode; // For sample-accurate cleanup
 }
 
 export class DrumPadEngine {
@@ -104,10 +103,7 @@ export class DrumPadEngine {
       }
     }
 
-    if (!sampleBuffer) {
-      console.warn(`[DrumPadEngine] Pad ${pad.id} has no sample`);
-      return;
-    }
+    if (!sampleBuffer) return;
 
     // Handle reverse: use reversed buffer
     if (pad.reverse) {
@@ -132,55 +128,49 @@ export class DrumPadEngine {
     }
 
     const now = this.context.currentTime;
+    const useFilter = pad.filterType !== 'off';
 
-    // Create audio nodes
+    // Create audio nodes — skip filter when not needed
     const source = this.context.createBufferSource();
     const gainNode = this.context.createGain();
-    const filterNode = this.context.createBiquadFilter();
     const panNode = this.context.createStereoPanner();
+    let filterNode: BiquadFilterNode | null = null;
 
     // Configure source
     source.buffer = sampleBuffer;
 
     // Pitch: tune is ±120, where 10 units = 1 semitone (MPC-style fine tuning)
-    // Velocity-to-pitch modulation: veloToPitch range ±120
     const veloFactor = velocity / 127;
     const inverseVeloFactor = 1 - veloFactor;
-    const pitchMod = (pad.veloToPitch / 100) * veloFactor * 12; // Scale to ±12 semitones
-    const totalTune = pad.tune / 10 + pitchMod; // Convert tune units to semitones
-    source.playbackRate.value = Math.pow(2, totalTune / 12);
+    const pitchMod = (pad.veloToPitch / 100) * veloFactor * 12;
+    const totalTune = pad.tune / 10 + pitchMod;
+    if (totalTune !== 0) {
+      source.playbackRate.value = Math.pow(2, totalTune / 12);
+    }
 
-    // Configure filter
-    if (pad.filterType !== 'off') {
+    // Configure filter (only if active)
+    if (useFilter) {
+      filterNode = this.context.createBiquadFilter();
       switch (pad.filterType) {
-        case 'lpf':
-          filterNode.type = 'lowpass';
-          break;
-        case 'hpf':
-          filterNode.type = 'highpass';
-          break;
-        case 'bpf':
-          filterNode.type = 'bandpass';
-          break;
+        case 'lpf': filterNode.type = 'lowpass'; break;
+        case 'hpf': filterNode.type = 'highpass'; break;
+        case 'bpf': filterNode.type = 'bandpass'; break;
       }
 
-      // Base cutoff + velocity modulation
       const veloCutoffMod = (pad.veloToFilter / 100) * veloFactor;
       const baseCutoff = pad.cutoff;
-      // Velocity opens the filter: at high velocity, cutoff goes up
       const modulatedCutoff = baseCutoff + veloCutoffMod * (20000 - baseCutoff);
 
       filterNode.frequency.value = Math.min(20000, Math.max(20, modulatedCutoff));
-      filterNode.Q.value = (pad.resonance / 100) * 20; // 0-20 Q range
+      filterNode.Q.value = (pad.resonance / 100) * 20;
 
       // Filter envelope sweep (MPC-style)
       if (pad.filterEnvAmount > 0) {
         const envDepth = (pad.filterEnvAmount / 100) * (20000 - modulatedCutoff);
-        const fAttackTime = (pad.filterAttack / 100) * 3; // 0-3 seconds
-        const fDecayTime = (pad.filterDecay / 100) * 2.6; // 0-2.6 seconds (MPC max)
+        const fAttackTime = (pad.filterAttack / 100) * 3;
+        const fDecayTime = (pad.filterDecay / 100) * 2.6;
         const peakCutoff = Math.min(20000, modulatedCutoff + envDepth);
 
-        // Filter envelope: attack up, then decay back to base
         filterNode.frequency.setValueAtTime(modulatedCutoff, now);
         filterNode.frequency.linearRampToValueAtTime(peakCutoff, now + fAttackTime);
         filterNode.frequency.exponentialRampToValueAtTime(
@@ -190,11 +180,12 @@ export class DrumPadEngine {
       }
     }
 
-    // Configure pan
-    panNode.pan.value = pad.pan / 64; // -64 to +63 -> -1 to ~1
+    // Configure pan (skip if centered)
+    if (pad.pan !== 0) {
+      panNode.pan.value = pad.pan / 64;
+    }
 
     // Velocity-to-level: controls how much velocity affects amplitude
-    // veloToLevel=0: fixed level, veloToLevel=100: full velocity range
     const veloLevelAmount = pad.veloToLevel / 100;
     const velocityScale = 1 - veloLevelAmount * inverseVeloFactor;
     const levelScale = pad.level / 127;
@@ -204,36 +195,35 @@ export class DrumPadEngine {
     // Velocity-to-attack modulation: higher velocity = shorter attack
     const baseAttack = pad.attack / 1000;
     const veloAttackMod = (pad.veloToAttack / 100) * inverseVeloFactor;
-    const attackTime = baseAttack * (1 + veloAttackMod * 2); // Soft hits get longer attack
+    const attackTime = baseAttack * (1 + veloAttackMod * 2);
 
     const decayTime = pad.decay / 1000;
     const sustainLevel = (pad.sustain / 100) * targetGain;
-    const releaseTime = pad.release / 1000;
 
-    // Attack
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(targetGain, now + attackTime);
+    // ADSR envelope — use setValueAtTime for instant-attack pads to avoid ramp overhead
+    if (attackTime < 0.001) {
+      gainNode.gain.setValueAtTime(targetGain, now);
+    } else {
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(targetGain, now + attackTime);
+    }
+    gainNode.gain.linearRampToValueAtTime(sustainLevel, now + attackTime + decayTime);
 
-    // Decay to sustain
-    gainNode.gain.linearRampToValueAtTime(
-      sustainLevel,
-      now + attackTime + decayTime
-    );
-
-    // Connect nodes
-    source.connect(filterNode);
-    filterNode.connect(panNode);
-    panNode.connect(gainNode);
-
-    // Route to appropriate output bus
+    // Connect nodes — minimal chain when filter is off
     const outputBus = this.outputs.get(pad.output) || this.masterGain;
+    if (filterNode) {
+      source.connect(filterNode);
+      filterNode.connect(panNode);
+    } else {
+      source.connect(panNode);
+    }
+    panNode.connect(gainNode);
     gainNode.connect(outputBus);
 
     // Calculate sample start/end offsets
-    // Velocity-to-start: soft hits start later in the sample (transient softening)
     const veloStartMod = (pad.veloToStart / 100) * inverseVeloFactor;
     let effectiveStart = pad.sampleStart + veloStartMod * (pad.sampleEnd - pad.sampleStart);
-    effectiveStart = Math.min(effectiveStart, pad.sampleEnd - 0.01); // Ensure some playback
+    effectiveStart = Math.min(effectiveStart, pad.sampleEnd - 0.01);
 
     let startOffset: number;
     let playDuration: number;
@@ -245,36 +235,23 @@ export class DrumPadEngine {
       playDuration = (pad.sampleEnd - effectiveStart) * sampleBuffer.duration;
     }
 
-    // Start playback with sample start/end
-    source.start(now, startOffset, playDuration);
+    // Start playback — schedule at 0 (now) for minimum latency
+    source.start(0, startOffset, playDuration);
 
-    // Schedule cleanup using Web Audio (sample-accurate)
-    const duration = playDuration / source.playbackRate.value;
-    const cleanupTime = now + duration + releaseTime + 0.1; // Extra 100ms buffer
-
-    // Create silent buffer to trigger cleanup at exact time
-    const silentBuffer = this.context.createBuffer(1, 1, this.context.sampleRate);
-    const cleanupSource = this.context.createBufferSource();
-    cleanupSource.buffer = silentBuffer;
-    cleanupSource.connect(this.context.destination);
-
-    // Use onended for sample-accurate cleanup
-    cleanupSource.onended = () => {
+    // Auto-cleanup via onended (no extra silent-buffer timer node)
+    source.onended = () => {
       this.cleanupVoice(pad.id);
     };
-
-    cleanupSource.start(cleanupTime);
 
     // Store voice state
     const voice: VoiceState = {
       source,
       gainNode,
-      filterNode,
+      filterNode: filterNode!,
       panNode,
       startTime: now,
       noteOffTime: null,
       velocity,
-      cleanupSource,
     };
 
     this.voices.set(pad.id, voice);
@@ -289,27 +266,20 @@ export class DrumPadEngine {
       return;
     }
 
-    // Trigger release phase
     const now = this.context.currentTime;
     voice.noteOffTime = now;
 
-    const fadeTime = releaseTime ?? 0.1; // Default 100ms release
+    const fadeTime = releaseTime ?? 0.01; // Default 10ms for fast choke
 
     // Release envelope (linear ramp to 0)
     voice.gainNode.gain.cancelScheduledValues(now);
     voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
     voice.gainNode.gain.linearRampToValueAtTime(0, now + fadeTime);
 
-    // Schedule cleanup using Web Audio (sample-accurate)
-    const cleanupTime = now + fadeTime + 0.05; // Extra 50ms buffer
-    const silentBuffer = this.context.createBuffer(1, 1, this.context.sampleRate);
-    const cleanupSource = this.context.createBufferSource();
-    cleanupSource.buffer = silentBuffer;
-    cleanupSource.connect(this.context.destination);
-    cleanupSource.onended = () => {
+    // Cleanup after fade completes
+    setTimeout(() => {
       this.cleanupVoice(padId);
-    };
-    cleanupSource.start(cleanupTime);
+    }, (fadeTime + 0.05) * 1000);
   }
 
   /**
@@ -341,19 +311,17 @@ export class DrumPadEngine {
   private cleanupVoice(padId: number): void {
     const voice = this.voices.get(padId);
     if (!voice) {
-      return; // Already cleaned up
+      return;
     }
 
-    // Delete immediately to prevent double-cleanup
     this.voices.delete(padId);
 
     try {
       voice.source?.stop();
       voice.source?.disconnect();
       voice.gainNode.disconnect();
-      voice.filterNode.disconnect();
+      voice.filterNode?.disconnect();
       voice.panNode.disconnect();
-      voice.cleanupSource?.disconnect();
     } catch {
       // Ignore errors from already-stopped sources
     }

@@ -43,9 +43,14 @@ export class DJMixerEngine {
   private limiter: Tone.Compressor;
   readonly masterMeter: Tone.Meter;
 
-  // Master FX chain (inserted between masterGain and limiter)
+  // Master FX chain (inserted between masterGain and duckGain)
+  // Each chain is wrapped in a chainGain for crossfading:
+  //   masterGain → chainGain → [FX nodes] → duckGain
+  // When no FX: masterGain → chainGain → duckGain
+  private chainGain: Tone.Gain;
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
   private masterEffectsRebuildVersion = 0;
+  private crossfadeCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Cue engine (injected from DJEngine)
   private cueEngine: DJCueEngine | null = null;
@@ -69,6 +74,7 @@ export class DJMixerEngine {
 
     this.masterGain = new Tone.Gain(1);
     this.duckGain = new Tone.Gain(1);
+    this.chainGain = new Tone.Gain(1);
 
     // Limiter: fast attack, high ratio compressor acting as a brickwall
     // Attack 1ms catches crossfader transient spikes (10ms ramps) — matches DB303Synth limiter pattern
@@ -92,7 +98,8 @@ export class DJMixerEngine {
       const masterGainRaw = this.masterGain.input as AudioNode;
       this.samplerInput.connect(masterGainRaw);
 
-      this.masterGain.connect(this.duckGain);
+      this.masterGain.connect(this.chainGain);
+      this.chainGain.connect(this.duckGain);
       this.duckGain.connect(this.limiter);
       this.limiter.toDestination();
       this.limiter.connect(this.masterMeter);
@@ -253,42 +260,39 @@ export class DJMixerEngine {
 
   /**
    * Rebuild the master effects chain from a list of EffectConfig.
-   * Inserts effects between masterGain and limiter.
-   * Called when the user selects/changes FX presets in the DJ view.
+   * Uses true parallel crossfade: old chain fades out while new chain fades in.
+   *
+   * Audio graph during crossfade (both paths active simultaneously):
+   *   masterGain → oldChainGain(1→0) → [old FX] → duckGain
+   *   masterGain → newChainGain(0→1) → [new FX] → duckGain
+   *
+   * Equal-power crossfade (cos/sin) keeps perceived loudness constant.
    */
   async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
     const myVersion = ++this.masterEffectsRebuildVersion;
 
-    // Capture current first node so we can disconnect it AFTER connecting the new path
-    const oldFirstNode = this.masterEffectsNodes[0] ?? this.limiter;
+    // Cancel any pending crossfade cleanup from a previous switch
+    if (this.crossfadeCleanupTimer) {
+      clearTimeout(this.crossfadeCleanupTimer);
+      this.crossfadeCleanupTimer = null;
+    }
+
+    // Snapshot old chain
+    const oldChainGain = this.chainGain;
     const oldNodes = [...this.masterEffectsNodes];
 
     // Filter to enabled effects only
     const enabled = effects.filter((fx) => fx.enabled);
-
-    if (enabled.length === 0) {
-      // No effects — ZERO-GAP SWAP: masterGain → duckGain → limiter
-      this.masterGain.connect(this.duckGain);
-      try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
-
-      // Dispose old effect nodes
-      for (const node of oldNodes) {
-        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
-      }
-      this.masterEffectsNodes = [];
-      return;
-    }
 
     // Ensure AudioContext is running
     if (Tone.getContext().state === 'suspended') {
       try { await Tone.start(); } catch { /* user gesture required */ }
     }
 
-    // Create effect nodes
+    // Create new effect nodes
     const nodes: Tone.ToneAudioNode[] = [];
     for (const config of enabled) {
       if (myVersion !== this.masterEffectsRebuildVersion) {
-        // Superseded by newer rebuild — abort
         nodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
         return;
       }
@@ -306,58 +310,75 @@ export class DJMixerEngine {
       return;
     }
 
-    if (nodes.length === 0) {
-      // All effects failed — ZERO-GAP SWAP: masterGain → duckGain → limiter
-      this.masterGain.connect(this.duckGain);
-      try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
-
-      for (const node of oldNodes) {
-        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+    // Build new chain: newChainGain → [FX nodes] → duckGain
+    const newChainGain = new Tone.Gain(0); // starts silent
+    try {
+      if (nodes.length > 0) {
+        newChainGain.connect(nodes[0]);
+        for (let i = 0; i < nodes.length - 1; i++) {
+          nodes[i].connect(nodes[i + 1]);
+        }
+        nodes[nodes.length - 1].connect(this.duckGain);
+      } else {
+        newChainGain.connect(this.duckGain);
       }
-      this.masterEffectsNodes = [];
+      // Connect masterGain → newChainGain (parallel with old chain)
+      this.masterGain.connect(newChainGain);
+    } catch (err) {
+      console.error('[DJMixerEngine] FX chain connection failed, keeping old chain:', err);
+      nodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+      try { newChainGain.disconnect(); newChainGain.dispose(); } catch { /* */ }
       return;
     }
 
-    // Wire new chain internally first (not yet connected to masterGain)
+    // Update state to point to new chain
+    this.chainGain = newChainGain;
+    this.masterEffectsNodes = nodes;
+
+    // Compute crossfade duration from BPM (~2 beats)
+    let fadeSec = 1.0; // fallback at 120 BPM = 2 beats
     try {
-      for (let i = 0; i < nodes.length - 1; i++) {
-        nodes[i].connect(nodes[i + 1]);
-      }
-      nodes[nodes.length - 1].connect(this.duckGain);
+      const { useDJStore } = await import('@/stores/useDJStore');
+      const state = useDJStore.getState();
+      const deckA = state.decks.A;
+      const deckB = state.decks.B;
+      const bpm = deckA.beatGrid?.bpm || deckA.detectedBPM ||
+                  deckB.beatGrid?.bpm || deckB.detectedBPM || 120;
+      // 2 beats, clamped 0.5–2.0s
+      fadeSec = Math.min(2.0, Math.max(0.5, (60 / bpm) * 2));
+    } catch { /* use fallback */ }
 
-      // ZERO-GAP SWAP: connect new chain FIRST, then disconnect old
-      // Web Audio allows multiple connections — for one sample frame both paths carry audio
-      this.masterGain.connect(nodes[0]);
-      try { this.masterGain.disconnect(oldFirstNode); } catch { /* already disconnected */ }
+    // Equal-power crossfade using Tone.js rampTo
+    // Old chain: 1 → 0, New chain: 0 → 1
+    const now = Tone.now();
+    oldChainGain.gain.cancelScheduledValues(now);
+    newChainGain.gain.cancelScheduledValues(now);
+    oldChainGain.gain.setValueAtTime(oldChainGain.gain.value, now);
+    newChainGain.gain.setValueAtTime(0, now);
 
-      // Dispose old effect nodes (already disconnected from masterGain)
-      for (const node of oldNodes) {
-        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
-      }
-
-      this.masterEffectsNodes = nodes;
-
-      console.log(`[DJMixer] Master FX chain: ${enabled.map(e => e.type).join(' → ')}`);
-    } catch (err) {
-      console.error('[DJMixerEngine] FX chain connection failed, bypassing effects:', err);
-
-      // Dispose all new nodes that may be partially connected
-      for (const node of nodes) {
-        try { node.disconnect(); node.dispose(); } catch { /* */ }
-      }
-
-      // Ensure direct bypass: masterGain → duckGain → limiter (skip FX)
-      try {
-        this.masterGain.disconnect();
-      } catch { /* already disconnected */ }
-      this.masterGain.connect(this.duckGain);
-
-      // Also dispose old nodes
-      for (const node of oldNodes) {
-        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
-      }
-      this.masterEffectsNodes = [];
+    // Schedule equal-power curve points (cos/sin) for smooth perceived loudness
+    const steps = 20;
+    for (let i = 1; i <= steps; i++) {
+      const t = now + (fadeSec * i) / steps;
+      const frac = i / steps;
+      // Equal-power: old = cos(frac * π/2), new = sin(frac * π/2)
+      oldChainGain.gain.linearRampToValueAtTime(Math.cos(frac * Math.PI * 0.5), t);
+      newChainGain.gain.linearRampToValueAtTime(Math.sin(frac * Math.PI * 0.5), t);
     }
+
+    console.log(`[DJMixer] Crossfading FX (${fadeSec.toFixed(1)}s): ${enabled.length ? enabled.map(e => e.type).join(' → ') : '(bypass)'}`);
+
+    // Schedule cleanup of old chain after crossfade completes
+    this.crossfadeCleanupTimer = setTimeout(() => {
+      this.crossfadeCleanupTimer = null;
+      // Only clean up if we haven't been superseded
+      if (oldChainGain === this.chainGain) return; // we ARE the current chain, don't dispose
+      try { this.masterGain.disconnect(oldChainGain); } catch { /* already disconnected */ }
+      for (const node of oldNodes) {
+        try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+      }
+      try { oldChainGain.disconnect(); oldChainGain.dispose(); } catch { /* */ }
+    }, (fadeSec + 0.1) * 1000); // small buffer after fade completes
   }
 
   // ==========================================================================
@@ -365,6 +386,12 @@ export class DJMixerEngine {
   // ==========================================================================
 
   dispose(): void {
+    // Cancel pending crossfade cleanup
+    if (this.crossfadeCleanupTimer) {
+      clearTimeout(this.crossfadeCleanupTimer);
+      this.crossfadeCleanupTimer = null;
+    }
+
     // Clean up PFL connections
     this.pflConnections.forEach((gain) => {
       gain.disconnect();
@@ -383,6 +410,8 @@ export class DJMixerEngine {
     this.inputC.dispose();
     this.samplerInput.disconnect();
     this.masterGain.dispose();
+    this.chainGain.dispose();
+    this.duckGain.dispose();
     this.limiter.dispose();
     this.masterMeter.dispose();
   }

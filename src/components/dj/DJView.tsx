@@ -14,6 +14,7 @@ import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
 import { useTransportStore } from '@/stores';
+import { useUIStore } from '@/stores/useUIStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { DJDeck } from './DJDeck';
@@ -115,21 +116,33 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
     setDJModeActive(true);
 
     return () => {
-      setDJModeActive(false);
-      disposeDJEngine();
-      clearSongCache();
+      // Keep DJ audio alive when navigating to companion views (drumpad/vj)
+      // or when auto DJ is actively running (must never be interrupted)
+      const nextView = useUIStore.getState().activeView;
+      const { autoDJEnabled, autoDJStatus, decks } = useDJStore.getState();
+      const autoDJActive = autoDJEnabled && autoDJStatus !== 'idle';
+      const anyDeckPlaying = decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying;
+      const keepAudio = nextView === 'drumpad' || nextView === 'vj' || autoDJActive || anyDeckPlaying;
+
+      if (!keepAudio) {
+        setDJModeActive(false);
+        disposeDJEngine();
+        clearSongCache();
+      }
       engineRef.current = null;
 
       // Reset global audio state that DJ mode may have left stale.
       // ToneEngine globals affect ALL sample playback rates and synth detune;
       // if not reset here, the tracker view plays at wrong pitch/BPM.
-      const engine = getToneEngine();
-      engine.setGlobalPlaybackRate(1.0);
-      engine.setGlobalDetune(0);
-      engine.releaseAll();
+      if (!keepAudio) {
+        const engine = getToneEngine();
+        engine.setGlobalPlaybackRate(1.0);
+        engine.setGlobalDetune(0);
+        engine.releaseAll();
 
-      // Reset transport store pitch display
-      useTransportStore.getState().setGlobalPitch(0);
+        // Reset transport store pitch display
+        useTransportStore.getState().setGlobalPitch(0);
+      }
     };
   }, [setDJModeActive]);
 
