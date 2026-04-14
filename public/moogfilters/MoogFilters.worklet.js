@@ -272,19 +272,6 @@ class MoogFiltersProcessor extends AudioWorkletProcessor {
       outputL.set(this.outputBufferL.subarray(0, numSamples));
       outputR.set(this.outputBufferR.subarray(0, numSamples));
 
-      // DIAGNOSTIC: Log input/output peak levels every 500 frames (~5sec)
-      if (!this._diagCounter) this._diagCounter = 0;
-      this._diagCounter++;
-      if (this._diagCounter % 500 === 0) {
-        let maxIn = 0, maxOut = 0;
-        for (let i = 0; i < numSamples; i++) {
-          maxIn = Math.max(maxIn, Math.abs(inputL[i]));
-          maxOut = Math.max(maxOut, Math.abs(outputL[i]));
-        }
-        console.warn('[MoogWorklet] frame', this._diagCounter,
-          'inPeak:', maxIn.toFixed(6), 'outPeak:', maxOut.toFixed(6),
-          'init:', this.isInitialized, 'hasEffect:', !!this.effect);
-      }
 
     } catch (error) {
       // Passthrough on error
