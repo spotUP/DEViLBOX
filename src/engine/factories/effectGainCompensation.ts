@@ -12,7 +12,7 @@
 
 const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   // ── Measured hot — reduce output ──
-  DragonflyHall:    -18.8,
+  DragonflyHall:    -6.0,
   Driva:            -10.0,
   Saturator:        -9.3,
   Distortion:       -4.5,
@@ -55,7 +55,7 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Roomy:            +1.4,   // was quiet, boost
   CalfPhaser:       -1.4,
   ZamDelay:         -1.3,
-  DragonflyRoom:    +5.3,   // was quiet, boost
+  DragonflyRoom:    -3.0,
   MultibandGate:    +1.1,   // was quiet, boost
   AutoPanner:       -1.0,
   BiPhase:          -1.0,
@@ -81,6 +81,27 @@ const EFFECT_GAIN_COMPENSATION_DB: Record<string, number> = {
   Chorus:              +4.5,
   JCReverb:            +3.0,
   Chebyshev:           +2.0,
+
+  // ── Migrated from old per-node wrapper table (EffectFactory) ──
+  MVerb:               -1.0,
+  SpringReverb:        -1.5,
+  ShimmerReverb:       -2.0,
+  Freeverb:            -1.5,
+  SpaceEcho:           -2.0,
+  Aelapse:             -1.5,
+  SwedishChainsaw:     -3.0,
+  Leslie:              -1.0,
+  WAMStonePhaser:      -0.5,
+  VinylNoise:          -1.0,
+  Filter:              +1.5,
+  AutoFilter:          +1.5,
+  MoogFilter:          +2.0,
+  Neural:              -1.0,
+  WAMBigMuff:          -3.0,
+  WAMTS9:              -2.0,
+  WAMDistoMachine:     -2.5,
+  WAMQuadraFuzz:       -2.5,
+  WAMVoxAmp:           -2.0,
 };
 
 /**
