@@ -200,6 +200,7 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
     phases: Float32Array;      // per-spike random phase offset for wave motion
     basePositions: Float32Array; // attribute buffer (interleaved: origin, tip, origin, tip...)
     count: number;
+    spikeScale: number;        // multiplier: maps 0-0.3 range to head geometry local coords
   } | null>(null);
 
   // Head look-at targets — pick a random point, turn toward it, hold, pick another
@@ -254,11 +255,24 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
       headMeshRef.current = morphMesh;
 
       // ── Create spike hair from scalp vertices ──
+      // The facecap.glb uses KHR_mesh_quantization — vertex positions are in
+      // a large coordinate space (thousands of units), not 0-1 normalized.
+      // Spike lengths must be scaled to match, and the spikeMesh must share
+      // the same parent + transforms as the head mesh so positions align.
       if (morphMesh) {
         const headGeo = (morphMesh as THREE.Mesh).geometry;
         const posAttr = headGeo.getAttribute('position');
         const normAttr = headGeo.getAttribute('normal');
         if (posAttr && normAttr) {
+          // Compute head bounding box for scale-independent thresholds
+          const headBounds = new THREE.Box3().setFromBufferAttribute(posAttr as THREE.BufferAttribute);
+          const headSize = new THREE.Vector3();
+          headBounds.getSize(headSize);
+          // Upper 40% of head = scalp region (above eyes)
+          const yThreshold = headBounds.min.y + headSize.y * 0.55;
+          // Deduplicate granularity relative to head size
+          const dedupeScale = 1.0 / (headSize.y * 0.01);
+
           // Collect scalp vertices (top of head)
           const scalpVerts: { x: number; y: number; z: number; nx: number; ny: number; nz: number }[] = [];
           const seen = new Set<string>();
@@ -269,10 +283,9 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
             const nx = normAttr.getX(i);
             const ny = normAttr.getY(i);
             const nz = normAttr.getZ(i);
-            // Scalp region: above eyes, normals pointing up/outward
-            if (ny > 0.3 && y > 0.02) {
-              // Deduplicate nearby vertices (round to 3 decimals)
-              const key = `${(x * 100) | 0},${(y * 100) | 0},${(z * 100) | 0}`;
+            // Scalp region: upper portion of head, normals pointing up/outward
+            if (ny > 0.3 && y > yThreshold) {
+              const key = `${(x * dedupeScale) | 0},${(y * dedupeScale) | 0},${(z * dedupeScale) | 0}`;
               if (!seen.has(key)) {
                 seen.add(key);
                 scalpVerts.push({ x, y, z, nx, ny, nz });
@@ -293,40 +306,57 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
           }
 
           const count = spikes.length;
-          const origins = new Float32Array(count * 3);
-          const normals = new Float32Array(count * 3);
-          const phases = new Float32Array(count);
-          // Line segments: 2 vertices per spike (base + tip)
-          const positions = new Float32Array(count * 2 * 3);
+          if (count > 0) {
+            const origins = new Float32Array(count * 3);
+            const normals = new Float32Array(count * 3);
+            const phases = new Float32Array(count);
+            // Line segments: 2 vertices per spike (base + tip)
+            const positions = new Float32Array(count * 2 * 3);
 
-          for (let i = 0; i < count; i++) {
-            const s = spikes[i];
-            origins[i * 3] = s.x;
-            origins[i * 3 + 1] = s.y;
-            origins[i * 3 + 2] = s.z;
-            normals[i * 3] = s.nx;
-            normals[i * 3 + 1] = s.ny;
-            normals[i * 3 + 2] = s.nz;
-            phases[i] = Math.random() * Math.PI * 2;
-            // Initial positions (base = tip, zero length)
-            positions[i * 6] = s.x;
-            positions[i * 6 + 1] = s.y;
-            positions[i * 6 + 2] = s.z;
-            positions[i * 6 + 3] = s.x;
-            positions[i * 6 + 4] = s.y;
-            positions[i * 6 + 5] = s.z;
+            for (let i = 0; i < count; i++) {
+              const s = spikes[i];
+              origins[i * 3] = s.x;
+              origins[i * 3 + 1] = s.y;
+              origins[i * 3 + 2] = s.z;
+              normals[i * 3] = s.nx;
+              normals[i * 3 + 1] = s.ny;
+              normals[i * 3 + 2] = s.nz;
+              phases[i] = Math.random() * Math.PI * 2;
+              // Initial positions (base = tip, zero length)
+              positions[i * 6] = s.x;
+              positions[i * 6 + 1] = s.y;
+              positions[i * 6 + 2] = s.z;
+              positions[i * 6 + 3] = s.x;
+              positions[i * 6 + 4] = s.y;
+              positions[i * 6 + 5] = s.z;
+            }
+
+            const spikeGeo = new THREE.BufferGeometry();
+            spikeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const spikeMesh = new THREE.LineSegments(spikeGeo, spikeMat);
+            spikeMesh.renderOrder = 2;
+            spikeMesh.frustumCulled = false;
+
+            // Add as sibling of morphMesh with same transforms so spike
+            // positions (in head geometry local coords) map correctly
+            const meshObj = morphMesh as THREE.Mesh;
+            if (meshObj.parent) {
+              spikeMesh.position.copy(meshObj.position);
+              spikeMesh.rotation.copy(meshObj.rotation);
+              spikeMesh.scale.copy(meshObj.scale);
+              meshObj.parent.add(spikeMesh);
+            } else {
+              result.scene.add(spikeMesh);
+            }
+            spikeMeshRef.current = spikeMesh;
+
+            // Scale factor: maps animation range (0-0.3) to head geometry coords.
+            // At max audio, spike = ~10% of head height.
+            const spikeScale = headSize.y * 0.33;
+
+            spikeDataRef.current = { origins, normals, phases, basePositions: positions, count, spikeScale };
           }
-
-          const spikeGeo = new THREE.BufferGeometry();
-          spikeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-          const spikeMesh = new THREE.LineSegments(spikeGeo, spikeMat);
-          spikeMesh.renderOrder = 2;
-          spikeMesh.frustumCulled = false;
-          result.scene.add(spikeMesh);
-          spikeMeshRef.current = spikeMesh;
-
-          spikeDataRef.current = { origins, normals, phases, basePositions: positions, count };
         }
       }
 
@@ -572,20 +602,19 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
     const spikeData = spikeDataRef.current;
     const spikeMesh = spikeMeshRef.current;
     if (spikeData && spikeMesh) {
-      const { origins, normals, phases, basePositions, count } = spikeData;
+      const { origins, normals, phases, basePositions, count, spikeScale } = spikeData;
       const posAttr = spikeMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
 
       for (let i = 0; i < count; i++) {
         const phase = phases[i];
         // Each spike responds to a mix of bass, mid, high with its own phase
-        // Creates a wave-like ripple across the scalp
         const wave = Math.sin(t * 4.0 + phase * 3.0) * 0.5 + 0.5;
         const bassWave = Math.sin(t * 2.0 + phase) * bass;
         const midPulse = mid * Math.sin(t * 6.0 + phase * 2.0);
         const highSparkle = high * (Math.sin(t * 12.0 + phase * 5.0) > 0.3 ? 1.0 : 0.0);
         const beatPop = beat ? 0.5 : 0;
 
-        // Combine into spike length (0 to ~0.25 units)
+        // Combine into normalized spike length (0 to ~0.3)
         let length = 0.02 + wave * 0.03 // idle gentle wave
           + bassWave * 0.12             // bass pumps
           + midPulse * 0.08             // mid ripples
@@ -597,8 +626,8 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
         }
         length = Math.max(0.01, Math.min(0.3, length));
 
-        // Scale opacity with visibility
-        length *= vis;
+        // Scale to head geometry coordinates and fade with visibility
+        length *= vis * spikeScale;
 
         const ox = origins[i * 3];
         const oy = origins[i * 3 + 1];
