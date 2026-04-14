@@ -10,6 +10,7 @@ import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { getCachedFilenames, cacheSourceFile } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { searchModland } from '@/lib/modlandApi';
 
 export interface PrecacheProgress {
   current: number;
@@ -82,12 +83,16 @@ export async function precachePlaylist(
       const { downloadModlandFile } = await import('@/lib/modlandApi');
       let buffer: ArrayBuffer;
       let retries = 0;
+      let currentPath = modlandPath;
+      
       while (true) {
         try {
-          buffer = await downloadModlandFile(modlandPath);
+          buffer = await downloadModlandFile(currentPath);
           break;
         } catch (dlErr) {
           const msg = dlErr instanceof Error ? dlErr.message : String(dlErr);
+          
+          // Handle rate limiting
           if (msg.includes('Rate limited') || msg.includes('429')) {
             retries++;
             if (retries > 8) throw dlErr;
@@ -95,6 +100,36 @@ export async function precachePlaylist(
             await new Promise(r => setTimeout(r, wait));
             continue;
           }
+          
+          // Handle 404: search Modland and auto-fix
+          if (msg.includes('404')) {
+            console.log(`[Precache] 404 for ${filename} — searching Modland...`);
+            try {
+              const nameNoExt = filename.replace(/\.[^.]+$/, '');
+              let selectedPath: string | null = null;
+              
+              // Try exact filename first, then fuzzy (name without extension)
+              for (const query of [filename, nameNoExt]) {
+                const results = await searchModland({ q: query, limit: 10 });
+                if (results.results.length > 0) {
+                  // Auto-fix with best match (shortest path = most likely)
+                  selectedPath = results.results[0].full_path;
+                  console.log(`[Precache] Auto-fix 404: ${selectedPath}`);
+                  break;
+                }
+                await new Promise(r => setTimeout(r, 1000));
+              }
+              
+              if (selectedPath) {
+                const newFileName = `modland:${selectedPath}`;
+                store.updateTrackMeta(playlistId, index, { fileName: newFileName });
+                currentPath = selectedPath;
+                await new Promise(r => setTimeout(r, 2000));
+                continue; // retry download with new path
+              }
+            } catch { /* search failed, fall through */ }
+          }
+          
           throw dlErr;
         }
       }
