@@ -6,6 +6,7 @@
  * which is posted back as Float32Array transferables.
  *
  * Format routing:
+ *   - C64 SID (PSID/RSID) → WebSID WASM engine (reSID, best accuracy)
  *   - AHX, HVL → HivelyTracker WASM engine
  *   - MOD + exotic Amiga formats → UADE engine
  *   - XM, IT, S3M + other PC formats → libopenmpt engine
@@ -36,41 +37,75 @@ interface InitRequest {
 type WorkerMessage = RenderRequest | InitRequest;
 
 // ── UADE extensions for format routing ───────────────────────────────────────
+// Synced with UADE_EXTENSIONS in UADEParser.ts — the authoritative source.
+// AHX is also here (UADE handles it); isHivelyFormat() takes priority for AHX/HVL.
 const AMIGA_EXTENSIONS = new Set([
-  // ProTracker MOD
+  // ProTracker MOD + variants handled better by UADE than libopenmpt
   'mod',
-  // Common UADE-handled exotic formats (non-exhaustive, covers the most common)
-  'aam', 'abk', 'adpcm', 'adsc', 'ahx', 'amc', 'aon', 'aon4', 'aon8', 'aps',
-  'ash', 'ast', 'bd', 'bds', 'bp', 'bp3', 'bss', 'bye',
-  'cin', 'cm', 'core', 'cus', 'cust', 'custom',
-  'dh', 'digi', 'dl', 'dl_deli', 'dln', 'dlm1', 'dlm2', 'dm', 'dm1', 'dm2',
-  'dmu', 'dmu2', 'dsr', 'dw', 'dwold', 'dz',
-  'ea', 'ems', 'emsv6',
-  'fc', 'fc13', 'fc14', 'fp', 'fred', 'fw',
-  'gmc', 'gv',
-  'hd', 'hipc', 'hot', 'hvl',
-  'iff', 'in', 'is', 'is20',
-  'jam', 'jcb', 'jd', 'jmf', 'jo', 'jpo', 'jpold',
-  'kh', 'kim', 'kris',
-  'lme', 'ma', 'mc', 'mcr', 'mdat', 'med', 'mii', 'mk2', 'mkiio',
-  'ml', 'mm4', 'mm8', 'mmdc', 'mms', 'mp', 'mp_id', 'mso', 'mtp2', 'mug', 'mug2',
-  'np', 'np1', 'np2', 'np3',
-  'okt', 'okta',
-  'pap', 'pha', 'pn', 'ps', 'psf', 'pt', 'pt36', 'ptm', 'puma',
-  'rh', 'riff', 'rjp',
-  'sa', 'sb', 'sc', 'scn', 'scr', 'sct', 'sfx', 'sfx13',
-  'sid', 'sid1', 'sid2', 'smn', 'smp', 'smus', 'sndmon', 'snk', 'soc',
-  'spm', 'ss', 'sun',
-  'syn', 'synmod',
-  'tcb', 'tf', 'tfx', 'thm', 'thn', 'tits', 'tme', 'tro', 'tronic',
-  'tw',
-  'uds',
-  'vss',
-  'wb',
-  'ym',
-  'zen',
-  // Packed MOD/ProTracker variants
-  'ac1', 'ac1d', 'aval', 'chan', 'cp', 'cplx', 'crb', 'di', 'eu',
+  // AProSys, ActionAmics, ADPCM, AM-Composer, AMOS, Anders Öland, ArtAndMagic
+  'aam', 'abk', 'act', 'adpcm', 'adsc', 'agi', 'ahx', 'alp', 'amc',
+  'ams', 'aon', 'aon4', 'aon8', 'aps', 'arp', 'ash', 'ast',
+  // BenDaglish, BladePacker, Beathoven, Andrew Parton
+  'bd', 'bds', 'bfc', 'bp', 'bp3', 'bsi', 'bss', 'bye',
+  // Cinemaware, ChipTracker, CoreDesign, custom/CustomMade, Chuck Biscuits, CDFM
+  'c67', 'cba', 'cin', 'cm', 'core', 'cus', 'cust', 'custom',
+  // DariusZendeh, DaveLowe, DavidHanney, DavidWhittaker, DeltaMusic, Desire
+  'dat', 'dh', 'digi', 'dl', 'dl_deli', 'dln', 'dlm1', 'dlm2',
+  'dm', 'dm1', 'dm2', 'dmu', 'dmu2', 'dns', 'doda', 'dp',
+  'dsc', 'dsr', 'dss', 'dsym', 'dum', 'dw', 'dwold', 'dz',
+  // EarAche, EMS, FashionTracker, FutureComposer variants
+  'ea', 'emod', 'ems', 'emsv6', 'ex',
+  'fc', 'fc-bsi', 'fc13', 'fc14', 'fc2', 'fc3', 'fc4',
+  // FMTracker, Fred, FredGray, FuturePlayer, ForgottenWorlds, FaceTheMusic
+  'fmt', 'fp', 'fred', 'ftm', 'fw',
+  // GlueMon, GMC, GraoumfTracker, EarAche
+  'glue', 'gm', 'gmc', 'gt2', 'gtk', 'gv',
+  // HowieDavies, JochenHippel (hip/hip7/hipc/hst/mcmd/sog/s7g)
+  'hd', 'hip', 'hip7', 'hipc', 'hmc', 'hn', 'hot', 'hrt', 'hst',
+  // ImagesMusicSystem, Infogrames, InStereo
+  'iff', 'ims', 'in', 'is', 'is20',
+  // JamCracker, JankoMrsicFlogel, JasonBrooke, JasonPage, JeroenTel, JesperOlsen
+  'jam', 'jb', 'jc', 'jcb', 'jcbo', 'jd', 'jmf', 'jo', 'jp', 'jpn', 'jpnd',
+  'jpo', 'jpold', 'js', 'jt',
+  // Kim, KrisHatlelid, Laxity, LegglessMusicEditor
+  'kh', 'kim', 'kris', 'lme',
+  // ManiacsOfNoise (mon), Mark Cooksey, MarkII, MajorTom, MaxTrax, Maximum Effect
+  'ma', 'max', 'mc', 'mcmd', 'mcmd_org', 'mco', 'mcr', 'md', 'mdat',
+  'med', 'mfp', 'mg', 'mii', 'mk2', 'mkii', 'mkiio', 'ml',
+  'mm4', 'mm8', 'mmdc', 'mms', 'mok', 'mon', 'mon_old', 'mosh',
+  'mp', 'mp_id', 'mso', 'mtp2', 'mug', 'mug2', 'mus', 'mxtx',
+  // Nick Pelling, NovoTrade, NTSP
+  'npp', 'np', 'np1', 'np2', 'np3', 'ntp',
+  // Octa-MED, OktaLyzer, onEscapee
+  'octamed', 'okt', 'okta', 'one', 'osp',
+  // PaulRobotham, PaulShields, PaulSummers, PaulTonge, PeterVerswyvelen
+  'pap', 'pat', 'pha', 'pn', 'powt', 'prt', 'ps', 'psf', 'psa', 'pt', 'pt36',
+  'ptm', 'puma', 'pvp',
+  // QuadraComposer, Quartet
+  'qc', 'qpa', 'qts',
+  // RichardJoseph, RiffRaff, RobHubbard
+  'rh', 'rho', 'riff', 'rj', 'rjp', 'rk', 'rkb',
+  // SeanConnolly, SeanConran, SCUMM, SIDMon, Silmarils, SonicArranger
+  's-c', 's7g', 'sa', 'sa-p', 'sa_old', 'sas', 'sb', 'sc', 'scn', 'scr',
+  'sct', 'scumm', 'sdata', 'sdr', 'sfc',
+  'sfx', 'sfx13', 'sfx20', 'sg', 'sid', 'sid1', 'sid2',
+  'sjs', 'sm', 'sm1', 'sm2', 'sm3', 'smod', 'smp', 'smpro',
+  'smus', 'smn', 'sndmon', 'sng', 'snk', 'snx', 'soc', 'sog', 'sonic',
+  'spl', 'spm', 'sqt', 'ss', 'st', 'sun', 'sym', 'symmod', 'syn', 'synmod',
+  // TCB, TFMX variants, ThomasHermann, TimFollin, TimeTracker, Titanics, etc.
+  'tcb', 'tf', 'tfhd1.5', 'tfhd7v', 'tfhdpro', 'tfmx', 'tfmx1.5', 'tfmx7v',
+  'tfmxpro', 'tfx', 'thm', 'thn', 'tiny', 'tits', 'tme', 'tmk',
+  'tpu', 'trc', 'tro', 'tronic', 'tsm', 'tw', 'two',
+  // UFO, BladePacker, VoodooSupreme, WallyBeben, YM, ZoundMonitor
+  'uds', 'ufo', 'vss', 'wb', 'ym', 'ymst', 'zen',
+  // DigiBooster Pro, Protracker4
+  'dbm', 'mod3',
+  // PTK-Prowiz packed formats
+  'mod_doc', 'mod15', 'mod15_mst', 'mod15_st-iv', 'mod15_ust',
+  'mod_ntk', 'mod_ntk1', 'mod_ntk2', 'mod_ntkamp', 'mod_flt4', 'mod_comp',
+  'mod_adsc4',
+  // Prowiz packed module variants
+  '4v', 'ac1', 'ac1d', 'aval', 'chan', 'cp', 'cplx', 'crb', 'di', 'eu',
   'fc-m', 'fcm', 'ft', 'fuz', 'fuzz',
   'ice', 'it1', 'kef', 'kef7', 'krs', 'ksm', 'lax',
   'mexxmp', 'mpro', 'nr', 'nru', 'ntpk',
@@ -133,6 +168,21 @@ const AMIGA_PREFIXES = new Set([
   // TimFollin, AHX-thx, TomyTracker, VoodooSupreme
   'tf', 'thx', 'tomy', 'vss',
 ]);
+
+/** Detect C64 SID files by PSID/RSID magic bytes at offset 0.
+ *  .sid extension is ambiguous: could be SIDMon (Amiga) or C64 PSID/RSID.
+ *  C64 SID files have 'PSID' or 'RSID' at bytes 0-3. */
+function isC64SID(fileBuffer: ArrayBuffer): boolean {
+  if (fileBuffer.byteLength < 4) return false;
+  const magic = new Uint8Array(fileBuffer, 0, 4);
+  // PSID = 0x50 0x53 0x49 0x44, RSID = 0x52 0x53 0x49 0x44
+  return (
+    (magic[0] === 0x50 || magic[0] === 0x52) && // P or R
+    magic[1] === 0x53 && // S
+    magic[2] === 0x49 && // I
+    magic[3] === 0x44    // D
+  );
+}
 
 /** Check if a filename should use UADE (Amiga formats) vs libopenmpt (PC formats) */
 function isAmigaFormat(filename: string): boolean {
@@ -553,6 +603,263 @@ async function renderWithHively(
   return { left, right, sampleRate };
 }
 
+// ── WebSID (C64 SID) Engine State ────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let sidModule: any = null;
+let sidReady = false;
+
+async function initSID(): Promise<void> {
+  if (sidReady) return;
+
+  const baseUrl = self.location.origin;
+
+  // Fetch backend JS, WASM binary, and C64 ROMs in parallel
+  const [jsResponse, wasmResponse, romsResponse] = await Promise.all([
+    fetch(`${baseUrl}/deepsid/backend_websid.js`),
+    fetch(`${baseUrl}/deepsid/websid.wasm`),
+    fetch(`${baseUrl}/deepsid/c64roms.js`),
+  ]);
+
+  let jsCode = await jsResponse.text();
+  const wasmBinary = await wasmResponse.arrayBuffer();
+  const romsCode = await romsResponse.text();
+
+  // Extract the Emscripten IIFE (between the module config and the adapter class).
+  // The IIFE: `var backend_SID = (function(Module) { ... })(window.spp_backend_state_SID);`
+  // We need to:
+  // 1. Shim window.* references
+  // 2. Provide wasmBinary to skip fetch
+  // 3. Return the Module with all exports
+
+  // Replace window references in the outer wrapper
+  jsCode = jsCode.replace(
+    /\(function\(\)\{.*?window\.printErr.*?\}\)\(\);/s,
+    '// console shim removed for worker'
+  );
+
+  // Replace the Module config with one that includes wasmBinary
+  jsCode = jsCode.replace(
+    /window\.spp_backend_state_SID\s*=\s*\{[^}]+\}/,
+    `window.spp_backend_state_SID = {
+      wasmBinary: __sidWasmBinary__,
+      locateFile: function(path) { return "${baseUrl}/deepsid/" + path; },
+      notReady: true,
+      adapterCallback: function(){}
+    }`
+  );
+
+  // Replace the onRuntimeInitialized setter (uses .bind(window...))
+  jsCode = jsCode.replace(
+    /window\.spp_backend_state_SID\["onRuntimeInitialized"\]\s*=\s*function\(\)\s*\{[^}]+\}\.bind\([^)]+\);/,
+    `window.spp_backend_state_SID["onRuntimeInitialized"] = function() {
+      this.notReady = false;
+      this.adapterCallback();
+    }.bind(window.spp_backend_state_SID);`
+  );
+
+  // Remove the adapter class and everything after (we don't need it)
+  const adapterIdx = jsCode.indexOf('class SIDBackendAdapter');
+  if (adapterIdx > 0) {
+    jsCode = jsCode.substring(0, adapterIdx);
+  }
+
+  // Wrap everything with window/document shims and execute
+  const wrappedCode = `
+    var window = self;
+    var document = { currentScript: { src: "${baseUrl}/deepsid/backend_websid.js" }, title: "" };
+    window.console = { log: function(){}, warn: function(){}, error: function(){} };
+    window.printErr = function(){};
+    window.sid_measure_runs = 0;
+    window.sid_measure_sum = 0;
+    window.sid_measure = 0;
+    window.sid_measure_avg_runs = 0;
+    window.sid_measure_avg_sum = 0;
+    window.sid_measure_avg = 0;
+    var __sidWasmBinary__ = this.__wasmBin__;
+    ${romsCode.replace(/window\./g, 'self.')}
+    ${jsCode}
+    return typeof backend_SID !== 'undefined' ? backend_SID : null;
+  `;
+
+  // Execute in a function scope, providing wasmBinary via 'this'
+  const factory = new Function(wrappedCode);
+  const result = factory.call({ __wasmBin__: new Uint8Array(wasmBinary) });
+
+  if (!result || !result.Module) {
+    throw new Error('WebSID module failed to initialize');
+  }
+
+  sidModule = result.Module;
+
+  // Wait for runtime initialization if needed
+  if (sidModule.calledRun) {
+    sidReady = true;
+  } else {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('WebSID init timeout')), 10000);
+      const origCallback = sidModule.onRuntimeInitialized;
+      sidModule.onRuntimeInitialized = () => {
+        clearTimeout(timeout);
+        if (origCallback) origCallback();
+        sidReady = true;
+        resolve();
+      };
+    });
+  }
+
+  console.log('[DJRenderWorker] WebSID engine initialized');
+}
+
+async function renderWithSID(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  subsong: number,
+  id: string,
+): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+  await initSID();
+  const mod = sidModule;
+  const sampleRate = 44100;
+
+  // Copy SID file data to WASM heap
+  const data = new Uint8Array(fileBuffer);
+  const buf = mod._malloc(data.length);
+  mod.HEAPU8.set(data, buf);
+
+  // Load the SID file:
+  // emu_load_file(filename, buf, len, sampleRate, procBufSize, scopeEnabled, basicBuf, charBuf, kernalBuf, enableMd5)
+  // ROMs: decode from base64 globals if available
+  let basicBuf = 0, charBuf = 0, kernalBuf = 0;
+  const ROM_SIZE = 0x2000;
+  const CHAR_ROM_SIZE = 0x1000;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g = self as any;
+  if (g.C64_BASIC_ROM) {
+    const rom = base64ToUint8Array(g.C64_BASIC_ROM);
+    basicBuf = mod._malloc(ROM_SIZE);
+    mod.HEAPU8.set(rom.subarray(0, ROM_SIZE), basicBuf);
+  }
+  if (g.C64_CHAR_ROM) {
+    const rom = base64ToUint8Array(g.C64_CHAR_ROM);
+    charBuf = mod._malloc(CHAR_ROM_SIZE);
+    mod.HEAPU8.set(rom.subarray(0, CHAR_ROM_SIZE), charBuf);
+  }
+  if (g.C64_KERNAL_ROM) {
+    const rom = base64ToUint8Array(g.C64_KERNAL_ROM);
+    kernalBuf = mod._malloc(ROM_SIZE);
+    mod.HEAPU8.set(rom.subarray(0, ROM_SIZE), kernalBuf);
+  }
+
+  const procBufSize = 8192; // processing buffer size (samples per compute call)
+  const ret = mod.ccall('emu_load_file', 'number',
+    ['string', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
+    [filename, buf, data.length, sampleRate, procBufSize, 0, basicBuf, charBuf, kernalBuf, 0]);
+
+  mod._free(buf);
+  if (kernalBuf) mod._free(kernalBuf);
+  if (charBuf) mod._free(charBuf);
+  if (basicBuf) mod._free(basicBuf);
+
+  if (ret !== 0) {
+    throw new Error(`WebSID failed to load ${filename} (code ${ret})`);
+  }
+
+  // Set subsong
+  if (subsong >= 0) {
+    mod.ccall('emu_set_subsong', 'number', ['number'], [subsong]);
+  }
+
+  postProgress(id, 10);
+
+  // Get max position for progress reporting
+  const maxPos = mod.ccall('emu_get_max_position', 'number');
+
+  // Render audio: each compute call produces ~1 frame (50/60Hz).
+  // SIDs loop forever, so render for a fixed duration (3 minutes default, up to 5 if still playing).
+  const maxDuration = 180; // 3 minutes
+  const maxFrames = sampleRate * maxDuration;
+  const chunks: { left: Float32Array; right: Float32Array }[] = [];
+  let totalFrames = 0;
+  let lastProgressPct = 10;
+  let songEnded = false;
+
+  while (totalFrames < maxFrames && !songEnded) {
+    // emu_compute_audio_samples returns >0 when song ends
+    const ended = mod._emu_compute_audio_samples();
+    if (ended) {
+      songEnded = true;
+      break;
+    }
+
+    // Get the audio buffer (Int16 interleaved stereo)
+    const audioBufPtr = mod._emu_get_audio_buffer() >> 1; // byte offset → Int16 index
+    const numSamples = mod._emu_get_audio_buffer_length();
+
+    if (numSamples <= 0) continue;
+
+    // WebSID uses 2 channels (stereo interleaved): [L, R, L, R, ...]
+    const framesThisChunk = numSamples >> 1; // numSamples is total Int16 values (L+R)
+    const chunkL = new Float32Array(framesThisChunk);
+    const chunkR = new Float32Array(framesThisChunk);
+
+    for (let i = 0; i < framesThisChunk; i++) {
+      chunkL[i] = mod.HEAP16[audioBufPtr + i * 2] / 32768.0;
+      chunkR[i] = mod.HEAP16[audioBufPtr + i * 2 + 1] / 32768.0;
+    }
+
+    chunks.push({ left: chunkL, right: chunkR });
+    totalFrames += framesThisChunk;
+
+    // Progress based on position or time
+    if (maxPos > 0) {
+      const curPos = mod.ccall('emu_get_current_position', 'number');
+      const pct = Math.round(10 + (curPos / maxPos) * 75);
+      if (pct > lastProgressPct) {
+        postProgress(id, pct);
+        lastProgressPct = pct;
+      }
+    } else {
+      const pct = Math.round(10 + (totalFrames / maxFrames) * 75);
+      if (pct > lastProgressPct) {
+        postProgress(id, pct);
+        lastProgressPct = pct;
+      }
+    }
+  }
+
+  // Teardown the SID instance
+  mod._emu_teardown();
+
+  if (totalFrames === 0) {
+    throw new Error(`WebSID rendered 0 frames for ${filename}`);
+  }
+
+  // Concatenate chunks
+  const left = new Float32Array(totalFrames);
+  const right = new Float32Array(totalFrames);
+  let offset = 0;
+  for (const chunk of chunks) {
+    left.set(chunk.left, offset);
+    right.set(chunk.right, offset);
+    offset += chunk.left.length;
+  }
+
+  postProgress(id, 85);
+  console.log(`[DJRenderWorker/WebSID] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames, songEnded: ${songEnded}`);
+  return { left, right, sampleRate };
+}
+
+/** Decode a base64 string to Uint8Array */
+function base64ToUint8Array(b64: string): Uint8Array {
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    arr[i] = raw.charCodeAt(i);
+  }
+  return arr;
+}
+
 // ── libopenmpt Engine State ──────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -702,7 +1009,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       try {
         let result: { left: Float32Array; right: Float32Array; sampleRate: number };
 
-        if (isHivelyFormat(filename)) {
+        if (isC64SID(fileBuffer)) {
+          result = await renderWithSID(fileBuffer, filename, subsong, id);
+        } else if (isHivelyFormat(filename)) {
           result = await renderWithHively(fileBuffer, filename, subsong, id);
         } else if (isAmigaFormat(filename)) {
           result = await renderWithUADE(fileBuffer, filename, subsong, id);
