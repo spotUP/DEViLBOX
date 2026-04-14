@@ -690,7 +690,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'BadCat Jazz', description: 'BadCat 50 clean — warm round jazz tones', tags: ['Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 75, neuralModelIndex: 23, parameters: { drive: 15, level: 100, presence: 40 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 60, neuralModelIndex: 23, parameters: { drive: 10, level: 70, presence: 35 } },
       { category: 'tonejs', type: 'Chorus', enabled: true, wet: 15, parameters: { frequency: 0.3, depth: 0.2 } },
       { category: 'wasm', type: 'MVerb', enabled: true, wet: 30, parameters: { damping: 0.3, density: 0.7, bandwidth: 0.5, decay: 0.5, predelay: 0.03, size: 0.6, gain: 1.0, mix: 0.4, earlyMix: 0.4 } },
     ] },
