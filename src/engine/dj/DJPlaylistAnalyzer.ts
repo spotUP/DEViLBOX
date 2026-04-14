@@ -95,6 +95,8 @@ export async function analyzePlaylist(
   let analyzed = 0;
   let failed = 0;
   const failures: AnalysisFailure[] = [];
+  let consecutiveNetworkFailures = 0;
+  const MAX_CONSECUTIVE_NETWORK_FAILURES = 5;
 
   console.log(`[PlaylistAnalyzer] Analyzing ${total} tracks in "${playlist.name}"`);
 
@@ -226,6 +228,7 @@ export async function analyzePlaylist(
         useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, meta);
       }
 
+      consecutiveNetworkFailures = 0; // Reset on success
       analyzed++;
       const done = analyzed + failed;
       onProgress?.({ current: done, total, analyzed, failed, trackName: track.trackName, status: 'done' });
@@ -233,6 +236,20 @@ export async function analyzePlaylist(
     } catch (err) {
       failed++;
       const reason = err instanceof Error ? err.message : String(err);
+      
+      // Check for network failures (server down, fetch failed, offline)
+      const isNetworkError = reason.includes('Failed to fetch') || reason.includes('NetworkError') || !navigator.onLine;
+      if (isNetworkError) {
+        consecutiveNetworkFailures++;
+        if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
+          console.error(`[PlaylistAnalyzer] Server unreachable — aborting after ${consecutiveNetworkFailures} consecutive network failures`);
+          onProgress?.({ current: analyzed + failed, total, analyzed, failed, trackName: 'Server unreachable', status: 'error' });
+          break; // Abort the loop
+        }
+      } else {
+        consecutiveNetworkFailures = 0; // Reset on non-network errors (404, parse errors, etc.)
+      }
+      
       failures.push({ trackName: track.trackName, fileName: track.fileName, reason });
       // Mark as skipped so it won't be re-scanned next time
       useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, { analysisSkipped: true });

@@ -142,6 +142,76 @@ export async function downloadTFMXCompanion(
   }
 }
 
+/**
+ * UADE/Amiga companion file support.
+ *
+ * Many UADE formats use two-file pairs:
+ *   - Sonix: .instr/.ss companions for instruments
+ *   - Jason Page: jpn.* song + smp.* samples
+ *   - MFP: .mfp song + smp.* samples  
+ *   - Richard Joseph: .dum/.sng song + .ins samples
+ *   - AdLib Tracker: .sng song + .ins instruments
+ *   - Startrekker AM: .mod song + .nt synthesis definitions
+ *
+ * Returns array of all found companions (some formats have multiple).
+ */
+export async function downloadUADECompanions(
+  mainPath: string,
+): Promise<Array<{ filename: string; buffer: ArrayBuffer }>> {
+  const lastSlash = mainPath.lastIndexOf('/');
+  const dir = lastSlash >= 0 ? mainPath.slice(0, lastSlash + 1) : '';
+  const basename = lastSlash >= 0 ? mainPath.slice(lastSlash + 1) : mainPath;
+  const basenameLower = basename.toLowerCase();
+  const companions: Array<{ filename: string; buffer: ArrayBuffer }> = [];
+
+  const tryDownload = async (companionName: string) => {
+    try {
+      const buffer = await downloadModlandFile(dir + companionName);
+      companions.push({ filename: companionName, buffer });
+    } catch {
+      // Companion not found - non-fatal
+    }
+  };
+
+  // Jason Page: jpn.* → smp.*
+  if (basenameLower.startsWith('jpn.') || basenameLower.startsWith('jpnd.') || 
+      basenameLower.startsWith('jp.') || basenameLower.startsWith('jpo.') || 
+      basenameLower.startsWith('jpold.')) {
+    const suffix = basename.slice(basename.indexOf('.') + 1);
+    await tryDownload('smp.' + suffix);
+  }
+
+  // MFP: mfp.* → smp.*
+  if (basenameLower.startsWith('mfp.')) {
+    const suffix = basename.slice(4);
+    await tryDownload('smp.' + suffix);
+  }
+
+  // Richard Joseph / AdLib Tracker: check for .ins companion
+  if (basenameLower.endsWith('.dum') || basenameLower.endsWith('.sng')) {
+    const nameNoExt = basename.slice(0, basename.lastIndexOf('.'));
+    await tryDownload(nameNoExt + '.ins');
+    // Also try .INS (uppercase)
+    await tryDownload(nameNoExt + '.INS');
+  }
+
+  // Startrekker AM: .mod → .nt
+  if (basenameLower.endsWith('.mod')) {
+    const nameNoExt = basename.slice(0, -4);
+    await tryDownload(nameNoExt + '.nt');
+  }
+
+  // Sonix: scan for .ss and .instr companions with same base name
+  // These follow pattern: basename.ss, basename.instr
+  if (basenameLower.endsWith('.smus') || basenameLower.endsWith('.dum')) {
+    const nameNoExt = basename.slice(0, basename.lastIndexOf('.'));
+    await tryDownload(nameNoExt + '.ss');
+    await tryDownload(nameNoExt + '.instr');
+  }
+
+  return companions;
+}
+
 export async function getModlandStatus(): Promise<ModlandStatus> {
   const response = await fetch(`${API_URL}/modland/status`);
   if (!response.ok) {
