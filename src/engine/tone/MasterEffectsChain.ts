@@ -142,6 +142,7 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   // effect-creation work — audio flows through the old chain until the last possible moment.
   const oldNodes = ctx.masterEffectsNodes.slice();
   const oldAnalysers = new Map(ctx.masterEffectAnalysers);
+  const oldConfigs = ctx.masterEffectConfigs;
 
   // Filter to only enabled effects
   const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
@@ -172,7 +173,8 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
       try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
     });
     ctx.masterEffectsNodes = ctx.masterEffectsNodes.filter(n => !oldNodes.includes(n));
-    ctx.masterEffectConfigs.clear();
+    // Clear the OLD config map (snapshotted), not the current one
+    oldConfigs.clear();
     oldAnalysers.forEach(({ pre, post }) => {
       try { pre.disconnect(); } catch { /* */ }
       try { post.disconnect(); } catch { /* */ }
