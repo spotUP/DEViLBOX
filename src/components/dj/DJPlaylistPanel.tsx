@@ -1331,6 +1331,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto min-h-0"
             style={{ maxHeight: 360 }}
+            onContextMenuCapture={(e) => { e.preventDefault(); }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDropOnPlaylist}
             tabIndex={0}
