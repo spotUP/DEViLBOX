@@ -317,11 +317,11 @@ export class DrumPadEngine {
     this.voices.delete(padId);
 
     try {
-      voice.source?.stop();
       voice.source?.disconnect();
       voice.gainNode.disconnect();
       voice.filterNode?.disconnect();
       voice.panNode.disconnect();
+      voice.source?.stop();
     } catch {
       // Ignore errors from already-stopped sources
     }

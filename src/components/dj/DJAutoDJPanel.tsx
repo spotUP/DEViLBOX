@@ -121,9 +121,8 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   );
 
   const handleAnalyze = useCallback(async () => {
-    if (!activePlaylistId) return;
+    if (analyzingRef.current || !activePlaylistId) return;
     // Reset stuck state from previous run (e.g. unresolved fix dialog)
-    analyzingRef.current = false;
     setFixDialog(null);
 
     analyzingRef.current = true;

@@ -239,6 +239,19 @@ export const PadGrid: React.FC<PadGridProps> = ({
               const normalizedVel = curvedVelocity / 127;
               const padInstId = PAD_INSTRUMENT_BASE + pad.id;
               const config = { ...pad.synthConfig, id: padInstId };
+              
+              // Debug logging
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[PadGrid] Triggering pad ${pad.id} "${pad.name}":`, {
+                  note,
+                  synthType: config.synthType,
+                  drumType: config.drumMachine?.drumType,
+                  io808Type: config.parameters?.io808Type,
+                  tr909Type: config.parameters?.tr909Type,
+                  velocity: normalizedVel,
+                });
+              }
+              
               engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
               if (pad.playMode === 'oneshot') {
                 const releaseDelay = Math.max(pad.decay, 100) / 1000;
