@@ -108,7 +108,15 @@ let _schemaResetPending = false;
 export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   // Pad mode
   padMode: 'samples' as PadMode,
-  setPadMode: (mode: PadMode) => set({ padMode: mode }),
+  setPadMode: (mode: PadMode) => {
+    const state = get();
+    // Clear active FX pads when switching away from djfx mode
+    if (state.padMode === 'djfx' && mode !== 'djfx') {
+      set({ padMode: mode, activeFxPads: new Set() });
+    } else {
+      set({ padMode: mode });
+    }
+  },
   activeFxPads: new Set<number>(),
   setFxPadActive: (padId: number, active: boolean) => {
     const prev = get().activeFxPads;

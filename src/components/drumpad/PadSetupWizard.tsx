@@ -8,8 +8,8 @@
  * Shared logic: src/hooks/drumpad/usePadSetupWizard.ts
  */
 
-import React from 'react';
-import { X, ChevronLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, ChevronLeft, ChevronDown, ChevronRight } from 'lucide-react';
 import { usePadSetupWizard, type SourceType } from '@/hooks/drumpad/usePadSetupWizard';
 import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import {
@@ -17,6 +17,7 @@ import {
   DEFAULT_ONESHOT_PADS,
   DEFAULT_SCRATCH_PADS,
 } from '@/constants/djPadModeDefaults';
+import { ONE_SHOT_PRESETS_BY_CATEGORY } from '@/constants/djOneShotPresetsByCategory';
 
 // ── Source type icons (text-based, no emoji per project rules) ──────────────
 
@@ -187,27 +188,102 @@ const StepDjFx: React.FC<{ wizard: ReturnType<typeof usePadSetupWizard> }> = ({ 
 
 // ── Step 2: One Shot ────────────────────────────────────────────────────────
 
-const StepOneShot: React.FC<{ wizard: ReturnType<typeof usePadSetupWizard> }> = ({ wizard }) => (
-  <div className="flex flex-col gap-2">
-    <p className="text-xs font-mono text-text-muted">Pick a one-shot sound (applies immediately):</p>
-    <div className="grid grid-cols-4 gap-2">
-      {DEFAULT_ONESHOT_PADS.map((os) => (
+const StepOneShot: React.FC<{ wizard: ReturnType<typeof usePadSetupWizard> }> = ({ wizard }) => {
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+
+  const toggleCategory = (category: string) => {
+    const next = new Set(expandedCategories);
+    if (next.has(category)) {
+      next.delete(category);
+    } else {
+      next.add(category);
+    }
+    setExpandedCategories(next);
+  };
+
+  if (showAll) {
+    // Full preset browser view
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-mono text-text-muted">Browse all one-shot presets:</p>
+          <button
+            onClick={() => setShowAll(false)}
+            className="text-[10px] font-mono text-accent-primary hover:text-accent-highlight transition-colors"
+          >
+            Quick View
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-2">
+          {Object.entries(ONE_SHOT_PRESETS_BY_CATEGORY).map(([categoryName, presets]) => {
+            const isExpanded = expandedCategories.has(categoryName);
+            return (
+              <div key={categoryName} className="border border-dark-border rounded">
+                <button
+                  onClick={() => toggleCategory(categoryName)}
+                  className="w-full px-3 py-2 flex items-center justify-between bg-dark-bgTertiary hover:bg-dark-surface transition-colors"
+                >
+                  <span className="text-[11px] font-mono font-bold text-text-primary">{categoryName} ({presets.length})</span>
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+                {isExpanded && (
+                  <div className="grid grid-cols-3 gap-1.5 p-2">
+                    {presets.map((preset) => (
+                      <button
+                        key={preset.index}
+                        onClick={() => wizard.selectOneShot(preset.index, preset.name, preset.category)}
+                        className="px-2 py-2 rounded border transition-all text-center hover:brightness-125"
+                        style={{
+                          borderColor: preset.color,
+                          backgroundColor: `${preset.color}15`,
+                          color: preset.color,
+                        }}
+                      >
+                        <span className="text-[9px] font-mono font-bold">{preset.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Quick access view (original 16 options)
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-mono text-text-muted">Quick access one-shots:</p>
         <button
-          key={os.presetIndex}
-          onClick={() => wizard.selectOneShot(os.presetIndex, os.label, os.category)}
-          className="px-2 py-2 rounded border transition-all text-center hover:brightness-125"
-          style={{
-            borderColor: os.color,
-            backgroundColor: `${os.color}15`,
-            color: os.color,
-          }}
+          onClick={() => { setShowAll(true); setExpandedCategories(new Set(Object.keys(ONE_SHOT_PRESETS_BY_CATEGORY))); }}
+          className="text-[10px] font-mono text-accent-primary hover:text-accent-highlight transition-colors"
         >
-          <span className="text-[10px] font-mono font-bold">{os.label}</span>
+          Browse All ({Object.values(ONE_SHOT_PRESETS_BY_CATEGORY).flat().length})
         </button>
-      ))}
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {DEFAULT_ONESHOT_PADS.map((os) => (
+          <button
+            key={os.presetIndex}
+            onClick={() => wizard.selectOneShot(os.presetIndex, os.label, os.category)}
+            className="px-2 py-2 rounded border transition-all text-center hover:brightness-125"
+            style={{
+              borderColor: os.color,
+              backgroundColor: `${os.color}15`,
+              color: os.color,
+            }}
+          >
+            <span className="text-[10px] font-mono font-bold">{os.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Step 2: Scratch ─────────────────────────────────────────────────────────
 

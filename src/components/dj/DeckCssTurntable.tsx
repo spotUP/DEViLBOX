@@ -77,6 +77,10 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
     let scratchIntegrating = false;
 
     const tick = (now: number) => {
+      if (!containerRef.current || !platterRef.current) {
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 

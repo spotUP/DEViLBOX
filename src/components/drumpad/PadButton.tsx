@@ -165,7 +165,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
       }
 
       setIsPressed(true);
-      const touch = event.touches[0];
+      // Use changedTouches to get the touch that started this event (correct for multi-touch)
+      const touch = event.changedTouches[0];
       const vel = calculateVelocity(touch.clientY, el);
       flashTrigger(vel);
       onTrigger(pad.id, vel);

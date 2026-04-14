@@ -392,7 +392,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         e.stopPropagation();
         const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
         if (index >= 0) {
-          console.log('[DJPlaylist] Native context menu on track:', index, 'at', e.clientX, e.clientY);
+
           const realIndex = getRealIndex(index);
           setContextMenuTrackIndex(realIndex);
           if (!selectedSet.has(realIndex)) {
