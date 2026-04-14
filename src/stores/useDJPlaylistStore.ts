@@ -132,6 +132,9 @@ function deepClonePlaylists(playlists: DJPlaylist[]): DJPlaylist[] {
 
 const MAX_UNDO = 30;
 
+// SID playlist detection keywords (used by repairSIDTracks below)
+const SID_PLAYLIST_KEYWORDS = ['sid', 'c64', 'commodore', 'dual sid', '6581', '8580'];
+
 // ── Store ────────────────────────────────────────────────────────────────────
 
 export const useDJPlaylistStore = create<DJPlaylistState>()(
@@ -621,8 +624,6 @@ function pushUndo(state: DJPlaylistState): void {
 }
 
 // ── Repair SID tracks missing hvsc: prefix ───────────────────────────────────
-
-const SID_PLAYLIST_KEYWORDS = ['sid', 'c64', 'commodore', 'dual sid', '6581', '8580'];
 
 function isSIDPlaylist(name: string): boolean {
   const lower = name.toLowerCase();
