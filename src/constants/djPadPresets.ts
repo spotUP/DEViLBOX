@@ -16,7 +16,7 @@ export interface DJPreset {
   id: string;
   name: string;
   description: string;
-  modes: PadMode[];  // Which pad modes this preset is compatible with
+  modes: PadMode[];  // Empty array = show in all modes
   create: () => DrumProgram;
 }
 
@@ -86,9 +86,9 @@ function applyScratchPads(program: DrumProgram, startPad: number, count: number)
 export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'djfx-essential',
-    name: 'DJ FX Essential',
+    name: 'DJ FX (Bank A)',
     description: '16 DJ FX pads in Bank A — stutter, delay, filter, reverb, modulation',
-    modes: ['djfx'],
+    modes: [],  // Show in all modes
     create: () => {
       const program = createEmptyProgram('D-01', 'DJ FX Essential');
       applyDjFxPads(program, 0, 16);
@@ -97,9 +97,9 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   },
   {
     id: 'oneshots-live',
-    name: 'One-Shots Live',
+    name: 'One-Shots (Bank A)',
     description: '16 one-shot pads in Bank A — horns, sirens, impacts, risers',
-    modes: ['oneshots'],
+    modes: [],  // Show in all modes
     create: () => {
       const program = createEmptyProgram('D-02', 'One-Shots Live');
       applyOneShotPads(program, 0, 16);
@@ -108,9 +108,9 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   },
   {
     id: 'scratch-master',
-    name: 'Scratch Master',
+    name: 'Scratch (Bank A)',
     description: '16 scratch pads in Bank A — baby, flare, crab, orbit, and more',
-    modes: ['scratch'],
+    modes: [],  // Show in all modes
     create: () => {
       const program = createEmptyProgram('D-03', 'Scratch Master');
       applyScratchPads(program, 0, 16);
@@ -119,27 +119,14 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   },
   {
     id: 'dj-complete',
-    name: 'DJ Complete',
+    name: 'DJ Complete (A+B+C)',
     description: 'FX in Bank A, one-shots in Bank B, scratch in Bank C',
-    modes: ['djfx', 'oneshots', 'scratch'],  // Multi-mode preset
+    modes: [],  // Show in all modes
     create: () => {
-      const program = createEmptyProgram('D-04', 'DJ Complete');
+      const program = createEmptyProgram('D-04', 'DJ Complete Kit');
       applyDjFxPads(program, 0, 16);
       applyOneShotPads(program, 16, 16);
       applyScratchPads(program, 32, 16);
-      return program;
-    },
-  },
-  {
-    id: 'minimal-dj',
-    name: 'Minimal DJ',
-    description: '8 FX + 4 one-shots + 4 scratch in Bank A',
-    modes: ['djfx', 'oneshots', 'scratch'],  // Multi-mode preset
-    create: () => {
-      const program = createEmptyProgram('D-05', 'Minimal DJ');
-      applyDjFxPads(program, 0, 8);
-      applyOneShotPads(program, 8, 4);
-      applyScratchPads(program, 12, 4);
       return program;
     },
   },

@@ -456,13 +456,13 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </button>
           ))}
           <div className="h-4 w-px bg-dark-border mx-1" />
-          {/* DJ Presets — filtered by current pad mode */}
+          {/* DJ Presets — show all presets (modes array controls filtering) */}
           <CustomSelect
             value=""
             onChange={handleLoadDJPreset}
             placeholder="DJ Presets"
             options={DJ_PAD_PRESETS
-              .filter(p => p.modes.includes(padMode))
+              .filter(p => p.modes.length === 0 || p.modes.includes(padMode))
               .map(p => ({ value: p.id, label: p.name }))}
             className="px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary hover:border-accent-highlight/50 cursor-pointer"
           />
