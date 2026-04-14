@@ -1,7 +1,7 @@
 /**
  * DJPlaylistAnalyzer — Batch analysis of playlist tracks for Auto DJ metadata
  *
- * Downloads each Modland track, renders through DJPipeline to get BPM/key/energy,
+ * Downloads each Modland/HVSC track, renders through DJPipeline to get BPM/key/energy,
  * updates the playlist store with the analysis results, then evicts the cached WAV
  * to avoid filling the drive.
  *
@@ -87,7 +87,7 @@ export async function analyzePlaylist(
 
   const tracksToAnalyze = playlist.tracks
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => trackNeedsAnalysis(track) && track.fileName.startsWith('modland:'));
+    .filter(({ track }) => trackNeedsAnalysis(track) && (track.fileName.startsWith('modland:') || track.fileName.startsWith('hvsc:')));
 
   if (tracksToAnalyze.length === 0) return { analyzed: 0, failed: 0, total: 0, failures: [] } as AnalysisResult;
 
@@ -101,86 +101,94 @@ export async function analyzePlaylist(
   console.log(`[PlaylistAnalyzer] Analyzing ${total} tracks in "${playlist.name}"`);
 
   for (const { track, index } of tracksToAnalyze) {
-    const modlandPath = track.fileName.slice('modland:'.length);
-    const filename = modlandPath.split('/').pop() || 'download.mod';
+    const isHVSC = track.fileName.startsWith('hvsc:');
+    const remotePath = isHVSC
+      ? track.fileName.slice('hvsc:'.length)
+      : track.fileName.slice('modland:'.length);
+    const filename = remotePath.split('/').pop() || 'download.mod';
     const processed = analyzed + failed;
 
     onProgress?.({ current: processed + 1, total, analyzed, failed, trackName: track.trackName, status: 'analyzing' });
 
     try {
-      // Throttle downloads to avoid Modland 429 rate limiting.
-      // Delay before EVERY track (not just successes) because fast 404s
-      // can trigger rate limiting too.
-      await new Promise(r => setTimeout(r, 4000));
+      // Throttle downloads (Modland needs 4s; HVSC is fine with less)
+      await new Promise(r => setTimeout(r, isHVSC ? 500 : 4000));
 
-      // Download with retry on rate limit (429) and auto-fix on 404
-      const { downloadModlandFile, searchModland } = await import('@/lib/modlandApi');
       let buffer: ArrayBuffer;
-      let currentPath = modlandPath;
-      let retries = 0;
-      while (true) {
-        try {
-          buffer = await downloadModlandFile(currentPath);
-          break;
-        } catch (dlErr) {
-          const msg = dlErr instanceof Error ? dlErr.message : String(dlErr);
-          if (msg.includes('Rate limited') || msg.includes('429')) {
-            retries++;
-            if (retries > 8) throw dlErr;
-            const wait = Math.min(60000, 5000 * Math.pow(2, retries - 1));
-            console.log(`[PlaylistAnalyzer] Rate limited, waiting ${wait / 1000}s (retry ${retries}/8)...`);
-            await new Promise(r => setTimeout(r, wait));
-            continue;
+
+      if (isHVSC) {
+        // HVSC: simple download
+        const { downloadHVSCFile } = await import('@/lib/hvscApi');
+        buffer = await downloadHVSCFile(remotePath);
+      } else {
+        // Download with retry on rate limit (429) and auto-fix on 404
+        const { downloadModlandFile, searchModland } = await import('@/lib/modlandApi');
+        let currentPath = remotePath;
+        let retries = 0;
+        while (true) {
+          try {
+            buffer = await downloadModlandFile(currentPath);
+            break;
+          } catch (dlErr) {
+            const msg = dlErr instanceof Error ? dlErr.message : String(dlErr);
+            if (msg.includes('Rate limited') || msg.includes('429')) {
+              retries++;
+              if (retries > 8) throw dlErr;
+              const wait = Math.min(60000, 5000 * Math.pow(2, retries - 1));
+              console.log(`[PlaylistAnalyzer] Rate limited, waiting ${wait / 1000}s (retry ${retries}/8)...`);
+              await new Promise(r => setTimeout(r, wait));
+              continue;
+            }
+            // On 404: search Modland for the filename and auto-fix the playlist link
+            if (msg.includes('404')) {
+              console.log(`[PlaylistAnalyzer] 404 for ${filename} — searching Modland...`);
+              try {
+                // Try exact filename first, then fuzzy (name without extension)
+                const nameNoExt = filename.replace(/\.[^.]+$/, '');
+                let candidates: ModlandFixCandidate[] = [];
+
+                for (const query of [filename, nameNoExt]) {
+                  const results = await searchModland({ q: query, limit: 10 });
+                  if (results.results.length > 0) {
+                    candidates = results.results.map(r => ({
+                      filename: r.filename,
+                      full_path: r.full_path,
+                      format: r.format,
+                      author: r.author,
+                    }));
+                    break;
+                  }
+                  await new Promise(r => setTimeout(r, 1000)); // throttle between searches
+                }
+
+                if (candidates.length > 0) {
+                  let selectedPath: string | null = null;
+
+                  if (candidates.length === 1) {
+                    // Single match — auto-fix
+                    selectedPath = candidates[0].full_path;
+                    console.log(`[PlaylistAnalyzer] Auto-fix: ${selectedPath}`);
+                  } else if (onFixNeeded) {
+                    // Multiple matches — let user choose
+                    selectedPath = await onFixNeeded(track.trackName, remotePath, candidates);
+                  } else {
+                    // No UI callback — pick best match (shortest path = most likely)
+                    selectedPath = candidates[0].full_path;
+                    console.log(`[PlaylistAnalyzer] Auto-fix (best guess): ${selectedPath}`);
+                  }
+
+                  if (selectedPath) {
+                    const newFileName = `modland:${selectedPath}`;
+                    useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, { fileName: newFileName });
+                    currentPath = selectedPath;
+                    await new Promise(r => setTimeout(r, 2000));
+                    continue; // retry download with new path
+                  }
+                }
+              } catch { /* search failed, fall through */ }
+            }
+            throw dlErr;
           }
-          // On 404: search Modland for the filename and auto-fix the playlist link
-          if (msg.includes('404')) {
-            console.log(`[PlaylistAnalyzer] 404 for ${filename} — searching Modland...`);
-            try {
-              // Try exact filename first, then fuzzy (name without extension)
-              const nameNoExt = filename.replace(/\.[^.]+$/, '');
-              let candidates: ModlandFixCandidate[] = [];
-
-              for (const query of [filename, nameNoExt]) {
-                const results = await searchModland({ q: query, limit: 10 });
-                if (results.results.length > 0) {
-                  candidates = results.results.map(r => ({
-                    filename: r.filename,
-                    full_path: r.full_path,
-                    format: r.format,
-                    author: r.author,
-                  }));
-                  break;
-                }
-                await new Promise(r => setTimeout(r, 1000)); // throttle between searches
-              }
-
-              if (candidates.length > 0) {
-                let selectedPath: string | null = null;
-
-                if (candidates.length === 1) {
-                  // Single match — auto-fix
-                  selectedPath = candidates[0].full_path;
-                  console.log(`[PlaylistAnalyzer] Auto-fix: ${selectedPath}`);
-                } else if (onFixNeeded) {
-                  // Multiple matches — let user choose
-                  selectedPath = await onFixNeeded(track.trackName, modlandPath, candidates);
-                } else {
-                  // No UI callback — pick best match (shortest path = most likely)
-                  selectedPath = candidates[0].full_path;
-                  console.log(`[PlaylistAnalyzer] Auto-fix (best guess): ${selectedPath}`);
-                }
-
-                if (selectedPath) {
-                  const newFileName = `modland:${selectedPath}`;
-                  useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, { fileName: newFileName });
-                  currentPath = selectedPath;
-                  await new Promise(r => setTimeout(r, 2000));
-                  continue; // retry download with new path
-                }
-              }
-            } catch { /* search failed, fall through */ }
-          }
-          throw dlErr;
         }
       }
 
@@ -189,11 +197,13 @@ export async function analyzePlaylist(
 
       // Detect TFMX companion file: mdat.* needs smpl.* from same directory
       let companionParam = '';
-      const baseName = filename.toLowerCase();
-      if (baseName.startsWith('mdat.')) {
-        const smplName = 'smpl.' + filename.slice(5);
-        const dirPath = modlandPath.split('/').slice(0, -1).join('/');
-        companionParam = `&companion=${encodeURIComponent(dirPath + '/' + smplName)}`;
+      if (!isHVSC) {
+        const baseName = filename.toLowerCase();
+        if (baseName.startsWith('mdat.')) {
+          const smplName = 'smpl.' + filename.slice(5);
+          const dirPath = remotePath.split('/').slice(0, -1).join('/');
+          companionParam = `&companion=${encodeURIComponent(dirPath + '/' + smplName)}`;
+        }
       }
 
       const response = await fetch(
