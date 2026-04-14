@@ -198,25 +198,26 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const padStyle = useMemo(() => {
     // Mode mapping color takes priority in non-samples modes
     if (modeMapping && padMode !== 'samples') {
-      return { className: '', bgColor: modeMapping.color };
+      return { className: 'bg-dark-border', textColor: modeMapping.color };
     }
 
     // Custom color takes priority
     if (pad.color && isLoaded) {
-      return { className: '', bgColor: pad.color };
+      return { className: 'bg-dark-border', textColor: pad.color };
     }
 
     if (!isLoaded) {
-      return { className: 'bg-dark-border', bgColor: undefined };
+      return { className: 'bg-dark-border', textColor: undefined };
     }
 
-    // Synth-only pads get a different color accent
+    // Synth-only pads get a blue text accent
     if (!pad.sample && (pad.synthConfig || pad.instrumentId != null)) {
-      return { className: isSelected ? 'bg-blue-800' : 'bg-blue-900', bgColor: undefined };
+      return { className: 'bg-dark-border', textColor: '#60a5fa' }; // blue-400
     }
 
-    return { className: 'bg-emerald-800', bgColor: undefined };
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.color, isSelected, modeMapping, padMode]);
+    // Sample pads get emerald text
+    return { className: 'bg-dark-border', textColor: '#34d399' }; // emerald-400
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, modeMapping, padMode]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
@@ -238,7 +239,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
       style={{
         aspectRatio: '1',
         transition: isPressed ? 'transform 50ms' : 'transform 120ms',
-        ...(padStyle.bgColor ? { backgroundColor: padStyle.bgColor } : {}),
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -268,7 +268,10 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
       {/* Pad name */}
       <div className="absolute inset-0 flex items-center justify-center px-2">
-        <span className="text-xs font-bold text-text-primary text-center truncate leading-tight">
+        <span 
+          className="text-xs font-bold text-center truncate leading-tight"
+          style={{ color: padStyle.textColor ?? '#f3f4f6' }}
+        >
           {modeMapping && padMode !== 'samples' ? modeMapping.label : pad.name}
         </span>
       </div>
