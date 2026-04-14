@@ -64,7 +64,7 @@ mkdir -p logs
 
 while true; do
   echo "[$(date)] Starting Vite dev server..."
-  NODE_OPTIONS="--max-old-space-size=1024" npm run dev 2>&1 | tee logs/frontend.log &
+  NODE_OPTIONS="--max-old-space-size=4096" npm run dev 2>&1 | tee logs/frontend.log &
   FRONTEND_PID=$!
   
   wait $FRONTEND_PID

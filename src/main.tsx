@@ -109,9 +109,13 @@ if (import.meta.env.DEV) {
   import('./debug/soakActions').then(m => m.installSoakHooks()).catch(() => {});
 }
 
-// Register service worker for sample pack caching
+// Register service worker for caching (samples, app shell, WAM plugins)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch((err) => {
+  navigator.serviceWorker.register('/sw.js').then(() => {
+    // Prefetch all WAM synth/FX plugins in background so they're cached
+    // and load instantly when needed (also enables offline use)
+    import('./engine/wam/WAMPrefetch').then(m => m.prefetchWAMPlugins()).catch(() => {});
+  }).catch((err) => {
     console.warn('[SW] Registration failed:', err);
   });
 }
