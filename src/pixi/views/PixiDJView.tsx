@@ -12,6 +12,7 @@ import { PixiDeckWaveform } from './dj/PixiDeckWaveform';
 import { PixiDJCratePanel } from './dj/PixiDJCratePanel';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useUIStore } from '@stores/useUIStore';
 import { useVocoderStore } from '@stores/useVocoderStore';
 import { getDJEngine, disposeDJEngine } from '@engine/dj/DJEngine';
 import { clearSongCache } from '@engine/dj/DJSongCache';
@@ -104,16 +105,28 @@ export const PixiDJView: React.FC = () => {
     setDJModeActive(true);
 
     return () => {
-      setDJModeActive(false);
-      disposeDJEngine();
-      clearSongCache();
+      // Keep DJ audio alive when navigating to companion views (drumpad/vj)
+      // or when auto DJ is actively running (must never be interrupted)
+      const nextView = useUIStore.getState().activeView;
+      const { autoDJEnabled, autoDJStatus, decks } = useDJStore.getState();
+      const autoDJActive = autoDJEnabled && autoDJStatus !== 'idle';
+      const anyDeckPlaying = decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying;
+      const keepAudio = nextView === 'drumpad' || nextView === 'vj' || autoDJActive || anyDeckPlaying;
+
+      if (!keepAudio) {
+        setDJModeActive(false);
+        disposeDJEngine();
+        clearSongCache();
+      }
       engineRef.current = null;
 
-      const engine = getToneEngine();
-      engine.setGlobalPlaybackRate(1.0);
-      engine.setGlobalDetune(0);
-      engine.releaseAll();
-      useTransportStore.getState().setGlobalPitch(0);
+      if (!keepAudio) {
+        const engine = getToneEngine();
+        engine.setGlobalPlaybackRate(1.0);
+        engine.setGlobalDetune(0);
+        engine.releaseAll();
+        useTransportStore.getState().setGlobalPitch(0);
+      }
     };
   }, [setDJModeActive]);
 

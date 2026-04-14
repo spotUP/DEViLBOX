@@ -42,6 +42,14 @@ export interface PlaylistTrack {
   analysisSkipped?: boolean;
   /** True if this track was played in the current session (cleared on playlist load) */
   played?: boolean;
+  /** True if this track failed to load (UADE crash, parse error, timeout, etc.) */
+  isBad?: boolean;
+  /** Error message from last failed load attempt */
+  badReason?: string;
+  /** Timestamp of last failed load */
+  badTimestamp?: number;
+  /** Number of consecutive load failures */
+  badFailCount?: number;
 }
 
 export interface DJPlaylist {
@@ -83,8 +91,10 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
+  markTrackBad: (playlistId: string, index: number, reason: string) => void;
+  clearTrackBadFlag: (playlistId: string, index: number) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
   setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
 
@@ -364,6 +374,34 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p && index >= 0 && index < p.tracks.length) {
             p.tracks[index].played = true;
+          }
+        });
+      },
+
+      markTrackBad: (playlistId: string, index: number, reason: string) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p && index >= 0 && index < p.tracks.length) {
+            const track = p.tracks[index];
+            track.isBad = true;
+            track.badReason = reason;
+            track.badTimestamp = Date.now();
+            track.badFailCount = (track.badFailCount || 0) + 1;
+            console.warn(`[DJPlaylist] Marked track ${index} as bad: ${track.trackName} - ${reason}`);
+          }
+        });
+      },
+
+      clearTrackBadFlag: (playlistId: string, index: number) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p && index >= 0 && index < p.tracks.length) {
+            const track = p.tracks[index];
+            track.isBad = false;
+            track.badReason = undefined;
+            track.badTimestamp = undefined;
+            track.badFailCount = 0;
+            console.log(`[DJPlaylist] Cleared bad flag for track ${index}: ${track.trackName}`);
           }
         });
       },

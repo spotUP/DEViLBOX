@@ -59,6 +59,25 @@ function getCtx(): AudioContext {
   return Tone.getContext().rawContext as AudioContext;
 }
 
+/**
+ * Get the raw Web Audio GainNode that carries ALL master audio
+ * (both DJ mixer and tracker output). This is the Tone.js Destination's
+ * internal output gain, sitting just before ctx.destination.
+ */
+function getMasterOutputNode(): GainNode | null {
+  try {
+    const dest = Tone.getDestination();
+    // Destination.output is a Tone.js Gain whose ._gainNode is the raw GainNode
+    const toneGain = (dest as any).output;
+    if (toneGain?._gainNode) return toneGain._gainNode as GainNode;
+    // Fallback: Destination.output.output for double-wrapped case
+    if (toneGain?.output) return toneGain.output as GainNode;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getBpm(): number {
   return useTransportStore.getState().bpm || 120;
 }
@@ -172,15 +191,15 @@ function createDubEcho(): DjFxAction {
       tap.connect(delay);
 
       // Connect Tone.js master to our tap
-      const masterNode = (Tone.getDestination() as any).output;
+      const masterNode = getMasterOutputNode();
       if (masterNode) {
-        try { (masterNode as any).connect(tap); } catch { /* */ }
+        masterNode.connect(tap);
       }
 
       activeFx.set(this.id, {
         nodes: [delay, feedback, filter, wetGain, tap],
         cleanup: () => {
-          try { (masterNode as any).disconnect(tap); } catch { /* */ }
+          try { masterNode?.disconnect(tap); } catch { /* */ }
         },
       });
     },
@@ -249,12 +268,12 @@ function createTapeEcho(): DjFxAction {
       tap.gain.value = 1;
       tap.connect(delay);
 
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      const masterNode = getMasterOutputNode();
+      if (masterNode) masterNode.connect(tap);
 
       activeFx.set(this.id, {
         nodes: [delay, feedback, lpf, hpf, saturation, wetGain, tap],
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
       });
     },
     disengage() {
@@ -310,12 +329,12 @@ function createPingPong(): DjFxAction {
       tap.gain.value = 1;
       tap.connect(delayL);
 
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      const masterNode = getMasterOutputNode();
+      if (masterNode) masterNode.connect(tap);
 
       activeFx.set(this.id, {
         nodes: [delayL, delayR, fbL, fbR, merger, wetGain, tap],
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
       });
     },
     disengage() {
@@ -346,7 +365,16 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
     engage() {
       cleanupFx(this.id);
       const ctx = getCtx();
+      const masterNode = getMasterOutputNode();
+      if (!masterNode) return;
 
+      // Get master's current destination
+      const originalDestination = ctx.destination;
+
+      // Disconnect master from destination
+      try { masterNode.disconnect(); } catch { /* */ }
+
+      // Create filter chain
       const filter = ctx.createBiquadFilter();
       filter.type = type;
       filter.Q.value = 8;
@@ -363,26 +391,45 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
         filter.frequency.exponentialRampToValueAtTime(5000, ctx.currentTime + 2);
       }
 
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.8;
-
-      filter.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(filter);
-
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      // Insert filter IN the signal chain (100% wet)
+      masterNode.connect(filter);
+      filter.connect(originalDestination);
 
       activeFx.set(this.id, {
-        nodes: [filter, wetGain, tap],
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        nodes: [filter],
+        cleanup: () => {
+          try {
+            masterNode.disconnect();
+            masterNode.connect(originalDestination);
+          } catch { /* */ }
+        },
       });
     },
     disengage() {
-      cleanupFx(this.id);
+      const state = activeFx.get(this.id);
+      if (!state) return;
+
+      const filter = state.nodes[0] as BiquadFilterNode;
+      const ctx = getCtx();
+
+      // Cancel any scheduled automation
+      filter.frequency.cancelScheduledValues(ctx.currentTime);
+
+      // Sweep back to neutral position over 0.5s, then cleanup
+      if (type === 'highpass') {
+        // Sweep back down to 20Hz (fully open)
+        filter.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.5);
+      } else if (type === 'lowpass') {
+        // Sweep back up to 20kHz (fully open)
+        filter.frequency.exponentialRampToValueAtTime(20000, ctx.currentTime + 0.5);
+      } else {
+        // Bandpass sweep back to center
+        filter.frequency.exponentialRampToValueAtTime(500, ctx.currentTime + 0.5);
+      }
+
+      // Cleanup after sweep completes
+      state.timer = setTimeout(() => cleanupFx(this.id), 600);
+      activeFx.set(this.id, state);
     },
   };
 }
@@ -421,12 +468,12 @@ function createReverbWash(): DjFxAction {
       tap.gain.value = 1;
       tap.connect(convolver);
 
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      const masterNode = getMasterOutputNode();
+      if (masterNode) masterNode.connect(tap);
 
       activeFx.set(this.id, {
         nodes: [convolver, wetGain, tap],
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
       });
     },
     disengage() {
@@ -482,13 +529,13 @@ function createFlanger(): DjFxAction {
       tap.gain.value = 1;
       tap.connect(delay);
 
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      const masterNode = getMasterOutputNode();
+      if (masterNode) masterNode.connect(tap);
 
       activeFx.set(this.id, {
         nodes: [delay, feedback, lfoGain, wetGain, tap],
         oscillator: lfo,
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
       });
     },
     disengage() { cleanupFx(this.id); },
@@ -541,13 +588,13 @@ function createPhaser(): DjFxAction {
       tap.gain.value = 1;
       tap.connect(stages[0]);
 
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      const masterNode = getMasterOutputNode();
+      if (masterNode) masterNode.connect(tap);
 
       activeFx.set(this.id, {
         nodes: [...stages, lfoGain, wetGain, tap],
         oscillator: lfo,
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
       });
     },
     disengage() { cleanupFx(this.id); },
@@ -582,13 +629,13 @@ function createRingMod(): DjFxAction {
       tap.gain.value = 1;
       tap.connect(ringGain);
 
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      const masterNode = getMasterOutputNode();
+      if (masterNode) masterNode.connect(tap);
 
       activeFx.set(this.id, {
         nodes: [ringGain, wetGain, tap],
         oscillator: carrier,
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        cleanup: () => { try { masterNode?.disconnect(tap); } catch { /* */ } },
       });
     },
     disengage() { cleanupFx(this.id); },
@@ -606,6 +653,14 @@ function createBitcrush(): DjFxAction {
     engage() {
       cleanupFx(this.id);
       const ctx = getCtx();
+      const masterNode = getMasterOutputNode();
+      if (!masterNode) return;
+
+      // Get master's current destination
+      const originalDestination = ctx.destination;
+
+      // Disconnect master from destination
+      try { masterNode.disconnect(); } catch { /* */ }
 
       // Bitcrush via waveshaper quantization
       const shaper = ctx.createWaveShaper();
@@ -618,21 +673,18 @@ function createBitcrush(): DjFxAction {
       }
       shaper.curve = curve;
 
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.7;
-      shaper.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(shaper);
-
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      // Insert shaper IN the signal chain (100% wet)
+      masterNode.connect(shaper);
+      shaper.connect(originalDestination);
 
       activeFx.set(this.id, {
-        nodes: [shaper, wetGain, tap],
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        nodes: [shaper],
+        cleanup: () => {
+          try {
+            masterNode.disconnect();
+            masterNode.connect(originalDestination);
+          } catch { /* */ }
+        },
       });
     },
     disengage() { cleanupFx(this.id); },
@@ -648,6 +700,14 @@ function createOverdrive(): DjFxAction {
     engage() {
       cleanupFx(this.id);
       const ctx = getCtx();
+      const masterNode = getMasterOutputNode();
+      if (!masterNode) return;
+
+      // Get master's current destination
+      const originalDestination = ctx.destination;
+
+      // Disconnect master from destination
+      try { masterNode.disconnect(); } catch { /* */ }
 
       const shaper = ctx.createWaveShaper();
       const curve = new Float32Array(256);
@@ -657,21 +717,18 @@ function createOverdrive(): DjFxAction {
       }
       shaper.curve = curve;
 
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.6;
-      shaper.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(shaper);
-
-      const masterNode = (Tone.getDestination() as any).output;
-      if (masterNode) try { (masterNode as any).connect(tap); } catch { /* */ }
+      // Insert overdrive IN the signal chain (100% wet)
+      masterNode.connect(shaper);
+      shaper.connect(originalDestination);
 
       activeFx.set(this.id, {
-        nodes: [shaper, wetGain, tap],
-        cleanup: () => { try { (masterNode as any).disconnect(tap); } catch { /* */ } },
+        nodes: [shaper],
+        cleanup: () => {
+          try {
+            masterNode.disconnect();
+            masterNode.connect(originalDestination);
+          } catch { /* */ }
+        },
       });
     },
     disengage() { cleanupFx(this.id); },
@@ -690,8 +747,7 @@ function createTapeStop(): DjFxAction {
       cleanupFx(this.id);
       // Ramp playback rate to 0 over ~1 second by pitching down the master
       const ctx = getCtx();
-      const dest = Tone.getDestination();
-      const masterGain = (dest as any)._gainNode as GainNode;
+      const masterGain = getMasterOutputNode();
       if (!masterGain) return;
 
       // Create pitch-shifting illusion via playback rate on a media element,
@@ -724,8 +780,7 @@ function createTapeStop(): DjFxAction {
     disengage() {
       // Restore volume immediately on release
       const ctx = getCtx();
-      const dest = Tone.getDestination();
-      const masterGain = (dest as any)._gainNode as GainNode;
+      const masterGain = getMasterOutputNode();
       if (masterGain) {
         masterGain.gain.cancelScheduledValues(ctx.currentTime);
         masterGain.gain.setValueAtTime(1, ctx.currentTime);
@@ -744,8 +799,7 @@ function createVinylBrake(): DjFxAction {
     engage() {
       cleanupFx(this.id);
       const ctx = getCtx();
-      const dest = Tone.getDestination();
-      const masterGain = (dest as any)._gainNode as GainNode;
+      const masterGain = getMasterOutputNode();
       if (!masterGain) return;
 
       // Faster stop than tape (0.8s) with volume duck
@@ -762,8 +816,7 @@ function createVinylBrake(): DjFxAction {
     },
     disengage() {
       const ctx = getCtx();
-      const dest = Tone.getDestination();
-      const masterGain = (dest as any)._gainNode as GainNode;
+      const masterGain = getMasterOutputNode();
       if (masterGain) {
         masterGain.gain.cancelScheduledValues(ctx.currentTime);
         masterGain.gain.setValueAtTime(1, ctx.currentTime);

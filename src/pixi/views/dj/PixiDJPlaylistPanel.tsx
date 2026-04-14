@@ -27,6 +27,7 @@ import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
 import { showConfirm } from '@/stores/useConfirmStore';
+import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 
@@ -102,9 +103,58 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
   const [showSort, setShowSort] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMoveMenu, setShowMoveMenu] = useState<'move' | 'copy' | null>(null);
+  const [retestingBad, setRetestingBad] = useState(false);
+  const contextMenu = useContextMenu();
+  const [contextMenuTrackId, setContextMenuTrackId] = useState<string | null>(null);
   const lastClickedRef = useRef(-1);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadTrackRef = useRef<((track: PlaylistTrack, deckId: DeckId) => Promise<void>) | undefined>(undefined);
+
+  // ── Bad track re-test ─────────────────────────────────────────────────────
+  
+  const badTrackCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.isBad).length
+    : 0;
+
+  const handleRetestBadTracks = useCallback(async () => {
+    if (!activePlaylist || !activePlaylistId || retestingBad) return;
+    
+    const badTracks = activePlaylist.tracks
+      .map((t, idx) => ({ track: t, index: idx }))
+      .filter(({ track }) => track.isBad);
+    
+    if (badTracks.length === 0) {
+      console.log('[PixiDJPlaylist] No bad tracks to re-test');
+      return;
+    }
+    
+    setRetestingBad(true);
+    console.log(`[PixiDJPlaylist] Re-testing ${badTracks.length} bad tracks...`);
+    
+    const { loadPlaylistTrackToDeck } = await import('@/engine/dj/DJTrackLoader');
+    const { clearTrackBadFlag } = useDJPlaylistStore.getState();
+    
+    let successCount = 0;
+    for (const { track, index } of badTracks) {
+      console.log(`[PixiDJPlaylist] Re-testing track ${index}: ${track.trackName} (reason: ${track.badReason})`);
+      
+      // Clear bad flag before testing
+      clearTrackBadFlag(activePlaylistId, index);
+      
+      // Try loading to deck A
+      const success = await loadPlaylistTrackToDeck(track, 'A');
+      
+      if (success) {
+        successCount++;
+        console.log(`[PixiDJPlaylist] ✓ Track ${index} now loads successfully`);
+      } else {
+        console.warn(`[PixiDJPlaylist] ✗ Track ${index} still fails`);
+      }
+    }
+    
+    setRetestingBad(false);
+    console.log(`[PixiDJPlaylist] Re-test complete: ${successCount}/${badTracks.length} now working`);
+  }, [activePlaylist, activePlaylistId, retestingBad]);
 
   // Sync PixiList selection with store
   useEffect(() => {
@@ -395,6 +445,162 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     [loadSongToDeck],
   );
 
+  // ── Context menu ──────────────────────────────────────────────────────────
+
+  const handleTrackRightClick = useCallback((trackId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[PixiDJPlaylist] Right-click on track:', trackId, 'at', e.clientX, e.clientY);
+    setContextMenuTrackId(trackId);
+    contextMenu.open(e);
+  }, [contextMenu]);
+
+  const contextMenuTrackIndex = useMemo(() => {
+    if (!activePlaylist || !contextMenuTrackId) return -1;
+    return activePlaylist.tracks.findIndex(t => t.id === contextMenuTrackId);
+  }, [activePlaylist, contextMenuTrackId]);
+
+  const contextMenuItems = useMemo((): MenuItemType[] => {
+    if (!activePlaylist || contextMenuTrackIndex < 0) return [];
+    const track = activePlaylist.tracks[contextMenuTrackIndex];
+    if (!track) return [];
+
+    const otherPlaylists = playlists.filter((p) => p.id !== activePlaylistId);
+    const selCount = selectedTrackIndices.length;
+
+    const items: MenuItemType[] = [
+      { id: 'load-1', label: 'Load to Deck 1', onClick: () => loadTrackToDeck(track, 'A') },
+      { id: 'load-2', label: 'Load to Deck 2', onClick: () => loadTrackToDeck(track, 'B') },
+    ];
+
+    if (thirdDeckActive) {
+      items.push({ id: 'load-3', label: 'Load to Deck 3', onClick: () => loadTrackToDeck(track, 'C') });
+    }
+
+    items.push({ type: 'divider' });
+
+    // Move up/down
+    if (selCount <= 1) {
+      items.push({
+        id: 'move-up',
+        label: 'Move Up',
+        disabled: contextMenuTrackIndex === 0,
+        onClick: () => {
+          if (activePlaylistId && contextMenuTrackIndex > 0) {
+            reorderTrack(activePlaylistId, contextMenuTrackIndex, contextMenuTrackIndex - 1);
+          }
+        },
+      });
+      items.push({
+        id: 'move-down',
+        label: 'Move Down',
+        disabled: contextMenuTrackIndex === activePlaylist.tracks.length - 1,
+        onClick: () => {
+          if (activePlaylistId && contextMenuTrackIndex < activePlaylist.tracks.length - 1) {
+            reorderTrack(activePlaylistId, contextMenuTrackIndex, contextMenuTrackIndex + 1);
+          }
+        },
+      });
+      items.push({ type: 'divider' });
+    }
+
+    if (otherPlaylists.length > 0) {
+      items.push({
+        id: 'move-to',
+        label: selCount > 1 ? `Move ${selCount} to...` : 'Move to...',
+        submenu: otherPlaylists.map((pl) => ({
+          id: `move-${pl.id}`,
+          label: pl.name,
+          onClick: () => { if (activePlaylistId) moveSelectedTracks(activePlaylistId, pl.id); },
+        })),
+      });
+      items.push({
+        id: 'copy-to',
+        label: selCount > 1 ? `Copy ${selCount} to...` : 'Copy to...',
+        submenu: otherPlaylists.map((pl) => ({
+          id: `copy-${pl.id}`,
+          label: pl.name,
+          onClick: () => { if (activePlaylistId) copySelectedTracks(activePlaylistId, pl.id); },
+        })),
+      });
+      items.push({ type: 'divider' });
+    }
+
+    // Copy track info
+    items.push({
+      id: 'copy-info',
+      label: 'Copy Track Info',
+      onClick: () => {
+        const info = [
+          `Name: ${track.trackName}`,
+          `File: ${track.fileName}`,
+          track.format && `Format: ${track.format}`,
+          track.bpm > 0 && `BPM: ${track.bpm}`,
+          track.musicalKey && `Key: ${track.musicalKey}`,
+          track.duration > 0 && `Duration: ${formatDuration(track.duration)}`,
+        ].filter(Boolean).join('\n');
+        navigator.clipboard.writeText(info).then(() => {
+          console.log('[PixiDJPlaylist] Track info copied to clipboard');
+        });
+      },
+    });
+
+    items.push({ type: 'divider' });
+
+    // Bad track management
+    if (track.isBad) {
+      items.push({
+        id: 'clear-bad',
+        label: 'Clear Bad Flag',
+        onClick: () => {
+          if (activePlaylistId) {
+            useDJPlaylistStore.getState().clearTrackBadFlag(activePlaylistId, contextMenuTrackIndex);
+          }
+        },
+      });
+    } else {
+      items.push({
+        id: 'mark-bad',
+        label: 'Mark as Bad',
+        onClick: () => {
+          if (activePlaylistId) {
+            const reason = prompt('Reason (optional):') || 'Manually marked';
+            useDJPlaylistStore.getState().markTrackBad(activePlaylistId, contextMenuTrackIndex, reason);
+          }
+        },
+      });
+    }
+
+    items.push({ type: 'divider' });
+
+    if (selCount > 1) {
+      items.push({
+        id: 'remove-selected',
+        label: `Remove ${selCount} tracks`,
+        danger: true,
+        onClick: async () => {
+          if (!activePlaylistId) return;
+          const confirmed = await showConfirm({
+            title: 'Remove Tracks',
+            message: `Remove ${selCount} selected tracks from this playlist?`,
+            confirmLabel: 'Remove',
+            danger: true,
+          });
+          if (confirmed) removeSelectedTracks(activePlaylistId);
+        },
+      });
+    } else {
+      items.push({
+        id: 'remove',
+        label: 'Remove from playlist',
+        danger: true,
+        onClick: () => { if (activePlaylistId) removeTrack(activePlaylistId, contextMenuTrackIndex); },
+      });
+    }
+
+    return items;
+  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackToDeck, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack]);
+
   // Keep ref in sync for keyboard handler
   loadTrackRef.current = loadTrackToDeck;
 
@@ -483,12 +689,15 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
     const tracks = isFiltered ? filteredTracks : activePlaylist.tracks;
     return tracks.map((t, i) => {
       const realIndex = isFiltered ? activePlaylist.tracks.indexOf(t) : i;
+      const badBadge = t.isBad ? '[✗] ' : '';
+      const playedBadge = t.played ? '[P] ' : '';
       return {
         id: t.id,
-        label: `${(realIndex + 1).toString().padStart(2, ' ')}  ${t.played ? '[P] ' : ''}${t.trackName}`,
+        label: `${(realIndex + 1).toString().padStart(2, ' ')}  ${badBadge}${playedBadge}${t.trackName}`,
+        labelColor: t.isBad ? 0xff5555 : undefined,
         sublabel: trackSublabel(t),
         iconName: 'diskio',
-        iconColor: t.played ? theme.success.color : undefined,
+        iconColor: t.isBad ? 0xff5555 : t.played ? theme.success.color : undefined,
         selected: selectedSet.has(realIndex),
         actions: [
           { label: '1', color: DECK_A, onClick: () => loadTrackToDeck(t, 'A') },
@@ -609,6 +818,19 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
             onClick={handleAddTracks}
           />
           <PixiButton label="Sort" variant="ghost" size="sm" width={40} height={22} onClick={() => setShowSort((v) => !v)} />
+          
+          {badTrackCount > 0 && (
+            <PixiButton
+              label={retestingBad ? 'Testing...' : `Re-test (${badTrackCount})`}
+              variant="ghost"
+              size="sm"
+              width={retestingBad ? 70 : 88}
+              height={22}
+              color="red"
+              disabled={retestingBad}
+              onClick={handleRetestBadTracks}
+            />
+          )}
 
           {selectedTrackIndices.length > 1 && (
             <>
@@ -690,6 +912,7 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
             itemHeight={26}
             selectedId={selectedTrackId}
             onSelect={setSelectedTrackId}
+            onRightClick={handleTrackRightClick}
             layout={{ flex: 1 }}
           />
         ) : (
@@ -702,6 +925,9 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
           <PixiLabel text="Create a playlist to get started" size="xs" color="textMuted" />
         </layoutContainer>
       )}
+
+      {/* ── Context Menu ─────────────────────────────────────────────────── */}
+      <ContextMenu items={contextMenuItems} position={contextMenu.position} onClose={contextMenu.close} />
     </layoutContainer>
   );
 };

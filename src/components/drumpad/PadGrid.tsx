@@ -11,7 +11,7 @@ import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
 import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
-import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
+import { getAudioContext } from '../../audio/AudioContextSingleton';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useOrientation } from '@hooks/useOrientation';
@@ -171,18 +171,19 @@ export const PadGrid: React.FC<PadGridProps> = ({
     }
   }, [busLevels]);
 
-  const handlePadTrigger = useCallback(async (padId: number, velocity: number) => {
-    // Update velocity for visual feedback
-    setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
-
-    // Ensure AudioContext is resumed (browser autoplay policy)
-    await resumeAudioContext();
+  const handlePadTrigger = useCallback((padId: number, velocity: number) => {
+    // Fire audio FIRST — synchronously, before any React state updates.
+    // The AudioContext is resumed on first user gesture; after that this is a no-op check.
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      // Only needed once per session — fire-and-forget, don't await
+      ctx.resume();
+    }
 
     const currentPadMode = useDrumPadStore.getState().padMode;
 
     // Mode-aware pad trigger
     if (currentPadMode === 'djfx') {
-      // DJ FX mode: engage the FX mapped to this pad index
       const padIndex = (padId - 1) % 16;
       const mapping = DEFAULT_DJFX_PADS[padIndex];
       if (mapping) {
@@ -191,7 +192,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
         heldPadsRef.current.add(padId);
       }
     } else if (currentPadMode === 'oneshots') {
-      // One-shots mode: trigger the synth preset
       const padIndex = (padId - 1) % 16;
       const mapping = DEFAULT_ONESHOT_PADS[padIndex];
       if (mapping) {
@@ -211,7 +211,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
         }
       }
     } else if (currentPadMode === 'scratch') {
-      // Scratch mode: fire the scratch pattern
       const padIndex = (padId - 1) % 16;
       const mapping = DEFAULT_SCRATCH_PADS[padIndex];
       if (mapping) {
@@ -281,6 +280,9 @@ export const PadGrid: React.FC<PadGridProps> = ({
         }
       }
     }
+
+    // Visual feedback AFTER audio — don't let React re-render delay the trigger
+    setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
 
     // Fade out velocity indicator after a short delay
     setTimeout(() => {
@@ -460,6 +462,18 @@ export const PadGrid: React.FC<PadGridProps> = ({
         const p = prog?.pads.find(pp => pp.id === id);
         if (p) engine.triggerPad(p, 100);
       }
+    },
+    onRename: (id: number) => {
+      const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
+      const p = prog?.pads.find(pp => pp.id === id);
+      const newName = window.prompt('Pad name:', p?.name || `Pad ${id}`);
+      if (newName !== null) {
+        useDrumPadStore.getState().updatePad(id, { name: newName });
+      }
+    },
+    onLoadSample: (id: number) => {
+      onPadSelect(id);
+      onEmptyPadClick?.(id);
     },
   }), [onPadSelect, onEmptyPadClick]);
 
