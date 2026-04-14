@@ -404,7 +404,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             className="fixed z-[99989] w-80"
             style={{ top: autoDJDropdownPos.top, left: autoDJDropdownPos.left }}
           >
-            <DJAutoDJPanel onClose={() => setShowAutoDJ(false)} />
+            <DJAutoDJPanel onClose={() => { setShowAutoDJ(false); setShowCrate(false); }} />
           </div>,
           document.body,
         )}
