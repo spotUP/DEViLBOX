@@ -122,6 +122,55 @@ const AMIGA_EXTENSIONS = new Set([
 /** HivelyTracker formats — these have a dedicated WASM replayer, don't route to UADE */
 const HIVELY_EXTENSIONS = new Set(['ahx', 'hvl']);
 
+/** AdLib/OPL formats — AdPlug engine (covers ~30 sub-formats) */
+const ADLIB_EXTENSIONS = new Set([
+  'a2m', 'adl', 'amd', 'bam', 'cff', 'cmf', 'd00', 'dfm', 'dmo', 'dro', 
+  'dtm', 'hsc', 'hsp', 'ksm', 'laa', 'lds', 'mkj', 'rad', 'raw', 'rol', 
+  'sat', 'sci', 'sng',
+]);
+
+/** Console/Arcade music formats */
+const CONSOLE_EXTENSIONS = new Set([
+  // Nintendo
+  'nsf', 'nsfe',        // NES
+  'spc',                // SNES
+  'gbs',                // Game Boy
+  'gsf', 'minigsf',     // Game Boy Advance
+  // Sega
+  'vgm', 'vgz',         // Multi-platform video game music
+  'gym',                // Genesis YM2612
+]);
+
+/** Atari/Retro Platform formats */
+const RETRO_EXTENSIONS = new Set([
+  'sc68', 'snd', 'sndh',  // Atari ST (SC68)
+  'ay', 'psg',            // ZX Spectrum/Amstrad (AY-3-8910)
+  'pt3',                  // Vortex Tracker (Spectrum)
+  'kss',                  // MSX audio
+  'mgs', 'bgm',           // MSX MuSICA
+  'mdx',                  // Sharp X68000
+  'pdx',                  // X68000 PCM (companion)
+  'm', 'm2', 'mz',        // PC-98 PMD
+  'sap', 'tm8',           // Atari 8-bit
+  'rmt',                  // Atari RMT
+  'prg',                  // Commodore Plus/4
+  'mm',                   // SAM Coupé
+]);
+
+/** Modern synthesizer formats */
+const SYNTH_EXTENSIONS = new Set([
+  'sunvox',               // SunVox modular synth
+  'v2m',                  // Farbrausch V2
+  'wsm',                  // WaveSabre
+  '4k',                   // 4klang
+  'ftm', '0cc', 'dnm',    // FamiTracker
+  'dmf',                  // DefleMask
+  'fur',                  // Furnace
+  'ct',                   // CheeseCutter
+  'kt',                   // Klystrack
+  'fmp',                  // FMPlayer
+]);
+
 /** Amiga formats that use prefix-based naming (e.g. cust.songname, mdat.songname).
  *  Must match UADE_ONLY_PREFIXES in UADEPrefixParsers.ts + TFMX/BP/Custom variants. */
 const AMIGA_PREFIXES = new Set([
@@ -199,6 +248,30 @@ function isAmigaFormat(filename: string): boolean {
 function isHivelyFormat(filename: string): boolean {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   return HIVELY_EXTENSIONS.has(ext);
+}
+
+/** Check if a filename should use the AdPlug WASM renderer (AdLib/OPL) */
+function isAdLibFormat(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return ADLIB_EXTENSIONS.has(ext);
+}
+
+/** Check if a filename should use a console/arcade game music renderer */
+function isConsoleFormat(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return CONSOLE_EXTENSIONS.has(ext);
+}
+
+/** Check if a filename should use a retro platform renderer */
+function isRetroFormat(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return RETRO_EXTENSIONS.has(ext);
+}
+
+/** Check if a filename should use a modern synthesizer renderer */
+function isSynthFormat(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return SYNTH_EXTENSIONS.has(ext);
 }
 
 // ── UADE Engine State ────────────────────────────────────────────────────────
@@ -639,14 +712,15 @@ async function initSID(): Promise<void> {
   );
 
   // Replace the Module config with one that includes wasmBinary
+  // The original object has nested braces (locateFile function), so use [\s\S]+? to match across lines
   jsCode = jsCode.replace(
-    /window\.spp_backend_state_SID\s*=\s*\{[^}]+\}/,
+    /window\.spp_backend_state_SID\s*=\s*\{[\s\S]+?\n\};/,
     `window.spp_backend_state_SID = {
       wasmBinary: __sidWasmBinary__,
       locateFile: function(path) { return "${baseUrl}/deepsid/" + path; },
       notReady: true,
       adapterCallback: function(){}
-    }`
+    };`
   );
 
   // Replace the onRuntimeInitialized setter (uses .bind(window...))
@@ -1009,10 +1083,32 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       try {
         let result: { left: Float32Array; right: Float32Array; sampleRate: number };
 
+        // Format routing with priority order:
+        // 1. C64 SID (magic number detection)
+        // 2. Hively (AHX/HVL)
+        // 3. AdLib/OPL (AdPlug)
+        // 4. Console/Arcade (NSF, SPC, VGM, etc.)
+        // 5. Retro platforms (Atari, MSX, X68000, PC-98, etc.)
+        // 6. Modern synthesizers (SunVox, V2, WaveSabre, etc.)
+        // 7. Amiga formats (UADE)
+        // 8. Everything else (libopenmpt fallback)
+
         if (isC64SID(fileBuffer)) {
           result = await renderWithSID(fileBuffer, filename, subsong, id);
         } else if (isHivelyFormat(filename)) {
           result = await renderWithHively(fileBuffer, filename, subsong, id);
+        } else if (isAdLibFormat(filename)) {
+          // TODO: Implement renderWithAdPlug()
+          throw new Error('AdLib/OPL formats not yet supported in DJ renderer (use main tracker)');
+        } else if (isConsoleFormat(filename)) {
+          // TODO: Implement console renderers (NSF, SPC, VGM, etc.)
+          throw new Error('Console formats not yet supported in DJ renderer (use main tracker)');
+        } else if (isRetroFormat(filename)) {
+          // TODO: Implement retro platform renderers (SC68, PT3, KSS, etc.)
+          throw new Error('Retro platform formats not yet supported in DJ renderer (use main tracker)');
+        } else if (isSynthFormat(filename)) {
+          // TODO: Implement synthesizer renderers (SunVox, V2, WaveSabre, etc.)
+          throw new Error('Synthesizer formats not yet supported in DJ renderer (use main tracker)');
         } else if (isAmigaFormat(filename)) {
           result = await renderWithUADE(fileBuffer, filename, subsong, id);
         } else {
