@@ -415,7 +415,7 @@ function buildQuickAssignSubmenu(
       { id: 'qa-speech-divider-1', label: '─────', disabled: true },
       {
         id: 'qa-mamesp0250',
-        label: 'GI SP0250 (ROM Speech)...',
+        label: 'GI SP0250 (Arcade)...',
         onClick: () => assignROMSpeech(padId, 'MAMESP0250', store),
       },
       {
@@ -434,9 +434,19 @@ function buildQuickAssignSubmenu(
         onClick: () => assignROMSpeech(padId, 'MAMEMEA8000', store),
       },
       {
-        id: 'qa-mameupd931',
-        label: 'NEC uPD931...',
-        onClick: () => assignROMSpeech(padId, 'MAMEUPD931', store),
+        id: 'qa-mames14001a',
+        label: 'S14001A (Berzerk)...',
+        onClick: () => assignROMSpeech(padId, 'MAMES14001A', store),
+      },
+      {
+        id: 'qa-mamevlm5030',
+        label: 'Sanyo VLM5030 (Konami)...',
+        onClick: () => assignROMSpeech(padId, 'MAMEVLM5030', store),
+      },
+      {
+        id: 'qa-mamehc55516',
+        label: 'Harris HC55516 (Sinistar)...',
+        onClick: () => assignROMSpeech(padId, 'MAMEHC55516', store),
       },
     ],
   });
@@ -547,7 +557,7 @@ function assignSpeechSynth(
 
 function assignROMSpeech(
   padId: number,
-  synthType: 'MAMESP0250' | 'MAMETMS5220' | 'MAMEVotrax' | 'MAMEMEA8000' | 'MAMEUPD931',
+  synthType: 'MAMESP0250' | 'MAMETMS5220' | 'MAMEVotrax' | 'MAMEMEA8000' | 'MAMES14001A' | 'MAMEVLM5030' | 'MAMEHC55516',
   store: ReturnType<typeof useDrumPadStore.getState>,
 ): void {
   const synthNames = {
@@ -555,7 +565,9 @@ function assignROMSpeech(
     MAMETMS5220: 'TI TMS5220',
     MAMEVotrax: 'Votrax SC-01',
     MAMEMEA8000: 'Philips MEA8000',
-    MAMEUPD931: 'NEC uPD931',
+    MAMES14001A: 'S14001A',
+    MAMEVLM5030: 'Sanyo VLM5030',
+    MAMEHC55516: 'Harris HC55516',
   };
   
   // Prompt for ROM sample/phrase to play
