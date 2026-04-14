@@ -34,6 +34,8 @@ interface ContextMenuProps {
   position: { x: number; y: number } | null;
   onClose: () => void;
   className?: string;
+  /** Minimum width in pixels (used by DropdownButton to match trigger width) */
+  minWidth?: number;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -41,6 +43,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   position,
   onClose,
   className = '',
+  minWidth,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -157,6 +160,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         top: adjustedPosition?.y ?? position.y,
         maxHeight: maxHeight ?? undefined,
         overflowY: maxHeight !== null ? 'auto' : undefined,
+        minWidth: minWidth ?? undefined,
         // Prevent wheel from leaking through to the pattern editor below
         overscrollBehavior: 'contain',
       }}
@@ -304,6 +308,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [triggerWidth, setTriggerWidth] = useState<number | undefined>(undefined);
 
   const handleClick = useCallback(() => {
     if (disabled) return;
@@ -314,6 +319,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
         x: rect.left,
         y: rect.bottom + 4,
       });
+      setTriggerWidth(rect.width);
       setIsOpen(true);
     }
   }, [disabled]);
@@ -339,6 +345,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
           items={items}
           position={position}
           onClose={handleClose}
+          minWidth={triggerWidth}
         />
       )}
     </>
