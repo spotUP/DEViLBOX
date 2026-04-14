@@ -38,7 +38,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
       if (loopActive) {
         deck.clearAudioLoop();
         setDeckLoop(deckId, 'off', false);
-      } else if (audioLoopIn !== null && audioLoopOut !== null) {
+      } else if (audioLoopIn !== null && audioLoopOut !== null && audioLoopOut > audioLoopIn) {
         deck.setAudioLoop(audioLoopIn, audioLoopOut);
         setDeckLoop(deckId, 'line', true);
       }
