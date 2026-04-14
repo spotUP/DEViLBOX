@@ -367,25 +367,34 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
     setDownloadingPaths((prev) => new Set(prev).add(file.key));
     setError(null);
     try {
-      let buffer: ArrayBuffer;
+      const cacheKey = `${file.source}:${file.key}`;
+
+      // SID files can't be parsed as tracker modules — add directly
       if (file.source === 'hvsc') {
-        buffer = await downloadHVSCFile(file.key);
-      } else {
-        const [modBuffer, companion] = await Promise.all([
-          downloadModlandFile(file.key),
-          downloadTFMXCompanion(file.key),
-        ]);
-        buffer = modBuffer;
-        if (companion) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
-        }
+        useDJPlaylistStore.getState().addTrack(playlistId, {
+          fileName: cacheKey,
+          trackName: file.filename.replace(/\.sid$/i, ''),
+          format: 'SID',
+          bpm: 0,
+          duration: 180,
+          addedAt: Date.now(),
+        });
+        return;
+      }
+
+      const [modBuffer, companion] = await Promise.all([
+        downloadModlandFile(file.key),
+        downloadTFMXCompanion(file.key),
+      ]);
+      const buffer = modBuffer;
+      if (companion) {
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
       }
       const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
       const song = await parseModuleToSong(blob);
       const bpmResult = detectBPM(song);
       const duration = estimateSongDuration(song);
-      const cacheKey = `${file.source}:${file.key}`;
       cacheSong(cacheKey, song);
       useDJPlaylistStore.getState().addTrack(playlistId, {
         fileName: cacheKey,
