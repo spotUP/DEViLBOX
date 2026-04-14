@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test DJ FX Pad Display</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+    .status { margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 4px; }
+    .pass { color: #22c55e; }
+    .fail { color: #ef4444; }
+    .info { color: #3b82f6; }
+    pre { background: #0a0a0a; padding: 10px; border-radius: 4px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>DJ FX Pad Display Test</h1>
+  <div id="results"></div>
+  
+  <script>
+    const results = document.getElementById('results');
+    
+    function log(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `status ${type}`;
+      div.textContent = message;
+      results.appendChild(div);
+    }
+    
+    function logData(label, data) {
+      const div = document.createElement('div');
+      div.className = 'status';
+      div.innerHTML = `<strong>${label}:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`;
+      results.appendChild(div);
+    }
+    
+    async function runTests() {
+      log('Starting DJ FX pad display tests...');
+      
+      // Wait for app to load
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      log('Waiting for app initialization...', 'info');
+      
+      try {
+        // Check if useDrumPadStore is available
+        const storeModule = await import('/src/stores/useDrumPadStore.ts');
+        const store = storeModule.useDrumPadStore.getState();
+        
+        log('✓ Store loaded', 'pass');
+        logData('Current state', {
+          currentProgramId: store.currentProgramId,
+          currentBank: store.currentBank,
+          padMode: store.padMode,
+          programCount: store.programs.size
+        });
+        
+        // Test 1: Check initial program
+        const currentProgram = store.programs.get(store.currentProgramId);
+        log(`Current program: ${currentProgram?.name}`, 'info');
+        
+        // Test 2: Switch to DJ FX mode
+        log('Switching to DJ FX mode...', 'info');
+        store.setPadMode('djfx');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (store.padMode === 'djfx') {
+          log('✓ Switched to DJ FX mode', 'pass');
+        } else {
+          log('✗ Failed to switch to DJ FX mode', 'fail');
+        }
+        
+        // Test 3: Check Bank A pads before loading preset
+        const bankAPadsBefore = currentProgram?.pads.slice(0, 16).map(p => ({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          hasDjFx: !!p.djFxAction,
+          djFxAction: p.djFxAction
+        }));
+        logData('Bank A pads (before preset)', bankAPadsBefore?.slice(0, 4));
+        
+        // Test 4: Load DJ FX Essential preset
+        log('Loading "DJ FX Essential" preset...', 'info');
+        const presetModule = await import('/src/constants/djPadPresets.ts');
+        const preset = presetModule.DJ_PAD_PRESETS.find(p => p.id === 'djfx-essential');
+        
+        if (preset) {
+          const program = preset.create();
+          log(`✓ Created preset program: ${program.name} (ID: ${program.id})`, 'pass');
+          
+          store.saveProgram(program);
+          store.loadProgram(program.id);
+          store.setBank('A');
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Test 5: Check Bank A pads after loading preset
+          const loadedProgram = store.programs.get(store.currentProgramId);
+          const bankAPadsAfter = loadedProgram?.pads.slice(0, 16).map(p => ({
+            id: p.id,
+            name: p.name,
+            color: p.color,
+            hasDjFx: !!p.djFxAction,
+            djFxAction: p.djFxAction
+          }));
+          
+          logData('Bank A pads (after preset)', bankAPadsAfter?.slice(0, 4));
+          
+          // Test 6: Check if pads have unique names
+          const uniqueNames = new Set(bankAPadsAfter?.map(p => p.name));
+          if (uniqueNames.size > 1) {
+            log(`✓ Bank A has ${uniqueNames.size} unique pad names`, 'pass');
+          } else {
+            log(`✗ Bank A pads all have same name`, 'fail');
+          }
+          
+          // Test 7: Check if pads have DJ FX actions
+          const fxCount = bankAPadsAfter?.filter(p => p.hasDjFx).length || 0;
+          if (fxCount === 16) {
+            log(`✓ All 16 Bank A pads have DJ FX actions`, 'pass');
+          } else {
+            log(`✗ Only ${fxCount}/16 Bank A pads have DJ FX actions`, 'fail');
+          }
+          
+          // Test 8: Check Bank B (should be empty)
+          const bankBPads = loadedProgram?.pads.slice(16, 32).filter(p => p.djFxAction);
+          if (bankBPads?.length === 0) {
+            log(`✓ Bank B has no DJ FX actions (as expected)`, 'pass');
+          } else {
+            log(`✗ Bank B has ${bankBPads?.length} DJ FX actions (should be 0)`, 'fail');
+          }
+          
+        } else {
+          log('✗ Failed to find DJ FX Essential preset', 'fail');
+        }
+        
+        log('Tests complete!', 'pass');
+        
+      } catch (error) {
+        log(`✗ Error: ${error.message}`, 'fail');
+        console.error(error);
+      }
+    }
+    
+    // Run tests when page loads
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', runTests);
+    } else {
+      runTests();
+    }
+  </script>
+</body>
+</html>
