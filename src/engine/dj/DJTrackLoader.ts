@@ -177,6 +177,33 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
     }
   }
 
+  // HVSC tracks: download SID and render in background
+  if (track.fileName.startsWith('hvsc:')) {
+    const hvscPath = track.fileName.slice('hvsc:'.length);
+    try {
+      const { downloadHVSCFile } = await import('@/lib/hvscApi');
+      const buffer = await downloadHVSCFile(hvscPath);
+      const filename = hvscPath.split('/').pop() || 'download.sid';
+
+      console.log(`[DJTrackLoader] Pre-rendering HVSC ${filename} in background...`);
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'high');
+      console.log(`[DJTrackLoader] Pre-render complete: ${filename}`);
+
+      return {
+        wavData: result.wavData,
+        filename: track.fileName,
+        trackName: track.trackName || filename,
+        bpm: result.analysis?.bpm || 125,
+        waveformPeaks: result.waveformPeaks,
+        duration: result.duration || 0,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Pre-render failed (HVSC): ${track.trackName || hvscPath} — ${msg}`);
+      return null;
+    }
+  }
+
   // Local files not supported for pre-render (need file picker)
   return null;
 }
@@ -312,6 +339,39 @@ async function loadPlaylistTrackToDeckInternal(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[DJTrackLoader] Parse/load failed for: ${track.trackName || modlandPath} — ${msg}`);
+      return false;
+    }
+  }
+
+  // HVSC tracks: auto-download SID from server
+  if (track.fileName.startsWith('hvsc:')) {
+    const hvscPath = track.fileName.slice('hvsc:'.length);
+    try {
+      const { downloadHVSCFile } = await import('@/lib/hvscApi');
+      const buffer = await downloadHVSCFile(hvscPath);
+      const filename = hvscPath.split('/').pop() || 'download.sid';
+
+      useDJStore.getState().setDeckState(deckId, {
+        fileName: track.fileName,
+        trackName: track.trackName || filename,
+        detectedBPM: 125,
+        effectiveBPM: 125,
+        analysisState: 'rendering',
+        isPlaying: false,
+      });
+
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+      await getDJEngine().loadAudioToDeck(
+        deckId,
+        result.wavData,
+        track.fileName,
+        track.trackName || filename,
+        result.analysis?.bpm || 125,
+      );
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Load failed (HVSC): ${track.trackName || hvscPath} — ${msg}`);
       return false;
     }
   }

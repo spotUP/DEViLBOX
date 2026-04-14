@@ -834,10 +834,18 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     lastClickedRef.current = realIndex;
   }, [getRealIndex, toggleTrackSelection, selectTrackRange, selectTrack]);
 
-  const handleTrackDoubleClick = useCallback((track: PlaylistTrack, displayIndex: number) => {
+  const handleTrackDoubleClick = useCallback(async (_track: PlaylistTrack, displayIndex: number) => {
     const realIndex = getRealIndex(displayIndex);
-    loadTrackWithProgress(track, pickFreeDeck(), realIndex);
-  }, [getRealIndex, loadTrackWithProgress, pickFreeDeck]);
+    // Double-click = Play from here with Auto DJ
+    if (!activePlaylistId) return;
+    const { getAutoDJ } = await import('@/engine/dj/DJAutoDJ');
+    const autoDJ = getAutoDJ();
+    const error = await autoDJ.enable(realIndex);
+    if (error) {
+      console.error('[DJPlaylist] Auto DJ start failed:', error);
+      alert(error); // Simple fallback - user should see the error
+    }
+  }, [getRealIndex, activePlaylistId]);
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
@@ -871,6 +879,17 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     const selCount = selectedTrackIndices.length;
 
     const items: MenuItemType[] = [
+      { id: 'play-from-here', label: 'Play from here (Auto DJ)', onClick: async () => {
+        if (!activePlaylistId) return;
+        const { getAutoDJ } = await import('@/engine/dj/DJAutoDJ');
+        const autoDJ = getAutoDJ();
+        const error = await autoDJ.enable(contextMenuTrackIndex);
+        if (error) {
+          console.error('[DJPlaylist] Auto DJ start failed:', error);
+          alert(error);
+        }
+      }},
+      { type: 'divider' },
       { id: 'load-1', label: 'Load to Deck 1', onClick: () => loadTrackWithProgress(track, 'A', contextMenuTrackIndex) },
       { id: 'load-2', label: 'Load to Deck 2', onClick: () => loadTrackWithProgress(track, 'B', contextMenuTrackIndex) },
     ];

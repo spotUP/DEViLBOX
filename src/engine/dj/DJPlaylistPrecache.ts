@@ -152,6 +152,18 @@ export async function precachePlaylist(
         }
       }
 
+      // Check for UADE companion files (Sonix, Jason Page, MFP, etc.)
+      try {
+        const { downloadUADECompanions } = await import('@/lib/modlandApi');
+        const companions = await downloadUADECompanions(currentPath);
+        for (const companion of companions) {
+          await cacheSourceFile(companion.buffer, companion.filename);
+          console.log(`[Precache] Cached UADE companion: ${companion.filename}`);
+        }
+      } catch (companionErr) {
+        console.warn(`[Precache] UADE companion download failed (non-fatal):`, companionErr);
+      }
+
       onProgress?.({ current: processed + 1, total, cached, failed, skipped, trackName: track.trackName, status: 'rendering' });
 
       if (!isAudioFile(filename)) {
