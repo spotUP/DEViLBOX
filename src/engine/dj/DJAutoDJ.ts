@@ -84,10 +84,12 @@ class DJAutoDJ {
       console.warn('[AutoDJ] Need at least 2 tracks — have:', playlist.tracks.length);
       return `Need at least 2 tracks in playlist (have ${playlist.tracks.length})`;
     }
-    const modlandCount = playlist.tracks.filter(t => t.fileName.startsWith('modland:')).length;
-    if (modlandCount < 2) {
-      console.warn('[AutoDJ] Need at least 2 downloadable (modland) tracks — have:', modlandCount);
-      return `Need at least 2 downloadable tracks (have ${modlandCount} — add tracks from Modland browser)`;
+    const downloadableCount = playlist.tracks.filter(t =>
+      t.fileName.startsWith('modland:') || t.fileName.startsWith('hvsc:')
+    ).length;
+    if (downloadableCount < 2) {
+      console.warn('[AutoDJ] Need at least 2 downloadable tracks — have:', downloadableCount);
+      return `Need at least 2 downloadable tracks (have ${downloadableCount} — add tracks from Online browser)`;
     }
     console.log(`[AutoDJ] Playlist: "${playlist.name}", ${playlist.tracks.length} tracks`);
 
