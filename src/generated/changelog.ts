@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-14T13:48:15.928Z
+ * Generated: 2026-04-14T14:05:21.093Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5248';
-export const BUILD_NUMBER = '5248';
-export const BUILD_HASH = 'd6ba6c29b';
+export const BUILD_VERSION = '1.0.5254';
+export const BUILD_NUMBER = '5254';
+export const BUILD_HASH = 'efee0b3b1';
 export const BUILD_DATE = '2026-04-14';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5248',
+    version: '1.0.5254',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Debug: add logging inside PopOutWindow conditional"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add App render logging for vjPoppedOut state"
+      },
+      {
+        type: 'fix',
+        "description": "Strip 2SID/SCC Extended/parenthetical suffixes in SID repair"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add PopOutWindow logging to trace popup issue"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add VJ popout logging to diagnose issue"
+      },
+      {
+        type: 'fix',
+        "description": "Deep audit round 3 — DJ engine, state management, and live performance reliability"
+      },
       {
         type: 'fix',
         "description": "DJ preset loading now auto-switches to Bank A"
@@ -208,30 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Rewrite ShimmerReverb DSP — true allpass, 4-head pitch shifter, Hermite interp"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Auto DJ UADE crashes with background pre-rendering"
-      },
-      {
-        type: 'fix',
-        "description": "FTM/Klystrack volume, AVP subsong selector UI"
-      },
-      {
-        type: 'fix',
-        "description": "ShimmerReverb stutter — remove ScriptProcessorNode fallback"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite Exciter as pure Web Audio — no WASM worklet"
-      },
-      {
-        type: 'fix',
-        "description": "Apply passthroughGain pattern to all 56 WASM AudioWorklet effects"
-      },
-      {
-        type: 'fix',
-        "description": "Exciter audio kill — use passthrough gain mute instead of disconnect"
       }
     ]
   }

@@ -356,6 +356,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       velocityCurve: undefined,
       name: `Pad ${padId}`,
     });
+    get().saveToIndexedDB();
   },
 
   // Layer management

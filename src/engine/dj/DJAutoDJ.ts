@@ -34,6 +34,7 @@ const POLL_INTERVAL_MS = 500;
 const PRELOAD_LEAD_TIME_SEC = 60;
 const MAX_SKIP_ATTEMPTS = 50;
 const MAX_CONSECUTIVE_NETWORK_FAILURES = 3;
+const MAX_PRELOAD_RETRIES = 10;  // Stop auto-DJ after this many consecutive preload failures
 const SKIP_TRANSITION_BARS = 4;
 
 
@@ -252,8 +253,14 @@ class DJAutoDJ {
       if (!playlist) return;
 
       const nextIdx = store.autoDJNextTrackIndex;
-      const track = playlist.tracks[nextIdx];
-      if (!track) return;
+      const track = nextIdx < playlist.tracks.length ? playlist.tracks[nextIdx] : undefined;
+      if (!track) {
+        // Track was removed — clamp index and retry on next skip
+        if (playlist.tracks.length === 0) return;
+        const fallbackIdx = Math.min(nextIdx, playlist.tracks.length - 1);
+        store.setAutoDJTrackIndices(store.autoDJCurrentTrackIndex, fallbackIdx);
+        return;
+      }
 
       store.setAutoDJStatus('preloading');
 
@@ -376,11 +383,17 @@ class DJAutoDJ {
         break;
 
       case 'preload-failed': {
+        // Give up after too many consecutive failures
+        if (this.preloadFailCount >= MAX_PRELOAD_RETRIES) {
+          console.error(`[AutoDJ] Giving up after ${MAX_PRELOAD_RETRIES} preload failures — stopping`);
+          this.disable();
+          break;
+        }
         // Exponential backoff: 5s, 10s, 20s, 40s… capped at 60s
         const backoffMs = Math.min(60_000, 5_000 * Math.pow(2, this.preloadFailCount - 1));
         const elapsed = Date.now() - this.lastPreloadFailTime;
         if (this.pollCount % 4 === 0) {
-          console.log(`[AutoDJ preload-failed] failCount=${this.preloadFailCount}, backoffMs=${backoffMs}, elapsed=${elapsed}ms, waiting=${elapsed < backoffMs}`);
+          console.log(`[AutoDJ preload-failed] failCount=${this.preloadFailCount}/${MAX_PRELOAD_RETRIES}, backoffMs=${backoffMs}, elapsed=${elapsed}ms, waiting=${elapsed < backoffMs}`);
         }
         if (elapsed < backoffMs) break; // Wait for backoff to expire
         console.log(`[AutoDJ] Retrying preload after ${(elapsed / 1000).toFixed(0)}s backoff (attempt ${this.preloadFailCount})`);
