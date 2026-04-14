@@ -172,64 +172,11 @@ switch (type) {
  * TapeSaturation handles its own makeup gain internally — not listed.
  */
 const GAIN_COMPENSATION_DB: Record<string, number> = {
-  // Reverbs: wet signal adds tail energy on top of dry
-  Reverb:         -1.5,
-  JCReverb:       -1.5,
-  MVerb:          -1.0,
-  SpringReverb:   -1.5,
-  ShimmerReverb:  -2.0,
-  Freeverb:       -1.5,
-
-  // Delays/echoes: wet signal is delayed copies that add energy
-  Delay:          -1.0,
-  FeedbackDelay:  -1.0,
-  PingPongDelay:  -1.5,
-  SpaceEcho:      -2.0,
-  SpaceyDelayer:  -1.5,
-  RETapeEcho:     -1.5,
-  AmbientDelay:   -1.5,
-  Aelapse:        -1.5,
-
-  // Distortion/saturation: adds harmonics that increase RMS
-  Distortion:     -2.5,
-  Chebyshev:      -2.0,
-  // TapeSaturation: handled internally via calculateMakeupGain
-  SwedishChainsaw: -3.0,
-
-  // Modulation: some add parallel signal energy
-  Chorus:         -1.0,
-  Leslie:         -1.0,
-  BiPhase:        -0.5,
-  Phaser:         -0.5,
-  WAMStonePhaser: -0.5,
-
-  // Vinyl/tape sim: adds noise + coloration energy
-  VinylNoise:     -1.0,
-  ToneArm:        -0.5,
-  TapeDegradation: -0.5,
-
-  // BitCrusher: quantization can boost peaks
-  BitCrusher:     -1.0,
-
-  // Filters: remove frequency content → volume loss
-  Filter:         +1.5,
-  AutoFilter:     +1.5,
-  MoogFilter:     +2.0,
-  DubFilter:      +1.0,
-
-  // Neural: LSTM gain varies by model; level param handles most of it,
-  // but wet signal tends to be slightly hot
-  Neural:         -1.0,
-
-  // WAM pedals: distortion/fuzz pedals boost signal
-  WAMBigMuff:     -3.0,
-  WAMTS9:         -2.0,
-  WAMDistoMachine: -2.5,
-  WAMQuadraFuzz:  -2.5,
-  WAMVoxAmp:      -2.0,
-
-  // Pitch shift can slightly alter RMS
-  PitchShift:     -0.5,
+  // Legacy per-node wrapper compensation — DEPRECATED.
+  // All gain compensation is now handled by effectGainCompensation.ts via
+  // a separate gain node in MasterEffectsChain. Keeping this table empty
+  // avoids double-compensation and avoids wrapping effects in Tone.Gain
+  // (which breaks instanceof checks in EffectParameterEngine).
 };
 
 /** dB → linear gain */

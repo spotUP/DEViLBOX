@@ -530,7 +530,7 @@ const tonejs: EffectDescriptor[] = [
       const p = c.parameters;
       return new Tone.FrequencyShifter({ frequency: Number(p.frequency) || 0, wet: c.wet / 100 });
     },
-    getDefaultParameters: () => ({ frequency: 0 }),
+    getDefaultParameters: () => ({ frequency: 5 }),
     presets: [
       { name: 'Subtle Shift', params: { frequency: 5 } },
       { name: 'Robot', params: { frequency: 50 } },

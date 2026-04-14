@@ -478,16 +478,19 @@ export function updateMasterEffectParams(ctx: MasterEffectsContext, effectId: st
   }
 
   const { node, config: prevConfig } = effectData;
+  // Unwrap gain-compensation wrapper to reach the real effect for wet/sidechain updates
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const innerNode = (node as any)._innerEffect ?? node;
 
   try {
     // Only update wet if it actually changed
     if (config.wet !== prevConfig.wet) {
       const wetValue = config.wet / 100;
-      if ('wet' in node && node.wet instanceof Tone.Signal) {
-        node.wet.rampTo(wetValue, 0.02);
-      } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
+      if ('wet' in innerNode && innerNode.wet instanceof Tone.Signal) {
+        innerNode.wet.rampTo(wetValue, 0.02);
+      } else if ('wet' in innerNode && typeof (innerNode as Record<string, unknown>).wet === 'number') {
         // Custom WASM effects (MoogFilter, MVerb, Leslie, SpringReverb) use a plain setter
-        (node as Record<string, unknown>).wet = wetValue;
+        (innerNode as Record<string, unknown>).wet = wetValue;
       }
     }
 
@@ -500,8 +503,8 @@ export function updateMasterEffectParams(ctx: MasterEffectsContext, effectId: st
     }
 
     // Re-wire sidechain routing if sidechainSource changed
-    if ('sidechainSource' in changedParams && 'getSidechainInput' in node) {
-      void wireMasterSidechain(node as Tone.ToneAudioNode, Number(changedParams.sidechainSource));
+    if ('sidechainSource' in changedParams && 'getSidechainInput' in innerNode) {
+      void wireMasterSidechain(innerNode as Tone.ToneAudioNode, Number(changedParams.sidechainSource));
     }
 
     // Strip routing params before sending to DSP
@@ -540,15 +543,18 @@ export function updateInstrumentEffectParams(
   if (!effectData) return; // Effect not in active chain
 
   const { node, config: prevConfig } = effectData;
+  // Unwrap gain-compensation wrapper for wet/param updates
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const innerNode = (node as any)._innerEffect ?? node;
 
   try {
     // Only update wet if it actually changed
     if (config.wet !== prevConfig.wet) {
       const wetValue = config.wet / 100;
-      if ('wet' in node && node.wet instanceof Tone.Signal) {
-        node.wet.rampTo(wetValue, 0.02);
-      } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
-        (node as Record<string, unknown>).wet = wetValue;
+      if ('wet' in innerNode && innerNode.wet instanceof Tone.Signal) {
+        innerNode.wet.rampTo(wetValue, 0.02);
+      } else if ('wet' in innerNode && typeof (innerNode as Record<string, unknown>).wet === 'number') {
+        (innerNode as Record<string, unknown>).wet = wetValue;
       }
     }
 

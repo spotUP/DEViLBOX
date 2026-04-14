@@ -486,7 +486,12 @@ export function applyEffectParametersDiff(
 
     case 'FrequencyShifter':
       if (node instanceof Tone.FrequencyShifter) {
-        if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
+        if ('frequency' in changed) {
+          const freq = Number(changed.frequency);
+          node.frequency.rampTo(freq, R);
+        }
+      } else {
+        console.warn('[EffectParameterEngine] FrequencyShifter instanceof check failed:', node?.constructor?.name);
       }
       break;
 
