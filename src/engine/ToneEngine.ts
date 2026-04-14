@@ -4862,6 +4862,10 @@ export class ToneEngine {
       get: () => self.masterEffectsNodes,
       set: (v: Tone.ToneAudioNode[]) => { self.masterEffectsNodes = v; },
     });
+    Object.defineProperty(ctx, 'masterEffectConfigs', {
+      get: () => self.masterEffectConfigs,
+      set: (v: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }>) => { self.masterEffectConfigs = v; },
+    });
     Object.defineProperty(ctx, '_isPlaying', {
       get: () => self._isPlaying,
     });
