@@ -505,18 +505,19 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     getCachedFilenames().then(names => {
       let count = 0;
       for (const t of activePlaylist.tracks) {
-        if (!t.fileName.startsWith('modland:')) continue;
-        const fn = t.fileName.slice('modland:'.length).split('/').pop() || '';
+        if (!t.fileName.startsWith('modland:') && !t.fileName.startsWith('hvsc:')) continue;
+        const prefix = t.fileName.startsWith('hvsc:') ? 'hvsc:' : 'modland:';
+        const fn = t.fileName.slice(prefix.length).split('/').pop() || '';
         if (names.has(fn)) count++;
       }
       setCachedCount(count);
     });
   }, [activePlaylist, precacheProgress]);
 
-  const modlandCount = activePlaylist
-    ? activePlaylist.tracks.filter(t => t.fileName.startsWith('modland:')).length
+  const onlineCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.fileName.startsWith('modland:') || t.fileName.startsWith('hvsc:')).length
     : 0;
-  const uncachedCount = modlandCount - cachedCount;
+  const uncachedCount = onlineCount - cachedCount;
 
   const handlePrecache = useCallback(async () => {
     if (!activePlaylistId || precachingRef.current) return;
@@ -1288,7 +1289,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       <input ref={importInputRef} type="file" accept=".m3u,.m3u8,.json" onChange={handleImport} className="hidden" />
 
       {/* Cache status & actions */}
-      {activePlaylist && (modlandCount > 0 || badTrackCount > 0) && (
+      {activePlaylist && (onlineCount > 0 || badTrackCount > 0) && (
         <div className="px-2 py-1.5 border-b border-dark-border">
           {precacheProgress ? (
             <div className="space-y-1">
@@ -1306,12 +1307,12 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           ) : (
             <div className="flex items-center gap-2 text-[10px]">
               {(() => {
-                console.log('[DJPlaylist] Cache status:', { modlandCount, cachedCount, uncachedCount, badTrackCount });
+                console.log('[DJPlaylist] Cache status:', { onlineCount, cachedCount, uncachedCount, badTrackCount });
                 return null;
               })()}
-              {modlandCount > 0 && (
+              {onlineCount > 0 && (
                 <>
-                  <span className="text-green-400">{cachedCount}/{modlandCount} cached</span>
+                  <span className="text-green-400">{cachedCount}/{onlineCount} cached</span>
                   {uncachedCount === 0 && <span className="text-green-500/80">Offline ready</span>}
                   {uncachedCount > 0 && (
                     <button onClick={handlePrecache}
