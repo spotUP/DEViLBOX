@@ -55,6 +55,7 @@ class TourEngine {
   private sourceNode: AudioBufferSourceNode | null = null;
   private gainNode: GainNode | null = null;
   private waitTimer: ReturnType<typeof setTimeout> | null = null;
+  private delayResolve: (() => void) | null = null;
   private pauseResumeResolve: (() => void) | null = null;
   private aborted = false;
   private previousView: string = 'tracker';
@@ -114,10 +115,14 @@ class TourEngine {
     // Stop current audio
     this.stopAudio();
 
-    // Cancel wait timer
+    // Cancel wait timer and resolve its promise
     if (this.waitTimer) {
       clearTimeout(this.waitTimer);
       this.waitTimer = null;
+    }
+    if (this.delayResolve) {
+      this.delayResolve();
+      this.delayResolve = null;
     }
 
     // Resolve any pause wait
@@ -167,7 +172,12 @@ class TourEngine {
       clearTimeout(this.waitTimer);
       this.waitTimer = null;
     }
-    // Resolve any pending wait to advance the loop
+    // Resolve any pending delay to advance the loop
+    if (this.delayResolve) {
+      this.delayResolve();
+      this.delayResolve = null;
+    }
+    // Resolve any pause wait
     if (this.pauseResumeResolve) {
       this.pauseResumeResolve();
       this.pauseResumeResolve = null;
@@ -259,8 +269,10 @@ class TourEngine {
 
   private delay(ms: number): Promise<void> {
     return new Promise<void>((resolve) => {
+      this.delayResolve = resolve;
       this.waitTimer = setTimeout(() => {
         this.waitTimer = null;
+        this.delayResolve = null;
         resolve();
       }, ms);
     });
