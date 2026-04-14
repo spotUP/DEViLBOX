@@ -21,6 +21,7 @@ import { SubsongSelector } from './SubsongSelector';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
+import { AVPSubsongSelector } from './AVPSubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
 import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
@@ -213,6 +214,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <SubsongSelector />
         <SIDSubsongSelector />
         <UADESubsongSelector />
+        <AVPSubsongSelector />
         <ModuleInfoButton />
 
         {/* Channel Selector (grid and piano roll views) */}
