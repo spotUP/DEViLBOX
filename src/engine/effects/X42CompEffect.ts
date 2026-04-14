@@ -98,7 +98,7 @@ export class X42CompEffect extends Tone.ToneAudioNode {
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
             // Now safe to disconnect passthrough
-            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            try { rawInput.disconnect(rawWet); } catch { /* */ }
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx.createGain();

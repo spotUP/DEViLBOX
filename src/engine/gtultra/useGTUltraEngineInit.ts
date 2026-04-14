@@ -14,6 +14,8 @@ import { GTUltraEngine } from './GTUltraEngine';
 import { getGTUltraASIDBridge } from './GTUltraASIDBridge';
 import { getSIDHardwareManager } from '@/lib/sid/SIDHardwareManager';
 import { setFormatPlaybackRow } from '@engine/FormatPlaybackState';
+import { getNativeAudioNode } from '@utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 /** Populate DEViLBOX instrument store from GT Ultra WASM instrument data */
 function populateInstrumentStore(): void {
@@ -148,7 +150,15 @@ export function useGTUltraEngineInit(): void {
       await gtEngine.init();
       await gtEngine.ready;
       if (disposed) { gtEngine.dispose(); return; }
-      gtEngine.output.connect(audioCtx.destination);
+      // Route through master effects chain (not directly to destination)
+      const masterFxIn = getNativeAudioNode(getToneEngine().masterEffectsInput as any);
+      if (masterFxIn) {
+        gtEngine.output.connect(masterFxIn);
+      } else {
+        // Fallback: direct to destination if ToneEngine not ready yet
+        gtEngine.output.connect(audioCtx.destination);
+        console.warn('[GTUltra] ToneEngine masterEffectsInput not available, audio bypasses master FX');
+      }
 
       // Mute softsynth output whenever the hardware bridge is on — otherwise
       // the WASM reSID emulator and the USB-SID-Pico would play the same song
