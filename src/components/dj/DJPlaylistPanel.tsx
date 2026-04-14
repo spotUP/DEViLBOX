@@ -1341,6 +1341,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                     return (
                       <div
                         key={track.id}
+                        data-track-index={virtualRow.index}
                         style={{
                           position: 'absolute',
                           top: 0,
