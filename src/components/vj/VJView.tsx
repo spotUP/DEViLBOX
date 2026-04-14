@@ -708,16 +708,28 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   }, []); // containerRef is stable; useDJStore is read imperatively
 
   const handlePopOut = useCallback(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[VJView] handlePopOut called');
+    }
     const s = useUIStore.getState();
     if (s.vjPoppedOut) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[VJView] Already popped out, focusing window');
+      }
       focusPopout('DEViLBOX — VJ');
     } else {
       // Exit fullscreen first — browsers block window.open() in fullscreen mode
       if (document.fullscreenElement) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[VJView] Exiting fullscreen before popout');
+        }
         document.exitFullscreen().then(() => {
           useUIStore.getState().setVJPoppedOut(true);
         });
       } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[VJView] Setting vjPoppedOut to true');
+        }
         s.setVJPoppedOut(true);
       }
     }
