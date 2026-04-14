@@ -192,6 +192,12 @@ function App() {
     vjPoppedOut, setVJPoppedOut,
     showFileBrowser, setShowFileBrowser,
   } = useUIStore();
+  
+  // Debug: log vjPoppedOut state
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[App] vjPoppedOut state:', vjPoppedOut);
+  }
+  
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
@@ -969,6 +975,13 @@ function App() {
               </PopOutWindow>
             </Suspense>
           )}
+          {/* VJ Popout Window */}
+          {(() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[App] Rendering VJ popout conditional, vjPoppedOut:', vjPoppedOut);
+            }
+            return null;
+          })()}
           {vjPoppedOut && (
             <Suspense fallback={null}>
               <PopOutWindow
