@@ -48,13 +48,18 @@ interface PreRenderedStep {
 }
 
 const DEFAULT_VOICE = 0;   // Paul
-const DEFAULT_RATE = 170;  // wpm — measured pace for narration
-const DEFAULT_POST_DELAY = 1500;
+const DEFAULT_RATE = 220;  // wpm — snappy narration pace
+const DEFAULT_POST_DELAY = 1000;
 
 class TourEngine {
   private preRendered: PreRenderedStep[] = [];
   private sourceNode: AudioBufferSourceNode | null = null;
   private gainNode: GainNode | null = null;
+  private convolverNode: ConvolverNode | null = null;
+  private delayNode: DelayNode | null = null;
+  private feedbackNode: GainNode | null = null;
+  private reverbSendNode: GainNode | null = null;
+  private delaySendNode: GainNode | null = null;
   private waitTimer: ReturnType<typeof setTimeout> | null = null;
   private delayResolve: (() => void) | null = null;
   private pauseResumeResolve: (() => void) | null = null;
@@ -82,7 +87,40 @@ class TourEngine {
     const audioContext = getDevilboxAudioContext();
     this.gainNode = audioContext.createGain();
     this.gainNode.gain.value = 1;
+
+    // Build FX chain: gainNode → [dry → dest] + [reverbSend → convolver → dest] + [delaySend → delay → feedback loop → dest]
     this.gainNode.connect(audioContext.destination);
+
+    // Convolution reverb (algorithmic impulse)
+    try {
+      this.convolverNode = audioContext.createConvolver();
+      this.convolverNode.buffer = this.createReverbImpulse(audioContext, 2.2, 3.0);
+      this.reverbSendNode = audioContext.createGain();
+      this.reverbSendNode.gain.value = 0.25; // wet amount
+      this.gainNode.connect(this.reverbSendNode);
+      this.reverbSendNode.connect(this.convolverNode);
+      this.convolverNode.connect(audioContext.destination);
+    } catch (err) {
+      console.warn('[Tour] Reverb setup failed:', err);
+    }
+
+    // Ping-pong style echo (single tap delay with feedback)
+    try {
+      this.delayNode = audioContext.createDelay(1.0);
+      this.delayNode.delayTime.value = 0.33; // ~330ms echo
+      this.feedbackNode = audioContext.createGain();
+      this.feedbackNode.gain.value = 0.3; // feedback amount (decaying repeats)
+      this.delaySendNode = audioContext.createGain();
+      this.delaySendNode.gain.value = 0.2; // echo send level
+      // Chain: gain → delaySend → delay → feedback → delay (loop) + delay → dest
+      this.gainNode.connect(this.delaySendNode);
+      this.delaySendNode.connect(this.delayNode);
+      this.delayNode.connect(this.feedbackNode);
+      this.feedbackNode.connect(this.delayNode); // feedback loop
+      this.delayNode.connect(audioContext.destination);
+    } catch (err) {
+      console.warn('[Tour] Delay setup failed:', err);
+    }
 
     this.preRendered = [];
     for (let i = 0; i < TOUR_SCRIPT.length; i++) {
@@ -136,6 +174,16 @@ class TourEngine {
       this.pauseResumeResolve();
       this.pauseResumeResolve = null;
     }
+
+    // Cleanup FX nodes
+    for (const node of [this.convolverNode, this.reverbSendNode, this.delaySendNode, this.delayNode, this.feedbackNode]) {
+      if (node) { try { node.disconnect(); } catch { /* */ } }
+    }
+    this.convolverNode = null;
+    this.reverbSendNode = null;
+    this.delaySendNode = null;
+    this.delayNode = null;
+    this.feedbackNode = null;
 
     // Cleanup gain node
     if (this.gainNode) {
@@ -313,6 +361,20 @@ class TourEngine {
     return new Promise<void>((resolve) => {
       this.pauseResumeResolve = resolve;
     });
+  }
+
+  /** Generate a synthetic reverb impulse response */
+  private createReverbImpulse(ctx: AudioContext, duration: number, decay: number): AudioBuffer {
+    const sampleRate = ctx.sampleRate;
+    const length = sampleRate * duration;
+    const buffer = ctx.createBuffer(2, length, sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return buffer;
   }
 }
 

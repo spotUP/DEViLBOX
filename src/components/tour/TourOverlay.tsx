@@ -6,7 +6,7 @@
  * Only renders when tour is active.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTourStore } from '@/stores/useTourStore';
 import { getTourEngine } from '@/engine/tour/TourEngine';
 
@@ -34,7 +34,6 @@ const SpotlightOverlay: React.FC<{ selector: string }> = ({ selector }) => {
   const [rect, setRect] = useState<SpotlightRect | null>(null);
 
   useEffect(() => {
-    // Initial measurement + periodic update (handles layout shifts)
     const measure = () => setRect(getSpotlightRect(selector));
     measure();
     const timer = setInterval(measure, 500);
@@ -43,7 +42,6 @@ const SpotlightOverlay: React.FC<{ selector: string }> = ({ selector }) => {
 
   if (!rect) return null;
 
-  // SVG mask: full-screen dark overlay with a cutout for the spotlight
   return (
     <div
       style={{
@@ -74,7 +72,6 @@ const SpotlightOverlay: React.FC<{ selector: string }> = ({ selector }) => {
           fill="rgba(0, 0, 0, 0.55)"
           mask="url(#tour-spotlight-mask)"
         />
-        {/* Glow border around spotlight */}
         <rect
           x={rect.left}
           y={rect.top}
@@ -87,6 +84,52 @@ const SpotlightOverlay: React.FC<{ selector: string }> = ({ selector }) => {
         />
       </svg>
     </div>
+  );
+};
+
+/** Subtitle text with fade-in/fade-out on change */
+const SubtitleText: React.FC<{ text: string; isSpeaking: boolean }> = ({ text, isSpeaking }) => {
+  const [displayText, setDisplayText] = useState(text);
+  const [opacity, setOpacity] = useState(1);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    if (!text || text === displayText) {
+      if (text) setOpacity(isSpeaking ? 1 : 0.6);
+      return;
+    }
+    // Fade out
+    setOpacity(0);
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setDisplayText(text);
+      setOpacity(1);
+    }, 250);
+    return () => clearTimeout(timeoutRef.current);
+  }, [text, isSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When speaking state changes but text is same, just adjust opacity
+  useEffect(() => {
+    if (text === displayText) {
+      setOpacity(isSpeaking ? 1 : 0.6);
+    }
+  }, [isSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <p
+      style={{
+        color: '#fff',
+        fontSize: 20,
+        lineHeight: 1.5,
+        fontFamily: "'JetBrains Mono', monospace",
+        textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+        margin: 0,
+        opacity,
+        transition: 'opacity 0.25s ease-in-out',
+      }}
+    >
+      {displayText || '\u00A0'}
+    </p>
   );
 };
 
@@ -173,20 +216,7 @@ export const TourOverlay: React.FC = () => {
               </div>
             </div>
           ) : (
-            <p
-              style={{
-                color: '#fff',
-                fontSize: 20,
-                lineHeight: 1.5,
-                fontFamily: "'JetBrains Mono', monospace",
-                textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-                margin: 0,
-                opacity: isSpeaking ? 1 : 0.6,
-                transition: 'opacity 0.3s',
-              }}
-            >
-              {subtitle || '\u00A0'}
-            </p>
+            <SubtitleText text={subtitle} isSpeaking={isSpeaking} />
           )}
         </div>
       </div>
