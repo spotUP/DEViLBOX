@@ -16,6 +16,7 @@ import type { DrumType, DrumMachineType } from '@/types/instrument/drums';
 import type { DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import type { ScratchActionId } from '@/types/drumpad';
 import { DJ_FX_CATEGORY_COLORS, ONE_SHOT_CATEGORY_COLORS } from '@/constants/djPadModeDefaults';
+import { DJ_ONE_SHOT_PRESETS } from '@/constants/djOneShotPresets';
 import { colorToHex } from '@/pixi/colors';
 import { SYNTH_QUICK_PRESETS, type SynthQuickPreset } from './useDJQuickAssignData';
 import { SAMPLE_CATEGORY_LABELS, type SampleCategory } from '@/types/samplePack';
@@ -225,21 +226,29 @@ export function usePadSetupWizard() {
     close(); // 2 clicks — no Step 3 for DJ FX
   }, [padId, close]);
 
-  const selectOneShot = useCallback((_presetIndex: number, name: string, category: string) => {
+  const selectOneShot = useCallback((presetIndex: number, name: string, category: string) => {
     if (padId === null) return;
     const catColor = ONE_SHOT_CATEGORY_COLORS[category] ?? 0x666666;
+    const preset = DJ_ONE_SHOT_PRESETS[presetIndex];
+    
+    if (!preset) {
+      console.error('[PadSetupWizard] Invalid preset index:', presetIndex);
+      return;
+    }
+    
     useDrumPadStore.getState().updatePad(padId, {
       name,
       color: colorToHex(catColor),
       synthConfig: {
         id: PAD_INSTRUMENT_BASE + padId,
-        name,
-        type: 'synth',
-        synthType: 'Synth',
-        effects: [],
-        volume: 0,
-        pan: 0,
-      },
+        name: preset.name ?? name,
+        type: preset.type ?? 'synth',
+        synthType: preset.synthType ?? 'Synth',
+        effects: preset.effects ?? [],
+        volume: preset.volume ?? 0,
+        pan: preset.pan ?? 0,
+        ...preset, // Spread full preset config after defaults
+      } as import('@/types/instrument/defaults').InstrumentConfig, // Preset is DeepPartial, cast to full type
       instrumentNote: 'C3',
       djFxAction: undefined,
       scratchAction: undefined,
