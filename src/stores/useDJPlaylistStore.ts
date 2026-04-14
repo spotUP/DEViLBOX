@@ -662,8 +662,9 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
         // Step 1: basic cleanup (keep hyphens — they're part of HVSC filenames)
         const stripped = raw
           .replace(/\.sid$/i, '')
-          .replace(/\s*\((?:sid|3sid|dual\s*sid|6581|8580)\)\s*$/i, '')
-          .replace(/^(\d{1,3})\.\s*/, '')
+          .replace(/\s*\([^)]*\)\s*$/i, '')     // strip any trailing parenthetical: (sid), (DCP), (Low+High, Res. F)
+          .replace(/^(\d{1,3})\.\s*/, '')         // strip leading track number "01. "
+          .replace(/\s+(?:2SID|3SID|SCC\s+Extended)\s*$/i, '') // strip SID variant suffixes
           .trim();
         if (!stripped) continue;
 
@@ -685,6 +686,10 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
             songTitle = underscored;
           }
         }
+        // Also strip 2SID/SCC Extended from song title after splitting
+        songTitle = songTitle
+          .replace(/\s+(?:2SID|3SID|SCC\s+Extended)\s*$/i, '')
+          .trim();
 
         type HVSCResult = { isDirectory: boolean; name: string; path: string; author?: string };
         const filterSID = (r: HVSCResult) => !r.isDirectory && r.path.toLowerCase().endsWith('.sid');
