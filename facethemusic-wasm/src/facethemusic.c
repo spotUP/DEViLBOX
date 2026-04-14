@@ -1200,9 +1200,10 @@ size_t ftm_render(FtmModule* module, float* interleaved_stereo, size_t frames) {
     return written;
 }
 
-size_t ftm_render_multi(FtmModule* module, float** channel_buffers, int num_channels, size_t frames) {
-    if (!module || !channel_buffers || frames == 0) return 0;
+size_t ftm_render_multi(FtmModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames) {
+    if (!module || frames == 0) return 0;
 
+    float* ch_out[4] = { ch0, ch1, ch2, ch3 };
     size_t written = 0;
     for (size_t f = 0; f < frames; f++) {
         module->tick_accumulator += 1.0f;
@@ -1210,18 +1211,21 @@ size_t ftm_render_multi(FtmModule* module, float** channel_buffers, int num_chan
             module->tick_accumulator -= module->ticks_per_frame;
             ftm_play_tick(module);
         }
-        for (int ch = 0; ch < num_channels && ch < module->active_channel_count; ch++) {
+        // Zero all output channels first
+        for (int i = 0; i < 4; i++) {
+            if (ch_out[i]) ch_out[i][f] = 0.0f;
+        }
+        for (int ch = 0; ch < module->active_channel_count; ch++) {
             FtmChannel* c = &module->channels[ch];
-            float sample = 0.0f;
-            if (!c->active || c->muted || c->period == 0 || !c->sample_data) {
-                if (channel_buffers[ch]) channel_buffers[ch][f] = 0.0f;
-                continue;
-            }
+            if (!c->active || c->muted || c->period == 0 || !c->sample_data) continue;
             double step = (double)c->period / (double)module->sample_rate;
             uint32_t pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
+            float sample = 0.0f;
             if (pos < c->sample_length) sample = (float)c->sample_data[pos] / 128.0f;
             sample *= (float)c->volume / 64.0f;
-            if (channel_buffers[ch]) channel_buffers[ch][f] = sample * 0.5f;
+            // Mix into output buffer ch%4 (channels 4-7 fold into 0-3)
+            int out_ch = ch % 4;
+            if (ch_out[out_ch]) ch_out[out_ch][f] += sample * 0.5f;
 
             c->position_fp += (uint64_t)(step * (double)(1 << SAMPLE_FRAC_BITS));
             uint32_t new_pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);

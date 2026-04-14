@@ -89,6 +89,8 @@ interface FormatStore {
   ronKlarenFileData: ArrayBuffer | null;
   actionamicsFileData: ArrayBuffer | null;
   activisionProFileData: ArrayBuffer | null;
+  activisionProSubsongCount: number;
+  activisionProCurrentSubsong: number;
   synthesisFileData: ArrayBuffer | null;
   dssFileData: ArrayBuffer | null;
   soundFactoryFileData: ArrayBuffer | null;
@@ -207,6 +209,8 @@ interface FormatStore {
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
   applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; coreDesignFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
+  setActivisionProSubsongs: (count: number) => void;
+  setActivisionProCurrentSubsong: (index: number) => void;
   reset: () => void;
 }
 
@@ -373,6 +377,8 @@ export const useFormatStore = create<FormatStore>()(
     ronKlarenFileData: null,
     actionamicsFileData: null,
     activisionProFileData: null,
+    activisionProSubsongCount: 0,
+    activisionProCurrentSubsong: 0,
     synthesisFileData: null,
     dssFileData: null,
     soundFactoryFileData: null,
@@ -903,6 +909,9 @@ export const useFormatStore = create<FormatStore>()(
 
     setFurnaceActiveSubsong: (index) => set((state) => { state.furnaceActiveSubsong = index; }),
 
+    setActivisionProSubsongs: (count) => set((state) => { state.activisionProSubsongCount = count; }),
+    setActivisionProCurrentSubsong: (index) => set((state) => { state.activisionProCurrentSubsong = index; }),
+
     // TFMX mutations
     setTFMXNative: (data) => set((state) => { state.tfmxNative = data; }),
     setTFMXSelectedPattern: (idx) => set((state) => { state.tfmxSelectedPattern = idx; }),
@@ -1081,6 +1090,8 @@ export const useFormatStore = create<FormatStore>()(
       state.ronKlarenFileData = null;
       state.actionamicsFileData = null;
       state.activisionProFileData = null;
+      state.activisionProSubsongCount = 0;
+      state.activisionProCurrentSubsong = 0;
       state.synthesisFileData = null;
       state.dssFileData = null;
       state.soundFactoryFileData = null;
