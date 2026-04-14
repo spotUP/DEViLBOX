@@ -7,10 +7,10 @@
  * When logged in, user presets are synced to the server.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Star, Trash2, CloudOff, Cloud, Plus } from 'lucide-react';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/fxPresets';
+import { ChevronDown, Star, Trash2, CloudOff, Cloud, Plus, Search, X } from 'lucide-react';
+import { FX_PRESETS, type FxPreset, type FxTag } from '@/constants/fxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@/constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@/constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
@@ -41,14 +41,32 @@ const effectsByGroup = AVAILABLE_EFFECTS.reduce((acc, effect) => {
   return acc;
 }, {} as Record<string, AvailableEffect[]>);
 
-// Group factory presets by category — derived from presets, sorted alphabetically
+// Group factory presets by primary tag (first tag) — sorted with DJ first
 const groupedPresets = (() => {
-  const byCategory: Record<string, MasterFxPreset[]> = {};
-  for (const p of MASTER_FX_PRESETS) {
-    if (!byCategory[p.category]) byCategory[p.category] = [];
-    byCategory[p.category].push(p);
+  const byCategory: Record<string, FxPreset[]> = {};
+  for (const p of FX_PRESETS) {
+    const cat = p.tags[0];
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(p);
   }
-  return Object.keys(byCategory).sort().map(cat => ({ category: cat, presets: byCategory[cat] }));
+  // DJ first, then alphabetical
+  const cats = Object.keys(byCategory).sort((a, b) => {
+    if (a === 'DJ') return -1;
+    if (b === 'DJ') return 1;
+    return a.localeCompare(b);
+  });
+  return cats.map(cat => ({ category: cat, presets: byCategory[cat] }));
+})();
+
+// Collect all unique tags across all presets, DJ first
+const ALL_TAGS: FxTag[] = (() => {
+  const tags = new Set<FxTag>();
+  for (const p of FX_PRESETS) for (const t of p.tags) tags.add(t);
+  const arr = Array.from(tags).sort((a, b) => a.localeCompare(b));
+  // Move DJ to front
+  const djIdx = arr.indexOf('DJ');
+  if (djIdx > 0) { arr.splice(djIdx, 1); arr.unshift('DJ'); }
+  return arr;
 })();
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -57,11 +75,39 @@ export const DJFxQuickPresets: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAddEffect, setShowAddEffect] = useState(false);
   const [activePresetName, setActivePresetName] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTag, setActiveTag] = useState<FxTag | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
   const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
   const user = useAuthStore((s) => s.user);
+
+  // Reset search/filter when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setActiveTag(null);
+    } else {
+      // Focus search input when opened
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [isOpen]);
+
+  // Filter presets by search query and active tag
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return groupedPresets.map(({ category, presets }) => ({
+      category,
+      presets: presets.filter(p => {
+        if (activeTag && !p.tags.includes(activeTag)) return false;
+        if (q && !p.name.toLowerCase().includes(q) && !p.description.toLowerCase().includes(q)
+            && !p.tags.some(t => t.toLowerCase().includes(q))) return false;
+        return true;
+      }),
+    })).filter(g => g.presets.length > 0);
+  }, [searchQuery, activeTag]);
 
   // ── Local user presets ───────────────────────────────────────────────────
 
@@ -110,7 +156,7 @@ export const DJFxQuickPresets: React.FC = () => {
   );
 
   const applyFactoryPreset = useCallback(
-    (preset: MasterFxPreset) => {
+    (preset: FxPreset) => {
       const effects: EffectConfig[] = preset.effects.map((fx, i) => ({
         ...fx,
         id: `master-fx-${Date.now()}-${i}`,
@@ -205,7 +251,7 @@ export const DJFxQuickPresets: React.FC = () => {
       const rect = buttonRef.current.getBoundingClientRect();
       setMenuPos({
         top: rect.bottom + 4,
-        left: Math.max(0, rect.right - 256), // 256 = w-64 (16rem)
+        left: Math.max(0, rect.right - 288), // 288 = w-72 (18rem)
       });
     }
   }, [isOpen]);
@@ -235,8 +281,63 @@ export const DJFxQuickPresets: React.FC = () => {
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
-          className="z-[99990] w-64 max-h-[70vh] overflow-y-auto rounded-lg border border-dark-border bg-dark-bgSecondary shadow-xl"
+          className="z-[99990] w-72 max-h-[70vh] overflow-hidden rounded-lg border border-dark-border bg-dark-bgSecondary shadow-xl flex flex-col"
         >
+          {/* Search + Tag filter header (sticky) */}
+          <div className="shrink-0 border-b border-dark-border bg-dark-bgSecondary">
+            {/* Search bar */}
+            <div className="relative px-2 pt-2 pb-1">
+              <Search size={12} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted/50 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search presets..."
+                className="w-full pl-7 pr-7 py-1.5 text-xs font-mono rounded border border-dark-borderLight
+                  bg-dark-bgTertiary text-text-primary placeholder:text-text-muted/40
+                  focus:outline-none focus:border-accent-primary/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/50 hover:text-text-primary"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Category tag pills */}
+            <div className="px-2 pb-2 flex gap-1 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setActiveTag(null)}
+                className={`shrink-0 px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors
+                  ${!activeTag
+                    ? 'border-accent-primary/60 bg-accent-primary/15 text-accent-primary'
+                    : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-primary hover:border-dark-borderLight'
+                  }`}
+              >
+                All
+              </button>
+              {ALL_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                  className={`shrink-0 px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors
+                    ${activeTag === tag
+                      ? 'border-accent-primary/60 bg-accent-primary/15 text-accent-primary'
+                      : 'border-dark-borderLight bg-dark-bgTertiary text-text-muted hover:text-text-primary hover:border-dark-borderLight'
+                    }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Scrollable preset list */}
+          <div className="overflow-y-auto flex-1 min-h-0">
           {/* Clear / Bypass */}
           <button
             onClick={clearPresets}
@@ -278,8 +379,8 @@ export const DJFxQuickPresets: React.FC = () => {
             </div>
           )}
 
-          {/* Factory presets by category */}
-          {groupedPresets.map(({ category, presets }) => (
+          {/* Factory presets by category (filtered) */}
+          {filteredGroups.map(({ category, presets }) => (
             <div key={category} className="border-b border-dark-border last:border-0">
               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-text-muted/60">
                 {category}
@@ -295,11 +396,19 @@ export const DJFxQuickPresets: React.FC = () => {
                     }`}
                   title={preset.description}
                 >
-                  {preset.name}
+                  <span>{preset.name}</span>
+                  <span className="ml-1.5 text-[9px] text-text-muted/40">{preset.tags.slice(1).join(' · ')}</span>
                 </button>
               ))}
             </div>
           ))}
+
+          {/* Empty state */}
+          {filteredGroups.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-text-muted/50 font-mono">
+              No presets match{searchQuery ? ` "${searchQuery}"` : ''}{activeTag ? ` in ${activeTag}` : ''}
+            </div>
+          )}
 
           {/* Add Individual Effect section */}
           <div className="border-t border-dark-border">
@@ -338,6 +447,7 @@ export const DJFxQuickPresets: React.FC = () => {
               </div>
             )}
           </div>
+          </div> {/* end scrollable area */}
         </div>,
         document.body,
       )}
