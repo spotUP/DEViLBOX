@@ -840,39 +840,25 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
-  // Native contextmenu listener - React synthetic events don't work reliably
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     
-    const handler = (e: MouseEvent) => {
-      // Check if we clicked on a track row
-      const target = e.target as HTMLElement;
-      const trackRow = target.closest('[data-track-index]');
-      if (trackRow) {
-        e.preventDefault();
-        e.stopPropagation();
-        const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
-        if (index >= 0) {
-          console.log('[DJPlaylist] Native context menu on track:', index, 'at', e.clientX, e.clientY);
-          const realIndex = getRealIndex(index);
-          setContextMenuTrackIndex(realIndex);
-          if (!selectedSet.has(realIndex)) {
-            selectTrack(realIndex);
-          }
-          const fakeEvent = {
-            preventDefault: () => {},
-            stopPropagation: () => {},
-            clientX: e.clientX,
-            clientY: e.clientY,
-          } as React.MouseEvent;
-          contextMenu.open(fakeEvent);
+    // Check if we clicked on a track row
+    const target = e.target as HTMLElement;
+    const trackRow = target.closest('[data-track-index]');
+    if (trackRow) {
+      const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
+      if (index >= 0) {
+        console.log('[DJPlaylist] Context menu on track:', index, 'at', e.clientX, e.clientY);
+        const realIndex = getRealIndex(index);
+        setContextMenuTrackIndex(realIndex);
+        if (!selectedSet.has(realIndex)) {
+          selectTrack(realIndex);
         }
+        contextMenu.open(e);
       }
-    };
-    
-    container.addEventListener('contextmenu', handler, true);
-    return () => container.removeEventListener('contextmenu', handler, true);
+    }
   }, [getRealIndex, selectedSet, selectTrack, contextMenu]);
 
   const contextMenuItems = useMemo((): MenuItemType[] => {
@@ -1331,7 +1317,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto min-h-0"
             style={{ maxHeight: 360 }}
-            onContextMenuCapture={(e) => { e.preventDefault(); }}
+            onContextMenuCapture={handleContextMenu}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDropOnPlaylist}
             tabIndex={0}
