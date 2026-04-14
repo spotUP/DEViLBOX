@@ -388,6 +388,59 @@ function buildQuickAssignSubmenu(
     });
   }
 
+  // Add Speech options
+  items.push({
+    id: 'qa-group-speech', label: 'Speech',
+    submenu: [
+      {
+        id: 'qa-sam',
+        label: 'SAM (Commodore)...',
+        onClick: () => assignSpeechSynth(padId, 'Sam', store),
+      },
+      {
+        id: 'qa-v2speech',
+        label: 'V2 Speech (Ronan/Lisa)...',
+        onClick: () => assignSpeechSynth(padId, 'V2Speech', store),
+      },
+      {
+        id: 'qa-dectalk',
+        label: 'DECtalk (Stephen Hawking)...',
+        onClick: () => assignSpeechSynth(padId, 'DECtalk', store),
+      },
+      {
+        id: 'qa-pinktrombone',
+        label: 'Pink Trombone (Vocal Tract)...',
+        onClick: () => assignSpeechSynth(padId, 'PinkTrombone', store),
+      },
+      { id: 'qa-speech-divider-1', label: '─────', disabled: true },
+      {
+        id: 'qa-mamesp0250',
+        label: 'GI SP0250 (ROM Speech)...',
+        onClick: () => assignROMSpeech(padId, 'MAMESP0250', store),
+      },
+      {
+        id: 'qa-mametms5220',
+        label: 'TI TMS5220 (Speak & Spell)...',
+        onClick: () => assignROMSpeech(padId, 'MAMETMS5220', store),
+      },
+      {
+        id: 'qa-mamevotrax',
+        label: 'Votrax SC-01 (Classic)...',
+        onClick: () => assignROMSpeech(padId, 'MAMEVotrax', store),
+      },
+      {
+        id: 'qa-mamemea8000',
+        label: 'Philips MEA8000 (LPC)...',
+        onClick: () => assignROMSpeech(padId, 'MAMEMEA8000', store),
+      },
+      {
+        id: 'qa-mameupd931',
+        label: 'NEC uPD931...',
+        onClick: () => assignROMSpeech(padId, 'MAMEUPD931', store),
+      },
+    ],
+  });
+
   return items;
 }
 
@@ -416,6 +469,121 @@ function assignSynthPreset(
       parameters: { [paramKey]: preset.subType },
     },
     instrumentNote: preset.note,
+  });
+}
+
+function assignSpeechSynth(
+  padId: number,
+  synthType: 'Sam' | 'V2Speech' | 'DECtalk' | 'PinkTrombone',
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  const synthNames = {
+    Sam: 'SAM',
+    V2Speech: 'V2 Speech',
+    DECtalk: 'DECtalk',
+    PinkTrombone: 'Pink Trombone',
+  };
+  
+  const text = window.prompt(`Enter text for ${synthNames[synthType]}:`, 'HELLO WORLD');
+  if (text === null) return; // User cancelled
+  
+  const finalText = text.trim() || 'HELLO WORLD';
+  
+  // Base config for all speech synths
+  const baseConfig: any = {
+    id: PAD_INSTRUMENT_BASE + padId,
+    name: `${synthNames[synthType]}: ${finalText}`,
+    type: 'synth' as const,
+    synthType,
+    effects: [],
+    volume: -6,
+    pan: 0,
+  };
+  
+  // Add synth-specific config
+  if (synthType === 'Sam') {
+    baseConfig.sam = {
+      text: finalText,
+      pitch: 64,
+      speed: 72,
+      mouth: 128,
+      throat: 128,
+      singmode: true,
+      phonetic: false,
+      vowelSequence: [],
+      vowelLoopSingle: true,
+    };
+  } else if (synthType === 'V2Speech') {
+    baseConfig.v2Speech = {
+      text: finalText,
+      speed: 1.0,
+      pitch: 1.0,
+      formantShift: 1.0,
+      singMode: true,
+      vowelSequence: [],
+      vowelLoopSingle: true,
+    };
+  } else if (synthType === 'DECtalk') {
+    baseConfig.parameters = {
+      text: finalText,
+      voice: 'paul',
+      rate: 180,
+      pitch: 100,
+    };
+  } else if (synthType === 'PinkTrombone') {
+    baseConfig.parameters = {
+      text: finalText,
+      voiceType: 'vowel',
+    };
+  }
+  
+  store.updatePad(padId, {
+    name: `${synthNames[synthType]}: ${finalText.substring(0, 20)}`,
+    synthConfig: baseConfig,
+    instrumentNote: 'C4',
+    playMode: 'oneshot',
+  });
+}
+
+function assignROMSpeech(
+  padId: number,
+  synthType: 'MAMESP0250' | 'MAMETMS5220' | 'MAMEVotrax' | 'MAMEMEA8000' | 'MAMEUPD931',
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  const synthNames = {
+    MAMESP0250: 'GI SP0250',
+    MAMETMS5220: 'TI TMS5220',
+    MAMEVotrax: 'Votrax SC-01',
+    MAMEMEA8000: 'Philips MEA8000',
+    MAMEUPD931: 'NEC uPD931',
+  };
+  
+  // Prompt for ROM sample/phrase to play
+  const sample = window.prompt(
+    `Enter ROM sample/phrase for ${synthNames[synthType]}:`,
+    'HELLO'
+  );
+  if (sample === null) return; // User cancelled
+  
+  const finalSample = sample.trim() || 'HELLO';
+  
+  store.updatePad(padId, {
+    name: `${synthNames[synthType]}: ${finalSample.substring(0, 20)}`,
+    synthConfig: {
+      id: PAD_INSTRUMENT_BASE + padId,
+      name: `${synthNames[synthType]}: ${finalSample}`,
+      type: 'synth',
+      synthType,
+      effects: [],
+      volume: -6,
+      pan: 0,
+      parameters: {
+        romSample: finalSample, // Store which sample to play
+        romsLoaded: true,
+      },
+    },
+    instrumentNote: 'C4',
+    playMode: 'oneshot',
   });
 }
 
