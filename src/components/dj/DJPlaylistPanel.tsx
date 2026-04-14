@@ -139,7 +139,6 @@ interface SortableTrackRowProps {
   onRemove: (index: number) => void;
   onClick: (index: number, e: React.MouseEvent) => void;
   onDoubleClick: (track: PlaylistTrack, index: number) => void;
-  onContextMenu: (e: React.MouseEvent, index: number) => void;
 }
 
 const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
@@ -156,7 +155,6 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
   onRemove,
   onClick,
   onDoubleClick,
-  onContextMenu,
 }) => {
   const {
     attributes,
@@ -194,10 +192,10 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
     <div
       ref={setNodeRef}
       style={style}
+      data-track-index={index}
       className={`flex items-center gap-1.5 px-1.5 border-b border-dark-border transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''}`}
       onClick={(e) => onClick(index, e)}
       onDoubleClick={() => onDoubleClick(track, index)}
-      onContextMenu={(e) => onContextMenu(e, index)}
       onPointerEnter={() => setIsHovered(true)}
       onPointerLeave={() => setIsHovered(false)}
     >
@@ -211,11 +209,13 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
         <span className="text-cyan-400 text-[9px] shrink-0 animate-pulse" title={`Loading to deck ${loadingDeckId}`}>
           {loadingDeckId}
         </span>
+      ) : track.isBad ? (
+        <span className="text-red-500 text-[9px] shrink-0" title={`Bad: ${track.badReason}`}>✗</span>
       ) : track.played ? (
         <span className="text-green-500/50 text-[9px] shrink-0" title="Played">P</span>
       ) : null}
       <span className={`flex-1 text-sm font-mono truncate min-w-0 ${
-        isLoading ? 'text-cyan-400' : track.played ? 'text-text-muted/40' : 'text-text-secondary'
+        isLoading ? 'text-cyan-400' : track.isBad ? 'text-red-500/90' : track.played ? 'text-text-muted/40' : 'text-text-secondary'
       }`}>
         {track.trackName}
       </span>
@@ -377,6 +377,41 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     return filteredIndexMap.get(displayIndex) ?? displayIndex;
   }, [filteredIndexMap]);
 
+  // Native contextmenu listener - React synthetic events don't work reliably
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const handler = (e: MouseEvent) => {
+      // Check if we clicked on a track row
+      const target = e.target as HTMLElement;
+      const trackRow = target.closest('[data-track-index]');
+      if (trackRow) {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
+        if (index >= 0) {
+          console.log('[DJPlaylist] Native context menu on track:', index, 'at', e.clientX, e.clientY);
+          const realIndex = getRealIndex(index);
+          setContextMenuTrackIndex(realIndex);
+          if (!selectedSet.has(realIndex)) {
+            selectTrack(realIndex);
+          }
+          const fakeEvent = {
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            clientX: e.clientX,
+            clientY: e.clientY,
+          } as React.MouseEvent;
+          contextMenu.open(fakeEvent);
+        }
+      }
+    };
+    
+    container.addEventListener('contextmenu', handler, true);
+    return () => container.removeEventListener('contextmenu', handler, true);
+  }, [getRealIndex, selectedSet, selectTrack, contextMenu]);
+
   // ── Virtual scrolling ─────────────────────────────────────────────────────
 
   const virtualizer = useVirtualizer({
@@ -415,6 +450,54 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [precacheProgress, setPrecacheProgress] = useState<PrecacheProgress | null>(null);
   const precachingRef = useRef(false);
   const [cachedCount, setCachedCount] = useState(0);
+
+  // ── Re-test bad tracks ───────────────────────────────────────────────────
+  
+  const [retestingBad, setRetestingBad] = useState(false);
+  
+  const badTrackCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.isBad).length
+    : 0;
+
+  const handleRetestBadTracks = useCallback(async () => {
+    if (!activePlaylist || !activePlaylistId || retestingBad) return;
+    
+    const badTracks = activePlaylist.tracks
+      .map((t, idx) => ({ track: t, index: idx }))
+      .filter(({ track }) => track.isBad);
+    
+    if (badTracks.length === 0) {
+      console.log('[DJPlaylist] No bad tracks to re-test');
+      return;
+    }
+    
+    setRetestingBad(true);
+    console.log(`[DJPlaylist] Re-testing ${badTracks.length} bad tracks...`);
+    
+    const { loadPlaylistTrackToDeck } = await import('@/engine/dj/DJTrackLoader');
+    const { clearTrackBadFlag } = useDJPlaylistStore.getState();
+    
+    let successCount = 0;
+    for (const { track, index } of badTracks) {
+      console.log(`[DJPlaylist] Re-testing track ${index}: ${track.trackName} (reason: ${track.badReason})`);
+      
+      // Clear bad flag before testing
+      clearTrackBadFlag(activePlaylistId, index);
+      
+      // Try loading to a temporary deck (use whichever deck is idle or just use A)
+      const success = await loadPlaylistTrackToDeck(track, 'A');
+      
+      if (success) {
+        successCount++;
+        console.log(`[DJPlaylist] ✓ Track ${index} now loads successfully`);
+      } else {
+        console.warn(`[DJPlaylist] ✗ Track ${index} still fails`);
+      }
+    }
+    
+    setRetestingBad(false);
+    console.log(`[DJPlaylist] Re-test complete: ${successCount}/${badTracks.length} now working`);
+  }, [activePlaylist, activePlaylistId, retestingBad]);
 
   useEffect(() => {
     if (!activePlaylist) { setCachedCount(0); return; }
@@ -757,13 +840,39 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
-  const handleTrackContextMenu = useCallback((e: React.MouseEvent, displayIndex: number) => {
-    const realIndex = getRealIndex(displayIndex);
-    setContextMenuTrackIndex(realIndex);
-    if (!selectedSet.has(realIndex)) {
-      selectTrack(realIndex);
-    }
-    contextMenu.open(e);
+  // Native contextmenu listener - React synthetic events don't work reliably
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const handler = (e: MouseEvent) => {
+      // Check if we clicked on a track row
+      const target = e.target as HTMLElement;
+      const trackRow = target.closest('[data-track-index]');
+      if (trackRow) {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
+        if (index >= 0) {
+          console.log('[DJPlaylist] Native context menu on track:', index, 'at', e.clientX, e.clientY);
+          const realIndex = getRealIndex(index);
+          setContextMenuTrackIndex(realIndex);
+          if (!selectedSet.has(realIndex)) {
+            selectTrack(realIndex);
+          }
+          const fakeEvent = {
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            clientX: e.clientX,
+            clientY: e.clientY,
+          } as React.MouseEvent;
+          contextMenu.open(fakeEvent);
+        }
+      }
+    };
+    
+    container.addEventListener('contextmenu', handler, true);
+    return () => container.removeEventListener('contextmenu', handler, true);
   }, [getRealIndex, selectedSet, selectTrack, contextMenu]);
 
   const contextMenuItems = useMemo((): MenuItemType[] => {
@@ -784,6 +893,31 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     }
 
     items.push({ type: 'divider' });
+
+    // Move up/down
+    if (selCount <= 1) {
+      items.push({
+        id: 'move-up',
+        label: 'Move Up',
+        disabled: contextMenuTrackIndex === 0,
+        onClick: () => {
+          if (activePlaylistId && contextMenuTrackIndex > 0) {
+            reorderTrack(activePlaylistId, contextMenuTrackIndex, contextMenuTrackIndex - 1);
+          }
+        },
+      });
+      items.push({
+        id: 'move-down',
+        label: 'Move Down',
+        disabled: contextMenuTrackIndex === activePlaylist.tracks.length - 1,
+        onClick: () => {
+          if (activePlaylistId && contextMenuTrackIndex < activePlaylist.tracks.length - 1) {
+            reorderTrack(activePlaylistId, contextMenuTrackIndex, contextMenuTrackIndex + 1);
+          }
+        },
+      });
+      items.push({ type: 'divider' });
+    }
 
     if (otherPlaylists.length > 0) {
       items.push({
@@ -813,6 +947,51 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       onClick: () => setEditTrack({ index: contextMenuTrackIndex, track }),
     });
 
+    // Copy track info
+    items.push({
+      id: 'copy-info',
+      label: 'Copy Track Info',
+      onClick: () => {
+        const info = [
+          `Name: ${track.trackName}`,
+          `File: ${track.fileName}`,
+          track.format && `Format: ${track.format}`,
+          track.bpm > 0 && `BPM: ${track.bpm}`,
+          track.musicalKey && `Key: ${track.musicalKey}`,
+          track.duration > 0 && `Duration: ${formatDuration(track.duration)}`,
+        ].filter(Boolean).join('\n');
+        navigator.clipboard.writeText(info).then(() => {
+          console.log('[DJPlaylist] Track info copied to clipboard');
+        });
+      },
+    });
+
+    items.push({ type: 'divider' });
+
+    // Bad track management
+    if (track.isBad) {
+      items.push({
+        id: 'clear-bad',
+        label: 'Clear Bad Flag',
+        onClick: () => {
+          if (activePlaylistId) {
+            useDJPlaylistStore.getState().clearTrackBadFlag(activePlaylistId, contextMenuTrackIndex);
+          }
+        },
+      });
+    } else {
+      items.push({
+        id: 'mark-bad',
+        label: 'Mark as Bad',
+        onClick: () => {
+          if (activePlaylistId) {
+            const reason = prompt('Reason (optional):') || 'Manually marked';
+            useDJPlaylistStore.getState().markTrackBad(activePlaylistId, contextMenuTrackIndex, reason);
+          }
+        },
+      });
+    }
+
     items.push({ type: 'divider' });
 
     if (selCount > 1) {
@@ -841,7 +1020,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     }
 
     return items;
-  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack]);
+  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack]);
 
   // ── Keyboard navigation ───────────────────────────────────────────────────
 
@@ -1127,6 +1306,13 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   Cache ({uncachedCount})
                 </button>
               )}
+              {badTrackCount > 0 && (
+                <button onClick={handleRetestBadTracks}
+                  disabled={retestingBad}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded border border-red-700 bg-red-900/20 text-red-400 hover:bg-red-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  {retestingBad ? 'Testing...' : `Re-test Bad (${badTrackCount})`}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1182,7 +1368,6 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                           onRemove={(i) => removeTrack(activePlaylist.id, getRealIndex(i))}
                           onClick={handleTrackClick}
                           onDoubleClick={handleTrackDoubleClick}
-                          onContextMenu={handleTrackContextMenu}
                         />
                       </div>
                     );
