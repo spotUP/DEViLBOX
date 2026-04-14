@@ -425,6 +425,24 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
         }
       }
 
+      if (track.fileName.startsWith('hvsc:')) {
+        const hvscPath = track.fileName.slice('hvsc:'.length);
+        try {
+          const { downloadHVSCFile } = await import('@/lib/hvscApi');
+          const buffer = await downloadHVSCFile(hvscPath);
+          const filename = hvscPath.split('/').pop() || 'download.sid';
+
+          const { loadUADEToDeck } = await import('@engine/dj/DJUADEPrerender');
+          await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, filename);
+          if (useDJStore.getState().deckViewMode !== '3d') {
+            useDJStore.getState().setDeckViewMode('vinyl');
+          }
+          return;
+        } catch (err) {
+          console.error(`[PixiDJPlaylistPanel] HVSC re-download failed:`, err);
+        }
+      }
+
       const file = await pickFiles({ accept: ACCEPT_AUDIO });
       const selected = file[0];
       if (!selected) return;
