@@ -1,8 +1,9 @@
 /**
  * Tour script — defines every step of the guided DEViLBOX tour.
  *
- * Each step has narration text (spoken by DECtalk) and an optional
- * action callback that performs UI changes (view switching, etc.).
+ * DESIGN PRINCIPLE: Show, don't tell. Every 1-2 sentences of narration
+ * should be followed by a visible action in the app. Keep narration
+ * SHORT and punchy. Let the demo speak for itself.
  */
 
 import { useUIStore } from '@/stores/useUIStore';
@@ -13,11 +14,11 @@ export interface TourStep {
   narration: string;
   /** UI action to perform when this step starts (before speech) */
   action?: () => Promise<void> | void;
-  /** Extra ms to wait after speech finishes (default 1500) */
+  /** Extra ms to wait after speech finishes (default 1000) */
   postDelay?: number;
   /** DECtalk voice override (default 0 = Paul) */
   voice?: number;
-  /** DECtalk rate override (default 170) */
+  /** DECtalk rate override (default 220) */
   rate?: number;
   /** CSS selector to spotlight/highlight during this step (null = no spotlight) */
   spotlight?: string;
@@ -29,273 +30,290 @@ function switchView(view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studi
   useUIStore.getState().setActiveView(view);
 }
 
-async function loadDemoSong(): Promise<void> {
+async function loadTrackerSong(filename: string): Promise<void> {
   try {
-    const resp = await fetch('/data/songs/exports/aces_high.mod');
+    const resp = await fetch(`/data/songs/exports/${filename}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const buf = await resp.arrayBuffer();
-    const file = new File([buf], 'aces_high.mod');
+    const file = new File([buf], filename);
     const { loadFile } = await import('@/lib/file/UnifiedFileLoader');
     await loadFile(file, { requireConfirmation: false });
   } catch (err) {
-    console.warn('[Tour] Failed to load demo song:', err);
+    console.warn('[Tour] Failed to load song:', err);
   }
 }
 
-function enableKraftwerkHead(): void {
+async function trackerPlay(): Promise<void> {
+  const { useTransportStore } = await import('@/stores/useTransportStore');
+  useTransportStore.getState().play();
+}
+
+async function trackerStop(): Promise<void> {
+  const { useTransportStore } = await import('@/stores/useTransportStore');
+  useTransportStore.getState().stop();
+}
+
+async function loadDJTrack(deckId: 'A' | 'B', filename: string): Promise<void> {
+  try {
+    const resp = await fetch(`/data/songs/exports/${filename}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    const { getDJEngine } = await import('@/engine/dj/DJEngine');
+    await getDJEngine().loadAudioToDeck(deckId, buf, filename, filename.replace(/\.\w+$/, ''));
+  } catch (err) {
+    console.warn(`[Tour] Failed to load DJ track ${filename}:`, err);
+  }
+}
+
+async function djPlay(deckId: 'A' | 'B'): Promise<void> {
+  const { togglePlay } = await import('@/engine/dj/DJActions');
+  const { useDJStore } = await import('@/stores/useDJStore');
+  if (!useDJStore.getState().decks[deckId].isPlaying) {
+    await togglePlay(deckId);
+  }
+}
+
+async function djSetCrossfader(pos: number): Promise<void> {
+  const { setCrossfader } = await import('@/engine/dj/DJActions');
+  setCrossfader(pos);
+}
+
+async function djSetFilter(deckId: 'A' | 'B', pos: number): Promise<void> {
+  const { setDeckFilter } = await import('@/engine/dj/DJActions');
+  setDeckFilter(deckId, pos);
+}
+
+async function djKillEQ(deckId: 'A' | 'B', band: 'low' | 'mid' | 'high', kill: boolean): Promise<void> {
+  const { setDeckEQKill } = await import('@/engine/dj/DJActions');
+  setDeckEQKill(deckId, band, kill);
+}
+
+async function djStopAll(): Promise<void> {
+  const { killAllDecks } = await import('@/engine/dj/DJActions');
+  killAllDecks();
+}
+
+function enableHead(): void {
   useSpeechActivityStore.getState().speechStart();
 }
 
-function disableKraftwerkHead(): void {
+function disableHead(): void {
   useSpeechActivityStore.getState().speechStop();
 }
 
 export const TOUR_SCRIPT: TourStep[] = [
-  // ── Act 1: Welcome ──────────────────────────────────────────────────────
+  // ── Act 1: Welcome (short!) ─────────────────────────────────────────────
   {
     id: 'welcome',
-    narration: 'Welcome to DEViLBOX. The ultimate browser-based music production studio. Let me give you a tour.',
-    postDelay: 1000,
-  },
-  {
-    id: 'overview',
-    narration: 'DEViLBOX runs entirely in your web browser. No installation required. It supports over 188 music file formats, from classic Amiga tracker modules to modern chip-tune files.',
-    postDelay: 1500,
-  },
-  {
-    id: 'overview-2',
-    narration: 'It includes a tracker editor, a DJ mixer, drum pads, visualizers, and over 120 synthesizer engines. All powered by Web Audio and WebAssembly.',
-    postDelay: 1500,
+    narration: 'Welcome to DEViLBOX. Let me show you what it can do.',
+    postDelay: 500,
   },
 
-  // ── Act 2: Tracker View ─────────────────────────────────────────────────
+  // ── Act 2: Tracker — load a song, play it ──────────────────────────────
   {
-    id: 'tracker-intro',
-    narration: 'This is the tracker view. The heart of DEViLBOX. A pattern-based music editor inspired by FastTracker 2 and ProTracker.',
-    action: () => switchView('tracker'),
-    postDelay: 2000,
-  },
-  {
-    id: 'tracker-pattern',
-    narration: 'The pattern editor shows notes, instruments, volumes, and effects in a scrolling grid. Each column represents a channel. You navigate with the keyboard, just like the original trackers from the early 1990s.',
-    spotlight: '[data-pattern-editor]',
-    postDelay: 1500,
-  },
-  {
-    id: 'tracker-demo',
-    narration: 'Let me load a classic demo song to show you how it looks and sounds.',
-    action: loadDemoSong,
-    postDelay: 2000,
-  },
-  {
-    id: 'tracker-playing',
-    narration: 'This is Aces High, a classic ProTracker module. Notice how each channel plays its own instrument, and the pattern scrolls as the song progresses.',
+    id: 'tracker-load',
+    narration: 'This is the tracker. A pattern editor for making music. Let me load a classic Amiga module.',
     action: async () => {
-      // Start playback via transport
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      useTransportStore.getState().play();
+      switchView('tracker');
+      await loadTrackerSong('aces_high.mod');
     },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 500,
+  },
+  {
+    id: 'tracker-play',
+    narration: 'Here we go.',
+    action: trackerPlay,
+    spotlight: '[data-pattern-editor]',
+    postDelay: 4000,
+  },
+  {
+    id: 'tracker-explain',
+    narration: 'Each column is a channel. Notes, instruments, and effects scroll as the song plays. Over 120 synth engines and 188 import formats.',
     spotlight: '[data-pattern-editor]',
     postDelay: 3000,
   },
   {
-    id: 'tracker-instruments',
-    narration: 'On the right side, the instrument panel. DEViLBOX has over 120 different synthesizer engines to choose from.',
-    postDelay: 1500,
-  },
-  {
-    id: 'tracker-chips',
-    narration: 'We emulate real hardware chips from the 1980s and 1990s. The Commodore 64 SID chip, Nintendo NES, Sega Genesis YM2612, Game Boy, Amiga Paula, and many more. All running as WebAssembly emulations of the original silicon.',
-    postDelay: 2000,
-  },
-  {
-    id: 'tracker-modern',
-    narration: 'For modern production, there are subtractive synths, FM synthesis, the legendary TB-303 acid bass line, wavetable synthesis, physical modeling, and community plugins.',
-    postDelay: 1500,
-  },
-  {
-    id: 'tracker-effects',
-    narration: 'Every instrument can have its own effects chain. Reverb, delay, distortion, chorus, phaser, EQ, vocoder, and dozens more. All running in real-time.',
-    postDelay: 1500,
-  },
-  {
-    id: 'tracker-formats',
-    narration: 'DEViLBOX imports songs from over 188 formats. ProTracker MOD, FastTracker XM, Impulse Tracker IT, Scream Tracker, Furnace chip-tune files, SunVox, MIDI, and many obscure Amiga formats.',
-    postDelay: 2000,
+    id: 'tracker-stop',
+    narration: '',
+    action: trackerStop,
+    postDelay: 300,
   },
 
-  // ── Act 3: Speech Synths (Meta moment) ──────────────────────────────────
+  // ── Act 3: DJ View — load two tracks and mix ──────────────────────────
   {
-    id: 'speech-intro',
-    narration: 'Now, let me tell you about something special. The voice you are hearing right now? That is DECtalk. One of our built-in speech synthesizers.',
-    showHead: true,
-    postDelay: 1500,
+    id: 'dj-switch',
+    narration: 'Now let us DJ. Switching to the dual deck mixer.',
+    action: () => switchView('dj'),
+    postDelay: 800,
   },
   {
-    id: 'speech-dectalk',
-    narration: 'DECtalk is the iconic speech synthesizer that Stephen Hawking used. We run it entirely in your browser as a WebAssembly module. I have 9 different voices. Right now, you are hearing Paul.',
-    showHead: true,
-    postDelay: 1500,
+    id: 'dj-load-a',
+    narration: 'Loading a track onto deck A.',
+    action: () => loadDJTrack('A', 'analogue_vibes.mod'),
+    spotlight: '[data-dj-deck-drop]',
+    postDelay: 1000,
   },
   {
-    id: 'speech-betty',
-    narration: 'And this is Betty. Another DECtalk voice. Every voice has its own personality and character.',
-    voice: 1,  // Betty
-    showHead: true,
-    postDelay: 1500,
+    id: 'dj-play-a',
+    narration: 'Play.',
+    action: () => djPlay('A'),
+    postDelay: 4000,
   },
   {
-    id: 'speech-harry',
-    narration: 'And this is Harry. A deeper, more authoritative voice.',
-    voice: 2,  // Harry
-    showHead: true,
-    postDelay: 1500,
+    id: 'dj-load-b',
+    narration: 'Loading deck B.',
+    action: () => loadDJTrack('B', 'anthrox_intro.mod'),
+    postDelay: 1000,
   },
   {
-    id: 'speech-back-to-paul',
-    narration: 'Back to Paul. Besides DECtalk, DEViLBOX also includes SAM, the Software Automatic Mouth from the Commodore 64. Pink Trombone, a real-time vocal tract simulator. And vintage arcade speech chips like the Votrax and the TI TMS5220.',
-    voice: 0,  // Paul
-    showHead: true,
-    postDelay: 2000,
-  },
-
-  // ── Act 4: DJ View ──────────────────────────────────────────────────────
-  {
-    id: 'dj-intro',
-    narration: 'Now let us switch to the DJ view.',
+    id: 'dj-play-b',
+    narration: 'Starting deck B and crossfading.',
     action: async () => {
-      // Stop tracker playback before switching
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      useTransportStore.getState().stop();
-      switchView('dj');
+      await djPlay('B');
+      // Animate crossfader from A to center over 2 seconds
+      for (let i = 0; i <= 10; i++) {
+        setTimeout(() => djSetCrossfader(i / 20), i * 200);
+      }
+    },
+    postDelay: 3000,
+  },
+  {
+    id: 'dj-fx-filter',
+    narration: 'Watch the filter sweep.',
+    action: async () => {
+      // Sweep low-pass filter on deck A
+      for (let i = 0; i <= 10; i++) {
+        setTimeout(() => djSetFilter('A', i / 10), i * 150);
+      }
+      // Sweep back
+      setTimeout(() => {
+        for (let i = 10; i >= 0; i--) {
+          setTimeout(() => djSetFilter('A', i / 10), (10 - i) * 150);
+        }
+      }, 1800);
     },
     postDelay: 2000,
   },
   {
-    id: 'dj-overview',
-    narration: 'Welcome to the DJ mixer. A full dual-deck system running in your browser. Two decks, a mixer, and effects. Everything you need to mix music live.',
+    id: 'dj-fx-kill',
+    narration: 'EQ kills. Drop the bass.',
+    action: async () => {
+      await djKillEQ('A', 'low', true);
+      setTimeout(() => djKillEQ('A', 'low', false), 1500);
+      setTimeout(() => djKillEQ('A', 'mid', true), 2000);
+      setTimeout(() => djKillEQ('A', 'mid', false), 3000);
+    },
     postDelay: 2000,
   },
   {
-    id: 'dj-decks',
-    narration: 'Each deck shows a real-time waveform display with beat detection and BPM analysis. Load any supported music file and it is instantly analyzed for beats and tempo.',
-    spotlight: '[data-dj-deck-drop]',
-    postDelay: 1500,
-  },
-  {
-    id: 'dj-mixer',
-    narration: 'The center mixer section has 3-band EQ, high, mid, and low. A crossfader to blend between decks. Volume controls. Just like a real hardware DJ mixer.',
-    postDelay: 1500,
-  },
-  {
-    id: 'dj-fx',
-    narration: 'FX pads give you instant access to filter sweeps, echo out, brake effects, and EQ band kills. Touch them to activate, release to deactivate.',
-    postDelay: 1500,
-  },
-  {
-    id: 'dj-autodj',
-    narration: 'Auto DJ mode automatically beat-matches tracks and crossfades between them. Build a playlist and let the machine take over.',
-    postDelay: 1500,
-  },
-  {
-    id: 'dj-vocoder',
-    narration: 'The built-in vocoder lets you use your microphone to create robotic vocal effects over the music in real-time. With auto-tune and formant shifting.',
-    postDelay: 1500,
+    id: 'dj-crossfade',
+    narration: 'Full crossfade to deck B.',
+    action: async () => {
+      for (let i = 5; i <= 20; i++) {
+        setTimeout(() => djSetCrossfader(i / 20), (i - 5) * 130);
+      }
+    },
+    postDelay: 3000,
   },
   {
     id: 'dj-archives',
-    narration: 'You can search and stream music from two massive online archives. Modland, with over 190,000 tracker modules from the demoscene. And the High Voltage SID Collection, with over 80,000 Commodore 64 tunes.',
-    postDelay: 2000,
+    narration: 'You can also stream from Modland, 190,000 tracker modules. Or the High Voltage SID Collection, 80,000 Commodore 64 tunes.',
+    postDelay: 1000,
+  },
+  {
+    id: 'dj-stop',
+    narration: '',
+    action: async () => {
+      await djStopAll();
+      // Reset crossfader and filters
+      await djSetCrossfader(0.5);
+      await djSetFilter('A', 0);
+      await djSetFilter('B', 0);
+    },
+    postDelay: 300,
   },
 
-  // ── Act 5: DrumPad View ─────────────────────────────────────────────────
+  // ── Act 4: DrumPads ─────────────────────────────────────────────────────
   {
-    id: 'drumpad-intro',
-    narration: 'Next up, the drum pad view.',
+    id: 'drumpad-switch',
+    narration: 'The drum pads. MPC-style, 16 pads, velocity sensitive.',
     action: () => switchView('drumpad'),
+    spotlight: '[data-pad-id]',
     postDelay: 2000,
   },
   {
-    id: 'drumpad-overview',
-    narration: 'An MPC-style 16-pad drum machine controller. Each pad can hold a sample, a synthesizer, or any instrument from our 120 engine collection.',
-    spotlight: '[data-pad-id]',
-    postDelay: 1500,
-  },
-  {
-    id: 'drumpad-velocity',
-    narration: 'Pads respond to velocity. Hit harder for louder sounds. On touch screens, press duration controls the velocity. Works with MIDI controllers too.',
-    postDelay: 1500,
-  },
-  {
-    id: 'drumpad-banks',
-    narration: 'Switch between banks for up to 128 total pads. Save and load entire drum kits. Import and export configurations.',
-    postDelay: 1500,
-  },
-  {
-    id: 'drumpad-djfx',
-    narration: 'In DJ FX mode, the pads become effect triggers for the DJ mixer. Perfect for live performance.',
-    postDelay: 1500,
+    id: 'drumpad-features',
+    narration: 'Load any sample or synth engine onto each pad. Switch banks for 128 total. Or use them as DJ FX triggers.',
+    postDelay: 1000,
   },
 
-  // ── Act 6: VJ & Visualizers ─────────────────────────────────────────────
+  // ── Act 5: Speech Synths (the meta moment) ──────────────────────────────
   {
-    id: 'vj-intro',
-    narration: 'Now, the VJ view. Real-time audio visualizations.',
+    id: 'speech-meta',
+    narration: 'By the way, this voice? DECtalk. Running as WebAssembly. The same voice Stephen Hawking used.',
+    showHead: true,
+    postDelay: 800,
+  },
+  {
+    id: 'speech-betty',
+    narration: 'And this is Betty.',
+    voice: 1,
+    showHead: true,
+    postDelay: 500,
+  },
+  {
+    id: 'speech-harry',
+    narration: 'And Harry.',
+    voice: 2,
+    showHead: true,
+    postDelay: 500,
+  },
+  {
+    id: 'speech-paul-back',
+    narration: 'We also have SAM from the Commodore 64, Pink Trombone, and vintage arcade speech chips.',
+    voice: 0,
+    showHead: true,
+    postDelay: 800,
+  },
+
+  // ── Act 6: VJ + Kraftwerk head ──────────────────────────────────────────
+  {
+    id: 'vj-switch',
+    narration: 'The VJ view. Real-time Milkdrop visualizations, and the Kraftwerk 3D head. Watch it sync to my voice.',
     action: () => {
-      enableKraftwerkHead();
+      enableHead();
       switchView('vj');
     },
     showHead: true,
-    postDelay: 2500,
+    postDelay: 3000,
   },
   {
-    id: 'vj-milkdrop',
-    narration: 'Butterchurn brings hundreds of Milkdrop music-reactive visual presets. WebGL powered, running at full frame rate. Originally from Winamp, now in your browser.',
-    showHead: true,
-    postDelay: 2000,
-  },
-  {
-    id: 'vj-kraftwerk',
-    narration: 'And this is our 3D Kraftwerk head avatar. It syncs its mouth movements to speech synthesis output in real-time. Yes, it is synced to my voice right now.',
+    id: 'vj-head-demo',
+    narration: 'Hello. I am DEViLBOX. I can see you. Can you see me?',
     showHead: true,
     postDelay: 2000,
   },
   {
     id: 'vj-cleanup',
     narration: '',
-    action: () => disableKraftwerkHead(),
+    action: () => disableHead(),
     postDelay: 100,
-    rate: 300,
   },
 
-  // ── Act 7: Mixer View ──────────────────────────────────────────────────
+  // ── Act 7: Mixer ────────────────────────────────────────────────────────
   {
-    id: 'mixer-intro',
-    narration: 'The mixer panel.',
+    id: 'mixer-switch',
+    narration: 'The mixer. Per-channel faders, pan, mute, solo, and meters.',
     action: () => switchView('mixer'),
-    postDelay: 2000,
-  },
-  {
-    id: 'mixer-overview',
-    narration: 'Per-channel volume faders, pan controls, mute and solo buttons, and peak level meters. Professional mixing capabilities right in your browser.',
-    postDelay: 2000,
+    postDelay: 1500,
   },
 
-  // ── Act 8: Closing ─────────────────────────────────────────────────────
+  // ── Act 8: Closing (fast) ───────────────────────────────────────────────
   {
     id: 'closing',
-    narration: 'That concludes our tour of DEViLBOX.',
+    narration: 'DEViLBOX. 120 synth engines. 188 formats. Two massive music archives. All in your browser. Thanks for watching.',
     action: () => switchView('tracker'),
-    postDelay: 1500,
-  },
-  {
-    id: 'closing-summary',
-    narration: 'A complete music production studio, DJ mixer, drum machine, and visualizer. Over 120 synthesizer engines, 188 format importers, and two massive online music archives. All running in your web browser, powered by WebAssembly.',
-    postDelay: 1500,
-  },
-  {
-    id: 'closing-thanks',
-    narration: 'Thank you for watching. Enjoy making music with DEViLBOX.',
-    postDelay: 3000,
+    postDelay: 2000,
   },
 ];
