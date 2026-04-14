@@ -162,8 +162,10 @@ int klys_decode(float *outL, float *outR, Uint32 numSamples)
     Uint32 lenBytes = numSamples * 2 * sizeof(Sint16);
     cyd_output_buffer_stereo(&g_cyd, (Uint8 *)g_mixBuf, lenBytes);
 
-    /* Convert interleaved Sint16 → separate float32 L/R */
-    const float scale = 1.0f / 32768.0f;
+    /* Convert interleaved Sint16 → separate float32 L/R.
+     * The CYD engine divides output by PRE_GAIN_DIVISOR (4) for multi-channel
+     * headroom, resulting in quiet output. Boost by 2x for normal levels. */
+    const float scale = 2.0f / 32768.0f;
     for (Uint32 i = 0; i < numSamples; i++) {
         outL[i] = g_mixBuf[i * 2] * scale;
         outR[i] = g_mixBuf[i * 2 + 1] * scale;

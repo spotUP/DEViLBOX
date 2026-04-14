@@ -5,6 +5,7 @@
  */
 
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { useFormatStore } from '@stores/useFormatStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 
 export class ActivisionProEngine {
@@ -109,6 +110,7 @@ export class ActivisionProEngine {
         case 'moduleLoaded':
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[ActivisionProEngine] Module loaded, subsongs:', data.subsongCount);
+          useFormatStore.getState().setActivisionProSubsongs(data.subsongCount ?? 1);
           break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels);
@@ -140,6 +142,10 @@ export class ActivisionProEngine {
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
+
+  setSubsong(index: number): void {
+    this.workletNode?.port.postMessage({ type: 'setSubsong', subsong: index });
+  }
 
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });

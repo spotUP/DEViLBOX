@@ -20,7 +20,7 @@ int ftm_channel_count(const FtmModule* module);
 void ftm_set_channel_mask(FtmModule* module, uint32_t mask);
 
 size_t ftm_render(FtmModule* module, float* interleaved_stereo, size_t frames);
-size_t ftm_render_multi(FtmModule* module, float** channel_buffers, int num_channels, size_t frames);
+size_t ftm_render_multi(FtmModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
 bool ftm_has_ended(const FtmModule* module);
 
