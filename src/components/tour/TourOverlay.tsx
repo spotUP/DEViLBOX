@@ -1,13 +1,94 @@
 /**
- * TourOverlay — Subtitle bar + controls displayed during the guided tour.
+ * TourOverlay — Subtitle bar + controls + spotlight displayed during the guided tour.
  *
  * Fixed at bottom of screen. Shows narration text, progress, and
- * pause/skip/stop controls. Only renders when tour is active.
+ * pause/skip/stop controls. Spotlight dims everything except the targeted element.
+ * Only renders when tour is active.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTourStore } from '@/stores/useTourStore';
 import { getTourEngine } from '@/engine/tour/TourEngine';
+
+interface SpotlightRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+function getSpotlightRect(selector: string): SpotlightRect | null {
+  const el = document.querySelector(selector);
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  const pad = 6;
+  return {
+    top: rect.top - pad,
+    left: rect.left - pad,
+    width: rect.width + pad * 2,
+    height: rect.height + pad * 2,
+  };
+}
+
+const SpotlightOverlay: React.FC<{ selector: string }> = ({ selector }) => {
+  const [rect, setRect] = useState<SpotlightRect | null>(null);
+
+  useEffect(() => {
+    // Initial measurement + periodic update (handles layout shifts)
+    const measure = () => setRect(getSpotlightRect(selector));
+    measure();
+    const timer = setInterval(measure, 500);
+    return () => clearInterval(timer);
+  }, [selector]);
+
+  if (!rect) return null;
+
+  // SVG mask: full-screen dark overlay with a cutout for the spotlight
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99998,
+        pointerEvents: 'none',
+        transition: 'opacity 0.4s',
+      }}
+    >
+      <svg width="100%" height="100%" style={{ display: 'block' }}>
+        <defs>
+          <mask id="tour-spotlight-mask">
+            <rect width="100%" height="100%" fill="white" />
+            <rect
+              x={rect.left}
+              y={rect.top}
+              width={rect.width}
+              height={rect.height}
+              rx={8}
+              fill="black"
+            />
+          </mask>
+        </defs>
+        <rect
+          width="100%"
+          height="100%"
+          fill="rgba(0, 0, 0, 0.55)"
+          mask="url(#tour-spotlight-mask)"
+        />
+        {/* Glow border around spotlight */}
+        <rect
+          x={rect.left}
+          y={rect.top}
+          width={rect.width}
+          height={rect.height}
+          rx={8}
+          fill="none"
+          stroke="rgba(96, 165, 250, 0.5)"
+          strokeWidth={2}
+        />
+      </svg>
+    </div>
+  );
+};
 
 export const TourOverlay: React.FC = () => {
   const isActive = useTourStore((s) => s.isActive);
@@ -18,6 +99,7 @@ export const TourOverlay: React.FC = () => {
   const isSpeaking = useTourStore((s) => s.isSpeaking);
   const isPreRendering = useTourStore((s) => s.isPreRendering);
   const preRenderProgress = useTourStore((s) => s.preRenderProgress);
+  const spotlightSelector = useTourStore((s) => s.spotlightSelector);
 
   const handlePauseResume = useCallback(() => {
     const engine = getTourEngine();
@@ -36,16 +118,21 @@ export const TourOverlay: React.FC = () => {
   if (!isActive) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 99999,
-        pointerEvents: 'auto',
-      }}
-    >
+    <>
+      {/* Spotlight overlay (behind subtitle bar) */}
+      {spotlightSelector && !isPreRendering && (
+        <SpotlightOverlay selector={spotlightSelector} />
+      )}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 99999,
+          pointerEvents: 'auto',
+        }}
+      >
       {/* Subtitle area */}
       <div
         style={{
@@ -162,7 +249,8 @@ export const TourOverlay: React.FC = () => {
           </TourButton>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
