@@ -21,8 +21,8 @@ export type QuantizeMode = 'off' | 'beat' | 'bar';
 export type EQBand = 'low' | 'mid' | 'high';
 
 interface ActiveSweep {
-  /** RAF / timer id */
-  id: number;
+  /** Timer id (setInterval) */
+  id: ReturnType<typeof setInterval> | number;
   /** Set to true when cancelled */
   cancelled: boolean;
 }
@@ -35,6 +35,43 @@ interface ActiveSweep {
 // to 'beat' or 'off' via the Q button on the deck transport.
 let quantizeMode: QuantizeMode = 'bar';
 const activeSweeps = new Map<string, ActiveSweep>();
+
+/**
+ * Start a timer-based animation loop that runs even when the page/element is
+ * hidden. requestAnimationFrame is throttled by browsers for invisible
+ * elements — catastrophic for auto DJ transitions that must complete
+ * regardless of which view is active.
+ */
+function startSweepTimer(
+  sweep: ActiveSweep,
+  key: string,
+  durationMs: number,
+  onTick: (progress: number, eased: number) => void,
+  onDone?: () => void,
+): void {
+  const TICK_MS = 16; // ~60fps
+  const sweepStart = performance.now();
+
+  sweep.id = setInterval(() => {
+    if (sweep.cancelled) {
+      clearInterval(sweep.id as ReturnType<typeof setInterval>);
+      return;
+    }
+    const elapsed = performance.now() - sweepStart;
+    const progress = Math.min(1, elapsed / durationMs);
+    const eased = progress < 0.5
+      ? 2 * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    onTick(progress, eased);
+
+    if (progress >= 1) {
+      clearInterval(sweep.id as ReturnType<typeof setInterval>);
+      activeSweeps.delete(key);
+      onDone?.();
+    }
+  }, TICK_MS);
+}
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -223,7 +260,7 @@ export function instantEQKill(deckId: DeckId, band: EQBand, enabled: boolean): v
 
 /**
  * Sweep the filter from its current position to `targetPosition` over
- * `beats` beats. Uses requestAnimationFrame for smooth interpolation.
+ * `beats` beats. Uses setInterval for reliable operation even when hidden.
  *
  * @param deckId   Deck to sweep on
  * @param target   Target filter position: -1 (HPF) → 0 (off) → +1 (LPF)
@@ -255,56 +292,40 @@ export function filterSweep(
 
   const clampedTarget = Math.max(-1, Math.min(1, target));
 
-  // Start the sweep (optionally quantized to next beat)
-  const cancelSchedule = scheduleQuantized(deckId, () => {
-    // Read actual start position at the moment the sweep begins
-    // For now we just begin from current state
-    let actualStart = 0;
+  // Apply an immediate initial offset so even short taps are audible
+  const INITIAL_JUMP = 0.15;
+  let actualStart = 0;
+  try {
+    actualStart = getTrackedFilterPosition(deckId);
+  } catch {
+    actualStart = 0;
+  }
+  const initialPos = actualStart + (clampedTarget - actualStart) * INITIAL_JUMP;
+  try {
+    getDJEngine().getDeck(deckId).setFilterPosition(initialPos);
+    setTrackedFilterPosition(deckId, initialPos);
+  } catch { /* engine not ready */ }
+  useDJStore.getState().setDeckFilter(deckId, initialPos);
+
+  // Fire sweep immediately — filter sweeps are continuous animations
+  // that don't benefit from beat-quantization (the ramp IS the timing)
+  startSweepTimer(sweep, key, durationMs, (progress, _eased) => {
+    const jumpBlend = Math.max(INITIAL_JUMP, progress < 0.5
+      ? 2 * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 2) / 2);
+    const current = actualStart + (clampedTarget - actualStart) * jumpBlend;
+
     try {
-      // We'll snapshot approximately from the engine
-      // DeckEngine doesn't expose getFilterPosition, so we track in this module
-      actualStart = getTrackedFilterPosition(deckId);
-    } catch {
-      actualStart = 0;
-    }
-
-    const sweepStartTime = performance.now();
-
-    function animate() {
-      if (sweep.cancelled) return;
-
-      const elapsed = performance.now() - sweepStartTime;
-      const progress = Math.min(1, elapsed / durationMs);
-
-      // Ease-in-out for smooth sweep
-      const eased = progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-      const current = actualStart + (clampedTarget - actualStart) * eased;
-
-      try {
-        getDJEngine().getDeck(deckId).setFilterPosition(current);
-        setTrackedFilterPosition(deckId, current);
-      } catch { /* engine not ready */ }
-      useDJStore.getState().setDeckFilter(deckId, current);
-
-      if (progress < 1) {
-        sweep.id = requestAnimationFrame(animate);
-      } else {
-        activeSweeps.delete(key);
-        onDone?.();
-      }
-    }
-
-    sweep.id = requestAnimationFrame(animate);
-  });
+      getDJEngine().getDeck(deckId).setFilterPosition(current);
+      setTrackedFilterPosition(deckId, current);
+    } catch { /* engine not ready */ }
+    useDJStore.getState().setDeckFilter(deckId, current);
+  }, onDone);
 
   return () => {
     sweep.cancelled = true;
-    cancelAnimationFrame(sweep.id);
+    clearInterval(sweep.id as ReturnType<typeof setInterval>);
     activeSweeps.delete(key);
-    cancelSchedule();
   };
 }
 
@@ -348,41 +369,20 @@ export function crossfaderSweep(
   const clampedTarget = Math.max(0, Math.min(1, target));
 
   const cancelSchedule = scheduleQuantized(referenceDeckId, () => {
-    // Read from store (single source of truth) — engine value can be stale
     const startVal = useDJStore.getState().crossfaderPosition;
 
-    const sweepStart = performance.now();
-
-    function animate() {
-      if (sweep.cancelled) return;
-
-      const elapsed = performance.now() - sweepStart;
-      const progress = Math.min(1, elapsed / durationMs);
-      const eased = progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
+    startSweepTimer(sweep, key, durationMs, (_progress, eased) => {
       const current = startVal + (clampedTarget - startVal) * eased;
-
       try {
         getDJEngine().setCrossfader(current);
       } catch { /* engine not ready */ }
       useDJStore.getState().setCrossfader(current);
-
-      if (progress < 1) {
-        sweep.id = requestAnimationFrame(animate);
-      } else {
-        activeSweeps.delete(key);
-        onDone?.();
-      }
-    }
-
-    sweep.id = requestAnimationFrame(animate);
+    }, onDone);
   });
 
   return () => {
     sweep.cancelled = true;
-    cancelAnimationFrame(sweep.id);
+    clearInterval(sweep.id as ReturnType<typeof setInterval>);
     activeSweeps.delete(key);
     cancelSchedule();
   };
@@ -711,50 +711,34 @@ export function echoOut(
       startVol = getDJEngine().getDeck(deckId).getVolume();
     } catch { /* fallback */ }
 
-    const sweepStart = performance.now();
-
-    function animate() {
-      if (sweep.cancelled) return;
-
-      const elapsed = performance.now() - sweepStart;
-      const progress = Math.min(1, elapsed / durationMs);
-
+    startSweepTimer(sweep, key, durationMs, (progress) => {
       // Exponential fade for natural-sounding decay
       const volume = startVol * Math.pow(1 - progress, 2);
-
       try {
         getDJEngine().getDeck(deckId).setVolume(volume);
       } catch { /* engine not ready */ }
       useDJStore.getState().setDeckVolume(deckId, volume);
-
-      if (progress < 1) {
-        sweep.id = requestAnimationFrame(animate);
-      } else {
-        // Fade complete — stop deck at zero volume, store the volume to restore on next play
-        try {
-          const engine = getDJEngine();
-          const deck = engine.getDeck(deckId);
-          deck.setVolume(0);
-          if (deck.playbackMode === 'audio') {
-            deck.audioPlayer.stop();
-          } else {
-            deck.pause();
-          }
-          useDJStore.getState().setDeckPlaying(deckId, false);
-          // Store pending volume restore — picked up by DeckEngine.play()
-          useDJStore.getState().setDeckVolume(deckId, startVol);
-        } catch { /* engine not ready */ }
-        activeSweeps.delete(key);
-        onDone?.();
-      }
-    }
-
-    sweep.id = requestAnimationFrame(animate);
+    }, () => {
+      // Fade complete — stop deck at zero volume
+      try {
+        const engine = getDJEngine();
+        const deck = engine.getDeck(deckId);
+        deck.setVolume(0);
+        if (deck.playbackMode === 'audio') {
+          deck.audioPlayer.stop();
+        } else {
+          deck.pause();
+        }
+        useDJStore.getState().setDeckPlaying(deckId, false);
+        useDJStore.getState().setDeckVolume(deckId, startVol);
+      } catch { /* engine not ready */ }
+      onDone?.();
+    });
   });
 
   return () => {
     sweep.cancelled = true;
-    cancelAnimationFrame(sweep.id);
+    clearInterval(sweep.id as ReturnType<typeof setInterval>);
     activeSweeps.delete(key);
     cancelSchedule();
     // Restore volume to pre-echo level
@@ -772,7 +756,7 @@ export function echoOut(
 export function cancelAllAutomation(): void {
   activeSweeps.forEach((sweep) => {
     sweep.cancelled = true;
-    cancelAnimationFrame(sweep.id);
+    clearInterval(sweep.id as ReturnType<typeof setInterval>);
   });
   activeSweeps.clear();
 }
@@ -783,7 +767,7 @@ function cancelSweep(key: string): void {
   const existing = activeSweeps.get(key);
   if (existing) {
     existing.cancelled = true;
-    cancelAnimationFrame(existing.id);
+    clearInterval(existing.id as ReturnType<typeof setInterval>);
     activeSweeps.delete(key);
   }
 }

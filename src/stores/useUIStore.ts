@@ -566,12 +566,16 @@ export const useUIStore = create<UIStore>()(
                 }
               } catch { /* not ready */ }
             }, 0);
-          } else if (prev === 'dj' && view !== 'dj' && view !== 'vj') {
+          } else if (prev === 'dj' && view !== 'dj' && view !== 'vj' && view !== 'drumpad') {
             setTimeout(() => {
               try {
                 const { useDJStore } = require('@stores/useDJStore');
-                const { getDJEngineIfActive } = require('@engine/dj/DJEngine');
                 const djStore = useDJStore.getState();
+                // NEVER stop decks if auto DJ is running — catastrophic at a gig
+                const autoDJActive = djStore.autoDJEnabled && djStore.autoDJStatus !== 'idle';
+                if (autoDJActive) return;
+
+                const { getDJEngineIfActive } = require('@engine/dj/DJEngine');
                 const djEngine = getDJEngineIfActive();
                 for (const deckId of ['A', 'B', 'C'] as const) {
                   if (djStore.decks[deckId].isPlaying) {

@@ -364,8 +364,27 @@ const COSMIC_RAY: InstrumentPreset['config'] = {
 };
 
 // =============================================================================
-// SIRENS & ALARMS (4)
+// SIRENS & ALARMS (5)
 // =============================================================================
+
+const DUB_SIREN: InstrumentPreset['config'] = {
+  type: 'synth',
+  name: 'Dub Siren',
+  synthType: 'DubSiren',
+  dubSiren: {
+    ...DEFAULT_DUB_SIREN,
+    oscillator: { type: 'sine', frequency: 440 },
+    lfo: { enabled: true, type: 'square', rate: 2, depth: 100 },
+    delay: { enabled: true, time: 0.3, feedback: 0.4, wet: 0.3 },
+    filter: { enabled: true, type: 'lowpass', frequency: 2000, rolloff: -12 },
+    reverb: { enabled: true, decay: 2, wet: 0.25 },
+  },
+  effects: [
+    { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.6, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.6 } },
+  ],
+  volume: -8,
+  pan: 0,
+};
 
 const RAVE_SIREN: InstrumentPreset['config'] = {
   type: 'synth',
@@ -598,6 +617,7 @@ export const DJ_ONE_SHOT_PRESETS: InstrumentPreset['config'][] = [
   PEW_PEW,
   COSMIC_RAY,
   // Sirens & Alarms
+  DUB_SIREN,
   RAVE_SIREN,
   AMBULANCE,
   NUCLEAR_ALARM,

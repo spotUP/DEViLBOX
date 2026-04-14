@@ -77,7 +77,21 @@ const BEAT_JUMPS: Record<string, number> = {
   'jump-fwd-16': 16,
 };
 
-// ── Component ────────────────────────────────────────────────────────────────
+// Color map for pad states — static values so Tailwind purging isn't needed
+const PAD_COLORS: Record<string, { bg: string; text: string; border: string; glow: string }> = {
+  violet:  { bg: 'rgba(139,92,246,0.45)',  text: '#c4b5fd', border: 'rgba(139,92,246,0.6)',  glow: 'rgba(139,92,246,0.5)' },
+  blue:    { bg: 'rgba(59,130,246,0.45)',   text: '#93c5fd', border: 'rgba(59,130,246,0.6)',   glow: 'rgba(59,130,246,0.5)' },
+  green:   { bg: 'rgba(34,197,94,0.45)',    text: '#86efac', border: 'rgba(34,197,94,0.6)',    glow: 'rgba(34,197,94,0.5)' },
+  amber:   { bg: 'rgba(245,158,11,0.45)',   text: '#fcd34d', border: 'rgba(245,158,11,0.6)',   glow: 'rgba(245,158,11,0.5)' },
+  red:     { bg: 'rgba(239,68,68,0.50)',    text: '#fca5a5', border: 'rgba(239,68,68,0.6)',    glow: 'rgba(239,68,68,0.5)' },
+  orange:  { bg: 'rgba(249,115,22,0.45)',   text: '#fdba74', border: 'rgba(249,115,22,0.6)',   glow: 'rgba(249,115,22,0.5)' },
+  cyan:    { bg: 'rgba(6,182,212,0.45)',    text: '#67e8f9', border: 'rgba(6,182,212,0.6)',    glow: 'rgba(6,182,212,0.5)' },
+  rose:    { bg: 'rgba(244,63,94,0.45)',    text: '#fda4af', border: 'rgba(244,63,94,0.6)',    glow: 'rgba(244,63,94,0.5)' },
+  gray:    { bg: 'rgba(156,163,175,0.35)',  text: '#d1d5db', border: 'rgba(156,163,175,0.5)',  glow: 'rgba(156,163,175,0.4)' },
+  indigo:  { bg: 'rgba(99,102,241,0.45)',   text: '#a5b4fc', border: 'rgba(99,102,241,0.6)',   glow: 'rgba(99,102,241,0.5)' },
+  sky:     { bg: 'rgba(14,165,233,0.45)',   text: '#7dd3fc', border: 'rgba(14,165,233,0.6)',   glow: 'rgba(14,165,233,0.5)' },
+  teal:    { bg: 'rgba(20,184,166,0.45)',   text: '#5eead4', border: 'rgba(20,184,166,0.6)',   glow: 'rgba(20,184,166,0.5)' },
+};
 
 export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   const [page, setPage] = useState<PadPage>('fx');
@@ -262,28 +276,48 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       <div className="grid grid-cols-4 gap-1">
         {pads.map((pad) => {
           const active = isActive(pad.id);
+          const pressed = activePads.has(pad.id);
+          const colorKey = active ? pad.activeColor : pad.color;
+          const colors = PAD_COLORS[colorKey] || PAD_COLORS.gray;
           return (
             <button
               key={pad.id}
               onPointerDown={() => handlePadDown(pad)}
               onPointerUp={() => handlePadUp(pad)}
               onPointerLeave={() => pad.mode === 'momentary' && handlePadUp(pad)}
-              className={`
-                flex flex-col items-center justify-center
-                h-9 rounded-md text-[8px] font-bold leading-tight
-                select-none touch-none
-                transition-all duration-75
-                active:scale-95
-                ${
-                  active
-                    ? `bg-${pad.activeColor}-600/40 text-${pad.activeColor}-200 border border-${pad.activeColor}-500/50`
-                    : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:bg-dark-bgHover hover:text-text-secondary'
-                }
-              `}
+              className="relative flex flex-col items-center justify-center rounded-md select-none touch-none overflow-hidden transform-gpu will-change-transform"
+              style={{
+                height: 40,
+                transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
+                transform: pressed ? 'scale(0.92)' : 'scale(1)',
+                backgroundColor: active ? colors.bg : 'var(--color-dark-bgTertiary)',
+                color: active ? colors.text : 'var(--color-text-muted)',
+                border: `1px solid ${active ? colors.border : 'var(--color-dark-border)'}`,
+                boxShadow: active ? `0 0 12px ${colors.glow}, inset 0 0 8px ${colors.glow}` : 'none',
+              }}
               title={`${pad.label} ${pad.sublabel ?? ''} (${pad.mode})`}
             >
-              <span>{pad.label}</span>
-              {pad.sublabel && <span className="text-[7px] opacity-60">{pad.sublabel}</span>}
+              {/* Active glow overlay */}
+              {active && (
+                <div
+                  className="absolute inset-0 rounded-md pointer-events-none"
+                  style={{
+                    background: `radial-gradient(circle at center, ${colors.glow} 0%, transparent 70%)`,
+                    opacity: 0.4,
+                  }}
+                />
+              )}
+              {/* Press flash */}
+              {pressed && (
+                <div
+                  className="absolute inset-0 rounded-md pointer-events-none"
+                  style={{
+                    background: `radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 60%)`,
+                  }}
+                />
+              )}
+              <span className="relative text-[9px] font-bold">{pad.label}</span>
+              {pad.sublabel && <span className="relative text-[7px] opacity-60">{pad.sublabel}</span>}
             </button>
           );
         })}

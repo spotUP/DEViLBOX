@@ -43,6 +43,7 @@ export interface PixiListAction {
 export interface PixiListItem {
   id: string;
   label: string;
+  labelColor?: number;
   sublabel?: string;
   /** Hex color for a small category dot rendered before the label */
   dotColor?: number;
@@ -64,6 +65,7 @@ interface PixiListProps {
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   onDoubleClick?: (id: string) => void;
+  onRightClick?: (id: string, e: React.MouseEvent) => void;
   /** Callback when a star is clicked. rating=1..5. */
   onRate?: (id: string, rating: number) => void;
   /** Number of buffer items above/below viewport */
@@ -79,6 +81,7 @@ export const PixiList: React.FC<PixiListProps> = ({
   selectedId,
   onSelect,
   onDoubleClick,
+  onRightClick,
   onRate,
   buffer = 3,
   layout: layoutProp,
@@ -113,6 +116,23 @@ export const PixiList: React.FC<PixiListProps> = ({
       lastClickRef.current = { id, time: now };
     }
   }, [onSelect, onDoubleClick]);
+
+  const handleItemPointerDown = useCallback((id: string, e: any) => {
+    console.log('[PixiList] PointerDown:', { id, button: e.button, globalX: e.globalX, globalY: e.globalY });
+    // Right-click (button 2) triggers context menu
+    if (e.button === 2) {
+      // Convert Pixi event to React MouseEvent-like object
+      const fakeEvent = {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        clientX: e.globalX || 0,
+        clientY: e.globalY || 0,
+      } as React.MouseEvent;
+      console.log('[PixiList] Right-click detected, calling onRightClick with:', fakeEvent);
+      onRightClick?.(id, fakeEvent);
+      return;
+    }
+  }, [onRightClick]);
 
   // Scrollbar geometry
   const trackHeight = height - 4;
@@ -225,6 +245,7 @@ export const PixiList: React.FC<PixiListProps> = ({
             cursor="pointer"
             hitArea={new Rectangle(0, 0, width - 10, itemHeight)}
             onClick={() => handleItemClick(item.id)}
+            onPointerDown={(e: any) => handleItemPointerDown(item.id, e)}
             layout={{
               position: 'absolute',
               left: 0,
@@ -265,7 +286,7 @@ export const PixiList: React.FC<PixiListProps> = ({
                 fontSize: 14,
                 fill: 0xffffff,
               }}
-              tint={isSelected ? theme.accent.color : theme.text.color}
+              tint={item.labelColor ?? (isSelected ? theme.accent.color : theme.text.color)}
               layout={{ flex: 1 }}
             />
 

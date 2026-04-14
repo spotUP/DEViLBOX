@@ -100,29 +100,29 @@ export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
 
 export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
   // Horns x2
-  osPad('Air Horn',      'Horns',       DJ_ONESHOT,     0),
-  osPad('Reggae Horn',   'Horns',       DJ_ONESHOT,     1),
+  osPad('Air Horn',      'Horns',       DJ_ONESHOT,     0),   // DJ_AIR_HORN
+  osPad('Reggae Horn',   'Horns',       DJ_ONESHOT,     1),   // REGGAETON_HORN
   // Sirens x2
-  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  20),
-  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  21),
+  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  20),  // DUB_SIREN
+  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  21),  // RAVE_SIREN
   // Impacts x2
-  osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),
-  osPad('Boom',          'Impacts',     DJ_MODULATION,  12),
+  osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),  // SUB_DROP
+  osPad('Boom',          'Impacts',     DJ_MODULATION,  12),  // BOOM
   // Transitions x2
-  osPad('Rewind',        'Transitions', DJ_TAPE,        29),
-  osPad('Tape Stop',     'Transitions', DJ_TAPE,        30),
+  osPad('Rewind',        'Transitions', DJ_TAPE,        31),  // REWIND
+  osPad('Tape Stop',     'Transitions', DJ_TAPE,        32),  // TAPE_STOP
   // Risers x4
-  osPad('Noise Riser',   'Risers',      DJ_FILTER,      6),
-  osPad('Freq Sweep',    'Risers',      DJ_FILTER,      8),
-  osPad('Dark Riser',    'Risers',      DJ_FILTER,      9),
-  osPad('Euphoria',      'Risers',      DJ_FILTER,      10),
+  osPad('Noise Riser',   'Risers',      DJ_FILTER,      6),   // WHITE_NOISE_RISER
+  osPad('Freq Sweep',    'Risers',      DJ_FILTER,      8),   // FREQUENCY_SWEEP
+  osPad('Dark Riser',    'Risers',      DJ_FILTER,      9),   // DARK_RISER
+  osPad('Euphoria',      'Risers',      DJ_FILTER,      10),  // EUPHORIA_RISER
   // Lasers x2
-  osPad('DJ Laser',      'Lasers',      DJ_SCRATCH,     17),
-  osPad('Glitch Zap',    'Lasers',      DJ_SCRATCH,     18),
+  osPad('DJ Laser',      'Lasers',      DJ_SCRATCH,     17),  // DJ_LASER
+  osPad('Glitch Zap',    'Lasers',      DJ_SCRATCH,     18),  // GLITCH_ZAP
   // Noise x1
-  osPad('Vinyl Scratch', 'Noise',       DJ_DELAY,       25),
+  osPad('Vinyl Scratch', 'Noise',       DJ_DELAY,       26),  // VINYL_SCRATCH
   // Transitions x1
-  osPad('Echo Washout',  'Transitions', DJ_TAPE,        28),
+  osPad('Echo Washout',  'Transitions', DJ_TAPE,        30),  // ECHO_WASHOUT
 ];
 
 // ─── Default Scratch Pads (16) ───────────────────────────────────────────────
