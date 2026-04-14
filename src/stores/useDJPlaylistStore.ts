@@ -600,6 +600,8 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
               if (!t.id) t.id = generateTrackId();
             }
           }
+          // Async migration: resolve SID tracks missing hvsc: prefix
+          repairSIDTracks(state.playlists);
         }
       },
     },
@@ -616,6 +618,91 @@ function pushUndo(state: DJPlaylistState): void {
   state._redoStack = [];
   state.canUndo = true;
   state.canRedo = false;
+}
+
+// ── Repair SID tracks missing hvsc: prefix ───────────────────────────────────
+
+const SID_PLAYLIST_KEYWORDS = ['sid', 'c64', 'commodore', 'dual sid', '6581', '8580'];
+
+function isSIDPlaylist(name: string): boolean {
+  const lower = name.toLowerCase();
+  return SID_PLAYLIST_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
+  const toFix: { playlistId: string; index: number; track: PlaylistTrack }[] = [];
+
+  for (const pl of playlists) {
+    const plIsSID = isSIDPlaylist(pl.name);
+    for (let i = 0; i < pl.tracks.length; i++) {
+      const t = pl.tracks[i];
+      if (t.fileName.startsWith('hvsc:') || t.fileName.startsWith('modland:')) continue;
+
+      // Detect SID by: playlist name keywords, format field, or .sid extension
+      const isSID = plIsSID ||
+        t.format === 'SID' ||
+        t.fileName.toLowerCase().endsWith('.sid') ||
+        t.trackName?.toLowerCase().endsWith('.sid');
+      if (isSID) toFix.push({ playlistId: pl.id, index: i, track: t });
+    }
+  }
+  if (toFix.length === 0) return;
+
+  console.log(`[DJPlaylistStore] Repairing ${toFix.length} SID tracks missing hvsc: prefix...`);
+
+  try {
+    const { searchHVSC } = await import('@/lib/hvscApi');
+    let fixed = 0;
+
+    for (const { playlistId, index, track } of toFix) {
+      try {
+        // Extract bare search term
+        const bare = (track.trackName || track.fileName)
+          .replace(/\.sid$/i, '')
+          .replace(/[_-]/g, ' ')
+          .trim();
+        if (!bare) continue;
+
+        // Search HVSC — try full term, then first word
+        let sidResults = (await searchHVSC(bare, 20))
+          .filter((r: { isDirectory: boolean; name: string }) => !r.isDirectory && r.name.toLowerCase().endsWith('.sid'));
+
+        if (sidResults.length === 0) {
+          const firstWord = bare.split(/\s+/)[0];
+          if (firstWord && firstWord.length >= 3) {
+            await new Promise(r => setTimeout(r, 200));
+            sidResults = (await searchHVSC(firstWord, 20))
+              .filter((r: { isDirectory: boolean; name: string }) => !r.isDirectory && r.name.toLowerCase().endsWith('.sid'));
+          }
+        }
+
+        // Prefer exact filename match
+        const lowerBare = bare.toLowerCase();
+        const exactMatch = sidResults.find((r: { name: string }) =>
+          r.name.toLowerCase().replace(/\.sid$/i, '') === lowerBare
+        );
+        const match = exactMatch || sidResults[0];
+
+        if (match) {
+          useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, {
+            fileName: `hvsc:${match.path}`,
+            trackName: track.trackName || match.name.replace(/\.sid$/i, ''),
+          });
+          fixed++;
+          console.log(`[DJPlaylistStore] Fixed: "${bare}" → hvsc:${match.path}`);
+        } else {
+          console.warn(`[DJPlaylistStore] No HVSC match for: "${bare}"`);
+        }
+        await new Promise(r => setTimeout(r, 200));
+      } catch (err) {
+        console.warn(`[DJPlaylistStore] Failed to repair "${track.trackName}":`, err);
+      }
+    }
+
+    console.log(`[DJPlaylistStore] SID repair complete: ${fixed}/${toFix.length} fixed`);
+  } catch (err) {
+    console.warn('[DJPlaylistStore] SID repair skipped (server unavailable):', err);
+  }
 }
 
 // ── Auto-import bundled playlists on first launch ────────────────────────────
