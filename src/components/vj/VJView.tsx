@@ -179,18 +179,23 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       return () => { cancelled = true; cancelAnimationFrame(initRaf); };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Render loop — only runs when visible (stops rAF entirely when hidden)
+    // Render loop — runs continuously once ready; skips draw when not visible.
+    // Only depends on `ready` (not `visible`) to avoid tearing down/recreating
+    // the rAF chain during crossfade visibility toggles.
     useEffect(() => {
-      if (!ready || !visible) return;
+      if (!ready) return;
+      let cancelled = false;
       const render = () => {
-        if (!visibleRef.current) return; // stop loop if visibility changed mid-frame
-        visualizerRef.current?.render();
-        audioDataBusRef.current?.update();
+        if (cancelled) return;
+        if (visibleRef.current) {
+          audioDataBusRef.current?.update();
+          visualizerRef.current?.render();
+        }
         rafRef.current = requestAnimationFrame(render);
       };
       rafRef.current = requestAnimationFrame(render);
-      return () => cancelAnimationFrame(rafRef.current);
-    }, [ready, visible]);
+      return () => { cancelled = true; cancelAnimationFrame(rafRef.current); };
+    }, [ready]);
 
     // Handle resize
     useEffect(() => {
@@ -510,6 +515,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const prevLayerRef = useRef<VJLayer>('milkdrop');
+  const switchToLayerRef = useRef<(target: VJLayer, loadPreset: () => void) => void>(undefined);
 
   // Which layers are actively rendering — both on during crossfade, then old one stops.
   // This avoids running two WebGL pipelines at 60fps permanently.
@@ -547,9 +553,12 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         setRenderMilkdrop(effectiveTarget === 'milkdrop');
         setRenderProjectm(effectiveTarget === 'projectm');
         crossfadeTimerRef.current = undefined;
-      }, 900); // 700ms CSS transition + 200ms buffer
+      }, 750); // 700ms CSS transition + 50ms safety margin
     }, 100); // ~6 frames for new preset to render
   }, []);
+
+  // Keep ref in sync so auto-advance timer always has current switchToLayer
+  useEffect(() => { switchToLayerRef.current = switchToLayer; }, [switchToLayer]);
 
   // ── DJ deck scratch via scroll ──────────────────────────────────────────
   const scratchPhysicsRef = useRef<TurntablePhysics | null>(null);
