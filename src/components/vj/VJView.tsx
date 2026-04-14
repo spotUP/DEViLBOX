@@ -338,8 +338,8 @@ const VJPatternOverlayWrapper: React.FC = () => {
   if (deckA.isPlaying) activeSources.push('deckA');
   if (deckB.isPlaying) activeSources.push('deckB');
 
-  // If nothing is playing, show tracker overlay as idle display (original behavior)
-  if (activeSources.length === 0) activeSources.push('tracker');
+  // Only show overlay when something with real pattern data is playing
+  if (activeSources.length === 0) return null;
 
   return <VJPatternOverlay sources={activeSources} crossfader={crossfader} />;
 };

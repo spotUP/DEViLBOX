@@ -126,13 +126,26 @@ interface PatternSnapshot {
   label?: string;
 }
 
+/** Check if a pattern contains any real note/instrument/effect data */
+function hasRealData(pattern: Pattern): boolean {
+  for (const ch of pattern.channels) {
+    for (const row of ch.rows) {
+      if ((row.note && row.note > 0) || (row.instrument && row.instrument > 0) ||
+          (row.effTyp && row.effTyp > 0) || (row.eff && row.eff > 0)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** Extract current pattern data from the given source. Returns null if no data available. */
 function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
   if (source === 'tracker') {
     const { patterns, currentPatternIndex } = useTrackerStore.getState();
     const { currentRow, isPlaying } = useTransportStore.getState();
     const pattern = patterns[currentPatternIndex];
-    if (!pattern) return null;
+    if (!pattern || !hasRealData(pattern)) return null;
     return { pattern, currentRow, isPlaying };
   }
 
@@ -153,7 +166,7 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
   // Use store's songPos/pattPos — kept current by DJDeck polling loop
   const patIdx = song.songPositions[deckState.songPos] ?? 0;
   const pattern = song.patterns[patIdx];
-  if (!pattern) return null;
+  if (!pattern || !hasRealData(pattern)) return null;
 
   return {
     pattern,
@@ -230,36 +243,11 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
         const snap = getPatternSnapshot(src);
         if (snap) snapshotBuf.push({ snapshot: snap, source: src });
       }
-      // Fallback: if nothing playing, try tracker for idle display
+      // No active sources with data — hide overlay (clear canvas)
       if (snapshotBuf.length === 0) {
-        const fallback = getPatternSnapshot('tracker');
-        if (!fallback) {
-          // No pattern data at all — draw oscilloscope waveform instead
-          bus.update();
-          const wf = bus.getFrame().waveform;
-          const wfW = ROW_NUM_W + 4 * CELL_W;
-          if (canvas.width !== wfW) canvas.width = wfW;
-          ctx.clearRect(0, 0, wfW, CANVAS_H);
-          const midY = CANVAS_H / 2;
-          const baseHue = (bandHue(bus.getFrame()) + anim.hueShift) % 360;
-          // Waveform line
-          ctx.strokeStyle = hsl(baseHue, 80, 70, 0.9);
-          ctx.lineWidth = 2;
-          ctx.shadowColor = hsl(baseHue, 90, 65, 0.7);
-          ctx.shadowBlur = 6 + bus.getFrame().rms * 12;
-          ctx.beginPath();
-          const wfStep = wf.length / wfW;
-          for (let x = 0; x < wfW; x++) {
-            const v = wf[Math.floor(x * wfStep)] ?? 0;
-            const y = midY + v * midY * 0.85;
-            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-          rafRef.current = requestAnimationFrame(render);
-          return;
-        }
-        snapshotBuf.push({ snapshot: fallback, source: 'tracker' });
+        ctx.clearRect(0, 0, canvas.width, CANVAS_H);
+        rafRef.current = requestAnimationFrame(render);
+        return;
       }
       const snapshots = snapshotBuf;
 

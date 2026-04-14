@@ -99,10 +99,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
   }, []);
 
   // A pad is "loaded" if it has any sound source assigned
-  // In non-samples modes, a mode mapping counts as loaded
-  const isLoaded = padMode !== 'samples'
-    ? !!modeMapping
-    : !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
+  // First check if pad has actual data, fallback to mode mapping
+  const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
+  const isLoaded = hasActualData || (padMode !== 'samples' && !!modeMapping);
 
   const isFxActive = padMode === 'djfx' && activeFxPads.has(pad.id);
 
@@ -219,14 +218,14 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   // Determine pad style based on state
   const padStyle = useMemo(() => {
-    // Mode mapping color takes priority in non-samples modes
-    if (modeMapping && padMode !== 'samples') {
-      return { className: 'bg-dark-border', textColor: ensureContrast(modeMapping.color) };
+    // If pad has actual data, use its custom color
+    if (hasActualData && pad.color) {
+      return { className: 'bg-dark-border', textColor: ensureContrast(pad.color) };
     }
 
-    // Custom color takes priority
-    if (pad.color && isLoaded) {
-      return { className: 'bg-dark-border', textColor: ensureContrast(pad.color) };
+    // Fallback to mode mapping color in non-samples modes
+    if (modeMapping && padMode !== 'samples' && !hasActualData) {
+      return { className: 'bg-dark-border', textColor: ensureContrast(modeMapping.color) };
     }
 
     if (!isLoaded) {
@@ -240,7 +239,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
     // Sample pads get emerald text
     return { className: 'bg-dark-border', textColor: '#34d399' }; // emerald-400 - already bright
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, modeMapping, padMode, ensureContrast]);
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, modeMapping, padMode, hasActualData, ensureContrast]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
@@ -298,7 +297,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
             textShadow: padStyle.textColor ? '0 1px 2px rgba(0,0,0,0.8)' : undefined
           }}
         >
-          {modeMapping && padMode !== 'samples' ? modeMapping.label : pad.name}
+          {/* Show actual pad name if pad has data, otherwise show mode mapping label */}
+          {hasActualData ? pad.name : (modeMapping && padMode !== 'samples' ? modeMapping.label : pad.name)}
         </span>
       </div>
 
