@@ -15,7 +15,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
-import { AudioDataBus } from '@engine/vj/AudioDataBus';
 import { TurntablePhysics } from '@engine/turntable/TurntablePhysics';
 import { getDJEngine } from '@engine/dj/DJEngine';
 import * as DJActions from '@engine/dj/DJActions';
@@ -101,7 +100,6 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
   ({ onReady, onPresetChange, visible = true }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const visualizerRef = useRef<any>(null);
-    const audioDataBusRef = useRef<AudioDataBus | null>(null);
     const rafRef = useRef<number>(0);
     const presetNamesRef = useRef<string[]>([]);
     const presetMapRef = useRef<Record<string, object>>({});
@@ -169,11 +167,6 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
           setReady(true);
           onReady?.(presetNames.length);
           onPresetChange?.(startIdx, presetNames[startIdx]);
-
-          // Enable audio analysis
-          const bus = new AudioDataBus();
-          bus.enable();
-          audioDataBusRef.current = bus;
         } catch (err) {
           console.error('[VJ] butterchurn load failed:', err);
           if (!cancelled) setLoadFailed(true);
@@ -192,7 +185,6 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       const render = () => {
         if (cancelled) return;
         if (visibleRef.current) {
-          audioDataBusRef.current?.update();
           visualizerRef.current?.render();
         }
         rafRef.current = requestAnimationFrame(render);
@@ -221,8 +213,10 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
     // Cleanup on unmount
     useEffect(() => {
       return () => {
-        audioDataBusRef.current?.disable();
         cancelAnimationFrame(rafRef.current);
+        // Disconnect butterchurn audio and free WebGL resources
+        try { visualizerRef.current?.disconnectAudio?.(); } catch { /* */ }
+        visualizerRef.current = null;
       };
     }, []);
 
@@ -532,6 +526,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const [renderProjectm, setRenderProjectm] = useState(false);
   const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const preloadTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const switchRafRef = useRef<number>(0); // tracks rAF chain in switchToLayer
   // Track what the auto-advance preloaded into the hidden canvas
   const preloadedTargetRef = useRef<VJLayer | null>(null);
 
@@ -551,6 +546,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     preloadedTargetRef.current = null; // cancel any pending auto-advance preload
 
     if (crossfadeTimerRef.current !== undefined) clearTimeout(crossfadeTimerRef.current);
+    cancelAnimationFrame(switchRafRef.current);
 
     // Wake both render loops
     setRenderMilkdrop(true);
@@ -561,8 +557,8 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     effectiveLoadPreset();
 
     // Wait 2 rAF frames for target to render, then CSS crossfade
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+    switchRafRef.current = requestAnimationFrame(() => {
+      switchRafRef.current = requestAnimationFrame(() => {
         setActiveLayer(effectiveTarget);
         // Stop old engine after CSS transition completes
         crossfadeTimerRef.current = setTimeout(() => {
@@ -576,6 +572,15 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
 
   // Keep ref in sync so auto-advance timer always has current switchToLayer
   useEffect(() => { switchToLayerRef.current = switchToLayer; }, [switchToLayer]);
+
+  // Cleanup transition state on unmount
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(switchRafRef.current);
+      if (crossfadeTimerRef.current !== undefined) clearTimeout(crossfadeTimerRef.current);
+      if (preloadTimerRef.current !== undefined) clearTimeout(preloadTimerRef.current);
+    };
+  }, []);
 
   // ── DJ deck scratch via scroll ──────────────────────────────────────────
   const scratchPhysicsRef = useRef<TurntablePhysics | null>(null);

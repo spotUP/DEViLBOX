@@ -39,16 +39,18 @@ const SceneWithAudio: React.FC = () => {
  *  visible or fading, and kicks a fresh invalidation when speech/vocoder starts. */
 const DemandInvalidator: React.FC = () => {
   const { invalidate } = useThree();
-  const needsRenderRef = useRef(false);
+  // Count down frames after activity stops to allow fade-out animation to complete
+  const fadeFramesRef = useRef(0);
+  const FADE_OUT_FRAMES = 90; // ~1.5s at 60fps for smooth fade-out
 
   // Subscribe to speech/vocoder stores — kick a render when activity starts
   useEffect(() => {
     const unsubs = [
       useSpeechActivityStore.subscribe((s) => {
-        if (s.activeSpeechCount > 0) { needsRenderRef.current = true; invalidate(); }
+        if (s.activeSpeechCount > 0) { fadeFramesRef.current = FADE_OUT_FRAMES; invalidate(); }
       }),
       useVocoderStore.subscribe((s) => {
-        if (s.isActive) { needsRenderRef.current = true; invalidate(); }
+        if (s.isActive) { fadeFramesRef.current = FADE_OUT_FRAMES; invalidate(); }
       }),
     ];
     // Kick one initial frame so KraftwerkHead can evaluate visibility
@@ -56,14 +58,18 @@ const DemandInvalidator: React.FC = () => {
     return () => unsubs.forEach(u => u());
   }, [invalidate]);
 
-  // While the head is visible (or fading out), keep invalidating
+  // While active or fading out, keep invalidating
   useFrame(() => {
     const speechActive = useSpeechActivityStore.getState().activeSpeechCount > 0;
     const vocoderActive = useVocoderStore.getState().isActive;
-    if (speechActive || vocoderActive || needsRenderRef.current) {
-      needsRenderRef.current = speechActive || vocoderActive;
+    if (speechActive || vocoderActive) {
+      fadeFramesRef.current = FADE_OUT_FRAMES;
+      invalidate();
+    } else if (fadeFramesRef.current > 0) {
+      fadeFramesRef.current--;
       invalidate();
     }
+    // When fadeFrames reaches 0 and nothing is active, stop invalidating → R3F stops rendering
   });
 
   return null;
@@ -126,6 +132,7 @@ export const KraftwerkHeadOverlay: React.FC = () => {
     >
       <Canvas
         key={canvasKey}
+        frameloop="demand"
         gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.5 }}
         camera={{ position: [0, 0, 4], fov: 45, near: 0.1, far: 100 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
