@@ -1106,7 +1106,8 @@ export class DeckEngine {
 
   setEQKill(band: 'low' | 'mid' | 'high', kill: boolean): void {
     this.eqKillState[band] = kill;
-    this.eq3[band].value = kill ? -Infinity : this.eqValues[band];
+    // Ramp over 3ms to avoid digital click/pop on instant kill toggle
+    this.eq3[band].rampTo(kill ? -Infinity : this.eqValues[band], 0.003);
   }
 
   getEQKill(band: 'low' | 'mid' | 'high'): boolean {

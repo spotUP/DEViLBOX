@@ -77,12 +77,13 @@ export class DJMixerEngine {
     this.chainGain = new Tone.Gain(1);
 
     // Limiter: fast attack, high ratio compressor acting as a brickwall
-    // Attack 1ms catches crossfader transient spikes (10ms ramps) — matches DB303Synth limiter pattern
+    // Attack 1ms catches crossfader transient spikes (10ms ramps)
+    // Release 50ms balances fast recovery for battle cuts vs pumping avoidance
     this.limiter = new Tone.Compressor({
       threshold: -1,
       ratio: 20,
       attack: 0.001,
-      release: 0.1,
+      release: 0.05,
       knee: 4,
     });
 
