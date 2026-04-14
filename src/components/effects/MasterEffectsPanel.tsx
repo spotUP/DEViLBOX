@@ -225,6 +225,35 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     masterEffectsRef.current = masterEffects;
   }, [masterEffects]);
 
+  // ── Smooth knob support ──────────────────────────────────────────────────
+  // Send audio param changes directly to ToneEngine (immediate, no Immer overhead).
+  // Throttle Zustand store writes to ~60 fps so React doesn't choke on rapid knob turns.
+  const pendingStoreUpdates = useRef<Map<string, { effectId: string; params: Record<string, number | string>; wet?: number }>>(new Map());
+  const storeFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const STORE_THROTTLE_MS = 16; // ~60 fps
+
+  const flushStoreUpdates = useCallback(() => {
+    storeFlushTimer.current = null;
+    const updates = pendingStoreUpdates.current;
+    if (updates.size === 0) return;
+    const batch = new Map(updates);
+    updates.clear();
+    batch.forEach(({ effectId, params, wet }) => {
+      const effect = masterEffectsRef.current.find(fx => fx.id === effectId);
+      if (!effect) return;
+      const u: Partial<EffectConfig> = {};
+      if (Object.keys(params).length > 0) u.parameters = { ...effect.parameters, ...params };
+      if (wet !== undefined) u.wet = wet;
+      if (Object.keys(u).length > 0) updateMasterEffect(effectId, u);
+    });
+  }, [updateMasterEffect]);
+
+  const scheduleStoreFlush = useCallback(() => {
+    if (!storeFlushTimer.current) {
+      storeFlushTimer.current = setTimeout(flushStoreUpdates, STORE_THROTTLE_MS);
+    }
+  }, [flushStoreUpdates]);
+
   // Get user presets from localStorage with validation
   const getUserPresets = useCallback((): UserMasterFxPreset[] => {
     try {
@@ -381,26 +410,48 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   }, [removeMasterEffect]);
 
   const handleWetChange = useCallback((effectId: string, wet: number) => {
-    updateMasterEffect(effectId, { wet });
-  }, [updateMasterEffect]);
+    // Immediate audio update — bypass Immer for responsiveness
+    const engine = useAudioStore.getState().toneEngineInstance;
+    const effect = masterEffectsRef.current.find(fx => fx.id === effectId);
+    if (engine && effect) {
+      engine.updateMasterEffectParams(effectId, { ...effect, wet } as EffectConfig);
+    }
+    // Throttled store persistence
+    const pending = pendingStoreUpdates.current.get(effectId) ?? { effectId, params: {} };
+    pending.wet = wet;
+    pendingStoreUpdates.current.set(effectId, pending);
+    scheduleStoreFlush();
+  }, [scheduleStoreFlush]);
 
   const handleUpdateParameter = useCallback((effectId: string, key: string, value: number | string) => {
+    // Immediate audio update — bypass Immer for responsiveness
+    const engine = useAudioStore.getState().toneEngineInstance;
     const effect = masterEffectsRef.current.find(fx => fx.id === effectId);
-    if (effect) {
-      updateMasterEffect(effectId, {
-        parameters: { ...effect.parameters, [key]: value },
-      });
+    if (engine && effect) {
+      const updatedConfig = { ...effect, parameters: { ...effect.parameters, [key]: value } } as EffectConfig;
+      engine.updateMasterEffectParams(effectId, updatedConfig);
     }
-  }, [updateMasterEffect]);
+    // Throttled store persistence
+    const pending = pendingStoreUpdates.current.get(effectId) ?? { effectId, params: {} };
+    pending.params[key] = value;
+    pendingStoreUpdates.current.set(effectId, pending);
+    scheduleStoreFlush();
+  }, [scheduleStoreFlush]);
 
   const handleUpdateParameters = useCallback((effectId: string, params: Record<string, number | string>) => {
+    // Immediate audio update — bypass Immer for responsiveness
+    const engine = useAudioStore.getState().toneEngineInstance;
     const effect = masterEffectsRef.current.find(fx => fx.id === effectId);
-    if (effect) {
-      updateMasterEffect(effectId, {
-        parameters: { ...effect.parameters, ...params },
-      });
+    if (engine && effect) {
+      const updatedConfig = { ...effect, parameters: { ...effect.parameters, ...params } } as EffectConfig;
+      engine.updateMasterEffectParams(effectId, updatedConfig);
     }
-  }, [updateMasterEffect]);
+    // Throttled store persistence
+    const pending = pendingStoreUpdates.current.get(effectId) ?? { effectId, params: {} };
+    Object.assign(pending.params, params);
+    pendingStoreUpdates.current.set(effectId, pending);
+    scheduleStoreFlush();
+  }, [scheduleStoreFlush]);
 
   const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
     updateMasterEffect(effectId, { selectedChannels: channels });
