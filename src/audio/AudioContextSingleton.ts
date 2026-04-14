@@ -33,7 +33,7 @@ export function getAudioContext(): AudioContext {
     } catch {
       // ToneEngine not initialized yet — fall through to create standalone
     }
-    globalAudioContext = new AudioContext();
+    globalAudioContext = new AudioContext({ latencyHint: 'interactive' });
     console.log('[AudioContext] Created standalone instance (ToneEngine not yet available)');
   }
   return globalAudioContext;
