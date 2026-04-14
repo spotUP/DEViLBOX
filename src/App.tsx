@@ -976,29 +976,28 @@ function App() {
             </Suspense>
           )}
           {/* VJ Popout Window */}
-          {(() => {
+          {vjPoppedOut && (() => {
             if (process.env.NODE_ENV === 'development') {
-              console.log('[App] Rendering VJ popout conditional, vjPoppedOut:', vjPoppedOut);
+              console.log('[App] vjPoppedOut is true, rendering PopOutWindow');
             }
-            return null;
+            return (
+              <Suspense fallback={null}>
+                <PopOutWindow
+                  isOpen={true}
+                  onClose={() => setVJPoppedOut(false)}
+                  title="DEViLBOX — VJ"
+                  width={1280}
+                  height={720}
+                >
+                  <DJErrorBoundary viewName="VJ">
+                    <div className="h-screen w-screen bg-black">
+                      <VJView isPopout />
+                    </div>
+                  </DJErrorBoundary>
+                </PopOutWindow>
+              </Suspense>
+            );
           })()}
-          {vjPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setVJPoppedOut(false)}
-                title="DEViLBOX — VJ"
-                width={1280}
-                height={720}
-              >
-                <DJErrorBoundary viewName="VJ">
-                  <div className="h-screen w-screen bg-black">
-                    <VJView isPopout />
-                  </div>
-                </DJErrorBoundary>
-              </PopOutWindow>
-            </Suspense>
-          )}
         </GlobalDragDropHandler>
       </Suspense>
     );
