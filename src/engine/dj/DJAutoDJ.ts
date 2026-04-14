@@ -13,6 +13,7 @@
 
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
+import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngine } from './DJEngine';
@@ -297,7 +298,7 @@ class DJAutoDJ {
       const bPlay = store.decks.B.isPlaying;
       const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
       const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
-      console.log(`[AutoDJ poll] status=${status} active=${this.activeDeck} idle=${this.idleDeck} cf=${cf} timeLeft=${timeRemaining.toFixed(1)}s A:[${aPlay ? 'PLAY' : 'stop'}]${aFile} B:[${bPlay ? 'PLAY' : 'stop'}]${bFile} preloaded=${this.preloadedDeck ?? 'none'}`);
+      console.log(`[AutoDJ poll #${this.pollCount}] status=${status} active=${this.activeDeck} idle=${this.idleDeck} cf=${cf} timeLeft=${timeRemaining.toFixed(1)}s A:[${aPlay ? 'PLAY' : 'stop'}]${aFile} B:[${bPlay ? 'PLAY' : 'stop'}]${bFile} preloaded=${this.preloadedDeck ?? 'none'} preloading=${this.preloading} staleCount=${this.staleCount}`);
     }
 
     switch (status) {
@@ -318,6 +319,7 @@ class DJAutoDJ {
           if (positionFrozen) {
             console.warn(`[AutoDJ] Position frozen at ${timeRemaining.toFixed(1)}s for ${this.staleCount} polls — forcing preload`);
           }
+          console.log(`[AutoDJ] PRELOAD TRIGGER: timeRemaining=${timeRemaining.toFixed(1)}s, positionFrozen=${positionFrozen}, preloading=${this.preloading}, preloadedDeck=${this.preloadedDeck}`);
           this.preloadNextTrack().catch(err =>
             console.warn('[AutoDJ] preload failed:', err instanceof Error ? err.message : err)
           );
@@ -328,6 +330,9 @@ class DJAutoDJ {
       case 'transition-pending': {
         // Check if it's time to start the transition
         const transitionDuration = this.getTransitionDurationSec();
+        if (this.pollCount % 4 === 0) {
+          console.log(`[AutoDJ transition-pending] timeLeft=${timeRemaining.toFixed(1)}s, transitionDur=${transitionDuration.toFixed(1)}s, preloadedDeck=${this.preloadedDeck}`);
+        }
         if (timeRemaining <= transitionDuration) {
           console.log(`[AutoDJ] Triggering transition: timeLeft=${timeRemaining.toFixed(1)}s <= transitionDur=${transitionDuration.toFixed(1)}s`);
           this.triggerTransition(store.autoDJTransitionBars);
@@ -337,23 +342,27 @@ class DJAutoDJ {
 
       case 'transitioning': {
         // Check if the transition is done.
-        // The crossfader sweep is the authoritative signal — when it reaches the
-        // target, the transition is complete regardless of the store's isPlaying
-        // flags (which can be stale due to useDeckStateSync racing with
-        // scheduleQuantized).
-        const outgoingPlaying = store.decks[this.activeDeck].isPlaying;
-        const incomingPlaying = store.decks[this.idleDeck].isPlaying;
+        // Read engine state directly — store state depends on rAF-based
+        // useDeckStateSync which browsers throttle when DJView is hidden
+        // (e.g. user is on drumpad view). The crossfader sweep is driven by
+        // Web Audio scheduling which runs regardless of visibility.
+        let outgoingPlaying: boolean;
+        try {
+          outgoingPlaying = getDJEngine().getDeck(this.activeDeck).isPlaying();
+        } catch {
+          outgoingPlaying = store.decks[this.activeDeck].isPlaying;
+        }
+
         const crossfader = store.crossfaderPosition;
         const crossfaderDone = this.idleDeck === 'B' ? crossfader >= 0.98
           : this.idleDeck === 'A' ? crossfader <= 0.02 : false;
 
         if (this.pollCount % 4 === 0) {
+          const incomingPlaying = store.decks[this.idleDeck].isPlaying;
           console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone}`);
         }
 
         // Complete when crossfader is done AND outgoing has stopped
-        // (don't require incomingPlaying — the store flag can be reset by
-        // useDeckStateSync before the scheduled play() fires)
         if (crossfaderDone && !outgoingPlaying) {
           this.completeTransition();
         }
@@ -368,6 +377,9 @@ class DJAutoDJ {
         // Exponential backoff: 5s, 10s, 20s, 40s… capped at 60s
         const backoffMs = Math.min(60_000, 5_000 * Math.pow(2, this.preloadFailCount - 1));
         const elapsed = Date.now() - this.lastPreloadFailTime;
+        if (this.pollCount % 4 === 0) {
+          console.log(`[AutoDJ preload-failed] failCount=${this.preloadFailCount}, backoffMs=${backoffMs}, elapsed=${elapsed}ms, waiting=${elapsed < backoffMs}`);
+        }
         if (elapsed < backoffMs) break; // Wait for backoff to expire
         console.log(`[AutoDJ] Retrying preload after ${(elapsed / 1000).toFixed(0)}s backoff (attempt ${this.preloadFailCount})`);
         this.preloading = false;
@@ -384,13 +396,20 @@ class DJAutoDJ {
 
   // ── Private: Preloading ──────────────────────────────────────────────────
 
+  private preRenderedTrack: { track: PlaylistTrack; data: any } | null = null;
+
   private async preloadNextTrack(): Promise<void> {
-    if (this.preloading) return;
+    if (this.preloading) {
+      console.log('[AutoDJ] preloadNextTrack() called but already preloading — skipping');
+      return;
+    }
     this.preloading = true;
+    console.log('[AutoDJ] preloadNextTrack() START');
 
     const store = useDJStore.getState();
     const playlist = this.getActivePlaylist();
     if (!playlist) {
+      console.warn('[AutoDJ] preloadNextTrack() no playlist — aborting');
       this.preloading = false;
       return;
     }
@@ -400,20 +419,36 @@ class DJAutoDJ {
     let attempts = 0;
     let consecutiveNetworkFailures = 0;
 
+    console.log(`[AutoDJ] preloadNextTrack() starting loop: nextIdx=${nextIdx}, maxAttempts=${MAX_SKIP_ATTEMPTS}`);
+
     while (attempts < MAX_SKIP_ATTEMPTS) {
       const track = playlist.tracks[nextIdx];
       if (!track) {
+        console.warn(`[AutoDJ] preloadNextTrack() track at index ${nextIdx} is null — wrapping to 0`);
         nextIdx = 0;
         if (attempts > 0) break;
         attempts++;
         continue;
       }
 
-      console.log(`[AutoDJ] Preloading track ${nextIdx + 1}/${playlist.tracks.length} to deck ${this.idleDeck}: ${track.trackName}`);
+      // Skip tracks already marked as bad (unless we've tried everything else)
+      if (track.isBad && attempts < MAX_SKIP_ATTEMPTS - 10) {
+        console.log(`[AutoDJ] Skipping bad track ${nextIdx}: ${track.trackName} (reason: ${track.badReason})`);
+        attempts++;
+        nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
+        continue;
+      }
+
+      console.log(`[AutoDJ] Pre-rendering track ${nextIdx + 1}/${playlist.tracks.length} in background: ${track.trackName} (attempt ${attempts + 1}/${MAX_SKIP_ATTEMPTS})${track.isBad ? ' [RETRY BAD TRACK]' : ''}`);
 
       try {
-        const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
-        if (loaded) {
+        // Pre-render in background - UADE crashes happen here, isolated from playback
+        const { preRenderTrack } = await import('./DJTrackLoader');
+        const preRendered = await preRenderTrack(track);
+        
+        if (preRendered) {
+          // Success - save pre-rendered data for instant loading during transition
+          this.preRenderedTrack = { track, data: preRendered };
           this.preloadedDeck = this.idleDeck;
           this.preloadFailCount = 0;
 
@@ -422,16 +457,19 @@ class DJAutoDJ {
             nextIdx,
           );
           useDJStore.getState().setAutoDJStatus('transition-pending');
-          console.log(`[AutoDJ] Preload complete → deck ${this.idleDeck}, status=transition-pending`);
+          console.log(`[AutoDJ] Preload SUCCESS → deck ${this.idleDeck}, status=transition-pending`);
           this.preloading = false;
           return;
+        } else {
+          console.warn(`[AutoDJ] loadPlaylistTrackToDeck returned false for ${track.fileName}`);
         }
       } catch (err) {
-        console.error(`[AutoDJ] Preload failed for ${track.fileName}:`, err);
+        console.error(`[AutoDJ] Preload exception for ${track.fileName}:`, err);
       }
 
       // Detect network-down vs bad-track: "Failed to fetch" means the server is unreachable
       const isNetworkError = !navigator.onLine || await this.isServerUnreachable();
+      console.log(`[AutoDJ] Track load failed - network error: ${isNetworkError}, consecutiveNetworkFailures: ${consecutiveNetworkFailures}`);
       if (isNetworkError) {
         consecutiveNetworkFailures++;
         if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
@@ -448,11 +486,11 @@ class DJAutoDJ {
 
       attempts++;
       nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
-      console.warn(`[AutoDJ] Skipping unloadable track, trying index ${nextIdx}`);
+      console.warn(`[AutoDJ] Skipping unloadable track, trying next index ${nextIdx} (attempt ${attempts}/${MAX_SKIP_ATTEMPTS})`);
     }
 
     // All attempts exhausted (bad tracks, not network)
-    console.error('[AutoDJ] Failed to preload any track after', MAX_SKIP_ATTEMPTS, 'attempts');
+    console.error('[AutoDJ] PRELOAD EXHAUSTED: Failed to preload any track after', MAX_SKIP_ATTEMPTS, 'attempts');
     this.preloadFailCount++;
     this.lastPreloadFailTime = Date.now();
     useDJStore.getState().setAutoDJStatus('preload-failed');
@@ -461,9 +499,28 @@ class DJAutoDJ {
 
   // ── Private: Transition ──────────────────────────────────────────────────
 
-  private triggerTransition(_userBars: number): void {
+  private async triggerTransition(_userBars: number): Promise<void> {
     const store = useDJStore.getState();
     if (!this.preloadedDeck) return;
+
+    // Load pre-rendered track instantly if available (background render complete)
+    if (this.preRenderedTrack) {
+      console.log(`[AutoDJ] Loading pre-rendered track to deck ${this.idleDeck}: ${this.preRenderedTrack.track.trackName}`);
+      const { loadPreRenderedTrackToDeck } = await import('./DJTrackLoader');
+      const loaded = await loadPreRenderedTrackToDeck(
+        this.preRenderedTrack.data,
+        this.preRenderedTrack.track,
+        this.idleDeck,
+      );
+      if (!loaded) {
+        console.error('[AutoDJ] Failed to load pre-rendered track — aborting transition');
+        this.preRenderedTrack = null;
+        this.preloadedDeck = null;
+        useDJStore.getState().setAutoDJStatus('preload-failed');
+        return;
+      }
+      this.preRenderedTrack = null; // Clear after use
+    }
 
     const outState = store.decks[this.activeDeck];
     const inState = store.decks[this.idleDeck];
@@ -573,6 +630,7 @@ class DJAutoDJ {
   }
 
   private completeTransition(): void {
+    console.log('[AutoDJ] completeTransition() START');
     this.transitionCancel = null;
 
     // Stop and reset the outgoing deck
@@ -626,8 +684,9 @@ class DJAutoDJ {
     // Don't wait for the poll loop — the new active deck's store position
     // may not have synced yet, so getTimeRemaining() could return a stale
     // value that prevents preload from triggering.
+    console.log('[AutoDJ] completeTransition() triggering immediate preloadNextTrack()');
     this.preloadNextTrack().catch(err =>
-      console.warn('[AutoDJ] preload failed:', err instanceof Error ? err.message : err)
+      console.warn('[AutoDJ] preload failed after transition complete:', err instanceof Error ? err.message : err)
     );
   }
 
@@ -655,15 +714,41 @@ class DJAutoDJ {
   }
 
   private getTimeRemaining(): number {
-    const state = useDJStore.getState().decks[this.activeDeck];
-    if (state.playbackMode === 'audio' && state.durationMs > 0) {
-      return (state.durationMs / 1000) - state.audioPosition;
+    // Read position directly from the engine — NOT from the store.
+    // The store is updated via requestAnimationFrame which browsers throttle
+    // when the DJView is hidden (e.g. drumpad view active). Reading from
+    // the engine ensures auto DJ transitions fire reliably regardless of
+    // which view is visible.
+    try {
+      const deck = getDJEngine().getDeck(this.activeDeck);
+      if (deck.playbackMode === 'audio') {
+        const pos = deck.audioPlayer.getPosition();
+        const dur = deck.audioPlayer.getDuration();
+        if (this.pollCount % 20 === 0) {
+          console.log(`[AutoDJ getTimeRemaining] deck=${this.activeDeck} mode=audio pos=${pos.toFixed(2)}s dur=${dur.toFixed(2)}s remaining=${(dur - pos).toFixed(2)}s`);
+        }
+        if (dur > 0) return dur - pos;
+      } else {
+        const replayer = deck.replayer;
+        const elapsedMs = replayer.getElapsedMs();
+        const state = useDJStore.getState().decks[this.activeDeck];
+        if (this.pollCount % 20 === 0) {
+          console.log(`[AutoDJ getTimeRemaining] deck=${this.activeDeck} mode=tracker elapsedMs=${elapsedMs} durationMs=${state.durationMs} remaining=${((state.durationMs - elapsedMs) / 1000).toFixed(2)}s`);
+        }
+        if (state.durationMs > 0) return (state.durationMs - elapsedMs) / 1000;
+      }
+    } catch (err) {
+      // Engine not ready — fall back to store
+      if (this.pollCount % 20 === 0) {
+        console.log(`[AutoDJ getTimeRemaining] FALLBACK to store (engine error):`, err);
+      }
+      const state = useDJStore.getState().decks[this.activeDeck];
+      if (state.playbackMode === 'audio' && state.durationMs > 0) {
+        return (state.durationMs / 1000) - state.audioPosition;
+      }
+      if (state.durationMs > 0) return (state.durationMs - state.elapsedMs) / 1000;
     }
-    // For tracker mode, use elapsed vs estimated duration
-    if (state.durationMs > 0) {
-      return (state.durationMs - state.elapsedMs) / 1000;
-    }
-    return Infinity; // Unknown duration
+    return Infinity;
   }
 
   private getTransitionDurationSec(): number {
