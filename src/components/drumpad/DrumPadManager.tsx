@@ -12,7 +12,7 @@ import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
-import type { SampleData, MpcResampleConfig, PadMode } from '../../types/drumpad';
+import type { SampleData, MpcResampleConfig } from '../../types/drumpad';
 import {
   getAllKitSources,
   loadKitSource,
@@ -26,12 +26,6 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
 
-const PAD_MODES: { id: PadMode; label: string }[] = [
-  { id: 'samples',  label: 'SAMPLES' },
-  { id: 'djfx',     label: 'DJ FX' },
-  { id: 'oneshots', label: 'ONE SHOTS' },
-  { id: 'scratch',  label: 'SCRATCH' },
-];
 
 /** Mini performance status: BPM + active deck letters */
 const PerformanceStatus: React.FC = () => {
@@ -107,8 +101,6 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     noteRepeatRate,
     setNoteRepeatEnabled,
     setNoteRepeatRate,
-    padMode,
-    setPadMode,
   } = useDrumPadStore();
 
   // Get all available kit sources (presets + sample packs)
@@ -319,25 +311,9 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     };
   }, []);
 
-  // Mode switching (1-4) and Escape — pad triggering handled by useDrumPadKeyboard hook
+  // Escape key handler — pad triggering handled by useDrumPadKeyboard hook
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      const isInputFocused =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' ||
-        target.isContentEditable;
-
-      // Mode switching: 1-4 keys
-      if (!isInputFocused && ['1', '2', '3', '4'].includes(event.key)) {
-        const modeIndex = parseInt(event.key) - 1;
-        if (PAD_MODES[modeIndex]) {
-          setPadMode(PAD_MODES[modeIndex].id);
-          event.preventDefault();
-        }
-      }
-
       // Escape to close (always works, even in inputs)
       if (event.key === 'Escape') {
         if (performanceMode) {
@@ -350,7 +326,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, performanceMode, setPadMode]);
+  }, [onClose, performanceMode]);
 
   // Determine if we're rendered as a full view (no onClose) or as a modal
   const isViewMode = !onClose;
@@ -438,32 +414,14 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Mode strip */}
+        {/* Preset strip */}
         <div className="flex items-center gap-1 px-4 py-1.5 border-b border-dark-border bg-dark-bg shrink-0">
-          <span className="text-[10px] font-mono text-text-muted mr-1">MODE</span>
-          {PAD_MODES.map((mode, i) => (
-            <button
-              key={mode.id}
-              onClick={() => setPadMode(mode.id)}
-              className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors ${
-                padMode === mode.id
-                  ? 'bg-accent-primary text-text-primary'
-                  : 'bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary'
-              }`}
-              title={`${mode.label} (${i + 1})`}
-            >
-              {mode.label}
-            </button>
-          ))}
-          <div className="h-4 w-px bg-dark-border mx-1" />
-          {/* DJ Presets — show all presets (modes array controls filtering) */}
+          <span className="text-[10px] font-mono text-text-muted mr-1">PRESETS</span>
           <CustomSelect
             value=""
             onChange={handleLoadDJPreset}
-            placeholder="DJ Presets"
-            options={DJ_PAD_PRESETS
-              .filter(p => p.modes.length === 0 || p.modes.includes(padMode))
-              .map(p => ({ value: p.id, label: p.name }))}
+            placeholder="Load Preset..."
+            options={DJ_PAD_PRESETS.map(p => ({ value: p.id, label: p.name }))}
             className="px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary hover:border-accent-highlight/50 cursor-pointer"
           />
         </div>

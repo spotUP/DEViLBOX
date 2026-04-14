@@ -9,11 +9,13 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useVJAudio } from './scenes/types';
 import { KraftwerkHead } from './scenes/KraftwerkHead';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
+import { useVocoderStore } from '@/stores/useVocoderStore';
 
 const SceneWithAudio: React.FC = () => {
   const audioRef = useVJAudio();
@@ -28,8 +30,43 @@ const SceneWithAudio: React.FC = () => {
           mipmapBlur
         />
       </EffectComposer>
+      <DemandInvalidator />
     </>
   );
+};
+
+/** Drives the demand-mode render loop: invalidates each frame while the head is
+ *  visible or fading, and kicks a fresh invalidation when speech/vocoder starts. */
+const DemandInvalidator: React.FC = () => {
+  const { invalidate } = useThree();
+  const needsRenderRef = useRef(false);
+
+  // Subscribe to speech/vocoder stores — kick a render when activity starts
+  useEffect(() => {
+    const unsubs = [
+      useSpeechActivityStore.subscribe((s) => {
+        if (s.activeSpeechCount > 0) { needsRenderRef.current = true; invalidate(); }
+      }),
+      useVocoderStore.subscribe((s) => {
+        if (s.isActive) { needsRenderRef.current = true; invalidate(); }
+      }),
+    ];
+    // Kick one initial frame so KraftwerkHead can evaluate visibility
+    invalidate();
+    return () => unsubs.forEach(u => u());
+  }, [invalidate]);
+
+  // While the head is visible (or fading out), keep invalidating
+  useFrame(() => {
+    const speechActive = useSpeechActivityStore.getState().activeSpeechCount > 0;
+    const vocoderActive = useVocoderStore.getState().isActive;
+    if (speechActive || vocoderActive || needsRenderRef.current) {
+      needsRenderRef.current = speechActive || vocoderActive;
+      invalidate();
+    }
+  });
+
+  return null;
 };
 
 export const KraftwerkHeadOverlay: React.FC = () => {
