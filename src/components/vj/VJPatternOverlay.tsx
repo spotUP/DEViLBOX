@@ -25,6 +25,31 @@ import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { TrackerCell, Pattern } from '@/types/tracker';
 
+// Formats that have genuine native pattern data (notes/instruments/effects).
+// Chip-dump / CPU-code / UADE catch-all formats generate synthesized/stub patterns
+// from register writes or chip RAM reads — those are NOT real pattern data.
+const REAL_PATTERN_FORMATS = new Set([
+  // Classic tracker formats
+  'MOD', 'XM', 'IT', 'S3M', 'FUR',
+  // Amiga tracker formats
+  'HVL', 'AHX', 'OKT', 'MED', 'DIGI', 'DBM', 'FC', 'ML',
+  'SFX', 'SMON', 'SIDMON2', 'FRED', 'DMUG',
+  // Exotic Amiga tracker formats with real note data
+  '667', '669', 'AMOSMusicBank', 'AON', 'AST', 'BD', 'C67',
+  'DigitalSymphony', 'DM1', 'DM2', 'DSM', 'DSS', 'DTM',
+  'FaceTheMusic', 'FMT', 'GameMusicCreator', 'GDM', 'GMC',
+  'GraoumfTracker', 'GraoumfTracker2', 'ICE', 'IMF', 'IMS', 'IS10', 'IS20',
+  'JamCracker', 'KRIS', 'MFP', 'MTM', 'MUS', 'PLM', 'PTM',
+  'PumaTracker', 'QuadraComposer', 'RTM', 'SonicArranger', 'STK', 'STM',
+  'STP', 'Symphonie', 'TCBTracker', 'ULT', 'UNIC',
+  // PC tracker formats
+  'AMS', 'DMF', 'MadTracker2', 'XRNS',
+  // TFMX has real sequence data
+  'TFMX',
+  // MDX has native note data
+  'MDX',
+]);
+
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function fmtNote(note: number): string {
@@ -145,7 +170,11 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
     const { patterns, currentPatternIndex } = useTrackerStore.getState();
     const { currentRow, isPlaying } = useTransportStore.getState();
     const pattern = patterns[currentPatternIndex];
-    if (!pattern || !hasRealData(pattern)) return null;
+    if (!pattern) return null;
+    // Skip formats that generate fake/synthesized pattern data
+    const sourceFormat = pattern.importMetadata?.sourceFormat;
+    if (sourceFormat && !REAL_PATTERN_FORMATS.has(sourceFormat)) return null;
+    if (!hasRealData(pattern)) return null;
     return { pattern, currentRow, isPlaying };
   }
 
@@ -162,6 +191,9 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
 
   const song = deck.replayer.getSong();
   if (!song || !song.patterns.length) return null;
+
+  // Skip formats that generate fake/synthesized pattern data
+  if (!REAL_PATTERN_FORMATS.has(song.format)) return null;
 
   // Use store's songPos/pattPos — kept current by DJDeck polling loop
   const patIdx = song.songPositions[deckState.songPos] ?? 0;
