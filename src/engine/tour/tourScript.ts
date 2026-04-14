@@ -6,6 +6,7 @@
  */
 
 import { useUIStore } from '@/stores/useUIStore';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 
 export interface TourStep {
   id: string;
@@ -18,10 +19,35 @@ export interface TourStep {
   voice?: number;
   /** DECtalk rate override (default 170) */
   rate?: number;
+  /** CSS selector to spotlight/highlight during this step (null = no spotlight) */
+  spotlight?: string;
+  /** Whether to show the Kraftwerk 3D head during this step */
+  showHead?: boolean;
 }
 
 function switchView(view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio'): void {
   useUIStore.getState().setActiveView(view);
+}
+
+async function loadDemoSong(): Promise<void> {
+  try {
+    const resp = await fetch('/data/songs/exports/aces_high.mod');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    const file = new File([buf], 'aces_high.mod');
+    const { loadFile } = await import('@/lib/file/UnifiedFileLoader');
+    await loadFile(file, { requireConfirmation: false });
+  } catch (err) {
+    console.warn('[Tour] Failed to load demo song:', err);
+  }
+}
+
+function enableKraftwerkHead(): void {
+  useSpeechActivityStore.getState().speechStart();
+}
+
+function disableKraftwerkHead(): void {
+  useSpeechActivityStore.getState().speechStop();
 }
 
 export const TOUR_SCRIPT: TourStep[] = [
@@ -52,7 +78,25 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'tracker-pattern',
     narration: 'The pattern editor shows notes, instruments, volumes, and effects in a scrolling grid. Each column represents a channel. You navigate with the keyboard, just like the original trackers from the early 1990s.',
+    spotlight: '[data-pattern-editor]',
     postDelay: 1500,
+  },
+  {
+    id: 'tracker-demo',
+    narration: 'Let me load a classic demo song to show you how it looks and sounds.',
+    action: loadDemoSong,
+    postDelay: 2000,
+  },
+  {
+    id: 'tracker-playing',
+    narration: 'This is Aces High, a classic ProTracker module. Notice how each channel plays its own instrument, and the pattern scrolls as the song progresses.',
+    action: async () => {
+      // Start playback via transport
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      useTransportStore.getState().play();
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 3000,
   },
   {
     id: 'tracker-instruments',
@@ -84,29 +128,34 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'speech-intro',
     narration: 'Now, let me tell you about something special. The voice you are hearing right now? That is DECtalk. One of our built-in speech synthesizers.',
+    showHead: true,
     postDelay: 1500,
   },
   {
     id: 'speech-dectalk',
     narration: 'DECtalk is the iconic speech synthesizer that Stephen Hawking used. We run it entirely in your browser as a WebAssembly module. I have 9 different voices. Right now, you are hearing Paul.',
+    showHead: true,
     postDelay: 1500,
   },
   {
     id: 'speech-betty',
     narration: 'And this is Betty. Another DECtalk voice. Every voice has its own personality and character.',
     voice: 1,  // Betty
+    showHead: true,
     postDelay: 1500,
   },
   {
     id: 'speech-harry',
     narration: 'And this is Harry. A deeper, more authoritative voice.',
     voice: 2,  // Harry
+    showHead: true,
     postDelay: 1500,
   },
   {
     id: 'speech-back-to-paul',
     narration: 'Back to Paul. Besides DECtalk, DEViLBOX also includes SAM, the Software Automatic Mouth from the Commodore 64. Pink Trombone, a real-time vocal tract simulator. And vintage arcade speech chips like the Votrax and the TI TMS5220.',
     voice: 0,  // Paul
+    showHead: true,
     postDelay: 2000,
   },
 
@@ -114,7 +163,12 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-intro',
     narration: 'Now let us switch to the DJ view.',
-    action: () => switchView('dj'),
+    action: async () => {
+      // Stop tracker playback before switching
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      useTransportStore.getState().stop();
+      switchView('dj');
+    },
     postDelay: 2000,
   },
   {
@@ -125,6 +179,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-decks',
     narration: 'Each deck shows a real-time waveform display with beat detection and BPM analysis. Load any supported music file and it is instantly analyzed for beats and tempo.',
+    spotlight: '[data-dj-deck-drop]',
     postDelay: 1500,
   },
   {
@@ -163,6 +218,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'drumpad-overview',
     narration: 'An MPC-style 16-pad drum machine controller. Each pad can hold a sample, a synthesizer, or any instrument from our 120 engine collection.',
+    spotlight: '[data-pad-id]',
     postDelay: 1500,
   },
   {
@@ -185,18 +241,31 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'vj-intro',
     narration: 'Now, the VJ view. Real-time audio visualizations.',
-    action: () => switchView('vj'),
+    action: () => {
+      enableKraftwerkHead();
+      switchView('vj');
+    },
+    showHead: true,
     postDelay: 2500,
   },
   {
     id: 'vj-milkdrop',
     narration: 'Butterchurn brings hundreds of Milkdrop music-reactive visual presets. WebGL powered, running at full frame rate. Originally from Winamp, now in your browser.',
+    showHead: true,
     postDelay: 2000,
   },
   {
     id: 'vj-kraftwerk',
-    narration: 'And our 3D Kraftwerk head avatar. It syncs its mouth movements to speech synthesis output in real-time. Yes, it is synced to my voice right now.',
+    narration: 'And this is our 3D Kraftwerk head avatar. It syncs its mouth movements to speech synthesis output in real-time. Yes, it is synced to my voice right now.',
+    showHead: true,
     postDelay: 2000,
+  },
+  {
+    id: 'vj-cleanup',
+    narration: '',
+    action: () => disableKraftwerkHead(),
+    postDelay: 100,
+    rate: 300,
   },
 
   // ── Act 7: Mixer View ──────────────────────────────────────────────────

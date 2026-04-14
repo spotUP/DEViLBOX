@@ -21,13 +21,15 @@ export interface TourState {
   /** Whether pre-rendering is in progress */
   isPreRendering: boolean;
   preRenderProgress: number;
+  /** CSS selector for spotlight highlight (null = no spotlight) */
+  spotlightSelector: string | null;
 
   // Actions
   startTour: (totalSteps: number) => void;
   stopTour: () => void;
   pauseTour: () => void;
   resumeTour: () => void;
-  setStep: (step: number, stepId: string, subtitle: string) => void;
+  setStep: (step: number, stepId: string, subtitle: string, spotlight?: string | null) => void;
   setSpeaking: (speaking: boolean) => void;
   setPreRendering: (rendering: boolean, progress?: number) => void;
 }
@@ -43,6 +45,7 @@ export const useTourStore = create<TourState>((set) => ({
   isSpeaking: false,
   isPreRendering: false,
   preRenderProgress: 0,
+  spotlightSelector: null,
 
   startTour: (totalSteps) =>
     set({
@@ -56,6 +59,7 @@ export const useTourStore = create<TourState>((set) => ({
       isSpeaking: false,
       isPreRendering: false,
       preRenderProgress: 0,
+      spotlightSelector: null,
     }),
 
   stopTour: () =>
@@ -69,17 +73,19 @@ export const useTourStore = create<TourState>((set) => ({
       isSpeaking: false,
       isPreRendering: false,
       preRenderProgress: 0,
+      spotlightSelector: null,
     }),
 
   pauseTour: () => set({ isPaused: true }),
   resumeTour: () => set({ isPaused: false }),
 
-  setStep: (step, stepId, subtitle) =>
+  setStep: (step, stepId, subtitle, spotlight) =>
     set((s) => ({
       currentStep: step,
       stepId,
       subtitle,
       progress: s.totalSteps > 0 ? step / s.totalSteps : 0,
+      spotlightSelector: spotlight ?? null,
     })),
 
   setSpeaking: (speaking) => set({ isSpeaking: speaking }),

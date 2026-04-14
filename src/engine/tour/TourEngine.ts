@@ -7,6 +7,7 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { useTourStore } from '@/stores/useTourStore';
+import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { TOUR_SCRIPT, type TourStep } from './tourScript';
 
@@ -59,6 +60,7 @@ class TourEngine {
   private pauseResumeResolve: (() => void) | null = null;
   private aborted = false;
   private previousView: string = 'tracker';
+  private headActive = false;
 
   // ── Public API ──────────────────────────────────────────────────────────
 
@@ -89,6 +91,10 @@ class TourEngine {
       store.setPreRendering(true, (i + 1) / totalSteps);
 
       try {
+        if (step.narration.trim().length === 0) {
+          this.preRendered.push({ step, buffer: null, duration: 0 });
+          continue;
+        }
         const voice = step.voice ?? DEFAULT_VOICE;
         const rate = step.rate ?? DEFAULT_RATE;
         const wavData = await synthesizeWav(step.narration, voice, rate);
@@ -136,6 +142,19 @@ class TourEngine {
       this.gainNode.disconnect();
       this.gainNode = null;
     }
+
+    // Disable Kraftwerk head if it was enabled
+    if (this.headActive) {
+      useSpeechActivityStore.getState().speechStop();
+      this.headActive = false;
+    }
+
+    // Stop tracker playback if we started it during the tour
+    import('@/stores/useTransportStore').then(({ useTransportStore }) => {
+      if (useTransportStore.getState().isPlaying) {
+        useTransportStore.getState().stop();
+      }
+    });
 
     // Restore previous view
     useUIStore.getState().setActiveView(this.previousView as never);
@@ -192,8 +211,17 @@ class TourEngine {
       const { step, buffer } = this.preRendered[i];
       const store = useTourStore.getState();
 
-      // Update store
-      store.setStep(i, step.id, step.narration);
+      // Update store (including spotlight selector)
+      store.setStep(i, step.id, step.narration, step.spotlight ?? null);
+
+      // Manage Kraftwerk head visibility
+      if (step.showHead && !this.headActive) {
+        useSpeechActivityStore.getState().speechStart();
+        this.headActive = true;
+      } else if (!step.showHead && this.headActive) {
+        useSpeechActivityStore.getState().speechStop();
+        this.headActive = false;
+      }
 
       // Execute action (view switch, etc.)
       if (step.action) {
