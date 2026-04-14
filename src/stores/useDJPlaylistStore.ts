@@ -657,32 +657,66 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
 
     for (const { playlistId, index, track } of toFix) {
       try {
-        // Extract bare search term
-        const bare = (track.trackName || track.fileName)
-          .replace(/\.sid$/i, '')
+        const raw = (track.trackName || track.fileName);
+        // Parse playlist track names like "01. Artist   Song Title (sid)" or "Song.sid"
+        const cleaned = raw
+          .replace(/\.sid$/i, '')       // strip .sid extension
+          .replace(/\s*\((?:sid|3sid|dual\s*sid|6581|8580)\)\s*$/i, '') // strip (sid) etc.
+          .replace(/^(\d{1,3})\.\s*/, '') // strip leading track number "01. "
           .replace(/[_-]/g, ' ')
           .trim();
-        if (!bare) continue;
+        if (!cleaned) continue;
 
-        // Search HVSC — try full term, then first word
-        let sidResults = (await searchHVSC(bare, 20))
-          .filter((r: { isDirectory: boolean; name: string }) => !r.isDirectory && r.name.toLowerCase().endsWith('.sid'));
+        // Split on double+ spaces: "Artist   Song Title" → [artist, songTitle]
+        const parts = cleaned.split(/\s{2,}/);
+        const artist = parts.length >= 2 ? parts[0].trim() : '';
+        const songTitle = parts.length >= 2 ? parts.slice(1).join(' ').trim() : cleaned;
 
-        if (sidResults.length === 0) {
-          const firstWord = bare.split(/\s+/)[0];
-          if (firstWord && firstWord.length >= 3) {
-            await new Promise(r => setTimeout(r, 200));
-            sidResults = (await searchHVSC(firstWord, 20))
-              .filter((r: { isDirectory: boolean; name: string }) => !r.isDirectory && r.name.toLowerCase().endsWith('.sid'));
-          }
+        type HVSCResult = { isDirectory: boolean; name: string; path: string; author?: string };
+        const filterSID = (r: HVSCResult) => !r.isDirectory && r.name.toLowerCase().endsWith('.sid');
+
+        // Search strategy: song title first (most specific), then artist+title, then full cleaned string
+        let sidResults: HVSCResult[] = [];
+        const searches: string[] = [];
+
+        if (songTitle.length >= 2) searches.push(songTitle);
+        if (artist && songTitle && artist !== songTitle) searches.push(`${artist} ${songTitle}`);
+        if (searches.length === 0) searches.push(cleaned);
+
+        for (const query of searches) {
+          sidResults = (await searchHVSC(query, 20)).filter(filterSID);
+          if (sidResults.length > 0) break;
+          await new Promise(r => setTimeout(r, 150));
         }
 
-        // Prefer exact filename match
-        const lowerBare = bare.toLowerCase();
-        const exactMatch = sidResults.find((r: { name: string }) =>
-          r.name.toLowerCase().replace(/\.sid$/i, '') === lowerBare
-        );
-        const match = exactMatch || sidResults[0];
+        // Score results: prefer exact name match, then artist match, then first result
+        let match: HVSCResult | undefined;
+        if (sidResults.length > 0) {
+          const lowerSong = songTitle.toLowerCase();
+          const lowerArtist = artist.toLowerCase();
+
+          // Exact song name match
+          match = sidResults.find(r =>
+            r.name.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ') === lowerSong
+          );
+          // Partial song name match + artist in path/author
+          if (!match && lowerArtist) {
+            match = sidResults.find(r => {
+              const rName = r.name.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ');
+              const rPath = r.path.toLowerCase();
+              const rAuthor = (r.author || '').toLowerCase();
+              return rName.includes(lowerSong) &&
+                (rPath.includes(lowerArtist) || rAuthor.includes(lowerArtist));
+            });
+          }
+          // Partial song name match
+          if (!match) {
+            match = sidResults.find(r =>
+              r.name.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ').includes(lowerSong)
+            );
+          }
+          if (!match) match = sidResults[0];
+        }
 
         if (match) {
           useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, {
@@ -690,11 +724,11 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
             trackName: track.trackName || match.name.replace(/\.sid$/i, ''),
           });
           fixed++;
-          console.log(`[DJPlaylistStore] Fixed: "${bare}" → hvsc:${match.path}`);
+          console.log(`[DJPlaylistStore] Fixed: "${cleaned}" → hvsc:${match.path}`);
         } else {
-          console.warn(`[DJPlaylistStore] No HVSC match for: "${bare}"`);
+          console.warn(`[DJPlaylistStore] No HVSC match for: "${cleaned}" (raw: "${raw}")`);
         }
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 150));
       } catch (err) {
         console.warn(`[DJPlaylistStore] Failed to repair "${track.trackName}":`, err);
       }
