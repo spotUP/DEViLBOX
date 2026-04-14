@@ -60,9 +60,10 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
     this.dryWet = 1.0;         // 0-1, mix control
     this.enabled = true;
 
-    // 4× downsampling state — LSTM runs at quarter sample rate, cubic interpolation
-    this.lstmOut = [0.0, 0.0, 0.0, 0.0]; // ring buffer of last 4 LSTM outputs for cubic interp
-    this.dsPhase = 0; // cycles 0,1,2,3
+    // 2× downsampling state — LSTM runs at half sample rate, linear interpolation
+    this.prevLSTMOut = 0.0;
+    this.currLSTMOut = 0.0;
+    this.dsPhase = 0; // toggles 0/1
 
     // DC blocker (one-pole highpass ~20Hz)
     this.dcBlocker_x1 = 0.0;
@@ -277,7 +278,8 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
     this.srcFilter_x2 = 0.0;
     this.srcFilter_y1 = 0.0;
     this.srcFilter_y2 = 0.0;
-    this.lstmOut = [0.0, 0.0, 0.0, 0.0];
+    this.prevLSTMOut = 0.0;
+    this.currLSTMOut = 0.0;
     this.dsPhase = 0;
   }
 
@@ -371,8 +373,9 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
     const dryWet = this.dryWet;
     const useSRC = this.useSRCFilter;
 
+    let prevOut = this.prevLSTMOut;
+    let currOut = this.currLSTMOut;
     let phase = this.dsPhase;
-    const lstmOut = this.lstmOut;
 
     for (let s = 0; s < numSamples; s++) {
       const dry = inputChannel[s];
@@ -380,9 +383,9 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
 
       if (phase === 0) {
         // === Run LSTM on this sample ===
-        let inp = dry * inputGain;
+        const inp = dry * inputGain;
 
-        // Step 1: gates = bias + Wih * input
+        // Step 1: gates = bias + Wih * input (inlined, no function call overhead)
         if (isCond) {
           for (let i = 0; i < H4; i++) {
             gates[i] = bias[i] + Wih[i] * inp + Wih[H4 + i] * cond;
@@ -393,7 +396,7 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
           }
         }
 
-        // Step 2: gates += Whh * h
+        // Step 2: gates += Whh * h (skip zero h values)
         for (let j = 0; j < H; j++) {
           const hj = h[j];
           if (hj === 0) continue;
@@ -403,44 +406,44 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
           }
         }
 
-        // Step 3: Activations and state update
-        for (let i = 0; i < H; i++) {
-          const ig = this.sigmoid(gates[i]);
-          const fg = this.sigmoid(gates[H + i]);
-          const gg = this.fastTanh(gates[H * 2 + i]);
-          const og = this.sigmoid(gates[H * 3 + i]);
-          c[i] = fg * c[i] + ig * gg;
-          h[i] = og * this.fastTanh(c[i]);
-        }
-
-        // Step 4: Dense output
+        // Step 3+4: Activations, state update, and dense output — all inlined
         let out = db;
         for (let i = 0; i < H; i++) {
-          out += dW[i] * h[i];
+          // Inline sigmoid: 0.5 + 0.5 * x / (1 + |x|)
+          let x = gates[i];
+          const ig = 0.5 + 0.5 * x / (1.0 + (x > 0 ? x : -x));
+          x = gates[H + i];
+          const fg = 0.5 + 0.5 * x / (1.0 + (x > 0 ? x : -x));
+          x = gates[H * 3 + i];
+          const og = 0.5 + 0.5 * x / (1.0 + (x > 0 ? x : -x));
+          // Inline fastTanh for cell gate
+          x = gates[H * 2 + i];
+          let gg;
+          if (x < -4.5) gg = -1.0;
+          else if (x > 4.5) gg = 1.0;
+          else { const x2 = x * x; gg = x * (135135 + x2 * (17325 + x2 * (378 + x2))) / (135135 + x2 * (62370 + x2 * (3150 + 28 * x2))); }
+          // Cell state
+          const ci = fg * c[i] + ig * gg;
+          c[i] = ci;
+          // Inline fastTanh for output
+          let th;
+          if (ci < -4.5) th = -1.0;
+          else if (ci > 4.5) th = 1.0;
+          else { const ci2 = ci * ci; th = ci * (135135 + ci2 * (17325 + ci2 * (378 + ci2))) / (135135 + ci2 * (62370 + ci2 * (3150 + 28 * ci2))); }
+          const hi = og * th;
+          h[i] = hi;
+          out += dW[i] * hi;
         }
 
-        // Shift ring buffer and store new output
-        lstmOut[3] = lstmOut[2];
-        lstmOut[2] = lstmOut[1];
-        lstmOut[1] = lstmOut[0];
-        lstmOut[0] = out;
-        sample = out;
+        prevOut = currOut;
+        currOut = out;
+        sample = currOut;
       } else {
-        // === Cubic Hermite interpolation between LSTM outputs ===
-        // lstmOut[0] = newest, lstmOut[1] = previous, etc.
-        const t = phase * 0.25; // 0.25, 0.5, 0.75
-        const y0 = lstmOut[2];
-        const y1 = lstmOut[1];
-        const y2 = lstmOut[0];
-        const y3 = lstmOut[0]; // clamp future to current
-        const a = -0.5 * y0 + 1.5 * y1 - 1.5 * y2 + 0.5 * y3;
-        const b = y0 - 2.5 * y1 + 2.0 * y2 - 0.5 * y3;
-        const cc = -0.5 * y0 + 0.5 * y2;
-        const d = y1;
-        sample = ((a * t + b) * t + cc) * t + d;
+        // === Linear interpolation between LSTM outputs ===
+        sample = (prevOut + currOut) * 0.5;
       }
 
-      phase = (phase + 1) & 3; // cycle 0,1,2,3
+      phase = 1 - phase; // toggle 0/1
 
       // Sample rate correction filter
       if (useSRC) {
@@ -454,6 +457,8 @@ class GuitarMLProcessor extends AudioWorkletProcessor {
       outputChannel[s] = dry * (1.0 - dryWet) + sample * dryWet;
     }
 
+    this.prevLSTMOut = prevOut;
+    this.currLSTMOut = currOut;
     this.dsPhase = phase;
 
     return true;

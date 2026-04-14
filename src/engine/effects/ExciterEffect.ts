@@ -53,12 +53,12 @@ export class ExciterEffect extends Tone.ToneAudioNode {
 
   constructor(options: ExciterOptions = {}) {
     super();
-    this._frequency = options.frequency ?? 3000;
-    this._amount = options.amount ?? 0.5;
-    this._blend = options.blend ?? 0.5;
-    this._ceil = options.ceil ?? 16000;
-    this._mix = options.mix ?? 1;
-    this._wet = options.wet ?? 1.0;
+    this._frequency = clamp(options.frequency ?? 3000, 1000, 10000);
+    this._amount = clamp(options.amount ?? 0.5, 0, 1);
+    this._blend = clamp(options.blend ?? 0.5, 0, 1);
+    this._ceil = clamp(options.ceil ?? 16000, 1000, 20000);
+    this._mix = clamp(options.mix ?? 1, 0, 1);
+    this._wet = clamp(options.wet ?? 1.0, 0, 1);
 
     const rawCtx = Tone.getContext().rawContext as AudioContext;
 

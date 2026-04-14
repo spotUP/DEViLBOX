@@ -163,6 +163,80 @@ switch (type) {
 /** Map synthType strings to FurnaceDispatchPlatform values for non-FM chips */
 
 
+/**
+ * Per-effect-type output gain compensation (dB).
+ * Each value offsets the typical gain change of that effect at 100% wet.
+ * Positive = effect cuts volume → boost. Negative = effect boosts volume → attenuate.
+ *
+ * Effects not listed here are assumed to be unity-gain (0dB compensation).
+ * TapeSaturation handles its own makeup gain internally — not listed.
+ */
+const GAIN_COMPENSATION_DB: Record<string, number> = {
+  // Reverbs: wet signal adds tail energy on top of dry
+  Reverb:         -1.5,
+  JCReverb:       -1.5,
+  MVerb:          -1.0,
+  SpringReverb:   -1.5,
+  ShimmerReverb:  -2.0,
+  Freeverb:       -1.5,
+
+  // Delays/echoes: wet signal is delayed copies that add energy
+  Delay:          -1.0,
+  FeedbackDelay:  -1.0,
+  PingPongDelay:  -1.5,
+  SpaceEcho:      -2.0,
+  SpaceyDelayer:  -1.5,
+  RETapeEcho:     -1.5,
+  AmbientDelay:   -1.5,
+  Aelapse:        -1.5,
+
+  // Distortion/saturation: adds harmonics that increase RMS
+  Distortion:     -2.5,
+  Chebyshev:      -2.0,
+  // TapeSaturation: handled internally via calculateMakeupGain
+  SwedishChainsaw: -3.0,
+
+  // Modulation: some add parallel signal energy
+  Chorus:         -1.0,
+  Leslie:         -1.0,
+  BiPhase:        -0.5,
+  Phaser:         -0.5,
+  WAMStonePhaser: -0.5,
+
+  // Vinyl/tape sim: adds noise + coloration energy
+  VinylNoise:     -1.0,
+  ToneArm:        -0.5,
+  TapeDegradation: -0.5,
+
+  // BitCrusher: quantization can boost peaks
+  BitCrusher:     -1.0,
+
+  // Filters: remove frequency content → volume loss
+  Filter:         +1.5,
+  AutoFilter:     +1.5,
+  MoogFilter:     +2.0,
+  DubFilter:      +1.0,
+
+  // Neural: LSTM gain varies by model; level param handles most of it,
+  // but wet signal tends to be slightly hot
+  Neural:         -1.0,
+
+  // WAM pedals: distortion/fuzz pedals boost signal
+  WAMBigMuff:     -3.0,
+  WAMTS9:         -2.0,
+  WAMDistoMachine: -2.5,
+  WAMQuadraFuzz:  -2.5,
+  WAMVoxAmp:      -2.0,
+
+  // Pitch shift can slightly alter RMS
+  PitchShift:     -0.5,
+};
+
+/** dB → linear gain */
+function dbToGain(db: number): number {
+  return Math.pow(10, db / 20);
+}
+
 export async function createEffectChain(
   effects: EffectConfig[]
 ): Promise<(Tone.ToneAudioNode | DevilboxSynth)[]> {
@@ -178,12 +252,41 @@ export async function createEffect(
   // Helper: Tone.js expects specific numeric/string params; our EffectConfig stores them as number|string
   const p = config.parameters as Record<string, number & string>;
 
+  /** Wrap an effect node with gain compensation if needed for its type. */
+  function applyGainCompensation(effectNode: Tone.ToneAudioNode | DevilboxSynth): Tone.ToneAudioNode | DevilboxSynth {
+    const effectType = config.category === 'neural' ? 'Neural' : config.type;
+    const compensationDb = GAIN_COMPENSATION_DB[effectType];
+    if (!compensationDb) return effectNode;
+    // Scale by wet: at low wet%, most signal is dry (unity) → less compensation needed
+    const scaledDb = compensationDb * wetValue;
+    const wrapper = new Tone.Gain(1);
+    const compensationGain = new Tone.Gain(dbToGain(scaledDb));
+    wrapper.connect(effectNode as Tone.ToneAudioNode);
+    (effectNode as Tone.ToneAudioNode).connect(compensationGain);
+    Object.defineProperty(wrapper, 'output', {
+      value: (compensationGain as unknown as { output: unknown }).output,
+      configurable: true,
+    });
+    // Override dispose to clean up all three nodes
+    const originalDispose = wrapper.dispose.bind(wrapper);
+    wrapper.dispose = () => {
+      try { (effectNode as Tone.ToneAudioNode).disconnect(); } catch { /* */ }
+      try { compensationGain.disconnect(); compensationGain.dispose(); } catch { /* */ }
+      try { (effectNode as Tone.ToneAudioNode).dispose(); } catch { /* */ }
+      return originalDispose();
+    };
+    (wrapper as Tone.ToneAudioNode & { _fxType?: string })._fxType = config.type;
+    (wrapper as unknown as Record<string, unknown>)._innerEffect = effectNode;
+    (wrapper as unknown as Record<string, unknown>)._compensationGain = compensationGain;
+    return wrapper;
+  }
+
   // Try EffectRegistry first
   const effectDesc = await EffectRegistry.ensure(config.type);
   if (effectDesc) {
     const registryNode = await effectDesc.create(config);
     (registryNode as Tone.ToneAudioNode & { _fxType?: string })._fxType = config.type;
-    return registryNode;
+    return applyGainCompensation(registryNode);
   }
 
   // Neural effects
@@ -204,7 +307,7 @@ export async function createEffect(
       wrapper.setParameter(key, value as number);
     });
 
-    return wrapper;
+    return applyGainCompensation(wrapper);
   }
 
   // Tone.js effects
@@ -344,7 +447,7 @@ export async function createEffect(
     case 'Chebyshev':
       node = new Tone.Chebyshev({
         order: p.order || 2,
-        oversample: p.oversample || 'none',
+        oversample: p.oversample || '2x',
         wet: wetValue,
       });
       break;
@@ -603,7 +706,7 @@ export async function createEffect(
       break;
 
     case 'ToneArm': {
-      const node = new ToneArmEffect({
+      node = new ToneArmEffect({
         wow:     (p.wow     != null ? Number(p.wow)     : 20) / 100,
         coil:    (p.coil    != null ? Number(p.coil)    : 50) / 100,
         flutter: (p.flutter != null ? Number(p.flutter) : 15) / 100,
@@ -614,12 +717,11 @@ export async function createEffect(
         rpm:     (p.rpm     != null ? Number(p.rpm)     : 33.333),
         wet:     wetValue,
       });
-      (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'ToneArm';
-      return node;
+      break;
     }
 
     case 'VinylNoise': {
-      const node = new VinylNoiseEffect({
+      node = new VinylNoiseEffect({
         hiss:            (p.hiss            != null ? Number(p.hiss)            : 20)  / 100,
         dust:            (p.dust            != null ? Number(p.dust)            : 30)  / 100,
         age:             (p.age             != null ? Number(p.age)             : 18)  / 100,
@@ -635,8 +737,7 @@ export async function createEffect(
         eccentricity:    (p.eccentricity    != null ? Number(p.eccentricity)    : 0)   / 100,
         wet: wetValue,
       });
-      (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'VinylNoise';
-      return node;
+      break;
     }
 
     // *Wave / ambient effects
@@ -775,6 +876,7 @@ export async function createEffect(
     }
   }
 
-  return node;
+  // Apply per-effect-type gain compensation to normalize output levels.
+  return applyGainCompensation(node);
 }
 

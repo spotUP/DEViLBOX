@@ -102,25 +102,25 @@ const wasmEffects: EffectDescriptor[] = [
       const { AelapseEffect } = await import('@engine/effects/AelapseEffect');
       const p = c.parameters;
       return new AelapseEffect({
-        delayActive:     (Number(p.delayActive) ?? 100) > 50,
-        delayDryWet:     (Number(p.delayDryWet) ?? 35) / 100,
-        delayTime:       (Number(p.delayTime) ?? 30) / 100,
-        delayFeedback:   (Number(p.delayFeedback) ?? 45) / 100,
-        delayCutLow:     (Number(p.delayCutLow) ?? 5) / 100,
-        delayCutHi:      (Number(p.delayCutHi) ?? 75) / 100,
-        delaySaturation: (Number(p.delaySaturation) ?? 25) / 100,
-        delayDrift:      (Number(p.delayDrift) ?? 15) / 100,
-        delayMode:       Number(p.delayMode) ?? 0,
-        springsActive:   (Number(p.springsActive) ?? 100) > 50,
-        springsDryWet:   (Number(p.springsDryWet) ?? 40) / 100,
-        springsWidth:    (Number(p.springsWidth) ?? 100) / 100,
-        springsLength:   (Number(p.springsLength) ?? 50) / 100,
-        springsDecay:    (Number(p.springsDecay) ?? 40) / 100,
-        springsDamp:     (Number(p.springsDamp) ?? 30) / 100,
-        springsShape:    (Number(p.springsShape) ?? 30) / 100,
-        springsTone:     (Number(p.springsTone) ?? 50) / 100,
-        springsScatter:  (Number(p.springsScatter) ?? 50) / 100,
-        springsChaos:    (Number(p.springsChaos) ?? 10) / 100,
+        delayActive:     (Number(p.delayActive) || 100) > 50,
+        delayDryWet:     (Number(p.delayDryWet) || 35) / 100,
+        delayTime:       (Number(p.delayTime) || 30) / 100,
+        delayFeedback:   (Number(p.delayFeedback) || 45) / 100,
+        delayCutLow:     (Number(p.delayCutLow) || 5) / 100,
+        delayCutHi:      (Number(p.delayCutHi) || 75) / 100,
+        delaySaturation: (Number(p.delaySaturation) || 25) / 100,
+        delayDrift:      (Number(p.delayDrift) || 15) / 100,
+        delayMode:       Number(p.delayMode) || 0,
+        springsActive:   (Number(p.springsActive) || 100) > 50,
+        springsDryWet:   (Number(p.springsDryWet) || 40) / 100,
+        springsWidth:    (Number(p.springsWidth) || 100) / 100,
+        springsLength:   (Number(p.springsLength) || 50) / 100,
+        springsDecay:    (Number(p.springsDecay) || 40) / 100,
+        springsDamp:     (Number(p.springsDamp) || 30) / 100,
+        springsShape:    (Number(p.springsShape) || 30) / 100,
+        springsTone:     (Number(p.springsTone) || 50) / 100,
+        springsScatter:  (Number(p.springsScatter) || 50) / 100,
+        springsChaos:    (Number(p.springsChaos) || 10) / 100,
         wet: c.wet / 100,
       });
     },
@@ -146,7 +146,7 @@ const wasmEffects: EffectDescriptor[] = [
       return new ShimmerReverbEffect({
         decay: (Number(p.decay) || 70) / 100,
         shimmer: (Number(p.shimmer) || 50) / 100,
-        pitch: Number(p.pitch) ?? 12,
+        pitch: Number(p.pitch) || 12,
         damping: (Number(p.damping) || 50) / 100,
         size: (Number(p.size) || 70) / 100,
         predelay: (Number(p.predelay) || 40) / 1000,
@@ -178,7 +178,7 @@ const wasmEffects: EffectDescriptor[] = [
         source: sourceStr,
         bands: Number(p.bands) || preset?.params.bands || 32,
         filtersPerBand: Number(p.filtersPerBand) || preset?.params.filtersPerBand || 6,
-        carrierType: (Number(p.carrierType) ?? 3) as 0 | 1 | 2 | 3,
+        carrierType: (Number(p.carrierType) || 3) as 0 | 1 | 2 | 3,
         carrierFreq: Number(p.carrierFreq) || preset?.params.carrierFreq || 130.81,
         formantShift: Number(p.formantShift) || preset?.params.formantShift || 1.0,
         reactionTime: (Number(p.reactionTime) || (preset?.params.reactionTime ?? 0.03) * 1000) / 1000,
@@ -213,8 +213,8 @@ const wasmEffects: EffectDescriptor[] = [
       return new AutoTuneEffect({
         key: Number(p.key) || 0,
         scale: scaleStr,
-        strength: (Number(p.strength) ?? 100) / 100,
-        speed: (Number(p.speed) ?? 70) / 100,
+        strength: (Number(p.strength) || 100) / 100,
+        speed: (Number(p.speed) || 70) / 100,
         wet: c.wet / 100,
       });
     },
@@ -241,7 +241,7 @@ const wasmEffects: EffectDescriptor[] = [
         grainSize: (Number(p.grainSize) || 80) / 1000,
         density: Number(p.density) || 12,
         scatter: (Number(p.scatter) || 30) / 100,
-        pitch: Number(p.pitch) ?? 0,
+        pitch: Number(p.pitch) || 0,
         spray: (Number(p.spray) || 20) / 100,
         shimmer: (Number(p.shimmer) || 0) / 100,
         stereoWidth: (Number(p.stereoWidth) || 70) / 100,
@@ -267,12 +267,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { NoiseGateEffect } = await import('@engine/effects/NoiseGateEffect');
       const p = c.parameters;
       return new NoiseGateEffect({
-        threshold: Number(p.threshold) ?? -40,
-        attack: Number(p.attack) ?? 0.5,
-        hold: Number(p.hold) ?? 50,
-        release: Number(p.release) ?? 100,
-        range: (Number(p.range) ?? 0) / 100,
-        hpf: Number(p.hpf) ?? 0,
+        threshold: Number(p.threshold) || -40,
+        attack: Number(p.attack) || 0.5,
+        hold: Number(p.hold) || 50,
+        release: Number(p.release) || 100,
+        range: (Number(p.range) || 0) / 100,
+        hpf: Number(p.hpf) || 0,
         wet: c.wet / 100,
       });
     },
@@ -290,12 +290,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { LimiterEffect } = await import('@engine/effects/LimiterEffect');
       const p = c.parameters;
       return new LimiterEffect({
-        threshold: Number(p.threshold) ?? -1,
-        ceiling: Number(p.ceiling) ?? -0.3,
-        attack: Number(p.attack) ?? 5,
-        release: Number(p.release) ?? 50,
-        lookahead: Number(p.lookahead) ?? 5,
-        knee: Number(p.knee) ?? 0,
+        threshold: Number(p.threshold) || -1,
+        ceiling: Number(p.ceiling) || -0.3,
+        attack: Number(p.attack) || 5,
+        release: Number(p.release) || 50,
+        lookahead: Number(p.lookahead) || 5,
+        knee: Number(p.knee) || 0,
         wet: c.wet / 100,
       });
     },
@@ -313,12 +313,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { FlangerEffect } = await import('@engine/effects/FlangerEffect');
       const p = c.parameters;
       return new FlangerEffect({
-        rate: Number(p.rate) ?? 0.3,
-        depth: (Number(p.depth) ?? 70) / 100,
-        delay: Number(p.delay) ?? 5,
-        feedback: (Number(p.feedback) ?? 30) / 100,
-        stereo: Number(p.stereo) ?? 90,
-        mix: (Number(p.mix) ?? 50) / 100,
+        rate: Number(p.rate) || 0.3,
+        depth: (Number(p.depth) || 70) / 100,
+        delay: Number(p.delay) || 5,
+        feedback: (Number(p.feedback) || 30) / 100,
+        stereo: Number(p.stereo) || 90,
+        mix: (Number(p.mix) || 50) / 100,
         wet: c.wet / 100,
       });
     },
@@ -336,10 +336,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { OverdriveEffect } = await import('@engine/effects/OverdriveEffect');
       const p = c.parameters;
       return new OverdriveEffect({
-        drive: (Number(p.drive) ?? 50) / 100,
-        tone: (Number(p.tone) ?? 50) / 100,
-        mix: (Number(p.mix) ?? 100) / 100,
-        level: (Number(p.level) ?? 50) / 100,
+        drive: (Number(p.drive) || 50) / 100,
+        tone: (Number(p.tone) || 50) / 100,
+        mix: (Number(p.mix) || 100) / 100,
+        level: (Number(p.level) || 50) / 100,
         wet: c.wet / 100,
       });
     },
@@ -357,11 +357,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { RingModEffect } = await import('@engine/effects/RingModEffect');
       const p = c.parameters;
       return new RingModEffect({
-        frequency: Number(p.frequency) ?? 440,
-        mix: (Number(p.mix) ?? 50) / 100,
-        waveform: Number(p.waveform) ?? 0,
-        lfoRate: Number(p.lfoRate) ?? 0,
-        lfoDepth: (Number(p.lfoDepth) ?? 0) / 100,
+        frequency: Number(p.frequency) || 440,
+        mix: (Number(p.mix) || 50) / 100,
+        waveform: Number(p.waveform) || 0,
+        lfoRate: Number(p.lfoRate) || 0,
+        lfoDepth: (Number(p.lfoDepth) || 0) / 100,
         wet: c.wet / 100,
       });
     },
@@ -379,11 +379,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { DragonflyPlateEffect } = await import('@engine/effects/DragonflyPlateEffect');
       const p = c.parameters;
       return new DragonflyPlateEffect({
-        decay: (Number(p.decay) ?? 70) / 100,
-        damping: (Number(p.damping) ?? 50) / 100,
-        predelay: Number(p.predelay) ?? 10,
-        width: (Number(p.width) ?? 100) / 100,
-        brightness: (Number(p.brightness) ?? 70) / 100,
+        decay: (Number(p.decay) || 70) / 100,
+        damping: (Number(p.damping) || 50) / 100,
+        predelay: Number(p.predelay) || 10,
+        width: (Number(p.width) || 100) / 100,
+        brightness: (Number(p.brightness) || 70) / 100,
         wet: c.wet / 100,
       });
     },
@@ -401,12 +401,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { DragonflyHallEffect } = await import('@engine/effects/DragonflyHallEffect');
       const p = c.parameters;
       return new DragonflyHallEffect({
-        decay: (Number(p.decay) ?? 80) / 100,
-        damping: (Number(p.damping) ?? 40) / 100,
-        predelay: Number(p.predelay) ?? 20,
-        width: (Number(p.width) ?? 100) / 100,
-        earlyLevel: (Number(p.earlyLevel) ?? 50) / 100,
-        size: Number(p.size) ?? 1.5,
+        decay: (Number(p.decay) || 80) / 100,
+        damping: (Number(p.damping) || 40) / 100,
+        predelay: Number(p.predelay) || 20,
+        width: (Number(p.width) || 100) / 100,
+        earlyLevel: (Number(p.earlyLevel) || 50) / 100,
+        size: Number(p.size) || 1.5,
         wet: c.wet / 100,
       });
     },
@@ -424,12 +424,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { DragonflyRoomEffect } = await import('@engine/effects/DragonflyRoomEffect');
       const p = c.parameters;
       return new DragonflyRoomEffect({
-        decay: (Number(p.decay) ?? 40) / 100,
-        damping: (Number(p.damping) ?? 60) / 100,
-        predelay: Number(p.predelay) ?? 5,
-        width: (Number(p.width) ?? 80) / 100,
-        earlyLevel: (Number(p.earlyLevel) ?? 70) / 100,
-        size: Number(p.size) ?? 0.7,
+        decay: (Number(p.decay) || 40) / 100,
+        damping: (Number(p.damping) || 60) / 100,
+        predelay: Number(p.predelay) || 5,
+        width: (Number(p.width) || 80) / 100,
+        earlyLevel: (Number(p.earlyLevel) || 70) / 100,
+        size: Number(p.size) || 0.7,
         wet: c.wet / 100,
       });
     },
@@ -447,10 +447,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { JunoChorusEffect } = await import('@engine/effects/JunoChorusEffect');
       const p = c.parameters;
       return new JunoChorusEffect({
-        rate: Number(p.rate) ?? 0.5,
-        depth: (Number(p.depth) ?? 50) / 100,
-        mode: Number(p.mode) ?? 2,
-        mix: (Number(p.mix) ?? 50) / 100,
+        rate: Number(p.rate) || 0.5,
+        depth: (Number(p.depth) || 50) / 100,
+        mode: Number(p.mode) || 2,
+        mix: (Number(p.mix) || 50) / 100,
         wet: c.wet / 100,
       });
     },
@@ -468,10 +468,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { ParametricEQEffect } = await import('@engine/effects/ParametricEQEffect');
       const p = c.parameters;
       return new ParametricEQEffect({
-        b1Freq: Number(p.b1Freq) ?? 100, b1Gain: Number(p.b1Gain) ?? 0, b1Q: Number(p.b1Q) ?? 0.7,
-        b2Freq: Number(p.b2Freq) ?? 500, b2Gain: Number(p.b2Gain) ?? 0, b2Q: Number(p.b2Q) ?? 0.7,
-        b3Freq: Number(p.b3Freq) ?? 2000, b3Gain: Number(p.b3Gain) ?? 0, b3Q: Number(p.b3Q) ?? 0.7,
-        b4Freq: Number(p.b4Freq) ?? 8000, b4Gain: Number(p.b4Gain) ?? 0, b4Q: Number(p.b4Q) ?? 0.7,
+        b1Freq: Number(p.b1Freq) || 100, b1Gain: Number(p.b1Gain) || 0, b1Q: Number(p.b1Q) || 0.7,
+        b2Freq: Number(p.b2Freq) || 500, b2Gain: Number(p.b2Gain) || 0, b2Q: Number(p.b2Q) || 0.7,
+        b3Freq: Number(p.b3Freq) || 2000, b3Gain: Number(p.b3Gain) || 0, b3Q: Number(p.b3Q) || 0.7,
+        b4Freq: Number(p.b4Freq) || 8000, b4Gain: Number(p.b4Gain) || 0, b4Q: Number(p.b4Q) || 0.7,
         wet: c.wet / 100,
       });
     },
@@ -494,9 +494,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { CabinetSimEffect } = await import('@engine/effects/CabinetSimEffect');
       const p = c.parameters;
       return new CabinetSimEffect({
-        cabinet: Number(p.cabinet) ?? 0,
-        mix: (Number(p.mix) ?? 100) / 100,
-        brightness: (Number(p.brightness) ?? 50) / 100,
+        cabinet: Number(p.cabinet) || 0,
+        mix: (Number(p.mix) || 100) / 100,
+        brightness: (Number(p.brightness) || 50) / 100,
         wet: c.wet / 100,
       });
     },
@@ -514,13 +514,13 @@ const wasmEffects: EffectDescriptor[] = [
       const { TubeAmpEffect } = await import('@engine/effects/TubeAmpEffect');
       const p = c.parameters;
       return new TubeAmpEffect({
-        drive: (Number(p.drive) ?? 50) / 100,
-        bass: (Number(p.bass) ?? 50) / 100,
-        mid: (Number(p.mid) ?? 50) / 100,
-        treble: (Number(p.treble) ?? 50) / 100,
-        presence: (Number(p.presence) ?? 50) / 100,
-        master: (Number(p.master) ?? 50) / 100,
-        sag: (Number(p.sag) ?? 20) / 100,
+        drive: (Number(p.drive) || 50) / 100,
+        bass: (Number(p.bass) || 50) / 100,
+        mid: (Number(p.mid) || 50) / 100,
+        treble: (Number(p.treble) || 50) / 100,
+        presence: (Number(p.presence) || 50) / 100,
+        master: (Number(p.master) || 50) / 100,
+        sag: (Number(p.sag) || 20) / 100,
         wet: c.wet / 100,
       });
     },
@@ -538,12 +538,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { DeEsserEffect } = await import('@engine/effects/DeEsserEffect');
       const p = c.parameters;
       return new DeEsserEffect({
-        frequency: Number(p.frequency) ?? 6000,
-        bandwidth: Number(p.bandwidth) ?? 1,
-        threshold: Number(p.threshold) ?? -20,
-        ratio: Number(p.ratio) ?? 4,
-        attack: Number(p.attack) ?? 1,
-        release: Number(p.release) ?? 50,
+        frequency: Number(p.frequency) || 6000,
+        bandwidth: Number(p.bandwidth) || 1,
+        threshold: Number(p.threshold) || -20,
+        ratio: Number(p.ratio) || 4,
+        attack: Number(p.attack) || 1,
+        release: Number(p.release) || 50,
         wet: c.wet / 100,
       });
     },
@@ -561,17 +561,17 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandCompEffect } = await import('@engine/effects/MultibandCompEffect');
       const p = c.parameters;
       return new MultibandCompEffect({
-        lowCrossover: Number(p.lowCrossover) ?? 200,
-        highCrossover: Number(p.highCrossover) ?? 3000,
-        lowThreshold: Number(p.lowThreshold) ?? -20,
-        midThreshold: Number(p.midThreshold) ?? -20,
-        highThreshold: Number(p.highThreshold) ?? -20,
-        lowRatio: Number(p.lowRatio) ?? 4,
-        midRatio: Number(p.midRatio) ?? 4,
-        highRatio: Number(p.highRatio) ?? 4,
-        lowGain: Number(p.lowGain) ?? 1,
-        midGain: Number(p.midGain) ?? 1,
-        highGain: Number(p.highGain) ?? 1,
+        lowCrossover: Number(p.lowCrossover) || 200,
+        highCrossover: Number(p.highCrossover) || 3000,
+        lowThreshold: Number(p.lowThreshold) || -20,
+        midThreshold: Number(p.midThreshold) || -20,
+        highThreshold: Number(p.highThreshold) || -20,
+        lowRatio: Number(p.lowRatio) || 4,
+        midRatio: Number(p.midRatio) || 4,
+        highRatio: Number(p.highRatio) || 4,
+        lowGain: Number(p.lowGain) || 1,
+        midGain: Number(p.midGain) || 1,
+        highGain: Number(p.highGain) || 1,
         wet: c.wet / 100,
       });
     },
@@ -589,9 +589,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { TransientDesignerEffect } = await import('@engine/effects/TransientDesignerEffect');
       const p = c.parameters;
       return new TransientDesignerEffect({
-        attack: Number(p.attack) ?? 0,
-        sustain: Number(p.sustain) ?? 0,
-        outputGain: Number(p.output) ?? 1,
+        attack: Number(p.attack) || 0,
+        sustain: Number(p.sustain) || 0,
+        outputGain: Number(p.output) || 1,
         wet: c.wet / 100,
       });
     },
@@ -609,10 +609,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { BassEnhancerEffect } = await import('@engine/effects/BassEnhancerEffect');
       const p = c.parameters;
       return new BassEnhancerEffect({
-        frequency: Number(p.frequency) ?? 100,
-        amount: Number(p.amount) ?? 0.5,
-        drive: Number(p.drive) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        frequency: Number(p.frequency) || 100,
+        amount: Number(p.amount) || 0.5,
+        drive: Number(p.drive) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -630,12 +630,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { ExpanderEffect } = await import('@engine/effects/ExpanderEffect');
       const p = c.parameters;
       return new ExpanderEffect({
-        threshold: Number(p.threshold) ?? -30,
-        ratio: Number(p.ratio) ?? 2,
-        attack: Number(p.attack) ?? 1,
-        release: Number(p.release) ?? 100,
-        range: Number(p.range) ?? -60,
-        knee: Number(p.knee) ?? 6,
+        threshold: Number(p.threshold) || -30,
+        ratio: Number(p.ratio) || 2,
+        attack: Number(p.attack) || 1,
+        release: Number(p.release) || 100,
+        range: Number(p.range) || -60,
+        knee: Number(p.knee) || 6,
         wet: c.wet / 100,
       });
     },
@@ -653,9 +653,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { ReverseDelayEffect } = await import('@engine/effects/ReverseDelayEffect');
       const p = c.parameters;
       return new ReverseDelayEffect({
-        time: Number(p.time) ?? 500,
-        feedback: Number(p.feedback) ?? 0.3,
-        mix: Number(p.mix) ?? 0.5,
+        time: Number(p.time) || 500,
+        feedback: Number(p.feedback) || 0.3,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -673,11 +673,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { VintageDelayEffect } = await import('@engine/effects/VintageDelayEffect');
       const p = c.parameters;
       return new VintageDelayEffect({
-        time: Number(p.time) ?? 400,
-        feedback: Number(p.feedback) ?? 0.4,
-        cutoff: Number(p.cutoff) ?? 3000,
-        drive: Number(p.drive) ?? 0.3,
-        mix: Number(p.mix) ?? 0.5,
+        time: Number(p.time) || 400,
+        feedback: Number(p.feedback) || 0.4,
+        cutoff: Number(p.cutoff) || 3000,
+        drive: Number(p.drive) || 0.3,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -695,13 +695,13 @@ const wasmEffects: EffectDescriptor[] = [
       const { ArtisticDelayEffect } = await import('@engine/effects/ArtisticDelayEffect');
       const p = c.parameters;
       return new ArtisticDelayEffect({
-        timeL: Number(p.timeL) ?? 500,
-        timeR: Number(p.timeR) ?? 375,
-        feedback: Number(p.feedback) ?? 0.4,
-        pan: Number(p.pan) ?? 0.5,
-        lpf: Number(p.lpf) ?? 12000,
-        hpf: Number(p.hpf) ?? 40,
-        mix: Number(p.mix) ?? 0.5,
+        timeL: Number(p.timeL) || 500,
+        timeR: Number(p.timeR) || 375,
+        feedback: Number(p.feedback) || 0.4,
+        pan: Number(p.pan) || 0.5,
+        lpf: Number(p.lpf) || 12000,
+        hpf: Number(p.hpf) || 40,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -719,10 +719,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { SlapbackDelayEffect } = await import('@engine/effects/SlapbackDelayEffect');
       const p = c.parameters;
       return new SlapbackDelayEffect({
-        time: Number(p.time) ?? 60,
-        feedback: Number(p.feedback) ?? 0.1,
-        tone: Number(p.tone) ?? 4000,
-        mix: Number(p.mix) ?? 0.5,
+        time: Number(p.time) || 60,
+        feedback: Number(p.feedback) || 0.1,
+        tone: Number(p.tone) || 4000,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -740,12 +740,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { ZamDelayEffect } = await import('@engine/effects/ZamDelayEffect');
       const p = c.parameters;
       return new ZamDelayEffect({
-        time: Number(p.time) ?? 500,
-        feedback: Number(p.feedback) ?? 0.4,
-        lpf: Number(p.lpf) ?? 8000,
-        hpf: Number(p.hpf) ?? 60,
-        invert: Number(p.invert) ?? 0,
-        mix: Number(p.mix) ?? 0.5,
+        time: Number(p.time) || 500,
+        feedback: Number(p.feedback) || 0.4,
+        lpf: Number(p.lpf) || 8000,
+        hpf: Number(p.hpf) || 60,
+        invert: Number(p.invert) || 0,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -763,11 +763,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { SaturatorEffect } = await import('@engine/effects/SaturatorEffect');
       const p = c.parameters;
       return new SaturatorEffect({
-        drive: Number(p.drive) ?? 0.5,
-        blend: Number(p.blend) ?? 0.5,
-        preFreq: Number(p.preFreq) ?? 20000,
-        postFreq: Number(p.postFreq) ?? 20000,
-        mix: Number(p.mix) ?? 1,
+        drive: Number(p.drive) || 0.5,
+        blend: Number(p.blend) || 0.5,
+        preFreq: Number(p.preFreq) || 20000,
+        postFreq: Number(p.postFreq) || 20000,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -785,11 +785,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { ExciterEffect } = await import('@engine/effects/ExciterEffect');
       const p = c.parameters;
       return new ExciterEffect({
-        frequency: Number(p.frequency) ?? 3000,
-        amount: Number(p.amount) ?? 0.5,
-        blend: Number(p.blend) ?? 0.5,
-        ceil: Number(p.ceil) ?? 16000,
-        mix: Number(p.mix) ?? 1,
+        frequency: Number(p.frequency) || 3000,
+        amount: Number(p.amount) || 0.5,
+        blend: Number(p.blend) || 0.5,
+        ceil: Number(p.ceil) || 16000,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -807,8 +807,8 @@ const wasmEffects: EffectDescriptor[] = [
       const { AutoSatEffect } = await import('@engine/effects/AutoSatEffect');
       const p = c.parameters;
       return new AutoSatEffect({
-        amount: Number(p.amount) ?? 0.5,
-        mix: Number(p.mix) ?? 1,
+        amount: Number(p.amount) || 0.5,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -826,9 +826,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { SatmaEffect } = await import('@engine/effects/SatmaEffect');
       const p = c.parameters;
       return new SatmaEffect({
-        distortion: Number(p.distortion) ?? 0.5,
-        tone: Number(p.tone) ?? 0.5,
-        mix: Number(p.mix) ?? 1,
+        distortion: Number(p.distortion) || 0.5,
+        tone: Number(p.tone) || 0.5,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -846,15 +846,15 @@ const wasmEffects: EffectDescriptor[] = [
       const { DistortionShaperEffect } = await import('@engine/effects/DistortionShaperEffect');
       const p = c.parameters;
       return new DistortionShaperEffect({
-        inputGain: Number(p.inputGain) ?? 1,
-        point1x: Number(p.point1x) ?? -0.5,
-        point1y: Number(p.point1y) ?? -0.5,
-        point2x: Number(p.point2x) ?? 0.5,
-        point2y: Number(p.point2y) ?? 0.5,
-        outputGain: Number(p.outputGain) ?? 1,
-        preLpf: Number(p.preLpf) ?? 20000,
-        postLpf: Number(p.postLpf) ?? 20000,
-        mix: Number(p.mix) ?? 1,
+        inputGain: Number(p.inputGain) || 1,
+        point1x: Number(p.point1x) || -0.5,
+        point1y: Number(p.point1y) || -0.5,
+        point2x: Number(p.point2x) || 0.5,
+        point2y: Number(p.point2y) || 0.5,
+        outputGain: Number(p.outputGain) || 1,
+        preLpf: Number(p.preLpf) || 20000,
+        postLpf: Number(p.postLpf) || 20000,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -872,12 +872,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { MonoCompEffect } = await import('@engine/effects/MonoCompEffect');
       const p = c.parameters;
       return new MonoCompEffect({
-        threshold: Number(p.threshold) ?? -12,
-        ratio: Number(p.ratio) ?? 4,
-        attack: Number(p.attack) ?? 10,
-        release: Number(p.release) ?? 100,
-        knee: Number(p.knee) ?? 6,
-        makeup: Number(p.makeup) ?? 0,
+        threshold: Number(p.threshold) || -12,
+        ratio: Number(p.ratio) || 4,
+        attack: Number(p.attack) || 10,
+        release: Number(p.release) || 100,
+        knee: Number(p.knee) || 6,
+        makeup: Number(p.makeup) || 0,
         wet: c.wet / 100,
       });
     },
@@ -895,13 +895,13 @@ const wasmEffects: EffectDescriptor[] = [
       const { SidechainGateEffect } = await import('@engine/effects/SidechainGateEffect');
       const p = c.parameters;
       return new SidechainGateEffect({
-        threshold: Number(p.threshold) ?? -30,
-        attack: Number(p.attack) ?? 1,
-        hold: Number(p.hold) ?? 50,
-        release: Number(p.release) ?? 200,
-        range: Number(p.range) ?? 0,
-        scFreq: Number(p.scFreq) ?? 200,
-        scQ: Number(p.scQ) ?? 1,
+        threshold: Number(p.threshold) || -30,
+        attack: Number(p.attack) || 1,
+        hold: Number(p.hold) || 50,
+        release: Number(p.release) || 200,
+        range: Number(p.range) || 0,
+        scFreq: Number(p.scFreq) || 200,
+        scQ: Number(p.scQ) || 1,
         wet: c.wet / 100,
       });
     },
@@ -922,16 +922,16 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandGateEffect } = await import('@engine/effects/MultibandGateEffect');
       const p = c.parameters;
       return new MultibandGateEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        highCross: Number(p.highCross) ?? 3000,
-        lowThresh: Number(p.lowThresh) ?? -40,
-        midThresh: Number(p.midThresh) ?? -40,
-        highThresh: Number(p.highThresh) ?? -40,
-        lowRange: Number(p.lowRange) ?? 0,
-        midRange: Number(p.midRange) ?? 0,
-        highRange: Number(p.highRange) ?? 0,
-        attack: Number(p.attack) ?? 1,
-        release: Number(p.release) ?? 200,
+        lowCross: Number(p.lowCross) || 200,
+        highCross: Number(p.highCross) || 3000,
+        lowThresh: Number(p.lowThresh) || -40,
+        midThresh: Number(p.midThresh) || -40,
+        highThresh: Number(p.highThresh) || -40,
+        lowRange: Number(p.lowRange) || 0,
+        midRange: Number(p.midRange) || 0,
+        highRange: Number(p.highRange) || 0,
+        attack: Number(p.attack) || 1,
+        release: Number(p.release) || 200,
         wet: c.wet / 100,
       });
     },
@@ -949,15 +949,15 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandLimiterEffect } = await import('@engine/effects/MultibandLimiterEffect');
       const p = c.parameters;
       return new MultibandLimiterEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        highCross: Number(p.highCross) ?? 3000,
-        lowCeil: Number(p.lowCeil) ?? -1,
-        midCeil: Number(p.midCeil) ?? -1,
-        highCeil: Number(p.highCeil) ?? -1,
-        lowGain: Number(p.lowGain) ?? 1,
-        midGain: Number(p.midGain) ?? 1,
-        highGain: Number(p.highGain) ?? 1,
-        release: Number(p.release) ?? 50,
+        lowCross: Number(p.lowCross) || 200,
+        highCross: Number(p.highCross) || 3000,
+        lowCeil: Number(p.lowCeil) || -1,
+        midCeil: Number(p.midCeil) || -1,
+        highCeil: Number(p.highCeil) || -1,
+        lowGain: Number(p.lowGain) || 1,
+        midGain: Number(p.midGain) || 1,
+        highGain: Number(p.highGain) || 1,
+        release: Number(p.release) || 50,
         wet: c.wet / 100,
       });
     },
@@ -975,10 +975,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { SidechainLimiterEffect } = await import('@engine/effects/SidechainLimiterEffect');
       const p = c.parameters;
       return new SidechainLimiterEffect({
-        ceiling: Number(p.ceiling) ?? -1,
-        release: Number(p.release) ?? 50,
-        scFreq: Number(p.scFreq) ?? 1000,
-        scGain: Number(p.scGain) ?? 0,
+        ceiling: Number(p.ceiling) || -1,
+        release: Number(p.release) || 50,
+        scFreq: Number(p.scFreq) || 1000,
+        scGain: Number(p.scGain) || 0,
         wet: c.wet / 100,
       });
     },
@@ -999,9 +999,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { ClipperEffect } = await import('@engine/effects/ClipperEffect');
       const p = c.parameters;
       return new ClipperEffect({
-        inputGain: Number(p.inputGain) ?? 0,
-        ceiling: Number(p.ceiling) ?? -1,
-        softness: Number(p.softness) ?? 0.5,
+        inputGain: Number(p.inputGain) || 0,
+        ceiling: Number(p.ceiling) || -1,
+        softness: Number(p.softness) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -1019,12 +1019,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { DynamicsProcEffect } = await import('@engine/effects/DynamicsProcEffect');
       const p = c.parameters;
       return new DynamicsProcEffect({
-        lowerThresh: Number(p.lowerThresh) ?? -40,
-        upperThresh: Number(p.upperThresh) ?? -12,
-        ratio: Number(p.ratio) ?? 4,
-        attack: Number(p.attack) ?? 10,
-        release: Number(p.release) ?? 100,
-        makeup: Number(p.makeup) ?? 0,
+        lowerThresh: Number(p.lowerThresh) || -40,
+        upperThresh: Number(p.upperThresh) || -12,
+        ratio: Number(p.ratio) || 4,
+        attack: Number(p.attack) || 10,
+        release: Number(p.release) || 100,
+        makeup: Number(p.makeup) || 0,
         wet: c.wet / 100,
       });
     },
@@ -1042,12 +1042,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { X42CompEffect } = await import('@engine/effects/X42CompEffect');
       const p = c.parameters;
       return new X42CompEffect({
-        threshold: Number(p.threshold) ?? -20,
-        ratio: Number(p.ratio) ?? 4,
-        attack: Number(p.attack) ?? 10,
-        release: Number(p.release) ?? 100,
-        hold: Number(p.hold) ?? 0,
-        inputGain: Number(p.inputGain) ?? 0,
+        threshold: Number(p.threshold) || -20,
+        ratio: Number(p.ratio) || 4,
+        attack: Number(p.attack) || 10,
+        release: Number(p.release) || 100,
+        hold: Number(p.hold) || 0,
+        inputGain: Number(p.inputGain) || 0,
         wet: c.wet / 100,
       });
     },
@@ -1065,20 +1065,20 @@ const wasmEffects: EffectDescriptor[] = [
       const { EQ5BandEffect } = await import('@engine/effects/EQ5BandEffect');
       const p = c.parameters;
       return new EQ5BandEffect({
-        lowShelfFreq: Number(p.lowShelfFreq) ?? 100,
-        lowShelfGain: Number(p.lowShelfGain) ?? 0,
-        peak1Freq: Number(p.peak1Freq) ?? 500,
-        peak1Gain: Number(p.peak1Gain) ?? 0,
-        peak1Q: Number(p.peak1Q) ?? 1,
-        peak2Freq: Number(p.peak2Freq) ?? 1500,
-        peak2Gain: Number(p.peak2Gain) ?? 0,
-        peak2Q: Number(p.peak2Q) ?? 1,
-        peak3Freq: Number(p.peak3Freq) ?? 5000,
-        peak3Gain: Number(p.peak3Gain) ?? 0,
-        peak3Q: Number(p.peak3Q) ?? 1,
-        highShelfFreq: Number(p.highShelfFreq) ?? 8000,
-        highShelfGain: Number(p.highShelfGain) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        lowShelfFreq: Number(p.lowShelfFreq) || 100,
+        lowShelfGain: Number(p.lowShelfGain) || 0,
+        peak1Freq: Number(p.peak1Freq) || 500,
+        peak1Gain: Number(p.peak1Gain) || 0,
+        peak1Q: Number(p.peak1Q) || 1,
+        peak2Freq: Number(p.peak2Freq) || 1500,
+        peak2Gain: Number(p.peak2Gain) || 0,
+        peak2Q: Number(p.peak2Q) || 1,
+        peak3Freq: Number(p.peak3Freq) || 5000,
+        peak3Gain: Number(p.peak3Gain) || 0,
+        peak3Q: Number(p.peak3Q) || 1,
+        highShelfFreq: Number(p.highShelfFreq) || 8000,
+        highShelfGain: Number(p.highShelfGain) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1114,7 +1114,7 @@ const wasmEffects: EffectDescriptor[] = [
         peak4Q: Number(p.peak4Q) || 1,
         highShelfFreq: Number(p.highShelfFreq) || 8000,
         highShelfGain: Number(p.highShelfGain) || 0,
-        mix: Number(p.mix) ?? 1,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1141,7 +1141,7 @@ const wasmEffects: EffectDescriptor[] = [
       const { EQ12BandEffect } = await import('@engine/effects/EQ12BandEffect');
       const p = c.parameters;
       const eq = new EQ12BandEffect({
-        mix: Number(p.mix) ?? 1,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
       for (let i = 0; i < 12; i++) {
@@ -1168,7 +1168,7 @@ const wasmEffects: EffectDescriptor[] = [
       const { GEQ31Effect } = await import('@engine/effects/GEQ31Effect');
       const p = c.parameters;
       const eq = new GEQ31Effect({
-        mix: Number(p.mix) ?? 1,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
       for (let i = 0; i < 31; i++) {
@@ -1194,13 +1194,13 @@ const wasmEffects: EffectDescriptor[] = [
       const { ZamEQ2Effect } = await import('@engine/effects/ZamEQ2Effect');
       const p = c.parameters;
       return new ZamEQ2Effect({
-        lowFreq: Number(p.lowFreq) ?? 200,
-        lowGain: Number(p.lowGain) ?? 0,
-        lowBw: Number(p.lowBw) ?? 1,
-        highFreq: Number(p.highFreq) ?? 4000,
-        highGain: Number(p.highGain) ?? 0,
-        highBw: Number(p.highBw) ?? 1,
-        mix: Number(p.mix) ?? 1,
+        lowFreq: Number(p.lowFreq) || 200,
+        lowGain: Number(p.lowGain) || 0,
+        lowBw: Number(p.lowBw) || 1,
+        highFreq: Number(p.highFreq) || 4000,
+        highGain: Number(p.highGain) || 0,
+        highBw: Number(p.highBw) || 1,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1218,8 +1218,8 @@ const wasmEffects: EffectDescriptor[] = [
       const { PhonoFilterEffect } = await import('@engine/effects/PhonoFilterEffect');
       const p = c.parameters;
       return new PhonoFilterEffect({
-        mode: Number(p.mode) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        mode: Number(p.mode) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1236,15 +1236,15 @@ const wasmEffects: EffectDescriptor[] = [
       const { DynamicEQEffect } = await import('@engine/effects/DynamicEQEffect');
       const p = c.parameters;
       return new DynamicEQEffect({
-        detectFreq: Number(p.detectFreq) ?? 1000,
-        detectQ: Number(p.detectQ) ?? 1,
-        processFreq: Number(p.processFreq) ?? 1000,
-        processQ: Number(p.processQ) ?? 1,
-        threshold: Number(p.threshold) ?? -20,
-        maxGain: Number(p.maxGain) ?? 0,
-        attack: Number(p.attack) ?? 10,
-        release: Number(p.release) ?? 100,
-        mix: Number(p.mix) ?? 1,
+        detectFreq: Number(p.detectFreq) || 1000,
+        detectQ: Number(p.detectQ) || 1,
+        processFreq: Number(p.processFreq) || 1000,
+        processQ: Number(p.processQ) || 1,
+        threshold: Number(p.threshold) || -20,
+        maxGain: Number(p.maxGain) || 0,
+        attack: Number(p.attack) || 10,
+        release: Number(p.release) || 100,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1262,9 +1262,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { HaasEnhancerEffect } = await import('@engine/effects/HaasEnhancerEffect');
       const p = c.parameters;
       return new HaasEnhancerEffect({
-        delay: Number(p.delay) ?? 10,
-        side: Number(p.side) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        delay: Number(p.delay) || 10,
+        side: Number(p.side) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1282,9 +1282,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultiSpreadEffect } = await import('@engine/effects/MultiSpreadEffect');
       const p = c.parameters;
       return new MultiSpreadEffect({
-        bands: Number(p.bands) ?? 4,
-        spread: Number(p.spread) ?? 0.7,
-        mix: Number(p.mix) ?? 1,
+        bands: Number(p.bands) || 4,
+        spread: Number(p.spread) || 0.7,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1302,15 +1302,15 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandEnhancerEffect } = await import('@engine/effects/MultibandEnhancerEffect');
       const p = c.parameters;
       return new MultibandEnhancerEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        midCross: Number(p.midCross) ?? 2000,
-        highCross: Number(p.highCross) ?? 8000,
-        lowWidth: Number(p.lowWidth) ?? 1,
-        midWidth: Number(p.midWidth) ?? 1,
-        highWidth: Number(p.highWidth) ?? 1,
-        topWidth: Number(p.topWidth) ?? 1,
-        harmonics: Number(p.harmonics) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        lowCross: Number(p.lowCross) || 200,
+        midCross: Number(p.midCross) || 2000,
+        highCross: Number(p.highCross) || 8000,
+        lowWidth: Number(p.lowWidth) || 1,
+        midWidth: Number(p.midWidth) || 1,
+        highWidth: Number(p.highWidth) || 1,
+        topWidth: Number(p.topWidth) || 1,
+        harmonics: Number(p.harmonics) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1328,9 +1328,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { EarlyReflectionsEffect } = await import('@engine/effects/EarlyReflectionsEffect');
       const p = c.parameters;
       return new EarlyReflectionsEffect({
-        size: Number(p.size) ?? 1,
-        damping: Number(p.damping) ?? 0.3,
-        mix: Number(p.mix) ?? 0.3,
+        size: Number(p.size) || 1,
+        damping: Number(p.damping) || 0.3,
+        mix: Number(p.mix) || 0.3,
         wet: c.wet / 100,
       });
     },
@@ -1348,12 +1348,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { PulsatorEffect } = await import('@engine/effects/PulsatorEffect');
       const p = c.parameters;
       return new PulsatorEffect({
-        rate: Number(p.rate) ?? 2,
-        depth: Number(p.depth) ?? 0.5,
-        waveform: Number(p.waveform) ?? 0,
-        stereoPhase: Number(p.stereoPhase) ?? 180,
-        offset: Number(p.offset) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        rate: Number(p.rate) || 2,
+        depth: Number(p.depth) || 0.5,
+        waveform: Number(p.waveform) || 0,
+        stereoPhase: Number(p.stereoPhase) || 180,
+        offset: Number(p.offset) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1371,10 +1371,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { DuckaEffect } = await import('@engine/effects/DuckaEffect');
       const p = c.parameters;
       return new DuckaEffect({
-        threshold: Number(p.threshold) ?? -20,
-        drop: Number(p.drop) ?? 0.5,
-        release: Number(p.release) ?? 200,
-        mix: Number(p.mix) ?? 1,
+        threshold: Number(p.threshold) || -20,
+        drop: Number(p.drop) || 0.5,
+        release: Number(p.release) || 200,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1392,11 +1392,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { MashaEffect } = await import('@engine/effects/MashaEffect');
       const p = c.parameters;
       return new MashaEffect({
-        time: Number(p.time) ?? 100,
-        volume: Number(p.volume) ?? 1,
-        passthrough: Number(p.passthrough) ?? 0,
-        active: Number(p.active) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        time: Number(p.time) || 100,
+        volume: Number(p.volume) || 1,
+        passthrough: Number(p.passthrough) || 0,
+        active: Number(p.active) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1414,12 +1414,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { VinylEffect } = await import('@engine/effects/VinylEffect');
       const p = c.parameters;
       return new VinylEffect({
-        crackle: Number(p.crackle) ?? 0.3,
-        noise: Number(p.noise) ?? 0.2,
-        rumble: Number(p.rumble) ?? 0.1,
-        wear: Number(p.wear) ?? 0.3,
-        speed: Number(p.speed) ?? 0.5,
-        mix: Number(p.mix) ?? 1,
+        crackle: Number(p.crackle) || 0.3,
+        noise: Number(p.noise) || 0.2,
+        rumble: Number(p.rumble) || 0.1,
+        wear: Number(p.wear) || 0.3,
+        speed: Number(p.speed) || 0.5,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1437,12 +1437,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { BeatBreatherEffect } = await import('@engine/effects/BeatBreatherEffect');
       const p = c.parameters;
       return new BeatBreatherEffect({
-        transientBoost: Number(p.transientBoost) ?? 0,
-        sustainBoost: Number(p.sustainBoost) ?? 0,
-        sensitivity: Number(p.sensitivity) ?? 0.5,
-        attack: Number(p.attack) ?? 5,
-        release: Number(p.release) ?? 100,
-        mix: Number(p.mix) ?? 1,
+        transientBoost: Number(p.transientBoost) || 0,
+        sustainBoost: Number(p.sustainBoost) || 0,
+        sensitivity: Number(p.sensitivity) || 0.5,
+        attack: Number(p.attack) || 5,
+        release: Number(p.release) || 100,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1460,13 +1460,13 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandClipperEffect } = await import('@engine/effects/MultibandClipperEffect');
       const p = c.parameters;
       return new MultibandClipperEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        highCross: Number(p.highCross) ?? 4000,
-        lowCeil: Number(p.lowCeil) ?? -3,
-        midCeil: Number(p.midCeil) ?? -3,
-        highCeil: Number(p.highCeil) ?? -3,
-        softness: Number(p.softness) ?? 0.5,
-        mix: Number(p.mix) ?? 1,
+        lowCross: Number(p.lowCross) || 200,
+        highCross: Number(p.highCross) || 4000,
+        lowCeil: Number(p.lowCeil) || -3,
+        midCeil: Number(p.midCeil) || -3,
+        highCeil: Number(p.highCeil) || -3,
+        softness: Number(p.softness) || 0.5,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1484,18 +1484,18 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandDynamicsEffect } = await import('@engine/effects/MultibandDynamicsEffect');
       const p = c.parameters;
       return new MultibandDynamicsEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        highCross: Number(p.highCross) ?? 4000,
-        lowExpThresh: Number(p.lowExpThresh) ?? -40,
-        midExpThresh: Number(p.midExpThresh) ?? -40,
-        highExpThresh: Number(p.highExpThresh) ?? -40,
-        lowCompThresh: Number(p.lowCompThresh) ?? -12,
-        midCompThresh: Number(p.midCompThresh) ?? -12,
-        highCompThresh: Number(p.highCompThresh) ?? -12,
-        ratio: Number(p.ratio) ?? 4,
-        attack: Number(p.attack) ?? 10,
-        release: Number(p.release) ?? 100,
-        mix: Number(p.mix) ?? 1,
+        lowCross: Number(p.lowCross) || 200,
+        highCross: Number(p.highCross) || 4000,
+        lowExpThresh: Number(p.lowExpThresh) || -40,
+        midExpThresh: Number(p.midExpThresh) || -40,
+        highExpThresh: Number(p.highExpThresh) || -40,
+        lowCompThresh: Number(p.lowCompThresh) || -12,
+        midCompThresh: Number(p.midCompThresh) || -12,
+        highCompThresh: Number(p.highCompThresh) || -12,
+        ratio: Number(p.ratio) || 4,
+        attack: Number(p.attack) || 10,
+        release: Number(p.release) || 100,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1513,16 +1513,16 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultibandExpanderEffect } = await import('@engine/effects/MultibandExpanderEffect');
       const p = c.parameters;
       return new MultibandExpanderEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        highCross: Number(p.highCross) ?? 4000,
-        lowThresh: Number(p.lowThresh) ?? -40,
-        midThresh: Number(p.midThresh) ?? -40,
-        highThresh: Number(p.highThresh) ?? -40,
-        ratio: Number(p.ratio) ?? 2,
-        attack: Number(p.attack) ?? 5,
-        release: Number(p.release) ?? 100,
-        range: Number(p.range) ?? -40,
-        mix: Number(p.mix) ?? 1,
+        lowCross: Number(p.lowCross) || 200,
+        highCross: Number(p.highCross) || 4000,
+        lowThresh: Number(p.lowThresh) || -40,
+        midThresh: Number(p.midThresh) || -40,
+        highThresh: Number(p.highThresh) || -40,
+        ratio: Number(p.ratio) || 2,
+        attack: Number(p.attack) || 5,
+        release: Number(p.release) || 100,
+        range: Number(p.range) || -40,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1540,17 +1540,17 @@ const wasmEffects: EffectDescriptor[] = [
       const { GOTTCompEffect } = await import('@engine/effects/GOTTCompEffect');
       const p = c.parameters;
       return new GOTTCompEffect({
-        lowCross: Number(p.lowCross) ?? 200,
-        highCross: Number(p.highCross) ?? 4000,
-        lowThresh: Number(p.lowThresh) ?? -18,
-        midThresh: Number(p.midThresh) ?? -18,
-        highThresh: Number(p.highThresh) ?? -18,
-        lowRatio: Number(p.lowRatio) ?? 4,
-        midRatio: Number(p.midRatio) ?? 4,
-        highRatio: Number(p.highRatio) ?? 4,
-        attack: Number(p.attack) ?? 10,
-        release: Number(p.release) ?? 100,
-        mix: Number(p.mix) ?? 1,
+        lowCross: Number(p.lowCross) || 200,
+        highCross: Number(p.highCross) || 4000,
+        lowThresh: Number(p.lowThresh) || -18,
+        midThresh: Number(p.midThresh) || -18,
+        highThresh: Number(p.highThresh) || -18,
+        lowRatio: Number(p.lowRatio) || 4,
+        midRatio: Number(p.midRatio) || 4,
+        highRatio: Number(p.highRatio) || 4,
+        attack: Number(p.attack) || 10,
+        release: Number(p.release) || 100,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1568,9 +1568,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { MaximizerEffect } = await import('@engine/effects/MaximizerEffect');
       const p = c.parameters;
       return new MaximizerEffect({
-        ceiling: Number(p.ceiling) ?? -0.3,
-        release: Number(p.release) ?? 50,
-        mix: Number(p.mix) ?? 1,
+        ceiling: Number(p.ceiling) || -0.3,
+        release: Number(p.release) || 50,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1588,10 +1588,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { AGCEffect } = await import('@engine/effects/AGCEffect');
       const p = c.parameters;
       return new AGCEffect({
-        target: Number(p.target) ?? -12,
-        speed: Number(p.speed) ?? 0.1,
-        maxGain: Number(p.maxGain) ?? 12,
-        mix: Number(p.mix) ?? 1,
+        target: Number(p.target) || -12,
+        speed: Number(p.speed) || 0.1,
+        maxGain: Number(p.maxGain) || 12,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1609,10 +1609,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { DellaEffect } = await import('@engine/effects/DellaEffect');
       const p = c.parameters;
       return new DellaEffect({
-        time: Number(p.time) ?? 300,
-        feedback: Number(p.feedback) ?? 0.5,
-        volume: Number(p.volume) ?? 0.7,
-        mix: Number(p.mix) ?? 0.5,
+        time: Number(p.time) || 300,
+        feedback: Number(p.feedback) || 0.5,
+        volume: Number(p.volume) || 0.7,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -1630,9 +1630,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { DrivaEffect } = await import('@engine/effects/DrivaEffect');
       const p = c.parameters;
       return new DrivaEffect({
-        amount: Number(p.amount) ?? 0.5,
-        tone: Number(p.tone) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        amount: Number(p.amount) || 0.5,
+        tone: Number(p.tone) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1650,10 +1650,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { PandaEffect } = await import('@engine/effects/PandaEffect');
       const p = c.parameters;
       return new PandaEffect({
-        threshold: Number(p.threshold) ?? -20,
-        factor: Number(p.factor) ?? 0.5,
-        release: Number(p.release) ?? 100,
-        mix: Number(p.mix) ?? 1,
+        threshold: Number(p.threshold) || -20,
+        factor: Number(p.factor) || 0.5,
+        release: Number(p.release) || 100,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1671,10 +1671,10 @@ const wasmEffects: EffectDescriptor[] = [
       const { BinauralPannerEffect } = await import('@engine/effects/BinauralPannerEffect');
       const p = c.parameters;
       return new BinauralPannerEffect({
-        azimuth: Number(p.azimuth) ?? 0,
-        elevation: Number(p.elevation) ?? 0,
-        distance: Number(p.distance) ?? 1,
-        mix: Number(p.mix) ?? 1,
+        azimuth: Number(p.azimuth) || 0,
+        elevation: Number(p.elevation) || 0,
+        distance: Number(p.distance) || 1,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1692,9 +1692,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { RoomyEffect } = await import('@engine/effects/RoomyEffect');
       const p = c.parameters;
       return new RoomyEffect({
-        time: Number(p.time) ?? 2,
-        damping: Number(p.damping) ?? 0.5,
-        mix: Number(p.mix) ?? 0.3,
+        time: Number(p.time) || 2,
+        damping: Number(p.damping) || 0.5,
+        mix: Number(p.mix) || 0.3,
         wet: c.wet / 100,
       });
     },
@@ -1712,8 +1712,8 @@ const wasmEffects: EffectDescriptor[] = [
       const { BittaEffect } = await import('@engine/effects/BittaEffect');
       const p = c.parameters;
       return new BittaEffect({
-        crush: Number(p.crush) ?? 8,
-        mix: Number(p.mix) ?? 1,
+        crush: Number(p.crush) || 8,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1731,12 +1731,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { KuizaEffect } = await import('@engine/effects/KuizaEffect');
       const p = c.parameters;
       return new KuizaEffect({
-        low: Number(p.low) ?? 0,
-        lowMid: Number(p.lowMid) ?? 0,
-        highMid: Number(p.highMid) ?? 0,
-        high: Number(p.high) ?? 0,
-        gain: Number(p.gain) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        low: Number(p.low) || 0,
+        lowMid: Number(p.lowMid) || 0,
+        highMid: Number(p.highMid) || 0,
+        high: Number(p.high) || 0,
+        gain: Number(p.gain) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1754,9 +1754,9 @@ const wasmEffects: EffectDescriptor[] = [
       const { VihdaEffect } = await import('@engine/effects/VihdaEffect');
       const p = c.parameters;
       return new VihdaEffect({
-        width: Number(p.width) ?? 1,
-        invert: Number(p.invert) ?? 0,
-        mix: Number(p.mix) ?? 1,
+        width: Number(p.width) || 1,
+        invert: Number(p.invert) || 0,
+        mix: Number(p.mix) || 1,
         wet: c.wet / 100,
       });
     },
@@ -1774,11 +1774,11 @@ const wasmEffects: EffectDescriptor[] = [
       const { MultiChorusEffect } = await import('@engine/effects/MultiChorusEffect');
       const p = c.parameters;
       return new MultiChorusEffect({
-        rate: Number(p.rate) ?? 0.5,
-        depth: Number(p.depth) ?? 0.5,
-        voices: Number(p.voices) ?? 4,
-        stereoPhase: Number(p.stereoPhase) ?? 90,
-        mix: Number(p.mix) ?? 0.5,
+        rate: Number(p.rate) || 0.5,
+        depth: Number(p.depth) || 0.5,
+        voices: Number(p.voices) || 4,
+        stereoPhase: Number(p.stereoPhase) || 90,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -1796,12 +1796,12 @@ const wasmEffects: EffectDescriptor[] = [
       const { CalfPhaserEffect } = await import('@engine/effects/CalfPhaserEffect');
       const p = c.parameters;
       return new CalfPhaserEffect({
-        rate: Number(p.rate) ?? 0.5,
-        depth: Number(p.depth) ?? 0.7,
-        stages: Number(p.stages) ?? 6,
-        feedback: Number(p.feedback) ?? 0.5,
-        stereoPhase: Number(p.stereoPhase) ?? 90,
-        mix: Number(p.mix) ?? 0.5,
+        rate: Number(p.rate) || 0.5,
+        depth: Number(p.depth) || 0.7,
+        stages: Number(p.stages) || 6,
+        feedback: Number(p.feedback) || 0.5,
+        stereoPhase: Number(p.stereoPhase) || 90,
+        mix: Number(p.mix) || 0.5,
         wet: c.wet / 100,
       });
     },
@@ -1819,15 +1819,15 @@ const wasmEffects: EffectDescriptor[] = [
       const { TapeDelayEffect } = await import('@engine/effects/TapeDelayEffect');
       const p = c.parameters;
       return new TapeDelayEffect({
-        delayTime: Number(p.delayTime) ?? 0.3,
-        feedback: Number(p.feedback) ?? 0.4,
-        mix: Number(p.mix) ?? 0.5,
-        toneFreq: Number(p.toneFreq) ?? 4000,
-        drive: Number(p.drive) ?? 0,
-        wowRate: Number(p.wowRate) ?? 0.5,
-        wowDepth: Number(p.wowDepth) ?? 0,
-        flutterRate: Number(p.flutterRate) ?? 6,
-        flutterDepth: Number(p.flutterDepth) ?? 0,
+        delayTime: Number(p.delayTime) || 0.3,
+        feedback: Number(p.feedback) || 0.4,
+        mix: Number(p.mix) || 0.5,
+        toneFreq: Number(p.toneFreq) || 4000,
+        drive: Number(p.drive) || 0,
+        wowRate: Number(p.wowRate) || 0.5,
+        wowDepth: Number(p.wowDepth) || 0,
+        flutterRate: Number(p.flutterRate) || 6,
+        flutterDepth: Number(p.flutterDepth) || 0,
         wet: c.wet / 100,
       });
     },

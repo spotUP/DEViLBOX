@@ -46,6 +46,9 @@ export interface WAMEffectNodeOptions {
 export class WAMEffectNode extends Tone.ToneAudioNode {
   readonly name = 'WAMEffect';
 
+  // Cache imported WAM constructors to avoid re-registering AudioWorklet processors
+  private static _wamModuleCache = new Map<string, unknown>();
+
   // Required by ToneAudioNode
   readonly input: Tone.Gain;
   readonly output: Tone.Gain;
@@ -114,26 +117,37 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
       // 1. Initialize WAM host (reuses WAMSynth's static host init)
       const [hostGroupId] = await WAMSynth.initializeHost(ctx);
 
-      // 2. Import the WAM module
-      const { default: WAMExport } = await import(/* @vite-ignore */ this._moduleUrl);
+      // 2. Import the WAM module (cached to avoid re-registering AudioWorklet processors)
+      let WAMExport: unknown;
+      if (WAMEffectNode._wamModuleCache.has(this._moduleUrl)) {
+        WAMExport = WAMEffectNode._wamModuleCache.get(this._moduleUrl);
+      } else {
+        const mod = await import(/* @vite-ignore */ this._moduleUrl);
+        WAMExport = mod.default;
+        if (WAMExport) {
+          WAMEffectNode._wamModuleCache.set(this._moduleUrl, WAMExport);
+        }
+      }
 
       if (!WAMExport || typeof WAMExport !== 'function') {
         throw new Error('Invalid WAM: Default export is not a constructor or factory function');
       }
 
       // 3. Create WAM instance
-      const isClass = /^class\s/.test(WAMExport.toString());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const WAMClass = WAMExport as any;
+      const isClass = /^class\s/.test(WAMClass.toString());
 
-      if (isClass && typeof WAMExport.createInstance === 'function') {
-        this._wamInstance = await WAMExport.createInstance(hostGroupId, ctx);
+      if (isClass && typeof WAMClass.createInstance === 'function') {
+        this._wamInstance = await WAMClass.createInstance(hostGroupId, ctx);
       } else if (isClass) {
-        const wamPlugin = new WAMExport(hostGroupId, ctx);
+        const wamPlugin = new WAMClass(hostGroupId, ctx);
         if (typeof wamPlugin.initialize === 'function') {
           await wamPlugin.initialize();
         }
         this._wamInstance = wamPlugin;
       } else {
-        this._wamInstance = await WAMExport(ctx, hostGroupId);
+        this._wamInstance = await WAMClass(ctx, hostGroupId);
       }
 
       // 4. Get audio node
@@ -165,7 +179,7 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
       const descriptor = this._wamInstance?.descriptor;
       console.log(`[WAMEffectNode] Loaded: ${descriptor?.name || this._moduleUrl}`);
     } catch (error) {
-      console.error('[WAMEffectNode] Initialization failed:', error);
+      console.warn(`[WAMEffectNode] ${this._moduleUrl.split('/').slice(-2, -1)[0] || 'WAM'} failed to load — bypassed (dry passthrough)`);
       // Dry path still works — audio passes through unprocessed
     }
   }

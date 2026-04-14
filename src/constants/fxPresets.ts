@@ -112,8 +112,8 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'Swedish Chainsaw', description: 'HM-2 + JCM800 — the legendary Swedish death metal tone', tags: ['Loud', 'Grit', 'Guitar'],
     effects: [
-      { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 80, parameters: { tight: 1, pedalGain: 0.7, ampGain: 0.6, bass: 0.5, middle: 0.8, treble: 0.6, volume: 0.7 } },
-      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.003, release: 0.1 } },
+      { category: 'wasm', type: 'SwedishChainsaw', enabled: true, wet: 80, parameters: { tight: 0, pedalGain: 55, ampGain: 45, bass: 50, middle: 60, treble: 50, volume: 50 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
     ] },
 
   // ═══ WIDE ═══
@@ -582,10 +582,11 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.08 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 1.0, high: 2.0 } },
     ] },
-  { name: 'Fuzz Box', description: 'Chebyshev waveshaper — thick fuzzy harmonics', tags: ['Grit'],
+  { name: 'Fuzz Box', description: 'Thick fuzzy saturation — gritty warmth with bite', tags: ['Grit'],
     effects: [
-      { category: 'tonejs', type: 'Chebyshev', enabled: true, wet: 55, parameters: { order: 6 } },
-      { category: 'tonejs', type: 'Filter', enabled: true, wet: 100, parameters: { frequency: 7000, type: 'lowpass', Q: 1 } },
+      { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 55, tone: 6000 } },
+      { category: 'tonejs', type: 'Filter', enabled: true, wet: 100, parameters: { frequency: 5500, type: 'lowpass', Q: 0.8 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 3, attack: 0.005, release: 0.12 } },
     ] },
 
   // ═══ CREATIVE ═══
@@ -668,13 +669,13 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'Crunch Marshall', description: 'Blackstar HT40 gain — British crunch', tags: ['Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 16, parameters: { drive: 55, level: 100, presence: 60 } },
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 1, high: 2 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 16, parameters: { drive: 35, level: 80, presence: 50 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 0.5, high: -0.5 } },
     ] },
   { name: 'High Gain Mesa', description: 'Mesa Mini Rectifier — tight modern high gain', tags: ['Amp', 'Guitar', 'Loud'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 90, neuralModelIndex: 11, parameters: { drive: 70, level: 100, presence: 55 } },
-      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 4, attack: 0.003, release: 0.1 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 11, parameters: { drive: 55, level: 85, presence: 50 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
     ] },
   { name: 'Dumble Lead', description: 'Dumble — smooth singing lead tones', tags: ['Amp', 'Guitar'],
     effects: [
@@ -684,8 +685,8 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'Sovtek Doom', description: 'Sovtek 50 + DOD — massive Russian tube doom', tags: ['Amp', 'Guitar', 'Loud'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 90, neuralModelIndex: 27, parameters: { drive: 75, level: 100, presence: 40 } },
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 1.0, high: -0.5 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 27, parameters: { drive: 60, level: 85, presence: 40 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: -1.0 } },
     ] },
   { name: 'BadCat Jazz', description: 'BadCat 50 clean — warm round jazz tones', tags: ['Amp', 'Guitar'],
     effects: [
@@ -703,9 +704,9 @@ export const FX_PRESETS: FxPreset[] = [
   // ═══ GUITAR ═══
   { name: 'ENGL Metal', description: 'ENGL E645 — tight European metal', tags: ['Guitar', 'Amp', 'Loud'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 90, neuralModelIndex: 28, parameters: { drive: 70, level: 100, presence: 65 } },
-      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 } },
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 1.5, high: 2.0 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 28, parameters: { drive: 55, level: 80, presence: 55 } },
+      { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
+      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 0.5, high: -0.5 } },
     ] },
   { name: 'TS9 + Spring', description: 'Tube Screamer + spring — blues/rock pedalboard', tags: ['Guitar'],
     effects: [
