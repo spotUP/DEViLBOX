@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-13T22:39:41.194Z
+ * Generated: 2026-04-14T10:00:44.770Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5188';
-export const BUILD_NUMBER = '5188';
-export const BUILD_HASH = 'd35fa2b07';
-export const BUILD_DATE = '2026-04-13';
+export const BUILD_VERSION = '1.0.5207';
+export const BUILD_NUMBER = '5207';
+export const BUILD_HASH = 'a28a005cd';
+export const BUILD_DATE = '2026-04-14';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,85 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5188',
+    version: '1.0.5207',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix playlist context menu - remove duplicate handler"
+      },
+      {
+        type: 'fix',
+        "description": "Fix UADE crash during pre-rendered track loading"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite ShimmerReverb DSP — true allpass, 4-head pitch shifter, Hermite interp"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Auto DJ UADE crashes with background pre-rendering"
+      },
+      {
+        type: 'fix',
+        "description": "FTM/Klystrack volume, AVP subsong selector UI"
+      },
+      {
+        type: 'fix',
+        "description": "ShimmerReverb stutter — remove ScriptProcessorNode fallback"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite Exciter as pure Web Audio — no WASM worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Apply passthroughGain pattern to all 56 WASM AudioWorklet effects"
+      },
+      {
+        type: 'fix',
+        "description": "Exciter audio kill — use passthrough gain mute instead of disconnect"
+      },
+      {
+        type: 'fix',
+        "description": "WASM effects disconnect bug (54 effects) + GT Ultra master FX routing"
+      },
+      {
+        type: 'fix',
+        "description": "Exciter/BassEnhancer audio kill + preset selector UX"
+      },
+      {
+        type: 'fix',
+        "description": "Suppress unknown synthType errors for dedicated WASM replayer formats"
+      },
+      {
+        type: 'feature',
+        "description": "Complete instrument param editing for all WASM replayer formats"
+      },
+      {
+        type: 'fix',
+        "description": "SoundFactory WASM silence, FC wrong engine routing, RK blank patterns"
+      },
+      {
+        type: 'improvement',
+        "description": "Derive effect preset categories from data instead of hardcoding"
+      },
+      {
+        type: 'fix',
+        "description": "Add Amiga and C64 to effect preset category order"
+      },
+      {
+        type: 'feature',
+        "description": "Add 18 Amiga & C64 SID effect chain presets for live gig"
+      },
+      {
+        type: 'feature',
+        "description": "Wire existing instrument editors to WASM param APIs"
+      },
+      {
+        type: 'feature',
+        "description": "Add instrument param APIs to ArtOfNoise, MusicAssembler, BenDaglish"
+      },
       {
         type: 'feature',
         "description": "Sidechain compressor WASM isolation integration + effect browser filter"
@@ -158,74 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "DefleMask — pre-decompress zlib in ModuleLoader before parseFurnaceFile"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: remove test binary and add to gitignore"
-      },
-      {
-        type: 'feature',
-        "description": "Sonic Arranger — NostalgicPlayer C port replaces UADE"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add entry log to loadFurFileWasm"
-      },
-      {
-        type: 'fix',
-        "description": "Use slice instead of subarray for zlib pre-decompress + log failures"
-      },
-      {
-        type: 'feature',
-        "description": "Extract PCM samples from CustomMade + MarkCooksey modules"
-      },
-      {
-        type: 'improvement',
-        "description": "Wip: Sonic Arranger NostalgicPlayer C port — builds but silent"
-      },
-      {
-        type: 'fix',
-        "description": "DefleMask — detect zlib-compressed DMF in WASM path + better error logging"
-      },
-      {
-        type: 'fix',
-        "description": "DefleMask — bypass TS parser, route through Furnace WASM via parseFurnaceFile"
-      },
-      {
-        type: 'feature',
-        "description": "Wire AshleyHogg + SoundMaster to native parser routes"
-      },
-      {
-        type: 'fix',
-        "description": "DefleMask zlib — fallback to inflateRaw on corrupted adler32 checksum"
-      },
-      {
-        type: 'fix',
-        "description": "DefleMask audio — route DMF through Furnace WASM dispatch"
-      },
-      {
-        type: 'feature',
-        "description": "BenDaglish — track-aligned patterns + variable-length encoder for chip RAM editing"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 18 UADE compiled-replayer formats to native parser routes"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove arrangement + piano roll stubs and all references"
-      },
-      {
-        type: 'fix',
-        "description": "DefleMask — add zlib decompression + correct magic in ModuleLoader"
-      },
-      {
-        type: 'fix',
-        "description": "PxTone silence + DefleMask parser crash + 4 more sourceFormat mismatches"
-      },
-      {
-        type: 'fix',
-        "description": "Revert dedicated WASM engine wiring — all 7 engines crash or silent"
       }
     ]
   }

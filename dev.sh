@@ -198,4 +198,15 @@ echo ""
 # ── Frontend (Vite) — foreground, output always visible ──────────────────────
 # All Vite output (HMR, build warnings, errors) prints directly to this terminal.
 # When Vite exits (Ctrl-C or crash), the EXIT trap above kills backend + collab.
-./node_modules/.bin/vite
+# Give Node.js 4GB heap to prevent OOM kills during HMR with large codebase.
+# Auto-restart on crash/OOM so the gig never stops — only Ctrl-C (SIGINT) exits.
+while true; do
+  NODE_OPTIONS="--max-old-space-size=4096" ./node_modules/.bin/vite
+  EXIT_CODE=$?
+  # Ctrl-C sends SIGINT (130) — respect the user's intent to stop
+  if [ $EXIT_CODE -eq 130 ] || [ $EXIT_CODE -eq 0 ]; then
+    break
+  fi
+  err "Vite crashed (exit $EXIT_CODE) — restarting in 2 seconds..."
+  sleep 2
+done
