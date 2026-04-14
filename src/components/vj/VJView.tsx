@@ -82,6 +82,10 @@ export interface VJCanvasHandle {
   loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => void;
   getPresetNames: () => string[];
   getCurrentIndex: () => number;
+  /** Load a random preset with NO internal transition (instant cut).
+   *  Used during layer switches where the CSS crossfade handles the visual transition.
+   *  Butterchurn: blend=0. ProjectM: direct load, no fade overlay. */
+  loadRandomDirect?: () => void;
 }
 
 interface VJCanvasProps {
@@ -266,6 +270,11 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => doLoadPresetByName(name, typeof blendOrSmooth === 'number' ? blendOrSmooth : undefined),
       getPresetNames: () => presetNamesRef.current,
       getCurrentIndex: () => currentIdxRef.current,
+      loadRandomDirect: () => {
+        const names = presetNamesRef.current;
+        if (names.length === 0) return;
+        doLoadPreset(Math.floor(Math.random() * names.length), 0.0);
+      },
     }), [doLoadPreset, doLoadPresetByName]);
 
     return (
@@ -523,38 +532,75 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const [renderProjectm, setRenderProjectm] = useState(false);
   const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const layerSwitchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const transitionOverlayRef = useRef<HTMLDivElement>(null);
 
-  // Prepare a layer switch: wake up the target engine, load a preset, then
-  // after a few frames switch activeLayer so the CSS crossfade begins with
-  // a live rendered frame already in the target canvas.
+  // Transition duration for the black overlay (ms).
+  // Compositor-driven CSS transition, so it animates even if the main thread
+  // blocks during shader compilation.
+  const TRANSITION_FADE_MS = 180;
+
+  // Prepare a layer switch: fade to black → load preset (shader compiles while
+  // screen is black) → wake target engine → wait for render → CSS crossfade
+  // + fade from black. This hides synchronous GLSL compilation (butterchurn)
+  // and async fetch delays (projectM) behind the black screen.
   const switchToLayer = useCallback((target: VJLayer, loadPreset: () => void) => {
     // HARD GUARD: never allow projectM → projectM (crashes native shader pipeline)
     let effectiveTarget = target;
     let effectiveLoadPreset = loadPreset;
     if (target === 'projectm' && prevLayerRef.current === 'projectm') {
       effectiveTarget = 'milkdrop';
-      effectiveLoadPreset = () => canvasHandleRef.current?.nextPreset();
+      effectiveLoadPreset = () => canvasHandleRef.current?.loadRandomDirect?.() ?? canvasHandleRef.current?.nextPreset();
     }
     prevLayerRef.current = effectiveTarget;
 
+    // Clear any in-progress transition
     if (layerSwitchTimerRef.current !== undefined) clearTimeout(layerSwitchTimerRef.current);
     if (crossfadeTimerRef.current !== undefined) clearTimeout(crossfadeTimerRef.current);
-    // 1. Wake up both render loops
-    setRenderMilkdrop(true);
-    setRenderProjectm(true);
-    // 2. Load the new preset into the target engine
-    effectiveLoadPreset();
-    // 3. After a few frames for the preset to render, trigger the crossfade
+
+    const overlay = transitionOverlayRef.current;
+
+    // 1. Fade to black (handled by compositor — animates even if main thread blocks)
+    if (overlay) {
+      overlay.style.transition = `opacity ${TRANSITION_FADE_MS}ms ease-in`;
+      overlay.style.opacity = '1';
+    }
+
+    // 2. After fade completes, do the heavy lifting behind the black screen
     layerSwitchTimerRef.current = setTimeout(() => {
-      setActiveLayer(effectiveTarget);
       layerSwitchTimerRef.current = undefined;
-      // 4. After the CSS transition completes, stop the old engine
-      crossfadeTimerRef.current = setTimeout(() => {
-        setRenderMilkdrop(effectiveTarget === 'milkdrop');
-        setRenderProjectm(effectiveTarget === 'projectm');
-        crossfadeTimerRef.current = undefined;
-      }, 750); // 700ms CSS transition + 50ms safety margin
-    }, 100); // ~6 frames for new preset to render
+
+      // Wake both render loops
+      setRenderMilkdrop(true);
+      setRenderProjectm(true);
+
+      // Load preset into the hidden canvas. For butterchurn, this compiles
+      // shaders synchronously (may block 0.1-3s — invisible behind black).
+      // For projectM, this starts an async fetch + queues the preset.
+      effectiveLoadPreset();
+
+      // 3. Wait for a few frames so the target canvas has rendered the new preset.
+      // Use rAF chain: after the sync butterchurn block returns, the next rAF
+      // gives the target a frame to render. For projectM the async fetch may
+      // still be in flight, but the CSS crossfade from the old content is
+      // acceptable (it's behind the overlay anyway).
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // 4. Start CSS layer crossfade + fade overlay from black simultaneously
+          setActiveLayer(effectiveTarget);
+          if (overlay) {
+            overlay.style.transition = `opacity 400ms ease-out`;
+            overlay.style.opacity = '0';
+          }
+
+          // 5. After CSS transition completes, stop the old engine
+          crossfadeTimerRef.current = setTimeout(() => {
+            setRenderMilkdrop(effectiveTarget === 'milkdrop');
+            setRenderProjectm(effectiveTarget === 'projectm');
+            crossfadeTimerRef.current = undefined;
+          }, 750);
+        });
+      });
+    }, TRANSITION_FADE_MS + 20); // +20ms safety margin for compositor
   }, []);
 
   // Keep ref in sync so auto-advance timer always has current switchToLayer
@@ -624,9 +670,9 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
       const doSwitch = switchToLayerRef.current;
       if (!doSwitch) return;
       if (activeLayer === 'projectm' && presetCount > 0) {
-        doSwitch('milkdrop', () => canvasHandleRef.current?.randomPreset());
+        doSwitch('milkdrop', () => canvasHandleRef.current?.loadRandomDirect?.() ?? canvasHandleRef.current?.randomPreset());
       } else if (activeLayer === 'milkdrop' && pmPresetCount > 0) {
-        doSwitch('projectm', () => projectmHandleRef.current?.randomPreset());
+        doSwitch('projectm', () => projectmHandleRef.current?.loadRandomDirect?.() ?? projectmHandleRef.current?.randomPreset());
       } else {
         // Only one engine available — stay on it and pick a new preset
         if (activeLayer === 'milkdrop') canvasHandleRef.current?.randomPreset();
@@ -806,6 +852,14 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         <LazyHeadOverlay />
       </React.Suspense>
       <VJPatternOverlayWrapper />
+      {/* Transition overlay — fades to black before shader compilation,
+          then fades from black during CSS crossfade. Compositor-driven
+          so it animates even if the main thread blocks. */}
+      <div
+        ref={transitionOverlayRef}
+        className="absolute inset-0 bg-black pointer-events-none"
+        style={{ opacity: 0, zIndex: 10 }}
+      />
       <VJControls
         currentName={currentName}
         currentIdx={currentIdx}
