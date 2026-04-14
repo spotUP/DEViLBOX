@@ -10,10 +10,13 @@ import { PAD_INSTRUMENT_BASE } from '../types/drumpad';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
+import type { PadMode } from '../types/drumpad';
+
 export interface DJPreset {
   id: string;
   name: string;
   description: string;
+  modes: PadMode[];  // Which pad modes this preset is compatible with
   create: () => DrumProgram;
 }
 
@@ -40,12 +43,29 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
     pad.color = mapping.color;
     const preset = DJ_ONE_SHOT_PRESETS[mapping.presetIndex];
     if (preset) {
+      // Ensure all required InstrumentConfig fields are present
       pad.synthConfig = {
-        ...preset,
         id: PAD_INSTRUMENT_BASE + pad.id,
         name: preset.name ?? mapping.label,
+        type: preset.type ?? 'synth',
+        synthType: preset.synthType ?? 'Synth',
+        effects: preset.effects ?? [],
+        volume: preset.volume ?? 0,
+        pan: preset.pan ?? 0,
+        ...preset,
       } as import('../types/instrument/defaults').InstrumentConfig;
       pad.instrumentNote = 'C3';
+      
+      // Debug logging
+      if (process.env.NODE_ENV === 'development' && i === 0) {
+        console.log('[applyOneShotPads] First pad config:', {
+          padId: pad.id,
+          name: pad.name,
+          synthType: pad.synthConfig.synthType,
+          instrumentNote: pad.instrumentNote,
+          hasEffects: !!pad.synthConfig.effects,
+        });
+      }
     }
   }
 }
@@ -68,6 +88,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     id: 'djfx-essential',
     name: 'DJ FX Essential',
     description: '16 DJ FX pads in Bank A — stutter, delay, filter, reverb, modulation',
+    modes: ['djfx'],
     create: () => {
       const program = createEmptyProgram('D-01', 'DJ FX Essential');
       applyDjFxPads(program, 0, 16);
@@ -78,6 +99,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     id: 'oneshots-live',
     name: 'One-Shots Live',
     description: '16 one-shot pads in Bank A — horns, sirens, impacts, risers',
+    modes: ['oneshots'],
     create: () => {
       const program = createEmptyProgram('D-02', 'One-Shots Live');
       applyOneShotPads(program, 0, 16);
@@ -88,6 +110,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     id: 'scratch-master',
     name: 'Scratch Master',
     description: '16 scratch pads in Bank A — baby, flare, crab, orbit, and more',
+    modes: ['scratch'],
     create: () => {
       const program = createEmptyProgram('D-03', 'Scratch Master');
       applyScratchPads(program, 0, 16);
@@ -98,6 +121,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     id: 'dj-complete',
     name: 'DJ Complete',
     description: 'FX in Bank A, one-shots in Bank B, scratch in Bank C',
+    modes: ['djfx', 'oneshots', 'scratch'],  // Multi-mode preset
     create: () => {
       const program = createEmptyProgram('D-04', 'DJ Complete');
       applyDjFxPads(program, 0, 16);
@@ -110,6 +134,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     id: 'minimal-dj',
     name: 'Minimal DJ',
     description: '8 FX + 4 one-shots + 4 scratch in Bank A',
+    modes: ['djfx', 'oneshots', 'scratch'],  // Multi-mode preset
     create: () => {
       const program = createEmptyProgram('D-05', 'Minimal DJ');
       applyDjFxPads(program, 0, 8);

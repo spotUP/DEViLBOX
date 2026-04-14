@@ -98,6 +98,18 @@ export const DJVocoderControl: React.FC = () => {
     };
   }, []);
 
+  // Stable refs for ensureEngine closure — avoids stale closures in PTT/toggle handlers
+  const selectedDeviceRef = useRef(selectedDeviceId);
+  const followMelodyEnabledRef = useRef(followMelodyEnabled);
+  const realTuneEnabledRef = useRef(realTuneEnabled);
+  const tuneKeyRef = useRef(tuneKey);
+  const tuneScaleRef = useRef(tuneScale);
+  useEffect(() => { selectedDeviceRef.current = selectedDeviceId; }, [selectedDeviceId]);
+  useEffect(() => { followMelodyEnabledRef.current = followMelodyEnabled; }, [followMelodyEnabled]);
+  useEffect(() => { realTuneEnabledRef.current = realTuneEnabled; }, [realTuneEnabled]);
+  useEffect(() => { tuneKeyRef.current = tuneKey; }, [tuneKey]);
+  useEffect(() => { tuneScaleRef.current = tuneScale; }, [tuneScale]);
+
   const ensureEngine = useCallback(async (): Promise<VocoderEngine | null> => {
     if (engineRef.current) return engineRef.current;
     try {
@@ -105,17 +117,17 @@ export const DJVocoderControl: React.FC = () => {
       const djEngine = getDJEngineIfActive();
       const destination = djEngine?.mixer.samplerInput;
       const engine = new VocoderEngine(destination);
-      await engine.start(selectedDeviceId || undefined);
+      await engine.start(selectedDeviceRef.current || undefined);
       engineRef.current = engine;
       setMuted(true);
       engine.setMuted(true);
-      if (followMelodyEnabled) {
+      if (followMelodyEnabledRef.current) {
         followMelodyRef.current = new VocoderAutoTune(engine);
         followMelodyRef.current.start();
       }
-      if (realTuneEnabled) {
+      if (realTuneEnabledRef.current) {
         engine.setRealAutoTuneEnabled(true, {
-          key: tuneKey, scale: tuneScale, strength: 1.0, speed: 0.7,
+          key: tuneKeyRef.current, scale: tuneScaleRef.current, strength: 1.0, speed: 0.7,
         });
       }
       const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -130,7 +142,7 @@ export const DJVocoderControl: React.FC = () => {
       console.error('[DJVocoderControl]', err);
       return null;
     }
-  }, [selectedDeviceId]);
+  }, []); // Stable — reads refs, not state
 
   const handleToggle = useCallback(async () => {
     try {
@@ -149,22 +161,24 @@ export const DJVocoderControl: React.FC = () => {
       setError(msg.includes('Permission') || msg.includes('NotAllowed') ? 'Mic blocked' : 'Failed');
       console.error('[DJVocoderControl]', err);
     }
-  }, [isActive, selectedDeviceId]);
+  }, [isActive, ensureEngine]);
 
   const handleDeviceChange = useCallback(async (deviceId: string) => {
     setSelectedDeviceId(deviceId);
-    if (engineRef.current?.isActive) {
-      engineRef.current.stop();
-      try {
-        const djEngine = getDJEngineIfActive();
-        const destination = djEngine?.mixer.samplerInput;
-        const engine = new VocoderEngine(destination);
-        await engine.start(deviceId || undefined);
-        engineRef.current = engine;
-      } catch (err) {
-        console.error('[DJVocoderControl] Device switch failed:', err);
-        setError('Switch failed');
-      }
+    if (!engineRef.current?.isActive) return;
+    const oldEngine = engineRef.current;
+    engineRef.current = null; // Prevent stale use during switch
+    oldEngine.stop();
+    try {
+      const djEngine = getDJEngineIfActive();
+      const destination = djEngine?.mixer.samplerInput;
+      const engine = new VocoderEngine(destination);
+      await engine.start(deviceId || undefined);
+      engineRef.current = engine;
+    } catch (err) {
+      console.error('[DJVocoderControl] Device switch failed:', err);
+      setError('Switch failed');
+      // Engine is gone — user must re-toggle vocoder
     }
   }, []);
 
