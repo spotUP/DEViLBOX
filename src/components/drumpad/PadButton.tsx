@@ -98,10 +98,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
     return Math.max(1, Math.min(127, baseVelocity));
   }, []);
 
-  // A pad is "loaded" if it has any sound source assigned
-  // First check if pad has actual data, fallback to mode mapping
+  // A pad is "loaded" if it has actual sound source assigned
   const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
-  const isLoaded = hasActualData || (padMode !== 'samples' && !!modeMapping);
+  const isLoaded = hasActualData;
 
   const isFxActive = padMode === 'djfx' && activeFxPads.has(pad.id);
 
@@ -223,11 +222,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
       return { className: 'bg-dark-border', textColor: ensureContrast(pad.color) };
     }
 
-    // Fallback to mode mapping color in non-samples modes
-    if (modeMapping && padMode !== 'samples' && !hasActualData) {
-      return { className: 'bg-dark-border', textColor: ensureContrast(modeMapping.color) };
-    }
-
     if (!isLoaded) {
       return { className: 'bg-dark-border', textColor: undefined };
     }
@@ -239,7 +233,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
     // Sample pads get emerald text
     return { className: 'bg-dark-border', textColor: '#34d399' }; // emerald-400 - already bright
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, modeMapping, padMode, hasActualData, ensureContrast]);
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, hasActualData, ensureContrast]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
@@ -297,8 +291,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
             textShadow: padStyle.textColor ? '0 1px 2px rgba(0,0,0,0.8)' : undefined
           }}
         >
-          {/* Show actual pad name if pad has data, otherwise show mode mapping label */}
-          {hasActualData ? pad.name : (modeMapping && padMode !== 'samples' ? modeMapping.label : pad.name)}
+          {/* Show actual pad name, or "Empty" if no data */}
+          {hasActualData ? pad.name : 'Empty'}
         </span>
       </div>
 
