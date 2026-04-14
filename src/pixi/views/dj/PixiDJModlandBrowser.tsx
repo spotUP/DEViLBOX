@@ -320,6 +320,22 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
             await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
           }
         }
+        // HVSC SIDs: render via WebSID in the pipeline (NOT UADE/parseModuleToSong)
+        if (file.source === 'hvsc') {
+          const cacheKey = `${file.source}:${file.key}`;
+          const engine = getDJEngine();
+          useDJStore.getState().setDeckState(deckId, {
+            fileName: cacheKey,
+            trackName: file.filename.replace(/\.sid$/i, ''),
+            detectedBPM: 125,
+            effectiveBPM: 125,
+            analysisState: 'rendering',
+            isPlaying: false,
+          });
+          const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, file.filename.replace(/\.sid$/i, ''), result.analysis?.bpm || 125);
+          useDJStore.getState().setDeckViewMode('visualizer');
+        } else {
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
         const song = await parseModuleToSong(blob);
         const bpmResult = detectBPM(song);
@@ -337,6 +353,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
         const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
         await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
         useDJStore.getState().setDeckViewMode('visualizer');
+        }
 
         // Auto-close when all active decks are filled
         setLoadedDecks((prev) => {
