@@ -202,10 +202,16 @@ export class DeckEngine {
     } else {
       this.channelGain.connect(options.outputNode);
     }
-    // Analysers tap from channelGain (pre-limiter) for accurate VU/spectrum
-    this.channelGain.connect(this.meter);
+    // Analysers tap from channelGain (pre-limiter) for accurate waveform/spectrum display
     this.channelGain.connect(this.waveformAnalyser);
     this.channelGain.connect(this.fftAnalyser);
+    // VU meter taps post-limiter to show actual output level
+    const nativeMeterInput = getNativeAudioNode(this.meter as unknown as Record<string, unknown>);
+    if (nativeMeterInput) {
+      limiter.connect(nativeMeterInput);
+    } else {
+      this.channelGain.connect(this.meter);
+    }
 
     // Create TrackerReplayer connected to our deckGain input
     this.replayer = new TrackerReplayer(this.deckGain);

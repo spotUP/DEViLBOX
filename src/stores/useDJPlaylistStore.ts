@@ -343,7 +343,20 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             if (state.focusedTrackIndex === fromIndex) {
               state.focusedTrackIndex = toIndex;
             }
-            state.selectedTrackIndices = [];
+            // Remap selected indices to follow the reorder
+            if (state.selectedTrackIndices.length > 0) {
+              state.selectedTrackIndices = state.selectedTrackIndices.map(idx => {
+                if (idx === fromIndex) return toIndex;
+                if (fromIndex < toIndex) {
+                  // Moved forward: indices in (from, to] shift down by 1
+                  if (idx > fromIndex && idx <= toIndex) return idx - 1;
+                } else {
+                  // Moved backward: indices in [to, from) shift up by 1
+                  if (idx >= toIndex && idx < fromIndex) return idx + 1;
+                }
+                return idx;
+              });
+            }
           }
         });
         syncPlaylists();
