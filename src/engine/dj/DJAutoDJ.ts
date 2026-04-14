@@ -443,11 +443,13 @@ class DJAutoDJ {
 
       try {
         // Pre-render in background - UADE crashes happen here, isolated from playback
+        console.log(`[AutoDJ] ⏳ Starting background pre-render for: ${track.trackName}`);
         const { preRenderTrack } = await import('./DJTrackLoader');
         const preRendered = await preRenderTrack(track);
         
         if (preRendered) {
           // Success - save pre-rendered data for instant loading during transition
+          console.log(`[AutoDJ] ✅ Pre-render complete, stored for later: ${track.trackName} (${(preRendered.wavData.byteLength / 1024 / 1024).toFixed(1)}MB)`);
           this.preRenderedTrack = { track, data: preRendered };
           this.preloadedDeck = this.idleDeck;
           this.preloadFailCount = 0;
@@ -461,7 +463,7 @@ class DJAutoDJ {
           this.preloading = false;
           return;
         } else {
-          console.warn(`[AutoDJ] loadPlaylistTrackToDeck returned false for ${track.fileName}`);
+          console.warn(`[AutoDJ] ❌ Pre-render returned null for ${track.fileName}`);
         }
       } catch (err) {
         console.error(`[AutoDJ] Preload exception for ${track.fileName}:`, err);
@@ -505,7 +507,7 @@ class DJAutoDJ {
 
     // Load pre-rendered track instantly if available (background render complete)
     if (this.preRenderedTrack) {
-      console.log(`[AutoDJ] Loading pre-rendered track to deck ${this.idleDeck}: ${this.preRenderedTrack.track.trackName}`);
+      console.log(`[AutoDJ] 🚀 Loading PRE-RENDERED track to deck ${this.idleDeck}: ${this.preRenderedTrack.track.trackName}`);
       const { loadPreRenderedTrackToDeck } = await import('./DJTrackLoader');
       const loaded = await loadPreRenderedTrackToDeck(
         this.preRenderedTrack.data,
@@ -513,13 +515,16 @@ class DJAutoDJ {
         this.idleDeck,
       );
       if (!loaded) {
-        console.error('[AutoDJ] Failed to load pre-rendered track — aborting transition');
+        console.error('[AutoDJ] ❌ Failed to load pre-rendered track — aborting transition');
         this.preRenderedTrack = null;
         this.preloadedDeck = null;
         useDJStore.getState().setAutoDJStatus('preload-failed');
         return;
       }
+      console.log(`[AutoDJ] ✅ Pre-rendered track loaded successfully to deck ${this.idleDeck}`);
       this.preRenderedTrack = null; // Clear after use
+    } else {
+      console.warn(`[AutoDJ] ⚠️ No pre-rendered track available, deck should already have track loaded`);
     }
 
     const outState = store.decks[this.activeDeck];
