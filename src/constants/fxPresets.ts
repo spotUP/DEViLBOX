@@ -664,7 +664,7 @@ export const FX_PRESETS: FxPreset[] = [
   // ═══ AMP ═══
   { name: 'Clean Fender', description: 'Princeton clean — sparkling tube shimmer', tags: ['Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 14, parameters: { drive: 25, level: 100, presence: 55 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 14, parameters: { drive: 25, level: 85, presence: 55 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.4, damping: 0.5, tension: 0.4, mix: 0.3, drip: 0.3, diffusion: 0.6 } },
     ] },
   { name: 'Crunch Marshall', description: 'Blackstar HT40 clean driven — British crunch', tags: ['Amp', 'Guitar'],
@@ -679,7 +679,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'Dumble Lead', description: 'Dumble — smooth singing lead tones', tags: ['Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 15, parameters: { drive: 65, level: 100, presence: 50 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 15, parameters: { drive: 65, level: 80, presence: 50 } },
       { category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 20, parameters: { delayTime: 0.35, feedback: 0.3 } },
       { category: 'wasm', type: 'MVerb', enabled: true, wet: 20, parameters: { damping: 0.4, density: 0.6, bandwidth: 0.6, decay: 0.4, predelay: 0.02, size: 0.5, gain: 1.0, mix: 0.35, earlyMix: 0.5 } },
     ] },
@@ -696,7 +696,7 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'El Coyote Blues', description: 'El Coyote crunch + spring + tremolo — desert blues', tags: ['Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 31, parameters: { drive: 45, level: 100, presence: 50 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 31, parameters: { drive: 45, level: 85, presence: 50 } },
       { category: 'tonejs', type: 'Tremolo', enabled: true, wet: 25, parameters: { frequency: 4, depth: 0.4 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.4, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.6 } },
     ] },
@@ -710,33 +710,33 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
   { name: 'TS9 + Spring', description: 'Tube Screamer + spring — blues/rock pedalboard', tags: ['Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 0, parameters: { drive: 50, tone: 55, level: 100 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 0, parameters: { drive: 50, tone: 55, level: 85 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.5, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.6 } },
     ] },
   { name: 'Big Muff Doom', description: 'Big Muff V6 + massive reverb — fuzzy doom', tags: ['Guitar', 'Loud'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 36, parameters: { drive: 70, tone: 40, level: 100 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 36, parameters: { drive: 70, tone: 40, level: 80 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: -0.5 } },
       { category: 'tonejs', type: 'Reverb', enabled: true, wet: 35, parameters: { decay: 5, preDelay: 0.04 } },
     ] },
   { name: 'RAT + Delay', description: 'ProCo RAT + delay — aggressive post-punk', tags: ['Guitar', 'Grit'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 4, parameters: { drive: 60, tone: 50, level: 100 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 4, parameters: { drive: 60, tone: 50, level: 80 } },
       { category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 30, parameters: { delayTime: 0.35, feedback: 0.45 } },
     ] },
   { name: 'Revv G3 Chug', description: 'Revv G3 — modern metal chug machine', tags: ['Guitar', 'Loud'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 90, neuralModelIndex: 7, parameters: { drive: 70, tone: 55, level: 100 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 7, parameters: { drive: 70, tone: 55, level: 80 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 } },
     ] },
   { name: 'Goat + Leslie', description: 'Goat fuzz + Leslie rotary — psychedelic swirl', tags: ['Guitar', 'Modulation'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 75, neuralModelIndex: 33, parameters: { drive: 55, tone: 50, level: 100 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 75, neuralModelIndex: 33, parameters: { drive: 55, tone: 50, level: 85 } },
       { category: 'wasm', type: 'Leslie', enabled: true, wet: 45, parameters: { speed: 1.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.6, width: 0.8, acceleration: 0.5 } },
     ] },
   { name: 'Aguilar Bass Grit', description: 'Aguilar Agro + compressor — punchy bass', tags: ['Guitar', 'Bass'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 21, parameters: { drive: 45, tone: 55, level: 100 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 70, neuralModelIndex: 21, parameters: { drive: 45, tone: 55, level: 85 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: 0.0 } },
     ] },
@@ -824,7 +824,7 @@ export const FX_PRESETS: FxPreset[] = [
   // ═══ RETRO HARDWARE — C64 SID ═══
   { name: 'SID Shredder', description: 'SID as guitar lead — Mesa high gain, compression, spring reverb', tags: ['C64', 'Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 45, neuralModelIndex: 11, parameters: { drive: 55, level: 100, presence: 60 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 45, neuralModelIndex: 12, parameters: { drive: 50, level: 80, presence: 55 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 4, attack: 0.003, release: 0.1 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 20, parameters: { decay: 0.45, damping: 0.4, tension: 0.5, mix: 0.3, drip: 0.4, diffusion: 0.6 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: 0.5, high: 0.5 } },
