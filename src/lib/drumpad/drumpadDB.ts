@@ -516,35 +516,56 @@ export async function importConfig(
   audioContext: BaseAudioContext,
 ): Promise<Map<string, DrumProgram>> {
   const text = await blob.text();
-  const config = JSON.parse(text) as ExportedConfig;
 
-  if (config.version !== 1) {
-    throw new Error(`Unsupported .dvbpads version: ${config.version}`);
+  let config: ExportedConfig;
+  try {
+    config = JSON.parse(text) as ExportedConfig;
+  } catch {
+    throw new Error('Invalid .dvbpads file: corrupt or malformed JSON');
+  }
+
+  if (!config || typeof config !== 'object' || config.version !== 1) {
+    throw new Error(`Unsupported .dvbpads version: ${config?.version ?? 'unknown'}`);
+  }
+  if (!Array.isArray(config.programs) || !Array.isArray(config.samples)) {
+    throw new Error('Invalid .dvbpads file: missing programs or samples');
   }
 
   // Reconstruct samples
   const sampleMap = new Map<string, SampleData>();
   for (const exported of config.samples) {
-    const numChannels = exported.channels.length;
-    const channelData = exported.channels.map(base64ToFloat32);
-    const sampleLength = channelData[0]?.length ?? 0;
+    try {
+      const numChannels = exported.channels?.length ?? 0;
+      if (numChannels === 0) {
+        console.warn(`[drumpadDB] Skipping sample "${exported.id}": no channel data`);
+        continue;
+      }
+      const channelData = exported.channels.map(base64ToFloat32);
+      const sampleLength = channelData[0]?.length ?? 0;
+      if (sampleLength === 0) {
+        console.warn(`[drumpadDB] Skipping sample "${exported.id}": 0-length audio`);
+        continue;
+      }
 
-    const audioBuffer = audioContext.createBuffer(
-      numChannels,
-      sampleLength,
-      exported.sampleRate,
-    );
-    for (let ch = 0; ch < numChannels; ch++) {
-      audioBuffer.copyToChannel(new Float32Array(channelData[ch]), ch);
+      const audioBuffer = audioContext.createBuffer(
+        numChannels,
+        sampleLength,
+        exported.sampleRate || 44100,
+      );
+      for (let ch = 0; ch < numChannels; ch++) {
+        audioBuffer.copyToChannel(new Float32Array(channelData[ch]), ch);
+      }
+
+      sampleMap.set(exported.id, {
+        id: exported.id,
+        name: exported.name,
+        audioBuffer,
+        sampleRate: exported.sampleRate || 44100,
+        duration: exported.duration,
+      });
+    } catch (err) {
+      console.warn(`[drumpadDB] Failed to import sample "${exported.id}":`, err);
     }
-
-    sampleMap.set(exported.id, {
-      id: exported.id,
-      name: exported.name,
-      audioBuffer,
-      sampleRate: exported.sampleRate,
-      duration: exported.duration,
-    });
   }
 
   // Reconstruct programs
