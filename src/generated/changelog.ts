@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-14T13:13:13.953Z
+ * Generated: 2026-04-14T13:48:15.928Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5242';
-export const BUILD_NUMBER = '5242';
-export const BUILD_HASH = '14cec4470';
+export const BUILD_VERSION = '1.0.5248';
+export const BUILD_NUMBER = '5248';
+export const BUILD_HASH = 'd6ba6c29b';
 export const BUILD_DATE = '2026-04-14';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5242',
+    version: '1.0.5248',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "DJ preset loading now auto-switches to Bank A"
+      },
+      {
+        type: 'fix',
+        "description": "Improve drumpad text contrast"
+      },
+      {
+        type: 'fix',
+        "description": "SID repair filter checks path not name for .sid extension"
+      },
+      {
+        type: 'fix',
+        "description": "PadButton uniform dark bg with colored text + SID render frame count fix"
+      },
+      {
+        type: 'feature',
+        "description": "Add full one-shot preset browser to pad wizard"
+      },
+      {
+        type: 'fix',
+        "description": "One-shot pad assignment now uses actual preset configs"
+      },
       {
         type: 'fix',
         "description": "DJ vocoder race conditions, error boundary recovery, drumpad keyboard dedup + voice cleanup"
@@ -208,30 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Exciter audio kill — use passthrough gain mute instead of disconnect"
-      },
-      {
-        type: 'fix',
-        "description": "WASM effects disconnect bug (54 effects) + GT Ultra master FX routing"
-      },
-      {
-        type: 'fix',
-        "description": "Exciter/BassEnhancer audio kill + preset selector UX"
-      },
-      {
-        type: 'fix',
-        "description": "Suppress unknown synthType errors for dedicated WASM replayer formats"
-      },
-      {
-        type: 'feature',
-        "description": "Complete instrument param editing for all WASM replayer formats"
-      },
-      {
-        type: 'fix',
-        "description": "SoundFactory WASM silence, FC wrong engine routing, RK blank patterns"
-      },
-      {
-        type: 'improvement',
-        "description": "Derive effect preset categories from data instead of hardcoding"
       }
     ]
   }

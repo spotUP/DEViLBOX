@@ -62,11 +62,15 @@ export class DeckAudioPlayer {
     return this._originalFileBytes;
   }
 
+  private _loadVersion = 0;
+
   async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
     if (buffer.byteLength > MAX_FILE_SIZE) {
       throw new Error(`File too large (${(buffer.byteLength / 1024 / 1024).toFixed(0)} MB, max ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
     }
+
+    const myVersion = ++this._loadVersion;
 
     // Release previous track resources before loading new ones
     if (this._originalFileBytes) {
@@ -82,6 +86,18 @@ export class DeckAudioPlayer {
     // Decode audio with cross-browser support
     const audioContext = Tone.getContext().rawContext as AudioContext;
     const result: DecodeResult = await decodeAudio(audioContext, buffer, { filename });
+
+    // Guard: if another load started while we were decoding, discard this result
+    if (myVersion !== this._loadVersion) {
+      console.log(`[DeckAudioPlayer] Discarding stale decode for ${filename} (version ${myVersion} != ${this._loadVersion})`);
+      return {
+        duration: result.audioBuffer.duration,
+        sampleRate: result.audioBuffer.sampleRate,
+        numberOfChannels: result.audioBuffer.numberOfChannels,
+        waveformPeaks: new Float32Array(0),
+      };
+    }
+
     const audioBuffer = result.audioBuffer;
 
     console.log(`[DeckAudioPlayer] Decoded: duration=${audioBuffer.duration.toFixed(2)}s, sampleRate=${audioBuffer.sampleRate}, channels=${audioBuffer.numberOfChannels}, frames=${audioBuffer.length}`);

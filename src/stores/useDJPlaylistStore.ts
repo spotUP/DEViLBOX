@@ -586,8 +586,9 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       version: 2,
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown>;
-        state.playlists = [];
-        state.activePlaylistId = null;
+        // Preserve existing playlists during migration; only init if missing
+        if (!state.playlists) state.playlists = [];
+        if (!state.activePlaylistId) state.activePlaylistId = null;
         return state;
       },
       partialize: (state) => ({
@@ -658,30 +659,50 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
     for (const { playlistId, index, track } of toFix) {
       try {
         const raw = (track.trackName || track.fileName);
-        // Parse playlist track names like "01. Artist   Song Title (sid)" or "Song.sid"
-        const cleaned = raw
-          .replace(/\.sid$/i, '')       // strip .sid extension
-          .replace(/\s*\((?:sid|3sid|dual\s*sid|6581|8580)\)\s*$/i, '') // strip (sid) etc.
-          .replace(/^(\d{1,3})\.\s*/, '') // strip leading track number "01. "
-          .replace(/[_-]/g, ' ')
+        // Step 1: basic cleanup (keep hyphens — they're part of HVSC filenames)
+        const stripped = raw
+          .replace(/\.sid$/i, '')
+          .replace(/\s*\((?:sid|3sid|dual\s*sid|6581|8580)\)\s*$/i, '')
+          .replace(/^(\d{1,3})\.\s*/, '')
           .trim();
-        if (!cleaned) continue;
+        if (!stripped) continue;
 
-        // Split on double+ spaces: "Artist   Song Title" → [artist, songTitle]
-        const parts = cleaned.split(/\s{2,}/);
-        const artist = parts.length >= 2 ? parts[0].trim() : '';
-        const songTitle = parts.length >= 2 ? parts.slice(1).join(' ').trim() : cleaned;
+        // Step 2: split artist/title on " - " BEFORE replacing hyphens
+        let artist = '';
+        let songTitle = '';
+        const dashSplit = stripped.split(/\s+-\s+/);
+        if (dashSplit.length >= 2) {
+          artist = dashSplit[0].replace(/_/g, ' ').trim();
+          songTitle = dashSplit.slice(1).join(' - ').replace(/_/g, ' ').trim();
+        } else {
+          // No " - " separator — try double-space split (old format)
+          const underscored = stripped.replace(/_/g, ' ');
+          const parts = underscored.split(/\s{2,}/);
+          if (parts.length >= 2) {
+            artist = parts[0].trim();
+            songTitle = parts.slice(1).join(' ').trim();
+          } else {
+            songTitle = underscored;
+          }
+        }
 
         type HVSCResult = { isDirectory: boolean; name: string; path: string; author?: string };
         const filterSID = (r: HVSCResult) => !r.isDirectory && r.path.toLowerCase().endsWith('.sid');
 
-        // Search strategy: song title first (most specific), then artist+title, then full cleaned string
+        // Build search queries in priority order
         let sidResults: HVSCResult[] = [];
         const searches: string[] = [];
 
+        // 1. Song title (most specific — preserves hyphens like "Disco-Data")
         if (songTitle.length >= 2) searches.push(songTitle);
+        // 2. Artist + song title
         if (artist && songTitle && artist !== songTitle) searches.push(`${artist} ${songTitle}`);
-        if (searches.length === 0) searches.push(cleaned);
+        // 3. Fallback: first significant word(s) for long titles
+        const words = songTitle.split(/[\s-]+/).filter(w => w.length >= 3);
+        if (words.length > 2) searches.push(words.slice(0, 2).join(' '));
+        if (words.length > 1) searches.push(words[0]);
+        // 4. Final fallback: full cleaned string
+        if (searches.length === 0) searches.push(stripped.replace(/_/g, ' '));
 
         for (const query of searches) {
           sidResults = (await searchHVSC(query, 20)).filter(filterSID);
@@ -692,17 +713,22 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
         // Score results: prefer exact name match, then artist match, then first result
         let match: HVSCResult | undefined;
         if (sidResults.length > 0) {
-          const lowerSong = songTitle.toLowerCase();
+          // Normalize for comparison: underscores→spaces, hyphens→hyphens, lowercase
+          const norm = (s: string) => s.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ').trim();
+          const lowerSong = norm(songTitle);
           const lowerArtist = artist.toLowerCase();
 
           // Exact song name match
-          match = sidResults.find(r =>
-            r.name.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ') === lowerSong
-          );
+          match = sidResults.find(r => norm(r.name) === lowerSong);
+          // Also try with hyphens normalized to spaces on both sides
+          if (!match) {
+            const flatSong = lowerSong.replace(/-/g, ' ');
+            match = sidResults.find(r => norm(r.name).replace(/-/g, ' ') === flatSong);
+          }
           // Partial song name match + artist in path/author
           if (!match && lowerArtist) {
             match = sidResults.find(r => {
-              const rName = r.name.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ');
+              const rName = norm(r.name);
               const rPath = r.path.toLowerCase();
               const rAuthor = (r.author || '').toLowerCase();
               return rName.includes(lowerSong) &&
@@ -711,9 +737,7 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
           }
           // Partial song name match
           if (!match) {
-            match = sidResults.find(r =>
-              r.name.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ').includes(lowerSong)
-            );
+            match = sidResults.find(r => norm(r.name).includes(lowerSong));
           }
           if (!match) match = sidResults[0];
         }
@@ -724,9 +748,9 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
             trackName: track.trackName || match.name.replace(/\.sid$/i, ''),
           });
           fixed++;
-          console.log(`[DJPlaylistStore] Fixed: "${cleaned}" → hvsc:${match.path}`);
+          console.log(`[DJPlaylistStore] Fixed: "${songTitle}" → hvsc:${match.path}`);
         } else {
-          console.warn(`[DJPlaylistStore] No HVSC match for: "${cleaned}" (raw: "${raw}")`);
+          console.warn(`[DJPlaylistStore] No HVSC match for: "${songTitle}" (raw: "${raw}")`);
         }
         await new Promise(r => setTimeout(r, 150));
       } catch (err) {

@@ -130,6 +130,7 @@ export class DeckEngine {
   // Raw native AudioParam for deckGain — bypasses Tone.Signal entirely
   // to avoid any Tone.js interception that corrupts automation during scratch.
   private _rawDeckGainParam: AudioParam | null = null;
+  private _brickwallLimiter: DynamicsCompressorNode | null = null;
 
   /**
    * Safely ramp deckGain to a target value using the RAW native AudioParam.
@@ -193,6 +194,7 @@ export class DeckEngine {
     limiter.ratio.value = 20;        // Near-infinite ratio
     limiter.attack.value = 0.001;    // 1ms attack (catch transients)
     limiter.release.value = 0.01;    // 10ms release (fast recovery)
+    this._brickwallLimiter = limiter;
     const nativeChannelGain = getNativeAudioNode(this.channelGain as unknown as Record<string, unknown>);
     if (nativeChannelGain) {
       nativeChannelGain.connect(limiter);
@@ -1336,5 +1338,6 @@ export class DeckEngine {
     this.pitchShift.dispose();
     this.eq3.dispose();
     this.deckGain.dispose();
+    try { this._brickwallLimiter?.disconnect(); } catch { /* already disconnected */ }
   }
 }
