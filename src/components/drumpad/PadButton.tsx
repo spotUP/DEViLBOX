@@ -93,6 +93,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const isFxActive = pad.djFxAction && activeFxPads.has(pad.id);
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    // Ignore right-click (context menu)
+    if (event.button === 2) return;
+    
     event.preventDefault();
     
     // Empty pads: open wizard (or fallback to select)
