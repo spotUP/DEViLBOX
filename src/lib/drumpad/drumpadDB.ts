@@ -384,24 +384,25 @@ export async function saveAllPrograms(
     }
   }
 
-  // Write samples
-  const sampleTx = db.transaction(STORE_SAMPLES, 'readwrite');
-  const sampleStore = sampleTx.objectStore(STORE_SAMPLES);
-  // Clear old samples first
+  // Atomic write: single transaction for both samples and programs
+  // Prevents orphaned data if app crashes between writes
+  const tx = db.transaction([STORE_SAMPLES, STORE_PROGRAMS], 'readwrite');
+  const sampleStore = tx.objectStore(STORE_SAMPLES);
+  const progStore = tx.objectStore(STORE_PROGRAMS);
+
+  // Clear and write samples
   sampleStore.clear();
   for (const sample of sampleSet.values()) {
     sampleStore.put(audioBufferToStored(sample));
   }
-  await idbTransaction(sampleTx);
 
-  // Write programs
-  const progTx = db.transaction(STORE_PROGRAMS, 'readwrite');
-  const progStore = progTx.objectStore(STORE_PROGRAMS);
+  // Clear and write programs
   progStore.clear();
   for (const program of programs.values()) {
     progStore.put(programToStored(program));
   }
-  await idbTransaction(progTx);
+
+  await idbTransaction(tx);
 }
 
 export async function loadAllPrograms(

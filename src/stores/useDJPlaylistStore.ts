@@ -702,15 +702,17 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
         if (songTitle.length >= 2) searches.push(songTitle);
         // 2. Artist + song title
         if (artist && songTitle && artist !== songTitle) searches.push(`${artist} ${songTitle}`);
-        // 3. Fallback: first significant word(s) for long titles
+        // 3. Fallback: shorter queries — multi-word titles often fail the API
         const words = songTitle.split(/[\s-]+/).filter(w => w.length >= 3);
         if (words.length > 2) searches.push(words.slice(0, 2).join(' '));
-        if (words.length > 1) searches.push(words[0]);
-        // 4. Final fallback: full cleaned string
+        // 4. Single longest word (catches "Doublebass v2" → "Doublebass")
+        const longest = words.length > 0 ? words.reduce((a, b) => a.length >= b.length ? a : b) : '';
+        if (longest.length >= 4 && !searches.includes(longest)) searches.push(longest);
+        // 5. Final fallback: full cleaned string
         if (searches.length === 0) searches.push(stripped.replace(/_/g, ' '));
 
         for (const query of searches) {
-          sidResults = (await searchHVSC(query, 20)).filter(filterSID);
+          sidResults = (await searchHVSC(query, 100)).filter(filterSID);
           if (sidResults.length > 0) break;
           await new Promise(r => setTimeout(r, 150));
         }
