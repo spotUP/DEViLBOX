@@ -841,32 +841,23 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   // ── Context menu ──────────────────────────────────────────────────────────
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    console.log('[DJPlaylist] handleContextMenu fired!', { target: e.target, currentTarget: e.currentTarget });
     e.preventDefault();
     e.stopPropagation();
     
     // Check if we clicked on a track row
     const target = e.target as HTMLElement;
-    console.log('[DJPlaylist] Looking for data-track-index on:', target);
     const trackRow = target.closest('[data-track-index]');
-    console.log('[DJPlaylist] Found track row:', trackRow);
     
     if (trackRow) {
       const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
-      console.log('[DJPlaylist] Track index:', index);
       if (index >= 0) {
-        console.log('[DJPlaylist] Context menu on track:', index, 'at', e.clientX, e.clientY);
         const realIndex = getRealIndex(index);
         setContextMenuTrackIndex(realIndex);
         if (!selectedSet.has(realIndex)) {
           selectTrack(realIndex);
         }
-        console.log('[DJPlaylist] Opening context menu...');
         contextMenu.open(e);
-        console.log('[DJPlaylist] Context menu opened, isOpen:', contextMenu.isOpen);
       }
-    } else {
-      console.log('[DJPlaylist] No track row found, clicking outside tracks');
     }
   }, [getRealIndex, selectedSet, selectTrack, contextMenu]);
 
