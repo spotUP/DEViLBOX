@@ -194,16 +194,39 @@ export const PadButton: React.FC<PadButtonProps> = ({
     };
   }, []); // stable — handlers accessed through ref
 
+  // Lighten very dark colors for better contrast on dark grey background
+  const ensureContrast = useCallback((hexColor: string): string => {
+    // Convert hex to RGB
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // Calculate relative luminance (simplified)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    // If too dark (luminance < 0.35), lighten it
+    if (luminance < 0.35) {
+      const boost = 1.5; // Lighten by 50%
+      const newR = Math.min(255, Math.floor(r * boost));
+      const newG = Math.min(255, Math.floor(g * boost));
+      const newB = Math.min(255, Math.floor(b * boost));
+      return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+    }
+    
+    return hexColor;
+  }, []);
+
   // Determine pad style based on state
   const padStyle = useMemo(() => {
     // Mode mapping color takes priority in non-samples modes
     if (modeMapping && padMode !== 'samples') {
-      return { className: 'bg-dark-border', textColor: modeMapping.color };
+      return { className: 'bg-dark-border', textColor: ensureContrast(modeMapping.color) };
     }
 
     // Custom color takes priority
     if (pad.color && isLoaded) {
-      return { className: 'bg-dark-border', textColor: pad.color };
+      return { className: 'bg-dark-border', textColor: ensureContrast(pad.color) };
     }
 
     if (!isLoaded) {
@@ -212,12 +235,12 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
     // Synth-only pads get a blue text accent
     if (!pad.sample && (pad.synthConfig || pad.instrumentId != null)) {
-      return { className: 'bg-dark-border', textColor: '#60a5fa' }; // blue-400
+      return { className: 'bg-dark-border', textColor: '#60a5fa' }; // blue-400 - already bright
     }
 
     // Sample pads get emerald text
-    return { className: 'bg-dark-border', textColor: '#34d399' }; // emerald-400
-  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, modeMapping, padMode]);
+    return { className: 'bg-dark-border', textColor: '#34d399' }; // emerald-400 - already bright
+  }, [isLoaded, pad.sample, pad.instrumentId, pad.synthConfig, pad.color, modeMapping, padMode, ensureContrast]);
 
   // Flash overlay opacity driven by triggerIntensity (animated)
   const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
@@ -270,7 +293,10 @@ export const PadButton: React.FC<PadButtonProps> = ({
       <div className="absolute inset-0 flex items-center justify-center px-2">
         <span 
           className="text-xs font-bold text-center truncate leading-tight"
-          style={{ color: padStyle.textColor ?? '#f3f4f6' }}
+          style={{ 
+            color: padStyle.textColor ?? '#f3f4f6',
+            textShadow: padStyle.textColor ? '0 1px 2px rgba(0,0,0,0.8)' : undefined
+          }}
         >
           {modeMapping && padMode !== 'samples' ? modeMapping.label : pad.name}
         </span>
