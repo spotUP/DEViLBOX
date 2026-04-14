@@ -90,14 +90,21 @@ export async function loadPreRenderedTrackToDeck(
   deckId: DeckId,
 ): Promise<boolean> {
   try {
+    // CRITICAL: Pass .wav filename to prevent decodeAudio from trying to use UADE
+    // The buffer is already a rendered WAV, but if we pass "zynaps.cus" as filename,
+    // decodeAudio might try to reinitialize UADE which causes the crash
+    const wavFilename = originalTrack.fileName.replace(/\.[^.]+$/, '.wav');
+    
+    console.log(`[DJTrackLoader] Loading pre-rendered WAV to deck ${deckId}: ${preRendered.trackName} (as ${wavFilename})`);
     await getDJEngine().loadAudioToDeck(
       deckId,
       preRendered.wavData,
-      originalTrack.fileName,
+      wavFilename, // Use .wav extension to avoid UADE code path
       preRendered.trackName,
       preRendered.bpm,
-      preRendered.song,
+      undefined, // Do NOT pass song - we only want audio playback, no UADE reinit
     );
+    console.log(`[DJTrackLoader] Pre-rendered track loaded successfully`);
     return true;
   } catch (err) {
     console.error('[DJTrackLoader] Failed to load pre-rendered track:', err);
