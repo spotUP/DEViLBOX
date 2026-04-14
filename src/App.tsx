@@ -63,6 +63,8 @@ import { ExposeOverlay } from '@components/ui/ExposeOverlay';
 import { GlobalConfirmDialog } from '@components/common/GlobalConfirmDialog';
 import { showAlert } from '@stores/useConfirmStore';
 import { DJErrorBoundary } from './components/dj/DJErrorBoundary';
+import { TourOverlay } from './components/tour/TourOverlay';
+import { useTourStore } from '@stores/useTourStore';
 
 // Lazy-loaded components for better startup performance
 const HelpModal = lazy(() => import('./components/help/HelpModal').then(m => ({ default: m.HelpModal })));
@@ -551,6 +553,17 @@ function App() {
         e.preventDefault();
         const uiStore = useUIStore.getState();
         uiStore.setActiveView(uiStore.activeView === 'dj' ? 'tracker' : 'dj');
+        return;
+      }
+
+      // Ctrl+Shift+T: Start guided tour
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        import('@/engine/tour/TourEngine').then(({ getTourEngine }) => {
+          const engine = getTourEngine();
+          if (useTourStore.getState().isActive) engine.stop();
+          else engine.start();
+        });
         return;
       }
 
@@ -1517,6 +1530,9 @@ function App() {
 
       {/* Global confirmation dialog — triggered by showConfirm() from any store */}
       <GlobalConfirmDialog />
+
+      {/* Guided Tour overlay — subtitles + controls */}
+      <TourOverlay />
     </AppLayout>
     </GlobalDragDropHandler>
   );
