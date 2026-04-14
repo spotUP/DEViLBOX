@@ -18,11 +18,9 @@ import { PAD_INSTRUMENT_BASE } from '@/types/drumpad';
 import type { DrumPad, OutputBus, VelocityCurve, ScratchActionId } from '@/types/drumpad';
 import type { DrumMachineType, DrumType } from '@/types/instrument/drums';
 import { getDjFxByCategory, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
-import {
-  DEFAULT_SCRATCH_PADS,
-  DEFAULT_ONESHOT_PADS,
-} from '@/constants/djPadModeDefaults';
+import { DEFAULT_SCRATCH_PADS } from '@/constants/djPadModeDefaults';
 import { DJ_ONE_SHOT_PRESETS } from '@/constants/djOneShotPresets';
+import { ONE_SHOT_PRESETS_BY_CATEGORY } from '@/constants/djOneShotPresetsByCategory';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -325,25 +323,20 @@ function buildOneShotSubmenu(
 ): MenuItemType[] {
   const items: MenuItemType[] = [];
 
-  // Group one-shot pads by category
-  const groups = new Map<string, typeof DEFAULT_ONESHOT_PADS>();
-  for (const os of DEFAULT_ONESHOT_PADS) {
-    if (!groups.has(os.category)) groups.set(os.category, []);
-    groups.get(os.category)!.push(os);
-  }
-
-  for (const [cat, pads] of groups) {
+  // Use the full categorized preset list (34 presets across 7 categories)
+  for (const [categoryName, presets] of Object.entries(ONE_SHOT_PRESETS_BY_CATEGORY)) {
     items.push({
-      id: `os-cat-${cat}`, label: cat,
-      submenu: pads.map((os) => {
-        const preset = DJ_ONE_SHOT_PRESETS[os.presetIndex];
+      id: `os-cat-${categoryName.replace(/\s+/g, '-').toLowerCase()}`,
+      label: categoryName,
+      submenu: presets.map((presetInfo) => {
+        const preset = DJ_ONE_SHOT_PRESETS[presetInfo.index];
         return {
-          id: `os-${os.presetIndex}`,
-          label: os.label,
+          id: `os-${presetInfo.index}`,
+          label: presetInfo.name,
           onClick: () => {
             if (preset) {
               store.updatePad(padId, {
-                name: os.label,
+                name: presetInfo.name,
                 synthConfig: {
                   id: PAD_INSTRUMENT_BASE + padId,
                   type: 'synth',
@@ -352,10 +345,11 @@ function buildOneShotSubmenu(
                   volume: -6,
                   pan: 0,
                   ...preset,
-                  name: os.label,
+                  name: presetInfo.name,
                 } as import('@/types/instrument/defaults').InstrumentConfig,
                 instrumentNote: 'C4',
                 playMode: 'oneshot',
+                color: presetInfo.color,
               });
             }
           },
