@@ -235,13 +235,19 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     
     // Debug logging
     if (process.env.NODE_ENV === 'development') {
-      console.log('[handleLoadDJPreset]', {
+      console.log('[handleLoadDJPreset] Loading preset', {
         presetId,
         presetName: preset.name,
         programId: program.id,
         programName: program.name,
         padCount: program.pads.filter(p => p.djFxAction || p.synthConfig || p.scratchAction || p.sample).length,
-        firstPad: program.pads[0],
+        bankAPads: program.pads.slice(0, 16).map((p) => ({
+          id: p.id,
+          name: p.name,
+          hasDjFx: !!p.djFxAction,
+          hasSynth: !!p.synthConfig,
+          djFxAction: p.djFxAction
+        }))
       });
     }
     
@@ -250,6 +256,13 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     
     // Auto-switch to Bank A since presets load into Bank A
     useDrumPadStore.getState().setBank('A');
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[handleLoadDJPreset] After loading, current program:', {
+        currentProgramId: useDrumPadStore.getState().currentProgramId,
+        currentBank: useDrumPadStore.getState().currentBank
+      });
+    }
   }, [loadProgram]);
 
   const handleMasterLevelChange = useCallback((level: number) => {
