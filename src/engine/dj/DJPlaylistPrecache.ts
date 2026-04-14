@@ -127,6 +127,10 @@ export async function precachePlaylist(
         consecutiveNetworkFailures = 0;
       }
       console.warn(`[Precache] ${cached + failed + skipped}/${total} FAIL — ${track.trackName}:`, err);
+      
+      // Mark track as bad so it shows in the Re-test Bad list
+      store.markTrackBad(playlistId, track.trackName, msg);
+      
       onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: track.trackName, status: 'error' });
     }
   }
