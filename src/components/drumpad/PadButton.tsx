@@ -3,11 +3,9 @@
  */
 
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import type { DrumPad, PadMode } from '../../types/drumpad';
+import type { DrumPad } from '../../types/drumpad';
 import { useUIStore } from '@stores/useUIStore';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
-import { DEFAULT_DJFX_PADS, DEFAULT_ONESHOT_PADS, DEFAULT_SCRATCH_PADS } from '../../constants/djPadModeDefaults';
-import type { ModePadMapping } from '../../constants/djPadModeDefaults';
 
 interface PadButtonProps {
   pad: DrumPad;
@@ -19,7 +17,6 @@ interface PadButtonProps {
   onSelect: (padId: number) => void;
   onEmptyPadClick?: (padId: number) => void;  // Opens sample browser for empty pads
   onFocus?: () => void;  // Focus callback
-  padMode?: PadMode;
   onQuickAssign?: (padId: number, rect: DOMRect) => void;
   className?: string;
 }
@@ -34,21 +31,12 @@ export const PadButton: React.FC<PadButtonProps> = ({
   onSelect,
   onEmptyPadClick,
   onFocus,
-  padMode = 'samples',
   onQuickAssign,
   className = '',
 }) => {
   const useHex = useUIStore(s => s.useHexNumbers);
   const activeFxPads = useDrumPadStore(s => s.activeFxPads);
 
-  // Compute mode mapping for non-samples modes
-  const padIndex = (pad.id - 1) % 16;
-  const modeMapping: ModePadMapping | undefined = useMemo(() => {
-    if (padMode === 'djfx') return DEFAULT_DJFX_PADS[padIndex];
-    if (padMode === 'oneshots') return DEFAULT_ONESHOT_PADS[padIndex];
-    if (padMode === 'scratch') return DEFAULT_SCRATCH_PADS[padIndex];
-    return undefined;
-  }, [padMode, padIndex]);
   const [isPressed, setIsPressed] = useState(false);
   const [triggerIntensity, setTriggerIntensity] = useState(0); // 0-1 animated flash
   const decayTimerRef = useRef<number | null>(null);
@@ -102,7 +90,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
   const isLoaded = hasActualData;
 
-  const isFxActive = padMode === 'djfx' && activeFxPads.has(pad.id);
+  const isFxActive = pad.djFxAction && activeFxPads.has(pad.id);
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
@@ -301,7 +289,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
         <div
           className="absolute inset-0 rounded-lg pointer-events-none animate-pulse"
           style={{
-            boxShadow: `0 0 12px 4px ${modeMapping?.color ?? '#fff'}`,
+            boxShadow: `0 0 12px 4px ${pad.color ?? '#60a5fa'}`,
           }}
         />
       )}
@@ -329,8 +317,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
         </div>
       )}
 
-      {/* Empty state icon (samples mode only) */}
-      {!isLoaded && padMode === 'samples' && (
+      {/* Empty state icon */}
+      {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-2xl text-white/20">+</div>
         </div>

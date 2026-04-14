@@ -267,7 +267,6 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
             onTrigger={handlePadTrigger}
             onRelease={handlePadRelease}
             onSelect={setSelectedPadId}
-            padMode="samples"
             className="!min-h-[40px] !text-[8px]"
           />
         ))}
