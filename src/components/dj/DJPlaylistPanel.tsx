@@ -1286,6 +1286,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             </div>
           ) : (
             <div className="flex items-center gap-2 text-[10px]">
+              {(() => {
+                console.log('[DJPlaylist] Cache status:', { modlandCount, cachedCount, uncachedCount, badTrackCount });
+                return null;
+              })()}
               {modlandCount > 0 && (
                 <>
                   <span className="text-green-400">{cachedCount}/{modlandCount} cached</span>
