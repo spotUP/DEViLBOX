@@ -31,6 +31,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain;
   private sidechainInput: Tone.Gain;
   private selfRouteGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
@@ -60,12 +61,14 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
     this.output  = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
+    this.passthroughGain = new Tone.Gain(1);
     this.sidechainInput = new Tone.Gain(1);
 
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
     this.wetGain.connect(this.output);
-    this.input.connect(this.wetGain);
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
 
     // Self-route: main input feeds sidechain for self-detection mode.
     // Controlled by selfRouteGain — set to 0 when external source is wired.
@@ -102,7 +105,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
             const rawSc = getNativeAudioNode(this.sidechainInput)!;
             if (rawSc) rawSc.connect(this.workletNode!, 0, 1);
             // Now safe to disconnect passthrough
-            try { rawInput.disconnect(rawWet); } catch { /* */ }
+            this.passthroughGain.gain.value = 0;
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx.createGain();
@@ -198,7 +201,7 @@ export class SidechainLimiterEffect extends Tone.ToneAudioNode {
       try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
-    this.dryGain.dispose(); this.wetGain.dispose(); this.sidechainInput.dispose();
+    this.passthroughGain.dispose(); this.dryGain.dispose(); this.wetGain.dispose(); this.sidechainInput.dispose();
     this.selfRouteGain.dispose();
     this.input.dispose(); this.output.dispose();
     super.dispose();

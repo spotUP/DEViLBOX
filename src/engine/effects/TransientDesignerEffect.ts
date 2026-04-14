@@ -20,6 +20,7 @@ export class TransientDesignerEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ param: string; value: number }> = [];
@@ -46,11 +47,13 @@ export class TransientDesignerEffect extends Tone.ToneAudioNode {
     this.output  = new Tone.Gain(1);
     this.dryGain = new Tone.Gain(1 - this._wet);
     this.wetGain = new Tone.Gain(this._wet);
+    this.passthroughGain = new Tone.Gain(1);
 
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
     this.wetGain.connect(this.output);
-    this.input.connect(this.wetGain);
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
 
     void this._initWorklet();
   }
@@ -82,7 +85,7 @@ export class TransientDesignerEffect extends Tone.ToneAudioNode {
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
             // Disconnect passthrough using native API
-            try { rawInput.disconnect(rawWet); } catch { /* */ }
+            this.passthroughGain.gain.value = 0;
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
@@ -182,6 +185,7 @@ export class TransientDesignerEffect extends Tone.ToneAudioNode {
       try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
+    this.passthroughGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.input.dispose();
