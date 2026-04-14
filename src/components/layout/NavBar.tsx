@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings, Lightbulb } from 'lucide-react';
+import { Plus, X, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings, Lightbulb, Play } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -16,6 +16,7 @@ import { isElectron } from '@utils/electron';
 import { useNavBar } from '@hooks/views/useNavBar';
 import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { useUIStore } from '@stores';
+import { useTourStore } from '@stores/useTourStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useTabsStore } from '@stores/useTabsStore';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -25,6 +26,12 @@ const NavBarComponent: React.FC = () => {
 
   const editorFullscreen = useUIStore((state) => state.editorFullscreen);
   const openModal = useUIStore((state) => state.openModal);
+  const tourActive = useTourStore((s) => s.isActive);
+
+  const handleStartTour = useCallback(async () => {
+    const { getTourEngine } = await import('@/engine/tour/TourEngine');
+    getTourEngine().start();
+  }, []);
 
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -199,6 +206,20 @@ const NavBarComponent: React.FC = () => {
             options={VIEW_OPTIONS.map((v) => ({ value: v.value, label: v.label }))}
             title="Switch view"
           />
+
+          {/* Guided Tour */}
+          {!tourActive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStartTour}
+              icon={<Play size={14} />}
+              iconPosition="left"
+              title="Start guided tour (Ctrl+Shift+T)"
+            >
+              <span className="hidden sm:inline">Tour</span>
+            </Button>
+          )}
 
           {/* Settings */}
           <Button
