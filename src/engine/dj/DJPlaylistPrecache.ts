@@ -137,6 +137,21 @@ export async function precachePlaylist(
       consecutiveNetworkFailures = 0;
       await cacheSourceFile(buffer, filename);
 
+      // Check for TFMX companion file (mdat.* needs smpl.*)
+      // Download and cache it so it's available offline
+      if (filename.toLowerCase().startsWith('mdat.')) {
+        try {
+          const { downloadTFMXCompanion } = await import('@/lib/modlandApi');
+          const companion = await downloadTFMXCompanion(currentPath);
+          if (companion) {
+            await cacheSourceFile(companion.buffer, companion.filename);
+            console.log(`[Precache] Cached TFMX companion: ${companion.filename}`);
+          }
+        } catch (companionErr) {
+          console.warn(`[Precache] TFMX companion download failed (non-fatal):`, companionErr);
+        }
+      }
+
       onProgress?.({ current: processed + 1, total, cached, failed, skipped, trackName: track.trackName, status: 'rendering' });
 
       if (!isAudioFile(filename)) {
