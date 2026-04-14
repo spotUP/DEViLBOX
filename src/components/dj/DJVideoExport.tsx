@@ -34,7 +34,7 @@ export const DJVideoExport: React.FC = () => {
         setDuration(recorderRef.current.durationMs);
         setFileSize(recorderRef.current.totalBytes);
       }
-    }, 250);
+    }, 1000);
     return () => clearInterval(timerRef.current);
   }, [isRecording]);
 

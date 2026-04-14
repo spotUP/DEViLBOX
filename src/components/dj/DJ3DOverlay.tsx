@@ -139,6 +139,7 @@ function DemandInvalidator() {
   useEffect(() => {
     let id: ReturnType<typeof setInterval>;
     const poll = () => {
+      if (document.hidden) return;
       const decks = useDJStore.getState().decks;
       if (decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying) {
         invalidateRef.current();

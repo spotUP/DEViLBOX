@@ -75,6 +75,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const driftHistoryRef = useRef<number[]>([]);
   useEffect(() => {
     const timer = setInterval(() => {
+      if (document.hidden) return;
       const s = useDJStore.getState();
       if (!s.decks.A.isPlaying || !s.decks.B.isPlaying || !s.decks.A.beatGrid || !s.decks.B.beatGrid) {
         setSyncDriftMs(null);

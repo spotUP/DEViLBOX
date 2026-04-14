@@ -31,13 +31,19 @@ export const DeckBeatPhase: React.FC<DeckBeatPhaseProps> = ({ deckId }) => {
   const [phase, setPhase] = useState<PhaseInfo | null>(null);
   const rafRef = useRef<number>(0);
   const mountedRef = useRef(true);
+  const prevBeatIdxRef = useRef(-1);
 
   useEffect(() => {
     mountedRef.current = true;
 
     const tick = () => {
       if (!mountedRef.current) return;
-      setPhase(viz.getBeatPhase());
+      const newPhase = viz.getBeatPhase();
+      // Only update state when beat index changes to reduce re-renders
+      if (newPhase?.nearestBeatIdx !== prevBeatIdxRef.current) {
+        prevBeatIdxRef.current = newPhase?.nearestBeatIdx ?? -1;
+        setPhase(newPhase);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
 
