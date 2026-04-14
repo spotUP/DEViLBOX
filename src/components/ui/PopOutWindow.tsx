@@ -56,10 +56,6 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
   });
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PopOutWindow] Effect run:', { isOpen, title });
-    }
-
     if (!isOpen) {
       // Close popup when isOpen goes false
       if (popupRef.current && !popupRef.current.closed) {
@@ -76,9 +72,6 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
 
     // If popup already exists and is open, just bring it to front
     if (popupRef.current && !popupRef.current.closed) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[PopOutWindow] Popup already exists, focusing');
-      }
       popupRef.current.focus();
       return;
     }
@@ -103,16 +96,7 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     // The static HTML at /popout.html reads the title from the query param.
     // Because it's same-origin, createPortal and shared Zustand stores still work.
     const popoutUrl = `/popout.html?t=${encodeURIComponent(title)}`;
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PopOutWindow] Opening window:', { popoutUrl, features });
-    }
-    
     const popup = window.open(popoutUrl, '', features);
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PopOutWindow] window.open returned:', popup);
-    }
 
     if (!popup) {
       console.error('[PopOutWindow] Popup blocked by browser');
