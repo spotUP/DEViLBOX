@@ -83,6 +83,10 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   // Track velocity for each pad (for visual feedback)
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
+  const velocityTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  // Track pending synth release timeouts (clean up on unmount/bank switch)
+  const pendingReleasesRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   // Track focused pad for keyboard navigation (uses bank-relative IDs)
   const [focusedPadId, setFocusedPadId] = useState<number>(1);
@@ -121,6 +125,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
     return () => {
       noteRepeatRef.current?.dispose();
       engineRef.current?.dispose();
+      // Clean up pending synth release timers
+      pendingReleasesRef.current.forEach(t => clearTimeout(t));
+      pendingReleasesRef.current.clear();
+      // Clean up velocity fade timers
+      Object.values(velocityTimersRef.current).forEach(t => clearTimeout(t));
     };
   }, []);
 
@@ -143,10 +152,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const noteRepeatRate = useDrumPadStore(s => s.noteRepeatRate);
   const bpm = useTransportStore(s => s.bpm);
 
-  // Reset focused pad when bank changes
+  // Reset focused pad and clear visual state when bank changes
   useEffect(() => {
     const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
     setFocusedPadId(bankOffset + 1);
+    setPadVelocities({});
   }, [currentBank]);
 
   useEffect(() => {
@@ -175,6 +185,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
     // Fire audio FIRST — synchronously, before any React state updates.
     // The AudioContext is resumed on first user gesture; after that this is a no-op check.
     const ctx = getAudioContext();
+    if (ctx.state === 'closed') return; // Cannot play on closed context
     if (ctx.state === 'suspended') {
       // Only needed once per session — fire-and-forget, don't await
       ctx.resume();
@@ -202,9 +213,13 @@ export const PadGrid: React.FC<PadGridProps> = ({
             const padInstId = PAD_INSTRUMENT_BASE + padId;
             const config = { ...preset, id: padInstId, name: preset.name ?? mapping.label } as import('../../types/instrument/defaults').InstrumentConfig;
             engine.triggerNoteAttack(padInstId, 'C3', 0, velocity / 127, config);
-            setTimeout(() => {
+            const existingTimer = pendingReleasesRef.current.get(padInstId);
+            if (existingTimer) clearTimeout(existingTimer);
+            const timer = setTimeout(() => {
               try { engine.triggerNoteRelease(padInstId, 'C3', 0, config); } catch { /* ignore */ }
+              pendingReleasesRef.current.delete(padInstId);
             }, 2000);
+            pendingReleasesRef.current.set(padInstId, timer);
           } catch (err) {
             console.warn('[PadGrid] One-shot trigger failed:', err);
           }
@@ -254,10 +269,14 @@ export const PadGrid: React.FC<PadGridProps> = ({
               
               engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
               if (pad.playMode === 'oneshot') {
-                const releaseDelay = Math.max(pad.decay, 100) / 1000;
-                setTimeout(() => {
+                const releaseDelayMs = Math.max(pad.decay, 100);
+                const existingTimer = pendingReleasesRef.current.get(padInstId);
+                if (existingTimer) clearTimeout(existingTimer);
+                const timer = setTimeout(() => {
                   try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
-                }, releaseDelay * 1000);
+                  pendingReleasesRef.current.delete(padInstId);
+                }, releaseDelayMs);
+                pendingReleasesRef.current.set(padInstId, timer);
               }
             } catch (err) {
               console.warn('[PadGrid] Pad synth trigger failed:', err);
@@ -271,12 +290,16 @@ export const PadGrid: React.FC<PadGridProps> = ({
                 const normalizedVel = curvedVelocity / 127;
                 engine.triggerNoteAttack(pad.instrumentId, note, 0, normalizedVel, config);
                 if (pad.playMode === 'oneshot') {
-                  const releaseDelay = Math.max(pad.decay, 100) / 1000;
-                  setTimeout(() => {
+                  const releaseDelayMs = Math.max(pad.decay, 100);
+                  const existingTimer = pendingReleasesRef.current.get(pad.instrumentId);
+                  if (existingTimer) clearTimeout(existingTimer);
+                  const timer = setTimeout(() => {
                     try {
                       engine.triggerNoteRelease(pad.instrumentId!, note, 0, config);
                     } catch { /* ignore release errors */ }
-                  }, releaseDelay * 1000);
+                    pendingReleasesRef.current.delete(pad.instrumentId!);
+                  }, releaseDelayMs);
+                  pendingReleasesRef.current.set(pad.instrumentId, timer);
                 }
               }
             } catch (err) {
@@ -297,9 +320,13 @@ export const PadGrid: React.FC<PadGridProps> = ({
     // Visual feedback AFTER audio — don't let React re-render delay the trigger
     setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
 
-    // Fade out velocity indicator after a short delay
-    setTimeout(() => {
+    // Fade out velocity indicator — clear any pending timer for this pad first
+    if (velocityTimersRef.current[padId]) {
+      clearTimeout(velocityTimersRef.current[padId]);
+    }
+    velocityTimersRef.current[padId] = setTimeout(() => {
       setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
+      delete velocityTimersRef.current[padId];
     }, 200);
   }, [currentProgram, setFxPadActive]);
 
