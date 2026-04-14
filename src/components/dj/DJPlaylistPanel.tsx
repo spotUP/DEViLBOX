@@ -1294,15 +1294,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                 <>
                   <span className="text-green-400">{cachedCount}/{modlandCount} cached</span>
                   {uncachedCount === 0 && <span className="text-green-500/80">Offline ready</span>}
-                  {(() => {
-                    console.log('[DJPlaylist] Button render check:', { uncachedCount, willRender: uncachedCount > 0 });
-                    return null;
-                  })()}
                   {uncachedCount > 0 && (
                     <button onClick={handlePrecache}
                       title="Download and cache all uncached tracks for offline playback"
-                      className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-700 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40 transition-all"
-                      style={{ border: '2px solid red' }}>
+                      className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-700 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40 transition-all">
                       Cache ({uncachedCount})
                     </button>
                   )}

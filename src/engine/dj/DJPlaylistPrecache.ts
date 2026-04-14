@@ -61,7 +61,7 @@ export async function precachePlaylist(
   let consecutiveNetworkFailures = 0;
   const MAX_CONSECUTIVE_NETWORK_FAILURES = 5;
 
-  for (const { track } of modlandTracks) {
+  for (const { track, index } of modlandTracks) {
     const modlandPath = track.fileName.slice('modland:'.length);
     const filename = modlandPath.split('/').pop() || 'unknown';
     const processed = cached + failed + skipped;
@@ -127,6 +127,10 @@ export async function precachePlaylist(
         consecutiveNetworkFailures = 0;
       }
       console.warn(`[Precache] ${cached + failed + skipped}/${total} FAIL — ${track.trackName}:`, err);
+      
+      // Mark track as bad so it shows in the Re-test Bad list
+      store.markTrackBad(playlistId, index, msg);
+      
       onProgress?.({ current: cached + failed + skipped, total, cached, failed, skipped, trackName: track.trackName, status: 'error' });
     }
   }
