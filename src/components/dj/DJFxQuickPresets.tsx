@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Star, Trash2, CloudOff, Cloud, Plus } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/fxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@/constants/unifiedEffects';
@@ -18,7 +19,6 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig, AudioEffectType } from '@typedefs/instrument';
-import { useClickOutside } from '@hooks/useClickOutside';
 
 // ── User preset types ────────────────────────────────────────────────────────
 
@@ -57,7 +57,8 @@ export const DJFxQuickPresets: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAddEffect, setShowAddEffect] = useState(false);
   const [activePresetName, setActivePresetName] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
   const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
   const user = useAuthStore((s) => s.user);
@@ -95,7 +96,18 @@ export const DJFxQuickPresets: React.FC = () => {
     pushToCloud(SYNC_KEYS.MASTER_FX_PRESETS, presets).catch((err) => console.warn('FX preset cloud sync failed:', err));
   }, []);
 
-  // ── Apply preset ───────────────────────────────────────────────────────
+  // ── Apply preset with beat-synced crossfade ──────────────────────────────
+
+  // The DJMixerEngine handles crossfading internally (equal-power, ~2 beats).
+  // Just apply the new effects — the engine does the rest.
+  const applyPreset = useCallback(
+    (newEffects: EffectConfig[], presetName: string) => {
+      setMasterEffects(newEffects);
+      setActivePresetName(presetName);
+      setIsOpen(false);
+    },
+    [setMasterEffects],
+  );
 
   const applyFactoryPreset = useCallback(
     (preset: MasterFxPreset) => {
@@ -103,11 +115,9 @@ export const DJFxQuickPresets: React.FC = () => {
         ...fx,
         id: `master-fx-${Date.now()}-${i}`,
       }));
-      setMasterEffects(effects);
-      setActivePresetName(preset.name);
-      setIsOpen(false);
+      applyPreset(effects, preset.name);
     },
-    [setMasterEffects],
+    [applyPreset],
   );
 
   const applyUserPreset = useCallback(
@@ -116,11 +126,9 @@ export const DJFxQuickPresets: React.FC = () => {
         ...fx,
         id: `master-fx-${Date.now()}-${i}`,
       }));
-      setMasterEffects(effects);
-      setActivePresetName(preset.name);
-      setIsOpen(false);
+      applyPreset(effects, preset.name);
     },
-    [setMasterEffects],
+    [applyPreset],
   );
 
   const deleteUserPreset = useCallback(
@@ -174,15 +182,41 @@ export const DJFxQuickPresets: React.FC = () => {
     [addMasterEffectConfig],
   );
 
-  // ── Click outside to close ─────────────────────────────────────────────
-  useClickOutside(dropdownRef, () => setIsOpen(false), { enabled: isOpen });
+  // ── Click outside to close (checks both wrapper and portal menu) ─────
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (wrapperRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setIsOpen(false);
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [isOpen]);
+
+  // Compute portal position from the trigger button's bounding rect
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: Math.max(0, rect.right - 256), // 256 = w-64 (16rem)
+      });
+    }
+  }, [isOpen]);
 
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={wrapperRef} className="relative">
       {/* Trigger button */}
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono border transition-all
           ${activePresetName
@@ -196,9 +230,13 @@ export const DJFxQuickPresets: React.FC = () => {
         <ChevronDown size={12} className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-[99990] w-64 max-h-[70vh] overflow-y-auto rounded-lg border border-dark-border bg-dark-bgSecondary shadow-xl">
+      {/* Dropdown menu — rendered via portal so parent overflow:hidden can't clip it */}
+      {isOpen && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
+          className="z-[99990] w-64 max-h-[70vh] overflow-y-auto rounded-lg border border-dark-border bg-dark-bgSecondary shadow-xl"
+        >
           {/* Clear / Bypass */}
           <button
             onClick={clearPresets}
@@ -300,7 +338,8 @@ export const DJFxQuickPresets: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

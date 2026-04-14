@@ -463,6 +463,18 @@ export const PixiDrumPadManager: React.FC = () => {
       const p = prog?.pads.find(pp => pp.id === id);
       if (p && engineRef.current) engineRef.current.triggerPad(p, 100);
     },
+    onRename: (id: number) => {
+      const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
+      const p = prog?.pads.find(pp => pp.id === id);
+      const newName = window.prompt('Pad name:', p?.name || `Pad ${id}`);
+      if (newName !== null) {
+        useDrumPadStore.getState().updatePad(id, { name: newName });
+      }
+    },
+    onLoadSample: (id: number) => {
+      setSelectedPadId(id);
+      padWizard.open(id);
+    },
   }), [padWizard]);
 
   const ctxMenuItemsDOM = usePadContextMenu(ctxMenuPadId, ctxMenuCallbacks);
