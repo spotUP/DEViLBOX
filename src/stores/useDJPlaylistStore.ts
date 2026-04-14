@@ -673,7 +673,7 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
         const songTitle = parts.length >= 2 ? parts.slice(1).join(' ').trim() : cleaned;
 
         type HVSCResult = { isDirectory: boolean; name: string; path: string; author?: string };
-        const filterSID = (r: HVSCResult) => !r.isDirectory && r.name.toLowerCase().endsWith('.sid');
+        const filterSID = (r: HVSCResult) => !r.isDirectory && r.path.toLowerCase().endsWith('.sid');
 
         // Search strategy: song title first (most specific), then artist+title, then full cleaned string
         let sidResults: HVSCResult[] = [];
