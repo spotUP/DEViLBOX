@@ -290,6 +290,29 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       }
     }, [doLoadPreset]);
 
+    // Direct preset load — fetches content and hard-cuts without any fade overlay.
+    // Used during layer switches where the parent CSS crossfade handles the transition.
+    const doLoadPresetDirect = useCallback(async (idx: number) => {
+      const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
+      if (!engineRef.current || names.length === 0) return;
+      const wrappedIdx = ((idx % names.length) + names.length) % names.length;
+      const name = names[wrappedIdx];
+      const content = await fetchPresetContent(name);
+      if (!content || !engineRef.current || !mountedRef.current) return;
+      // Cancel any in-progress fade from a previous load
+      if (fadeTimerRef.current !== undefined) clearTimeout(fadeTimerRef.current);
+      fadeTimerRef.current = undefined;
+      const fade = fadeRef.current;
+      if (fade) { fade.style.transition = 'none'; fade.style.opacity = '0'; }
+      presetLoadTimeRef.current = performance.now();
+      engineRef.current.loadPresetData(content, false);
+      currentIdxRef.current = wrappedIdx;
+      onPresetChange?.(wrappedIdx, name);
+      // Pre-fetch next preset
+      const nextIdx = Math.floor(Math.random() * names.length);
+      fetchPresetContent(names[nextIdx]);
+    }, [onPresetChange, allPresetNames]);
+
     // Render loop — runs continuously once ready; skips draw when not visible.
     // Stuck detection moved to separate 1Hz timer to avoid GPU→CPU stalls.
     useEffect(() => {
@@ -410,7 +433,11 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => { doLoadPresetByName(name, blendOrSmooth !== false); },
       getPresetNames: () => allPresetNames ?? Object.keys(BUILTIN_PRESETS),
       getCurrentIndex: () => currentIdxRef.current,
-    }), [doLoadPreset, doLoadPresetByName]);
+      loadRandomDirect: () => {
+        const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
+        doLoadPresetDirect(Math.floor(Math.random() * names.length));
+      },
+    }), [doLoadPreset, doLoadPresetByName, doLoadPresetDirect]);
 
     return (
       <div ref={containerRef} className="w-full h-full relative">
