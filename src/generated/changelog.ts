@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-14T10:00:44.770Z
+ * Generated: 2026-04-14T12:49:29.268Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5207';
-export const BUILD_NUMBER = '5207';
-export const BUILD_HASH = 'a28a005cd';
+export const BUILD_VERSION = '1.0.5238';
+export const BUILD_NUMBER = '5238';
+export const BUILD_HASH = 'c6623212e';
 export const BUILD_DATE = '2026-04-14';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,133 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5207',
+    version: '1.0.5238',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'feature',
+        "description": "Auto-repair SID playlists on store load"
+      },
+      {
+        type: 'fix',
+        "description": "Close AutoDJ dialog + playlist panel when starting Auto DJ"
+      },
+      {
+        type: 'fix',
+        "description": "HVSC SIDs can now be added to DJ playlists"
+      },
+      {
+        type: 'feature',
+        "description": "Add search + category filter to DJ FX preset selector"
+      },
+      {
+        type: 'feature',
+        "description": "Add HVSC (C64 SID) support to DJ auto-download pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "UADE companion support, Play from here, network abort for analyzer"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove MoogFilter diagnostic logging spam"
+      },
+      {
+        type: 'fix',
+        "description": "Dropdown menu matches trigger button width"
+      },
+      {
+        type: 'fix',
+        "description": "Audit all FX presets — fix 10 neural amp clipping/artefact risks"
+      },
+      {
+        type: 'fix',
+        "description": "Add 404 auto-fix to precache process"
+      },
+      {
+        type: 'feature',
+        "description": "Add WebSID C64 SID rendering to DJ view + sync AMIGA_EXTENSIONS"
+      },
+      {
+        type: 'fix',
+        "description": "BadCat Jazz squeaky glitch — reduce drive/level/wet"
+      },
+      {
+        type: 'fix',
+        "description": "High Gain Mesa beep — swap to Splawn OD, reduce drive/level"
+      },
+      {
+        type: 'fix',
+        "description": "Crunch Marshall beep — swap SM57 mic model to clean DI model"
+      },
+      {
+        type: 'fix',
+        "description": "Mark failed tracks as bad during precache, remove debug logging"
+      },
+      {
+        type: 'fix',
+        "description": "WAM prefetch uses fetch() not import(), suppress effect rebuild spam"
+      },
+      {
+        type: 'improvement',
+        "description": "Smooth FX knobs — direct engine calls + throttled store writes"
+      },
+      {
+        type: 'fix',
+        "description": "Add button render debug logging and red border"
+      },
+      {
+        type: 'fix',
+        "description": "MasterEffectConfigs not proxied in _masterFxCtx — knobs saw empty map"
+      },
+      {
+        type: 'fix',
+        "description": "Add debug logging for cache button visibility"
+      },
+      {
+        type: 'feature',
+        "description": "Add tooltips to all playlist buttons and show Re-test Bad always"
+      },
+      {
+        type: 'fix',
+        "description": "Dragonfly gain comp, eliminate double compensation, unwrap wet updates"
+      },
+      {
+        type: 'fix',
+        "description": "Remove debug logging from context menu handler"
+      },
+      {
+        type: 'feature',
+        "description": "Add data-track-index to virtual scroll wrapper div"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: dev scripts, service worker, vite config, remove tinyplayer.exe"
+      },
+      {
+        type: 'feature',
+        "description": "Drumpad context menu, DJ FX crossfade, volume normalization"
+      },
+      {
+        type: 'fix',
+        "description": "FX preset tuning, gain-comp unwrap, neural amp 2x, WAM caching, chain race fix"
+      },
+      {
+        type: 'fix',
+        "description": "Add debug logging to context menu handler"
+      },
+      {
+        type: 'fix',
+        "description": "Fix context menu using onContextMenuCapture handler"
+      },
+      {
+        type: 'fix',
+        "description": "Tame harsh FX presets + 4× neural amp downsampling"
+      },
+      {
+        type: 'feature',
+        "description": "Add onContextMenuCapture to prevent browser context menu"
+      },
       {
         type: 'fix',
         "description": "Fix playlist context menu - remove duplicate handler"
@@ -108,132 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add instrument param APIs to ArtOfNoise, MusicAssembler, BenDaglish"
-      },
-      {
-        type: 'feature',
-        "description": "Sidechain compressor WASM isolation integration + effect browser filter"
-      },
-      {
-        type: 'feature',
-        "description": "Instrument editors for 28+ WASM formats — interactive param editing"
-      }
-    ]
-  },
-  {
-    version: '2026-04-13',
-    date: '2026-04-13',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Live pattern editing for all 23 NostalgicPlayer WASM replayers"
-      },
-      {
-        type: 'feature',
-        "description": "Full edit APIs for all 22 NostalgicPlayer C replayers"
-      },
-      {
-        type: 'feature',
-        "description": "Add edit API + export to all 22 NostalgicPlayer C replayers"
-      },
-      {
-        type: 'fix',
-        "description": "SA export roundtrip — use original file data, remove broken serializer"
-      },
-      {
-        type: 'feature',
-        "description": "Sonic Arranger edit API — get/set cells, instruments, positions"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 12 parsers to dedicated WASM replayers (bypass UADE)"
-      },
-      {
-        type: 'fix',
-        "description": "Fred converter — allow negative offsetDiff (fuzzball-title.fred)"
-      },
-      {
-        type: 'fix',
-        "description": "Fred replayer — add Amiga hunk stripper + Final format converter"
-      },
-      {
-        type: 'fix',
-        "description": "SoundFactory opcode interpreter infinite loop"
-      },
-      {
-        type: 'feature',
-        "description": "Sawteeth (.st) WASM engine — transpiled from NostalgicPlayer C#"
-      },
-      {
-        type: 'feature',
-        "description": "Port final 8 NostalgicPlayer formats (batch 4) — 23 total"
-      },
-      {
-        type: 'fix',
-        "description": "Sidechain compressor — broken signal path, missing self-route, param normalization"
-      },
-      {
-        type: 'feature',
-        "description": "Port 6 more NostalgicPlayer formats (batch 3)"
-      },
-      {
-        type: 'feature',
-        "description": "Decode SynTracker pattern data — 4-byte cells, per-channel patterns"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite shimmer reverb pitch shifter — crossfade dual-tap replaces broken grain OLA"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel render + oscilloscope for all 4 NostalgicPlayer ports"
-      },
-      {
-        type: 'fix',
-        "description": "SoundMon C port — reader_eof was too strict (>= vs >)"
-      },
-      {
-        type: 'fix',
-        "description": "Rebuild SoundMon C port (still has loading bug — WIP)"
-      },
-      {
-        type: 'feature',
-        "description": "Port SoundMon, Digital Mugician, David Whittaker from NostalgicPlayer C#"
-      },
-      {
-        type: 'fix',
-        "description": "Stub UADE parsers use tick reconstruction instead of empty patterns"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: wrap fur_load in try/catch to capture WASM abort details"
-      },
-      {
-        type: 'fix',
-        "description": "Revert SynTracker→Symphonie Pro redirect — synmod IS SynTracker, .symmod is Symphonie Pro"
-      },
-      {
-        type: 'fix',
-        "description": "Update remaining synmod comment from SynTracker to Symphonie Pro"
-      },
-      {
-        type: 'fix',
-        "description": "Route synmod (SynTracker) to Symphonie Pro parser — correct format identification"
-      },
-      {
-        type: 'feature',
-        "description": "Parsers + native routes for remaining 5 FORCE_CLASSIC formats"
-      },
-      {
-        type: 'fix',
-        "description": "Only use SA WASM replayer for SOARV1.0 format, 4EFA falls to UADE"
-      },
-      {
-        type: 'feature',
-        "description": "Parsers + native routes for 6 more UADE formats"
-      },
-      {
-        type: 'fix',
-        "description": "DefleMask — pre-decompress zlib in ModuleLoader before parseFurnaceFile"
       }
     ]
   }

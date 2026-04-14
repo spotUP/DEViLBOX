@@ -290,59 +290,15 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     };
   }, []);
 
-  // Keyboard shortcuts for triggering pads (bank-aware)
-  // Uses mousedown simulation on pad buttons instead of broken click approach
-  const currentBank = useDrumPadStore(s => s.currentBank);
+  // Mode switching (1-4) and Escape — pad triggering handled by useDrumPadKeyboard hook
   useEffect(() => {
-    // Map keys to pad index within bank (0-15)
-    const keyToPadIndex: Record<string, number> = {
-      // Top row: Q W E R (pads 0-3)
-      'q': 0, 'w': 1, 'e': 2, 'r': 3,
-      // Second row: A S D F (pads 4-7)
-      'a': 4, 's': 5, 'd': 6, 'f': 7,
-      // Third row: Z X C V (pads 8-11)
-      'z': 8, 'x': 9, 'c': 10, 'v': 11,
-      // Fourth row: T G B N (pads 12-15)
-      't': 12, 'g': 13, 'b': 14, 'n': 15,
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't trigger shortcuts if typing in input/textarea/select
       const target = event.target as HTMLElement;
       const isInputFocused =
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
         target.tagName === 'SELECT' ||
         target.isContentEditable;
-
-      const key = event.key.toLowerCase();
-      const padIndex = keyToPadIndex[key];
-
-      if (padIndex !== undefined) {
-        if (!isInputFocused) {
-          // Calculate bank-aware pad ID
-          const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
-          const padId = bankOffset + padIndex + 1;
-          const program = programs.get(currentProgramId);
-          if (program) {
-            event.preventDefault();
-            const pad = program.pads.find((p) => p.id === padId);
-            if (pad?.sample || pad?.instrumentId != null || pad?.synthConfig) {
-              // Trigger via mousedown event on the pad button for proper audio triggering
-              const padButton = document.querySelector(`[data-pad-id="${padId}"]`) as HTMLElement;
-              if (padButton) {
-                const rect = padButton.getBoundingClientRect();
-                const mouseEvent = new MouseEvent('mousedown', {
-                  bubbles: true,
-                  clientX: rect.left + rect.width / 2,
-                  clientY: rect.top + rect.height * 0.3, // Upper area = medium velocity
-                });
-                padButton.dispatchEvent(mouseEvent);
-              }
-            }
-          }
-        }
-      }
 
       // Mode switching: 1-4 keys
       if (!isInputFocused && ['1', '2', '3', '4'].includes(event.key)) {
@@ -365,7 +321,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [programs, currentProgramId, currentBank, onClose, performanceMode, setPadMode]);
+  }, [onClose, performanceMode, setPadMode]);
 
   // Determine if we're rendered as a full view (no onClose) or as a modal
   const isViewMode = !onClose;
@@ -471,11 +427,14 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </button>
           ))}
           <div className="h-4 w-px bg-dark-border mx-1" />
+          {/* DJ Presets — filtered by current pad mode */}
           <CustomSelect
             value=""
             onChange={handleLoadDJPreset}
             placeholder="DJ Presets"
-            options={DJ_PAD_PRESETS.map(p => ({ value: p.id, label: p.name }))}
+            options={DJ_PAD_PRESETS
+              .filter(p => p.modes.includes(padMode))
+              .map(p => ({ value: p.id, label: p.name }))}
             className="px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary hover:border-accent-highlight/50 cursor-pointer"
           />
         </div>

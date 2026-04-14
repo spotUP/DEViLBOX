@@ -122,7 +122,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     ['A-01', create808Program()],
     ['B-01', create909Program()],
     ['C-01', createDJFXProgram()],
-    ['C-01', createEmptyProgram('C-01', 'Empty Kit')],
+    ['D-01', createEmptyProgram('D-01', 'Empty Kit')],
   ]),
   currentProgramId: 'A-01',
   midiMappings: {},

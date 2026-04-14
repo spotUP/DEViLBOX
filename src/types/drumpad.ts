@@ -327,7 +327,20 @@ export function create808Program(): DrumProgram {
     const cfg = makeDrumMachineConfig(pad.id, name, drumType, M, note, subType);
     pad.synthConfig = cfg.synthConfig;
     pad.instrumentNote = cfg.instrumentNote;
+    
+    // Debug logging
+    if (process.env.NODE_ENV === 'development' && i === 0) {
+      console.log('[create808Program] First pad config:', {
+        padId: pad.id,
+        name: pad.name,
+        synthType: pad.synthConfig.synthType,
+        drumType: pad.synthConfig.drumMachine?.drumType,
+        io808Type: pad.synthConfig.parameters?.io808Type,
+        instrumentNote: pad.instrumentNote,
+      });
+    }
   });
+
 
   return program;
 }
@@ -361,6 +374,18 @@ export function create909Program(): DrumProgram {
     const cfg = makeDrumMachineConfig(pad.id, name, drumType, M, note, subType);
     pad.synthConfig = cfg.synthConfig;
     pad.instrumentNote = cfg.instrumentNote;
+    
+    // Debug logging
+    if (process.env.NODE_ENV === 'development' && i === 0) {
+      console.log('[create909Program] First pad config:', {
+        padId: pad.id,
+        name: pad.name,
+        synthType: pad.synthConfig.synthType,
+        drumType: pad.synthConfig.drumMachine?.drumType,
+        tr909Type: pad.synthConfig.parameters?.tr909Type,
+        instrumentNote: pad.instrumentNote,
+      });
+    }
   });
 
   return program;
