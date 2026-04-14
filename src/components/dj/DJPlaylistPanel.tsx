@@ -253,6 +253,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(index); }}
+          title="Remove from playlist"
           className="p-0.5 text-accent-error hover:text-red-400 transition-colors"
         >
           <X size={8} />
@@ -1199,6 +1200,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
         {!isCreating ? (
           <button onClick={() => setIsCreating(true)}
+            title="Create new playlist"
             className="px-2 py-1 text-[10px] font-mono text-text-secondary bg-dark-bgTertiary border border-dark-borderLight rounded hover:bg-dark-bgHover hover:text-text-primary transition-colors">
             New
           </button>
@@ -1208,13 +1210,13 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
               onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsCreating(false); }}
               placeholder="Name..."
               className="w-24 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-primary placeholder:text-text-muted/40" />
-            <button onClick={handleCreate} className="p-0.5 text-green-400 hover:text-green-300"><Check size={12} /></button>
-            <button onClick={() => setIsCreating(false)} className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
+            <button onClick={handleCreate} title="Create playlist" className="p-0.5 text-green-400 hover:text-green-300"><Check size={12} /></button>
+            <button onClick={() => setIsCreating(false)} title="Cancel" className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
           </div>
         )}
 
         {onClose && (
-          <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1"><X size={12} /></button>
+          <button onClick={onClose} title="Close playlist panel" className="text-text-muted hover:text-text-primary p-1"><X size={12} /></button>
         )}
       </div>
 
@@ -1225,8 +1227,8 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             onKeyDown={(e) => { if (e.key === 'Enter') handleRename(editingId); if (e.key === 'Escape') setEditingId(null); }}
             onBlur={() => handleRename(editingId)}
             className="flex-1 px-2 py-0.5 text-[10px] font-mono bg-dark-bg border border-dark-borderLight rounded text-text-primary" />
-          <button onClick={() => handleRename(editingId)} className="p-0.5 text-green-400 hover:text-green-300"><Check size={12} /></button>
-          <button onClick={() => setEditingId(null)} className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
+          <button onClick={() => handleRename(editingId)} title="Save new name" className="p-0.5 text-green-400 hover:text-green-300"><Check size={12} /></button>
+          <button onClick={() => setEditingId(null)} title="Cancel rename" className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
         </div>
       )}
 
@@ -1248,7 +1250,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             </span>
           )}
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="p-0.5 text-text-muted hover:text-text-primary"><X size={10} /></button>
+            <button onClick={() => setSearchQuery('')} title="Clear search" className="p-0.5 text-text-muted hover:text-text-primary"><X size={10} /></button>
           )}
         </div>
       )}
@@ -1257,17 +1259,17 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       {selectedTrackIndices.length > 1 && activePlaylist && (
         <div className="flex items-center gap-2 px-2 py-0.5 text-[9px] font-mono text-accent-primary/70">
           <span>{selectedTrackIndices.length} selected</span>
-          <button onClick={clearSelection} className="text-text-muted hover:text-text-primary">clear</button>
-          {canUndo && <button onClick={undo} className="text-text-muted hover:text-text-primary">undo</button>}
-          {canRedo && <button onClick={redo} className="text-text-muted hover:text-text-primary">redo</button>}
+          <button onClick={clearSelection} title="Clear selection" className="text-text-muted hover:text-text-primary">clear</button>
+          {canUndo && <button onClick={undo} title="Undo last action" className="text-text-muted hover:text-text-primary">undo</button>}
+          {canRedo && <button onClick={redo} title="Redo last undone action" className="text-text-muted hover:text-text-primary">redo</button>}
         </div>
       )}
 
       <input ref={fileInputRef} type="file" multiple accept="*/*" onChange={handleAddFiles} className="hidden" />
       <input ref={importInputRef} type="file" accept=".m3u,.m3u8,.json" onChange={handleImport} className="hidden" />
 
-      {/* Cache status */}
-      {activePlaylist && modlandCount > 0 && (
+      {/* Cache status & actions */}
+      {activePlaylist && (modlandCount > 0 || badTrackCount > 0) && (
         <div className="px-2 py-1.5 border-b border-dark-border">
           {precacheProgress ? (
             <div className="space-y-1">
@@ -1284,18 +1286,24 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             </div>
           ) : (
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="text-green-400">{cachedCount}/{modlandCount} cached</span>
-              {uncachedCount === 0 && <span className="text-green-500/80 ml-auto">Offline ready</span>}
-              {uncachedCount > 0 && (
-                <button onClick={handlePrecache}
-                  className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-amber-700 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40 transition-all">
-                  Cache ({uncachedCount})
-                </button>
+              {modlandCount > 0 && (
+                <>
+                  <span className="text-green-400">{cachedCount}/{modlandCount} cached</span>
+                  {uncachedCount === 0 && <span className="text-green-500/80">Offline ready</span>}
+                  {uncachedCount > 0 && (
+                    <button onClick={handlePrecache}
+                      title="Download and cache all uncached tracks for offline playback"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-700 bg-amber-900/20 text-amber-400 hover:bg-amber-900/40 transition-all">
+                      Cache ({uncachedCount})
+                    </button>
+                  )}
+                </>
               )}
               {badTrackCount > 0 && (
                 <button onClick={handleRetestBadTracks}
                   disabled={retestingBad}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded border border-red-700 bg-red-900/20 text-red-400 hover:bg-red-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  title="Re-test all tracks marked as bad (clears bad flag and attempts reload)"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded border border-red-700 bg-red-900/20 text-red-400 hover:bg-red-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
                   {retestingBad ? 'Testing...' : `Re-test Bad (${badTrackCount})`}
                 </button>
               )}
