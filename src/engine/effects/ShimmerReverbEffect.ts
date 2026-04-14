@@ -25,12 +25,12 @@ export interface ShimmerReverbOptions {
 }
 
 /**
- * ShimmerReverbEffect - WASM-powered shimmer reverb with JS Schroeder fallback
+ * ShimmerReverbEffect - WASM-powered shimmer reverb.
  *
- * Wraps a pitch-shifting shimmer reverb via AudioWorklet+WASM.
- * Falls back to a simple Schroeder reverb if WASM fails to load.
+ * Uses AudioWorklet+WASM for the reverb DSP. Passthrough until WASM is ready
+ * (no ScriptProcessorNode fallback — that caused main-thread buffer underruns
+ * and the "brrrrr" stutter).
  */
-/** Extract the underlying native AudioNode from a Tone.js wrapper */
 export class ShimmerReverbEffect extends Tone.ToneAudioNode {
   readonly name = 'ShimmerReverb';
 
@@ -39,14 +39,11 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
 
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
+  private passthroughGain: Tone.Gain;
 
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
   private pendingParams: Array<{ paramId: number; value: number }> = [];
-
-  private fallbackNode: ScriptProcessorNode | null = null;
-  private fallbackReverb: SchroederFallback | null = null;
-  private usingFallback = false;
 
   private _options: Required<ShimmerReverbOptions>;
 
@@ -75,13 +72,18 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
 
     this.dryGain = new Tone.Gain(1 - this._options.wet);
     this.wetGain = new Tone.Gain(this._options.wet);
+    this.passthroughGain = new Tone.Gain(1);
 
+    // Dry path
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
+
+    // Wet passthrough (until WASM takes over)
+    this.input.connect(this.passthroughGain);
+    this.passthroughGain.connect(this.wetGain);
     this.wetGain.connect(this.output);
 
-    this.initFallback();
-    this.initWasm();
+    void this.initWasm();
   }
 
   setDecay(v: number) { this._options.decay = clamp01(v); this.sendParam(PARAM_DECAY, v); }
@@ -100,13 +102,27 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
     this.dryGain.gain.value = 1 - this._options.wet;
   }
 
+  setParam(param: string, value: number): void {
+    switch (param) {
+      case 'decay': this.setDecay(value); break;
+      case 'shimmer': this.setShimmer(value); break;
+      case 'pitch': this.setPitch(value); break;
+      case 'damping': this.setDamping(value); break;
+      case 'size': this.setSize(value); break;
+      case 'predelay': this.setPredelay(value); break;
+      case 'modRate': this.setModRate(value); break;
+      case 'modDepth': this.setModDepth(value); break;
+      case 'wet': this.wet = value; break;
+    }
+  }
+
   private async initWasm() {
     try {
       const rawContext = Tone.getContext().rawContext as AudioContext;
       await ShimmerReverbEffect.ensureInitialized(rawContext);
 
       if (!ShimmerReverbEffect.wasmBinary || !ShimmerReverbEffect.jsCode) {
-        console.warn('[ShimmerReverb] WASM not available, using JS fallback');
+        console.warn('[ShimmerReverb] WASM not available, staying on passthrough');
         return;
       }
 
@@ -115,7 +131,7 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
-          // Send initial params from _options (always up-to-date via setters)
+          // Send all params
           this.sendParam(PARAM_DECAY, this._options.decay);
           this.sendParam(PARAM_SHIMMER, this._options.shimmer);
           this.sendParam(PARAM_PITCH, this._options.pitch);
@@ -124,13 +140,28 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
           this.sendParam(PARAM_PREDELAY, this._options.predelay);
           this.sendParam(PARAM_MOD_RATE, this._options.modRate);
           this.sendParam(PARAM_MOD_DEPTH, this._options.modDepth);
-          this.sendParam(PARAM_MIX, 1.0); // WASM always 100% wet
-          // Flush any params queued before WASM was ready (overrides _options with latest user values)
+          this.sendParam(PARAM_MIX, 1.0);
           for (const { paramId, value } of this.pendingParams) {
             this.sendParam(paramId, value);
           }
           this.pendingParams = [];
-          this.swapToWasm();
+
+          // Wire worklet into wet path, mute passthrough
+          try {
+            const rawInput = getNativeAudioNode(this.input)!;
+            const rawWet = getNativeAudioNode(this.wetGain)!;
+            rawInput.connect(this.workletNode!);
+            this.workletNode!.connect(rawWet);
+            this.passthroughGain.gain.value = 0;
+
+            // Keepalive
+            const keepalive = rawContext.createGain();
+            keepalive.gain.value = 0;
+            this.workletNode!.connect(keepalive);
+            keepalive.connect(rawContext.destination);
+          } catch (err) {
+            console.warn('[ShimmerReverb] WASM swap failed, staying on passthrough:', err);
+          }
         } else if (event.data.type === 'error') {
           console.warn('[ShimmerReverb] WASM worklet error:', event.data.error);
         }
@@ -143,7 +174,7 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
       });
 
     } catch (err) {
-      console.warn('[ShimmerReverb] WASM init failed, using JS fallback:', err);
+      console.warn('[ShimmerReverb] WASM init failed, staying on passthrough:', err);
     }
   }
 
@@ -189,7 +220,6 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
                 /(wasmMemory=wasmExports\["\w+"\])/,
                 '$1;Module["wasmMemory"]=wasmMemory'
               );
-            // Inject shim for AudioWorklet scope (has globalThis but no `self`)
             code = 'var self = globalThis;\n' + code;
             this.jsCode = code;
           }
@@ -205,76 +235,10 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
     return initPromise;
   }
 
-  private initFallback() {
-    try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-      this.fallbackNode = rawContext.createScriptProcessor(256, 2, 2);
-      this.fallbackReverb = new SchroederFallback(rawContext.sampleRate);
-
-      this.fallbackNode.onaudioprocess = (e) => {
-        const inL = e.inputBuffer.getChannelData(0);
-        const inR = e.inputBuffer.getChannelData(1);
-        const outL = e.outputBuffer.getChannelData(0);
-        const outR = e.outputBuffer.getChannelData(1);
-        this.fallbackReverb!.process(inL, inR, outL, outR);
-      };
-
-      const rawInput = getNativeAudioNode(this.input)!;
-      const rawWet = getNativeAudioNode(this.wetGain)!;
-
-      rawInput.connect(this.fallbackNode);
-      this.fallbackNode.connect(rawWet);
-      // wetGain -> output already connected via Tone.js in constructor
-
-      // Keepalive: ensure ScriptProcessorNode is processed
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.fallbackNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-
-      this.usingFallback = true;
-    } catch (err) {
-      console.warn('[ShimmerReverb] Fallback init failed:', err);
-      this.input.connect(this.wetGain);
-    }
-  }
-
-  private swapToWasm() {
-    if (!this.workletNode) return;
-
-    try {
-      const rawContext = Tone.getContext().rawContext as AudioContext;
-
-      // Connect WASM first, then disconnect fallback (avoids silent gap)
-      const rawInput = getNativeAudioNode(this.input)!;
-      const rawWet = getNativeAudioNode(this.wetGain)!;
-
-      rawInput.connect(this.workletNode);
-      this.workletNode.connect(rawWet);
-      // wetGain -> output already connected via Tone.js in constructor
-
-      // Now safe to disconnect fallback
-      if (this.fallbackNode && this.usingFallback) {
-        try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-        this.fallbackNode.onaudioprocess = null;
-        this.usingFallback = false;
-      }
-
-      const keepalive = rawContext.createGain();
-      keepalive.gain.value = 0;
-      this.workletNode.connect(keepalive);
-      keepalive.connect(rawContext.destination);
-
-    } catch (err) {
-      console.warn('[ShimmerReverb] WASM swap failed, staying on fallback:', err);
-    }
-  }
-
   private sendParam(paramId: number, value: number) {
     if (this.workletNode && this.isWasmReady) {
       this.workletNode.port.postMessage({ type: 'parameter', paramId, value });
     } else {
-      // Queue param until WASM is ready; last write wins for each paramId
       this.pendingParams = this.pendingParams.filter(p => p.paramId !== paramId);
       this.pendingParams.push({ paramId, value });
     }
@@ -283,14 +247,10 @@ export class ShimmerReverbEffect extends Tone.ToneAudioNode {
   dispose(): this {
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'dispose' });
-      try { this.workletNode.disconnect(); } catch { /* ignored */ }
+      try { this.workletNode.disconnect(); } catch { /* */ }
       this.workletNode = null;
     }
-    if (this.fallbackNode) {
-      this.fallbackNode.onaudioprocess = null;
-      try { this.fallbackNode.disconnect(); } catch { /* ignored */ }
-      this.fallbackNode = null;
-    }
+    this.passthroughGain.dispose();
     this.dryGain.dispose();
     this.wetGain.dispose();
     this.input.dispose();
@@ -306,80 +266,4 @@ function clamp01(v: number): number {
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
-}
-
-/**
- * Simple Schroeder reverb fallback (4 parallel comb filters + 2 allpass in series)
- */
-class SchroederFallback {
-  private combs: CombFilter[];
-  private allpasses: AllpassFilter[];
-
-  constructor(sampleRate: number) {
-    const sr = sampleRate / 44100;
-    this.combs = [
-      new CombFilter(Math.round(1116 * sr), 0.84),
-      new CombFilter(Math.round(1188 * sr), 0.84),
-      new CombFilter(Math.round(1277 * sr), 0.84),
-      new CombFilter(Math.round(1356 * sr), 0.84),
-    ];
-    this.allpasses = [
-      new AllpassFilter(Math.round(556 * sr), 0.5),
-      new AllpassFilter(Math.round(441 * sr), 0.5),
-    ];
-  }
-
-  process(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array) {
-    const n = inL.length;
-    for (let i = 0; i < n; i++) {
-      const mono = (inL[i] + inR[i]) * 0.5;
-      let sum = 0;
-      for (const comb of this.combs) {
-        sum += comb.process(mono);
-      }
-      sum *= 0.25;
-      for (const ap of this.allpasses) {
-        sum = ap.process(sum);
-      }
-      outL[i] = sum;
-      outR[i] = sum;
-    }
-  }
-}
-
-class CombFilter {
-  private buffer: Float32Array;
-  private index = 0;
-  private feedback: number;
-
-  constructor(size: number, feedback: number) {
-    this.buffer = new Float32Array(size);
-    this.feedback = feedback;
-  }
-
-  process(input: number): number {
-    const out = this.buffer[this.index];
-    this.buffer[this.index] = input + out * this.feedback;
-    this.index = (this.index + 1) % this.buffer.length;
-    return out;
-  }
-}
-
-class AllpassFilter {
-  private buffer: Float32Array;
-  private index = 0;
-  private feedback: number;
-
-  constructor(size: number, feedback: number) {
-    this.buffer = new Float32Array(size);
-    this.feedback = feedback;
-  }
-
-  process(input: number): number {
-    const buffered = this.buffer[this.index];
-    const out = -input + buffered;
-    this.buffer[this.index] = input + buffered * this.feedback;
-    this.index = (this.index + 1) % this.buffer.length;
-    return out;
-  }
 }
