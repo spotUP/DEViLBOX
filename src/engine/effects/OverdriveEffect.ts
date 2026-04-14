@@ -89,7 +89,7 @@ export class OverdriveEffect extends Tone.ToneAudioNode {
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            try { rawInput.disconnect(rawWet); } catch { /* */ }
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
             keepalive.gain.value = 0;

@@ -107,7 +107,7 @@ export class TapeSimulatorEffect extends Tone.ToneAudioNode {
             const rawWet = getNativeAudioNode(this.wetGain)!;
             rawInput.connect(this.workletNode!);
             this.workletNode!.connect(rawWet);
-            try { this.input.disconnect(this.wetGain); } catch { /* */ }
+            try { rawInput.disconnect(rawWet); } catch { /* */ }
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx2 = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx2.createGain();
