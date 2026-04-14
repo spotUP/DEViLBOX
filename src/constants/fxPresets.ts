@@ -667,9 +667,9 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 14, parameters: { drive: 25, level: 100, presence: 55 } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.4, damping: 0.5, tension: 0.4, mix: 0.3, drip: 0.3, diffusion: 0.6 } },
     ] },
-  { name: 'Crunch Marshall', description: 'Blackstar HT40 gain — British crunch', tags: ['Amp', 'Guitar'],
+  { name: 'Crunch Marshall', description: 'Blackstar HT40 clean driven — British crunch', tags: ['Amp', 'Guitar'],
     effects: [
-      { category: 'neural', type: 'Neural', enabled: true, wet: 85, neuralModelIndex: 16, parameters: { drive: 35, level: 80, presence: 50 } },
+      { category: 'neural', type: 'Neural', enabled: true, wet: 80, neuralModelIndex: 10, parameters: { drive: 55, level: 75, presence: 50 } },
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 1.5, mid: 0.5, high: -0.5 } },
     ] },
   { name: 'High Gain Mesa', description: 'Mesa Mini Rectifier — tight modern high gain', tags: ['Amp', 'Guitar', 'Loud'],
