@@ -1562,63 +1562,6 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 100,
   },
 
-  // ── Act 8: Mixer ────────────────────────────────────────────────────────
-  {
-    id: 'mixer-switch',
-    narration: 'The mixer. Per-channel faders, pan, mute, solo, and real-time meters. Let me load a song and show you.',
-    action: async () => {
-      switchView('tracker');
-      await loadTrackerSong('/data/songs/formats/aces_high.ahx');
-      await trackerPlay();
-      await new Promise(r => setTimeout(r, 500));
-      switchView('mixer');
-    },
-    postDelay: 2000,
-  },
-  {
-    id: 'mixer-solo',
-    narration: 'Solo a channel to hear just that part.',
-    action: async () => {
-      const { useMixerStore } = await import('@/stores/useMixerStore');
-      const mixer = useMixerStore.getState();
-      mixer.setChannelSolo(0, true);
-    },
-    postDelay: 3000,
-  },
-  {
-    id: 'mixer-unsolo',
-    narration: 'And bring it all back.',
-    action: async () => {
-      const { useMixerStore } = await import('@/stores/useMixerStore');
-      useMixerStore.getState().setChannelSolo(0, false);
-    },
-    postDelay: 2000,
-  },
-  {
-    id: 'mixer-mute',
-    narration: 'Mute channels to build breakdowns.',
-    action: async () => {
-      const { useMixerStore } = await import('@/stores/useMixerStore');
-      const mixer = useMixerStore.getState();
-      mixer.setChannelMute(1, true);
-      setTimeout(() => mixer.setChannelMute(2, true), 800);
-      setTimeout(() => mixer.setChannelMute(3, true), 1600);
-      // Unmute all after a while
-      setTimeout(() => {
-        mixer.setChannelMute(1, false);
-        mixer.setChannelMute(2, false);
-        mixer.setChannelMute(3, false);
-      }, 3500);
-    },
-    postDelay: 4500,
-  },
-  {
-    id: 'mixer-stop',
-    narration: '',
-    action: trackerStop,
-    postDelay: 300,
-  },
-
   // ── Act 9: Automation ──────────────────────────────────────────────────
   {
     id: 'automation-intro',
