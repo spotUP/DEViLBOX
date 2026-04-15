@@ -282,9 +282,9 @@ export const useMIDIStore = create<MIDIStore>()(
                   return;
                 }
 
-                // In DrumPad view, notes 36-43 (MPK Mini pads) are handled by PadGrid directly
+                // In DrumPad / DJ / VJ views, notes 36-43 trigger drum pads instead of bank switching
                 const activeView = useUIStore.getState().activeView;
-                if (activeView === 'drumpad' && message.note >= 36 && message.note <= 43) {
+                if ((activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') && message.note >= 36 && message.note <= 43) {
                   return;
                 }
 
@@ -425,9 +425,9 @@ export const useMIDIStore = create<MIDIStore>()(
                   return;
                 }
 
-                // In DrumPad view, notes 36-43 are handled by PadGrid directly
+                // In DrumPad / DJ / VJ views, notes 36-43 are routed to drum pads
                 const activeView = useUIStore.getState().activeView;
-                if (activeView === 'drumpad' && message.note >= 36 && message.note <= 43) {
+                if ((activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') && message.note >= 36 && message.note <= 43) {
                   return;
                 }
 
