@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-15T06:56:33.329Z
+ * Generated: 2026-04-15T09:09:07.969Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5287';
-export const BUILD_NUMBER = '5287';
-export const BUILD_HASH = '2452748fe';
+export const BUILD_VERSION = '1.0.5315';
+export const BUILD_NUMBER = '5315';
+export const BUILD_HASH = 'c644f2d0c';
 export const BUILD_DATE = '2026-04-15';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,121 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5287',
+    version: '1.0.5315',
     date: '2026-04-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Autotune dropdown z-index in vocoder panel"
+      },
+      {
+        type: 'fix',
+        "description": "TALK button starts muted (push-to-talk, not toggle)"
+      },
+      {
+        type: 'fix',
+        "description": "DJ loading uses pipeline directly + music ducks during speech"
+      },
+      {
+        type: 'feature',
+        "description": "Device persistence and smart reconnection"
+      },
+      {
+        type: 'fix',
+        "description": "Interactive sample editor demo with correct pitch"
+      },
+      {
+        type: 'fix',
+        "description": "Per-channel DJ oscilloscopes now show independent data"
+      },
+      {
+        type: 'fix',
+        "description": "AHX/HVL loads through native parser path in tour"
+      },
+      {
+        type: 'feature',
+        "description": "NKS-powered auto-configuration"
+      },
+      {
+        type: 'fix',
+        "description": "Portal vocoder settings panel to escape overflow clipping"
+      },
+      {
+        type: 'fix',
+        "description": "Tour DJ loading, speech pad, and format suppression"
+      },
+      {
+        type: 'feature',
+        "description": "Add ping-pong sweep to filter FX"
+      },
+      {
+        type: 'fix',
+        "description": "Use AHX chiptune for tracker demo, MOD for sample editor"
+      },
+      {
+        type: 'fix',
+        "description": "Handle 'pending-import' for .mod files in loadTrackerSong"
+      },
+      {
+        type: 'feature',
+        "description": "Add Swedish Chainsaw HM-2 preset to master FX demo"
+      },
+      {
+        type: 'fix',
+        "description": "Use loadFile() for tracker songs (same path as file dialog)"
+      },
+      {
+        type: 'fix',
+        "description": "Phonemize 'music' → 'myuzik' for DECtalk"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker playback, smooth subtitle fade, phonemization"
+      },
+      {
+        type: 'fix',
+        "description": "Fix first keypress silence in sample editor and synths"
+      },
+      {
+        type: 'feature',
+        "description": "Double playhead trail to 240px"
+      },
+      {
+        type: 'feature',
+        "description": "Laser glow on waveform lines + triple playhead trail"
+      },
+      {
+        type: 'fix',
+        "description": "Nicer synth sound + move tour button next to tips"
+      },
+      {
+        type: 'fix',
+        "description": "Clear playhead on key release in sample editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Smooth playhead line via overlay canvas (no re-render flicker)"
+      },
+      {
+        type: 'feature',
+        "description": "Live Modland/HVSC search, automation demo, MIDI demo"
+      },
+      {
+        type: 'fix',
+        "description": "Clear stale audioBuffer when persisting sample edits"
+      },
+      {
+        type: 'feature',
+        "description": "Master FX demo + mixer solo/mute demo"
+      },
+      {
+        type: 'fix',
+        "description": "Fix drumpad bank switching and keyboard control bugs"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove dead PadMode type and modes field"
+      },
       {
         type: 'fix',
         "description": "Fix drumpad bugs: stutter routing, copy/paste, touch handling"
@@ -126,118 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Remove mode tabs entirely - bank-based organization only"
-      },
-      {
-        type: 'fix',
-        "description": "Replace fade-to-black with preload strategy for smooth transitions"
-      },
-      {
-        type: 'improvement',
-        "description": "Show all DJ presets in all modes for better bank organization"
-      },
-      {
-        type: 'fix',
-        "description": "Hide shader compilation behind fade-to-black overlay"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove test file"
-      },
-      {
-        type: 'improvement',
-        "description": "Show empty pads as 'Empty' instead of mode mapping placeholders"
-      },
-      {
-        type: 'fix',
-        "description": "Hide pattern overlay for formats without real pattern data"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DJ FX pad display: show actual pad names/colors when loaded"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate frame drops during transitions and playback"
-      },
-      {
-        type: 'fix',
-        "description": "Playlist reorder selection, post-limiter metering, import error handling"
-      },
-      {
-        type: 'fix',
-        "description": "VJ popout now works - was missing from DOM mode render"
-      },
-      {
-        type: 'fix',
-        "description": "DJ/DrumPad audit round 4 - EQ kill clicks, atomic IDB save, AutoDJ resilience"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add logging inside PopOutWindow conditional"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add App render logging for vjPoppedOut state"
-      },
-      {
-        type: 'fix',
-        "description": "Strip 2SID/SCC Extended/parenthetical suffixes in SID repair"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add PopOutWindow logging to trace popup issue"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add VJ popout logging to diagnose issue"
-      },
-      {
-        type: 'fix',
-        "description": "Deep audit round 3 — DJ engine, state management, and live performance reliability"
-      },
-      {
-        type: 'fix',
-        "description": "DJ preset loading now auto-switches to Bank A"
-      },
-      {
-        type: 'fix',
-        "description": "Improve drumpad text contrast"
-      },
-      {
-        type: 'fix',
-        "description": "SID repair filter checks path not name for .sid extension"
-      },
-      {
-        type: 'fix',
-        "description": "PadButton uniform dark bg with colored text + SID render frame count fix"
-      },
-      {
-        type: 'feature',
-        "description": "Add full one-shot preset browser to pad wizard"
-      },
-      {
-        type: 'fix',
-        "description": "One-shot pad assignment now uses actual preset configs"
-      },
-      {
-        type: 'fix',
-        "description": "DJ vocoder race conditions, error boundary recovery, drumpad keyboard dedup + voice cleanup"
-      },
-      {
-        type: 'fix',
-        "description": "WebSID init regex for nested braces in spp_backend_state_SID"
-      },
-      {
-        type: 'fix',
-        "description": "Route HVSC SIDs to WebSID pipeline, not UADE, when loading to DJ deck"
-      },
-      {
-        type: 'fix',
-        "description": "Move SID_PLAYLIST_KEYWORDS before store creation to avoid TDZ"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-repair SID playlists on store load"
       }
     ]
   }

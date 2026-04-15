@@ -238,6 +238,12 @@ export function resetFormatViolations(): void {
 
 /** Detect the active native format from the format store */
 export function getActiveFormatLimits(): FormatConstraints | null {
+  // When format checks are suppressed (e.g. during tour/import), return null
+  // so callers skip all limit checks. This prevents infinite recursion in
+  // store methods that call checkFormatViolation().then(() => self()) —
+  // when suppressed, the check returns true, causing infinite re-invocation.
+  if (_suppressDepth > 0) return null;
+
   try {
     const fmt = useFormatStore.getState();
     const hasNative = !!(
