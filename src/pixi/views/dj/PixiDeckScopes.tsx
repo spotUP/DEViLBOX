@@ -54,30 +54,36 @@ const ScopeBox: React.FC<{
 
       // Waveform — read from shared visualization cache
       const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
-      const waveform = isPlaying ? viz.getWaveform() : null;
 
-      if (waveform && waveform.length >= 256) {
+      if (isPlaying) {
         const waveColor = muted ? theme.textMuted.color : theme.success.color;
         const waveAlpha = muted ? 0.3 : 1;
 
         if (isAll) {
-          g.moveTo(1, midY - (waveform[0] || 0) * (size / 2 - 2));
-          for (let i = 1; i < 256; i++) {
-            const x = 1 + (i / 255) * (size - 2);
-            const y = midY - (waveform[i] || 0) * (size / 2 - 2);
-            g.lineTo(x, y);
+          const waveform = viz.getWaveform();
+          if (waveform && waveform.length >= 256) {
+            g.moveTo(1, midY - (waveform[0] || 0) * (size / 2 - 2));
+            for (let i = 1; i < 256; i++) {
+              const x = 1 + (i / 255) * (size - 2);
+              const y = midY - (waveform[i] || 0) * (size / 2 - 2);
+              g.lineTo(x, y);
+            }
+            g.stroke({ color: waveColor, alpha: waveAlpha, width: 1 });
           }
         } else {
-          const spc = 64;
-          const offset = channel * spc;
-          g.moveTo(1, midY - (waveform[offset] || 0) * (size / 2 - 2));
-          for (let i = 1; i < spc; i++) {
-            const x = 1 + (i / (spc - 1)) * (size - 2);
-            const y = midY - (waveform[offset + i] || 0) * (size / 2 - 2);
-            g.lineTo(x, y);
+          const channelWaveforms = viz.getChannelWaveforms();
+          const chData = channelWaveforms?.[channel];
+          if (chData && chData.length > 0) {
+            const len = chData.length;
+            g.moveTo(1, midY - (chData[0] || 0) * (size / 2 - 2));
+            for (let i = 1; i < len; i++) {
+              const x = 1 + (i / (len - 1)) * (size - 2);
+              const y = midY - (chData[i] || 0) * (size / 2 - 2);
+              g.lineTo(x, y);
+            }
+            g.stroke({ color: waveColor, alpha: waveAlpha, width: 1 });
           }
         }
-        g.stroke({ color: waveColor, alpha: waveAlpha, width: 1 });
       }
 
       rafRef.current = requestAnimationFrame(draw);

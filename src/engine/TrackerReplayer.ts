@@ -549,6 +549,9 @@ export class TrackerReplayer {
   // Channels
   private channels: ChannelState[] = [];
 
+  // Per-channel analysers for DJ oscilloscope display (created on demand)
+  private channelAnalysers: AnalyserNode[] = [];
+
   // Master output
   private masterGain: Tone.Gain;
   private readonly separationNode: StereoSeparationNode;
@@ -1401,6 +1404,10 @@ export class TrackerReplayer {
     }).catch(() => { /* scratch not available */ });
 
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
+    for (const a of this.channelAnalysers) {
+      try { a.disconnect(); } catch { /* ignored */ }
+    }
+    this.channelAnalysers = [];
     for (const ch of this.channels) {
       for (const p of ch.playerPool) {
         try { p.dispose(); } catch { /* ignored */ }
@@ -5624,6 +5631,47 @@ export class TrackerReplayer {
   getCurrentRow(): number { return this.pattPos; }
   getCurrentPosition(): number { return this.songPos; }
   getCurrentTick(): number { return this.currentTick; }
+
+  /**
+   * Get per-channel waveform data for oscilloscope display.
+   * Creates lightweight AnalyserNodes on demand (one per channel, 128 samples).
+   * Returns array of Float32Array, one per channel (up to maxChannels).
+   */
+  getChannelWaveforms(maxChannels = 4): Float32Array[] {
+    const ctx = Tone.getContext().rawContext;
+    if (!ctx) return [];
+
+    const numCh = Math.min(this.channels.length, maxChannels);
+
+    // Create analysers on demand when channel count changes
+    if (this.channelAnalysers.length !== numCh) {
+      // Dispose old analysers
+      for (const a of this.channelAnalysers) {
+        a.disconnect();
+      }
+      this.channelAnalysers = [];
+
+      for (let i = 0; i < numCh; i++) {
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.5;
+        // Tap from the channel's gain node (pre-pan, has the raw channel audio)
+        const ch = this.channels[i];
+        if (ch?.gainNode) {
+          (ch.gainNode as any).connect(analyser);
+        }
+        this.channelAnalysers.push(analyser);
+      }
+    }
+
+    const result: Float32Array[] = [];
+    for (let i = 0; i < numCh; i++) {
+      const buf = new Float32Array(128);
+      this.channelAnalysers[i].getFloatTimeDomainData(buf);
+      result.push(buf);
+    }
+    return result;
+  }
 
   /** Update Furnace speed alternation for live subsong switching (no song reload needed). */
   setSpeed2(value: number | null): void {

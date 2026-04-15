@@ -83,40 +83,43 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Waveform trace — read from shared visualization cache
-    const waveform = isPlaying ? viz.getWaveform() : null;
-
-    if (waveform && waveform.length >= 256) {
+    if (isPlaying) {
       if (isAll) {
-        // ALL: draw full 256-sample buffer
-        ctx.beginPath();
-        for (let i = 0; i < 256; i++) {
-          const x = 1 + (i / 255) * (size - 2);
-          const sample = waveform[i] || 0;
-          const y = midY - sample * (size / 2 - 2);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+        // ALL: draw full merged waveform (256 samples)
+        const waveform = viz.getWaveform();
+        if (waveform && waveform.length >= 256) {
+          ctx.beginPath();
+          for (let i = 0; i < 256; i++) {
+            const x = 1 + (i / 255) * (size - 2);
+            const sample = waveform[i] || 0;
+            const y = midY - sample * (size / 2 - 2);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = successColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
-        ctx.strokeStyle = successColor;
-        ctx.lineWidth = 1;
-        ctx.stroke();
       } else {
-        // Per-channel: 64-sample slice
-        const samplesPerChannel = 64;
-        const offset = channel * samplesPerChannel;
-        ctx.beginPath();
-        for (let i = 0; i < samplesPerChannel; i++) {
-          const x = 1 + (i / (samplesPerChannel - 1)) * (size - 2);
-          const sample = waveform[offset + i] || 0;
-          const y = midY - sample * (size / 2 - 2);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+        // Per-channel: use dedicated per-channel analyser data
+        const channelWaveforms = viz.getChannelWaveforms();
+        const chData = channelWaveforms?.[channel];
+        if (chData && chData.length > 0) {
+          const len = chData.length;
+          ctx.beginPath();
+          for (let i = 0; i < len; i++) {
+            const x = 1 + (i / (len - 1)) * (size - 2);
+            const sample = chData[i] || 0;
+            const y = midY - sample * (size / 2 - 2);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = muted ? mutedColor : successColor;
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = muted ? 0.3 : 1;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
         }
-        ctx.strokeStyle = muted ? mutedColor : successColor;
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = muted ? 0.3 : 1;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
       }
     }
 
