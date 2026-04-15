@@ -45,15 +45,16 @@ function triggerPattern(patternName: string): boolean {
       return true;
     }
 
-    // Nothing running → start
+    // Nothing running → set state BEFORE starting playback to prevent race condition
+    store.setDeckPattern(deckId, patternName);
+    
     let quantizeWaitMs = 0;
     deck.playPattern(patternName, (waitMs) => {
       quantizeWaitMs = waitMs;
-      setTimeout(() => store.setDeckPattern(deckId, patternName), waitMs);
       useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
     });
+    
     if (quantizeWaitMs === 0) {
-      store.setDeckPattern(deckId, patternName);
       useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
     }
   } catch {
