@@ -30,7 +30,6 @@ import { DECTALK_PRESETS } from '@/constants/dectalkPresets';
 
 interface PadContextMenuCallbacks {
   onEdit: (padId: number) => void;
-  onWizard: (padId: number) => void;
   onPreview: (padId: number) => void;
   onRename?: (padId: number) => void;
   onLoadSample?: (padId: number) => void;
@@ -195,18 +194,14 @@ function buildEmptyPadMenu(
 ): MenuItemType[] {
   const items: MenuItemType[] = [];
 
-  // Wizard
-  items.push({
-    id: 'setup', label: 'Setup Pad...',
-    onClick: () => callbacks.onWizard(padId),
-  });
+  // Load Sample
   if (callbacks.onLoadSample) {
     items.push({
       id: 'load-sample', label: 'Load Sample...',
       onClick: () => callbacks.onLoadSample!(padId),
     });
+    items.push({ type: 'divider' });
   }
-  items.push({ type: 'divider' });
 
   // Paste
   items.push({
@@ -559,15 +554,12 @@ function assignSpeechSynth(
     PinkTrombone: 'Pink Trombone',
   };
   
-  const text = window.prompt(`Enter text for ${synthNames[synthType]}:`, 'HELLO WORLD');
-  if (text === null) return; // User cancelled
-  
-  const finalText = text.trim() || 'HELLO WORLD';
+  const defaultText = 'HELLO WORLD';
   
   // Base config for all speech synths
   const baseConfig: any = {
     id: PAD_INSTRUMENT_BASE + padId,
-    name: `${synthNames[synthType]}: ${finalText}`,
+    name: `${synthNames[synthType]}: ${defaultText}`,
     type: 'synth' as const,
     synthType,
     effects: [],
@@ -575,10 +567,10 @@ function assignSpeechSynth(
     pan: 0,
   };
   
-  // Add synth-specific config
+  // Add synth-specific config with defaults
   if (synthType === 'Sam') {
     baseConfig.sam = {
-      text: finalText,
+      text: defaultText,
       pitch: 64,
       speed: 72,
       mouth: 128,
@@ -590,7 +582,7 @@ function assignSpeechSynth(
     };
   } else if (synthType === 'V2Speech') {
     baseConfig.v2Speech = {
-      text: finalText,
+      text: defaultText,
       speed: 1.0,
       pitch: 1.0,
       formantShift: 1.0,
@@ -599,21 +591,22 @@ function assignSpeechSynth(
       vowelLoopSingle: true,
     };
   } else if (synthType === 'DECtalk') {
-    baseConfig.parameters = {
-      text: finalText,
-      voice: 'paul',
+    baseConfig.dectalk = {
+      text: defaultText,
+      voice: 0,
       rate: 180,
-      pitch: 100,
+      pitch: 0.5,
+      volume: 0.8,
     };
   } else if (synthType === 'PinkTrombone') {
     baseConfig.parameters = {
-      text: finalText,
+      text: defaultText,
       voiceType: 'vowel',
     };
   }
   
   store.updatePad(padId, {
-    name: `${synthNames[synthType]}: ${finalText.substring(0, 20)}`,
+    name: synthNames[synthType],
     synthConfig: baseConfig,
     instrumentNote: 'C4',
     playMode: 'oneshot',
@@ -635,27 +628,20 @@ function assignROMSpeech(
     MAMEHC55516: 'Harris HC55516',
   };
   
-  // Prompt for ROM sample/phrase to play
-  const sample = window.prompt(
-    `Enter ROM sample/phrase for ${synthNames[synthType]}:`,
-    'HELLO'
-  );
-  if (sample === null) return; // User cancelled
-  
-  const finalSample = sample.trim() || 'HELLO';
+  const defaultSample = 'HELLO';
   
   store.updatePad(padId, {
-    name: `${synthNames[synthType]}: ${finalSample.substring(0, 20)}`,
+    name: synthNames[synthType],
     synthConfig: {
       id: PAD_INSTRUMENT_BASE + padId,
-      name: `${synthNames[synthType]}: ${finalSample}`,
+      name: synthNames[synthType],
       type: 'synth',
       synthType,
       effects: [],
       volume: -6,
       pan: 0,
       parameters: {
-        romSample: finalSample, // Store which sample to play
+        romSample: defaultSample,
         romsLoaded: true,
       },
     },
