@@ -751,180 +751,33 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'acid-setup',
-    narration: 'I will import a classic acid pattern from a Behringer TD-3 sequence file. Phuture, Acid Trax. The record that started it all.',
+    narration: 'Loading a 303 acid demo with TR-909 drums. The sound that started a revolution.',
     action: async () => {
-      const { useTrackerStore } = await import('@/stores/useTrackerStore');
-      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const { useTransportStore } = await import('@/stores/useTransportStore');
-      const { useEditorStore } = await import('@/stores/useEditorStore');
-      const { stringNoteToXM } = await import('@/lib/xmConversions');
-      const { parseTD3File, convertTD3PatternToDbox } = await import('@/lib/import/TD3PatternLoader');
 
       // Stop anything playing
       useTransportStore.getState().stop();
 
-      // Stop the replayer, which also stops all native WASM engines (Hively, UADE, etc.)
-      // that may still be running from the previous AHX song.
+      // Stop native WASM engines from previous song
       const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
       const { clearRunningEngineKeys } = await import('@/engine/replayer/NativeEngineRouting');
       getTrackerReplayer().stop(false);
       clearRunningEngineKeys();
 
-      // Clear format-specific data from previous AHX song and switch to classic editor.
-      // Without this, usePatternPlayback still sees hivelyNative and routes to the
-      // Hively playback engine instead of the XM replayer for our acid pattern.
+      // Clear format-specific data from previous AHX song
       const { useFormatStore } = await import('@/stores/useFormatStore');
       useFormatStore.getState().applyEditorMode({});
 
-      // Clear ALL old instruments (AHX HivelySynths etc.) before creating acid instruments.
-      // Without this, the 34 AHX instruments remain in the store and get included in the
-      // song object, polluting the instrumentMap and causing processRow to trigger
-      // HivelySynth notes instead of the 303.
+      // Clear old instruments
       const { getToneEngine } = await import('@/engine/ToneEngine');
       getToneEngine().disposeAllInstruments();
-      useInstrumentStore.getState().loadInstruments([]);
 
-      // Create TB-303 instrument (id will be assigned)
-      const acid303Id = await createAndSelectInstrument('TB303', 'Acid 303');
-      if (acid303Id == null) return;
+      // Load the pre-made 303 demo song
+      await loadTrackerSong('/data/songs/303-Demo.dbx');
 
-      // Apply "Acid RAT" preset for a fat distorted acid sound
-      const { TB303_PRESETS } = await import('@/constants/tb303Presets');
-      const acidPreset = TB303_PRESETS.find(p => p.name === 'Acid RAT');
-      if (acidPreset) {
-        useInstrumentStore.getState().loadPreset(
-          { id: 'acid-rat', name: 'Acid RAT', category: 'Bass', tags: ['303', 'acid'], config: acidPreset },
-          acid303Id,
-        );
-      }
-
-      // Add a master compressor to glue the acid mix
-      const { useAudioStore } = await import('@/stores/useAudioStore');
-      useAudioStore.getState().addMasterEffectConfig({
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -18, ratio: 4, attack: 0.003, release: 0.15 },
-      });
-
-      // Create a TR-909 drum instrument for kick + hats
-      const drumId = useInstrumentStore.getState().createInstrument({
-        synthType: 'TR909',
-        name: '909 Drums',
-        volume: -2,
-        pan: 0,
-      } as any);
-
-      // Normalize note strings to XM format (e.g., "C2" → "C-2", "D#2" stays "D#2")
-      const normNote = (n: string | null): string | null => {
-        if (!n) return null;
-        // If no sharp and second char is a digit, insert dash: "C2" → "C-2"
-        if (n.length === 2 && /^[A-G]\d$/.test(n)) return `${n[0]}-${n[1]}`;
-        return n;
-      };
-
-      // Fetch and parse the TD-3 pattern
-      let acidRows: Array<{ note: string | null; accent: boolean; slide: boolean }> = [];
-      try {
-        const resp = await fetch('/data/songs/behringer-td-3/Phuture \u200E- Acid Traxx.seq');
-        if (resp.ok) {
-          const buf = await resp.arrayBuffer();
-          const td3File = await parseTD3File(buf);
-          if (td3File.patterns.length > 0) {
-            const converted = convertTD3PatternToDbox(td3File.patterns[0], 2);
-            acidRows = converted.rows;
-          }
-        }
-      } catch (err) {
-        console.warn('[Tour] TD-3 import failed, using fallback pattern:', err);
-      }
-      // Fallback if import fails
-      if (acidRows.length === 0) {
-        acidRows = [
-          { note: 'C-2', accent: false, slide: false },
-          { note: 'C-2', accent: false, slide: false },
-          { note: null, accent: false, slide: false },
-          { note: 'C-2', accent: true, slide: false },
-          { note: 'D#2', accent: false, slide: true },
-          { note: 'C-2', accent: false, slide: false },
-          { note: null, accent: false, slide: false },
-          { note: 'C-2', accent: true, slide: false },
-          { note: 'G-2', accent: false, slide: true },
-          { note: 'F-2', accent: false, slide: true },
-          { note: 'D#2', accent: false, slide: false },
-          { note: 'C-2', accent: true, slide: false },
-          { note: null, accent: false, slide: false },
-          { note: 'C-2', accent: false, slide: false },
-          { note: 'D#2', accent: false, slide: true },
-          { note: 'C-2', accent: false, slide: false },
-        ];
-      }
-
-      // Build a 3-channel, 32-row pattern (2 bars at speed 6)
-      const patLength = 32;
-      const emptyCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-
-      // Channel 1: TB-303 acid pattern (repeat the 16-step TD-3 pattern twice)
-      const ch1Rows = [];
-      for (let i = 0; i < patLength; i++) {
-        const src = acidRows[i % acidRows.length];
-        if (src?.note) {
-          ch1Rows.push({
-            ...emptyCell,
-            note: stringNoteToXM(normNote(src.note)),
-            instrument: acid303Id,
-            flag1: src.accent ? 1 : undefined,
-            flag2: src.slide ? 2 : undefined,
-          });
-        } else {
-          ch1Rows.push({ ...emptyCell });
-        }
-      }
-
-      // Channel 2: 4-on-the-floor 909 kick (C-4 = kick in TR909 map)
-      const ch2Rows = [];
-      for (let i = 0; i < patLength; i++) {
-        if (i % 4 === 0) {
-          ch2Rows.push({ ...emptyCell, note: stringNoteToXM('C-4'), instrument: drumId });
-        } else {
-          ch2Rows.push({ ...emptyCell });
-        }
-      }
-
-      // Channel 3: 8th-note 909 closed hats (D-4 = closedHat in TR909 map)
-      const ch3Rows = [];
-      for (let i = 0; i < patLength; i++) {
-        if (i % 2 === 0) {
-          ch3Rows.push({ ...emptyCell, note: stringNoteToXM('D-4'), instrument: drumId });
-        } else {
-          ch3Rows.push({ ...emptyCell });
-        }
-      }
-
-      const pattern = {
-        id: 'acid-demo-pattern',
-        name: 'Acid Demo',
-        length: patLength,
-        channels: [
-          { id: 'ch-303', name: 'Acid 303', rows: ch1Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: acid303Id, color: '#ec4899' },
-          { id: 'ch-kick', name: '909 Kick', rows: ch2Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: drumId, color: '#f59e0b' },
-          { id: 'ch-hat', name: '909 Hat', rows: ch3Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: drumId, color: '#6ee7b7' },
-        ],
-      };
-
-      useTrackerStore.getState().loadPatterns([pattern as any]);
-      useTrackerStore.getState().setPatternOrder([0]);
-      useTransportStore.getState().setBPM(138);
-      useTransportStore.getState().setSpeed(6);
+      // Show accent/slide columns
+      const { useEditorStore } = await import('@/stores/useEditorStore');
       useEditorStore.getState().setColumnVisibility({ flag1: true, flag2: true });
-
-      // Re-select the 303 so octave goes to 2
-      useInstrumentStore.getState().setCurrentInstrument(acid303Id);
-
-      // NOTE: Don't call replayer.loadSong() here — let the React usePatternPlayback
-      // effect handle it when acid-play sets isPlaying=true. Calling both creates a
-      // race condition where two loadSong/play sequences compete via _playGeneration.
     },
     postDelay: 1500,
   },
