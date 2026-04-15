@@ -770,7 +770,7 @@ async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
           fixed++;
           console.log(`[DJPlaylistStore] Fixed: "${songTitle}" → hvsc:${match.path}`);
         } else {
-          console.warn(`[DJPlaylistStore] No HVSC match for: "${songTitle}" (raw: "${raw}")`);
+          // Track exists in playlist but no HVSC match — not an error, just unmatched
         }
         await new Promise(r => setTimeout(r, 150));
       } catch (err) {

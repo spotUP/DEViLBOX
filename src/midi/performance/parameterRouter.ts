@@ -484,7 +484,7 @@ export function routeParameterToEngine(
   const instrument = instrumentStore.instruments.find(i => i.id === targetId);
 
   if (!instrument) {
-    console.warn(`[parameterRouter] No instrument found for id: ${targetId}`);
+    // Normal during startup — MIDI CC arrives before instruments are loaded
     return;
   }
 
