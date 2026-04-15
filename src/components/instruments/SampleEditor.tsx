@@ -161,7 +161,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const onPersistBuffer = useCallback(
     async (buffer: AudioBuffer, label: string) => {
       const dataUrl = await bufferToDataUrl(buffer);
-      updateInstrument(instrument.id, {
+      const updates: Parameters<typeof updateInstrument>[1] = {
         parameters: {
           ...instrument.parameters,
           sampleUrl: dataUrl,
@@ -177,7 +177,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             channels: buffer.numberOfChannels,
           },
         },
-      });
+      };
+      // If instrument.sample?.url exists it takes priority in the engine's
+      // sampleUrl resolution, so we must also update it here — otherwise the
+      // engine recreates the Sampler with the original (pre-edit) sample.url.
+      if (instrument.sample) {
+        updates.sample = { ...instrument.sample, url: dataUrl };
+      }
+      updateInstrument(instrument.id, updates);
 
       // Write-back to UADE chip RAM when editing a UADE enhanced-mode sample.
       const samplePtr = instrument.sample?.uadeSamplePtr;

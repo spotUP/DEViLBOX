@@ -130,6 +130,132 @@ function disableHead(): void {
   useSpeechActivityStore.getState().speechStop();
 }
 
+// ── DrumPad actions ──────────────────────────────────────────────────────────
+
+/** Trigger a synth-configured pad via ToneEngine (808/909 drum machines) */
+async function triggerDrumPad(padId: number, note?: string, velocity = 0.85): Promise<void> {
+  try {
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    const { getToneEngine } = await import('@/engine/ToneEngine');
+    const { PAD_INSTRUMENT_BASE } = await import('@/types/drumpad');
+
+    const store = useDrumPadStore.getState();
+    const program = store.programs.get(store.currentProgramId);
+    const pad = program?.pads.find(p => p.id === padId);
+    if (!pad?.synthConfig) return;
+
+    const instId = PAD_INSTRUMENT_BASE + pad.id;
+    const config = { ...pad.synthConfig, id: instId };
+    const n = note || pad.instrumentNote || 'C4';
+    getToneEngine().triggerNoteAttack(instId, n, 0, velocity, config);
+    // Auto-release after short time
+    setTimeout(() => {
+      try { getToneEngine().triggerNoteRelease(instId, n, 0, config); } catch { /* */ }
+    }, 300);
+  } catch (err) {
+    console.warn(`[Tour] Failed to trigger pad ${padId}:`, err);
+  }
+}
+
+/** Play a rhythmic pattern on 808 pads */
+async function play808Pattern(): Promise<void> {
+  // Simple boom-bap pattern: kick, hat, snare, hat (repeating)
+  const pattern = [
+    { pad: 1, delay: 0 },      // Kick
+    { pad: 5, delay: 200 },    // Closed hat
+    { pad: 2, delay: 400 },    // Snare
+    { pad: 5, delay: 600 },    // Closed hat
+    { pad: 1, delay: 800 },    // Kick
+    { pad: 5, delay: 1000 },   // Closed hat
+    { pad: 2, delay: 1200 },   // Snare
+    { pad: 6, delay: 1400 },   // Open hat
+    // Second bar — with toms and cowbell
+    { pad: 1, delay: 1600 },   // Kick
+    { pad: 5, delay: 1800 },   // Closed hat
+    { pad: 2, delay: 2000 },   // Snare
+    { pad: 12, delay: 2100 },  // Cowbell
+    { pad: 1, delay: 2400 },   // Kick
+    { pad: 8, delay: 2600 },   // Mid tom
+    { pad: 2, delay: 2800 },   // Snare
+    { pad: 3, delay: 3000 },   // Clap
+  ];
+  for (const hit of pattern) {
+    setTimeout(() => triggerDrumPad(hit.pad), hit.delay);
+  }
+}
+
+/** Switch to the 808 program */
+async function loadDrumProgram(programId: string): Promise<void> {
+  const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+  useDrumPadStore.getState().loadProgram(programId);
+}
+
+/** Switch drum pad bank */
+async function setDrumBank(bank: 'A' | 'B' | 'C' | 'D'): Promise<void> {
+  const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+  useDrumPadStore.getState().setBank(bank);
+}
+
+/** Engage a DJ FX action (from the DJ FX program pad set) */
+async function engageDjFx(actionId: string): Promise<void> {
+  try {
+    const { DJ_FX_ACTION_MAP } = await import('@/engine/drumpad/DjFxActions');
+    const action = DJ_FX_ACTION_MAP[actionId as keyof typeof DJ_FX_ACTION_MAP];
+    if (action) action.engage();
+  } catch (err) {
+    console.warn(`[Tour] Failed to engage DJ FX ${actionId}:`, err);
+  }
+}
+
+/** Disengage a DJ FX action */
+async function disengageDjFx(actionId: string): Promise<void> {
+  try {
+    const { DJ_FX_ACTION_MAP } = await import('@/engine/drumpad/DjFxActions');
+    const action = DJ_FX_ACTION_MAP[actionId as keyof typeof DJ_FX_ACTION_MAP];
+    if (action) action.disengage();
+  } catch (err) {
+    console.warn(`[Tour] Failed to disengage DJ FX ${actionId}:`, err);
+  }
+}
+
+/** Set up a DECtalk speech synth on a pad and trigger it */
+async function triggerSpeechPad(padId: number, text: string, voice = 0): Promise<void> {
+  try {
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    const { getToneEngine } = await import('@/engine/ToneEngine');
+    const { PAD_INSTRUMENT_BASE } = await import('@/types/drumpad');
+
+    // Configure the pad with DECtalk synth
+    useDrumPadStore.getState().updatePad(padId, {
+      name: 'DECtalk',
+      color: '#8b5cf6',
+      synthConfig: {
+        id: PAD_INSTRUMENT_BASE + padId,
+        name: `DECtalk Pad ${padId}`,
+        type: 'synth',
+        synthType: 'DECtalk',
+        effects: [],
+        volume: 0,
+        pan: 0,
+        parameters: { text, voice, rate: 220, pitch: 0.5 },
+      },
+      instrumentNote: 'C4',
+    });
+
+    // Small delay for the synth to initialize and pre-render
+    await new Promise(r => setTimeout(r, 1500));
+
+    const instId = PAD_INSTRUMENT_BASE + padId;
+    const config = useDrumPadStore.getState().programs.get(
+      useDrumPadStore.getState().currentProgramId
+    )?.pads.find(p => p.id === padId)?.synthConfig;
+    if (!config) return;
+    getToneEngine().triggerNoteAttack(instId, 'C4', 0, 0.9, { ...config, id: instId });
+  } catch (err) {
+    console.warn(`[Tour] Failed to trigger speech pad:`, err);
+  }
+}
+
 export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 1: Welcome (short!) ─────────────────────────────────────────────
   {
@@ -169,7 +295,81 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 300,
   },
 
-  // ── Act 3: DJ View — load two tracks and mix ──────────────────────────
+  // ── Act 3: DrumPads — 808 demo, DJ FX, speech synth ────────────────────
+  {
+    id: 'drumpad-switch',
+    narration: 'The drum pads. MPC-style, 16 pads, velocity sensitive. Let me play a beat.',
+    action: async () => {
+      switchView('drumpad');
+      await loadDrumProgram('A-01'); // TR-808
+      await setDrumBank('A');
+    },
+    spotlight: '[data-pad-id]',
+    postDelay: 500,
+  },
+  {
+    id: 'drumpad-808-beat',
+    narration: '',
+    action: play808Pattern,
+    spotlight: '[data-pad-id]',
+    postDelay: 3500,
+  },
+  {
+    id: 'drumpad-808-explain',
+    narration: 'Circuit-modeled 808 and 909 drum synthesis. Every parameter, just like the real hardware.',
+    spotlight: '[data-pad-id]',
+    postDelay: 1000,
+  },
+  {
+    id: 'drumpad-djfx-switch',
+    narration: 'The pads also work as DJ effects triggers. Hold a pad to engage.',
+    action: async () => {
+      await loadDrumProgram('C-01'); // DJ FX
+    },
+    spotlight: '[data-pad-id]',
+    postDelay: 500,
+  },
+  {
+    id: 'drumpad-djfx-demo',
+    narration: '',
+    action: async () => {
+      // Flash through a few FX: dub siren, then air horn, then bitcrush
+      await engageDjFx('fx_dub_siren');
+      setTimeout(() => disengageDjFx('fx_dub_siren'), 1500);
+      setTimeout(() => engageDjFx('fx_air_horn'), 2000);
+      setTimeout(() => disengageDjFx('fx_air_horn'), 3000);
+    },
+    spotlight: '[data-pad-id]',
+    postDelay: 3500,
+  },
+  {
+    id: 'drumpad-speech-setup',
+    narration: 'Now watch this. I can put a speech synth on a pad.',
+    action: async () => {
+      // Switch back to an editable kit and set up DECtalk on pad 1
+      await loadDrumProgram('D-01'); // Empty Kit
+      await triggerSpeechPad(49, 'DEViLBOX is alive. I am a drum pad now.', 0);
+    },
+    spotlight: '[data-pad-id]',
+    postDelay: 4000,
+  },
+  {
+    id: 'drumpad-speech-demo2',
+    narration: '',
+    action: async () => {
+      // Trigger same pad at different pitches
+      await triggerSpeechPad(50, 'Hello from Betty.', 1);
+    },
+    spotlight: '[data-pad-id]',
+    postDelay: 3500,
+  },
+  {
+    id: 'drumpad-banks',
+    narration: 'Four banks of sixteen pads. 128 total slots per program. Drag and drop any sample or synth.',
+    postDelay: 1000,
+  },
+
+  // ── Act 4: DJ View — load two tracks and mix ──────────────────────────
   {
     id: 'dj-switch',
     narration: 'Now let us DJ. Switching to the dual deck mixer.',
@@ -261,20 +461,6 @@ export const TOUR_SCRIPT: TourStep[] = [
       await djSetFilter('B', 0);
     },
     postDelay: 300,
-  },
-
-  // ── Act 4: DrumPads ─────────────────────────────────────────────────────
-  {
-    id: 'drumpad-switch',
-    narration: 'The drum pads. MPC-style, 16 pads, velocity sensitive.',
-    action: () => switchView('drumpad'),
-    spotlight: '[data-pad-id]',
-    postDelay: 2000,
-  },
-  {
-    id: 'drumpad-features',
-    narration: 'Load any sample or synth engine onto each pad. Switch banks for 128 total. Or use them as DJ FX triggers.',
-    postDelay: 1000,
   },
 
   // ── Act 5: Speech Synths (the meta moment) ──────────────────────────────
