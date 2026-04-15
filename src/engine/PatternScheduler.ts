@@ -494,6 +494,11 @@ export class PatternScheduler {
         // Apply groove template or swing timing offset
         const repStartTime = startOffset + rowTiming.time + rep * rowDuration + this.getGrooveOrSwingOffset(row, rowDuration);
 
+        // Accumulate meter triggers during audio callback, fire via separate
+        // Tone.Draw.schedule with +30ms offset so VU flash lands ON or just AFTER
+        // the audible note (compensates for audio output latency).
+        const pendingMeterTriggers: Array<[number, number]> = [];
+
         events.push({
           time: repStartTime,
           audioCallback: (time) => {
@@ -640,7 +645,7 @@ export class PatternScheduler {
                         effectResult.nnaAction // Pass IT NNA Action
                       );
 
-                      engine.triggerChannelMeter(channelIndex, velocity);
+                      pendingMeterTriggers.push([channelIndex, velocity]);
                     } catch (error) {
                       this.trackPlaybackError(toneNote, error as Error);
                     }
@@ -731,6 +736,18 @@ export class PatternScheduler {
                 this.onPatternEnd();
               }
               this.pendingPatternBreak = null;
+            }
+
+            // Schedule meter triggers via Tone.Draw with +30ms offset so the
+            // VU flash aligns with the audible note (not schedule-ahead time).
+            // Each row's array is its own closure — no cross-row contamination.
+            if (pendingMeterTriggers.length > 0) {
+              Tone.Draw.schedule(() => {
+                for (const [ch, vel] of pendingMeterTriggers) {
+                  engine.triggerChannelMeter(ch, vel);
+                }
+                pendingMeterTriggers.length = 0;
+              }, time + 0.03);
             }
           },
           uiCallback: () => {

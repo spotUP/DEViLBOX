@@ -20,7 +20,8 @@ import { cssColorToPixi } from '../../theme';
 import { VU_GREEN, VU_YELLOW, VU_RED } from '../../colors';
 
 // VU meter constants — must match DOM ChannelVUMeters.tsx for parity
-const DECAY_RATE = 0.92;
+const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
+const REFERENCE_FRAME_MS = 1000 / 60; // 16.667ms — normalizes decay across frame rates
 const SWING_RANGE = 25;
 const SWING_FREQ = 0.0025;     // radians per ms (~2.5s full cycle)
 const SWING_PHASE_STEP = 0.45; // radians between adjacent channels
@@ -144,6 +145,8 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         rafId = requestAnimationFrame(draw);
         return;
       }
+      // Compute frame delta for time-based decay
+      const dt = lastDrawTime > 0 ? Math.min(now - lastDrawTime, 100) : REFERENCE_FRAME_MS;
       lastDrawTime = now;
 
       const playing = useTransportStore.getState().isPlaying;
@@ -189,16 +192,17 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
       }
 
+      // Time-based decay factor: identical visual result regardless of frame rate
+      const decayFactor = Math.pow(DECAY_RATE, dt / REFERENCE_FRAME_MS);
+
       // Update levels and check if any meter is active
       let anyActive = false;
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
         if (!meter) continue;
-        const staggerOffset = i * 0.012;
 
-        // Always decay first — prevents meters getting stuck when
-        // WASM engines call triggerChannelMeter on every audio tick
-        meter.level *= (DECAY_RATE - staggerOffset);
+        // Time-based decay — consistent across all frame rates
+        meter.level *= decayFactor;
         if (meter.level < 0.01) meter.level = 0;
 
         // Always check trigger data (works for all synths including native WASM like DB303)

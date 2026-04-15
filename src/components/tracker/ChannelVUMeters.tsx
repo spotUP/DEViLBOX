@@ -16,7 +16,8 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
 
 // VU meter timing constants - ProTracker style
-const DECAY_RATE = 0.92;
+const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
+const REFERENCE_FRAME_MS = 1000 / 60; // 16.667ms — normalizes decay across frame rates
 const SWING_RANGE = 50;        // wider horizontal travel
 const SWING_FREQ = 0.0025;     // radians per ms (~2.5s full cycle)
 const SWING_PHASE_STEP = 0.45; // radians between adjacent channels
@@ -109,6 +110,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   // Animation loop — always runs (VU meters are lightweight canvas ops,
   // no need to gate on performanceQuality which can oscillate and kill the loop)
   useEffect(() => {
+    let lastTickTime = 0;
+
     const tick = () => {
       const canvas = canvasRef.current;
       if (!canvas) {
@@ -121,6 +124,11 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         animationRef.current = requestAnimationFrame(tick);
         return;
       }
+
+      // Compute frame delta for time-based decay
+      const now = performance.now();
+      const dt = lastTickTime > 0 ? Math.min(now - lastTickTime, 100) : REFERENCE_FRAME_MS; // cap at 100ms to avoid huge jumps
+      lastTickTime = now;
 
       const dpr = window.devicePixelRatio || 1;
       const cw = canvas.width / dpr;
@@ -157,6 +165,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       const accentRaw = useThemeStore.getState().getCurrentTheme().colors.accent || '#22c55e';
       const [ar, ag, ab] = parseColor(accentRaw);
 
+      // Time-based decay factor: identical visual result regardless of frame rate
+      const decayFactor = Math.pow(DECAY_RATE, dt / REFERENCE_FRAME_MS);
+
       // Grow lastGens if needed
       if (lastGensRef.current.length < nc) {
         const old = lastGensRef.current;
@@ -171,15 +182,12 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // Skip collapsed channels
         if (widths[i] && widths[i] < 20) continue;
 
-        const staggerOffset = i * 0.012;
-
         // When playback is stopped, kill meters instantly (no lingering bounce)
         if (!isPlaying) {
           meter.level = 0;
         } else {
-          // Always decay first — prevents meters getting stuck when
-          // WASM engines call triggerChannelMeter on every audio tick
-          meter.level = meter.level * (DECAY_RATE - staggerOffset);
+          // Time-based decay — consistent across all frame rates
+          meter.level *= decayFactor;
           if (meter.level < 0.01) meter.level = 0;
 
           // Always check trigger data (works for all synths including native WASM like DB303)
