@@ -150,11 +150,52 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const bpm = useTransportStore(s => s.bpm);
 
   // Reset focused pad and clear visual state when bank changes
+  // Also release all held pads to prevent audio leaking across banks
   useEffect(() => {
     const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
     setFocusedPadId(bankOffset + 1);
     setPadVelocities({});
-  }, [currentBank]);
+    
+    // Release all held pads when switching banks (direct cleanup, not via callback)
+    heldPadsRef.current.forEach(padId => {
+      // Stop note repeat
+      noteRepeatRef.current?.stopRepeat(padId);
+      
+      if (currentProgram && engineRef.current) {
+        const pad = currentProgram.pads.find(p => p.id === padId);
+        if (pad) {
+          // Disengage DJ FX
+          if (pad.djFxAction) {
+            DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+            setFxPadActive(padId, false);
+          }
+          // Stop sustain samples
+          if (pad.playMode === 'sustain') {
+            engineRef.current.stopPad(padId, pad.release / 1000);
+            // Release synth voices
+            if (pad.synthConfig || pad.instrumentId != null) {
+              try {
+                let instId: number;
+                let config: any;
+                if (pad.synthConfig) {
+                  instId = PAD_INSTRUMENT_BASE + pad.id;
+                  config = { ...pad.synthConfig, id: instId };
+                } else {
+                  instId = pad.instrumentId!;
+                  config = useInstrumentStore.getState().getInstrument(instId);
+                }
+                if (config) {
+                  const note = pad.instrumentNote || 'C3';
+                  getToneEngine().triggerNoteRelease(instId, note, 0, config);
+                }
+              } catch { /* ignore */ }
+            }
+          }
+        }
+      }
+    });
+    heldPadsRef.current.clear();
+  }, [currentBank, currentProgram, setFxPadActive]);
 
   useEffect(() => {
     noteRepeatEnabledRef.current = noteRepeatEnabled;
@@ -377,9 +418,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
           break;
         case 'Enter':
         case ' ':
-          event.preventDefault();
-          // Trigger focused pad with medium velocity
-          handlePadTrigger(focusedPadId, 100);
+          // Only trigger if not already held (prevent key repeat spam)
+          if (!event.repeat) {
+            event.preventDefault();
+            handlePadTrigger(focusedPadId, 100);
+          }
           break;
         case 'Tab':
           // Don't prevent default for Tab - let it navigate normally
@@ -413,9 +456,29 @@ export const PadGrid: React.FC<PadGridProps> = ({
       }
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Release pad on Enter/Space keyup (for sustain mode and DJ FX)
+      if (event.key === 'Enter' || event.key === ' ') {
+        const target = event.target as HTMLElement;
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT'
+        ) {
+          return;
+        }
+        event.preventDefault();
+        handlePadRelease(focusedPadId);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedPadId, currentProgram, currentBank, handlePadTrigger]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [focusedPadId, currentProgram, currentBank, handlePadTrigger, handlePadRelease]);
 
   if (!currentProgram) {
     return (
