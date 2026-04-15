@@ -15,7 +15,6 @@ interface PadButtonProps {
   onTrigger: (padId: number, velocity: number) => void;
   onRelease?: (padId: number) => void;  // For sustain mode
   onSelect: (padId: number) => void;
-  onEmptyPadClick?: (padId: number) => void;  // Opens sample browser for empty pads
   onFocus?: () => void;  // Focus callback
   onQuickAssign?: (padId: number, rect: DOMRect) => void;
   className?: string;
@@ -29,7 +28,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
   onTrigger,
   onRelease,
   onSelect,
-  onEmptyPadClick,
   onFocus,
   onQuickAssign,
   className = '',
@@ -93,17 +91,16 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const isFxActive = pad.djFxAction && activeFxPads.has(pad.id);
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
-    // Ignore right-click (context menu)
+    // Ignore right-click (context menu handles it)
     if (event.button === 2) return;
     
     event.preventDefault();
     
-    // Empty pads: open wizard (or fallback to select)
+    // Empty pads: open context menu on left click for easy setup
     if (!isLoaded) {
-      if (onEmptyPadClick) {
-        onEmptyPadClick(pad.id);
-      } else {
-        onSelect(pad.id);
+      if (onQuickAssign) {
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        onQuickAssign(pad.id, rect);
       }
       return;
     }
@@ -112,7 +109,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
     const vel = calculateVelocity(event.clientY, event.currentTarget);
     flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, isLoaded, onTrigger, onSelect, onEmptyPadClick, calculateVelocity, flashTrigger]);
+  }, [pad.id, isLoaded, onTrigger, onQuickAssign, calculateVelocity, flashTrigger]);
 
   const handleMouseUp = useCallback(() => {
     setIsPressed(false);
@@ -136,9 +133,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   // Touch support — use ref-based listeners with { passive: false } to allow preventDefault
   const touchHandlersRef = useRef({
-    onTrigger, onRelease, onSelect, onEmptyPadClick, pad, calculateVelocity, flashTrigger,
+    onTrigger, onRelease, onSelect, pad, calculateVelocity, flashTrigger,
   });
-  touchHandlersRef.current = { onTrigger, onRelease, onSelect, onEmptyPadClick, pad, calculateVelocity, flashTrigger };
+  touchHandlersRef.current = { onTrigger, onRelease, onSelect, pad, calculateVelocity, flashTrigger };
 
   useEffect(() => {
     const el = buttonRef.current;
@@ -146,16 +143,12 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
     const handleTouchStart = (event: TouchEvent) => {
       event.preventDefault(); // safe: non-passive listener
-      const { pad, onSelect, onTrigger, calculateVelocity, flashTrigger, onEmptyPadClick } = touchHandlersRef.current;
+      const { pad, onTrigger, calculateVelocity, flashTrigger } = touchHandlersRef.current;
 
       // Check if pad is empty (same check as line 90 hasActualData)
       const isEmpty = !pad.sample && !pad.synthConfig && pad.instrumentId == null && !pad.djFxAction && !pad.scratchAction;
       if (isEmpty) {
-        if (onEmptyPadClick) {
-          onEmptyPadClick(pad.id);
-        } else {
-          onSelect(pad.id);
-        }
+        // Empty pads: do nothing on touch (use context menu to set up)
         return;
       }
 
@@ -250,7 +243,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
         ${className}
       `}
       style={{
-        aspectRatio: '1',
+        aspectRatio: '4 / 3',
         transition: isPressed ? 'transform 50ms' : 'transform 120ms',
       }}
       onMouseDown={handleMouseDown}
@@ -282,10 +275,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
       {/* Pad name */}
       <div className="absolute inset-0 flex items-center justify-center px-2">
         <span 
-          className="text-xs font-bold text-center truncate leading-tight"
+          className="text-[28px] font-bold text-center truncate leading-tight"
           style={{ 
             color: padStyle.textColor ?? '#f3f4f6',
-            textShadow: padStyle.textColor ? '0 1px 2px rgba(0,0,0,0.8)' : undefined
           }}
         >
           {/* Show actual pad name, or "Empty" if no data */}

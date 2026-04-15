@@ -32,10 +32,8 @@ import { PixiCheckbox } from '../components';
 import { PixiViewHeader } from '../components/PixiViewHeader';
 import { PixiSlider } from '../components/PixiSlider';
 import { PixiPadEditor } from './PixiPadEditor';
-import { PixiPadSetupWizard } from './PixiPadSetupWizard';
 import { PixiContextMenu, type ContextMenuItem } from '../input/PixiContextMenu';
 import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
-import { usePadSetupWizard } from '@/hooks/drumpad/usePadSetupWizard';
 import type { MenuItemType, MenuItem } from '@/components/common/ContextMenu';
 import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import { usePixiTheme } from '../theme';
@@ -118,11 +116,10 @@ interface PadCellProps {
   onTrigger: (padId: number, velocity: number) => void;
   onRelease: (padId: number) => void;
   onRightClick: (padId: number, x: number, y: number) => void;
-  onEmptyClick: (padId: number) => void;
   size: number;
 }
 
-const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, velocity, onSelect, onTrigger, onRelease, onRightClick, onEmptyClick, size }) => {
+const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, velocity, onSelect, onTrigger, onRelease, onRightClick, size }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -170,7 +167,7 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
 
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     if (e.button === 2) { onRightClick(pad.id, e.globalX, e.globalY); return; }
-    if (!isLoaded) { onEmptyClick(pad.id); return; }
+    if (!isLoaded) { return; } // Empty pads: do nothing, use right-click context menu
     const local = e.getLocalPosition(e.currentTarget as Container);
     const relativeY = local.y / size;
     const vel = Math.max(1, Math.min(127, Math.floor((1 - relativeY) * 127)));
@@ -178,7 +175,7 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
     onSelect();
     startFlash(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, size, isLoaded, onSelect, onTrigger, onRightClick, onEmptyClick, startFlash]);
+  }, [pad.id, size, isLoaded, onSelect, onTrigger, onRightClick, startFlash]);
 
   const handlePointerUp = useCallback(() => {
     setPressed(false);
@@ -328,7 +325,6 @@ export const PixiDrumPadManager: React.FC = () => {
   const [ctxMenuPadId, setCtxMenuPadId] = useState<number | null>(null);
   const [ctxMenuPos, setCtxMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [ctxMenuOpen, setCtxMenuOpen] = useState(false);
-  const padWizard = usePadSetupWizard();
   const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
   const noteRepeatEnabledRef = useRef(false);
   const heldPadsRef = useRef<Set<number>>(new Set());
@@ -447,10 +443,7 @@ export const PixiDrumPadManager: React.FC = () => {
     }
   }, [currentProgram]);
 
-  const handleEmptyPadClick = useCallback((padId: number) => {
-    setSelectedPadId(padId);
-    padWizard.open(padId);
-  }, [padWizard]);
+
 
   const handlePadRightClick = useCallback((padId: number, x: number, y: number) => {
     setCtxMenuPadId(padId);
@@ -460,7 +453,6 @@ export const PixiDrumPadManager: React.FC = () => {
 
   const ctxMenuCallbacks = useMemo(() => ({
     onEdit: (id: number) => { setSelectedPadId(id); setShowPadEditor(true); },
-    onWizard: (id: number) => { setSelectedPadId(id); padWizard.open(id); },
     onPreview: (id: number) => {
       const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
       const p = prog?.pads.find(pp => pp.id === id);
@@ -476,9 +468,8 @@ export const PixiDrumPadManager: React.FC = () => {
     },
     onLoadSample: (id: number) => {
       setSelectedPadId(id);
-      padWizard.open(id);
     },
-  }), [padWizard]);
+  }), []);
 
   const ctxMenuItemsDOM = usePadContextMenu(ctxMenuPadId, ctxMenuCallbacks);
   const ctxMenuItems: ContextMenuItem[] = useMemo(() => {
@@ -937,7 +928,6 @@ export const PixiDrumPadManager: React.FC = () => {
                 onTrigger={handlePadTrigger}
                 onRelease={handlePadRelease}
                 onRightClick={handlePadRightClick}
-                onEmptyClick={handleEmptyPadClick}
                 size={padSize}
               />
             ))}
@@ -1174,9 +1164,6 @@ export const PixiDrumPadManager: React.FC = () => {
           </Div>
         )}
       </Div>
-
-      {/* ── Pad Setup Wizard ── */}
-      <PixiPadSetupWizard wizard={padWizard} />
 
       {/* ── Context menu ── */}
       <PixiContextMenu
