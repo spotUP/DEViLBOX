@@ -84,7 +84,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...FURNACE_CHIP_PRESETS,
   ...FX_PRESETS,
   ...WAM_PRESETS,
-  ...DUB_SIREN_PRESETS,
+  // DUB_SIREN_PRESETS already included via BASS_PRESETS
   ...SPACE_LASER_PRESETS,
   ...V2_PRESETS,
   ...V2_FACTORY_PRESETS,
