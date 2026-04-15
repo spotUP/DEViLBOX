@@ -111,8 +111,11 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  * - 18: Added replacedInstruments for hybrid WASM/ToneEngine synth playback.
  *       When a sample instrument is replaced with a synth, its ID is saved so
  *       hybrid playback state persists across save/reload.
+ * - 19: Tracker channels now use monophonic synth instances (MonoSynth/FMSynth/AMSynth)
+ *       instead of PolySynth wrappers. Enables FT2-style frequency modulation for
+ *       arpeggio, vibrato, portamento effects. Old PolySynth instances incompatible.
  */
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 
 interface SavedProject {
   version: string;
