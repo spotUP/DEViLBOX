@@ -199,8 +199,9 @@ async function getFirstSampleInstrument(): Promise<number | null> {
     console.warn(`[Tour] getFirstSampleInstrument: ${instruments.length} instruments, ${sampleTypes.length} sample-type, none with valid data`);
     return null;
   }
-  // Pick the largest sample (most visually interesting waveform)
-  const best = sampleInsts.reduce((a, b) => {
+  // Prefer instrument ID 6 (sample 6 in the MOD — good waveform for demo)
+  const preferred = sampleInsts.find(i => i.id === 6);
+  const best = preferred ?? sampleInsts.reduce((a, b) => {
     const aSize = (a.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 0;
     const bSize = (b.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 0;
     return bSize > aSize ? b : a;
