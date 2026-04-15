@@ -111,6 +111,16 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
     ? (layout.tabs.find((t: { id: string; label: string; sections: SectionDescriptor[] }) => t.id === activeTab)?.sections ?? layout.tabs[0]?.sections ?? [])
     : (layout.sections ?? []);
 
+  // Knob width ~80px (56px knob + label padding). Per-section flex-basis
+  // is driven by how many knobs fit in one row (capped at 3).
+  const KNOB_W = 80;
+  const SECTION_PAD = 32; // p-3 * 2 + border
+  const sectionBases = sections.map(s => {
+    const knobCount = s.controls.filter(c => c.type === 'knob' || c.type === 'slider').length;
+    const knobsPerRow = Math.min(knobCount, 3);
+    return knobsPerRow * KNOB_W + SECTION_PAD;
+  });
+
   return (
     <div
       className="synth-editor-container rounded-xl overflow-hidden select-none"
@@ -177,12 +187,13 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
         </div>
       )}
 
-      {/* Sections */}
-      <div className="p-3 flex flex-col gap-3">
+      {/* Sections — flex-wrap, each section sized to its knob content */}
+      <div className="p-3 flex flex-wrap gap-3">
         {sections.map((section, sIdx) => (
           <DOMSynthSection
             key={`${activeTab}-${sIdx}`}
             section={section}
+            flexBasis={sectionBases[sIdx]}
             getValue={getValue}
             updateParam={updateParam}
             accent={SECTION_ACCENTS[sIdx % SECTION_ACCENTS.length]}
@@ -198,21 +209,23 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
 
 interface SectionProps {
   section: SectionDescriptor;
+  flexBasis: number;
   getValue: (key: string) => unknown;
   updateParam: (key: string, value: unknown) => void;
   accent: string;
   enclosure: EnclosureColors;
 }
 
-const DOMSynthSection: React.FC<SectionProps> = ({ section, getValue, updateParam, accent, enclosure }) => {
+const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue, updateParam, accent, enclosure }) => {
   const knobs = section.controls.filter((c: ControlDescriptor) => c.type === 'knob' || c.type === 'slider');
   const toggles = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way' || c.type === 'select');
-  const cols = section.columns ?? Math.min(knobs.length, 6);
 
   return (
     <div
       className="rounded-lg p-3 backdrop-blur-sm"
       style={{
+        flex: `1 1 ${flexBasis}px`,
+        minWidth: flexBasis,
         background: 'rgba(0,0,0,0.3)',
         border: `1px solid ${enclosure.border}`,
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
@@ -229,9 +242,9 @@ const DOMSynthSection: React.FC<SectionProps> = ({ section, getValue, updatePara
         </span>
       </div>
 
-      {/* Knobs + sliders */}
+      {/* Knobs + sliders — auto-sized columns, centered so they don't stretch */}
       {knobs.length > 0 && (
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+        <div className="flex flex-wrap justify-center gap-2">
           {knobs.map((ctrl: ControlDescriptor) => (
             <DOMSynthControl
               key={ctrl.key}
