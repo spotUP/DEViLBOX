@@ -468,14 +468,15 @@ export function useMIDIPadRouting() {
       
       // Learning mode: collect notes
       if (_learningMode !== 'off' && message.type === 'noteOn') {
+        const maxPads = useDrumPadStore.getState().controllerPadCount;
         if (_learningMode === 'auto') {
           // Auto mode: collect unique notes, sort later
           if (!learnedNotes.includes(message.note)) {
             learnedNotes.push(message.note);
             setCurrentMapping(learnedNotes);
-            console.log(`[MIDI Pads] Auto-learned note ${message.note} (${learnedNotes.length}/16)`);
+            console.log(`[MIDI Pads] Auto-learned note ${message.note} (${learnedNotes.length}/${maxPads})`);
             
-            if (learnedNotes.length === 16) {
+            if (learnedNotes.length === maxPads) {
               stopMIDIPadLearning();
             }
           }
@@ -486,7 +487,7 @@ export function useMIDIPadRouting() {
           console.log(`[MIDI Pads] Learned pad ${_manualLearnIndex + 1} → note ${message.note}`);
           _manualLearnIndex++;
           
-          if (_manualLearnIndex === 16) {
+          if (_manualLearnIndex === maxPads) {
             stopMIDIPadLearning();
           } else {
             console.log(`[MIDI Pads] Press pad ${_manualLearnIndex + 1}`);

@@ -34,6 +34,7 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
+import { noteToMidi, midiToNote } from '@/lib/xmConversions';
 // HivelyEngine used via dynamic import
 // MusicLineEngine used via dynamic import
 
@@ -228,6 +229,13 @@ export interface ChannelState {
 
   // Synth pitch tracking (for portamento/vibrato/arpeggio on synths)
   _synthDetuneOffset?: number;   // Current detune offset in semitones (for 1xx/2xx portamento)
+  
+  // Note retriggering state (for synth pitch effects via note attack/release)
+  baseNote?: string;             // Original note name (e.g., "C-4") before pitch effects
+  baseMidiNote?: number;         // Original MIDI note number (e.g., 60) before pitch effects
+  currentPitchOffset?: number;   // Current semitone offset applied (0 for base pitch)
+  currentPlayingNote?: string;   // Currently playing note name after pitch offset
+  currentVelocity?: number;      // Current velocity for retriggering
 
   // Audio nodes - player pool (pre-allocated, pre-connected)
   player: Tone.Player | null;       // Active player reference (for updatePeriod compatibility)
@@ -4135,7 +4143,7 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private doArpeggio(ch: ChannelState, param: number, chIndex?: number): void {
-    // For synths, apply arpeggio as detune in cents
+    // For synths, use note retriggering (works on ALL synths)
     if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
       const x = (param >> 4) & 0x0F;
       const y = param & 0x0F;
@@ -4148,7 +4156,8 @@ export class TrackerReplayer {
         semitoneOffset = y;
       }
       
-      getToneEngine().applySynthPitch(ch.sampleNum, semitoneOffset, Tone.now(), chIndex);
+      // Use note retriggering instead of detune
+      this.retriggerNoteAtPitch(ch, semitoneOffset, chIndex);
     } else {
       // Sample-based arpeggio via period modulation
       _doArpeggio(ch, param, this.currentTick, this.speed, this.useXMPeriods, this.linearPeriods,
@@ -4158,32 +4167,41 @@ export class TrackerReplayer {
   }
 
   private doTonePortamento(ch: ChannelState, chIndex?: number): void {
-    // For synths, slide frequency toward target note
+    // For synths, slide frequency toward target note using retriggering
     if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
       if (!ch.portaTarget || ch.portaTarget === ch.period) return;
       
-      const speed = ch.portaSpeed || 1;
-      const currentDetune = ch._synthDetuneOffset ?? 0;
+      const currentOffset = ch.currentPitchOffset ?? 0;
       
       // Calculate target in semitones from base note
-      // portaTarget is the target period, ch.period is current
-      // Lower period = higher pitch
-      const periodDiff = ch.period - ch.portaTarget;
-      const semitoneChange = periodDiff / 64; // Approximate conversion
+      // portaTarget is the target period, ch.note is the original period
+      // Lower period = higher pitch, so we need to invert the relationship
+      // This is a rough approximation - for exact conversion we'd need the period table
+      const basePeriod = ch.note;
+      if (!basePeriod || basePeriod === 0) return;
       
-      // Slide toward target
-      if (Math.abs(semitoneChange) < speed / 64) {
-        // Close enough - snap to target
-        ch._synthDetuneOffset = currentDetune + semitoneChange;
-        ch.period = ch.portaTarget;
-      } else {
-        // Slide by speed amount
-        const slideAmount = semitoneChange > 0 ? speed / 64 : -speed / 64;
-        ch._synthDetuneOffset = currentDetune + slideAmount;
-        ch.period -= Math.sign(semitoneChange) * speed;
+      // Calculate semitone difference (rough approximation)
+      // In tracker formats, 1 semitone ≈ period change of ~6%
+      const periodRatio = ch.portaTarget / basePeriod;
+      const targetSemitones = Math.round(-12 * Math.log2(periodRatio));
+      
+      // Slide toward target by 1 semitone per tick (retriggering doesn't support smooth glide)
+      let newOffset = currentOffset;
+      if (targetSemitones > currentOffset) {
+        newOffset = currentOffset + 1;
+        if (newOffset > targetSemitones) newOffset = targetSemitones;
+      } else if (targetSemitones < currentOffset) {
+        newOffset = currentOffset - 1;
+        if (newOffset < targetSemitones) newOffset = targetSemitones;
       }
       
-      getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, Tone.now(), chIndex);
+      // Update period to match offset (for when portamento stops)
+      if (newOffset === targetSemitones) {
+        ch.period = ch.portaTarget;
+      }
+      
+      // Retrigger at new pitch
+      this.retriggerNoteAtPitch(ch, newOffset, chIndex);
     } else {
       // Sample-based portamento
       _doTonePortamento(ch, this.useXMPeriods, this.linearPeriods,
@@ -4193,7 +4211,7 @@ export class TrackerReplayer {
   }
 
   private doVibrato(ch: ChannelState, chIndex?: number): void {
-    // For synths, apply vibrato as pitch modulation
+    // For synths, apply vibrato as note retriggering
     if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
       // Calculate vibrato offset in semitones
       const speed = (ch.vibratoCmd >> 4) & 0x0F;
@@ -4219,9 +4237,14 @@ export class TrackerReplayer {
       
       // Convert to semitones: depth controls range
       // Max vibrato = depth * (255/128) / 12 semitones
-      const semitoneOffset = ((value - 128) / 128) * (depth / 12);
+      const continuousOffset = ((value - 128) / 128) * (depth / 12);
       
-      getToneEngine().applySynthPitch(ch.sampleNum, semitoneOffset, Tone.now(), chIndex);
+      // Round to nearest semitone for retriggering
+      // For smooth vibrato, keep small offsets (< 0.5 semitones) as 0
+      const semitoneOffset = Math.abs(continuousOffset) < 0.5 ? 0 : Math.round(continuousOffset);
+      
+      // Use note retriggering instead of detune
+      this.retriggerNoteAtPitch(ch, semitoneOffset, chIndex);
       ch.vibratoPos = (ch.vibratoPos + speed) & 63;
     } else {
       // Sample-based vibrato via period modulation
@@ -4907,6 +4930,12 @@ export class TrackerReplayer {
       ? xmNoteToNoteName(ch.xmNote)
       : periodToNoteName(ch.period);
     
+    // Store base note state for pitch effect retriggering
+    ch.baseNote = noteName;
+    ch.baseMidiNote = noteToMidi(noteName);
+    ch.currentPitchOffset = 0;
+    ch.currentPlayingNote = noteName;
+    
     // --- Groove Velocity/Dynamics ---
     // PERF: Use cached state from scheduler tick (avoids redundant getState())
     const transportState = this._cachedTransportState ?? useTransportStore.getState();
@@ -4922,6 +4951,9 @@ export class TrackerReplayer {
     }
 
     const velocity = Math.max(0, Math.min(1, (ch.volume / 64) + velocityOffset));
+    
+    // Store velocity for retriggering
+    ch.currentVelocity = velocity;
 
     if (typeof window !== 'undefined' && (window as unknown as { GROOVE_DEBUG?: boolean }).GROOVE_DEBUG && grooveTemplate && grooveTemplate.id !== 'straight') {
       console.log(`[Groove] row=${String(this.pattPos).padStart(2)} ch=${channelIndex} velOffset=${velocityOffset >= 0 ? '+' : ''}${velocityOffset.toFixed(3)} velocity=${velocity.toFixed(3)}`);
@@ -5226,6 +5258,59 @@ export class TrackerReplayer {
       } catch { /* ignored */ }
     }
     ch.lastPlayedNoteName = null; // Clear for next note sequence
+  }
+
+  /**
+   * Retrigger note at a different pitch (for arpeggio/vibrato/portamento on synths)
+   * 
+   * @param ch Channel state
+   * @param semitoneOffset Semitone offset from base note (0 = base pitch, +4 = major third up, etc.)
+   * @param channelIndex Tracker channel index
+   */
+  private retriggerNoteAtPitch(ch: ChannelState, semitoneOffset: number, channelIndex?: number): void {
+    // Only retrigger if pitch actually changed
+    if (ch.currentPitchOffset === semitoneOffset) return;
+    
+    // Skip if no note state (note hasn't been triggered yet)
+    if (!ch.baseNote || ch.baseMidiNote === undefined || !ch.instrument) return;
+    
+    // Skip if not a synth instrument
+    if (!ch.instrument.synthType || ch.instrument.synthType === 'Sampler') return;
+    
+    const engine = getToneEngine();
+    const time = Tone.now();
+    
+    // Calculate new note
+    const newMidiNote = ch.baseMidiNote + semitoneOffset;
+    const newNoteName = midiToNote(newMidiNote);
+    
+    // Release old note
+    if (ch.currentPlayingNote) {
+      try {
+        engine.triggerNoteRelease(ch.instrument.id, ch.currentPlayingNote, time, ch.instrument, channelIndex);
+      } catch { /* ignored */ }
+    }
+    
+    // Attack new note at offset pitch
+    const velocity = ch.currentVelocity ?? 1;
+    try {
+      engine.triggerNoteAttack(
+        ch.instrument.id,
+        newNoteName,
+        time,
+        velocity,
+        ch.instrument,
+        ch.period,
+        false, // accent
+        false, // slide (no slide for retriggering)
+        channelIndex
+      );
+    } catch { /* ignored */ }
+    
+    // Update state
+    ch.currentPitchOffset = semitoneOffset;
+    ch.currentPlayingNote = newNoteName;
+    ch.lastPlayedNoteName = newNoteName;
   }
 
   private updatePeriod(ch: ChannelState): void {
