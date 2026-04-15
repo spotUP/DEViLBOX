@@ -81,7 +81,10 @@ const PHONEME_MAP: Record<string, string> = {
   'CC':           'C C',
   'Amiga':        'ah mee gah',
   'Commodore':    'comma door',
-  // Music terms
+  // Common mispronunciations
+  'music':        'myuzik',
+  'Music':        'myuzik',
+  'musical':      'myuzikal',
   'crossfading':  'cross fading',
   'crossfade':    'cross fade',
   'lo-fi':        'low fie',
