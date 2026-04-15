@@ -807,24 +807,11 @@ export const TOUR_SCRIPT: TourStep[] = [
         parameters: { threshold: -18, ratio: 4, attack: 0.003, release: 0.15 },
       });
 
-      // Create a simple kick drum instrument
-      const kickId = useInstrumentStore.getState().createInstrument({
-        synthType: 'Synth',
-        name: 'Kick',
-        oscillator: { type: 'triangle', detune: 0, octave: 0 },
-        envelope: { attack: 1, decay: 200, sustain: 0, release: 50 },
-        pitchEnvelope: { enabled: true, amount: 48, attack: 0, decay: 40, sustain: 0, release: 10 },
-        volume: -4,
-        pan: 0,
-      } as any);
-
-      // Create a simple hihat instrument
-      const hihatId = useInstrumentStore.getState().createInstrument({
-        synthType: 'NoiseSynth',
-        name: 'HiHat',
-        envelope: { attack: 0.5, decay: 60, sustain: 0, release: 30 },
-        filter: { type: 'highpass', frequency: 8000, Q: 1 },
-        volume: -14,
+      // Create a TR-909 drum instrument for kick + hats
+      const drumId = useInstrumentStore.getState().createInstrument({
+        synthType: 'TR909',
+        name: '909 Drums',
+        volume: -2,
         pan: 0,
       } as any);
 
@@ -894,21 +881,21 @@ export const TOUR_SCRIPT: TourStep[] = [
         }
       }
 
-      // Channel 2: 4-on-the-floor kick (every 4 rows at speed 6 = quarter notes)
+      // Channel 2: 4-on-the-floor 909 kick (C-4 = kick in TR909 map)
       const ch2Rows = [];
       for (let i = 0; i < patLength; i++) {
         if (i % 4 === 0) {
-          ch2Rows.push({ ...emptyCell, note: stringNoteToXM('C-2'), instrument: kickId });
+          ch2Rows.push({ ...emptyCell, note: stringNoteToXM('C-4'), instrument: drumId });
         } else {
           ch2Rows.push({ ...emptyCell });
         }
       }
 
-      // Channel 3: 8th-note hihats (every 2 rows)
+      // Channel 3: 8th-note 909 closed hats (D-4 = closedHat in TR909 map)
       const ch3Rows = [];
       for (let i = 0; i < patLength; i++) {
         if (i % 2 === 0) {
-          ch3Rows.push({ ...emptyCell, note: stringNoteToXM('C-4'), instrument: hihatId });
+          ch3Rows.push({ ...emptyCell, note: stringNoteToXM('D-4'), instrument: drumId });
         } else {
           ch3Rows.push({ ...emptyCell });
         }
@@ -920,8 +907,8 @@ export const TOUR_SCRIPT: TourStep[] = [
         length: patLength,
         channels: [
           { id: 'ch-303', name: 'Acid 303', rows: ch1Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: acid303Id, color: '#ec4899' },
-          { id: 'ch-kick', name: 'Kick', rows: ch2Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: kickId, color: '#f59e0b' },
-          { id: 'ch-hat', name: 'HiHat', rows: ch3Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: hihatId, color: '#6ee7b7' },
+          { id: 'ch-kick', name: '909 Kick', rows: ch2Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: drumId, color: '#f59e0b' },
+          { id: 'ch-hat', name: '909 Hat', rows: ch3Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: drumId, color: '#6ee7b7' },
         ],
       };
 
@@ -1103,10 +1090,10 @@ export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 3b: Sample Editor Deep Dive ─────────────────────────────────────
   {
     id: 'sample-load',
-    narration: 'Now the sample editor. Let me load Aces High — Iron Maiden covered in ProTracker with big guitar samples.',
+    narration: 'Now the sample editor. Let me load Break the Box — a classic ProTracker module with big samples.',
     action: async () => {
       await closeModals();
-      await loadTrackerSong('/data/songs/exports/aces_high.mod');
+      await loadTrackerSong('/data/songs/mod/break the box.mod');
     },
     postDelay: 2000,
   },
