@@ -131,7 +131,6 @@ const MAME_GENERIC_TYPES: SynthType[] = [
   // Speech synthesizers
   'MAMEMEA8000',      // Philips MEA8000 LPC Speech
   'MAMESP0250',       // GI SP0250 Digital LPC Speech
-  'MAMETMS5220',      // TI TMS5220 Speak & Spell
   'MAMEVotrax',       // Votrax SC-01 Formant Speech
 
   // Keyboard / Phase Distortion

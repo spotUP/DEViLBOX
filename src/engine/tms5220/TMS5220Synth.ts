@@ -97,9 +97,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
   private _speechPitchIndex = 32;   // default center (chipParameters default)
   private _speechEnergyIndex = 10;  // default (chipParameters default)
 
-  // Mode: 0 = Tone (MIDI), 1 = Speech (TTS on noteOn)
-  private _mode: 0 | 1 = 1;
-  private _singMode = true;  // When true, MIDI note shifts speech pitch (like SAM/V2Speech)
+  private _singMode = true;  // When true, MIDI note shifts speech pitch
   private _speechText = 'HELLO WORLD';
 
   // Vowel sequence state
@@ -225,48 +223,28 @@ export class TMS5220Synth extends MAMEBaseSynth {
   // MAMEBaseSynth Abstract Method Implementations
   // ===========================================================================
 
-  protected writeKeyOn(note: number, velocity: number): void {
+  protected writeKeyOn(note: number, _velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    if (this._mode === 1) {
-      // Speech mode
-      if (this._singMode && this._vowelSequence.length > 0) {
-        // Vowel sequence mode: cycle through vowels per note
-        const pitchOffset = Math.round((note - 60) * 0.5);
-        this.setParameterById(TMS5220Param.SPEECH_PITCH_OFFSET, pitchOffset);
-        this._speakSingleVowel();
-      } else if (this._singMode) {
-        // Sing mode: MIDI note controls pitch via WASM offset (slides smoothly)
-        const pitchOffset = Math.round((note - 60) * 0.5);
-        this.setParameterById(TMS5220Param.SPEECH_PITCH_OFFSET, pitchOffset);
-
-        // Only start speech if not already speaking — don't retrigger
-        if (!this.isSpeaking) {
-          this.speakText(this._speechText);
-        }
-      } else {
-        // Non-sing: each note retriggers speech from the start (one-shot)
-        this.stopSpeaking();
+    if (this._singMode && this._vowelSequence.length > 0) {
+      const pitchOffset = Math.round((note - 60) * 0.5);
+      this.setParameterById(TMS5220Param.SPEECH_PITCH_OFFSET, pitchOffset);
+      this._speakSingleVowel();
+    } else if (this._singMode) {
+      const pitchOffset = Math.round((note - 60) * 0.5);
+      this.setParameterById(TMS5220Param.SPEECH_PITCH_OFFSET, pitchOffset);
+      if (!this.isSpeaking) {
         this.speakText(this._speechText);
       }
     } else {
-      // Tone mode: standard MIDI noteOn
-      this.workletNode.port.postMessage({
-        type: 'noteOn',
-        note,
-        velocity: Math.floor(velocity * 127),
-      });
+      this.stopSpeaking();
+      this.speakText(this._speechText);
     }
   }
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-
-    if (this._mode === 1) {
-      // Speech mode: let speech finish naturally (like SAM)
-    } else {
-      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
-    }
+    // Speech mode: let speech finish naturally
   }
 
   protected writeFrequency(freq: number): void {
@@ -653,7 +631,6 @@ export class TMS5220Synth extends MAMEBaseSynth {
     // Track speech-relevant params locally for TTS frame modification
     if (param === 'pitch_index') this._speechPitchIndex = value;
     if (param === 'energy_index') this._speechEnergyIndex = value;
-    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
   }

@@ -59,7 +59,6 @@ export class HC55516Synth extends MAMEBaseSynth {
 
   private _speechSequencer: SpeechSequencer<SP0250Frame> | null = null;
 
-  private _mode: 0 | 1 = 1;
   private _singMode = true;
   private _speechText = 'I HUNGER';
 
@@ -169,32 +168,24 @@ export class HC55516Synth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    // ROM speech mode: trigger ROM speech on note-on
-    if (this._romSentToWasm && this._mode === 1) {
+    // ROM speech: play selected ROM phrase/word
+    if (this._romSentToWasm) {
       this._playRomSpeech(this._currentRomSpeech);
       return;
     }
 
-    if (this._mode === 1) {
-      if (this._singMode && this._presetSequence.length > 0) {
-        this._speakSinglePreset(note, velocity);
-      } else if (this._singMode) {
-        if (this._speechSequencer) {
-          const freq = 440 * Math.pow(2, (note - 69) / 12);
-          this.writeFrequency(freq);
-        } else {
-          this._startSpeechAtNote(this._speechText, note, velocity);
-        }
-      } else if (this._speechText && this._speechText.trim().length > 0) {
-        this._startSpeechAtNote(this._speechText, 60, velocity);
+    // TTS speech
+    if (this._singMode && this._presetSequence.length > 0) {
+      this._speakSinglePreset(note, velocity);
+    } else if (this._singMode) {
+      if (this._speechSequencer) {
+        const freq = 440 * Math.pow(2, (note - 69) / 12);
+        this.writeFrequency(freq);
       } else {
-        // No speech text set — fall through to direct WASM noteOn (uses default preset)
-        this.workletNode.port.postMessage({
-          type: 'noteOn',
-          note,
-          velocity: Math.floor(velocity * 127),
-        });
+        this._startSpeechAtNote(this._speechText, note, velocity);
       }
+    } else if (this._speechText && this._speechText.trim().length > 0) {
+      this._startSpeechAtNote(this._speechText, 60, velocity);
     } else {
       this.workletNode.port.postMessage({
         type: 'noteOn',
@@ -381,12 +372,10 @@ export class HC55516Synth extends MAMEBaseSynth {
       this.setParameterById(paramId, value);
     }
 
-    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
     if (param === 'romSpeech') {
       this._currentRomSpeech = Math.round(value);
-      if (this._romSentToWasm) this._playRomSpeech(this._currentRomSpeech);
     }
   }
 
