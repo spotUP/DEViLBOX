@@ -209,6 +209,22 @@ class TourEngine {
       }
     });
 
+    // Clear any master effects the tour applied
+    import('@/stores/useAudioStore').then(({ useAudioStore }) => {
+      if (useAudioStore.getState().masterEffects.some(e => e.id.startsWith('tour-fx-'))) {
+        useAudioStore.getState().setMasterEffects([]);
+      }
+    });
+
+    // Reset mixer mute/solo state
+    import('@/stores/useMixerStore').then(({ useMixerStore }) => {
+      const mixer = useMixerStore.getState();
+      for (let ch = 0; ch < 16; ch++) {
+        mixer.setChannelMute(ch, false);
+        mixer.setChannelSolo(ch, false);
+      }
+    });
+
     // Restore previous view
     useUIStore.getState().setActiveView(this.previousView as never);
 
