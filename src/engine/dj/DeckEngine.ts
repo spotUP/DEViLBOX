@@ -1296,6 +1296,11 @@ export class DeckEngine {
     return this.waveformAnalyser.getValue() as Float32Array;
   }
 
+  /** Get per-channel waveform data for oscilloscope display (128 samples each) */
+  getChannelWaveforms(maxChannels = 4): Float32Array[] {
+    return this.replayer.getChannelWaveforms(maxChannels);
+  }
+
   /** Get FFT data (1024 bins, dB values -100 to 0) */
   getFFT(): Float32Array {
     return this.fftAnalyser.getValue() as Float32Array;

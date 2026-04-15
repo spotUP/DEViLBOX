@@ -15,6 +15,7 @@ import type { DeckId } from '@/engine/dj/DeckEngine';
 
 export interface DeckVizData {
   waveform: Float32Array | null;
+  channelWaveforms: Float32Array[] | null;
   fft: Float32Array | null;
   level: number;
   beatPhase: PhaseInfo | null;
@@ -39,6 +40,7 @@ function startLoop(deckId: DeckId, entry: DeckCacheEntry): void {
     try {
       const deck = getDJEngine().getDeck(deckId);
       entry.data.waveform = deck.getWaveform();
+      entry.data.channelWaveforms = deck.getChannelWaveforms(4);
       entry.data.fft = deck.getFFT();
       entry.data.level = deck.getLevel();
     } catch {
@@ -60,6 +62,8 @@ function startLoop(deckId: DeckId, entry: DeckCacheEntry): void {
 export function useDeckVisualizationData(deckId: DeckId): {
   /** Read cached waveform (updated every rAF frame) */
   getWaveform: () => Float32Array | null;
+  /** Read cached per-channel waveforms (updated every rAF frame) */
+  getChannelWaveforms: () => Float32Array[] | null;
   /** Read cached FFT (updated every rAF frame) */
   getFFT: () => Float32Array | null;
   /** Read cached level in dB (updated every rAF frame) */
@@ -77,6 +81,7 @@ export function useDeckVisualizationData(deckId: DeckId): {
       existing = {
         data: {
           waveform: null,
+          channelWaveforms: null,
           fft: null,
           level: -Infinity,
           beatPhase: null,
@@ -109,6 +114,10 @@ export function useDeckVisualizationData(deckId: DeckId): {
     () => deckCaches.get(deckIdRef.current)?.data.waveform ?? null,
     [],
   );
+  const getChannelWaveforms = useCallback(
+    () => deckCaches.get(deckIdRef.current)?.data.channelWaveforms ?? null,
+    [],
+  );
   const getFFT = useCallback(
     () => deckCaches.get(deckIdRef.current)?.data.fft ?? null,
     [],
@@ -122,5 +131,5 @@ export function useDeckVisualizationData(deckId: DeckId): {
     [],
   );
 
-  return { getWaveform, getFFT, getLevel, getBeatPhase };
+  return { getWaveform, getChannelWaveforms, getFFT, getLevel, getBeatPhase };
 }
