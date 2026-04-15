@@ -798,13 +798,11 @@ export const TOUR_SCRIPT: TourStep[] = [
       // Stop anything playing
       useTransportStore.getState().stop();
 
-      // Stop and dispose all native WASM engines (Hively, UADE, etc.) that may still
-      // be running from the previous song. Without this, the HivelyEngine singleton
-      // keeps its audio graph alive and the old HivelySynth instruments remain active.
-      const { stopNativeEngines, clearRunningEngineKeys } = await import('@/engine/replayer/NativeEngineRouting');
+      // Stop the replayer, which also stops all native WASM engines (Hively, UADE, etc.)
+      // that may still be running from the previous AHX song.
       const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      const replayer = getTrackerReplayer();
-      stopNativeEngines(replayer.song, replayer.routedNativeEngines, null);
+      const { clearRunningEngineKeys } = await import('@/engine/replayer/NativeEngineRouting');
+      getTrackerReplayer().stop(false);
       clearRunningEngineKeys();
 
       // Clear format-specific data from previous AHX song and switch to classic editor.
@@ -1141,16 +1139,16 @@ export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 3b: Sample Editor Deep Dive ─────────────────────────────────────
   {
     id: 'sample-load',
-    narration: 'Now the sample editor. Let me load Cannon Fodder — a classic Amiga game with vocal samples.',
+    narration: 'Now the sample editor. Let me load Aces High — Iron Maiden covered in ProTracker with big guitar samples.',
     action: async () => {
       await closeModals();
-      await loadTrackerSong('/data/songs/exports/cannonfodder.mod');
+      await loadTrackerSong('/data/songs/exports/aces_high.mod');
     },
     postDelay: 2000,
   },
   {
     id: 'sample-open',
-    narration: 'Opening the biggest sample — should have the most interesting waveform.',
+    narration: 'Opening the biggest sample — a guitar riff with a nice waveform.',
     action: async () => {
       await closeModals();
       const id = await getFirstSampleInstrument();
