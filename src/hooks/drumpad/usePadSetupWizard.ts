@@ -249,7 +249,7 @@ export function usePadSetupWizard() {
         pan: preset.pan ?? 0,
         ...preset, // Spread full preset config after defaults
       } as import('@/types/instrument/defaults').InstrumentConfig, // Preset is DeepPartial, cast to full type
-      instrumentNote: 'C3',
+      instrumentNote: 'C4',
       djFxAction: undefined,
       scratchAction: undefined,
       playMode: 'oneshot',

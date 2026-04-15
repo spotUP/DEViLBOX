@@ -81,13 +81,12 @@ export function playPattern(): boolean {
 }
 
 /**
- * Play song from current position / row 0.
+ * Play song from position 0, row 0.
+ * If already playing, instantly restarts from the beginning.
  */
 export function playSong(): boolean {
   const replayer = getTrackerReplayer();
   const store = useTransportStore.getState();
-  const trackerStore = useTrackerStore.getState();
-  const startPos = trackerStore.currentPositionIndex;
   const playing = replayer.isPlaying() || store.isPlaying;
 
   if (playing) {
@@ -96,7 +95,8 @@ export function playSong(): boolean {
       store.stop();
       getToneEngine().stop();
     } else {
-      replayer.forcePosition(startPos, 0);
+      // Restart from song beginning — position 0, row 0
+      replayer.forcePosition(0, 0);
       return true;
     }
   }

@@ -282,10 +282,10 @@ export const useMIDIStore = create<MIDIStore>()(
                   return;
                 }
 
-                // In DrumPad / DJ / VJ views, notes 36-43 trigger drum pads instead of bank switching
+                // In DrumPad / DJ / VJ views, ALL notes trigger drum pads (not tracker)
                 const activeView = useUIStore.getState().activeView;
-                if ((activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') && message.note >= 36 && message.note <= 43) {
-                  return;
+                if (activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') {
+                  return; // Skip all tracker note handling in pad views
                 }
 
                 // Check if note matches bank switch (Akai MPK Mini Pads: 36, 37, 38, 39)

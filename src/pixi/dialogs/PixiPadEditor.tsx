@@ -87,11 +87,11 @@ const SCRATCH_ACTION_OPTIONS: SelectOption[] = [
   { value: 'scratch_drag', label: 'Drag' },
   { value: 'scratch_vibrato', label: 'Vibrato' },
   { value: 'scratch_stop', label: 'Stop Scratch' },
-  { value: 'lfo_off', label: 'Fader LFO: Off' },
-  { value: 'lfo_14', label: 'Fader LFO: 1/4' },
-  { value: 'lfo_18', label: 'Fader LFO: 1/8' },
-  { value: 'lfo_116', label: 'Fader LFO: 1/16' },
-  { value: 'lfo_132', label: 'Fader LFO: 1/32' },
+  { value: 'fader_lfo_off', label: 'Fader LFO: Off' },
+  { value: 'fader_lfo_1_4', label: 'Fader LFO: 1/4' },
+  { value: 'fader_lfo_1_8', label: 'Fader LFO: 1/8' },
+  { value: 'fader_lfo_1_16', label: 'Fader LFO: 1/16' },
+  { value: 'fader_lfo_1_32', label: 'Fader LFO: 1/32' },
 ];
 
 // ADSR bar colors

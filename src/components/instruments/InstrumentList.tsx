@@ -166,12 +166,11 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback
         || (inst as any).modPlayback?.usePeriodPlayback;
       const isSampleInst = inst.type === 'sample' || inst.synthType === 'Sampler' || inst.synthType === 'Player';
-      const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
       const rawPreviewNote = (isSampleInst && inst.sample?.baseNote)
         ? inst.sample.baseNote
         : isModSample
-          ? (inst.sample?.baseNote || 'C3')
-          : (isBass ? 'C3' : 'C4');
+          ? (inst.sample?.baseNote || 'C4')
+          : 'C4';
       const previewNote = rawPreviewNote.replace('-', '');
       const now = Tone.now();
 

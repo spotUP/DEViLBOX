@@ -340,7 +340,7 @@ async function playSampleInstrument(instrumentId: number, durationMs = 1500): Pr
   const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
   const config = useInstrumentStore.getState().getInstrument(instrumentId);
   // Use the sample's stored base note so playback is at the correct rate
-  const note = config?.sample?.baseNote || 'C3';
+  const note = config?.sample?.baseNote || 'C4';
   await playInstrumentNote(instrumentId, note, durationMs);
 }
 
@@ -351,6 +351,9 @@ async function playInstrumentNote(instrumentId: number, note: string, durationMs
     const { getToneEngine } = await import('@/engine/ToneEngine');
     const config = useInstrumentStore.getState().getInstrument(instrumentId);
     if (!config) return;
+    // Ensure instrument is created and sample data is decoded before triggering
+    await getToneEngine().ensureInstrumentReady(config);
+    await getToneEngine().awaitPendingLoads(3000);
     getToneEngine().triggerNoteAttack(instrumentId, note, 0, 0.85, config);
     setTimeout(() => {
       try { getToneEngine().triggerNoteRelease(instrumentId, note, 0, config); } catch { /* */ }

@@ -72,6 +72,60 @@ function triggerPattern(patternName: string): boolean {
   return true;
 }
 
+// Hold-down behavior: start scratch pattern on press
+function startPattern(patternName: string): boolean {
+  const deckId = getActiveDeck();
+  const current = activePatterns[deckId];
+
+  // Already playing something → ignore
+  if (current !== null) {
+    return true;
+  }
+
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    
+    // Set IMMEDIATE guard, then state
+    activePatterns[deckId] = patternName;
+    useDJStore.getState().setDeckPattern(deckId, patternName);
+    
+    let quantizeWaitMs = 0;
+    deck.playPattern(patternName, (waitMs) => {
+      quantizeWaitMs = waitMs;
+      useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
+    });
+    
+    if (quantizeWaitMs === 0) {
+      useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
+    }
+  } catch {
+    useUIStore.getState().setStatusMessage('DJ engine not active', false, 1000);
+  }
+  return true;
+}
+
+// Hold-down behavior: stop scratch pattern on release
+function stopPattern(): boolean {
+  const deckId = getActiveDeck();
+  const current = activePatterns[deckId];
+
+  // Nothing running → ignore
+  if (current === null) {
+    return true;
+  }
+
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    deck.stopPattern();
+    activePatterns[deckId] = null;
+    useDJStore.getState().setDeckPattern(deckId, null);
+    useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
+  } catch {
+    useUIStore.getState().setStatusMessage('DJ engine not active', false, 1000);
+  }
+  return true;
+}
+
 function triggerFaderLFO(division: FaderLFODivision | null): boolean {
   const deckId = getActiveDeck();
   const store = useDJStore.getState();
@@ -95,28 +149,64 @@ function triggerFaderLFO(division: FaderLFODivision | null): boolean {
   return true;
 }
 
-// ── Pattern commands ──────────────────────────────────────────────────────────
-export function djScratchBaby():  boolean { return triggerPattern(SCRATCH_PATTERNS[0].name); }
-export function djScratchTrans(): boolean { return triggerPattern(SCRATCH_PATTERNS[1].name); }
-export function djScratchFlare(): boolean { return triggerPattern(SCRATCH_PATTERNS[2].name); }
-export function djScratchHydro(): boolean { return triggerPattern(SCRATCH_PATTERNS[3].name); }
-export function djScratchCrab():  boolean { return triggerPattern(SCRATCH_PATTERNS[4].name); }
-export function djScratchOrbit(): boolean { return triggerPattern(SCRATCH_PATTERNS[5].name); }
-export function djScratchChirp(): boolean { return triggerPattern(SCRATCH_PATTERNS[6].name); }
-export function djScratchStab():  boolean { return triggerPattern(SCRATCH_PATTERNS[7].name); }
-export function djScratchScrbl(): boolean { return triggerPattern(SCRATCH_PATTERNS[8].name); }
-export function djScratchTear():  boolean { return triggerPattern(SCRATCH_PATTERNS[9].name); }
+// ── Pattern commands (hold-down behavior: true = press, false = release) ──────
+export function djScratchBaby(start: boolean = true):  boolean { return start ? startPattern(SCRATCH_PATTERNS[0].name) : stopPattern(); }
+export function djScratchTrans(start: boolean = true): boolean { return start ? startPattern(SCRATCH_PATTERNS[1].name) : stopPattern(); }
+export function djScratchFlare(start: boolean = true): boolean { return start ? startPattern(SCRATCH_PATTERNS[2].name) : stopPattern(); }
+export function djScratchHydro(start: boolean = true): boolean { return start ? startPattern(SCRATCH_PATTERNS[3].name) : stopPattern(); }
+export function djScratchCrab(start: boolean = true):  boolean { return start ? startPattern(SCRATCH_PATTERNS[4].name) : stopPattern(); }
+export function djScratchOrbit(start: boolean = true): boolean { return start ? startPattern(SCRATCH_PATTERNS[5].name) : stopPattern(); }
+export function djScratchChirp(start: boolean = true): boolean { return start ? startPattern(SCRATCH_PATTERNS[6].name) : stopPattern(); }
+export function djScratchStab(start: boolean = true):  boolean { return start ? startPattern(SCRATCH_PATTERNS[7].name) : stopPattern(); }
+export function djScratchScrbl(start: boolean = true): boolean { return start ? startPattern(SCRATCH_PATTERNS[8].name) : stopPattern(); }
+export function djScratchTear(start: boolean = true):  boolean { return start ? startPattern(SCRATCH_PATTERNS[9].name) : stopPattern(); }
 
 // ── Advanced pattern commands (10-18) ────────────────────────────────────────
-export function djScratchUzi():     boolean { return triggerPattern(SCRATCH_PATTERNS[10].name); }
-export function djScratchTwiddle(): boolean { return triggerPattern(SCRATCH_PATTERNS[11].name); }
-export function djScratch8Crab():   boolean { return triggerPattern(SCRATCH_PATTERNS[12].name); }
-export function djScratch3Flare():  boolean { return triggerPattern(SCRATCH_PATTERNS[13].name); }
-export function djScratchLaser():   boolean { return triggerPattern(SCRATCH_PATTERNS[14].name); }
-export function djScratchPhaser():  boolean { return triggerPattern(SCRATCH_PATTERNS[15].name); }
-export function djScratchTweak():   boolean { return triggerPattern(SCRATCH_PATTERNS[16].name); }
-export function djScratchDrag():    boolean { return triggerPattern(SCRATCH_PATTERNS[17].name); }
-export function djScratchVibrato(): boolean { return triggerPattern(SCRATCH_PATTERNS[18].name); }
+export function djScratchUzi(start?: boolean):     boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[10].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[10].name);
+}
+export function djScratchTwiddle(start?: boolean): boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[11].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[11].name);
+}
+export function djScratch8Crab(start?: boolean):   boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[12].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[12].name);
+}
+export function djScratch3Flare(start?: boolean):  boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[13].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[13].name);
+}
+export function djScratchLaser(start?: boolean):   boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[14].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[14].name);
+}
+export function djScratchPhaser(start?: boolean):  boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[15].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[15].name);
+}
+export function djScratchTweak(start?: boolean):   boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[16].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[16].name);
+}
+export function djScratchDrag(start?: boolean):    boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[17].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[17].name);
+}
+export function djScratchVibrato(start?: boolean): boolean { 
+  if (start === true) return startPattern(SCRATCH_PATTERNS[18].name);
+  if (start === false) return stopPattern();
+  return triggerPattern(SCRATCH_PATTERNS[18].name);
+}
 
 export function djScratchStop(): boolean {
   const deckId = getActiveDeck();
