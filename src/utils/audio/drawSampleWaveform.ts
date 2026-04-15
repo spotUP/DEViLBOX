@@ -173,6 +173,8 @@ function drawWaveformData(
   const visibleSamples = viewEndSample - viewStartSample;
   const samplesPerPixel = visibleSamples / width;
 
+  ctx.shadowColor = COLORS.waveform;
+  ctx.shadowBlur = 6;
   ctx.strokeStyle = COLORS.waveform;
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -206,10 +208,13 @@ function drawWaveformData(
     }
   }
   ctx.stroke();
+  ctx.shadowBlur = 0;
 
   // Secondary channel (if stereo) — drawn dimmer underneath
   if (buffer.numberOfChannels >= 2) {
     const ch2 = buffer.getChannelData(1);
+    ctx.shadowColor = COLORS.waveformDim;
+    ctx.shadowBlur = 4;
     ctx.strokeStyle = COLORS.waveformDim;
     ctx.globalAlpha = 0.4;
     ctx.lineWidth = 1;
@@ -230,6 +235,7 @@ function drawWaveformData(
       ctx.lineTo(x, maxY);
     }
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
 }
