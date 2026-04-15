@@ -482,6 +482,10 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <SpeechSynthControls
                 config={pad.synthConfig}
                 onChange={(updates) => {
+                  // Dispose cached synth so next trigger creates fresh instance with new config
+                  const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+                  try { getToneEngine().disposeInstrument(padInstId); } catch {}
+                  
                   handleUpdate({
                     synthConfig: {
                       ...pad.synthConfig!,
