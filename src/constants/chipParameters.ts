@@ -206,10 +206,10 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'noise_mode', label: 'Noise Mode', group: 'Excitation', type: 'toggle', min: 0, max: 1, default: 0 },
-      { key: 'f1_index', label: 'F1 Index', group: 'Formants', type: 'knob', min: 0, max: 7, step: 1, default: 3, formatValue: 'int' },
-      { key: 'f2_index', label: 'F2 Index', group: 'Formants', type: 'knob', min: 0, max: 7, step: 1, default: 4, formatValue: 'int' },
+      { key: 'f1_index', label: 'F1 Index', group: 'Formants', type: 'knob', min: 0, max: 31, step: 1, default: 27, formatValue: 'int' },
+      { key: 'f2_index', label: 'F2 Index', group: 'Formants', type: 'knob', min: 0, max: 31, step: 1, default: 16, formatValue: 'int' },
       { key: 'f3_index', label: 'F3 Index', group: 'Formants', type: 'knob', min: 0, max: 7, step: 1, default: 5, formatValue: 'int' },
-      { key: 'bw_index', label: 'Bandwidth', group: 'Formants', type: 'select', min: 0, max: 3, default: 0, formatValue: 'int', options: [
+      { key: 'bw_index', label: 'Bandwidth', group: 'Formants', type: 'select', min: 0, max: 3, default: 2, formatValue: 'int', options: [
         { value: 0, label: 'Wide (726Hz)' }, { value: 1, label: 'Medium (309Hz)' },
         { value: 2, label: 'Narrow (125Hz)' }, { value: 3, label: 'V.Narrow (50Hz)' },
       ]},
