@@ -187,7 +187,23 @@ async function closeModals(): Promise<void> {
 async function getFirstSampleInstrument(): Promise<number | null> {
   const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
   const instruments = useInstrumentStore.getState().instruments;
-  const sampleInst = instruments.find(i => i.type === 'sample' && i.sample?.audioBuffer);
+  // Find first instrument with actual sample data (non-empty audioBuffer or URL)
+  const sampleInst = instruments.find(i =>
+    i.type === 'sample' && (
+      (i.sample?.audioBuffer instanceof ArrayBuffer && i.sample.audioBuffer.byteLength > 0) ||
+      (i.sample?.url && i.sample.url.length > 0)
+    )
+  );
+  if (!sampleInst) {
+    const sampleTypes = instruments.filter(i => i.type === 'sample');
+    console.warn(`[Tour] getFirstSampleInstrument: ${instruments.length} instruments, ${sampleTypes.length} sample-type, none with valid data`);
+    if (sampleTypes.length > 0) {
+      const first = sampleTypes[0];
+      console.warn(`[Tour]   first sample: id=${first.id} name="${first.name}" bufLen=${(first.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 'none'} url=${first.sample?.url ? 'yes' : 'no'}`);
+    }
+  } else {
+    console.log(`[Tour] getFirstSampleInstrument: found id=${sampleInst.id} name="${sampleInst.name}"`);
+  }
   return sampleInst?.id ?? null;
 }
 
@@ -322,10 +338,46 @@ async function restoreSample(instrumentId: number): Promise<void> {
 /** Play the currently selected sample instrument at its natural pitch */
 async function playSampleInstrument(instrumentId: number, durationMs = 1500): Promise<void> {
   const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+  const { getToneEngine } = await import('@/engine/ToneEngine');
+  const Tone = await import('tone');
   const config = useInstrumentStore.getState().getInstrument(instrumentId);
-  // Use the sample's stored base note so playback is at the correct rate
-  const note = config?.sample?.baseNote || 'C4';
-  await playInstrumentNote(instrumentId, note, durationMs);
+  if (!config) return;
+
+  // Ensure audio context is running
+  if (Tone.getContext().state !== 'running') {
+    await Tone.start();
+  }
+
+  // Try ToneEngine path first
+  try {
+    await getToneEngine().ensureInstrumentReady(config);
+    await getToneEngine().awaitPendingLoads(5000);
+    const note = config.sample?.baseNote || 'C4';
+    getToneEngine().triggerNoteAttack(instrumentId, note, 0, 0.85, config);
+    setTimeout(() => {
+      try { getToneEngine().triggerNoteRelease(instrumentId, note, 0, config); } catch { /* */ }
+    }, durationMs);
+    return;
+  } catch (err) {
+    console.warn('[Tour] ToneEngine sample playback failed, trying direct path:', err);
+  }
+
+  // Fallback: decode and play via raw Web Audio API
+  const rawBuf = config.sample?.audioBuffer;
+  if (rawBuf && rawBuf instanceof ArrayBuffer && rawBuf.byteLength > 0) {
+    try {
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      const decoded = await ctx.decodeAudioData(rawBuf.slice(0));
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(ctx.destination);
+      source.start();
+      setTimeout(() => { try { source.stop(); } catch { /* */ } }, durationMs);
+      console.log(`[Tour] playSampleInstrument: direct Web Audio playback for id=${instrumentId}`);
+    } catch (err2) {
+      console.warn('[Tour] Direct Web Audio playback also failed:', err2);
+    }
+  }
 }
 
 /** Trigger a note on an instrument (for demo) */
@@ -333,11 +385,21 @@ async function playInstrumentNote(instrumentId: number, note: string, durationMs
   try {
     const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
     const { getToneEngine } = await import('@/engine/ToneEngine');
+    const Tone = await import('tone');
     const config = useInstrumentStore.getState().getInstrument(instrumentId);
-    if (!config) return;
+    if (!config) {
+      console.warn(`[Tour] playInstrumentNote: no config for id=${instrumentId}`);
+      return;
+    }
+    // Ensure audio context is running (may have been suspended after inactivity)
+    if (Tone.getContext().state !== 'running') {
+      console.log('[Tour] Audio context not running, starting...');
+      await Tone.start();
+    }
     // Ensure instrument is created and sample data is decoded before triggering
     await getToneEngine().ensureInstrumentReady(config);
-    await getToneEngine().awaitPendingLoads(3000);
+    await getToneEngine().awaitPendingLoads(5000);
+    console.log(`[Tour] playInstrumentNote: id=${instrumentId} note=${note} synthType=${config.synthType} hasAudioBuffer=${!!config.sample?.audioBuffer} hasUrl=${!!config.sample?.url}`);
     getToneEngine().triggerNoteAttack(instrumentId, note, 0, 0.85, config);
     setTimeout(() => {
       try { getToneEngine().triggerNoteRelease(instrumentId, note, 0, config); } catch { /* */ }
@@ -989,7 +1051,7 @@ export const TOUR_SCRIPT: TourStep[] = [
       await closeModals();
       await loadTrackerSong('/data/songs/exports/aces_high.mod');
     },
-    postDelay: 500,
+    postDelay: 2000,
   },
   {
     id: 'sample-open',
