@@ -97,13 +97,14 @@ const flatShadeMat = new THREE.MeshPhongMaterial({
   side: THREE.FrontSide,
 });
 
-// Spike hair material — bright cyan lines with additive glow
-const spikeMat = new THREE.LineBasicMaterial({
+// Spike hair material — bright cyan cones with additive glow
+const spikeMat = new THREE.MeshBasicMaterial({
   color: 0x00eeff,
   transparent: true,
   opacity: 0.9,
   blending: THREE.AdditiveBlending,
   depthWrite: false,
+  side: THREE.DoubleSide,
 });
 
 // ─── Model loading with KTX2 + Meshopt ───────────────────────────────────────
@@ -193,12 +194,11 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
   const smoothGlow = useRef(0);
 
   // Spike hair system
-  const spikeMeshRef = useRef<THREE.LineSegments | null>(null);
+  const spikeMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const spikeDataRef = useRef<{
     origins: Float32Array;     // base positions (scalp vertices)
     normals: Float32Array;     // outward direction per spike
     phases: Float32Array;      // per-spike random phase offset for wave motion
-    basePositions: Float32Array; // attribute buffer (interleaved: origin, tip, origin, tip...)
     count: number;
     spikeScale: number;        // multiplier: maps 0-0.3 range to head geometry local coords
   } | null>(null);
@@ -310,8 +310,6 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
             const origins = new Float32Array(count * 3);
             const normals = new Float32Array(count * 3);
             const phases = new Float32Array(count);
-            // Line segments: 2 vertices per spike (base + tip)
-            const positions = new Float32Array(count * 2 * 3);
 
             for (let i = 0; i < count; i++) {
               const s = spikes[i];
@@ -322,21 +320,28 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
               normals[i * 3 + 1] = s.ny;
               normals[i * 3 + 2] = s.nz;
               phases[i] = Math.random() * Math.PI * 2;
-              // Initial positions (base = tip, zero length)
-              positions[i * 6] = s.x;
-              positions[i * 6 + 1] = s.y;
-              positions[i * 6 + 2] = s.z;
-              positions[i * 6 + 3] = s.x;
-              positions[i * 6 + 4] = s.y;
-              positions[i * 6 + 5] = s.z;
             }
 
-            const spikeGeo = new THREE.BufferGeometry();
-            spikeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            // Create cone geometry for spikes (radius, height, radialSegments)
+            const coneGeo = new THREE.ConeGeometry(0.015, 1, 6);
+            // Rotate so cone points up along +Y (default is -Y)
+            coneGeo.rotateX(Math.PI);
+            // Translate so base is at origin (default is centered)
+            coneGeo.translate(0, 0.5, 0);
 
-            const spikeMesh = new THREE.LineSegments(spikeGeo, spikeMat);
+            const spikeMesh = new THREE.InstancedMesh(coneGeo, spikeMat, count);
             spikeMesh.renderOrder = 2;
             spikeMesh.frustumCulled = false;
+
+            // Initialize all instances at zero scale (invisible)
+            const dummy = new THREE.Object3D();
+            dummy.scale.set(1, 0.01, 1); // Start tiny
+            for (let i = 0; i < count; i++) {
+              dummy.position.set(origins[i * 3], origins[i * 3 + 1], origins[i * 3 + 2]);
+              dummy.updateMatrix();
+              spikeMesh.setMatrixAt(i, dummy.matrix);
+            }
+            spikeMesh.instanceMatrix.needsUpdate = true;
 
             // Add as sibling of morphMesh with same transforms so spike
             // positions (in head geometry local coords) map correctly
@@ -355,7 +360,7 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
             // At max audio, spike = ~10% of head height.
             const spikeScale = headSize.y * 0.33;
 
-            spikeDataRef.current = { origins, normals, phases, basePositions: positions, count, spikeScale };
+            spikeDataRef.current = { origins, normals, phases, count, spikeScale };
           }
         }
       }
@@ -602,8 +607,9 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
     const spikeData = spikeDataRef.current;
     const spikeMesh = spikeMeshRef.current;
     if (spikeData && spikeMesh) {
-      const { origins, normals, phases, basePositions, count, spikeScale } = spikeData;
-      const posAttr = spikeMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const { origins, normals, phases, count, spikeScale } = spikeData;
+      const dummy = new THREE.Object3D();
+      const upVec = new THREE.Vector3(0, 1, 0);
 
       for (let i = 0; i < count; i++) {
         const phase = phases[i];
@@ -636,17 +642,21 @@ export const KraftwerkHead: React.FC<VJSceneProps> = ({ audioRef }) => {
         const ny = normals[i * 3 + 1];
         const nz = normals[i * 3 + 2];
 
-        // Base vertex stays at origin
-        basePositions[i * 6] = ox;
-        basePositions[i * 6 + 1] = oy;
-        basePositions[i * 6 + 2] = oz;
-        // Tip vertex extends along normal
-        basePositions[i * 6 + 3] = ox + nx * length;
-        basePositions[i * 6 + 4] = oy + ny * length;
-        basePositions[i * 6 + 5] = oz + nz * length;
+        // Position at spike origin
+        dummy.position.set(ox, oy, oz);
+        
+        // Orient cone to point along normal direction
+        const normalVec = new THREE.Vector3(nx, ny, nz);
+        dummy.quaternion.setFromUnitVectors(upVec, normalVec);
+        
+        // Scale cone height by spike length (width stays constant)
+        dummy.scale.set(1, length, 1);
+        
+        dummy.updateMatrix();
+        spikeMesh.setMatrixAt(i, dummy.matrix);
       }
 
-      posAttr.needsUpdate = true;
+      spikeMesh.instanceMatrix.needsUpdate = true;
       spikeMat.opacity = 0.9 * vis;
     }
 
