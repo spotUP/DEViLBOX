@@ -18,12 +18,14 @@ import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
+  onLoadSample?: (padId: number) => void;
   selectedPadId: number | null;
   performanceMode?: boolean;
 }
 
 export const PadGrid: React.FC<PadGridProps> = ({
   onPadSelect,
+  onLoadSample,
   selectedPadId,
   performanceMode = false,
 }) => {
@@ -240,9 +242,13 @@ export const PadGrid: React.FC<PadGridProps> = ({
       }
     },
     onLoadSample: (id: number) => {
-      onPadSelect(id);
+      if (onLoadSample) {
+        onLoadSample(id);
+      } else {
+        onPadSelect(id);
+      }
     },
-  }), [onPadSelect, engineRef]);
+  }), [onPadSelect, onLoadSample, engineRef]);
 
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 
