@@ -1,5 +1,8 @@
 /**
  * PadGrid - 4x4 grid of drum pads (MPC-style)
+ *
+ * Audio triggering is delegated to useMIDIPadRouting (shared with DJ/VJ views).
+ * This component handles UI concerns: visual feedback, keyboard nav, context menu.
  */
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
@@ -7,59 +10,11 @@ import { PadButton } from './PadButton';
 import { ContextMenu, useContextMenu } from '@components/common/ContextMenu';
 import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
-import { useInstrumentStore } from '../../stores/useInstrumentStore';
-import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
-import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
-import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
-import { getToneEngine } from '../../engine/ToneEngine';
-import { useTransportStore } from '../../stores/useTransportStore';
 import { useOrientation } from '@hooks/useOrientation';
-import type { ScratchActionId, PadBank } from '../../types/drumpad';
-import { getBankPads, applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
-import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
-import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
-import { getMIDIManager } from '../../midi/MIDIManager';
-import type { MIDIMessage } from '../../midi/types';
-import {
-  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
-  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
-  djScratchUzi, djScratchTwiddle, djScratch8Crab, djScratch3Flare,
-  djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
-  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
-} from '../../engine/keyboard/commands/djScratch';
-
-const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => boolean> = {
-  // Basic patterns
-  scratch_baby:     djScratchBaby,
-  scratch_trans:    djScratchTrans,
-  scratch_flare:    djScratchFlare,
-  scratch_hydro:    djScratchHydro,
-  scratch_crab:     djScratchCrab,
-  scratch_orbit:    djScratchOrbit,
-  // Extended patterns
-  scratch_chirp:    djScratchChirp,
-  scratch_stab:     djScratchStab,
-  scratch_scribble: djScratchScrbl,
-  scratch_tear:     djScratchTear,
-  // Advanced patterns
-  scratch_uzi:      djScratchUzi,
-  scratch_twiddle:  djScratchTwiddle,
-  scratch_8crab:    djScratch8Crab,
-  scratch_3flare:   djScratch3Flare,
-  scratch_laser:    djScratchLaser,
-  scratch_phaser:   djScratchPhaser,
-  scratch_tweak:    djScratchTweak,
-  scratch_drag:     djScratchDrag,
-  scratch_vibrato:  djScratchVibrato,
-  // Control
-  scratch_stop:     djScratchStop,
-  lfo_off:          djFaderLFOOff,
-  lfo_14:           djFaderLFO14,
-  lfo_18:           djFaderLFO18,
-  lfo_116:          djFaderLFO116,
-  lfo_132:          djFaderLFO132,
-};
+import type { PadBank } from '../../types/drumpad';
+import { getBankPads } from '../../types/drumpad';
+import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
@@ -74,280 +29,53 @@ export const PadGrid: React.FC<PadGridProps> = ({
   selectedPadId,
   performanceMode = false,
 }) => {
+  // ── Shared full-featured pad engine (also handles MIDI routing) ──
+  const { triggerPad: hookTriggerPad, releasePad: hookReleasePad, releaseAllHeld, engineRef } = useMIDIPadRouting();
+
   // Context menu state
   const contextMenu = useContextMenu();
   const [contextMenuPadId, setContextMenuPadId] = useState<number | null>(null);
-
-  // Pad mode from store
-  const setFxPadActive = useDrumPadStore(s => s.setFxPadActive);
 
   // Track velocity for each pad (for visual feedback)
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
   const velocityTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
-  // Track pending synth release timeouts (clean up on unmount/bank switch)
-  const pendingReleasesRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
-
   // Track focused pad for keyboard navigation (uses bank-relative IDs)
   const [focusedPadId, setFocusedPadId] = useState<number>(1);
-
-  // Ref for noteRepeatEnabled to avoid stale closure in callbacks
-  const noteRepeatEnabledRef = useRef(false);
-
-  // Track held pads for sustain mode
-  const heldPadsRef = useRef<Set<number>>(new Set());
 
   // Current bank
   const { currentBank, setBank } = useDrumPadStore();
 
   const { isPortrait } = useOrientation();
-  const gridCols = isPortrait ? 2 : 4; // 2x8 grid on portrait, 4x4 on landscape
+  const gridCols = isPortrait ? 2 : 4;
 
   const { programs, currentProgramId } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
 
-  // Audio engine instance
-  const engineRef = useRef<DrumPadEngine | null>(null);
-  const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
-
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Initialize audio engine + load persisted samples from IndexedDB
-  useEffect(() => {
-    const audioContext = getAudioContext();
-    engineRef.current = new DrumPadEngine(audioContext);
-    noteRepeatRef.current = new NoteRepeatEngine(engineRef.current);
-
-    // Load persisted audio samples from IndexedDB
-    useDrumPadStore.getState().loadFromIndexedDB(audioContext);
-
-    return () => {
-      noteRepeatRef.current?.dispose();
-      engineRef.current?.dispose();
-      // Clean up pending synth release timers
-      pendingReleasesRef.current.forEach(t => clearTimeout(t));
-      pendingReleasesRef.current.clear();
-      // Clean up velocity fade timers
-      Object.values(velocityTimersRef.current).forEach(t => clearTimeout(t));
-    };
-  }, []);
-
-  // Sync master level to engine whenever it changes
-  useEffect(() => {
-    if (engineRef.current && currentProgram) {
-      engineRef.current.setMasterLevel(currentProgram.masterLevel);
-    }
-  }, [currentProgram?.masterLevel]);
-
-  // Sync mute groups to engine when program changes
-  useEffect(() => {
-    if (engineRef.current && currentProgram) {
-      engineRef.current.setMuteGroups(currentProgram.pads);
-    }
-  }, [currentProgram]);
-
-  // Sync note repeat state
-  const noteRepeatEnabled = useDrumPadStore(s => s.noteRepeatEnabled);
-  const noteRepeatRate = useDrumPadStore(s => s.noteRepeatRate);
-  const bpm = useTransportStore(s => s.bpm);
-
   // Reset focused pad and clear visual state when bank changes
-  // Also release all held pads to prevent audio leaking across banks
   useEffect(() => {
     const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
     setFocusedPadId(bankOffset + 1);
     setPadVelocities({});
-    
-    // Release all held pads when switching banks (direct cleanup, not via callback)
-    heldPadsRef.current.forEach(padId => {
-      // Stop note repeat
-      noteRepeatRef.current?.stopRepeat(padId);
-      
-      if (currentProgram && engineRef.current) {
-        const pad = currentProgram.pads.find(p => p.id === padId);
-        if (pad) {
-          // Disengage DJ FX
-          if (pad.djFxAction) {
-            DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
-            setFxPadActive(padId, false);
-          }
-          // Stop sustain samples
-          if (pad.playMode === 'sustain') {
-            engineRef.current.stopPad(padId, pad.release / 1000);
-            // Release synth voices
-            if (pad.synthConfig || pad.instrumentId != null) {
-              try {
-                let instId: number;
-                let config: any;
-                if (pad.synthConfig) {
-                  instId = PAD_INSTRUMENT_BASE + pad.id;
-                  config = { ...pad.synthConfig, id: instId };
-                } else {
-                  instId = pad.instrumentId!;
-                  config = useInstrumentStore.getState().getInstrument(instId);
-                }
-                if (config) {
-                  const note = pad.instrumentNote || 'C3';
-                  getToneEngine().triggerNoteRelease(instId, note, 0, config);
-                }
-              } catch { /* ignore */ }
-            }
-          }
-        }
-      }
-    });
-    heldPadsRef.current.clear();
-  }, [currentBank, currentProgram, setFxPadActive]);
+    releaseAllHeld();
+  }, [currentBank, releaseAllHeld]);
 
+  // Clean up velocity fade timers on unmount
   useEffect(() => {
-    noteRepeatEnabledRef.current = noteRepeatEnabled;
-    noteRepeatRef.current?.setEnabled(noteRepeatEnabled);
-  }, [noteRepeatEnabled]);
+    return () => {
+      Object.values(velocityTimersRef.current).forEach(t => clearTimeout(t));
+    };
+  }, []);
 
-  useEffect(() => {
-    noteRepeatRef.current?.setRate(noteRepeatRate as NoteRepeatRate);
-  }, [noteRepeatRate]);
-
-  useEffect(() => {
-    noteRepeatRef.current?.setBpm(bpm);
-  }, [bpm]);
-
-  // Sync bus levels from store to engine
-  const busLevels = useDrumPadStore(s => s.busLevels);
-  useEffect(() => {
-    if (!engineRef.current || !busLevels) return;
-    for (const [bus, level] of Object.entries(busLevels)) {
-      engineRef.current.setOutputLevel(bus, level);
-    }
-  }, [busLevels]);
-
+  // ── Pad trigger wrapper: delegates to hook + adds visual feedback ──
   const handlePadTrigger = useCallback((padId: number, velocity: number) => {
-    // Fire audio FIRST — synchronously, before any React state updates.
-    // The AudioContext is resumed on first user gesture; after that this is a no-op check.
-    const ctx = getAudioContext();
-    if (ctx.state === 'closed') return; // Cannot play on closed context
-    if (ctx.state === 'suspended') {
-      // Only needed once per session — fire-and-forget, don't await
-      ctx.resume();
-    }
+    hookTriggerPad(padId, velocity);
 
-    // Always use actual pad data (no more mode mappings)
-    if (currentProgram && engineRef.current) {
-      const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad) {
-        const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
-
-        if (pad.scratchAction) {
-          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
-        }
-        if (pad.djFxAction) {
-          // ── DJ FX Quantization ──
-          // Rhythmic effects (stutter, delay, tape stop) snap to beat/bar boundaries
-          // to prevent out-of-sync triggers during live performance. Quantize mode
-          // is controlled via the Q button in DJ deck transport (bar/beat/off).
-          //
-          // Quantized effects:
-          //   - Stutter (1/8, 1/16, 1/32)
-          //   - Dub Echo (1/4)
-          //   - Tape Echo (1/8d)
-          //   - Ping Pong (1/8)
-          //   - Tape Stop (1/4 decel)
-          //   - Vinyl Brake
-          //
-          // Non-quantized effects (fire immediately):
-          //   - Filter sweeps (low/mid/high)
-          //   - Reverb throws
-          //   - Backspin
-          const shouldQuantize = 
-            pad.djFxAction.startsWith('fx_stutter') ||
-            pad.djFxAction.startsWith('fx_dub_echo') ||
-            pad.djFxAction.startsWith('fx_tape_echo') ||
-            pad.djFxAction.startsWith('fx_ping_pong') ||
-            pad.djFxAction === 'fx_tape_stop' ||
-            pad.djFxAction === 'fx_vinyl_brake';
-
-          const engageFx = () => {
-            if (!pad.djFxAction) return;
-            DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
-            setFxPadActive(padId, true);
-            heldPadsRef.current.add(padId);
-          };
-
-          if (shouldQuantize && getQuantizeMode() !== 'off') {
-            // Use deck 'A' as reference for beat quantization
-            quantizeAction('A', engageFx, { allowSolo: true, kind: 'play' });
-          } else {
-            // Non-rhythmic effects or quantize=off fire immediately
-            engageFx();
-          }
-        }
-        if (pad.sample) {
-          engineRef.current.triggerPad(pad, curvedVelocity);
-        }
-        if (pad.synthConfig || pad.instrumentId != null) {
-          try {
-            const engine = getToneEngine();
-            const note = pad.instrumentNote || 'C3';
-            const normalizedVel = curvedVelocity / 127;
-            
-            // Determine instrument ID and config
-            let instId: number;
-            let config: any;
-            
-            if (pad.synthConfig) {
-              instId = PAD_INSTRUMENT_BASE + pad.id;
-              config = { ...pad.synthConfig, id: instId };
-              
-              // Debug logging for pad synths
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[PadGrid] Triggering pad ${pad.id} "${pad.name}":`, {
-                  note,
-                  synthType: config.synthType,
-                  drumType: config.drumMachine?.drumType,
-                  io808Type: config.parameters?.io808Type,
-                  tr909Type: config.parameters?.tr909Type,
-                  velocity: normalizedVel,
-                });
-              }
-            } else {
-              instId = pad.instrumentId!;
-              config = useInstrumentStore.getState().getInstrument(instId);
-              if (!config) return; // Instrument not found
-            }
-            
-            // Trigger note
-            engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
-            
-            // Auto-release for oneshot mode
-            if (pad.playMode === 'oneshot') {
-              const releaseDelayMs = Math.max(pad.decay, 100);
-              const existingTimer = pendingReleasesRef.current.get(instId);
-              if (existingTimer) clearTimeout(existingTimer);
-              const timer = setTimeout(() => {
-                try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
-                pendingReleasesRef.current.delete(instId);
-              }, releaseDelayMs);
-              pendingReleasesRef.current.set(instId, timer);
-            }
-          } catch (err) {
-            console.warn('[PadGrid] Synth trigger failed:', err);
-          }
-        }
-        if (pad.playMode === 'sustain') {
-          heldPadsRef.current.add(padId);
-        }
-        if (noteRepeatEnabledRef.current && noteRepeatRef.current) {
-          noteRepeatRef.current.startRepeat(pad, velocity);
-          heldPadsRef.current.add(padId);
-        }
-      }
-    }
-
-    // Visual feedback AFTER audio — don't let React re-render delay the trigger
+    // Visual feedback AFTER audio
     setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
-
-    // Fade out velocity indicator — clear any pending timer for this pad first
     if (velocityTimersRef.current[padId]) {
       clearTimeout(velocityTimersRef.current[padId]);
     }
@@ -355,72 +83,12 @@ export const PadGrid: React.FC<PadGridProps> = ({
       setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
       delete velocityTimersRef.current[padId];
     }, 200);
-  }, [currentProgram, setFxPadActive]);
+  }, [hookTriggerPad]);
 
+  // ── Pad release wrapper ──
   const handlePadRelease = useCallback((padId: number) => {
-    if (!heldPadsRef.current.has(padId)) return;
-    heldPadsRef.current.delete(padId);
-
-    // Stop note repeat
-    noteRepeatRef.current?.stopRepeat(padId);
-
-    if (currentProgram && engineRef.current) {
-      const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad) {
-        // Disengage DJ FX on release
-        if (pad.djFxAction) {
-          DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
-          setFxPadActive(padId, false);
-        }
-        if (pad.playMode === 'sustain') {
-          // Release sample voice
-          engineRef.current.stopPad(padId, pad.release / 1000);
-          
-          // Release synth voice
-          if (pad.synthConfig || pad.instrumentId != null) {
-            try {
-              let instId: number;
-              let config: any;
-              
-              if (pad.synthConfig) {
-                instId = PAD_INSTRUMENT_BASE + pad.id;
-                config = { ...pad.synthConfig, id: instId };
-              } else {
-                instId = pad.instrumentId!;
-                config = useInstrumentStore.getState().getInstrument(instId);
-              }
-              
-              if (config) {
-                const note = pad.instrumentNote || 'C3';
-                getToneEngine().triggerNoteRelease(instId, note, 0, config);
-              }
-            } catch { /* ignore release errors */ }
-          }
-        }
-      }
-    }
-  }, [currentProgram, setFxPadActive]);
-
-  // MIDI pad handler: route hardware pad notes (36-43) to the first 8 pads of current bank
-  useEffect(() => {
-    const manager = getMIDIManager();
-    const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
-
-    const handler = (message: MIDIMessage) => {
-      if (message.note === undefined || message.note < 36 || message.note > 43) return;
-      const padIndex = message.note - 36; // 0-7
-      const padId = bankOffset + padIndex + 1; // 1-based pad IDs
-
-      if (message.type === 'noteOn' && message.velocity) {
-        handlePadTrigger(padId, message.velocity);
-      } else if (message.type === 'noteOff' || (message.type === 'noteOn' && message.velocity === 0)) {
-        handlePadRelease(padId);
-      }
-    };
-
-    manager.addMessageHandler(handler);
-    return () => manager.removeMessageHandler(handler);
-  }, [currentBank, handlePadTrigger, handlePadRelease]);
+    hookReleasePad(padId);
+  }, [hookReleasePad]);
 
   // Get pads for current bank (memoized for performance)
   const bankPads = useMemo(() => {
@@ -442,7 +110,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
   // Keyboard navigation (arrow keys) - bank-aware
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't handle if focus is on input element
       const target = event.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
@@ -452,7 +119,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
         return;
       }
 
-      // Calculate bank-aware bounds
       const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
       const bankStart = bankOffset + 1;
       const bankEnd = bankOffset + 16;
@@ -478,14 +144,12 @@ export const PadGrid: React.FC<PadGridProps> = ({
           break;
         case 'Enter':
         case ' ':
-          // Only trigger if not already held (prevent key repeat spam)
           if (!event.repeat) {
             event.preventDefault();
             handlePadTrigger(focusedPadId, 100);
           }
           break;
         case 'Tab':
-          // Don't prevent default for Tab - let it navigate normally
           if (event.shiftKey) {
             newFocusedId = focusedPadId > bankStart ? focusedPadId - 1 : bankEnd;
           } else {
@@ -498,7 +162,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
       if (newFocusedId !== focusedPadId) {
         setFocusedPadId(newFocusedId);
-        // Announce to screen readers
         const pad = currentProgram?.pads.find(p => p.id === newFocusedId);
         if (pad) {
           let liveRegion = document.getElementById('pad-navigation-announcer');
@@ -517,7 +180,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      // Release pad on Enter/Space keyup (for sustain mode and DJ FX)
       if (event.key === 'Enter' || event.key === ' ') {
         const target = event.target as HTMLElement;
         if (
@@ -577,7 +239,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
       onPadSelect(id);
       onEmptyPadClick?.(id);
     },
-  }), [onPadSelect, onEmptyPadClick]);
+  }), [onPadSelect, onEmptyPadClick, engineRef]);
 
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 

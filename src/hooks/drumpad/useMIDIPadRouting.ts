@@ -1,12 +1,18 @@
 /**
- * useMIDIPadRouting — Global MIDI pad → DrumPad routing hook.
+ * useMIDIPadRouting — Full-featured MIDI pad → DrumPad routing.
  *
- * Maps MIDI notes 36-43 (MPK Mini pads 1-8) to the first 8 pads of the
- * current drum pad bank. Active when the view is DJ or VJ (DrumPad view
- * has its own richer handler inside PadGrid).
+ * Uses a module-level singleton DrumPadEngine so the same engine is shared
+ * regardless of how many call sites mount the hook (App.tsx for global MIDI
+ * routing + PadGrid for UI-driven triggering).
  *
- * Creates its own DrumPadEngine instance so pads play even when no pad
- * panel/grid component is mounted.
+ * Features:
+ *   - Sample playback via DrumPadEngine
+ *   - Synth triggering via ToneEngine (with oneshot auto-release)
+ *   - DJ FX actions with beat quantization
+ *   - Scratch actions
+ *   - Note repeat
+ *   - Velocity curves, mute groups, master level, bus levels sync
+ *   - MIDI notes 36-43 → first 8 pads of current bank (drumpad/dj/vj views)
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -14,61 +20,223 @@ import { getMIDIManager } from '../../midi/MIDIManager';
 import type { MIDIMessage } from '../../midi/types';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import { useTransportStore } from '../../stores/useTransportStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
+import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
+import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
-import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
+import { applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
+import type { ScratchActionId } from '../../types/drumpad';
+import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
+import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
+import {
+  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
+  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
+  djScratchUzi, djScratchTwiddle, djScratch8Crab, djScratch3Flare,
+  djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
+  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
+} from '../../engine/keyboard/commands/djScratch';
+
+/* ── Scratch action lookup ── */
+const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => boolean> = {
+  scratch_baby: djScratchBaby, scratch_trans: djScratchTrans,
+  scratch_flare: djScratchFlare, scratch_hydro: djScratchHydro,
+  scratch_crab: djScratchCrab, scratch_orbit: djScratchOrbit,
+  scratch_chirp: djScratchChirp, scratch_stab: djScratchStab,
+  scratch_scribble: djScratchScrbl, scratch_tear: djScratchTear,
+  scratch_uzi: djScratchUzi, scratch_twiddle: djScratchTwiddle,
+  scratch_8crab: djScratch8Crab, scratch_3flare: djScratch3Flare,
+  scratch_laser: djScratchLaser, scratch_phaser: djScratchPhaser,
+  scratch_tweak: djScratchTweak, scratch_drag: djScratchDrag,
+  scratch_vibrato: djScratchVibrato, scratch_stop: djScratchStop,
+  fader_lfo_off: djFaderLFOOff, fader_lfo_1_4: djFaderLFO14,
+  fader_lfo_1_8: djFaderLFO18, fader_lfo_1_16: djFaderLFO116,
+  fader_lfo_1_32: djFaderLFO132,
+};
 
 const MIDI_PAD_LO = 36;
 const MIDI_PAD_HI = 43;
+const PAD_VIEWS = new Set(['drumpad', 'dj', 'vj']);
+
+/* ── Module-level singleton engine ── */
+let _engine: DrumPadEngine | null = null;
+let _noteRepeat: NoteRepeatEngine | null = null;
+let _refCount = 0;
+const _heldPads = new Set<number>();
+const _pendingReleases = new Map<number, ReturnType<typeof setTimeout>>();
+
+function getOrCreateEngine(): DrumPadEngine {
+  if (!_engine) {
+    const ctx = getAudioContext();
+    _engine = new DrumPadEngine(ctx);
+    _noteRepeat = new NoteRepeatEngine(_engine);
+    useDrumPadStore.getState().loadFromIndexedDB(ctx);
+  }
+  return _engine;
+}
+
+function disposeEngineIfUnused(): void {
+  if (_refCount <= 0 && _engine) {
+    _noteRepeat?.dispose();
+    _engine.dispose();
+    _pendingReleases.forEach(t => clearTimeout(t));
+    _pendingReleases.clear();
+    _heldPads.clear();
+    _engine = null;
+    _noteRepeat = null;
+  }
+}
+
+/* ── MIDI handler registration (once globally) ── */
+let _midiRegistered = false;
 
 export function useMIDIPadRouting() {
+  const { programs, currentProgramId, currentBank } = useDrumPadStore();
+  const currentProgram = programs.get(currentProgramId);
+  const setFxPadActive = useDrumPadStore(s => s.setFxPadActive);
+
+  const noteRepeatEnabled = useDrumPadStore(s => s.noteRepeatEnabled);
+  const noteRepeatRate = useDrumPadStore(s => s.noteRepeatRate);
+  const bpm = useTransportStore(s => s.bpm);
+  const busLevels = useDrumPadStore(s => s.busLevels);
+
+  // Stable ref to the engine
   const engineRef = useRef<DrumPadEngine | null>(null);
-  const heldPadsRef = useRef<Set<number>>(new Set());
 
-  // Init / dispose engine
+  // ── Lifecycle: acquire / release singleton ──
   useEffect(() => {
-    const ctx = getAudioContext();
-    engineRef.current = new DrumPadEngine(ctx);
-
-    // Load persisted samples from IndexedDB
-    useDrumPadStore.getState().loadFromIndexedDB(ctx);
-
+    _refCount++;
+    engineRef.current = getOrCreateEngine();
     return () => {
-      engineRef.current?.dispose();
+      _refCount--;
+      disposeEngineIfUnused();
       engineRef.current = null;
-      heldPadsRef.current.clear();
     };
   }, []);
 
-  // Sync master level
-  const currentProgram = useDrumPadStore(s => s.programs.get(s.currentProgramId));
+  // ── Sync engine state ──
   useEffect(() => {
-    if (engineRef.current && currentProgram) {
-      engineRef.current.setMasterLevel(currentProgram.masterLevel);
-      engineRef.current.setMuteGroups(currentProgram.pads);
+    if (_engine && currentProgram) {
+      _engine.setMasterLevel(currentProgram.masterLevel);
+    }
+  }, [currentProgram?.masterLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (_engine && currentProgram) {
+      _engine.setMuteGroups(currentProgram.pads);
     }
   }, [currentProgram]);
 
-  const currentBank = useDrumPadStore(s => s.currentBank);
+  useEffect(() => {
+    if (_noteRepeat) _noteRepeat.setEnabled(noteRepeatEnabled);
+  }, [noteRepeatEnabled]);
 
-  // Trigger a pad (sample + synth)
+  useEffect(() => {
+    if (_noteRepeat) _noteRepeat.setRate(noteRepeatRate as NoteRepeatRate);
+  }, [noteRepeatRate]);
+
+  useEffect(() => {
+    if (_noteRepeat) _noteRepeat.setBpm(bpm);
+  }, [bpm]);
+
+  useEffect(() => {
+    if (!_engine || !busLevels) return;
+    for (const [bus, level] of Object.entries(busLevels)) {
+      _engine.setOutputLevel(bus, level);
+    }
+  }, [busLevels]);
+
+  // ── Release all held pads ──
+  const releaseAllHeld = useCallback(() => {
+    _heldPads.forEach(padId => {
+      _noteRepeat?.stopRepeat(padId);
+      if (currentProgram && _engine) {
+        const pad = currentProgram.pads.find(p => p.id === padId);
+        if (pad) {
+          if (pad.djFxAction) {
+            DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+            setFxPadActive(padId, false);
+          }
+          if (pad.playMode === 'sustain') {
+            _engine.stopPad(padId, pad.release / 1000);
+            if (pad.synthConfig || pad.instrumentId != null) {
+              try {
+                let instId: number;
+                let config: any;
+                if (pad.synthConfig) {
+                  instId = PAD_INSTRUMENT_BASE + pad.id;
+                  config = { ...pad.synthConfig, id: instId };
+                } else {
+                  instId = pad.instrumentId!;
+                  config = useInstrumentStore.getState().getInstrument(instId);
+                }
+                if (config) {
+                  const note = pad.instrumentNote || 'C3';
+                  getToneEngine().triggerNoteRelease(instId, note, 0, config);
+                }
+              } catch { /* ignore */ }
+            }
+          }
+        }
+      }
+    });
+    _heldPads.clear();
+  }, [currentProgram, setFxPadActive]);
+
+  // ── Full-featured pad trigger ──
   const triggerPad = useCallback((padId: number, velocity: number) => {
-    if (!currentProgram || !engineRef.current) return;
+    const ctx = getAudioContext();
+    if (ctx.state === 'closed') return;
+    if (ctx.state === 'suspended') { ctx.resume(); }
+
+    if (!currentProgram || !_engine) return;
     const pad = currentProgram.pads.find(p => p.id === padId);
     if (!pad) return;
 
-    if (pad.sample) {
-      engineRef.current.triggerPad(pad, velocity);
+    const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
+
+    // Scratch actions
+    if (pad.scratchAction) {
+      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
     }
 
-    // Also trigger synth if configured
+    // DJ FX with quantization
+    if (pad.djFxAction) {
+      const shouldQuantize =
+        pad.djFxAction.startsWith('fx_stutter') ||
+        pad.djFxAction.startsWith('fx_dub_echo') ||
+        pad.djFxAction.startsWith('fx_tape_echo') ||
+        pad.djFxAction.startsWith('fx_ping_pong') ||
+        pad.djFxAction === 'fx_tape_stop' ||
+        pad.djFxAction === 'fx_vinyl_brake';
+
+      const engageFx = () => {
+        if (!pad.djFxAction) return;
+        DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
+        setFxPadActive(padId, true);
+        _heldPads.add(padId);
+      };
+
+      if (shouldQuantize && getQuantizeMode() !== 'off') {
+        quantizeAction('A', engageFx, { allowSolo: true, kind: 'play' });
+      } else {
+        engageFx();
+      }
+    }
+
+    // Sample playback
+    if (pad.sample) {
+      _engine.triggerPad(pad, curvedVelocity);
+    }
+
+    // Synth trigger
     if (pad.synthConfig || pad.instrumentId != null) {
       try {
         const engine = getToneEngine();
         const note = pad.instrumentNote || 'C3';
-        const normalizedVel = velocity / 127;
+        const normalizedVel = curvedVelocity / 127;
 
         let instId: number;
         let config: any;
@@ -80,75 +248,111 @@ export function useMIDIPadRouting() {
           config = useInstrumentStore.getState().getInstrument(instId);
           if (!config) return;
         }
+
         engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
 
-        // Auto-release for oneshot
         if (pad.playMode === 'oneshot') {
-          const releaseMs = Math.max(pad.decay, 100);
-          setTimeout(() => {
+          const releaseDelayMs = Math.max(pad.decay, 100);
+          const existing = _pendingReleases.get(instId);
+          if (existing) clearTimeout(existing);
+          const timer = setTimeout(() => {
             try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
-          }, releaseMs);
+            _pendingReleases.delete(instId);
+          }, releaseDelayMs);
+          _pendingReleases.set(instId, timer);
         }
       } catch { /* ignore synth errors */ }
     }
 
     if (pad.playMode === 'sustain') {
-      heldPadsRef.current.add(padId);
+      _heldPads.add(padId);
     }
-  }, [currentProgram]);
 
-  // Release a pad
+    // Note repeat
+    if (noteRepeatEnabled && _noteRepeat) {
+      _noteRepeat.startRepeat(pad, velocity);
+      _heldPads.add(padId);
+    }
+  }, [currentProgram, setFxPadActive, noteRepeatEnabled]);
+
+  // ── Full-featured pad release ──
   const releasePad = useCallback((padId: number) => {
-    if (!heldPadsRef.current.has(padId)) return;
-    heldPadsRef.current.delete(padId);
+    if (!_heldPads.has(padId)) return;
+    _heldPads.delete(padId);
 
-    if (!currentProgram || !engineRef.current) return;
+    _noteRepeat?.stopRepeat(padId);
+
+    if (!currentProgram || !_engine) return;
     const pad = currentProgram.pads.find(p => p.id === padId);
-    if (!pad || pad.playMode !== 'sustain') return;
+    if (!pad) return;
 
-    engineRef.current.stopPad(padId, pad.release / 1000);
-
-    if (pad.synthConfig || pad.instrumentId != null) {
-      try {
-        let instId: number;
-        let config: any;
-        if (pad.synthConfig) {
-          instId = PAD_INSTRUMENT_BASE + pad.id;
-          config = { ...pad.synthConfig, id: instId };
-        } else {
-          instId = pad.instrumentId!;
-          config = useInstrumentStore.getState().getInstrument(instId);
-        }
-        if (config) {
-          const note = pad.instrumentNote || 'C3';
-          getToneEngine().triggerNoteRelease(instId, note, 0, config);
-        }
-      } catch { /* ignore */ }
+    if (pad.djFxAction) {
+      DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+      setFxPadActive(padId, false);
     }
-  }, [currentProgram]);
 
-  // Register MIDI handler — only active in DJ and VJ views
+    if (pad.playMode === 'sustain') {
+      _engine.stopPad(padId, pad.release / 1000);
+
+      if (pad.synthConfig || pad.instrumentId != null) {
+        try {
+          let instId: number;
+          let config: any;
+          if (pad.synthConfig) {
+            instId = PAD_INSTRUMENT_BASE + pad.id;
+            config = { ...pad.synthConfig, id: instId };
+          } else {
+            instId = pad.instrumentId!;
+            config = useInstrumentStore.getState().getInstrument(instId);
+          }
+          if (config) {
+            const note = pad.instrumentNote || 'C3';
+            getToneEngine().triggerNoteRelease(instId, note, 0, config);
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  }, [currentProgram, setFxPadActive]);
+
+  // ── MIDI handler (register once globally, uses latest callbacks via refs) ──
+  const triggerRef = useRef(triggerPad);
+  const releaseRef = useRef(releasePad);
+  triggerRef.current = triggerPad;
+  releaseRef.current = releasePad;
+
+  const currentBankRef = useRef(currentBank);
+  currentBankRef.current = currentBank;
+
   useEffect(() => {
+    if (_midiRegistered) return;
+    _midiRegistered = true;
+
     const manager = getMIDIManager();
-    const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
 
     const handler = (message: MIDIMessage) => {
-      // Only handle pad notes in DJ / VJ views
       const view = useUIStore.getState().activeView;
-      if (view !== 'dj' && view !== 'vj') return;
+      if (!PAD_VIEWS.has(view)) return;
       if (message.note === undefined || message.note < MIDI_PAD_LO || message.note > MIDI_PAD_HI) return;
 
-      const padIndex = message.note - MIDI_PAD_LO; // 0-7
-      const padId = bankOffset + padIndex + 1;      // 1-based
+      const bank = currentBankRef.current;
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[bank];
+      const padIndex = message.note - MIDI_PAD_LO;
+      const padId = bankOffset + padIndex + 1;
 
       if (message.type === 'noteOn' && message.velocity) {
-        triggerPad(padId, message.velocity);
+        triggerRef.current(padId, message.velocity);
       } else if (message.type === 'noteOff' || (message.type === 'noteOn' && message.velocity === 0)) {
-        releasePad(padId);
+        releaseRef.current(padId);
       }
     };
 
     manager.addMessageHandler(handler);
-    return () => manager.removeMessageHandler(handler);
-  }, [currentBank, triggerPad, releasePad]);
+
+    return () => {
+      manager.removeMessageHandler(handler);
+      _midiRegistered = false;
+    };
+  }, []); // Only register once — uses refs for latest state
+
+  return { triggerPad, releasePad, releaseAllHeld, engineRef };
 }
