@@ -110,23 +110,7 @@ async function trackerStop(): Promise<void> {
   useTransportStore.getState().stop();
 }
 
-async function loadDJTrack(deckId: 'A' | 'B', filename: string): Promise<void> {
-  try {
-    const resp = await fetch(`/data/songs/exports/${filename}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const buf = await resp.arrayBuffer();
-    console.log(`[Tour] DJ track ${filename}: ${buf.byteLength} bytes`);
 
-    const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
-    const engine = getDJEngine();
-
-    const result = await loadUADEToDeck(engine, deckId, buf, filename, true);
-    console.log(`[Tour] DJ track ${filename} loaded: cached=${result.cached}, duration=${result.duration}`);
-  } catch (err) {
-    console.warn(`[Tour] Failed to load DJ track ${filename}:`, err);
-  }
-}
 
 async function djPlay(deckId: 'A' | 'B'): Promise<void> {
   const { togglePlay } = await import('@/engine/dj/DJActions');
@@ -880,31 +864,13 @@ export const TOUR_SCRIPT: TourStep[] = [
       };
 
       useTrackerStore.getState().loadPatterns([pattern as any]);
+      useTrackerStore.getState().setPatternOrder([0]);
       useTransportStore.getState().setBPM(138);
       useTransportStore.getState().setSpeed(6);
       useEditorStore.getState().setColumnVisibility({ flag1: true, flag2: true });
 
       // Re-select the 303 so octave goes to 2
       useInstrumentStore.getState().setCurrentInstrument(acid303Id);
-
-      // Directly load the song into the replayer so playback works without
-      // waiting for the React usePatternPlayback effect to fire
-      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      const replayer = getTrackerReplayer();
-      const allInstruments = useInstrumentStore.getState().instruments;
-      replayer.loadSong({
-        name: 'Acid Demo',
-        format: 'XM',
-        patterns: [pattern as any],
-        instruments: allInstruments,
-        songPositions: [0],
-        songLength: 1,
-        restartPosition: 0,
-        numChannels: 3,
-        initialSpeed: 6,
-        initialBPM: 138,
-        linearPeriods: true,
-      });
     },
     postDelay: 1500,
   },
@@ -912,19 +878,23 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-play',
     narration: 'Four on the floor kick, hi-hats, and the 303. Let it rip.',
     action: async () => {
-      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      const replayer = getTrackerReplayer();
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      // Set transport playing so the UI reflects playback state
-      useTransportStore.getState().play();
-      // Directly start the replayer
-      await replayer.play();
+      await trackerPlay();
     },
     postDelay: 4000,
   },
   {
+    id: 'acid-editor-open',
+    narration: 'Now watch what happens when I start turning the knobs.',
+    action: async () => {
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
+      if (inst) await openInstrumentEditor(inst.id);
+    },
+    postDelay: 1500,
+  },
+  {
     id: 'acid-tweak',
-    narration: 'Now watch what happens when I start turning the knobs. Cutoff. Resonance. Envelope mod. This is what makes the 303 scream.',
+    narration: 'Cutoff. Resonance. Envelope mod. This is what makes the 303 scream.',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
 
@@ -994,11 +964,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-stop',
     narration: 'That is the sound of acid house. Born in Chicago, 1987.',
     action: async () => {
-      // Stop replayer directly + update transport state
-      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      getTrackerReplayer().stop();
-      const { useTransportStore } = await import('@/stores/useTransportStore');
-      useTransportStore.getState().stop();
+      await trackerStop();
+      await closeModals();
       // Reset 303 to defaults
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
@@ -1277,10 +1244,10 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-load-a',
-    narration: 'Loading a track onto deck A.',
-    action: () => loadDJTrack('A', 'analogue_vibes.mod'),
+    narration: 'Searching Modland for Analog Vibes by Jesper Kyd. Loading into deck A.',
+    action: () => searchAndLoadModland('jesper kyd analogue', 'A'),
     spotlight: '[data-dj-deck-drop]',
-    postDelay: 1000,
+    postDelay: 2000,
   },
   {
     id: 'dj-play-a',
@@ -1290,9 +1257,9 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-load-b',
-    narration: 'Loading deck B.',
-    action: () => loadDJTrack('B', 'anthrox_intro.mod'),
-    postDelay: 1000,
+    narration: 'Searching Modland for Anthrox Intro by Walkman. Loading deck B.',
+    action: () => searchAndLoadModland('walkman anthrox', 'B'),
+    postDelay: 2000,
   },
   {
     id: 'dj-play-b',
