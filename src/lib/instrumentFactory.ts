@@ -27,6 +27,7 @@ export function createDefaultTB303Instrument(): InstrumentConfig {
     type: 'synth',
     synthType: 'TB303',
     tb303: { ...DEFAULT_TB303 } as TB303Config,
+    defaultOctave: 2, // Real 303 is a bass synth — C2-C4 range
     effects: [],
     volume: -6,
     pan: 0,
