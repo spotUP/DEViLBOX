@@ -420,12 +420,14 @@ export const DJVocoderControl: React.FC = () => {
                 onChange={handleTuneKeyChange}
                 options={KEY_NAMES.map((name, i) => ({ value: String(i), label: name }))}
                 className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-pink-400 w-14"
+                zIndex={99992}
               />
               <CustomSelect
                 value={tuneScale}
                 onChange={handleTuneScaleChange}
                 options={SCALE_OPTIONS.map((s) => ({ value: s, label: s }))}
                 className="px-1.5 py-0.5 text-[10px] rounded border border-dark-border bg-dark-bg text-pink-400 flex-1"
+                zIndex={99992}
               />
             </div>
           )}

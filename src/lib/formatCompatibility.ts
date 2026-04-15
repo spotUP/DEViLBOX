@@ -224,6 +224,11 @@ export function restoreFormatChecks(): void {
   if (_suppressDepth > 0) _suppressDepth--;
 }
 
+/** Check if format violation dialogs are currently suppressed. */
+export function isFormatChecksSuppressed(): boolean {
+  return _suppressDepth > 0;
+}
+
 /** Reset all violation confirmations (call on song load) */
 export function resetFormatViolations(): void {
   _confirmedViolations.clear();
