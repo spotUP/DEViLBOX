@@ -66,6 +66,12 @@ export const EQSlider: React.FC<EQSliderProps> = ({
     onChangeRef.current(0);
   }, []);
 
+  // Right-click to reset to 0
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    onChangeRef.current(0);
+  }, []);
+
   const thumbY = valueToY(value);
   const zeroY = valueToY(0);
   const isPositive = value > 0;
@@ -95,6 +101,7 @@ export const EQSlider: React.FC<EQSliderProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
       >
         {/* Zero line */}
         <div

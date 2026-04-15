@@ -102,6 +102,8 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onContextMenu={(e) => { e.preventDefault(); setVolume(1); }}
+        onDoubleClick={() => setVolume(1)}
       >
         {/* Track groove */}
         <div
