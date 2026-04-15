@@ -51,6 +51,8 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   const { programs, currentProgramId } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
+  const controllerPadCount = useDrumPadStore(s => s.controllerPadCount);
+  const visiblePads = Math.min(controllerPadCount, 16);
 
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
@@ -96,16 +98,16 @@ export const PadGrid: React.FC<PadGridProps> = ({
     return getBankPads(currentProgram.pads, currentBank);
   }, [currentProgram, currentBank]);
 
-  // Arrange pads in 4x4 grid (memoized for performance)
+  // Arrange pads in rows (dynamic based on controller pad count)
   const rows = useMemo(() => {
     if (bankPads.length === 0) return [];
-    return [
-      bankPads.slice(0, 4),
-      bankPads.slice(4, 8),
-      bankPads.slice(8, 12),
-      bankPads.slice(12, 16),
-    ];
-  }, [bankPads]);
+    const pads = bankPads.slice(0, visiblePads);
+    const result: typeof bankPads[] = [];
+    for (let i = 0; i < pads.length; i += gridCols) {
+      result.push(pads.slice(i, i + gridCols));
+    }
+    return result;
+  }, [bankPads, visiblePads, gridCols]);
 
   // Keyboard navigation (arrow keys) - bank-aware
   useEffect(() => {
@@ -121,7 +123,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
       const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
       const bankStart = bankOffset + 1;
-      const bankEnd = bankOffset + 16;
+      const bankEnd = bankOffset + visiblePads;
 
       let newFocusedId = focusedPadId;
 
@@ -136,11 +138,15 @@ export const PadGrid: React.FC<PadGridProps> = ({
           break;
         case 'ArrowUp':
           event.preventDefault();
-          newFocusedId = focusedPadId > bankStart + 3 ? focusedPadId - 4 : focusedPadId + 12;
+          newFocusedId = focusedPadId > bankStart + (gridCols - 1)
+            ? focusedPadId - gridCols
+            : focusedPadId + (visiblePads - gridCols);
           break;
         case 'ArrowDown':
           event.preventDefault();
-          newFocusedId = focusedPadId <= bankEnd - 4 ? focusedPadId + 4 : focusedPadId - 12;
+          newFocusedId = focusedPadId <= bankEnd - gridCols
+            ? focusedPadId + gridCols
+            : focusedPadId - (visiblePads - gridCols);
           break;
         case 'Enter':
         case ' ':
@@ -200,7 +206,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [focusedPadId, currentProgram, currentBank, handlePadTrigger, handlePadRelease]);
+  }, [focusedPadId, currentProgram, currentBank, visiblePads, gridCols, handlePadTrigger, handlePadRelease]);
 
   if (!currentProgram) {
     return (
@@ -244,7 +250,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 
   const bankButtons: PadBank[] = ['A', 'B', 'C', 'D'];
-  const bankLoadedCount = bankPads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
+  const bankLoadedCount = bankPads.slice(0, visiblePads).filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
   const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
 
   return (
@@ -302,7 +308,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
             Import
           </button>
           <div className="text-xs text-text-muted" title={`${totalLoadedCount} samples across all banks`}>
-            {bankLoadedCount}/16 ({totalLoadedCount}/64)
+            {bankLoadedCount}/{visiblePads} ({totalLoadedCount}/64)
           </div>
         </div>
       </div>

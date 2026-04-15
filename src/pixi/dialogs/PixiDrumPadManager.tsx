@@ -88,8 +88,6 @@ const KEY_TO_PAD: Record<string, number> = {
 /* ── Constants ──────────────────────────────────────────────────────────────── */
 
 const PAD_GAP = 6;
-const GRID_COLS = 4;
-const GRID_ROWS = 4;
 const MIN_PAD_SIZE = 48;
 const MAX_PAD_SIZE = 90;
 const RIGHT_W = 240;
@@ -310,6 +308,11 @@ export const PixiDrumPadManager: React.FC = () => {
     loadSampleToPad,
     clearPad,
   } = useDrumPadStore();
+
+  const controllerPadCount = useDrumPadStore(s => s.controllerPadCount);
+  const visiblePads = Math.min(controllerPadCount, 16);
+  const gridCols = 4;
+  const gridRows = Math.ceil(visiblePads / gridCols);
 
   const allSamplePacks = useAllSamplePacks();
   const allKitSources = useMemo(() => getAllKitSources(allSamplePacks), [allSamplePacks]);
@@ -772,14 +775,14 @@ export const PixiDrumPadManager: React.FC = () => {
 
       const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
       const bankStart = bankOffset + 1;
-      const bankEnd = bankOffset + 16;
+      const bankEnd = bankOffset + visiblePads;
       let newFocused = focusedPadId;
 
       switch (event.key) {
         case 'ArrowLeft': event.preventDefault(); newFocused = focusedPadId > bankStart ? focusedPadId - 1 : bankEnd; break;
         case 'ArrowRight': event.preventDefault(); newFocused = focusedPadId < bankEnd ? focusedPadId + 1 : bankStart; break;
-        case 'ArrowUp': event.preventDefault(); newFocused = focusedPadId > bankStart + 3 ? focusedPadId - 4 : focusedPadId + 12; break;
-        case 'ArrowDown': event.preventDefault(); newFocused = focusedPadId <= bankEnd - 4 ? focusedPadId + 4 : focusedPadId - 12; break;
+        case 'ArrowUp': event.preventDefault(); newFocused = focusedPadId > bankStart + (gridCols - 1) ? focusedPadId - gridCols : focusedPadId + (visiblePads - gridCols); break;
+        case 'ArrowDown': event.preventDefault(); newFocused = focusedPadId <= bankEnd - gridCols ? focusedPadId + gridCols : focusedPadId - (visiblePads - gridCols); break;
         case 'Enter': case ' ': event.preventDefault(); handlePadTrigger(focusedPadId, 100); break;
         default: break;
       }
@@ -791,7 +794,7 @@ export const PixiDrumPadManager: React.FC = () => {
       const target = event.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
       const idx = KEY_TO_PAD[event.key.toLowerCase()];
-      if (idx === undefined) return;
+      if (idx === undefined || idx >= visiblePads) return;
       const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
       const padId = bankOffset + idx + 1;
       const velocity = event.shiftKey ? 100 : 80;
@@ -800,7 +803,7 @@ export const PixiDrumPadManager: React.FC = () => {
 
     const handleQWERTYUp = (event: KeyboardEvent) => {
       const idx = KEY_TO_PAD[event.key.toLowerCase()];
-      if (idx === undefined) return;
+      if (idx === undefined || idx >= visiblePads) return;
       const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
       handlePadRelease(bankOffset + idx + 1);
     };
@@ -813,7 +816,7 @@ export const PixiDrumPadManager: React.FC = () => {
       window.removeEventListener('keydown', handleQWERTY);
       window.removeEventListener('keyup', handleQWERTYUp);
     };
-  }, [focusedPadId, currentBank, handlePadTrigger, handlePadRelease]);
+  }, [focusedPadId, currentBank, visiblePads, gridCols, handlePadTrigger, handlePadRelease]);
 
   /* ── Derived values ── */
   const masterLevel = localMasterLevel ?? currentProgram?.masterLevel ?? 100;
@@ -838,18 +841,18 @@ export const PixiDrumPadManager: React.FC = () => {
     [],
   );
 
-  const bankLoadedCount = bankPads.filter(p => p.sample !== null).length;
+  const bankLoadedCount = bankPads.slice(0, visiblePads).filter(p => p.sample !== null).length;
   const totalLoadedCount = currentProgram?.pads.filter(p => p.sample !== null).length ?? 0;
 
   /* ── Layout — compute pad size to fill available space ── */
   const rightPanelW = showPadEditor ? EDITOR_W : RIGHT_W;
   const availW = screenW - rightPanelW - LEFT_PADDING - 1; // -1 for border
   const availH = screenH - HEADER_H - BANK_ROW_H - PROGRAM_INFO_H - PAD_INFO_H - SHORTCUTS_H - LEFT_PADDING - 16;
-  const maxFromW = Math.floor((availW - (GRID_COLS - 1) * PAD_GAP) / GRID_COLS);
-  const maxFromH = Math.floor((availH - (GRID_ROWS - 1) * PAD_GAP) / GRID_ROWS);
+  const maxFromW = Math.floor((availW - (gridCols - 1) * PAD_GAP) / gridCols);
+  const maxFromH = Math.floor((availH - (gridRows - 1) * PAD_GAP) / gridRows);
   const padSize = Math.max(MIN_PAD_SIZE, Math.min(MAX_PAD_SIZE, maxFromW, maxFromH));
-  const gridW = GRID_COLS * padSize + (GRID_COLS - 1) * PAD_GAP;
-  const gridH = GRID_ROWS * padSize + (GRID_ROWS - 1) * PAD_GAP;
+  const gridW = gridCols * padSize + (gridCols - 1) * PAD_GAP;
+  const gridH = gridRows * padSize + (gridRows - 1) * PAD_GAP;
 
   return (
     <Div
@@ -864,7 +867,7 @@ export const PixiDrumPadManager: React.FC = () => {
     >
       {/* ── Header bar ── */}
       <PixiViewHeader activeView="drumpad" title="DRUM PADS">
-        <Txt className="text-xs text-text-muted">MPC-style 64-pad drum machine</Txt>
+        <Txt className="text-xs text-text-muted">{`MPC-style ${visiblePads === 16 ? '64' : visiblePads * 4}-pad drum machine`}</Txt>
         <pixiContainer layout={{ flex: 1 }} />
         <PixiButton
           label="MIDI Map"
@@ -902,10 +905,10 @@ export const PixiDrumPadManager: React.FC = () => {
               />
             ))}
             <Div layout={{ flex: 1 }} />
-            <Txt className="text-xs text-text-muted">{`${bankLoadedCount}/16 (${totalLoadedCount}/64)`}</Txt>
+            <Txt className="text-xs text-text-muted">{`${bankLoadedCount}/${visiblePads} (${totalLoadedCount}/64)`}</Txt>
           </Div>
 
-          {/* 4×4 Pad grid */}
+          {/* Pad grid (dynamic rows based on controller) */}
           <Div
             layout={{
               width: gridW,
@@ -915,7 +918,7 @@ export const PixiDrumPadManager: React.FC = () => {
               gap: PAD_GAP,
             }}
           >
-            {bankPads.map((pad) => (
+            {bankPads.slice(0, visiblePads).map((pad) => (
               <PadCell
                 key={pad.id}
                 pad={pad}
