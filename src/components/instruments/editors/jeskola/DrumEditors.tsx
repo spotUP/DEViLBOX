@@ -39,7 +39,7 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
         {/* Pitch Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Pitch" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={startFreq}
               min={1}
@@ -64,7 +64,7 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
         {/* Envelope Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Envelope" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={toneDecTime}
               min={1}
@@ -142,7 +142,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         {/* Pitch Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Pitch" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={startFreq}
               min={1}
@@ -189,7 +189,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         {/* Character Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Character" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={buzz}
               min={0}
@@ -246,7 +246,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         {/* Amplitude Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#eab308" title="Amplitude" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={ampDecSlope}
               min={1}
@@ -362,7 +362,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
         {/* Filter */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Filter" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={cutoff}
               min={0}
@@ -396,7 +396,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
         {/* Envelope & Accent */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#eab308" title="Envelope & Output" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={decay}
               min={0}

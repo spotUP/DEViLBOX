@@ -392,7 +392,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
             {/* Algorithm Controls */}
             <div className="bg-dark-bgSecondary p-3 rounded-lg border border-dark-border">
-              <div className="flex flex-wrap gap-6">
+              <div className="flex flex-wrap gap-3">
                 <Knob
                   label="ALG"
                   value={config.algorithm}
@@ -2130,7 +2130,7 @@ const PSGPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
           <Music size={16} className="text-sky-400" />
           <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Pulse Control</h3>
         </div>
-        <div className="flex flex-wrap gap-6">
+        <div className="flex flex-wrap gap-3">
           <Knob label="DUTY" value={psg.duty} min={0} max={100}
             onChange={(v) => updatePSG({ duty: Math.round(v) })}
             size="md" color="#38bdf8" formatValue={(v) => `${Math.round(v)}%`} />

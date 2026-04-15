@@ -43,7 +43,7 @@ export const JeskolaDelayEditor: React.FC<GeneratorEditorProps> = ({ config, onC
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#3b82f6" title="Time" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={length} min={1} max={65535} onChange={(v) => updateWord(1, 2, Math.round(v))} label="Length" size="lg" color="#3b82f6" formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex justify-center mt-4 gap-1">
@@ -54,7 +54,7 @@ export const JeskolaDelayEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#06b6d4" title="Mix" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col items-center gap-2">
               <span className="text-xs text-text-secondary">Dry Thru</span>
               <button onClick={() => updateParam(0, dryThru === 1 ? 0 : 1)} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${dryThru === 1 ? 'bg-accent-highlight/20 text-accent-highlight ring-1 ring-accent-highlight' : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'}`}>{dryThru === 1 ? 'ON' : 'OFF'}</button>
@@ -108,7 +108,7 @@ export const JeskolaCrossDelayEditor: React.FC<GeneratorEditorProps> = ({ config
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ec4899" title="Stereo Time" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={leftLength} min={1} max={65535} onChange={(v) => updateWord(1, 2, Math.round(v))} label="Left" color="#ec4899" formatValue={(v) => Math.round(v).toString()} />
             <Knob value={rightLength} min={1} max={65535} onChange={(v) => updateWord(3, 4, Math.round(v))} label="Right" color="#a855f7" formatValue={(v) => Math.round(v).toString()} />
           </div>
@@ -120,7 +120,7 @@ export const JeskolaCrossDelayEditor: React.FC<GeneratorEditorProps> = ({ config
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#8b5cf6" title="Mix" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col items-center gap-2">
               <span className="text-xs text-text-secondary">Dry Thru</span>
               <button onClick={() => updateParam(0, dryThru === 1 ? 0 : 1)} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${dryThru === 1 ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500' : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'}`}>{dryThru === 1 ? 'ON' : 'OFF'}</button>
@@ -166,7 +166,7 @@ export const JeskolaFreeverbEditor: React.FC<GeneratorEditorProps> = ({ config, 
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#6366f1" title="Reverb Character" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={revTime} min={0} max={255} onChange={(v) => updateParam(0, Math.round(v))} label="Room Size" color="#6366f1" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={hiDamp} min={0} max={255} onChange={(v) => updateParam(1, Math.round(v))} label="Hi Damp" color="#6366f1" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={preDelay} min={0} max={255} onChange={(v) => updateParam(2, Math.round(v))} label="Pre-Delay" color="#6366f1" formatValue={(v) => `${Math.round(v)}ms`} />
@@ -174,14 +174,14 @@ export const JeskolaFreeverbEditor: React.FC<GeneratorEditorProps> = ({ config, 
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#8b5cf6" title="Filter" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={lowCut} min={0} max={255} onChange={(v) => updateParam(3, Math.round(v))} label="Low Cut" color="#8b5cf6" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={hiCut} min={0} max={255} onChange={(v) => updateParam(4, Math.round(v))} label="Hi Cut" color="#8b5cf6" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
           </div>
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#a855f7" title="Output" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={dryOut} min={0} max={255} onChange={(v) => updateParam(6, Math.round(v))} label="Dry" color="#a855f7" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
             <Knob value={revOut} min={0} max={255} onChange={(v) => updateParam(5, Math.round(v))} label="Reverb" color="#a855f7" formatValue={(v) => `${Math.round(v / 2.55)}%`} />
           </div>
@@ -228,14 +228,14 @@ export const JeskolaDistortionEditor: React.FC<GeneratorEditorProps> = ({ config
       <div className="p-4 space-y-4">
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#22c55e" title="Positive (+)" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={posThreshold} min={0} max={65535} onChange={(v) => updateWord(0, 1, Math.round(v))} label="Threshold" color="#22c55e" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
             <Knob value={posClamp} min={0} max={65535} onChange={(v) => updateWord(2, 3, Math.round(v))} label="Clamp" color="#22c55e" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
           </div>
         </section>
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Negative (-)" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={negThreshold} min={0} max={65535} onChange={(v) => updateWord(4, 5, Math.round(v))} label="Threshold" color="#ef4444" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
             <Knob value={negClamp} min={0} max={65535} onChange={(v) => updateWord(6, 7, Math.round(v))} label="Clamp" color="#ef4444" formatValue={(v) => `${Math.round(v / 655.35)}%`} />
           </div>
