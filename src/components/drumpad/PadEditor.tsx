@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, lazy } from 'react';
-import type { DrumPad, FilterType, OutputBus, ScratchActionId, PlayMode, VelocityCurve } from '../../types/drumpad';
+import type { DrumPad, FilterType, OutputBus, ScratchActionId, VelocityCurve } from '../../types/drumpad';
 import type { DjFxActionId } from '../../engine/drumpad/DjFxActions';
 import { DJ_FX_ACTIONS } from '../../engine/drumpad/DjFxActions';
 import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
@@ -299,14 +299,16 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handlePreview}
+            onMouseDown={handlePreviewDown}
+            onMouseUp={handlePreviewUp}
+            onMouseLeave={handlePreviewUp}
             disabled={!pad.sample && !pad.synthConfig && pad.instrumentId == null}
-            className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+            className={`px-2 py-1 text-[10px] font-mono rounded transition-colors select-none ${
               pad.sample || pad.synthConfig || pad.instrumentId != null
-                ? 'text-accent-primary hover:text-accent-primaryHover bg-dark-surface border border-accent-primary/30'
+                ? 'text-accent-primary hover:text-accent-primaryHover bg-dark-surface border border-accent-primary/30 active:bg-accent-primary/20'
                 : 'text-text-muted/30 bg-dark-surface/50 border border-dark-border/50 cursor-not-allowed'
             }`}
-            title="Preview pad sound"
+            title="Hold to preview pad sound"
           >
             ▶ Preview
           </button>
