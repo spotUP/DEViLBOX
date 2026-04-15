@@ -349,7 +349,7 @@ function renderOscillatorTab(
         </div>
 
         {/* Oscillator Knobs */}
-        <div className="flex flex-wrap gap-6 items-end">
+        <div className="flex flex-wrap gap-3 items-end">
           <Knob
             value={instrument.oscillator.detune || 0}
             min={-100}
@@ -475,7 +475,7 @@ function renderEnvelopeTab(
         </div>
 
         {/* Pitch Envelope Knobs */}
-        <div className={`flex flex-wrap gap-6 items-end ${!instrument.pitchEnvelope?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`flex flex-wrap gap-3 items-end ${!instrument.pitchEnvelope?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
           <Knob
             value={instrument.pitchEnvelope?.amount || 12}
             min={-48}
@@ -644,7 +644,7 @@ function renderOutputTab(
       <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
         <SectionHeader color="#a855f7" title="Output" />
 
-        <div className="flex flex-wrap gap-6 items-end">
+        <div className="flex flex-wrap gap-3 items-end">
           <Knob
             value={instrument.volume}
             min={-60}
@@ -711,7 +711,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#22d3ee" title="FM Synthesis" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.modulationIndex ?? 10} min={0} max={100} onChange={(v) => updateParam('modulationIndex', v)} label="Mod Index" color="#22d3ee" formatValue={(v) => v.toFixed(1)} />
             <Knob value={params.harmonicity ?? 3} min={0.1} max={20} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#22d3ee" formatValue={(v) => v.toFixed(2)} />
             <Knob value={params.modulationEnvAmount ?? 50} min={0} max={100} onChange={(v) => updateParam('modulationEnvAmount', v)} label="Mod Env" color="#22d3ee" formatValue={(v) => `${Math.round(v)}%`} />
@@ -724,7 +724,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#14b8a6" title="AM Synthesis" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.harmonicity ?? 3} min={0.1} max={20} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#14b8a6" formatValue={(v) => v.toFixed(2)} />
             <Knob value={params.modulationDepth ?? 50} min={0} max={100} onChange={(v) => updateParam('modulationDepth', v)} label="Depth" color="#14b8a6" formatValue={(v) => `${Math.round(v)}%`} />
           </div>
@@ -736,7 +736,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f59e0b" title="Pluck Parameters" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.attackNoise ?? 1} min={0} max={10} step={0.1} onChange={(v) => updateParam('attackNoise', v)} label="Attack" color="#f59e0b" formatValue={(v) => v.toFixed(1)} />
             <Knob value={params.dampening ?? 4000} min={100} max={10000} onChange={(v) => updateParam('dampening', v)} label="Dampening" color="#f59e0b" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
             <Knob value={params.resonance ?? 0.9} min={0.1} max={0.999} step={0.001} onChange={(v) => updateParam('resonance', v)} label="Resonance" color="#f59e0b" formatValue={(v) => v.toFixed(3)} />
@@ -749,7 +749,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Membrane Parameters" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.pitchDecay ?? 0.05} min={0.001} max={1} step={0.001} onChange={(v) => updateParam('pitchDecay', v)} label="Pitch Decay" color="#f97316" formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
             <Knob value={params.octaves ?? 10} min={0.5} max={20} step={0.5} onChange={(v) => updateParam('octaves', v)} label="Octaves" color="#f97316" formatValue={(v) => v.toFixed(1)} />
           </div>
@@ -761,7 +761,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Metal Parameters" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.frequency ?? 200} min={50} max={1000} onChange={(v) => updateParam('frequency', v)} label="Frequency" color="#ef4444" formatValue={(v) => `${Math.round(v)}Hz`} />
             <Knob value={params.harmonicity ?? 5.1} min={0.5} max={20} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#ef4444" formatValue={(v) => v.toFixed(1)} />
             <Knob value={params.modulationIndex ?? 32} min={1} max={100} onChange={(v) => updateParam('modulationIndex', v)} label="Mod Index" color="#ef4444" formatValue={(v) => Math.round(v).toString()} />
@@ -794,7 +794,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#8b5cf6" title="Duo Parameters" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.vibratoAmount ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => updateParam('vibratoAmount', v)} label="Vibrato" color="#8b5cf6" formatValue={(v) => `${Math.round(v * 100)}%`} />
             <Knob value={params.vibratoRate ?? 5} min={0.1} max={20} step={0.1} onChange={(v) => updateParam('vibratoRate', v)} label="Vib Rate" color="#8b5cf6" formatValue={(v) => `${v.toFixed(1)}Hz`} />
             <Knob value={params.harmonicity ?? 1.5} min={0.5} max={4} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#8b5cf6" formatValue={(v) => v.toFixed(2)} />
@@ -807,7 +807,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ec4899" title="Mono Parameters" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob value={params.portamento ?? 0} min={0} max={1000} onChange={(v) => updateParam('portamento', v)} label="Glide" color="#ec4899" formatValue={(v) => `${Math.round(v)}ms`} />
           </div>
         </section>
@@ -827,7 +827,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FILTER</p>
-            <div className="flex flex-wrap gap-6 items-end">
+            <div className="flex flex-wrap gap-3 items-end">
               <Knob value={ssConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, cutoff: v } } })} label="Cutoff" color="#f43f5e" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={ssConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, resonance: v } } })} label="Reso" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={ssConfig.filter.envelopeAmount} min={-100} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, envelopeAmount: v } } })} label="Env Amt" color="#f43f5e" bipolar formatValue={(v) => `${Math.round(v)}%`} />
@@ -848,7 +848,7 @@ export function renderSpecialParameters(
               <button key={type} onClick={() => onChange({ polySynth: { ...psConfig, voiceType: type } })} className={`flex-1 px-2 py-1.5 rounded font-bold text-xs transition-all ${psConfig.voiceType === type ? 'bg-accent-highlight/20 border border-accent-highlight text-accent-highlight' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary hover:border-dark-borderLight'}`}>{type}</button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-6 items-end mb-3">
+          <div className="flex flex-wrap gap-3 items-end mb-3">
             <Knob value={psConfig.voiceCount} min={1} max={16} onChange={(v) => onChange({ polySynth: { ...psConfig, voiceCount: Math.round(v) } })} label="Voices" color="#06b6d4" formatValue={(v) => Math.round(v).toString()} />
             <Knob value={psConfig.portamento} min={0} max={1000} onChange={(v) => onChange({ polySynth: { ...psConfig, portamento: v } })} label="Portamento" color="#06b6d4" formatValue={(v) => `${Math.round(v)}ms`} />
           </div>
@@ -1108,7 +1108,7 @@ export function renderSpecialParameters(
               <span className="text-purple-400 font-medium">Filter</span> tabs to shape your sound.
             </p>
           </div>
-          <div className="flex flex-wrap gap-6 items-end mt-4">
+          <div className="flex flex-wrap gap-3 items-end mt-4">
             <Knob value={params.portamento ?? 0} min={0} max={1} step={0.01} onChange={(v) => updateParam('portamento', v)} label="Portamento" color="#a855f7" formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
             <Knob value={params.volume ?? 0} min={-24} max={6} step={0.5} onChange={(v) => updateParam('volume', v)} label="Volume" color="#a855f7" formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`} />
           </div>

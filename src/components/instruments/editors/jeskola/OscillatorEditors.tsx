@@ -37,7 +37,7 @@ export const JeskolaTrilokEditor: React.FC<GeneratorEditorProps> = ({ config, on
         {/* Bass Drum Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Bass Drum" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={bdTone}
               min={0}
@@ -115,7 +115,7 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         {/* Envelope Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#6b7280" title="Envelope" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={attack}
               min={1}
@@ -149,7 +149,7 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         {/* Tone Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#a855f7" title="Tone" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={color}
               min={0}
@@ -241,7 +241,7 @@ export const CyanPhaseDTMFEditor: React.FC<GeneratorEditorProps> = ({ config, on
         {/* Output */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#3b82f6" title="Output" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={length}
               min={1}
@@ -314,7 +314,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
         {/* Frequency Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Frequency Sweep" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={startFreq}
               min={0}
@@ -383,7 +383,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={wavePower}
               min={1}
