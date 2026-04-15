@@ -316,8 +316,8 @@ export function create808Program(): DrumProgram {
     ['Cowbell',    'cowbell',  'C4',  'cowbell'],
     ['Maracas',    'maracas',  'C4',  'maracas'],
     ['Conga Low',  'conga',    'C4',  'congaLow'],
+    ['Conga Mid',  'conga',    'C4',  'congaMid'],
     ['Conga High', 'conga',    'C4',  'congaHigh'],
-    ['Cymbal 2',   'cymbal',   'C4',  'cymbal'],
   ];
 
   kit.forEach(([name, drumType, note, subType], i) => {

@@ -47,6 +47,7 @@ export const SYNTH_QUICK_PRESETS: SynthQuickPreset[] = [
   { label: '808 Cowbell',    machine: '808', drumType: 'cowbell',   subType: 'cowbell',   note: 'C4' },
   { label: '808 Maracas',    machine: '808', drumType: 'maracas',  subType: 'maracas',   note: 'C4' },
   { label: '808 Conga Low',  machine: '808', drumType: 'conga',    subType: 'congaLow',  note: 'C4' },
+  { label: '808 Conga Mid',  machine: '808', drumType: 'conga',    subType: 'congaMid',  note: 'C4' },
   { label: '808 Conga High', machine: '808', drumType: 'conga',    subType: 'congaHigh', note: 'C4' },
   // TR-909 voices
   { label: '909 Kick',       machine: '909', drumType: 'kick',     subType: 'kick',      note: 'C4' },
