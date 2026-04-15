@@ -456,9 +456,21 @@ async function triggerDrumPad(padId: number, note?: string, velocity = 0.85): Pr
 }
 
 
-/** Switch to the 808 program */
+/** Load a fresh factory drum program (replaces any stale persisted state) */
 async function loadDrumProgram(programId: string): Promise<void> {
   const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+  const { create808Program, create909Program, createDJFXProgram } = await import('@/types/drumpad');
+
+  // Replace with fresh factory program so synthConfigs are guaranteed present
+  const factories: Record<string, () => import('@/types/drumpad').DrumProgram> = {
+    'A-01': create808Program,
+    'B-01': create909Program,
+    'C-01': createDJFXProgram,
+  };
+  const factory = factories[programId];
+  if (factory) {
+    useDrumPadStore.getState().saveProgram(factory());
+  }
   useDrumPadStore.getState().loadProgram(programId);
 }
 
