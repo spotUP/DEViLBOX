@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, lazy } from 'react';
-import type { DrumPad, FilterType, OutputBus, ScratchActionId, VelocityCurve } from '../../types/drumpad';
+import type { DrumPad, FilterType, OutputBus, ScratchActionId, VelocityCurve, SampleData } from '../../types/drumpad';
 import type { DjFxActionId } from '../../engine/drumpad/DjFxActions';
 import { DJ_FX_ACTIONS } from '../../engine/drumpad/DjFxActions';
 import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
@@ -59,6 +59,8 @@ function setSpeechTextField(config: InstrumentConfig, synthType: string, text: s
 interface PadEditorProps {
   padId: number;
   onClose?: () => void;
+  initialTab?: TabName;
+  initialShowSampleBrowser?: boolean;
 }
 
 type TabName = 'sound' | 'main' | 'envelope' | 'velo' | 'layers' | 'dj';
@@ -116,17 +118,18 @@ const FX_CATEGORY_LABELS: Record<string, string> = {
   oneshot: 'One-Shot Sounds',
 };
 
-export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
-  const [activeTab, setActiveTab] = useState<TabName>('sound');
+export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialTab = 'sound', initialShowSampleBrowser = false }) => {
+  const [activeTab, setActiveTab] = useState<TabName>(initialTab);
   const [isLearning, setIsLearning] = useState(false);
   const [showLayerBrowser, setShowLayerBrowser] = useState(false);
+  const [showSampleBrowser, setShowSampleBrowser] = useState(initialShowSampleBrowser);
   const learningRef = useRef(false);
 
   const {
     programs, currentProgramId, updatePad, clearPad,
     midiMappings, setMIDIMapping, clearMIDIMapping,
     addLayerToPad, removeLayerFromPad, updateLayerOnPad,
-    clipboardPad, copyPad, pastePad,
+    clipboardPad, copyPad, pastePad, loadSampleToPad,
   } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
   const pad = currentProgram?.pads.find(p => p.id === padId);
@@ -448,6 +451,66 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 </div>
               )}
             </div>
+
+            {/* Sample loader */}
+            <div className="border border-dark-border rounded-lg p-3 space-y-3">
+              <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Sample</div>
+              {pad.sample ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 text-xs text-text-primary font-mono truncate">{pad.sample.name}</div>
+                  <button
+                    onClick={() => setShowSampleBrowser(true)}
+                    className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    onClick={() => handleUpdate({ sample: null as any })}
+                    className="px-2 py-1 text-[10px] font-mono text-red-400 hover:text-red-300 bg-dark-surface border border-dark-border rounded"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowSampleBrowser(true)}
+                    className="flex-1 px-3 py-2 text-xs font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
+                  >
+                    Browse Sample Packs...
+                  </button>
+                  <label className="px-3 py-2 text-xs font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors cursor-pointer">
+                    Upload File...
+                    <input type="file" accept="audio/*" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const arrayBuf = await file.arrayBuffer();
+                      const audioBuffer = await getDevilboxAudioContext().decodeAudioData(arrayBuf);
+                      const sample: SampleData = {
+                        id: `upload-${Date.now()}`,
+                        name: file.name.replace(/\.[^.]+$/, ''),
+                        audioBuffer,
+                        duration: audioBuffer.duration,
+                        sampleRate: audioBuffer.sampleRate,
+                      };
+                      loadSampleToPad(padId, sample);
+                      e.target.value = '';
+                    }} />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {showSampleBrowser && (
+              <SamplePackBrowser
+                mode="drumpad"
+                onSelectSample={(sample) => {
+                  loadSampleToPad(padId, sample);
+                  setShowSampleBrowser(false);
+                }}
+                onClose={() => setShowSampleBrowser(false)}
+              />
+            )}
 
             {/* Embed the real synth editor — same UI as the instrument editor, but isolated to this pad */}
             {pad.synthConfig && (
