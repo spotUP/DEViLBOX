@@ -76,30 +76,13 @@ async function loadDJTrack(deckId: 'A' | 'B', filename: string): Promise<void> {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const buf = await resp.arrayBuffer();
 
-    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
-    const { useDJStore } = await import('@/stores/useDJStore');
+    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
+    const engine = getDJEngine();
 
-    const blob = new File([buf], filename, { type: 'application/octet-stream' });
-    const song = await parseModuleToSong(blob);
-    const bpmResult = detectBPM(song);
-
-    useDJStore.getState().setDeckState(deckId, {
-      fileName: filename,
-      trackName: song.name || filename,
-      detectedBPM: bpmResult.bpm,
-      effectiveBPM: bpmResult.bpm,
-      analysisState: 'rendering',
-      isPlaying: false,
-    });
-
-    const result = await getDJPipeline().loadOrEnqueue(buf, filename, deckId, 'high');
-    await getDJEngine().loadAudioToDeck(
-      deckId, result.wavData, filename,
-      song.name || filename, result.analysis?.bpm || bpmResult.bpm, song
-    );
+    // Use the standard UADE pre-render path — handles caching, UADE rendering,
+    // beat detection, and proper audio loading (same as the DJ file browser)
+    await loadUADEToDeck(engine, deckId, buf, filename, true);
   } catch (err) {
     console.warn(`[Tour] Failed to load DJ track ${filename}:`, err);
   }
@@ -360,7 +343,7 @@ async function triggerSpeechPad(padId: number, text: string, voice = 0): Promise
         effects: [],
         volume: 0,
         pan: 0,
-        parameters: { text, voice, rate: 220, pitch: 0.5 },
+        dectalk: { text, voice, rate: 220, pitch: 0.5, volume: 0.8 },
       },
       instrumentNote: 'C4',
     });
@@ -394,30 +377,9 @@ async function searchAndLoadModland(query: string, deckId: 'A' | 'B'): Promise<v
     const buffer = await downloadModlandFile(file.full_path);
     const filename = file.full_path.split('/').pop() || 'download.mod';
 
-    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
-    const { useDJStore } = await import('@/stores/useDJStore');
-
-    const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-    const song = await parseModuleToSong(blob);
-    const bpmResult = detectBPM(song);
-
-    useDJStore.getState().setDeckState(deckId, {
-      fileName: filename,
-      trackName: song.name || filename,
-      detectedBPM: bpmResult.bpm,
-      effectiveBPM: bpmResult.bpm,
-      analysisState: 'rendering',
-      isPlaying: false,
-    });
-
-    const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-    await getDJEngine().loadAudioToDeck(
-      deckId, result.wavData, filename,
-      song.name || filename, result.analysis?.bpm || bpmResult.bpm, song
-    );
+    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
+    await loadUADEToDeck(getDJEngine(), deckId, buffer, filename, true);
   } catch (err) {
     console.warn(`[Tour] Modland search/load failed for "${query}":`, err);
   }
@@ -436,24 +398,9 @@ async function searchAndLoadHVSC(query: string, deckId: 'A' | 'B'): Promise<void
     const buffer = await downloadHVSCFile(entry.path);
     const filename = entry.path.split('/').pop() || 'download.sid';
 
-    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { useDJStore } = await import('@/stores/useDJStore');
-
-    useDJStore.getState().setDeckState(deckId, {
-      fileName: filename,
-      trackName: entry.name || filename,
-      detectedBPM: 125,
-      effectiveBPM: 125,
-      analysisState: 'rendering',
-      isPlaying: false,
-    });
-
-    const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
-    await getDJEngine().loadAudioToDeck(
-      deckId, result.wavData, filename,
-      entry.name || filename, result.analysis?.bpm || 125
-    );
+    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
+    await loadUADEToDeck(getDJEngine(), deckId, buffer, filename, true);
   } catch (err) {
     console.warn(`[Tour] HVSC search/load failed for "${query}":`, err);
   }
@@ -863,9 +810,10 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'drumpad-speech-setup',
     narration: 'Now watch this. I can put a speech synth on a pad.',
     action: async () => {
-      // Switch back to an editable kit and set up DECtalk on pad 1
-      await loadDrumProgram('D-01'); // Empty Kit
-      await triggerSpeechPad(49, 'DEViLBOX is alive. I am a drum pad now.', 0);
+      // Switch back to 808 kit so we don't conflict with DJ FX actions
+      await loadDrumProgram('A-01');
+      await setDrumBank('A');
+      await triggerSpeechPad(13, 'devil box is alive. I am a drum pad now.', 0);
     },
     spotlight: '[data-pad-id]',
     postDelay: 4000,
@@ -874,8 +822,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'drumpad-speech-demo2',
     narration: '',
     action: async () => {
-      // Trigger same pad at different pitches
-      await triggerSpeechPad(50, 'Hello from Betty.', 1);
+      await triggerSpeechPad(14, 'Hello from Betty.', 1);
     },
     spotlight: '[data-pad-id]',
     postDelay: 3500,
