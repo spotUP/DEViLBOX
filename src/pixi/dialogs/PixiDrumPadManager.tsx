@@ -781,8 +781,8 @@ export const PixiDrumPadManager: React.FC = () => {
       switch (event.key) {
         case 'ArrowLeft': event.preventDefault(); newFocused = focusedPadId > bankStart ? focusedPadId - 1 : bankEnd; break;
         case 'ArrowRight': event.preventDefault(); newFocused = focusedPadId < bankEnd ? focusedPadId + 1 : bankStart; break;
-        case 'ArrowUp': event.preventDefault(); newFocused = focusedPadId > bankStart + (gridCols - 1) ? focusedPadId - gridCols : focusedPadId + (visiblePads - gridCols); break;
-        case 'ArrowDown': event.preventDefault(); newFocused = focusedPadId <= bankEnd - gridCols ? focusedPadId + gridCols : focusedPadId - (visiblePads - gridCols); break;
+        case 'ArrowUp': event.preventDefault(); newFocused = focusedPadId <= bankEnd - gridCols ? focusedPadId + gridCols : focusedPadId - (visiblePads - gridCols); break;
+        case 'ArrowDown': event.preventDefault(); newFocused = focusedPadId > bankStart + (gridCols - 1) ? focusedPadId - gridCols : focusedPadId + (visiblePads - gridCols); break;
         case 'Enter': case ' ': event.preventDefault(); handlePadTrigger(focusedPadId, 100); break;
         default: break;
       }
@@ -908,7 +908,7 @@ export const PixiDrumPadManager: React.FC = () => {
             <Txt className="text-xs text-text-muted">{`${bankLoadedCount}/${visiblePads} (${totalLoadedCount}/64)`}</Txt>
           </Div>
 
-          {/* Pad grid (dynamic rows based on controller) */}
+          {/* Pad grid (dynamic rows, bottom-up MPC layout: pad 1 = bottom-left) */}
           <Div
             layout={{
               width: gridW,
@@ -918,7 +918,15 @@ export const PixiDrumPadManager: React.FC = () => {
               gap: PAD_GAP,
             }}
           >
-            {bankPads.slice(0, visiblePads).map((pad) => (
+            {(() => {
+              const pads = bankPads.slice(0, visiblePads);
+              const rows: typeof pads[] = [];
+              for (let i = 0; i < pads.length; i += gridCols) {
+                rows.push(pads.slice(i, i + gridCols));
+              }
+              rows.reverse();
+              return rows.flat();
+            })().map((pad) => (
               <PadCell
                 key={pad.id}
                 pad={pad}
