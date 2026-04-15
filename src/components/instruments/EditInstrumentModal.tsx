@@ -107,7 +107,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
   // Edit mode state
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
-  const [showKeyboard, setShowKeyboard] = useState(true);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
 

@@ -32,7 +32,7 @@ export const InstrumentEditorPopout: React.FC = () => {
   }, []);
 
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
-  const [showKeyboard, setShowKeyboard] = useState(true);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // Navigate instruments
