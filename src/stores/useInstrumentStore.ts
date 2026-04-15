@@ -364,7 +364,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
           // parameters.sampleUrl so the engine doesn't use the old URL instead
           if (updates.sample && (updates.sample as Record<string, unknown>).url) {
             const params = instrument.parameters as Record<string, unknown> | undefined;
-            console.log(`[InstrumentStore] sample.url updated for id=${id}: newUrl=${String((updates.sample as Record<string, unknown>).url).substring(0, 60)} clearingSampleUrl=${!!params?.sampleUrl} finalSampleUrl=${String(instrument.sample?.url).substring(0, 60)}`);
             if (params?.sampleUrl) {
               delete params.sampleUrl;
             }
@@ -805,7 +804,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // Invalidate the cached Tone.js instrument for any sound-affecting changes
       // (only if not handled by real-time update path above)
       if (synthTypeChanging || isPresetLoad || soundParamsChanging) {
-        console.log(`[InstrumentStore] Sound params changed for id=${id} synthType=${get().instruments.find(i => i.id === id)?.synthType} — checking invalidation`);
         // SAFETY: Zynthian/WASM synths that use applyConfig() must NEVER be invalidated
         // for config-only changes — invalidation kills the audio worklet and forces a
         // full WASM rebuild. Only invalidate when synthType actually changes or preset loads.

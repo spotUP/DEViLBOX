@@ -161,7 +161,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const onPersistBuffer = useCallback(
     async (buffer: AudioBuffer, label: string) => {
       const dataUrl = await bufferToDataUrl(buffer);
-      console.log(`[SampleEditor] onPersistBuffer: label="${label}" bufDur=${buffer.duration.toFixed(3)}s dataUrlLen=${dataUrl.length} hasSample=${!!instrument.sample} sampleUrl=${instrument.sample?.url?.substring(0, 60)}...`);
       const updates: Parameters<typeof updateInstrument>[1] = {
         parameters: {
           ...instrument.parameters,
@@ -182,10 +181,12 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       // If instrument.sample?.url exists it takes priority in the engine's
       // sampleUrl resolution, so we must also update it here — otherwise the
       // engine recreates the Sampler with the original (pre-edit) sample.url.
+      // CRITICAL: Clear audioBuffer — ToneEngine's case 'Sampler' checks
+      // config.sample.audioBuffer BEFORE sample.url, so a stale audioBuffer
+      // would cause the engine to play the original unedited sample.
       if (instrument.sample) {
-        updates.sample = { ...instrument.sample, url: dataUrl };
+        updates.sample = { ...instrument.sample, url: dataUrl, audioBuffer: undefined };
       }
-      console.log(`[SampleEditor] onPersistBuffer: updates.sample set=${!!updates.sample} newUrlLen=${dataUrl.length}`);
       updateInstrument(instrument.id, updates);
 
       // Write-back to UADE chip RAM when editing a UADE enhanced-mode sample.
@@ -663,8 +664,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         }
         // If instrument.sample?.url exists it takes priority in sampleUrl derivation,
         // so we must also update it here to ensure the waveform useEffect re-fires.
+        // Clear audioBuffer so the engine uses the new URL, not a stale buffer.
         if (instrument.sample) {
-          updates.sample = { ...instrument.sample, url: dataUrl };
+          updates.sample = { ...instrument.sample, url: dataUrl, audioBuffer: undefined };
         }
         updateInstrument(instrument.id, updates);
         clearSelection();

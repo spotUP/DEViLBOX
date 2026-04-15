@@ -97,7 +97,6 @@ const samplerDescs: SynthDescriptor[] = [
       const params = config.parameters as Record<string, string | number> | undefined;
       const sampleUrl = config.sample?.url || params?.sampleUrl as string | undefined;
       const baseNote = config.sample?.baseNote || 'C3';
-      console.log(`[Sampler.create] id=${config.id} sample.url=${config.sample?.url?.substring(0, 60) ?? 'none'} params.sampleUrl=${(params?.sampleUrl as string)?.substring(0, 60) ?? 'none'} resolved=${sampleUrl?.substring(0, 60) ?? 'none'}`);
 
       if (sampleUrl) {
         const urls: { [note: string]: string } = {};
