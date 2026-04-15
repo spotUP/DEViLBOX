@@ -121,7 +121,7 @@ export class DECtalkSynth implements DevilboxSynth {
       }
     };
     this._sourceNode = source;
-    source.start(time ?? 0);
+    source.start(time ?? this.audioContext.currentTime);
     this._isPlaying = true;
     useSpeechActivityStore.getState().speechStart();
   }
@@ -238,7 +238,7 @@ export class DECtalkSynth implements DevilboxSynth {
       }
     };
     this._sourceNode = source;
-    source.start(time ?? 0);
+    source.start(time ?? this.audioContext.currentTime);
     this._isPlaying = true;
     useSpeechActivityStore.getState().speechStart();
   }

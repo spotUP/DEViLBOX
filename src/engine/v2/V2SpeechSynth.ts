@@ -106,7 +106,7 @@ export class V2SpeechSynth implements DevilboxSynth {
       }
     };
     this._sourceNode = source;
-    source.start(time, offset ?? 0);
+    source.start(time ?? this.audioContext.currentTime, offset ?? 0);
     this._isPlaying = true;
     useSpeechActivityStore.getState().speechStart();
   }
@@ -251,7 +251,10 @@ export class V2SpeechSynth implements DevilboxSynth {
     }
 
     if (!this._buffer) {
-      console.warn('[V2Speech] triggerAttack called before buffer ready');
+      console.log('[V2Speech] triggerAttack: buffer not ready, rendering first...');
+      this._render().then(() => {
+        if (this._buffer) this.triggerAttack(note, undefined, velocity);
+      });
       return;
     }
 
