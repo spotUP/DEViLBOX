@@ -347,6 +347,7 @@ export interface InstrumentConfig {
   effects: EffectConfig[];
   volume: number; // -60 to 0 dB
   pan: number; // -100 to 100
+  defaultOctave?: number; // Per-instrument default octave for note entry (e.g. 2 for bass synths)
   monophonic?: boolean; // If true, force monophonic playback (one voice at a time)
   isLive?: boolean; // If true, bypass lookahead buffer for instant triggering during playback
   lfo?: LFOConfig; // Global LFO for filter/pitch/volume modulation
