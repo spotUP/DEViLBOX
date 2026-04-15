@@ -537,24 +537,32 @@ async function createAutomationCurve(
 ): Promise<void> {
   const { useAutomationStore } = await import('@/stores/useAutomationStore');
   const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const { suppressFormatChecks, restoreFormatChecks } = await import('@/lib/formatCompatibility');
 
   const store = useAutomationStore.getState();
   const trackerState = useTrackerStore.getState();
-  const patternId = `pattern-${trackerState.currentPatternIndex}`;
+  const pattern = trackerState.patterns[trackerState.currentPatternIndex];
+  if (!pattern) return;
+  const patternId = pattern.id;
 
-  // Add curve
-  const curveId = store.addCurve(patternId, channelIndex, parameter);
-  if (!curveId) return;
+  // Suppress format violation dialogs — the tour doesn't click confirm
+  suppressFormatChecks();
+  try {
+    const curveId = store.addCurve(patternId, channelIndex, parameter);
+    if (!curveId) return;
 
-  // Apply a preset shape
-  const preset = store.presets.find(p => p.id === presetId);
-  if (preset) {
-    store.applyPreset(curveId, preset);
+    // Apply a preset shape
+    const preset = store.presets.find(p => p.id === presetId);
+    if (preset) {
+      store.applyPreset(curveId, preset);
+    }
+
+    // Show the automation lane for this channel
+    store.setShowLane(channelIndex, true);
+    store.setActiveParameter(channelIndex, parameter);
+  } finally {
+    restoreFormatChecks();
   }
-
-  // Show the automation lane for this channel
-  store.setShowLane(channelIndex, true);
-  store.setActiveParameter(channelIndex, parameter);
 }
 
 /** Clear all automation curves (cleanup) */
