@@ -148,7 +148,7 @@ export function renderAllSections(
             color="#4a9eff"
           />
         </div>
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+        <div className="grid grid-cols-2 gap-3">
           <Knob
             value={instrument.oscillator.detune || 0} min={-100} max={100}
             onChange={(v) => updateOscillator('detune', v)}
@@ -183,7 +183,7 @@ export function renderAllSections(
             className="w-3.5 h-3.5 rounded bg-dark-bgHover border-dark-borderLight text-orange-500 focus:ring-orange-500 focus:ring-offset-0" />
         </label>
       </div>
-      <div className={`grid gap-3 ${!instrument.pitchEnvelope?.enabled ? 'opacity-40 pointer-events-none' : ''}`} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+      <div className={`grid grid-cols-2 gap-3 ${!instrument.pitchEnvelope?.enabled ? 'opacity-40 pointer-events-none' : ''}`}>
         <Knob value={instrument.pitchEnvelope?.amount || 12} min={-48} max={48}
           onChange={(v) => updatePitchEnvelope('amount', v)}
           label="Amt" color="#f97316" formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}st`} />
@@ -207,7 +207,7 @@ export function renderAllSections(
   smallSections.push(
     <div key="output">
       <SectionHeader color="#a855f7" title="Output" />
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+      <div className="grid grid-cols-2 gap-3">
         <Knob value={instrument.volume} min={-60} max={0}
           onChange={(v) => onChange({ volume: v })}
           label="Volume" unit="dB" color="#a855f7" />
@@ -349,7 +349,7 @@ function renderOscillatorTab(
         </div>
 
         {/* Oscillator Knobs */}
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+        <div className="grid grid-cols-2 gap-3">
           <Knob
             value={instrument.oscillator.detune || 0}
             min={-100}
@@ -475,7 +475,7 @@ function renderEnvelopeTab(
         </div>
 
         {/* Pitch Envelope Knobs */}
-        <div className={`grid gap-3 ${!instrument.pitchEnvelope?.enabled ? 'opacity-50 pointer-events-none' : ''}`} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+        <div className={`grid grid-cols-2 gap-3 ${!instrument.pitchEnvelope?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
           <Knob
             value={instrument.pitchEnvelope?.amount || 12}
             min={-48}
@@ -644,7 +644,7 @@ function renderOutputTab(
       <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
         <SectionHeader color="#a855f7" title="Output" />
 
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+        <div className="grid grid-cols-2 gap-3">
           <Knob
             value={instrument.volume}
             min={-60}
@@ -711,7 +711,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#22d3ee" title="FM Synthesis" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.modulationIndex ?? 10} min={0} max={100} onChange={(v) => updateParam('modulationIndex', v)} label="Mod Index" color="#22d3ee" formatValue={(v) => v.toFixed(1)} />
             <Knob value={params.harmonicity ?? 3} min={0.1} max={20} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#22d3ee" formatValue={(v) => v.toFixed(2)} />
             <Knob value={params.modulationEnvAmount ?? 50} min={0} max={100} onChange={(v) => updateParam('modulationEnvAmount', v)} label="Mod Env" color="#22d3ee" formatValue={(v) => `${Math.round(v)}%`} />
@@ -724,7 +724,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#14b8a6" title="AM Synthesis" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.harmonicity ?? 3} min={0.1} max={20} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#14b8a6" formatValue={(v) => v.toFixed(2)} />
             <Knob value={params.modulationDepth ?? 50} min={0} max={100} onChange={(v) => updateParam('modulationDepth', v)} label="Depth" color="#14b8a6" formatValue={(v) => `${Math.round(v)}%`} />
           </div>
@@ -736,7 +736,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f59e0b" title="Pluck Parameters" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.attackNoise ?? 1} min={0} max={10} step={0.1} onChange={(v) => updateParam('attackNoise', v)} label="Attack" color="#f59e0b" formatValue={(v) => v.toFixed(1)} />
             <Knob value={params.dampening ?? 4000} min={100} max={10000} onChange={(v) => updateParam('dampening', v)} label="Dampening" color="#f59e0b" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
             <Knob value={params.resonance ?? 0.9} min={0.1} max={0.999} step={0.001} onChange={(v) => updateParam('resonance', v)} label="Resonance" color="#f59e0b" formatValue={(v) => v.toFixed(3)} />
@@ -749,7 +749,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Membrane Parameters" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.pitchDecay ?? 0.05} min={0.001} max={1} step={0.001} onChange={(v) => updateParam('pitchDecay', v)} label="Pitch Decay" color="#f97316" formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
             <Knob value={params.octaves ?? 10} min={0.5} max={20} step={0.5} onChange={(v) => updateParam('octaves', v)} label="Octaves" color="#f97316" formatValue={(v) => v.toFixed(1)} />
           </div>
@@ -761,7 +761,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Metal Parameters" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.frequency ?? 200} min={50} max={1000} onChange={(v) => updateParam('frequency', v)} label="Frequency" color="#ef4444" formatValue={(v) => `${Math.round(v)}Hz`} />
             <Knob value={params.harmonicity ?? 5.1} min={0.5} max={20} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#ef4444" formatValue={(v) => v.toFixed(1)} />
             <Knob value={params.modulationIndex ?? 32} min={1} max={100} onChange={(v) => updateParam('modulationIndex', v)} label="Mod Index" color="#ef4444" formatValue={(v) => Math.round(v).toString()} />
@@ -794,7 +794,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#8b5cf6" title="Duo Parameters" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.vibratoAmount ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => updateParam('vibratoAmount', v)} label="Vibrato" color="#8b5cf6" formatValue={(v) => `${Math.round(v * 100)}%`} />
             <Knob value={params.vibratoRate ?? 5} min={0.1} max={20} step={0.1} onChange={(v) => updateParam('vibratoRate', v)} label="Vib Rate" color="#8b5cf6" formatValue={(v) => `${v.toFixed(1)}Hz`} />
             <Knob value={params.harmonicity ?? 1.5} min={0.5} max={4} step={0.1} onChange={(v) => updateParam('harmonicity', v)} label="Harmonicity" color="#8b5cf6" formatValue={(v) => v.toFixed(2)} />
@@ -807,7 +807,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ec4899" title="Mono Parameters" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={params.portamento ?? 0} min={0} max={1000} onChange={(v) => updateParam('portamento', v)} label="Glide" color="#ec4899" formatValue={(v) => `${Math.round(v)}ms`} />
           </div>
         </section>
@@ -819,7 +819,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f43f5e" title="SuperSaw" />
-          <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3 mb-4">
             <Knob value={ssConfig.voices} min={3} max={9} onChange={(v) => onChange({ superSaw: { ...ssConfig, voices: v } })} label="Voices" color="#f43f5e" formatValue={(v) => Math.round(v).toString()} />
             <Knob value={ssConfig.detune} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, detune: v } })} label="Detune" color="#f43f5e" formatValue={(v) => `${Math.round(v)}`} />
             <Knob value={ssConfig.mix} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, mix: v } })} label="Mix" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
@@ -827,7 +827,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FILTER</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={ssConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, cutoff: v } } })} label="Cutoff" color="#f43f5e" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={ssConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, resonance: v } } })} label="Reso" color="#f43f5e" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={ssConfig.filter.envelopeAmount} min={-100} max={100} onChange={(v) => onChange({ superSaw: { ...ssConfig, filter: { ...ssConfig.filter, envelopeAmount: v } } })} label="Env Amt" color="#f43f5e" bipolar formatValue={(v) => `${Math.round(v)}%`} />
@@ -848,7 +848,7 @@ export function renderSpecialParameters(
               <button key={type} onClick={() => onChange({ polySynth: { ...psConfig, voiceType: type } })} className={`flex-1 px-2 py-1.5 rounded font-bold text-xs transition-all ${psConfig.voiceType === type ? 'bg-accent-highlight/20 border border-accent-highlight text-accent-highlight' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary hover:border-dark-borderLight'}`}>{type}</button>
             ))}
           </div>
-          <div className="grid gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <Knob value={psConfig.voiceCount} min={1} max={16} onChange={(v) => onChange({ polySynth: { ...psConfig, voiceCount: Math.round(v) } })} label="Voices" color="#06b6d4" formatValue={(v) => Math.round(v).toString()} />
             <Knob value={psConfig.portamento} min={0} max={1000} onChange={(v) => onChange({ polySynth: { ...psConfig, portamento: v } })} label="Portamento" color="#06b6d4" formatValue={(v) => `${Math.round(v)}ms`} />
           </div>
@@ -920,7 +920,7 @@ export function renderSpecialParameters(
           case 'kick': {
             const kick = dmConfig.kick || DEFAULT_DRUM_MACHINE.kick!;
             return (
-              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+              <div className="grid grid-cols-2 gap-3">
                 <Knob value={kick.pitch} min={30} max={100} onChange={(v) => onChange({ drumMachine: { ...dmConfig, kick: { ...kick, pitch: v } } })} label="Pitch" color="#ef4444" formatValue={(v) => `${Math.round(v)}Hz`} />
                 <Knob value={kick.decay} min={50} max={1000} onChange={(v) => onChange({ drumMachine: { ...dmConfig, kick: { ...kick, decay: v } } })} label="Decay" color="#ef4444" formatValue={(v) => `${Math.round(v)}ms`} />
                 <Knob value={kick.tone} min={0} max={100} onChange={(v) => onChange({ drumMachine: { ...dmConfig, kick: { ...kick, tone: v } } })} label="Tone" color="#ef4444" formatValue={(v) => `${Math.round(v)}%`} />
@@ -931,7 +931,7 @@ export function renderSpecialParameters(
           case 'snare': {
             const snare = dmConfig.snare || DEFAULT_DRUM_MACHINE.snare!;
             return (
-              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+              <div className="grid grid-cols-2 gap-3">
                 <Knob value={snare.pitch} min={100} max={400} onChange={(v) => onChange({ drumMachine: { ...dmConfig, snare: { ...snare, pitch: v } } })} label="Pitch" color="#f97316" formatValue={(v) => `${Math.round(v)}Hz`} />
                 <Knob value={snare.decay} min={50} max={500} onChange={(v) => onChange({ drumMachine: { ...dmConfig, snare: { ...snare, decay: v } } })} label="Decay" color="#f97316" formatValue={(v) => `${Math.round(v)}ms`} />
                 <Knob value={snare.tone} min={0} max={100} onChange={(v) => onChange({ drumMachine: { ...dmConfig, snare: { ...snare, tone: v } } })} label="Tone" color="#f97316" formatValue={(v) => `${Math.round(v)}%`} />
@@ -963,7 +963,7 @@ export function renderSpecialParameters(
               <button key={ch} onClick={() => onChange({ chipSynth: { ...chipConfig, channel: ch } })} className={`flex-1 px-2 py-1 rounded text-xs font-bold uppercase transition-all ${chipConfig.channel === ch ? 'bg-accent-highlight/20 text-accent-highlight ring-1 ring-accent-highlight' : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'}`}>{ch.replace('pulse', 'P')}</button>
             ))}
           </div>
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={chipConfig.bitDepth} min={2} max={16} onChange={(v) => onChange({ chipSynth: { ...chipConfig, bitDepth: Math.round(v) } })} label="Bits" color="#22d3ee" formatValue={(v) => `${Math.round(v)}`} />
             {(chipConfig.channel === 'pulse1' || chipConfig.channel === 'pulse2') && (
               <Knob value={chipConfig.pulse?.duty || 50} min={12.5} max={50} step={12.5} onChange={(v) => onChange({ chipSynth: { ...chipConfig, pulse: { duty: v as 12.5 | 25 | 50 } } })} label="Duty" color="#22d3ee" formatValue={(v) => `${v}%`} />
@@ -1005,7 +1005,7 @@ export function renderSpecialParameters(
           {/* Oscillators */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">OSC 1 / OSC 2</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={wbConfig.osc1.level} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, osc1: { ...wbConfig.osc1, level: v } } })} label="O1 Lv" color="#d946ef" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={wbConfig.osc1.detune} min={-100} max={100} bipolar onChange={(v) => onChange({ wobbleBass: { ...wbConfig, osc1: { ...wbConfig.osc1, detune: v } } })} label="O1 Det" color="#d946ef" formatValue={(v) => `${Math.round(v)}¢`} />
               <Knob value={wbConfig.osc2.level} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, osc2: { ...wbConfig.osc2, level: v } } })} label="O2 Lv" color="#c026d3" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1015,7 +1015,7 @@ export function renderSpecialParameters(
           {/* Sub + Unison */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">SUB / UNISON</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => onChange({ wobbleBass: { ...wbConfig, sub: { ...wbConfig.sub, enabled: !wbConfig.sub.enabled } } })} className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${wbConfig.sub.enabled ? 'bg-fuchsia-500/20 border border-fuchsia-500 text-fuchsia-400' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary'}`}>SUB</button>
               {wbConfig.sub.enabled && (
                 <Knob value={wbConfig.sub.level} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, sub: { ...wbConfig.sub, level: v } } })} label="Sub Lv" color="#e879f9" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1027,7 +1027,7 @@ export function renderSpecialParameters(
           {/* FM */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FM</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => onChange({ wobbleBass: { ...wbConfig, fm: { ...wbConfig.fm, enabled: !wbConfig.fm.enabled } } })} className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${wbConfig.fm.enabled ? 'bg-fuchsia-500/20 border border-fuchsia-500 text-fuchsia-400' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary'}`}>FM</button>
               {wbConfig.fm.enabled && (<>
                 <Knob value={wbConfig.fm.amount} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, fm: { ...wbConfig.fm, amount: v } } })} label="Amount" color="#f0abfc" formatValue={(v) => `${Math.round(v)}`} />
@@ -1039,7 +1039,7 @@ export function renderSpecialParameters(
           {/* Filter */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FILTER</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={wbConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, filter: { ...wbConfig.filter, cutoff: v } } })} label="Cutoff" color="#d946ef" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={wbConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, filter: { ...wbConfig.filter, resonance: v } } })} label="Reso" color="#d946ef" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={wbConfig.filter.drive} min={0} max={100} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, filter: { ...wbConfig.filter, drive: v } } })} label="Drive" color="#d946ef" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1049,7 +1049,7 @@ export function renderSpecialParameters(
           {/* Wobble LFO */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">WOBBLE LFO</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col items-center">
                 <p className="text-[9px] text-text-muted mb-1">Sync</p>
                 <CustomSelect value={wbConfig.wobbleLFO.sync} onChange={(v) => onChange({ wobbleBass: { ...wbConfig, wobbleLFO: { ...wbConfig.wobbleLFO, sync: v as typeof wbConfig.wobbleLFO.sync } } })} className="bg-dark-bgTertiary text-text-primary text-xs px-2 py-1 rounded border border-dark-borderLight" options={syncOptions.map((opt) => ({ value: opt.value, label: opt.label }))} />
@@ -1062,7 +1062,7 @@ export function renderSpecialParameters(
           {/* Distortion */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">DISTORTION</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => onChange({ wobbleBass: { ...wbConfig, distortion: { ...wbConfig.distortion, enabled: !wbConfig.distortion.enabled } } })} className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${wbConfig.distortion.enabled ? 'bg-red-500/20 border border-red-500 text-red-400' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary'}`}>DIST</button>
               {wbConfig.distortion.enabled && (<>
                 <div className="flex gap-1">
@@ -1078,7 +1078,7 @@ export function renderSpecialParameters(
           {/* Formant (Growl) */}
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FORMANT (GROWL)</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => onChange({ wobbleBass: { ...wbConfig, formant: { ...wbConfig.formant, enabled: !wbConfig.formant.enabled } } })} className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${wbConfig.formant.enabled ? 'bg-orange-500/20 border border-orange-500 text-orange-400' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary'}`}>GROWL</button>
               {wbConfig.formant.enabled && (<>
                 <div className="flex gap-1">
@@ -1122,7 +1122,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border space-y-4">
           <SectionHeader color="#e879f9" title="PWM Synthesis" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={pwmConfig.pulseWidth} min={5} max={95} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, pulseWidth: v } })} label="Width" color="#e879f9" formatValue={(v) => `${Math.round(v)}%`} />
             <Knob value={pwmConfig.pwmDepth} min={0} max={100} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, pwmDepth: v } })} label="PWM Depth" color="#e879f9" formatValue={(v) => `${Math.round(v)}%`} />
             <Knob value={pwmConfig.pwmRate} min={0.1} max={20} step={0.1} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, pwmRate: v } })} label="PWM Rate" color="#e879f9" formatValue={(v) => `${v.toFixed(1)}Hz`} />
@@ -1137,14 +1137,14 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">OSCILLATORS</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={pwmConfig.oscillators} min={1} max={3} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, oscillators: Math.round(v) } })} label="Count" color="#d946ef" formatValue={(v) => Math.round(v).toString()} />
               <Knob value={pwmConfig.detune} min={0} max={50} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, detune: v } })} label="Detune" color="#d946ef" formatValue={(v) => `${Math.round(v)}¢`} />
             </div>
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FILTER</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={pwmConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, filter: { ...pwmConfig.filter, cutoff: v } } })} label="Cutoff" color="#c084fc" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={pwmConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, filter: { ...pwmConfig.filter, resonance: v } } })} label="Reso" color="#c084fc" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={pwmConfig.filter.envelopeAmount} min={-100} max={100} bipolar onChange={(v) => onChange({ pwmSynth: { ...pwmConfig, filter: { ...pwmConfig.filter, envelopeAmount: v } } })} label="Env Amt" color="#c084fc" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1163,7 +1163,7 @@ export function renderSpecialParameters(
           <SectionHeader color="#22c55e" title="String Machine" />
           <div>
             <p className="text-xs text-text-muted mb-2">SECTIONS</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={smConfig.sections.violin} min={0} max={100} onChange={(v) => onChange({ stringMachine: { ...smConfig, sections: { ...smConfig.sections, violin: v } } })} label="Violin" color="#4ade80" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={smConfig.sections.viola} min={0} max={100} onChange={(v) => onChange({ stringMachine: { ...smConfig, sections: { ...smConfig.sections, viola: v } } })} label="Viola" color="#22c55e" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={smConfig.sections.cello} min={0} max={100} onChange={(v) => onChange({ stringMachine: { ...smConfig, sections: { ...smConfig.sections, cello: v } } })} label="Cello" color="#16a34a" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1172,7 +1172,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">ENSEMBLE</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={smConfig.ensemble.depth} min={0} max={100} onChange={(v) => onChange({ stringMachine: { ...smConfig, ensemble: { ...smConfig.ensemble, depth: v } } })} label="Depth" color="#34d399" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={smConfig.ensemble.rate} min={0.5} max={6} step={0.1} onChange={(v) => onChange({ stringMachine: { ...smConfig, ensemble: { ...smConfig.ensemble, rate: v } } })} label="Rate" color="#34d399" formatValue={(v) => `${v.toFixed(1)}Hz`} />
               <Knob value={smConfig.ensemble.voices} min={2} max={6} onChange={(v) => onChange({ stringMachine: { ...smConfig, ensemble: { ...smConfig.ensemble, voices: Math.round(v) } } })} label="Voices" color="#34d399" formatValue={(v) => Math.round(v).toString()} />
@@ -1180,7 +1180,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">AMPLITUDE</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={smConfig.attack} min={10} max={2000} onChange={(v) => onChange({ stringMachine: { ...smConfig, attack: v } })} label="Attack" color="#6ee7b7" formatValue={(v) => `${Math.round(v)}ms`} />
               <Knob value={smConfig.release} min={100} max={5000} onChange={(v) => onChange({ stringMachine: { ...smConfig, release: v } })} label="Release" color="#6ee7b7" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
               <Knob value={smConfig.brightness} min={0} max={100} onChange={(v) => onChange({ stringMachine: { ...smConfig, brightness: v } })} label="Bright" color="#6ee7b7" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1218,14 +1218,14 @@ export function renderSpecialParameters(
                 <button key={mode} onClick={() => onChange({ formantSynth: { ...fmtConfig, vowelMorph: { ...fmtConfig.vowelMorph, mode } } })} className={`flex-1 px-2 py-1 rounded text-xs font-bold uppercase transition-all ${fmtConfig.vowelMorph.mode === mode ? 'bg-orange-500/20 text-orange-400' : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'}`}>{mode}</button>
               ))}
             </div>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={fmtConfig.vowelMorph.amount} min={0} max={100} onChange={(v) => onChange({ formantSynth: { ...fmtConfig, vowelMorph: { ...fmtConfig.vowelMorph, amount: v } } })} label="Amount" color="#fb923c" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={fmtConfig.vowelMorph.rate} min={0} max={5} step={0.1} onChange={(v) => onChange({ formantSynth: { ...fmtConfig, vowelMorph: { ...fmtConfig.vowelMorph, rate: v } } })} label="Rate" color="#fb923c" formatValue={(v) => `${v.toFixed(1)}Hz`} />
             </div>
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FORMANTS</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={fmtConfig.formants.f1} min={200} max={1200} onChange={(v) => onChange({ formantSynth: { ...fmtConfig, formants: { ...fmtConfig.formants, f1: v } } })} label="F1" color="#f97316" formatValue={(v) => `${Math.round(v)}Hz`} />
               <Knob value={fmtConfig.formants.f2} min={500} max={3000} onChange={(v) => onChange({ formantSynth: { ...fmtConfig, formants: { ...fmtConfig.formants, f2: v } } })} label="F2" color="#f97316" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={fmtConfig.formants.f3} min={1500} max={4000} onChange={(v) => onChange({ formantSynth: { ...fmtConfig, formants: { ...fmtConfig.formants, f3: v } } })} label="F3" color="#f97316" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
@@ -1244,7 +1244,7 @@ export function renderSpecialParameters(
       return (
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border space-y-4">
           <SectionHeader color="#06b6d4" title="Wavetable" />
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+          <div className="grid grid-cols-2 gap-3">
             <Knob value={wtConfig.morphPosition} min={0} max={100} onChange={(v) => onChange({ wavetable: { ...wtConfig, morphPosition: v } })} label="Morph" color="#06b6d4" formatValue={(v) => `${Math.round(v)}%`} />
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
@@ -1254,7 +1254,7 @@ export function renderSpecialParameters(
                 <button key={src} onClick={() => onChange({ wavetable: { ...wtConfig, morphModSource: src } })} className={`flex-1 px-2 py-1.5 rounded text-xs font-bold uppercase transition-all ${wtConfig.morphModSource === src ? 'bg-accent-highlight/20 border border-accent-highlight text-accent-highlight' : 'bg-dark-bgTertiary border border-dark-borderLight text-text-secondary hover:border-dark-borderLight'}`}>{src}</button>
               ))}
             </div>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={wtConfig.morphModAmount} min={0} max={100} onChange={(v) => onChange({ wavetable: { ...wtConfig, morphModAmount: v } })} label="Mod Amt" color="#22d3ee" formatValue={(v) => `${Math.round(v)}%`} />
               {wtConfig.morphModSource === 'lfo' && (
                 <Knob value={wtConfig.morphLFORate} min={0.1} max={20} step={0.1} onChange={(v) => onChange({ wavetable: { ...wtConfig, morphLFORate: v } })} label="LFO Rate" color="#22d3ee" formatValue={(v) => `${v.toFixed(1)}Hz`} />
@@ -1263,7 +1263,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">UNISON</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={wtConfig.unison.voices} min={1} max={8} onChange={(v) => onChange({ wavetable: { ...wtConfig, unison: { ...wtConfig.unison, voices: Math.round(v) } } })} label="Voices" color="#67e8f9" formatValue={(v) => Math.round(v).toString()} />
               <Knob value={wtConfig.unison.detune} min={0} max={100} onChange={(v) => onChange({ wavetable: { ...wtConfig, unison: { ...wtConfig.unison, detune: v } } })} label="Detune" color="#67e8f9" formatValue={(v) => `${Math.round(v)}¢`} />
               <Knob value={wtConfig.unison.stereoSpread} min={0} max={100} onChange={(v) => onChange({ wavetable: { ...wtConfig, unison: { ...wtConfig.unison, stereoSpread: v } } })} label="Spread" color="#67e8f9" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1271,7 +1271,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FILTER</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={wtConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ wavetable: { ...wtConfig, filter: { ...wtConfig.filter, cutoff: v } } })} label="Cutoff" color="#0891b2" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={wtConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ wavetable: { ...wtConfig, filter: { ...wtConfig.filter, resonance: v } } })} label="Reso" color="#0891b2" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={wtConfig.filter.envelopeAmount} min={-100} max={100} bipolar onChange={(v) => onChange({ wavetable: { ...wtConfig, filter: { ...wtConfig.filter, envelopeAmount: v } } })} label="Env Amt" color="#0891b2" formatValue={(v) => `${Math.round(v)}%`} />
@@ -1289,7 +1289,7 @@ export function renderSpecialParameters(
           <SectionHeader color="#a78bfa" title="Granular Synthesis" />
           <div>
             <p className="text-xs text-text-muted mb-2">GRAIN</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={grConfig.grainSize} min={10} max={500} onChange={(v) => onChange({ granular: { ...grConfig, grainSize: v } })} label="Size" color="#a78bfa" formatValue={(v) => `${Math.round(v)}ms`} />
               <Knob value={grConfig.grainOverlap} min={0} max={100} onChange={(v) => onChange({ granular: { ...grConfig, grainOverlap: v } })} label="Overlap" color="#a78bfa" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={grConfig.density} min={1} max={16} onChange={(v) => onChange({ granular: { ...grConfig, density: Math.round(v) } })} label="Density" color="#a78bfa" formatValue={(v) => Math.round(v).toString()} />
@@ -1298,7 +1298,7 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">PLAYBACK</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={grConfig.scanPosition} min={0} max={100} onChange={(v) => onChange({ granular: { ...grConfig, scanPosition: v } })} label="Position" color="#8b5cf6" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={grConfig.scanSpeed} min={-100} max={100} bipolar onChange={(v) => onChange({ granular: { ...grConfig, scanSpeed: v } })} label="Scan Spd" color="#8b5cf6" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={grConfig.playbackRate} min={0.25} max={4} step={0.01} onChange={(v) => onChange({ granular: { ...grConfig, playbackRate: v } })} label="Speed" color="#8b5cf6" formatValue={(v) => `${v.toFixed(2)}x`} />
@@ -1307,21 +1307,21 @@ export function renderSpecialParameters(
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">RANDOM</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={grConfig.randomPitch} min={0} max={100} onChange={(v) => onChange({ granular: { ...grConfig, randomPitch: v } })} label="Rnd Pitch" color="#7c3aed" formatValue={(v) => `${Math.round(v)}%`} />
               <Knob value={grConfig.randomPosition} min={0} max={100} onChange={(v) => onChange({ granular: { ...grConfig, randomPosition: v } })} label="Rnd Pos" color="#7c3aed" formatValue={(v) => `${Math.round(v)}%`} />
             </div>
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">GRAIN ENVELOPE</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={grConfig.envelope.attack} min={1} max={100} onChange={(v) => onChange({ granular: { ...grConfig, envelope: { ...grConfig.envelope, attack: v } } })} label="Attack" color="#c4b5fd" formatValue={(v) => `${Math.round(v)}ms`} />
               <Knob value={grConfig.envelope.release} min={1} max={100} onChange={(v) => onChange({ granular: { ...grConfig, envelope: { ...grConfig.envelope, release: v } } })} label="Release" color="#c4b5fd" formatValue={(v) => `${Math.round(v)}ms`} />
             </div>
           </div>
           <div className="pt-3 border-t border-dark-borderLight">
             <p className="text-xs text-text-muted mb-2">FILTER</p>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
+            <div className="grid grid-cols-2 gap-3">
               <Knob value={grConfig.filter.cutoff} min={20} max={20000} onChange={(v) => onChange({ granular: { ...grConfig, filter: { ...grConfig.filter, cutoff: v } } })} label="Cutoff" color="#6d28d9" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
               <Knob value={grConfig.filter.resonance} min={0} max={100} onChange={(v) => onChange({ granular: { ...grConfig, filter: { ...grConfig.filter, resonance: v } } })} label="Reso" color="#6d28d9" formatValue={(v) => `${Math.round(v)}%`} />
             </div>
