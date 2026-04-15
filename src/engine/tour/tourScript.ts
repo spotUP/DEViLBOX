@@ -802,6 +802,12 @@ export const TOUR_SCRIPT: TourStep[] = [
       // Stop anything playing
       useTransportStore.getState().stop();
 
+      // Clear format-specific data from previous AHX song and switch to classic editor.
+      // Without this, usePatternPlayback still sees hivelyNative and routes to the
+      // Hively playback engine instead of the XM replayer for our acid pattern.
+      const { useFormatStore } = await import('@/stores/useFormatStore');
+      useFormatStore.getState().applyEditorMode({});
+
       // Create TB-303 instrument (id will be assigned)
       const acid303Id = await createAndSelectInstrument('TB303', 'Acid 303');
       if (acid303Id == null) return;
