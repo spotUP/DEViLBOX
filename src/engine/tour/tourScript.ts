@@ -443,11 +443,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'masterfx-lofi',
-    narration: 'Lo-fi radio.',
+    narration: 'Lo-fi tape.',
     action: async () => {
       const { useAudioStore } = await import('@/stores/useAudioStore');
       const { FX_PRESETS } = await import('@/constants/fxPresets');
-      const preset = FX_PRESETS.find(p => p.name === 'Lo-Fi Radio');
+      const preset = FX_PRESETS.find(p => p.name === 'Lo-Fi Master');
       if (preset) {
         const effects = preset.effects.map((e, i) => ({
           ...e,
