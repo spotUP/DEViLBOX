@@ -71,7 +71,7 @@ export const MadBrain4FM2FEditor: React.FC<GeneratorEditorProps> = ({ config, on
               }))}
             />
           </div>
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={osc4Freq}
               min={0}
@@ -146,7 +146,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
         {/* Pitch Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#eab308" title="Pitch" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={coarse}
               min={1}
@@ -173,7 +173,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
         {/* Envelope Section */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Envelope" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={attack}
               min={0}
@@ -340,7 +340,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={pw2}
               min={0}
@@ -396,7 +396,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={mix}
               min={0}
@@ -567,7 +567,7 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-6 items-end mt-6">
+          <div className="flex flex-wrap gap-3 items-end mt-6">
             <Knob
               value={mix}
               min={0}
@@ -602,7 +602,7 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
         {/* Filter */}
         <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ec4899" title="Filter" />
-          <div className="flex flex-wrap gap-6 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <Knob
               value={cutoff}
               min={0}
