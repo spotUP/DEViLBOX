@@ -252,9 +252,14 @@ export class HarmonicSynth implements DevilboxSynth {
 
   private killVoice(voice: HarmonicVoice): void {
     if (voice.releaseTimeout) clearTimeout(voice.releaseTimeout);
-    try { voice.osc.stop(); } catch { /* ignored */ }
-    try { voice.osc.disconnect(); } catch { /* ignored */ }
-    try { voice.gain.disconnect(); } catch { /* ignored */ }
+    // Anti-click: quick 5ms fade-out before stopping
+    try {
+      const now = this.audioContext.currentTime;
+      voice.gain.gain.cancelScheduledValues(now);
+      voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+      voice.gain.gain.linearRampToValueAtTime(0, now + 0.005);
+      voice.osc.stop(now + 0.006);
+    } catch { /* ignored */ }
   }
 
   set(param: string, value: number): void {

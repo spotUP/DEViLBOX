@@ -385,16 +385,18 @@ class WavetableVoice {
     void velocity;
     this.oscillators.forEach((osc) => {
       osc.frequency.setValueAtTime(frequency, time);
-      osc.start(time);
+      try { osc.start(time); } catch { /* already started — voice reuse */ }
     });
 
-    // Schedule ADSR attack + decay on each gain node
+    // Anti-click: quick fade-out from current level before ADSR ramp-up
+    const fadeOut = 0.003;
     this.gains.forEach((g) => {
       const param = g.gain;
       param.cancelScheduledValues(time);
-      param.setValueAtTime(0, time);
-      param.linearRampToValueAtTime(1, time + this.attackTime);
-      param.linearRampToValueAtTime(this.sustainLevel, time + this.attackTime + this.decayTime);
+      param.setValueAtTime(param.value, time);
+      param.linearRampToValueAtTime(0, time + fadeOut);
+      param.linearRampToValueAtTime(1, time + fadeOut + this.attackTime);
+      param.linearRampToValueAtTime(this.sustainLevel, time + fadeOut + this.attackTime + this.decayTime);
     });
   }
 
