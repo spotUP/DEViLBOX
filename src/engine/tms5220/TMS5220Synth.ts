@@ -99,6 +99,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   private _singMode = true;  // When true, MIDI note shifts speech pitch
   private _speechText = 'HELLO WORLD';
+  private _currentRomSpeech = 0;  // 0 = TTS mode, 1+ = ROM word index + 1
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
@@ -225,6 +226,13 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   protected writeKeyOn(note: number, _velocity: number): void {
     if (!this.workletNode || this._disposed) return;
+
+    // ROM speech: play selected ROM word directly
+    if (this._currentRomSpeech > 0 && this._romSentToWasm) {
+      this.stopSpeaking();
+      this.speakWord(this._currentRomSpeech - 1);
+      return;
+    }
 
     if (this._singMode && this._vowelSequence.length > 0) {
       const pitchOffset = Math.round((note - 60) * 0.5);
@@ -633,6 +641,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
     if (param === 'energy_index') this._speechEnergyIndex = value;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
+    if (param === 'romSpeech') this._currentRomSpeech = Math.round(value);
   }
 
   /** Store speech text for use in Speech mode noteOn */
