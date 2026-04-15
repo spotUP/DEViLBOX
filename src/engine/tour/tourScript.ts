@@ -964,7 +964,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'sample-open',
-    narration: 'Opening the biggest sample — a guitar riff with a nice waveform.',
+    narration: 'Opening sample six — a 303 acid line with a nice waveform.',
     action: async () => {
       await closeModals();
       const id = await getFirstSampleInstrument();
