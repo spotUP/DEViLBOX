@@ -17,7 +17,7 @@
  *   0x00 = silent frame, 0xFF = stop marker
  *
  * pitch: raw pitch period (0=noise-only, higher=lower frequency)
- *   Typical voiced speech: 15-40 range (~250-670Hz at 10kHz LPC rate)
+ *   Typical voiced speech: 50-80 range (~125-200Hz at 10kHz LPC rate)
  *
  * Filter coefficient ranges for formant shaping:
  *   F coefficients set resonant frequency positions
@@ -63,91 +63,91 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
 
     // /i:/ (beet) — F1=270Hz F2=2290Hz: low F1, very high F2
     'IY': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xC0, 0x80, 0x88, 0x80, 0x80, 0x80],
       filterB: [0x38, 0x30, 0x20, 0x18, 0x18, 0x10],
       durationMs: 150,
     },
     // /I/ (bit) — F1=390Hz F2=1990Hz
     'IH': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xBC, 0x88, 0x90, 0x80, 0x84, 0x80],
       filterB: [0x34, 0x34, 0x24, 0x1C, 0x1C, 0x14],
       durationMs: 120,
     },
     // /E/ (bet) — F1=530Hz F2=1840Hz
     'EH': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xBA, 0x8C, 0x94, 0x80, 0x84, 0x80],
       filterB: [0x32, 0x34, 0x24, 0x1C, 0x1C, 0x14],
       durationMs: 140,
     },
     // /ae/ (bat) — F1=660Hz F2=1720Hz
     'AE': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB6, 0x90, 0x98, 0x80, 0x84, 0x80],
       filterB: [0x30, 0x36, 0x26, 0x1E, 0x1C, 0x14],
       durationMs: 150,
     },
     // /a/ (father) — F1=730Hz F2=1090Hz: high F1, mid F2
     'AA': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB8, 0x90, 0xA0, 0x80, 0x88, 0x80],
       filterB: [0x30, 0x38, 0x28, 0x20, 0x20, 0x18],
       durationMs: 160,
     },
     // /uh/ (but) — F1=640Hz F2=1190Hz
     'AH': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xB6, 0x92, 0x9C, 0x80, 0x86, 0x80],
       filterB: [0x30, 0x38, 0x28, 0x20, 0x1E, 0x16],
       durationMs: 130,
     },
     // /aw/ (caught) — F1=570Hz F2=840Hz: mid F1, low F2
     'AO': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB4, 0xA8, 0x98, 0x80, 0x84, 0x80],
       filterB: [0x34, 0x3C, 0x2C, 0x20, 0x1C, 0x14],
       durationMs: 150,
     },
     // /U/ (book) — F1=440Hz F2=1020Hz
     'UH': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xB8, 0xA4, 0x96, 0x80, 0x82, 0x80],
       filterB: [0x36, 0x3A, 0x2A, 0x20, 0x1A, 0x12],
       durationMs: 120,
     },
     // schwa (about) — F1=500Hz F2=1500Hz: neutral
     'AX': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xB8, 0x94, 0x98, 0x80, 0x84, 0x80],
       filterB: [0x32, 0x36, 0x26, 0x1E, 0x1C, 0x14],
       durationMs: 90,
     },
     // unstressed /I/ — near schwa
     'IX': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xBC, 0x8A, 0x92, 0x80, 0x84, 0x80],
       filterB: [0x34, 0x34, 0x24, 0x1C, 0x1C, 0x14],
       durationMs: 90,
     },
     // /er/ (bird) — F1=490Hz F2=1350Hz with F3 lowered
     'ER': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xB8, 0x96, 0x8C, 0x88, 0x84, 0x80],
       filterB: [0x32, 0x36, 0x28, 0x22, 0x1E, 0x16],
       durationMs: 160,
     },
     // /u:/ (boot) — F1=300Hz F2=870Hz: low F1, low F2
     'UX': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xBE, 0xA4, 0x94, 0x80, 0x80, 0x80],
       filterB: [0x38, 0x3C, 0x2C, 0x20, 0x18, 0x10],
       durationMs: 130,
     },
     // /o/ (boat) — F1=570Hz F2=840Hz
     'OH': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB4, 0xA8, 0x98, 0x80, 0x84, 0x80],
       filterB: [0x34, 0x3C, 0x2C, 0x20, 0x1C, 0x14],
       durationMs: 150,
@@ -157,37 +157,37 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
     // Diphthongs (voiced) — use dominant vowel
     // =====================================================================
     'EY': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xBA, 0x8C, 0x94, 0x80, 0x84, 0x80],
       filterB: [0x32, 0x34, 0x24, 0x1C, 0x1C, 0x14],
       durationMs: 200,
     },
     'AY': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB8, 0x90, 0xA0, 0x80, 0x88, 0x80],
       filterB: [0x30, 0x38, 0x28, 0x20, 0x20, 0x18],
       durationMs: 200,
     },
     'OY': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB4, 0xA8, 0x98, 0x80, 0x84, 0x80],
       filterB: [0x34, 0x3C, 0x2C, 0x20, 0x1C, 0x14],
       durationMs: 200,
     },
     'AW': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB8, 0x90, 0xA0, 0x80, 0x88, 0x80],
       filterB: [0x30, 0x38, 0x28, 0x20, 0x20, 0x18],
       durationMs: 200,
     },
     'OW': {
-      amp: 0x4A, pitch: 22, voiced: true,
+      amp: 0x4A, pitch: 60, voiced: true,
       filterF: [0xB4, 0xA8, 0x98, 0x80, 0x84, 0x80],
       filterB: [0x34, 0x3C, 0x2C, 0x20, 0x1C, 0x14],
       durationMs: 200,
     },
     'UW': {
-      amp: 0x48, pitch: 22, voiced: true,
+      amp: 0x48, pitch: 60, voiced: true,
       filterF: [0xBE, 0xA4, 0x94, 0x80, 0x80, 0x80],
       filterB: [0x38, 0x3C, 0x2C, 0x20, 0x18, 0x10],
       durationMs: 160,
@@ -197,37 +197,37 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
     // Glides / Liquids (voiced, lower amplitude)
     // =====================================================================
     'R*': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xB8, 0x96, 0x8C, 0x88, 0x84, 0x80],
       filterB: [0x32, 0x36, 0x28, 0x22, 0x1E, 0x16],
       durationMs: 100,
     },
     'RX': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xB8, 0x96, 0x8C, 0x88, 0x84, 0x80],
       filterB: [0x32, 0x36, 0x28, 0x22, 0x1E, 0x16],
       durationMs: 100,
     },
     'L*': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xBC, 0x90, 0x8E, 0x84, 0x82, 0x80],
       filterB: [0x34, 0x36, 0x26, 0x20, 0x1C, 0x14],
       durationMs: 110,
     },
     'LX': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xBC, 0x90, 0x8E, 0x84, 0x82, 0x80],
       filterB: [0x34, 0x36, 0x26, 0x20, 0x1C, 0x14],
       durationMs: 110,
     },
     'W*': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0xBE, 0xA4, 0x94, 0x80, 0x80, 0x80],
       filterB: [0x38, 0x3C, 0x2C, 0x20, 0x18, 0x10],
       durationMs: 80,
     },
     'WX': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0xBE, 0xA4, 0x94, 0x80, 0x80, 0x80],
       filterB: [0x38, 0x3C, 0x2C, 0x20, 0x18, 0x10],
       durationMs: 80,
@@ -239,13 +239,13 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
       durationMs: 80,
     },
     'Y*': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0xC0, 0x80, 0x88, 0x80, 0x80, 0x80],
       filterB: [0x36, 0x30, 0x20, 0x18, 0x18, 0x10],
       durationMs: 80,
     },
     'YX': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0xC0, 0x80, 0x88, 0x80, 0x80, 0x80],
       filterB: [0x36, 0x30, 0x20, 0x18, 0x18, 0x10],
       durationMs: 80,
@@ -256,19 +256,19 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
     // Nasals have F1 at mouth resonance + nasal antiformant cancelling F2-F3
     // =====================================================================
     'M*': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xB6, 0x94, 0x80, 0x8C, 0x80, 0x80],
       filterB: [0x30, 0x38, 0x20, 0x28, 0x18, 0x10],
       durationMs: 120,
     },
     'N*': {
-      amp: 0x44, pitch: 22, voiced: true,
+      amp: 0x44, pitch: 60, voiced: true,
       filterF: [0xB8, 0x90, 0x80, 0x8A, 0x80, 0x80],
       filterB: [0x30, 0x36, 0x20, 0x26, 0x18, 0x10],
       durationMs: 100,
     },
     'NX': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0xB4, 0x98, 0x80, 0x8E, 0x80, 0x80],
       filterB: [0x30, 0x3A, 0x20, 0x2A, 0x18, 0x10],
       durationMs: 120,
@@ -319,25 +319,25 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
     // Voiced fricatives — voiced excitation through fricative filter shapes
     // =====================================================================
     'Z*': {
-      amp: 0x46, pitch: 22, voiced: true,
+      amp: 0x46, pitch: 60, voiced: true,
       filterF: [0x90, 0x80, 0x84, 0x8C, 0x90, 0x88],
       filterB: [0x18, 0x14, 0x18, 0x20, 0x24, 0x1C],
       durationMs: 130,
     },
     'ZH': {
-      amp: 0x46, pitch: 22, voiced: true,
+      amp: 0x46, pitch: 60, voiced: true,
       filterF: [0x94, 0x84, 0x88, 0x8A, 0x8C, 0x86],
       filterB: [0x1C, 0x18, 0x1C, 0x1E, 0x20, 0x18],
       durationMs: 120,
     },
     'V*': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0x88, 0x80, 0x80, 0x84, 0x88, 0x84],
       filterB: [0x14, 0x10, 0x10, 0x18, 0x1C, 0x14],
       durationMs: 100,
     },
     'DH': {
-      amp: 0x42, pitch: 22, voiced: true,
+      amp: 0x42, pitch: 60, voiced: true,
       filterF: [0x8C, 0x80, 0x82, 0x86, 0x8A, 0x84],
       filterB: [0x16, 0x12, 0x14, 0x1A, 0x1E, 0x16],
       durationMs: 80,
@@ -353,7 +353,7 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
       durationMs: 120,
     },
     'J*': {
-      amp: 0x46, pitch: 22, voiced: true,
+      amp: 0x46, pitch: 60, voiced: true,
       filterF: [0x94, 0x84, 0x88, 0x8A, 0x8C, 0x86],
       filterB: [0x1C, 0x18, 0x1C, 0x1E, 0x20, 0x18],
       durationMs: 120,
@@ -363,25 +363,25 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
     // Stops — brief burst, low energy
     // =====================================================================
     'B*': {
-      amp: 0x3C, pitch: 22, voiced: true,
+      amp: 0x3C, pitch: 60, voiced: true,
       filterF: [0xB8, 0x90, 0xA0, 0x80, 0x88, 0x80],
       filterB: [0x20, 0x28, 0x1C, 0x18, 0x14, 0x10],
       durationMs: 60,
     },
     'D*': {
-      amp: 0x3C, pitch: 22, voiced: true,
+      amp: 0x3C, pitch: 60, voiced: true,
       filterF: [0xB8, 0x88, 0x94, 0x80, 0x86, 0x80],
       filterB: [0x20, 0x24, 0x1C, 0x18, 0x14, 0x10],
       durationMs: 60,
     },
     'G*': {
-      amp: 0x3C, pitch: 22, voiced: true,
+      amp: 0x3C, pitch: 60, voiced: true,
       filterF: [0xB4, 0x98, 0x90, 0x84, 0x82, 0x80],
       filterB: [0x22, 0x2A, 0x1E, 0x1A, 0x14, 0x10],
       durationMs: 60,
     },
     'GX': {
-      amp: 0x3C, pitch: 22, voiced: true,
+      amp: 0x3C, pitch: 60, voiced: true,
       filterF: [0xB4, 0x98, 0x90, 0x84, 0x82, 0x80],
       filterB: [0x22, 0x2A, 0x1E, 0x1A, 0x14, 0x10],
       durationMs: 60,
@@ -415,7 +415,7 @@ export function samToSP0250LPC(samCode: string): SP0250LPCFrame | null {
     // Other
     // =====================================================================
     'DX': {
-      amp: 0x3A, pitch: 22, voiced: true,
+      amp: 0x3A, pitch: 60, voiced: true,
       filterF: [0xB8, 0x88, 0x94, 0x80, 0x86, 0x80],
       filterB: [0x20, 0x24, 0x1C, 0x18, 0x14, 0x10],
       durationMs: 40,
@@ -485,7 +485,8 @@ export function phonemesToSP0250LPCFrames(
     const frame = samToSP0250LPC(token.code);
     if (frame) {
       const ampBoost = token.stress >= 4 ? 0x04 : token.stress >= 2 ? 0x02 : 0;
-      const pitchBoost = token.stress >= 4 ? 4 : token.stress >= 2 ? 2 : 0;
+      // Higher pitch period = lower frequency; stress should raise pitch (lower period)
+      const pitchDrop = token.stress >= 4 ? 8 : token.stress >= 2 ? 4 : 0;
       // Vowel reduction: unstressed vowels shorter
       let duration = frame.durationMs;
       if (VOWELS.has(token.code) && token.stress === 0) {
@@ -495,7 +496,7 @@ export function phonemesToSP0250LPCFrames(
         ...frame,
         durationMs: duration,
         amp: Math.min(0xFE, frame.amp + ampBoost),
-        pitch: frame.voiced ? Math.min(63, frame.pitch + pitchBoost) : 0,
+        pitch: frame.voiced ? Math.max(1, frame.pitch - pitchDrop) : 0,
       });
       tokenCodes.push(token.code);
     }
@@ -503,16 +504,18 @@ export function phonemesToSP0250LPCFrames(
 
   if (rawFrames.length === 0) return [];
 
-  // Sentence intonation
+  // Sentence intonation (higher pitch period = lower frequency)
   const total = rawFrames.length;
   for (let i = 0; i < total; i++) {
     const f = rawFrames[i];
     if (f.voiced && f.pitch > 0) {
       const pos = i / total;
       if (question) {
-        if (pos > 0.7) { const rise = Math.round((pos - 0.7) / 0.3 * 6); f.pitch = Math.min(63, f.pitch + rise); }
+        // Questions: raise pitch at end (decrease period)
+        if (pos > 0.7) { const rise = Math.round((pos - 0.7) / 0.3 * 10); f.pitch = Math.max(1, f.pitch - rise); }
       } else {
-        if (pos > 0.7) { const drop = Math.round((pos - 0.7) / 0.3 * 5); f.pitch = Math.max(1, f.pitch - drop); }
+        // Statements: lower pitch at end (increase period)
+        if (pos > 0.7) { const drop = Math.round((pos - 0.7) / 0.3 * 8); f.pitch = Math.min(255, f.pitch + drop); }
       }
     }
   }
