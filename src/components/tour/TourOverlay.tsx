@@ -92,28 +92,37 @@ const SubtitleText: React.FC<{ text: string; isSpeaking: boolean }> = ({ text, i
   const [displayText, setDisplayText] = useState(text);
   const [opacity, setOpacity] = useState(1);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const prevTextRef = useRef(text);
 
   useEffect(() => {
-    if (!text || text === displayText) {
-      if (text) setOpacity(isSpeaking ? 1 : 0.6);
-      return;
+    const prevText = prevTextRef.current;
+    prevTextRef.current = text;
+
+    // Text cleared — fade out fully and clear display
+    if (!text && prevText) {
+      setOpacity(0);
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setDisplayText(''), 300);
+      return () => clearTimeout(timeoutRef.current);
     }
-    // Fade out
-    setOpacity(0);
-    clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      setDisplayText(text);
-      setOpacity(1);
-    }, 250);
-    return () => clearTimeout(timeoutRef.current);
-  }, [text, isSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When speaking state changes but text is same, just adjust opacity
-  useEffect(() => {
+    // Text unchanged — just adjust brightness based on speaking state
     if (text === displayText) {
       setOpacity(isSpeaking ? 1 : 0.6);
+      return;
     }
-  }, [isSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Text changed — fade out old, swap, fade in new
+    if (text) {
+      setOpacity(0);
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setDisplayText(text);
+        setOpacity(1);
+      }, 300);
+      return () => clearTimeout(timeoutRef.current);
+    }
+  }, [text, isSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <p
@@ -125,7 +134,8 @@ const SubtitleText: React.FC<{ text: string; isSpeaking: boolean }> = ({ text, i
         textShadow: '0 2px 8px rgba(0,0,0,0.8)',
         margin: 0,
         opacity,
-        transition: 'opacity 0.25s ease-in-out',
+        transition: 'opacity 0.3s ease-in-out',
+        minHeight: 30,
       }}
     >
       {displayText || '\u00A0'}
