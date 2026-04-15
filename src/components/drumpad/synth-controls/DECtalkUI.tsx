@@ -1,8 +1,8 @@
 /**
- * DECtalkUI — Enhanced DECtalk controls with 85 preset dropdown
+ * DECtalkUI — DECtalk voice and rate controls with character presets
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DECTALK_PRESETS } from '@constants/dectalkPresets';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -14,37 +14,53 @@ interface DECtalkUIProps {
   onChange: (config: Partial<InstrumentConfig>) => void;
 }
 
-const VOICE_NAMES = [
-  'Paul (Hawking)',
-  'Betty',
-  'Harry',
-  'Frank',
-  'Dennis',
-  'Kit',
-  'Ursula',
-  'Rita',
-  'Wendy'
-];
+// Build voice preset options from DECTALK_PRESETS (voice+rate+pitch, no text)
+const VOICE_PRESET_GROUPS = (() => {
+  const groups: { label: string; start: number; end: number }[] = [
+    { label: 'HAL 9000 Series', start: 0, end: 10 },
+    { label: 'Classic Robots', start: 10, end: 19 },
+    { label: 'Sci-Fi Computers', start: 19, end: 44 },
+    { label: 'Voice Demos', start: 44, end: DECTALK_PRESETS.length },
+  ];
+  return groups.map(g => ({
+    label: g.label,
+    options: DECTALK_PRESETS.slice(g.start, g.end).map((p, i) => ({
+      value: String(g.start + i),
+      label: (p.name || `Preset ${g.start + i + 1}`).replace(/^DEC_/, ''),
+    })),
+  }));
+})();
 
 export const DECtalkUI: React.FC<DECtalkUIProps> = ({ config, onChange }) => {
   const dectalk = config.dectalk;
 
-  const handlePresetChange = useCallback((presetIndex: number) => {
-    if (presetIndex < 0) return;
-    
-    const preset = DECTALK_PRESETS[presetIndex];
+  // Find which preset matches current voice+rate+pitch (if any)
+  const currentPresetIdx = useMemo(() => {
+    if (!dectalk) return '';
+    const idx = DECTALK_PRESETS.findIndex(p =>
+      p.dectalk?.voice === dectalk.voice &&
+      p.dectalk?.rate === dectalk.rate &&
+      Math.abs((p.dectalk?.pitch ?? 0.5) - (dectalk.pitch ?? 0.5)) < 0.01
+    );
+    return idx >= 0 ? String(idx) : '';
+  }, [dectalk]);
+
+  const handleVoicePreset = useCallback((val: string) => {
+    const idx = parseInt(val);
+    if (idx < 0 || idx >= DECTALK_PRESETS.length) return;
+    const preset = DECTALK_PRESETS[idx];
     if (!preset.dectalk) return;
-    
+    // Apply voice+rate+pitch from preset, keep current text
     onChange({
       dectalk: {
-        text: preset.dectalk.text || '',
+        ...DEFAULT_DECTALK_CONFIG,
+        ...dectalk,
         voice: preset.dectalk.voice ?? 0,
         rate: preset.dectalk.rate ?? 180,
         pitch: preset.dectalk.pitch ?? 0.5,
-        volume: preset.dectalk.volume ?? 0.8
       }
     });
-  }, [onChange]);
+  }, [dectalk, onChange]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -52,31 +68,15 @@ export const DECtalkUI: React.FC<DECtalkUIProps> = ({ config, onChange }) => {
         DECtalk Speech Synthesizer
       </h3>
 
-      {/* Preset Selector */}
+      {/* Voice Preset Selector */}
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-mono text-text-muted">Preset (85 voices)</label>
+        <label className="text-[10px] font-mono text-text-muted">Voice Preset</label>
         <CustomSelect
-          value=""
-          onChange={(val) => handlePresetChange(parseInt(val))}
-          placeholder="Select a preset..."
+          value={currentPresetIdx}
+          onChange={handleVoicePreset}
+          placeholder="Select a voice..."
           zIndex={100000}
-          options={[
-            { label: 'HAL 9000 Series', options: DECTALK_PRESETS.slice(0, 10).map((preset, idx) => ({ value: String(idx), label: preset.name || `Preset ${idx + 1}` })) },
-            { label: 'Classic Robots', options: DECTALK_PRESETS.slice(10, 19).map((preset, idx) => ({ value: String(idx + 10), label: preset.name || `Preset ${idx + 11}` })) },
-            { label: 'Sci-Fi Computers', options: DECTALK_PRESETS.slice(19, 44).map((preset, idx) => ({ value: String(idx + 19), label: preset.name || `Preset ${idx + 20}` })) },
-            { label: 'Voice Demos', options: DECTALK_PRESETS.slice(44).map((preset, idx) => ({ value: String(idx + 44), label: preset.name || `Preset ${idx + 45}` })) },
-          ]}
-        />
-      </div>
-
-      {/* Voice Selector */}
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-mono text-text-muted">Voice Character</label>
-        <CustomSelect
-          value={String(dectalk?.voice || 0)}
-          onChange={(val) => onChange({ dectalk: { ...DEFAULT_DECTALK_CONFIG, ...dectalk, voice: parseInt(val) } })}
-          zIndex={100000}
-          options={VOICE_NAMES.map((name, idx) => ({ value: String(idx), label: name }))}
+          options={VOICE_PRESET_GROUPS}
         />
       </div>
 
