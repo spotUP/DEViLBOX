@@ -19,6 +19,8 @@ import type { ScratchActionId, PadBank } from '../../types/drumpad';
 import { getBankPads, applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
+import { getMIDIManager } from '../../midi/MIDIManager';
+import type { MIDIMessage } from '../../midi/types';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -27,7 +29,7 @@ import {
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
 } from '../../engine/keyboard/commands/djScratch';
 
-const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
+const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => boolean> = {
   // Basic patterns
   scratch_baby:     djScratchBaby,
   scratch_trans:    djScratchTrans,
@@ -398,6 +400,27 @@ export const PadGrid: React.FC<PadGridProps> = ({
       }
     }
   }, [currentProgram, setFxPadActive]);
+
+  // MIDI pad handler: route hardware pad notes (36-43) to the first 8 pads of current bank
+  useEffect(() => {
+    const manager = getMIDIManager();
+    const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+
+    const handler = (message: MIDIMessage) => {
+      if (message.note === undefined || message.note < 36 || message.note > 43) return;
+      const padIndex = message.note - 36; // 0-7
+      const padId = bankOffset + padIndex + 1; // 1-based pad IDs
+
+      if (message.type === 'noteOn' && message.velocity) {
+        handlePadTrigger(padId, message.velocity);
+      } else if (message.type === 'noteOff' || (message.type === 'noteOn' && message.velocity === 0)) {
+        handlePadRelease(padId);
+      }
+    };
+
+    manager.addMessageHandler(handler);
+    return () => manager.removeMessageHandler(handler);
+  }, [currentBank, handlePadTrigger, handlePadRelease]);
 
   // Get pads for current bank (memoized for performance)
   const bankPads = useMemo(() => {
