@@ -117,12 +117,25 @@ async function loadDJTrack(deckId: 'A' | 'B', filename: string): Promise<void> {
     const buf = await resp.arrayBuffer();
 
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
+    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
+    const { useDJStore } = await import('@/stores/useDJStore');
     const engine = getDJEngine();
 
-    // Use the standard UADE pre-render path — handles caching, UADE rendering,
-    // beat detection, and proper audio loading (same as the DJ file browser)
-    await loadUADEToDeck(engine, deckId, buf, filename, true);
+    // Set loading state
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: filename,
+      analysisState: 'rendering',
+      isPlaying: false,
+    });
+
+    // Render to WAV via the pipeline worker (UADE for MOD, libopenmpt for XM/IT)
+    // then load the rendered audio — same as DJFileBrowser non-UADE path.
+    const result = await getDJPipeline().loadOrEnqueue(buf, filename, deckId, 'high');
+    await engine.loadAudioToDeck(
+      deckId, result.wavData, filename, filename,
+      result.analysis?.bpm || 125
+    );
   } catch (err) {
     console.warn(`[Tour] Failed to load DJ track ${filename}:`, err);
   }
@@ -499,8 +512,21 @@ async function searchAndLoadModland(query: string, deckId: 'A' | 'B'): Promise<v
     const filename = file.full_path.split('/').pop() || 'download.mod';
 
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
-    await loadUADEToDeck(getDJEngine(), deckId, buffer, filename, true);
+    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
+    const { useDJStore } = await import('@/stores/useDJStore');
+
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: filename,
+      analysisState: 'rendering',
+      isPlaying: false,
+    });
+
+    const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+    await getDJEngine().loadAudioToDeck(
+      deckId, result.wavData, filename, filename,
+      result.analysis?.bpm || 125
+    );
   } catch (err) {
     console.warn(`[Tour] Modland search/load failed for "${query}":`, err);
   }
@@ -520,8 +546,21 @@ async function searchAndLoadHVSC(query: string, deckId: 'A' | 'B'): Promise<void
     const filename = entry.path.split('/').pop() || 'download.sid';
 
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
-    await loadUADEToDeck(getDJEngine(), deckId, buffer, filename, true);
+    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
+    const { useDJStore } = await import('@/stores/useDJStore');
+
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: entry.name || filename,
+      analysisState: 'rendering',
+      isPlaying: false,
+    });
+
+    const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+    await getDJEngine().loadAudioToDeck(
+      deckId, result.wavData, filename, entry.name || filename,
+      result.analysis?.bpm || 125
+    );
   } catch (err) {
     console.warn(`[Tour] HVSC search/load failed for "${query}":`, err);
   }
