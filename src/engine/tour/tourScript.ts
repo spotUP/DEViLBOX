@@ -207,7 +207,7 @@ async function getFirstSampleInstrument(): Promise<number | null> {
 /** Apply a WaveformProcessor operation to an instrument's sample (visually updates editor) */
 async function applySampleOperation(
   instrumentId: number,
-  operation: 'reverse' | 'normalize' | 'fadeIn' | 'fadeOut' | 'amigaPal8Bit'
+  operation: 'reverse' | 'normalize' | 'fadeIn' | 'fadeOut' | 'amigaPal8Bit' | 'silence'
 ): Promise<void> {
   try {
     const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
@@ -240,6 +240,9 @@ async function applySampleOperation(
       case 'amigaPal8Bit':
         result = WaveformProcessor.amigaPal8Bit(audioBuffer);
         break;
+      case 'silence':
+        result = WaveformProcessor.silence(audioBuffer, Math.floor(audioBuffer.length * 0.3), Math.floor(audioBuffer.length * 0.6));
+        break;
       default:
         return;
     }
@@ -255,9 +258,87 @@ async function applySampleOperation(
   }
 }
 
-/** Play the currently selected sample instrument */
-async function playSampleInstrument(instrumentId: number): Promise<void> {
-  await playInstrumentNote(instrumentId, 'C4', 1500);
+/** Apply a SampleProcessing enhancement to an instrument's sample */
+async function applySampleEnhancement(
+  instrumentId: number,
+  enhancement: 'exciter' | 'transient' | 'denoise' | 'stereo'
+): Promise<void> {
+  try {
+    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+    const { getToneEngine } = await import('@/engine/ToneEngine');
+    const {
+      applySpectralExciter,
+      applyTransientSharpening,
+      applyDenoise,
+      applyPseudoStereo,
+    } = await import('@/utils/audio/SampleProcessing');
+
+    const inst = useInstrumentStore.getState().getInstrument(instrumentId);
+    if (!inst?.sample?.audioBuffer) return;
+
+    const ctx = new OfflineAudioContext(1, 1, 44100);
+    const audioBuffer = await ctx.decodeAudioData(
+      (inst.sample.audioBuffer as ArrayBuffer).slice(0)
+    );
+
+    let processed: { buffer: AudioBuffer };
+    switch (enhancement) {
+      case 'exciter':
+        processed = await applySpectralExciter(audioBuffer, { drive: 60, mix: 50, frequency: 4000 });
+        break;
+      case 'transient':
+        processed = await applyTransientSharpening(audioBuffer, 0.7);
+        break;
+      case 'denoise':
+        processed = await applyDenoise(audioBuffer, -40);
+        break;
+      case 'stereo':
+        processed = await applyPseudoStereo(audioBuffer, 0.7);
+        break;
+      default:
+        return;
+    }
+
+    const arrayBuffer = await getToneEngine().encodeAudioData(processed.buffer);
+    useInstrumentStore.getState().updateInstrument(instrumentId, {
+      sample: { ...inst.sample, audioBuffer: arrayBuffer },
+    });
+    getToneEngine().invalidateInstrument(instrumentId);
+  } catch (err) {
+    console.warn(`[Tour] Enhancement ${enhancement} failed:`, err);
+  }
+}
+
+/** Store the original sample buffer for undo during the demo */
+let originalSampleBackup: ArrayBuffer | null = null;
+
+async function backupSample(instrumentId: number): Promise<void> {
+  const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+  const inst = useInstrumentStore.getState().getInstrument(instrumentId);
+  if (inst?.sample?.audioBuffer) {
+    originalSampleBackup = (inst.sample.audioBuffer as ArrayBuffer).slice(0);
+  }
+}
+
+async function restoreSample(instrumentId: number): Promise<void> {
+  if (!originalSampleBackup) return;
+  const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+  const { getToneEngine } = await import('@/engine/ToneEngine');
+  const inst = useInstrumentStore.getState().getInstrument(instrumentId);
+  if (!inst?.sample) return;
+  useInstrumentStore.getState().updateInstrument(instrumentId, {
+    sample: { ...inst.sample, audioBuffer: originalSampleBackup.slice(0) },
+  });
+  getToneEngine().invalidateInstrument(instrumentId);
+}
+
+/** Play the currently selected sample instrument at its natural pitch */
+async function playSampleInstrument(instrumentId: number, durationMs = 1500): Promise<void> {
+  const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+  const config = useInstrumentStore.getState().getInstrument(instrumentId);
+  // Use the sample's stored base note so playback is at the correct rate
+  const note = config?.sample?.baseNote || 'C3';
+  await playInstrumentNote(instrumentId, note, durationMs);
 }
 
 /** Trigger a note on an instrument (for demo) */
@@ -696,7 +777,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'sample-open',
-    narration: 'Let me open a sample.',
+    narration: 'Opening the first sample instrument.',
     action: async () => {
       await closeModals();
       const id = await getFirstSampleInstrument();
@@ -704,27 +785,29 @@ export const TOUR_SCRIPT: TourStep[] = [
         const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
         useInstrumentStore.getState().setCurrentInstrument(id);
         await openInstrumentEditor(id);
+        await backupSample(id);
       }
     },
     postDelay: 1500,
   },
   {
     id: 'sample-play-original',
-    narration: 'Here is the original sample.',
+    narration: 'Here is the original sample at its native pitch.',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) await playSampleInstrument(id);
     },
     postDelay: 2000,
   },
+
+  // -- Reverse demo --
   {
     id: 'sample-reverse',
-    narration: 'Watch — I can reverse it live.',
+    narration: 'Reverse. Flips the waveform backwards. Watch.',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
         await applySampleOperation(id, 'reverse');
-        // Brief pause then play reversed
         await new Promise(r => setTimeout(r, 300));
         await playSampleInstrument(id);
       }
@@ -735,15 +818,16 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'sample-reverse-back',
     narration: '',
     action: async () => {
-      // Reverse it back to original
       const id = await getFirstSampleInstrument();
       if (id != null) await applySampleOperation(id, 'reverse');
     },
-    postDelay: 300,
+    postDelay: 200,
   },
+
+  // -- Normalize demo --
   {
     id: 'sample-normalize',
-    narration: 'Normalize to maximize volume. Watch the waveform scale up.',
+    narration: 'Normalize. Maximizes the volume to zero dB. See the waveform grow.',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -754,22 +838,79 @@ export const TOUR_SCRIPT: TourStep[] = [
     },
     postDelay: 2000,
   },
+
+  // -- Fade In demo --
   {
-    id: 'sample-features',
-    narration: 'Cut, copy, paste. Fade in, fade out. Loop point detection. Beat slicing. Spectral filtering. DC offset removal. All nondestructive with full undo.',
-    postDelay: 1500,
-  },
-  {
-    id: 'sample-enhancement',
-    narration: 'Plus AI-powered enhancement. Spectral exciter for brightness. Transient sharpening for punch. Noise reduction. Pseudo-stereo widening.',
-    postDelay: 1500,
-  },
-  {
-    id: 'sample-amiga',
-    narration: 'And Amiga PAL 8-bit resampling. Authentic hardware sound, down to the aliasing artifacts.',
+    id: 'sample-fadein',
+    narration: 'Fade in. Smoothly ramps the attack from silence.',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
+        await restoreSample(id);
+        await applySampleOperation(id, 'fadeIn');
+        await new Promise(r => setTimeout(r, 300));
+        await playSampleInstrument(id);
+      }
+    },
+    postDelay: 2000,
+  },
+
+  // -- Fade Out demo --
+  {
+    id: 'sample-fadeout',
+    narration: 'Fade out. Tapers the tail to nothing.',
+    action: async () => {
+      const id = await getFirstSampleInstrument();
+      if (id != null) {
+        await restoreSample(id);
+        await applySampleOperation(id, 'fadeOut');
+        await new Promise(r => setTimeout(r, 300));
+        await playSampleInstrument(id);
+      }
+    },
+    postDelay: 2000,
+  },
+
+  // -- Spectral Exciter --
+  {
+    id: 'sample-exciter',
+    narration: 'Spectral exciter. Adds harmonic overtones for brightness and presence. Listen.',
+    action: async () => {
+      const id = await getFirstSampleInstrument();
+      if (id != null) {
+        await restoreSample(id);
+        await applySampleEnhancement(id, 'exciter');
+        await new Promise(r => setTimeout(r, 300));
+        await playSampleInstrument(id);
+      }
+    },
+    postDelay: 2500,
+  },
+
+  // -- Transient Sharpening --
+  {
+    id: 'sample-transient',
+    narration: 'Transient sharpening. Punches up the attack for more snap and bite.',
+    action: async () => {
+      const id = await getFirstSampleInstrument();
+      if (id != null) {
+        await restoreSample(id);
+        await applySampleEnhancement(id, 'transient');
+        await new Promise(r => setTimeout(r, 300));
+        await playSampleInstrument(id);
+      }
+    },
+    postDelay: 2500,
+  },
+
+  // -- Amiga PAL 8-bit --
+  {
+    id: 'sample-amiga',
+    narration: 'Amiga PAL 8-bit resampling. The authentic aliasing and crunch of the original hardware.',
+    action: async () => {
+      const id = await getFirstSampleInstrument();
+      if (id != null) {
+        await restoreSample(id);
         await applySampleOperation(id, 'amigaPal8Bit');
         await new Promise(r => setTimeout(r, 300));
         await playSampleInstrument(id);
@@ -777,20 +918,25 @@ export const TOUR_SCRIPT: TourStep[] = [
     },
     postDelay: 2500,
   },
+
+  // -- Restore + summary --
   {
-    id: 'sample-mpc',
-    narration: 'Or MPC-style resampling. SP twelve hundred, MPC sixty, MPC three thousand. The grit and color of classic samplers.',
-    postDelay: 1500,
+    id: 'sample-restore',
+    narration: 'Full undo. Back to the original in one click.',
+    action: async () => {
+      const id = await getFirstSampleInstrument();
+      if (id != null) {
+        await restoreSample(id);
+        await new Promise(r => setTimeout(r, 300));
+        await playSampleInstrument(id);
+      }
+    },
+    postDelay: 2000,
   },
   {
-    id: 'sample-granular',
-    narration: 'There is also a granular synth engine. Scatter clouds of tiny grains across the sample. Freeze, stretch, morph.',
-    postDelay: 1500,
-  },
-  {
-    id: 'sample-waveform-studio',
-    narration: 'And a waveform drawing studio for chip music. Draw single-cycle waveforms pixel by pixel, like the Amiga days.',
-    postDelay: 1500,
+    id: 'sample-features-summary',
+    narration: 'Also available: cut, copy, paste. Loop point detection. Beat slicing. DC offset removal. MPC resampling. Granular synthesis. And a waveform drawing studio for chip music.',
+    postDelay: 2000,
   },
   {
     id: 'synth-cleanup',
