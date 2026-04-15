@@ -30,17 +30,17 @@ function switchView(view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studi
   useUIStore.getState().setActiveView(view);
 }
 
-async function loadTrackerSong(filename: string): Promise<void> {
+async function loadTrackerSong(path: string): Promise<void> {
   try {
-    const resp = await fetch(`/data/songs/exports/${filename}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const resp = await fetch(path);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${path}`);
     const buf = await resp.arrayBuffer();
+    const filename = path.split('/').pop() || 'song';
     const file = new File([buf], filename, { type: 'application/octet-stream' });
 
     // loadFile() for .mod/.xm/.it returns 'pending-import' — expecting the
     // ImportModuleDialog to handle it. We bypass that dialog by calling
     // importTrackerModule directly (the same function the dialog calls).
-    // But we must use the server to parse the module metadata first.
     const { loadFile, importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
     const result = await loadFile(file, { requireConfirmation: false });
 
@@ -48,7 +48,7 @@ async function loadTrackerSong(filename: string): Promise<void> {
       // Module needs the import pipeline — parse and import directly
       const { loadModuleFile } = await import('@/lib/import/ModuleLoader');
       const info = await loadModuleFile(file);
-      await importTrackerModule(info, { useLibopenmpt: true });
+      await importTrackerModule(info, { useLibopenmpt: false });
     } else if (!result.success) {
       console.warn('[Tour] loadFile failed:', result.error);
     }
@@ -506,10 +506,10 @@ export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 2: Tracker — load a song, play it ──────────────────────────────
   {
     id: 'tracker-load',
-    narration: 'This is the tracker. A pattern editor for making music. Let me load a classic Amiga module.',
+    narration: 'This is the tracker. A pattern editor for making music. Let me load an AHX chiptune.',
     action: async () => {
       switchView('tracker');
-      await loadTrackerSong('aces_high.mod');
+      await loadTrackerSong('/data/songs/formats/aces_high.ahx');
     },
     spotlight: '[data-pattern-editor]',
     postDelay: 800,
@@ -699,8 +699,17 @@ export const TOUR_SCRIPT: TourStep[] = [
 
   // ── Act 3b: Sample Editor Deep Dive ─────────────────────────────────────
   {
+    id: 'sample-load',
+    narration: 'Now the sample editor. Let me load a classic Amiga module with real samples.',
+    action: async () => {
+      await closeModals();
+      await loadTrackerSong('/data/songs/exports/aces_high.mod');
+    },
+    postDelay: 500,
+  },
+  {
     id: 'sample-open',
-    narration: 'Now the sample editor. This module has real Amiga samples. Let me open one.',
+    narration: 'Let me open a sample.',
     action: async () => {
       await closeModals();
       const id = await getFirstSampleInstrument();
@@ -1065,9 +1074,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'The mixer. Per-channel faders, pan, mute, solo, and real-time meters. Let me load a song and show you.',
     action: async () => {
       switchView('tracker');
-      await loadTrackerSong('aces_high.mod');
+      await loadTrackerSong('/data/songs/formats/aces_high.ahx');
       await trackerPlay();
-      // Brief pause before switching to mixer so patterns load
       await new Promise(r => setTimeout(r, 500));
       switchView('mixer');
     },
@@ -1123,8 +1131,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Automation. Draw curves to control any parameter over time.',
     action: async () => {
       switchView('tracker');
-      // Load a song so we have patterns to automate
-      await loadTrackerSong('aces_high.mod');
+      await loadTrackerSong('/data/songs/formats/aces_high.ahx');
     },
     spotlight: '[data-pattern-editor]',
     postDelay: 500,
