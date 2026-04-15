@@ -42,7 +42,7 @@ export type ScratchActionId =
   | 'scratch_3flare' | 'scratch_laser' | 'scratch_phaser'
   | 'scratch_tweak' | 'scratch_drag' | 'scratch_vibrato'
   | 'scratch_stop'
-  | 'lfo_off' | 'lfo_14' | 'lfo_18' | 'lfo_116' | 'lfo_132';
+  | 'fader_lfo_off' | 'fader_lfo_1_4' | 'fader_lfo_1_8' | 'fader_lfo_1_16' | 'fader_lfo_1_32';
 
 export type VelocityCurve = 'linear' | 'exponential' | 'logarithmic' | 'scurve' | 'fixed';
 
@@ -227,7 +227,7 @@ export function getBankPads(pads: DrumPad[], bank: PadBank): DrumPad[] {
 
 /** Create a pad-owned synth-based InstrumentConfig (used when user picks a synth type in PadEditor) */
 export function makeDrumConfig(
-  padId: number, name: string, synthType: SynthType, note: string = 'C3',
+  padId: number, name: string, synthType: SynthType, note: string = 'C4',
   envelope?: Partial<EnvelopeConfig>,
   parameters?: Record<string, unknown>,
 ): { synthConfig: InstrumentConfig; instrumentNote: string } {
@@ -273,7 +273,7 @@ export function makeSampleConfig(padId: number, name: string, url: string): { sy
 /** Create a pad-owned DrumMachine config (circuit-modeled 808/909 synthesis) */
 function makeDrumMachineConfig(
   padId: number, name: string, drumType: DrumType, machineType: DrumMachineType,
-  note: string = 'C3', drumSubType?: string
+  note: string = 'C4', drumSubType?: string
 ): { synthConfig: InstrumentConfig; instrumentNote: string } {
   const synthType = machineType === '808' ? 'TR808' : 'TR909';
   const paramKey = machineType === '808' ? 'io808Type' : 'tr909Type';

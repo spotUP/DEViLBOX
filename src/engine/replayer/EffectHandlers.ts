@@ -357,7 +357,7 @@ export function doMultiNoteRetrig(
  * Tremor effect: alternates between volume on/off.
  * x = on-time ticks, y = off-time ticks.
  */
-export function doTremor(ch: ChannelState, param: number, time: number): void {
+export function doTremor(ch: ChannelState, param: number, time: number, applySynthVolume?: (vol: number) => void): void {
   const tp = param !== 0 ? param : ch.tremorParam;
   ch.tremorParam = tp;
 
@@ -379,4 +379,8 @@ export function doTremor(ch: ChannelState, param: number, time: number): void {
   ch.tremorPos = tremorSign | (tremorData & 0x7F);
   const tremorVol = tremorSign === 0x80 ? ch.volume : 0;
   ch.gainNode.gain.setValueAtTime(tremorVol / 64, time);
+  // Apply to synths if callback provided
+  if (applySynthVolume) {
+    applySynthVolume(tremorVol / 64);
+  }
 }

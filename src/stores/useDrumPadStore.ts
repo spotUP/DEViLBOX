@@ -491,6 +491,8 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           // Apply MPC field defaults for pads loaded from older versions
           const migratedPads = (prog.pads || []).map((p: DrumPad) => ({
             ...p,
+            // Migrate C3 → C4 (old default played too low — Z row instead of Q row)
+            instrumentNote: p.instrumentNote === 'C3' ? 'C4' : p.instrumentNote,
             muteGroup: p.muteGroup ?? 0,
             playMode: p.playMode ?? 'oneshot',
             sampleStart: p.sampleStart ?? 0,
@@ -508,7 +510,8 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           }));
           // Expand 16-pad programs to 64
           while (migratedPads.length < 64) {
-            migratedPads.push(createEmptyPad(migratedPads.length + 1));
+            const ep = createEmptyPad(migratedPads.length + 1);
+            migratedPads.push({ ...ep, instrumentNote: ep.instrumentNote });
           }
           programs.set(id, { ...prog, pads: migratedPads });
         });

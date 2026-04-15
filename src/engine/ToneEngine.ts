@@ -5184,6 +5184,147 @@ export class ToneEngine {
   }
 
   // ============================================
+  // EFFECT COMMAND SUPPORT FOR SYNTHS
+  // ============================================
+
+  /**
+   * Apply volume to a synth instrument (for Cxx, Axy, 7xy effects)
+   * @param instrumentId - Instrument ID
+   * @param volume - Volume 0-1 (linear gain)
+   * @param time - Audio time
+   * @param channelIndex - Channel index for per-channel synths
+   */
+  public applySynthVolume(instrumentId: number, volume: number, time: number, channelIndex?: number): void {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    const instrument = this.instruments.get(key);
+    if (!instrument) return;
+
+    const safeTime = this.getSafeTime(time) ?? Tone.now();
+    
+    // Convert 0-1 linear gain to decibels for Tone.js
+    const dbVolume = volume <= 0 ? -Infinity : Tone.gainToDb(volume);
+    
+    // Most Tone.js synths have .volume (Param<"decibels">)
+    if ('volume' in instrument && instrument.volume) {
+      const volParam = instrument.volume as unknown as Tone.Param<'decibels'>;
+      if (typeof volParam.setValueAtTime === 'function') {
+        volParam.setValueAtTime(dbVolume, safeTime);
+      }
+    }
+  }
+
+  /**
+   * Apply panning to a synth instrument (for 8xx, Pxy effects)
+   * @param instrumentId - Instrument ID
+   * @param pan - Pan -1 (left) to 1 (right)
+   * @param time - Audio time
+   * @param channelIndex - Channel index for per-channel synths
+   */
+  public applySynthPan(instrumentId: number, pan: number, time: number, channelIndex?: number): void {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    const instrument = this.instruments.get(key);
+    if (!instrument) return;
+
+    const safeTime = this.getSafeTime(time) ?? Tone.now();
+    
+    // Check if synth has internal panner
+    if ('pan' in instrument && instrument.pan) {
+      const panParam = instrument.pan as unknown as Tone.Param<'audioRange'>;
+      if (typeof panParam.setValueAtTime === 'function') {
+        panParam.setValueAtTime(pan, safeTime);
+      }
+    } else {
+      // TODO: Create external panner if synth doesn't have one
+      // For now, synths without .pan won't respond to pan effects
+    }
+  }
+
+  /**
+   * Apply pitch offset to a synth instrument (for portamento, vibrato, arpeggio)
+   * @param instrumentId - Instrument ID
+   * @param semitones - Pitch offset in semitones (can be fractional)
+   * @param time - Audio time
+   * @param channelIndex - Channel index for per-channel synths
+   * @param rampTime - If provided, ramp to the pitch over this duration
+   */
+  public applySynthPitch(instrumentId: number, semitones: number, time: number, channelIndex?: number, rampTime?: number): void {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    const instrument = this.instruments.get(key);
+    
+    if (!instrument) {
+      console.warn('🎵 applySynthPitch: No instrument for key', key);
+      return;
+    }
+
+    const safeTime = this.getSafeTime(time) ?? Tone.now();
+    const cents = semitones * 100;
+
+    // PolySynth: detune all voices
+    if (instrument instanceof Tone.PolySynth) {
+      console.log('🎵 Detuning PolySynth voices:', instrument._activeVoices.length, 'active');
+      instrument._activeVoices.forEach((voice: any) => {
+        if (voice.detune) {
+          voice.detune.setValueAtTime(cents, safeTime);
+        }
+      });
+      return;
+    }
+
+    // Regular synths with .detune parameter
+    if ('detune' in instrument && instrument.detune) {
+      const detuneParam = instrument.detune as unknown as Tone.Param<'cents'>;
+      console.log('🎵 Setting detune to', cents, 'cents on', instrument.constructor.name);
+      if (rampTime && typeof detuneParam.linearRampToValueAtTime === 'function') {
+        detuneParam.linearRampToValueAtTime(cents, safeTime + rampTime);
+      } else if (typeof detuneParam.setValueAtTime === 'function') {
+        detuneParam.setValueAtTime(cents, safeTime);
+      }
+    } else {
+      console.warn('⚠️ No detune on', instrument.constructor.name);
+    }
+  }
+
+  /**
+   * Apply frequency effect to a synth instrument (for portamento)
+   * @param instrumentId - Instrument ID
+   * @param frequency - Target frequency in Hz
+   * @param time - Audio time
+   * @param channelIndex - Channel index for per-channel synths
+   * @param rampTime - If provided, ramp to the frequency over this duration
+   */
+  public applySynthFrequency(instrumentId: number, frequency: number, time: number, channelIndex?: number, rampTime?: number): void {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    const instrument = this.instruments.get(key);
+    if (!instrument) return;
+
+    const safeTime = this.getSafeTime(time) ?? Tone.now();
+
+    // Get frequency parameter (varies by synth type)
+    let freqParam: Tone.Param<'frequency'> | undefined;
+    
+    if ('frequency' in instrument && instrument.frequency) {
+      freqParam = instrument.frequency as Tone.Param<'frequency'>;
+    } else if ('oscillator' in instrument && (instrument as any).oscillator?.frequency) {
+      freqParam = (instrument as any).oscillator.frequency;
+    } else if ('voice0' in instrument && (instrument as any).voice0?.oscillator?.frequency) {
+      // DuoSynth has voice0 and voice1
+      freqParam = (instrument as any).voice0.oscillator.frequency;
+    }
+
+    if (freqParam && typeof freqParam.setValueAtTime === 'function') {
+      if (rampTime && typeof freqParam.exponentialRampToValueAtTime === 'function') {
+        freqParam.exponentialRampToValueAtTime(Math.max(0.01, frequency), safeTime + rampTime);
+      } else {
+        freqParam.setValueAtTime(frequency, safeTime);
+      }
+    }
+  }
+
+  // ============================================
+  // END EFFECT COMMAND SUPPORT
+  // ============================================
+
+  // ============================================
   // END PERFORMANCE QUALITY MANAGEMENT
   // ============================================
 }

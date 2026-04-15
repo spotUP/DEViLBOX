@@ -72,11 +72,11 @@ const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
   scratch_drag: djScratchDrag,
   scratch_vibrato: djScratchVibrato,
   scratch_stop: djScratchStop,
-  lfo_off: djFaderLFOOff,
-  lfo_14: djFaderLFO14,
-  lfo_18: djFaderLFO18,
-  lfo_116: djFaderLFO116,
-  lfo_132: djFaderLFO132,
+  fader_lfo_off: djFaderLFOOff,
+  fader_lfo_1_4: djFaderLFO14,
+  fader_lfo_1_8: djFaderLFO18,
+  fader_lfo_1_16: djFaderLFO116,
+  fader_lfo_1_32: djFaderLFO132,
 };
 
 /* ── QWERTY pad map ─────────────────────────────────────────────────────────── */

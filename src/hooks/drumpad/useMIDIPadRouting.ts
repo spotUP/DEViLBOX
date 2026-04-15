@@ -56,8 +56,130 @@ const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => bool
   fader_lfo_1_32: djFaderLFO132,
 };
 
-const MIDI_PAD_LO = 36;
-const MIDI_PAD_HI = 43;
+// Accept wide MIDI note range - auto-detect controller mapping
+const MIDI_PAD_LO = 0;    // Accept any MIDI note
+const MIDI_PAD_HI = 127;  // Full MIDI range
+
+// Auto-learned note mapping (stored in module scope, persisted to localStorage)
+// Key: MIDI device ID, Value: learned note array
+const _deviceMappings = new Map<string, number[]>();
+let _currentDeviceId: string | null = null;
+let _learningMode: 'off' | 'auto' | 'manual' = 'off';
+let _manualLearnIndex = 0;
+
+// Load all learned mappings from localStorage
+try {
+  const stored = localStorage.getItem('devilbox_midi_pad_mappings');
+  if (stored) {
+    const obj = JSON.parse(stored);
+    Object.entries(obj).forEach(([deviceId, notes]) => {
+      _deviceMappings.set(deviceId, notes as number[]);
+    });
+    console.log('[MIDI Pads] Loaded learned mappings for', _deviceMappings.size, 'devices');
+  }
+} catch (e) {
+  console.warn('[MIDI Pads] Failed to load learned mappings:', e);
+}
+
+// Save all learned mappings to localStorage
+function saveLearning() {
+  try {
+    const obj: Record<string, number[]> = {};
+    _deviceMappings.forEach((notes, deviceId) => {
+      obj[deviceId] = notes;
+    });
+    localStorage.setItem('devilbox_midi_pad_mappings', JSON.stringify(obj));
+    console.log('[MIDI Pads] Saved learned mappings');
+  } catch (e) {
+    console.warn('[MIDI Pads] Failed to save learned mappings:', e);
+  }
+}
+
+// Get current device's learned notes
+function getCurrentMapping(): number[] {
+  if (!_currentDeviceId) return [];
+  return _deviceMappings.get(_currentDeviceId) || [];
+}
+
+// Set current device's learned notes
+function setCurrentMapping(notes: number[]) {
+  if (!_currentDeviceId) return;
+  _deviceMappings.set(_currentDeviceId, notes);
+  saveLearning();
+}
+
+// Start auto-detection mode - collects unique notes then sorts them
+export function startMIDIPadAutoDetect() {
+  if (!_currentDeviceId) {
+    console.warn('[MIDI Pads] No MIDI device connected');
+    return;
+  }
+  _deviceMappings.set(_currentDeviceId, []);
+  _learningMode = 'auto';
+  console.log('[MIDI Pads] Auto-detect started - play all 16 pads');
+}
+
+// Start manual learn mode - learns pads in order (pad 1, pad 2, pad 3...)
+export function startMIDIPadManualLearn() {
+  if (!_currentDeviceId) {
+    console.warn('[MIDI Pads] No MIDI device connected');
+    return;
+  }
+  _deviceMappings.set(_currentDeviceId, []);
+  _manualLearnIndex = 0;
+  _learningMode = 'manual';
+  console.log('[MIDI Pads] Manual learn started - press pad 1');
+}
+
+// Stop learning mode
+export function stopMIDIPadLearning() {
+  const learnedNotes = getCurrentMapping();
+  
+  if (_learningMode === 'auto' && learnedNotes.length > 0) {
+    learnedNotes.sort((a, b) => a - b);
+    setCurrentMapping(learnedNotes);
+  }
+  
+  if (learnedNotes.length > 0) {
+    console.log('[MIDI Pads] Learning complete:', learnedNotes);
+  }
+  
+  _learningMode = 'off';
+  _manualLearnIndex = 0;
+}
+
+// Get learning status (for UI display)
+export function getMIDIPadLearningStatus() {
+  return {
+    mode: _learningMode,
+    deviceId: _currentDeviceId,
+    learnedCount: getCurrentMapping().length,
+    currentPad: _learningMode === 'manual' ? _manualLearnIndex + 1 : null,
+    notes: getCurrentMapping(),
+  };
+}
+
+// Reset learned mapping for current device
+export function resetMIDIPadLearning() {
+  if (!_currentDeviceId) {
+    console.warn('[MIDI Pads] No MIDI device connected');
+    return;
+  }
+  _deviceMappings.delete(_currentDeviceId);
+  _learningMode = 'off';
+  _manualLearnIndex = 0;
+  saveLearning();
+  console.log('[MIDI Pads] Learned mapping reset for device:', _currentDeviceId);
+}
+
+// Expose to window for console debugging
+if (typeof window !== 'undefined') {
+  (window as any).startMIDIPadAutoDetect = startMIDIPadAutoDetect;
+  (window as any).startMIDIPadManualLearn = startMIDIPadManualLearn;
+  (window as any).stopMIDIPadLearning = stopMIDIPadLearning;
+  (window as any).getMIDIPadLearningStatus = getMIDIPadLearningStatus;
+  (window as any).resetMIDIPadLearning = resetMIDIPadLearning;
+}
 const PAD_VIEWS = new Set(['drumpad', 'dj', 'vj']);
 
 /* ── Module-level singleton engine ── */
@@ -173,7 +295,7 @@ export function useMIDIPadRouting() {
                   config = useInstrumentStore.getState().getInstrument(instId);
                 }
                 if (config) {
-                  const note = pad.instrumentNote || 'C3';
+                  const note = pad.instrumentNote || 'C4';
                   getToneEngine().triggerNoteRelease(instId, note, 0, config);
                 }
               } catch { /* ignore */ }
@@ -185,7 +307,6 @@ export function useMIDIPadRouting() {
     _heldPads.clear();
   }, [currentProgram, setFxPadActive]);
 
-  // ── Full-featured pad trigger ──
   const triggerPad = useCallback((padId: number, velocity: number) => {
     const ctx = getAudioContext();
     if (ctx.state === 'closed') return;
@@ -235,7 +356,7 @@ export function useMIDIPadRouting() {
     if (pad.synthConfig || pad.instrumentId != null) {
       try {
         const engine = getToneEngine();
-        const note = pad.instrumentNote || 'C3';
+        const note = pad.instrumentNote || 'C4';
         const normalizedVel = curvedVelocity / 127;
 
         let instId: number;
@@ -306,7 +427,7 @@ export function useMIDIPadRouting() {
             config = useInstrumentStore.getState().getInstrument(instId);
           }
           if (config) {
-            const note = pad.instrumentNote || 'C3';
+            const note = pad.instrumentNote || 'C4';
             getToneEngine().triggerNoteRelease(instId, note, 0, config);
           }
         } catch { /* ignore */ }
@@ -334,9 +455,60 @@ export function useMIDIPadRouting() {
       if (!PAD_VIEWS.has(view)) return;
       if (message.note === undefined || message.note < MIDI_PAD_LO || message.note > MIDI_PAD_HI) return;
 
+      // Track current MIDI device (use channel as proxy for device ID)
+      const deviceKey = `ch${message.channel}`;
+      if (_currentDeviceId !== deviceKey) {
+        _currentDeviceId = deviceKey;
+      }
+
       const bank = currentBankRef.current;
       const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[bank];
-      const padIndex = message.note - MIDI_PAD_LO;
+      
+      const learnedNotes = getCurrentMapping();
+      
+      // Learning mode: collect notes
+      if (_learningMode !== 'off' && message.type === 'noteOn') {
+        if (_learningMode === 'auto') {
+          // Auto mode: collect unique notes, sort later
+          if (!learnedNotes.includes(message.note)) {
+            learnedNotes.push(message.note);
+            setCurrentMapping(learnedNotes);
+            console.log(`[MIDI Pads] Auto-learned note ${message.note} (${learnedNotes.length}/16)`);
+            
+            if (learnedNotes.length === 16) {
+              stopMIDIPadLearning();
+            }
+          }
+        } else if (_learningMode === 'manual') {
+          // Manual mode: learn pads in order (1, 2, 3...)
+          learnedNotes[_manualLearnIndex] = message.note;
+          setCurrentMapping(learnedNotes);
+          console.log(`[MIDI Pads] Learned pad ${_manualLearnIndex + 1} → note ${message.note}`);
+          _manualLearnIndex++;
+          
+          if (_manualLearnIndex === 16) {
+            stopMIDIPadLearning();
+          } else {
+            console.log(`[MIDI Pads] Press pad ${_manualLearnIndex + 1}`);
+          }
+        }
+        // Don't trigger pads during learning
+        return;
+      }
+      
+      // Map note to pad index (0-15)
+      // Standard GM drum mapping: note 36 = pad 0 (kick), 37 = pad 1, ...
+      let padIndex: number;
+      if (learnedNotes.length > 0) {
+        padIndex = learnedNotes.indexOf(message.note);
+        if (padIndex === -1) {
+          // Note not in learned set — fall back to GM drum mapping
+          padIndex = ((message.note - 36) % 16 + 16) % 16;
+        }
+      } else {
+        padIndex = ((message.note - 36) % 16 + 16) % 16;
+      }
+      
       const padId = bankOffset + padIndex + 1;
 
       if (message.type === 'noteOn' && message.velocity) {

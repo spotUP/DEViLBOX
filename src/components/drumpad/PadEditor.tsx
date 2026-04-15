@@ -146,11 +146,11 @@ const SCRATCH_ACTION_OPTIONS: { value: ScratchActionId | ''; label: string }[] =
   { value: 'scratch_vibrato', label: 'Vibrato' },
   // Control
   { value: 'scratch_stop',   label: 'Stop Scratch' },
-  { value: 'lfo_off',        label: 'Fader LFO: Off' },
-  { value: 'lfo_14',         label: 'Fader LFO: ¼' },
-  { value: 'lfo_18',         label: 'Fader LFO: ⅛' },
-  { value: 'lfo_116',        label: 'Fader LFO: ⅟₁₆' },
-  { value: 'lfo_132',        label: 'Fader LFO: ⅟₃₂' },
+  { value: 'fader_lfo_off',        label: 'Fader LFO: Off' },
+  { value: 'fader_lfo_1_4',         label: 'Fader LFO: ¼' },
+  { value: 'fader_lfo_1_8',         label: 'Fader LFO: ⅛' },
+  { value: 'fader_lfo_1_16',        label: 'Fader LFO: ⅟₁₆' },
+  { value: 'fader_lfo_1_32',        label: 'Fader LFO: ⅟₃₂' },
 ];
 
 const DJ_FX_OPTIONS: { value: DjFxActionId | ''; label: string; category: string }[] = [
@@ -393,7 +393,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                       handleUpdate({
                         synthConfig: newConfig,
                         instrumentId: undefined,
-                        instrumentNote: pad.instrumentNote || 'C3',
+                        instrumentNote: pad.instrumentNote || 'C4',
                         name: pad.name === `Pad ${pad.id}` ? val : pad.name,
                       });
                     }
@@ -417,7 +417,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Trigger Note</label>
                   <CustomSelect
-                    value={pad.instrumentNote || 'C3'}
+                    value={pad.instrumentNote || 'C4'}
                     onChange={(v) => handleUpdate({ instrumentNote: v })}
                     options={(() => {
                       const notes: { value: string; label: string }[] = [];
@@ -498,7 +498,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                       try {
                         const padInstId = PAD_INSTRUMENT_BASE + pad.id;
                         const config = { ...pad.synthConfig, id: padInstId };
-                        const note = pad.instrumentNote || 'C3';
+                        const note = pad.instrumentNote || 'C4';
                         getToneEngine().triggerNoteAttack(padInstId, note, 0, 0.8, config);
                         setTimeout(() => {
                           try { getToneEngine().triggerNoteRelease(padInstId, note, 0, config); } catch {}
@@ -537,7 +537,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                           try {
                             const padInstId = PAD_INSTRUMENT_BASE + pad.id;
                             const config = { ...pad.synthConfig!, id: padInstId };
-                            const note = pad.instrumentNote || 'C3';
+                            const note = pad.instrumentNote || 'C4';
                             getToneEngine().triggerNoteAttack(padInstId, note, 0, 0.8, config);
                             setTimeout(() => {
                               try { getToneEngine().triggerNoteRelease(padInstId, note, 0, config); } catch {}

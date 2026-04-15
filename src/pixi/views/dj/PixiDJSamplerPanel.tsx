@@ -49,11 +49,11 @@ const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
   scratch_drag: djScratchDrag,
   scratch_vibrato: djScratchVibrato,
   scratch_stop: djScratchStop,
-  lfo_off: djFaderLFOOff,
-  lfo_14: djFaderLFO14,
-  lfo_18: djFaderLFO18,
-  lfo_116: djFaderLFO116,
-  lfo_132: djFaderLFO132,
+  fader_lfo_off: djFaderLFOOff,
+  fader_lfo_1_4: djFaderLFO14,
+  fader_lfo_1_8: djFaderLFO18,
+  fader_lfo_1_16: djFaderLFO116,
+  fader_lfo_1_32: djFaderLFO132,
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -327,7 +327,7 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
       if (pad.synthConfig) {
         try {
           const engine = getToneEngine();
-          const note = pad.instrumentNote || 'C3';
+          const note = pad.instrumentNote || 'C4';
           const normalizedVel = velocity / 127;
           const padInstId = PAD_INSTRUMENT_BASE + pad.id;
           const config = { ...pad.synthConfig, id: padInstId };
@@ -371,7 +371,7 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
       try {
         const padInstId = PAD_INSTRUMENT_BASE + pad.id;
         const config = { ...pad.synthConfig, id: padInstId };
-        const note = pad.instrumentNote || 'C3';
+        const note = pad.instrumentNote || 'C4';
         getToneEngine().triggerNoteRelease(padInstId, note, 0, config);
       } catch { /* ignore */ }
     }

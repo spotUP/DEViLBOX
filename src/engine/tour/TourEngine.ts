@@ -83,6 +83,8 @@ const PHONEME_MAP: Record<string, string> = {
   'Amiga':        'ah mee gah',
   'Commodore':    'comma door',
   // Common mispronunciations
+  'instruments':  'instr uments',
+  'instrument':   'instr ument',
   'music':        'myuzik',
   'Music':        'myuzik',
   'musical':      'myuzikal',
