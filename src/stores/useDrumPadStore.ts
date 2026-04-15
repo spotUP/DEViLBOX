@@ -24,6 +24,10 @@ import { mpcResample, MODEL_CONFIGS } from '../engine/mpc-resampler/MpcResampler
 import type { MpcResampleOptions } from '../engine/mpc-resampler/MpcResamplerDSP';
 
 interface DrumPadStore extends DrumPadState {
+  // Controller-detected pad count (8, 16, etc.) — drives grid layout
+  controllerPadCount: number;
+  setControllerPadCount: (count: number) => void;
+
   // FX tracking
   activeFxPads: Set<number>;
   setFxPadActive: (padId: number, active: boolean) => void;
@@ -103,6 +107,10 @@ const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 let _schemaResetPending = false;
 
 export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
+  // Controller-detected pad count (default 16 = MPC standard 4×4)
+  controllerPadCount: 16,
+  setControllerPadCount: (count: number) => set({ controllerPadCount: count }),
+
   // FX tracking
   activeFxPads: new Set<number>(),
   setFxPadActive: (padId: number, active: boolean) => {

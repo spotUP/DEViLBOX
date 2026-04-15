@@ -125,6 +125,26 @@ export function noteToMidi(note: string | number | null | undefined): number {
 }
 
 /**
+ * Convert MIDI note number to string note
+ *
+ * @param midi MIDI note number (0-127)
+ * @returns String note ("C-4", "D#5", etc.)
+ *
+ * MIDI: C-4 = 60, C-0 = 12
+ */
+export function midiToNote(midi: number): string {
+  // Clamp to valid MIDI range
+  const clampedMidi = Math.max(0, Math.min(127, midi));
+  
+  // Calculate octave and semitone
+  // MIDI C-0 = 12, so (midi / 12) - 1 = octave
+  const octave = Math.floor(clampedMidi / 12) - 1;
+  const semitone = clampedMidi % 12;
+  
+  return `${NOTE_NAMES[semitone]}${octave}`;
+}
+
+/**
  * XM Effect type mapping
  * Maps effect character to effect type number
  */

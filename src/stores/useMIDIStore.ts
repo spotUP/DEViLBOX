@@ -653,6 +653,22 @@ export const useMIDIStore = create<MIDIStore>()(
           }
         });
 
+        // Detect controller profile → update drum pad grid layout
+        if (id) {
+          const device = get().inputDevices.find(d => d.id === id);
+          if (device) {
+            import('../midi/controllerProfiles').then(({ detectControllerProfile }) => {
+              const profile = detectControllerProfile(device.name);
+              if (profile && profile.pads.length > 0) {
+                import('./useDrumPadStore').then(({ useDrumPadStore }) => {
+                  useDrumPadStore.getState().setControllerPadCount(profile.pads.length);
+                  console.log(`[MIDI] Detected ${profile.name}: ${profile.pads.length} pads`);
+                });
+              }
+            });
+          }
+        }
+
         // Auto-apply NKS mappings if device selected
         if (id) {
           // Import dynamically to avoid circular dependency
