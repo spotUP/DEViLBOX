@@ -183,28 +183,30 @@ async function closeModals(): Promise<void> {
   UI.getState().closeModal();
 }
 
-/** Get the first sample-type instrument from the loaded song */
+/** Get the best sample-type instrument from the loaded song (largest sample = most interesting) */
 async function getFirstSampleInstrument(): Promise<number | null> {
   const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
   const instruments = useInstrumentStore.getState().instruments;
-  // Find first instrument with actual sample data (non-empty audioBuffer or URL)
-  const sampleInst = instruments.find(i =>
+  // Find all instruments with actual sample data
+  const sampleInsts = instruments.filter(i =>
     i.type === 'sample' && (
       (i.sample?.audioBuffer instanceof ArrayBuffer && i.sample.audioBuffer.byteLength > 0) ||
       (i.sample?.url && i.sample.url.length > 0)
     )
   );
-  if (!sampleInst) {
+  if (sampleInsts.length === 0) {
     const sampleTypes = instruments.filter(i => i.type === 'sample');
     console.warn(`[Tour] getFirstSampleInstrument: ${instruments.length} instruments, ${sampleTypes.length} sample-type, none with valid data`);
-    if (sampleTypes.length > 0) {
-      const first = sampleTypes[0];
-      console.warn(`[Tour]   first sample: id=${first.id} name="${first.name}" bufLen=${(first.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 'none'} url=${first.sample?.url ? 'yes' : 'no'}`);
-    }
-  } else {
-    console.log(`[Tour] getFirstSampleInstrument: found id=${sampleInst.id} name="${sampleInst.name}"`);
+    return null;
   }
-  return sampleInst?.id ?? null;
+  // Pick the largest sample (most visually interesting waveform)
+  const best = sampleInsts.reduce((a, b) => {
+    const aSize = (a.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 0;
+    const bSize = (b.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 0;
+    return bSize > aSize ? b : a;
+  });
+  console.log(`[Tour] getFirstSampleInstrument: picked id=${best.id} name="${best.name}" (${(best.sample?.audioBuffer as ArrayBuffer)?.byteLength ?? 0} bytes)`);
+  return best.id;
 }
 
 /** Apply a WaveformProcessor operation to an instrument's sample (visually updates editor) */
@@ -250,10 +252,14 @@ async function applySampleOperation(
         return;
     }
 
-    // Encode back and update in store
+    // Encode back and update in store — also create a blob URL so the
+    // SampleEditor waveform display sees the change (it watches sample.url,
+    // not sample.audioBuffer directly)
     const arrayBuffer = await getToneEngine().encodeAudioData(result);
+    const blob = new Blob([arrayBuffer.slice(0)], { type: 'audio/wav' });
+    const blobUrl = URL.createObjectURL(blob);
     useInstrumentStore.getState().updateInstrument(instrumentId, {
-      sample: { ...inst.sample, audioBuffer: arrayBuffer },
+      sample: { ...inst.sample, audioBuffer: arrayBuffer, url: blobUrl },
     });
     getToneEngine().invalidateInstrument(instrumentId);
   } catch (err) {
@@ -303,8 +309,10 @@ async function applySampleEnhancement(
     }
 
     const arrayBuffer = await getToneEngine().encodeAudioData(processed.buffer);
+    const blob = new Blob([arrayBuffer.slice(0)], { type: 'audio/wav' });
+    const blobUrl = URL.createObjectURL(blob);
     useInstrumentStore.getState().updateInstrument(instrumentId, {
-      sample: { ...inst.sample, audioBuffer: arrayBuffer },
+      sample: { ...inst.sample, audioBuffer: arrayBuffer, url: blobUrl },
     });
     getToneEngine().invalidateInstrument(instrumentId);
   } catch (err) {
@@ -329,8 +337,11 @@ async function restoreSample(instrumentId: number): Promise<void> {
   const { getToneEngine } = await import('@/engine/ToneEngine');
   const inst = useInstrumentStore.getState().getInstrument(instrumentId);
   if (!inst?.sample) return;
+  const buf = originalSampleBackup.slice(0);
+  const blob = new Blob([buf.slice(0)], { type: 'audio/wav' });
+  const blobUrl = URL.createObjectURL(blob);
   useInstrumentStore.getState().updateInstrument(instrumentId, {
-    sample: { ...inst.sample, audioBuffer: originalSampleBackup.slice(0) },
+    sample: { ...inst.sample, audioBuffer: buf, url: blobUrl },
   });
   getToneEngine().invalidateInstrument(instrumentId);
 }
@@ -559,26 +570,6 @@ async function searchAndLoadModland(query: string, deckId: 'A' | 'B'): Promise<v
 }
 
 /** Search HVSC and load the first result into DJ deck */
-async function searchAndLoadHVSC(query: string, deckId: 'A' | 'B'): Promise<void> {
-  try {
-    const { searchHVSC, downloadHVSCFile } = await import('@/lib/hvscApi');
-    const results = await searchHVSC(query, 5);
-    if (!results || results.length === 0) {
-      console.warn(`[Tour] No HVSC results for "${query}"`);
-      return;
-    }
-    const entry = results[0];
-    const buffer = await downloadHVSCFile(entry.path);
-    const filename = entry.path.split('/').pop() || 'download.sid';
-
-    const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    const { loadUADEToDeck } = await import('@/engine/dj/DJUADEPrerender');
-    await loadUADEToDeck(getDJEngine(), deckId, buffer, filename, true);
-  } catch (err) {
-    console.warn(`[Tour] HVSC search/load failed for "${query}":`, err);
-  }
-}
-
 // ── Automation actions ──────────────────────────────────────────────────────
 
 /** Create a demo automation curve on a channel with a preset shape */
@@ -1143,21 +1134,32 @@ export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 3b: Sample Editor Deep Dive ─────────────────────────────────────
   {
     id: 'sample-load',
-    narration: 'Now the sample editor. Let me load a classic Amiga module with real samples.',
+    narration: 'Now the sample editor. Let me load Cannon Fodder — a classic Amiga game with vocal samples.',
     action: async () => {
       await closeModals();
-      await loadTrackerSong('/data/songs/exports/aces_high.mod');
+      await loadTrackerSong('/data/songs/exports/cannonfodder.mod');
     },
     postDelay: 2000,
   },
   {
     id: 'sample-open',
-    narration: 'Opening the first sample instrument.',
+    narration: 'Opening the biggest sample — should have the most interesting waveform.',
     action: async () => {
       await closeModals();
       const id = await getFirstSampleInstrument();
       if (id != null) {
         const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+        const inst = useInstrumentStore.getState().getInstrument(id);
+        // If the instrument has an audioBuffer but no URL (MOD import), create a
+        // blob URL so the SampleEditor's useEffect will load and display the waveform
+        if (inst?.sample?.audioBuffer && !inst.sample.url) {
+          const buf = inst.sample.audioBuffer as ArrayBuffer;
+          const blob = new Blob([buf.slice(0)], { type: 'audio/wav' });
+          const blobUrl = URL.createObjectURL(blob);
+          useInstrumentStore.getState().updateInstrument(id, {
+            sample: { ...inst.sample, url: blobUrl },
+          });
+        }
         useInstrumentStore.getState().setCurrentInstrument(id);
         await openInstrumentEditor(id);
         await backupSample(id);
@@ -1492,15 +1494,15 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-archives-hvsc',
-    narration: 'Now the HVSC. 80,000 Commodore 64 SID tunes. Searching Rob Hubbard.',
+    narration: 'Now another classic. Searching Jochen Hippel on Modland.',
     action: async () => {
-      await searchAndLoadHVSC('hubbard commando', 'B');
+      await searchAndLoadModland('jochen hippel', 'B');
     },
     postDelay: 1500,
   },
   {
     id: 'dj-archives-play-sid',
-    narration: 'Commodore 64 on deck B. Crossfading.',
+    narration: 'Two classic modules. Crossfading between them.',
     action: async () => {
       await djPlay('B');
       // Crossfade from A to B over 3 seconds
