@@ -71,8 +71,7 @@ export class VLM5030Synth extends MAMEBaseSynth {
   // ROM state
   private _romData: Uint8Array | null = null;
   private _romSentToWasm = false;
-  private _currentRomSpeech = 0;  // merged selector: 0..3 = phrases, 4+ = words
-  private static readonly PHRASE_COUNT = 4;
+  private _currentRomSpeech = 0;  // 0 = TTS, 1+ = ROM word index + 1
 
   constructor() {
     super();
@@ -362,32 +361,8 @@ export class VLM5030Synth extends MAMEBaseSynth {
 
   /** Play ROM speech — phrases (0..3) or individual words (4+) */
   private _playRomSpeech(selection: number): void {
-    if (selection < VLM5030Synth.PHRASE_COUNT) {
-      this._playPhrase(selection);
-    } else {
-      this.speakWord(selection - VLM5030Synth.PHRASE_COUNT);
-    }
-  }
-
-  /** Track & Field phrase sequences (word indices) */
-  private static readonly PHRASES: number[][] = [
-    [0, 1, 2],         // READY SET GO
-    [3, 4],            // 100 METER DASH
-    [18],              // NEW RECORD
-    [19],              // GAME OVER
-  ];
-
-  private _playPhrase(phraseIdx: number): void {
-    if (phraseIdx < 0 || phraseIdx >= VLM5030Synth.PHRASES.length) return;
-    const words = VLM5030Synth.PHRASES[phraseIdx];
-    let i = 0;
-    const playNext = () => {
-      if (i >= words.length) return;
-      this.speakWord(words[i]);
-      i++;
-      setTimeout(playNext, 600);
-    };
-    playNext();
+    // selection is 1-based (0 = TTS), word index is 0-based
+    this.speakWord(selection - 1);
   }
 
   setTextParam(key: string, value: string): void {
