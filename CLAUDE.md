@@ -84,7 +84,49 @@ Stores + Hooks (shared)  →  DOM Components (React HTML/canvas)
 3. **Never use DOM overlays in the Pixi/GL UI** — `PixiDOMOverlay` breaks CRT shaders and post-processing effects. All Pixi views must render natively using Pixi components.
 4. **Pattern editors are modular** — Use `PatternEditorCanvas` (DOM) and `PixiPatternEditor`/format-specific grid (Pixi) with shared format channel data from the adapter layer.
 5. **DOM is the source of truth — always fix DOM first, then GL** — The user tests in DOM mode. When they report a UI issue, ALWAYS check and fix the DOM component first (`src/components/`), then apply the same fix to the Pixi/GL equivalent (`src/pixi/`). Never fix GL without first verifying DOM is correct. Every new UI component, dialog, or view MUST be implemented in both DOM and GL. The GL version must be visually 1:1 with the DOM version.
-6. **Always use design tokens — NEVER hardcode colors** — DOM components use Tailwind token classes (`text-accent-primary`, `bg-accent-error/10`, `text-text-muted`, etc.) — NEVER raw Tailwind colors (`text-red-400`, `bg-blue-500`). Pixi/GL components use `theme.*` from `usePixiTheme()` (`theme.accent.color`, `theme.error.color`, `theme.success.color`, etc.) — NEVER hardcoded hex values (`0xff4444`, `0x60a5fa`). For tinted backgrounds in GL, use `tintBg(theme.error.color)` pattern. The only exceptions are intentional decorative palettes (channel colors, hot cue colors, oscilloscope voice colors).
+6. **Always use design tokens — NEVER hardcode colors** — DOM components use Tailwind token classes from `tailwind.config.js` — NEVER raw Tailwind colors (`text-red-400`, `bg-blue-500`). Pixi/GL components use `theme.*` from `usePixiTheme()` — NEVER hardcoded hex values. The only exceptions are intentional decorative palettes (channel colors, hot cue colors, oscilloscope voice colors). **See the exact token class reference below.**
+
+### Tailwind Token Class Reference (MANDATORY)
+
+These are the **ONLY** valid color classes. Do NOT invent class names — if it's not in this list, it doesn't exist.
+
+**COMMON MISTAKE:** Using `bg-bg-primary`, `border-border-primary`, `bg-bg-secondary` — these DO NOT EXIST. The correct prefix is `dark-` for backgrounds/borders and `text-` for text colors.
+
+| Purpose | Background | Text | Border |
+|---------|-----------|------|--------|
+| **Primary surface** | `bg-dark-bg` | `text-text-primary` | `border-dark-border` |
+| **Secondary surface** | `bg-dark-bgSecondary` | `text-text-secondary` | `border-dark-borderLight` |
+| **Tertiary surface** | `bg-dark-bgTertiary` | `text-text-muted` | — |
+| **Hover state** | `bg-dark-bgHover` | — | — |
+| **Active state** | `bg-dark-bgActive` | — | — |
+| **Inverse text** | — | `text-text-inverse` | — |
+| **Primary accent** | `bg-accent-primary` | `text-accent-primary` | `border-accent-primary` |
+| **Secondary accent** | `bg-accent-secondary` | `text-accent-secondary` | `border-accent-secondary` |
+| **Highlight accent** | `bg-accent-highlight` | `text-accent-highlight` | `border-accent-highlight` |
+| **Error / destructive** | `bg-accent-error` | `text-accent-error` | `border-accent-error` |
+| **Success** | `bg-accent-success` | `text-accent-success` | `border-accent-success` |
+| **Warning** | `bg-accent-warning` | `text-accent-warning` | `border-accent-warning` |
+
+**Opacity variants:** Append `/<opacity>` — e.g., `bg-accent-primary/10`, `bg-accent-error/20`, `border-accent-primary/50`.
+
+**Focus rings:** `focus:ring-accent-primary` (use `focus:ring-1` not `focus:ring-2` in compact panels).
+
+**Inputs & controls:** `bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs`
+
+**Compact panel typography:** `text-[10px] font-mono` for labels, `text-[9px] font-mono` for badges. NEVER `text-sm font-semibold` in side panels — that's for full-page layouts.
+
+### UI Component Usage (MANDATORY)
+
+Use the design system components from `src/components/ui/` — NEVER build one-off inline buttons/modals:
+
+| Need | Use | NOT |
+|------|-----|-----|
+| Any clickable action | `<Button variant="primary\|default\|ghost\|danger">` | `<button className="px-4 py-2 bg-...">` |
+| Dialog/popup | `<Modal>` + `<ModalHeader>` + `<ModalFooter>` | `<div className="fixed inset-0 ...">` |
+| Dropdown select | `<CustomSelect>` from `@components/common/CustomSelect` | `<select className="...">` |
+| Continuous value | `<Knob>` from `@components/controls/Knob` | `<input type="range">` |
+| Boolean toggle | `<Toggle>` from `@components/controls/Toggle` | `<input type="checkbox">` |
+| Toast message | `notify.success\|error\|warning()` | `alert()` or custom toast div |
 
 ---
 
