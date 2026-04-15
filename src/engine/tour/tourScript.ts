@@ -631,7 +631,6 @@ export const TOUR_SCRIPT: TourStep[] = [
       switchView('tracker');
       await loadTrackerSong('/data/songs/formats/aces_high.ahx');
     },
-    spotlight: '[data-pattern-editor]',
     postDelay: 800,
   },
   {
@@ -806,6 +805,26 @@ export const TOUR_SCRIPT: TourStep[] = [
       // Create TB-303 instrument (id will be assigned)
       const acid303Id = await createAndSelectInstrument('TB303', 'Acid 303');
       if (acid303Id == null) return;
+
+      // Apply "Acid RAT" preset for a fat distorted acid sound
+      const { TB303_PRESETS } = await import('@/constants/tb303Presets');
+      const acidPreset = TB303_PRESETS.find(p => p.name === 'Acid RAT');
+      if (acidPreset) {
+        useInstrumentStore.getState().loadPreset(
+          { id: 'acid-rat', name: 'Acid RAT', category: 'Bass', tags: ['303', 'acid'], config: acidPreset },
+          acid303Id,
+        );
+      }
+
+      // Add a master compressor to glue the acid mix
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      useAudioStore.getState().addMasterEffectConfig({
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 4, attack: 0.003, release: 0.15 },
+      });
 
       // Create a simple kick drum instrument
       const kickId = useInstrumentStore.getState().createInstrument({
@@ -986,6 +1005,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-editor-open',
     narration: 'Now watch what happens when I start turning the knobs.',
     action: async () => {
+      // Expand the synth knob panel to show the 303 controls
+      useUIStore.getState().setKnobPanelCollapsed(false);
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
       if (inst) await openInstrumentEditor(inst.id);
@@ -1090,6 +1111,12 @@ export const TOUR_SCRIPT: TourStep[] = [
       replayer.onSongEnd = null;
       await trackerStop();
       await closeModals();
+      // Collapse the synth panel back
+      useUIStore.getState().setKnobPanelCollapsed(true);
+      // Remove master effects added for the acid demo
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      const masterFx = useAudioStore.getState().masterEffects;
+      masterFx.forEach(fx => useAudioStore.getState().removeMasterEffect(fx.id));
       // Reset 303 to defaults
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
