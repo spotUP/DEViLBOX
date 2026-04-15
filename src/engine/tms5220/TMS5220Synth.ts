@@ -143,6 +143,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
       this._romLoaded = true;
       this.romLoaded = true;
       this._updateRomStatus(true);
+      this._publishRomWordNames();
       const sampleNames = this._romWords.slice(0, 10).map(w => w.name);
       console.log(`[TMS5220] Loaded VSM ROMs: ${this._romData.length} bytes, ${this._romWords.length} words, first 10: [${sampleNames.join(', ')}]`);
 
@@ -175,6 +176,28 @@ export class TMS5220Synth extends MAMEBaseSynth {
     this._romData = null;
     this._romSentToWasm = true;
     console.log('[TMS5220] ROM data sent to WASM worklet');
+  }
+
+  /** Publish ROM word names to the instrument store for dynamic dropdown labels */
+  private _publishRomWordNames(): void {
+    if (this._romWords.length === 0) return;
+    const names = this._romWords.map(w => w.name).join(',');
+    const chipName = this.chipName;
+    const synthType = `MAME${chipName}`;
+    const altTypes = [synthType, chipName];
+
+    import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+      const store = useInstrumentStore.getState();
+      const inst = store.instruments.find((i: { synthType?: string }) =>
+        altTypes.includes(i.synthType ?? '')
+      );
+      if (inst) {
+        const params = (inst as { parameters?: Record<string, unknown> }).parameters;
+        store.updateInstrument(inst.id, {
+          parameters: { ...params, _romWordNames: names },
+        });
+      }
+    }).catch(() => {});
   }
 
   /** Override message handler to send ROM when WASM is ready */
@@ -227,8 +250,9 @@ export class TMS5220Synth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, _velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    // ROM speech: play selected ROM word directly
-    if (this._currentRomSpeech > 0 && this._romSentToWasm) {
+    // ROM speech mode: play selected ROM word directly
+    if (this._currentRomSpeech > 0) {
+      if (!this._romSentToWasm) return; // ROM not ready yet — don't fall through to TTS
       this.stopSpeaking();
       this.speakWord(this._currentRomSpeech - 1);
       return;

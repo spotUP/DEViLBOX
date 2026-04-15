@@ -114,8 +114,8 @@ export class PinkTromboneSynth implements DevilboxSynth {
 
     PinkTromboneSynth._activeInstance = this;
 
-    // Start loading eSpeak-NG in background (non-blocking, with 8s timeout)
-    preloadEspeak();
+    // Defer eSpeak-NG preload to avoid freezing UI on first note
+    setTimeout(() => preloadEspeak(), 2000);
 
     // Speech sequencer: drives tract parameters from phoneme sequence
     this._speechSequencer = new SpeechSequencer<TractShape>(
