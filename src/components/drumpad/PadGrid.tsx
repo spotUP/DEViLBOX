@@ -18,6 +18,7 @@ import { useOrientation } from '@hooks/useOrientation';
 import type { ScratchActionId, PadBank } from '../../types/drumpad';
 import { getBankPads, applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
+import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -239,9 +240,30 @@ export const PadGrid: React.FC<PadGridProps> = ({
           SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
         }
         if (pad.djFxAction) {
-          DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
-          setFxPadActive(padId, true);
-          heldPadsRef.current.add(padId);
+          // Quantize FX triggers for rhythmic effects (stutter, delay, tape stop)
+          // This prevents out-of-sync triggers during live performance
+          const shouldQuantize = 
+            pad.djFxAction.startsWith('fx_stutter') ||
+            pad.djFxAction.startsWith('fx_dub_echo') ||
+            pad.djFxAction.startsWith('fx_tape_echo') ||
+            pad.djFxAction.startsWith('fx_ping_pong') ||
+            pad.djFxAction === 'fx_tape_stop' ||
+            pad.djFxAction === 'fx_vinyl_brake';
+
+          const engageFx = () => {
+            if (!pad.djFxAction) return;
+            DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
+            setFxPadActive(padId, true);
+            heldPadsRef.current.add(padId);
+          };
+
+          if (shouldQuantize && getQuantizeMode() !== 'off') {
+            // Use deck 'A' as reference for beat quantization
+            quantizeAction('A', engageFx, { allowSolo: true, kind: 'play' });
+          } else {
+            // Non-rhythmic effects or quantize=off fire immediately
+            engageFx();
+          }
         }
         if (pad.sample) {
           engineRef.current.triggerPad(pad, curvedVelocity);
