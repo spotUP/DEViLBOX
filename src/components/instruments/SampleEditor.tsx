@@ -338,7 +338,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     if (x < 0 || x > w) return;
 
     // Trailing glow — fading gradient behind the playhead
-    const trailPx = 120;
+    const trailPx = 240;
     const prevX = prevPos > 0 ? ((prevPos - vs) / range) * w : x;
     const movingRight = x >= prevX;
     const trailStart = movingRight ? x - trailPx : x + trailPx;
