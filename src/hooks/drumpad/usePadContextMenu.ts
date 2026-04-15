@@ -22,7 +22,9 @@ import { DEFAULT_SCRATCH_PADS } from '@/constants/djPadModeDefaults';
 import { DJ_ONE_SHOT_PRESETS } from '@/constants/djOneShotPresets';
 import { ONE_SHOT_PRESETS_BY_CATEGORY } from '@/constants/djOneShotPresetsByCategory';
 import { SYNTH_CATEGORIES, getSynthInfo } from '@/constants/synthCategories';
-import type { SynthType } from '@/types/instrument';
+import type { SynthType, InstrumentPreset } from '@/types/instrument';
+import { TB303_PRESETS } from '@/constants/tb303Presets';
+import { DECTALK_PRESETS } from '@/constants/dectalkPresets';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -365,6 +367,20 @@ function buildOneShotSubmenu(
 
 // ── Quick assign submenu (synth voices) ─────────────────────────────────────
 
+// Helper to get presets for a synth type
+function getPresetsForSynth(synthType: SynthType): InstrumentPreset['config'][] | null {
+  switch (synthType) {
+    case 'TB303':
+      return TB303_PRESETS;
+    case 'DECtalk':
+      return DECTALK_PRESETS;
+    case 'DubSiren':
+      return DJ_ONE_SHOT_PRESETS;
+    default:
+      return null;
+  }
+}
+
 function buildQuickAssignSubmenu(
   padId: number,
   store: ReturnType<typeof useDrumPadStore.getState>,
@@ -373,11 +389,37 @@ function buildQuickAssignSubmenu(
 
   // Build categorized menu from SYNTH_CATEGORIES
   for (const category of SYNTH_CATEGORIES) {
-    const synthItems = category.synths.map((synthInfo) => ({
-      id: `qa-${synthInfo.type.toLowerCase()}`,
-      label: synthInfo.name,
-      onClick: () => assignGeneralSynth(padId, synthInfo.type, store),
-    }));
+    const synthItems = category.synths.map((synthInfo) => {
+      const presets = getPresetsForSynth(synthInfo.type);
+      
+      // If synth has presets, show them in a submenu
+      if (presets && presets.length > 0) {
+        return {
+          id: `qa-${synthInfo.type.toLowerCase()}`,
+          label: synthInfo.name,
+          submenu: [
+            {
+              id: `qa-${synthInfo.type.toLowerCase()}-default`,
+              label: 'Default',
+              onClick: () => assignGeneralSynth(padId, synthInfo.type, store),
+            },
+            { id: `qa-${synthInfo.type.toLowerCase()}-div`, label: '─────', disabled: true },
+            ...presets.map((preset, idx) => ({
+              id: `qa-${synthInfo.type.toLowerCase()}-preset-${idx}`,
+              label: preset.name || `Preset ${idx + 1}`,
+              onClick: () => assignSynthWithPreset(padId, synthInfo.type, preset, store),
+            })),
+          ],
+        };
+      }
+      
+      // No presets - direct assignment
+      return {
+        id: `qa-${synthInfo.type.toLowerCase()}`,
+        label: synthInfo.name,
+        onClick: () => assignGeneralSynth(padId, synthInfo.type, store),
+      };
+    });
 
     items.push({
       id: `qa-cat-${category.id}`,
@@ -387,6 +429,26 @@ function buildQuickAssignSubmenu(
   }
 
   return items;
+}
+
+function assignSynthWithPreset(
+  padId: number,
+  synthType: SynthType,
+  preset: InstrumentPreset['config'],
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  // Merge preset with pad-specific IDs
+  const presetConfig = {
+    ...preset,
+    id: PAD_INSTRUMENT_BASE + padId,
+  };
+
+  store.updatePad(padId, {
+    name: preset.name || synthType,
+    synthConfig: presetConfig as any,
+    instrumentNote: 'C4',
+    playMode: 'oneshot',
+  });
 }
 
 function assignGeneralSynth(
