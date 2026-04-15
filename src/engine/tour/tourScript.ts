@@ -1241,7 +1241,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-load-a',
     narration: 'Searching Modland for a classic ProTracker module. Loading into deck A.',
-    action: () => searchAndLoadModland('jogeir liljedahl', 'A'),
+    action: () => { searchAndLoadModland('jogeir liljedahl', 'A'); },
     spotlight: '[data-dj-deck-drop]',
     postDelay: 2000,
   },
@@ -1254,7 +1254,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-load-b',
     narration: 'Searching for another module. Loading deck B.',
-    action: () => searchAndLoadModland('chromag', 'B'),
+    action: () => { searchAndLoadModland('chromag', 'B'); },
     postDelay: 2000,
   },
   {
@@ -1317,7 +1317,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Searching for Lizardking. Loading into deck A.',
     action: async () => {
       await djStopAll();
-      await searchAndLoadModland('lizardking', 'A');
+      searchAndLoadModland('lizardking', 'A');
     },
     postDelay: 1500,
   },
@@ -1330,9 +1330,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-archives-hvsc',
     narration: 'Now another classic. Searching Karsten Obarski on Modland.',
-    action: async () => {
-      await searchAndLoadModland('karsten obarski amegas', 'B');
-    },
+    action: () => { searchAndLoadModland('karsten obarski amegas', 'B'); },
     postDelay: 1500,
   },
   {
