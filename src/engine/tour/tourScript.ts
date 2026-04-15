@@ -35,9 +35,15 @@ async function loadTrackerSong(filename: string): Promise<void> {
     const resp = await fetch(`/data/songs/exports/${filename}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const buf = await resp.arrayBuffer();
-    const file = new File([buf], filename);
-    const { loadFile } = await import('@/lib/file/UnifiedFileLoader');
-    await loadFile(file, { requireConfirmation: false });
+    const file = new File([buf], filename, { type: 'application/octet-stream' });
+
+    // loadFile returns 'pending-import' for .mod/.xm/.it etc — it expects
+    // the import dialog to handle it.  Bypass that: prepare ModuleInfo and
+    // call importTrackerModule directly (the same function the dialog calls).
+    const { loadModuleFile } = await import('@/lib/import/ModuleLoader');
+    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+    const info = await loadModuleFile(file);
+    await importTrackerModule(info, { useLibopenmpt: false });
   } catch (err) {
     console.warn('[Tour] Failed to load song:', err);
   }
