@@ -458,7 +458,7 @@ export class TrackerGLRenderer {
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     if (ui.trackerVisualBg) {
-      gl.clearColor(0, 0, 0, 0);
+      gl.clearColor(0, 0, 0, 0.75);
     } else {
       const [r, g, b, a] = colors.bg;
       gl.clearColor(r, g, b, a);

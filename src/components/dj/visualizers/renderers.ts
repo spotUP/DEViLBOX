@@ -776,7 +776,5 @@ type RendererFn = (
 ) => void;
 
 export const RENDERERS: Record<WebGLVisualizerMode, RendererFn> = {
-  circularSpectrum: renderCircularSpectrum,
-  waveformTerrain: renderWaveformTerrain,
   starfield: renderStarfield,
 };
