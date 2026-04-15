@@ -16,6 +16,14 @@ import { SCRATCH_PATTERNS } from '@engine/dj/DJScratchEngine';
 type DeckId = 'A' | 'B' | 'C';
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
+// Immediate guard to prevent concurrent triggers before state updates propagate
+const activePatterns: Record<DeckId, string | null> = { A: null, B: null, C: null };
+
+/** Clear the pattern guard for a deck (called when pattern ends naturally) */
+export function clearPatternGuard(deckId: DeckId): void {
+  activePatterns[deckId] = null;
+}
+
 /** Returns whichever deck is currently playing, preferring A > B > C. */
 function getActiveDeck(): DeckId {
   const { decks } = useDJStore.getState();
@@ -26,8 +34,7 @@ function getActiveDeck(): DeckId {
 
 function triggerPattern(patternName: string): boolean {
   const deckId = getActiveDeck();
-  const store = useDJStore.getState();
-  const current = store.decks[deckId].activePatternName;
+  const current = activePatterns[deckId];
 
   try {
     const deck = getDJEngine().getDeck(deckId);
@@ -35,7 +42,8 @@ function triggerPattern(patternName: string): boolean {
     // Same pattern running → stop it
     if (current === patternName) {
       deck.stopPattern();
-      store.setDeckPattern(deckId, null);
+      activePatterns[deckId] = null;
+      useDJStore.getState().setDeckPattern(deckId, null);
       useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
       return true;
     }
@@ -45,8 +53,9 @@ function triggerPattern(patternName: string): boolean {
       return true;
     }
 
-    // Nothing running → set state BEFORE starting playback to prevent race condition
-    store.setDeckPattern(deckId, patternName);
+    // Nothing running → set IMMEDIATE guard, then state
+    activePatterns[deckId] = patternName;
+    useDJStore.getState().setDeckPattern(deckId, patternName);
     
     let quantizeWaitMs = 0;
     deck.playPattern(patternName, (waitMs) => {

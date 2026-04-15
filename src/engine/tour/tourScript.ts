@@ -606,12 +606,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   // ── Master FX demo (song still playing) ──────────────────────────────
   {
     id: 'masterfx-intro',
-    narration: 'While it plays, let me add some master effects. Listen.',
+    narration: 'While it plays, let me throw on some master effects. Tape echo.',
     action: async () => {
       const { useAudioStore } = await import('@/stores/useAudioStore');
       const { FX_PRESETS } = await import('@/constants/fxPresets');
-      // Apply "Analog Warmth" preset
-      const preset = FX_PRESETS.find(p => p.name === 'Analog Warmth');
+      const preset = FX_PRESETS.find(p => p.name === 'Echo Out');
       if (preset) {
         const effects = preset.effects.map((e, i) => ({
           ...e,
@@ -625,12 +624,12 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 4000,
   },
   {
-    id: 'masterfx-vinyl',
-    narration: 'Or how about vinyl.',
+    id: 'masterfx-dreamy',
+    narration: 'Dreamy haze.',
     action: async () => {
       const { useAudioStore } = await import('@/stores/useAudioStore');
       const { FX_PRESETS } = await import('@/constants/fxPresets');
-      const preset = FX_PRESETS.find(p => p.name === 'Vinyl Press');
+      const preset = FX_PRESETS.find(p => p.name === 'Dreamy Haze');
       if (preset) {
         const effects = preset.effects.map((e, i) => ({
           ...e,
@@ -644,12 +643,12 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 4000,
   },
   {
-    id: 'masterfx-lofi',
-    narration: 'Lo-fi tape.',
+    id: 'masterfx-psychedelic',
+    narration: 'Psychedelic.',
     action: async () => {
       const { useAudioStore } = await import('@/stores/useAudioStore');
       const { FX_PRESETS } = await import('@/constants/fxPresets');
-      const preset = FX_PRESETS.find(p => p.name === 'Lo-Fi Master');
+      const preset = FX_PRESETS.find(p => p.name === 'Psychedelic');
       if (preset) {
         const effects = preset.effects.map((e, i) => ({
           ...e,
@@ -683,7 +682,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'masterfx-clear',
-    narration: 'Back to clean. Over 60 mastering presets. Compression, reverb, delay, saturation, vinyl, lo-fi, dub, stereo widening.',
+    narration: 'Back to clean. Over 60 mastering presets. Echo, distortion, reverb, vinyl, lo-fi, dub, stereo widening.',
     action: async () => {
       const { useAudioStore } = await import('@/stores/useAudioStore');
       useAudioStore.getState().setMasterEffects([]);

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-15T09:09:07.969Z
+ * Generated: 2026-04-15T10:46:24.404Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5315';
-export const BUILD_NUMBER = '5315';
-export const BUILD_HASH = 'c644f2d0c';
+export const BUILD_VERSION = '1.0.5321';
+export const BUILD_NUMBER = '5321';
+export const BUILD_HASH = '00b6effcd';
 export const BUILD_DATE = '2026-04-15';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5315',
+    version: '1.0.5321',
     date: '2026-04-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix DJ scratch volume stacking bug - prevent race condition"
+      },
+      {
+        type: 'fix',
+        "description": "Fix synth editors to use simple 2-column grid layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert synth editors to responsive grid layout"
+      },
+      {
+        type: 'fix',
+        "description": "TB303 editor not showing — provide DEFAULT_TB303 config on create"
+      },
+      {
+        type: 'fix',
+        "description": "Fix synth editor spacing - reduce gap-6 to gap-3"
+      },
+      {
+        type: 'fix',
+        "description": "Missing import for isFormatChecksSuppressed"
+      },
       {
         type: 'fix',
         "description": "Autotune dropdown z-index in vocoder panel"
@@ -214,30 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix ROM speech synths in drumpad context menu"
-      },
-      {
-        type: 'fix',
-        "description": "Make Kraftwerk head spikes visible — correct coordinate space"
-      },
-      {
-        type: 'feature',
-        "description": "Add all speech synths to drumpad context menu"
-      },
-      {
-        type: 'improvement',
-        "description": "Prevent drum pads from triggering on right-click"
-      },
-      {
-        type: 'feature',
-        "description": "Add full one-shot preset selection to pad context menu"
-      },
-      {
-        type: 'fix',
-        "description": "Deep audit — 6 issues fixed across VJ pipeline"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove mode tabs entirely - bank-based organization only"
       }
     ]
   }

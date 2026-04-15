@@ -18,6 +18,7 @@ import { getQuantizeMode } from './DJQuantizedFX';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
+import { clearPatternGuard } from '../keyboard/commands/djScratch';
 
 export type PlaybackMode = 'tracker' | 'audio';
 
@@ -233,6 +234,7 @@ export class DeckEngine {
     // rate ramp from 0.04x → 1.0x confuses sample buffer end-time tracking.
     this.scratchPlayback.onPatternEnd = () => {
       this._endPatternScratch();
+      clearPatternGuard(this.id); // Clear guard when pattern ends naturally
       if (!this._isScratchActive) {
         if (this.decayRafId !== null) {
           cancelAnimationFrame(this.decayRafId);
@@ -998,6 +1000,7 @@ export class DeckEngine {
   stopPattern(): void {
     this.scratchPlayback.stopPattern();
     this._endPatternScratch();
+    clearPatternGuard(this.id); // Clear guard when manually stopped
     // Only restore if the jog wheel isn't actively being held (it has its own restore path)
     if (!this._isScratchActive) {
       this._decayToRest(300);
