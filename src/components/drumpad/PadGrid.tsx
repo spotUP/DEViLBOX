@@ -98,7 +98,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
     return getBankPads(currentProgram.pads, currentBank);
   }, [currentProgram, currentBank]);
 
-  // Arrange pads in rows (dynamic based on controller pad count)
+  // Arrange pads in rows, bottom-up (MPC layout: pad 1 = bottom-left)
   const rows = useMemo(() => {
     if (bankPads.length === 0) return [];
     const pads = bankPads.slice(0, visiblePads);
@@ -106,6 +106,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
     for (let i = 0; i < pads.length; i += gridCols) {
       result.push(pads.slice(i, i + gridCols));
     }
+    result.reverse();
     return result;
   }, [bankPads, visiblePads, gridCols]);
 
@@ -138,15 +139,15 @@ export const PadGrid: React.FC<PadGridProps> = ({
           break;
         case 'ArrowUp':
           event.preventDefault();
-          newFocusedId = focusedPadId > bankStart + (gridCols - 1)
-            ? focusedPadId - gridCols
-            : focusedPadId + (visiblePads - gridCols);
-          break;
-        case 'ArrowDown':
-          event.preventDefault();
           newFocusedId = focusedPadId <= bankEnd - gridCols
             ? focusedPadId + gridCols
             : focusedPadId - (visiblePads - gridCols);
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          newFocusedId = focusedPadId > bankStart + (gridCols - 1)
+            ? focusedPadId - gridCols
+            : focusedPadId + (visiblePads - gridCols);
           break;
         case 'Enter':
         case ' ':
