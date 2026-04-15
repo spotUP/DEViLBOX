@@ -73,7 +73,8 @@ export class S14001ASynth extends MAMEBaseSynth {
   // ROM state
   private _romData: Uint8Array | null = null;
   private _romSentToWasm = false;
-  private _currentRomWord = 0;
+  private _currentRomSpeech = 0;  // merged selector: 0..5 = phrases, 6+ = words
+  private static readonly PHRASE_COUNT = 6;
 
   constructor() {
     super();
@@ -175,10 +176,9 @@ export class S14001ASynth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    // ROM speech mode: trigger ROM word on note-on
+    // ROM speech mode: trigger ROM speech on note-on
     if (this._romSentToWasm && this._mode === 1) {
-      const wordIndex = note >= 36 ? Math.min(note - 36, 28) : this._currentRomWord;
-      this.speakWord(wordIndex);
+      this._playRomSpeech(this._currentRomSpeech);
       return;
     }
 
@@ -401,8 +401,19 @@ export class S14001ASynth extends MAMEBaseSynth {
     if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
-    if (param === 'romWord') { this._currentRomWord = Math.round(value); this.speakWord(this._currentRomWord); }
-    if (param === 'romPhrase') this._playPhrase(Math.round(value));
+    if (param === 'romSpeech') {
+      this._currentRomSpeech = Math.round(value);
+      if (this._romSentToWasm) this._playRomSpeech(this._currentRomSpeech);
+    }
+  }
+
+  /** Play ROM speech — phrases (0..5) or individual words (6+) */
+  private _playRomSpeech(selection: number): void {
+    if (selection < S14001ASynth.PHRASE_COUNT) {
+      this._playPhrase(selection);
+    } else {
+      this.speakWord(selection - S14001ASynth.PHRASE_COUNT);
+    }
   }
 
   /** Berzerk phrase sequences (word indices) */
