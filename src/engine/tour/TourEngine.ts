@@ -459,12 +459,12 @@ class TourEngine {
       import('@/stores/useDJStore').then(({ useDJStore }) => {
         const s = useDJStore.getState();
         if (this.savedDJVolume === null) this.savedDJVolume = s.masterVolume;
-        s.setMasterVolume(Math.min(s.masterVolume, 0.25));
+        s.setMasterVolume(Math.min(s.masterVolume, 0.45));
       });
       import('@/stores/useAudioStore').then(({ useAudioStore }) => {
         const s = useAudioStore.getState();
         if (this.savedTrackerVolume === null) this.savedTrackerVolume = s.masterVolume;
-        s.setMasterVolume(Math.max(s.masterVolume - 18, -60));
+        s.setMasterVolume(Math.max(s.masterVolume - 8, -60));
       });
     } catch { /* */ }
   }
