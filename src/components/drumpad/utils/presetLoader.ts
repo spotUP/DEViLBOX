@@ -159,7 +159,7 @@ function createRomWordCollection(
         type: 'synth' as const,
         name: `${chipParams.shortName || chipParams.name} ${cleanLabel}`,
         synthType: synthType as SynthType,
-        parameters: { mode: 1, romSpeech: opt.value, volume: 0.8 },
+        parameters: { romSpeech: opt.value, volume: 0.8 },
         effects: [],
         volume: -10,
         pan: 0,

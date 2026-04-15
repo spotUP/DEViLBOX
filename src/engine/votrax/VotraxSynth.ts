@@ -61,7 +61,6 @@ export class VotraxSynth extends MAMEBaseSynth {
   private _speechSequencer: SpeechSequencer<VotraxFrame> | null = null;
 
   // Speech mode state
-  private _mode: 0 | 1 = 1;
   private _singMode = true;
   private _speechText = 'HELLO WORLD';
 
@@ -82,35 +81,23 @@ export class VotraxSynth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    if (this._mode === 1) {
-      if (this._singMode && this._vowelSequence.length > 0) {
-        this._speakSingleVowel(note, velocity);
-      } else if (this._singMode) {
-        if (this._speechSequencer) {
-          const freq = 440 * Math.pow(2, (note - 69) / 12);
-          this.writeFrequency(freq);
-        } else {
-          this._startSpeechAtNote(this._speechText, note, velocity);
-        }
+    if (this._singMode && this._vowelSequence.length > 0) {
+      this._speakSingleVowel(note, velocity);
+    } else if (this._singMode) {
+      if (this._speechSequencer) {
+        const freq = 440 * Math.pow(2, (note - 69) / 12);
+        this.writeFrequency(freq);
       } else {
-        this._startSpeechAtNote(this._speechText, 60, velocity);
+        this._startSpeechAtNote(this._speechText, note, velocity);
       }
     } else {
-      this.workletNode.port.postMessage({
-        type: 'noteOn',
-        note,
-        velocity: Math.floor(velocity * 127),
-      });
+      this._startSpeechAtNote(this._speechText, 60, velocity);
     }
   }
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    if (this._mode === 1) {
-      // Speech mode: let speech finish naturally
-    } else {
-      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
-    }
+    // Speech mode: let speech finish naturally
   }
 
   protected writeFrequency(freq: number): void {
@@ -329,7 +316,6 @@ export class VotraxSynth extends MAMEBaseSynth {
       this.setParameterById(paramId, value);
     }
 
-    if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
   }
