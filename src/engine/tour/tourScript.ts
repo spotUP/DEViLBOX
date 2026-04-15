@@ -585,6 +585,25 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 3000,
   },
   {
+    id: 'masterfx-chainsaw',
+    narration: 'And the Swedish Chainsaw. H M 2 death metal tone.',
+    action: async () => {
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      const { FX_PRESETS } = await import('@/constants/fxPresets');
+      const preset = FX_PRESETS.find(p => p.name === 'Swedish Chainsaw');
+      if (preset) {
+        const effects = preset.effects.map((e, i) => ({
+          ...e,
+          id: `tour-fx-${Date.now()}-${i}`,
+          parameters: { ...e.parameters },
+        }));
+        useAudioStore.getState().setMasterEffects(effects);
+      }
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 5000,
+  },
+  {
     id: 'masterfx-clear',
     narration: 'Back to clean. Over 60 mastering presets. Compression, reverb, delay, saturation, vinyl, lo-fi, dub, stereo widening.',
     action: async () => {
