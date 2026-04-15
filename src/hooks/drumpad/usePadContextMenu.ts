@@ -170,6 +170,17 @@ function buildLoadedPadMenu(
     id: 'clear', label: 'Clear Pad', danger: true,
     onClick: () => store.clearPad(padId),
   });
+  
+  // Get current bank letter for this pad
+  const currentBank = store.currentBank;
+  items.push({
+    id: 'clear-bank', label: `Clear All Pads in Bank ${currentBank}`, danger: true,
+    onClick: () => {
+      // Get all pad IDs in current bank and clear them
+      const bankPads = store.getCurrentBankPads();
+      bankPads.forEach(pad => store.clearPad(pad.id));
+    },
+  });
 
   return items;
 }

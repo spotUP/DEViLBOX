@@ -88,7 +88,7 @@ const SpotlightOverlay: React.FC<{ selector: string }> = ({ selector }) => {
 };
 
 /** Subtitle text with fade-in/fade-out on change */
-const SubtitleText: React.FC<{ text: string; isSpeaking: boolean }> = ({ text, isSpeaking }) => {
+const SubtitleText: React.FC<{ text: string }> = ({ text }) => {
   const [displayText, setDisplayText] = useState(text);
   const [opacity, setOpacity] = useState(1);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -106,11 +106,8 @@ const SubtitleText: React.FC<{ text: string; isSpeaking: boolean }> = ({ text, i
       return () => clearTimeout(timeoutRef.current);
     }
 
-    // Text unchanged — just adjust brightness based on speaking state
-    if (text === displayText) {
-      setOpacity(isSpeaking ? 1 : 0.6);
-      return;
-    }
+    // Same text or both empty — no animation needed
+    if (text === displayText) return;
 
     // Text changed — fade out old, swap, fade in new
     if (text) {
@@ -122,7 +119,7 @@ const SubtitleText: React.FC<{ text: string; isSpeaking: boolean }> = ({ text, i
       }, 300);
       return () => clearTimeout(timeoutRef.current);
     }
-  }, [text, isSpeaking]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <p
@@ -149,7 +146,6 @@ export const TourOverlay: React.FC = () => {
   const subtitle = useTourStore((s) => s.subtitle);
   const currentStep = useTourStore((s) => s.currentStep);
   const totalSteps = useTourStore((s) => s.totalSteps);
-  const isSpeaking = useTourStore((s) => s.isSpeaking);
   const isPreRendering = useTourStore((s) => s.isPreRendering);
   const preRenderProgress = useTourStore((s) => s.preRenderProgress);
   const spotlightSelector = useTourStore((s) => s.spotlightSelector);
@@ -226,7 +222,7 @@ export const TourOverlay: React.FC = () => {
               </div>
             </div>
           ) : (
-            <SubtitleText text={subtitle} isSpeaking={isSpeaking} />
+            <SubtitleText text={subtitle} />
           )}
         </div>
       </div>
