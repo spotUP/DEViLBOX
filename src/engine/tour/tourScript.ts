@@ -386,16 +386,9 @@ async function playSampleInstrument(instrumentId: number, durationMs = 3000): Pr
       }
       const source = ctx.createBufferSource();
       source.buffer = decoded;
-      // Pitch up from baseNote to C4 so it sounds like pressing Q (not Z).
-      // MOD samples have baseNote "C3" (8363 Hz) — playing at 2x gives C4.
-      const baseNote = config.sample?.baseNote || 'C3';
-      const baseMatch = baseNote.match(/([A-G]#?)(-?\d+)/);
-      if (baseMatch) {
-        const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-        const baseMidi = (parseInt(baseMatch[2]) + 1) * 12 + noteNames.indexOf(baseMatch[1]);
-        const targetMidi = 60; // C4
-        source.playbackRate.value = Math.pow(2, (targetMidi - baseMidi) / 12);
-      }
+      // MOD samples at native rate (8363 Hz) sound one octave too low;
+      // double playback rate to match the Q-key (C one octave up from Z).
+      source.playbackRate.value = 2.0;
       source.connect(ctx.destination);
       source.start();
       const playDuration = Math.min(durationMs, decoded.duration * 1000);
