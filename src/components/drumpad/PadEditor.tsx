@@ -2,7 +2,7 @@
  * PadEditor - Detailed pad parameter editor with tabs
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, lazy } from 'react';
 import type { DrumPad, FilterType, OutputBus, ScratchActionId, PlayMode, VelocityCurve } from '../../types/drumpad';
 import type { DjFxActionId } from '../../engine/drumpad/DjFxActions';
 import { DJ_FX_ACTIONS } from '../../engine/drumpad/DjFxActions';
@@ -14,78 +14,17 @@ import { DEFAULT_V2_SPEECH } from '../../types/instrument/defaults';
 import type { SynthType } from '../../types/instrument/base';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { getToneEngine } from '../../engine/ToneEngine';
+import { getDevilboxAudioContext } from '@utils/audio-context';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { getMIDIManager } from '../../midi/MIDIManager';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { SYNTH_CATEGORIES } from '@constants/synthCategories';
 import type { MIDIMessage } from '../../midi/types';
-import { SpeechSynthControls } from './synth-controls/SpeechSynthControls';
+
+// Lazy-load the full synth editor — same one used by the instrument editor
+const UnifiedInstrumentEditor = lazy(() => import('../instruments/editors/UnifiedInstrumentEditor'));
 
 const SPEECH_SYNTH_TYPES = new Set(['Sam', 'DECtalk', 'PinkTrombone', 'V2Speech']);
-
-/** Grouped synth types for the pad synth picker */
-const SYNTH_TYPE_GROUPS: { label: string; types: { value: SynthType; label: string }[] }[] = [
-  { label: 'Basic Synths', types: [
-    { value: 'Synth', label: 'Synth' },
-    { value: 'MonoSynth', label: 'Mono Synth' },
-    { value: 'FMSynth', label: 'FM Synth' },
-    { value: 'ToneAM', label: 'AM Synth' },
-    { value: 'DuoSynth', label: 'Duo Synth' },
-    { value: 'NoiseSynth', label: 'Noise' },
-  ]},
-  { label: 'Drums & Percussion', types: [
-    { value: 'TR808', label: 'TR-808' },
-    { value: 'TR909', label: 'TR-909' },
-    { value: 'MembraneSynth', label: 'Membrane (Kick/Tom)' },
-    { value: 'MetalSynth', label: 'Metal (HiHat/Cymbal)' },
-    { value: 'PluckSynth', label: 'Pluck' },
-    { value: 'Synare', label: 'Synare Drum' },
-  ]},
-  { label: 'Modern Synths', types: [
-    { value: 'SuperSaw', label: 'Super Saw' },
-    { value: 'Wavetable', label: 'Wavetable' },
-    { value: 'PolySynth', label: 'Poly Synth' },
-    { value: 'ChipSynth', label: 'Chip Synth' },
-    { value: 'PWMSynth', label: 'PWM Synth' },
-    { value: 'WobbleBass', label: 'Wobble Bass' },
-    { value: 'FormantSynth', label: 'Formant' },
-    { value: 'StringMachine', label: 'String Machine' },
-    { value: 'Organ', label: 'Organ' },
-  ]},
-  { label: 'Bass & Lead', types: [
-    { value: 'TB303', label: 'TB-303' },
-    { value: 'DubSiren', label: 'Dub Siren' },
-    { value: 'SpaceLaser', label: 'Space Laser' },
-  ]},
-  { label: 'Speech', types: [
-    { value: 'Sam', label: 'SAM (Robot Voice)' },
-    { value: 'DECtalk', label: 'DECtalk (Hawking)' },
-    { value: 'PinkTrombone', label: 'Pink Trombone' },
-  ]},
-  { label: 'WASM Synths', types: [
-    { value: 'ToneAM' as SynthType, label: 'amsynth' },
-    { value: 'SynthV1', label: 'SynthV1' },
-    { value: 'TalNoizeMaker', label: 'TAL NoiseMaker' },
-    { value: 'MdaEPiano', label: 'MDA EPiano' },
-    { value: 'MdaJX10', label: 'MDA JX10' },
-    { value: 'SetBfree', label: 'setBfree (B3 Organ)' },
-    { value: 'ZynAddSubFX', label: 'ZynAddSubFX' },
-  ]},
-  { label: 'Chip / Retro', types: [
-    { value: 'HarmonicSynth', label: 'Harmonic' },
-    { value: 'FurnaceGB', label: 'Game Boy' },
-    { value: 'FurnaceNES', label: 'NES' },
-    { value: 'FurnacePSG', label: 'PSG (Master System)' },
-    { value: 'FurnaceC64', label: 'C64 (Furnace)' },
-    { value: 'FurnaceAY', label: 'AY-3-8910' },
-    { value: 'FurnacePCE', label: 'PC Engine' },
-    { value: 'FurnaceSNES', label: 'SNES' },
-  ]},
-  { label: 'V2 / Demoscene', types: [
-    { value: 'V2', label: 'V2 Synth' },
-    { value: 'V2Speech', label: 'V2 Speech' },
-    { value: 'Oidos', label: 'Oidos' },
-  ]},
-];
 
 const VELOCITY_CURVE_OPTIONS: { value: VelocityCurve; label: string; desc: string }[] = [
   { value: 'linear',      label: 'Linear',      desc: 'Default — velocity maps directly' },
@@ -126,6 +65,7 @@ type TabName = 'sound' | 'main' | 'envelope' | 'velo' | 'layers' | 'dj';
 
 // Must be higher than the modal overlay z-index (99990) so dropdown menus render above it
 const MODAL_DROPDOWN_Z = 100000;
+
 
 const SCRATCH_ACTION_OPTIONS: { value: ScratchActionId | ''; label: string }[] = [
   { value: '',                label: 'None' },
@@ -197,6 +137,60 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   const handleUpdate = useCallback((updates: Partial<DrumPad>) => {
     updatePad(padId, updates);
   }, [padId, updatePad]);
+
+  // Preview: hold-to-sustain — press triggers, release stops
+  const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const previewInstRef = useRef<{ instId: number; note: string; config: InstrumentConfig } | null>(null);
+
+  const handlePreviewDown = useCallback(() => {
+    if (!pad) return;
+    const ctx = getDevilboxAudioContext();
+
+    // Sample preview
+    if (pad.sample?.audioBuffer) {
+      try { previewSourceRef.current?.stop(); } catch { /* ignore */ }
+      const src = ctx.createBufferSource();
+      src.buffer = pad.sample.audioBuffer;
+      if (pad.tune !== 0) {
+        src.playbackRate.value = Math.pow(2, (pad.tune / 10) / 12);
+      }
+      src.connect(ctx.destination);
+      src.start(ctx.currentTime);
+      previewSourceRef.current = src;
+    }
+
+    // Synth preview
+    if (pad.synthConfig || pad.instrumentId != null) {
+      try {
+        const engine = getToneEngine();
+        const note = pad.instrumentNote || 'C4';
+        let instId: number;
+        let config: InstrumentConfig;
+        if (pad.synthConfig) {
+          instId = PAD_INSTRUMENT_BASE + pad.id;
+          config = { ...pad.synthConfig, id: instId } as InstrumentConfig;
+        } else {
+          instId = pad.instrumentId!;
+          config = { id: instId } as InstrumentConfig;
+        }
+        engine.triggerNoteAttack(instId, note, 0, 0.8, config);
+        previewInstRef.current = { instId, note, config };
+      } catch { /* ignore synth errors */ }
+    }
+  }, [pad]);
+
+  const handlePreviewUp = useCallback(() => {
+    // Stop sample
+    try { previewSourceRef.current?.stop(); } catch { /* ignore */ }
+    previewSourceRef.current = null;
+
+    // Release synth note
+    const inst = previewInstRef.current;
+    if (inst) {
+      try { getToneEngine().triggerNoteRelease(inst.instId, inst.note, 0, inst.config); } catch { /* ignore */ }
+      previewInstRef.current = null;
+    }
+  }, []);
 
   // MIDI Learn handler
   const handleMIDILearn = useCallback(() => {
@@ -288,7 +282,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   ];
 
   return (
-    <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden flex flex-col max-h-[95vh]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
         <div>
@@ -304,6 +298,18 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handlePreview}
+            disabled={!pad.sample && !pad.synthConfig && pad.instrumentId == null}
+            className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+              pad.sample || pad.synthConfig || pad.instrumentId != null
+                ? 'text-accent-primary hover:text-accent-primaryHover bg-dark-surface border border-accent-primary/30'
+                : 'text-text-muted/30 bg-dark-surface/50 border border-dark-border/50 cursor-not-allowed'
+            }`}
+            title="Preview pad sound"
+          >
+            ▶ Preview
+          </button>
           <button
             onClick={() => copyPad(padId)}
             className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
@@ -403,11 +409,11 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                   }}
                   options={[
                     { value: '', label: 'None' },
-                    ...SYNTH_TYPE_GROUPS.map(group => ({
-                      label: group.label,
-                      options: group.types.map(t => ({
-                        value: t.value,
-                        label: t.label,
+                    ...SYNTH_CATEGORIES.map(cat => ({
+                      label: cat.name,
+                      options: cat.synths.map(s => ({
+                        value: s.type,
+                        label: s.name,
                       })),
                     })),
                   ]}
@@ -439,103 +445,24 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                   />
                 </div>
               )}
-
-              {/* Status */}
-              {pad.sample && (
-                <div className="flex items-center gap-2 text-xs text-accent-success font-mono">
-                  <span className="w-2 h-2 rounded-full bg-accent-success inline-block" />
-                  Sample: {pad.sample.name}
-                </div>
-              )}
-              {pad.synthConfig && (
-                <div className="flex items-center gap-2 text-xs text-accent-highlight font-mono">
-                  <span className="w-2 h-2 rounded-full bg-accent-highlight inline-block" />
-                  Synth: {pad.synthConfig.synthType}
-                </div>
-              )}
-
-              {/* Preview */}
-              {(pad.sample || pad.synthConfig) && (
-                <button
-                  onMouseDown={() => {
-                    if (pad.synthConfig) {
-                      try {
-                        const padInstId = PAD_INSTRUMENT_BASE + pad.id;
-                        const config = { ...pad.synthConfig, id: padInstId };
-                        const note = pad.instrumentNote || 'C4';
-                        getToneEngine().triggerNoteAttack(padInstId, note, 0, 0.8, config);
-                        setTimeout(() => {
-                          try { getToneEngine().triggerNoteRelease(padInstId, note, 0, config); } catch {}
-                        }, 500);
-                      } catch {}
-                    }
-                  }}
-                  className="w-full px-3 py-1.5 bg-dark-surface border border-dark-border rounded text-xs text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary transition-colors font-mono"
-                >
-                  Preview Sound
-                </button>
-              )}
             </div>
 
-            {/* Speech Synth Controls (inline when applicable) */}
-            {pad.synthConfig && SPEECH_SYNTH_TYPES.has(pad.synthConfig.synthType) && (
-              <SpeechSynthControls
-                config={pad.synthConfig}
-                onChange={(updates) => {
-                  // Dispose cached synth so next trigger creates fresh instance with new config
-                  const padInstId = PAD_INSTRUMENT_BASE + pad.id;
-                  try { getToneEngine().disposeInstrument(padInstId); } catch {}
-                  
-                  handleUpdate({
-                    synthConfig: {
-                      ...pad.synthConfig!,
-                      ...updates
-                    }
-                  });
-                }}
-              />
+            {/* Embed the real synth editor — same UI as the instrument editor, but isolated to this pad */}
+            {pad.synthConfig && (
+              <Suspense fallback={<div className="p-4 text-text-muted text-xs font-mono">Loading synth editor...</div>}>
+                <UnifiedInstrumentEditor
+                  instrument={{ ...pad.synthConfig, id: PAD_INSTRUMENT_BASE + pad.id }}
+                  onChange={(updates) => {
+                    const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+                    try { getToneEngine().disposeInstrument(padInstId); } catch {}
+                    handleUpdate({
+                      synthConfig: { ...pad.synthConfig!, ...updates },
+                      ...(updates.name ? { name: updates.name } : {}),
+                    });
+                  }}
+                />
+              </Suspense>
             )}
-
-            {/* IO808/TR909 Drum Parameters */}
-            {pad.synthConfig && (pad.synthConfig.synthType === 'TR808' || pad.synthConfig.synthType === 'TR909') && (() => {
-              const drumType = pad.synthConfig?.parameters?.io808Type as string
-                || pad.synthConfig?.parameters?.tr909Type as string
-                || pad.synthConfig?.drumMachine?.drumType || '';
-              const params = (pad.synthConfig?.parameters || {}) as Record<string, number | string>;
-              const updateDrumParam = (key: string, value: number) => {
-                handleUpdate({
-                  synthConfig: {
-                    ...pad.synthConfig!,
-                    parameters: { ...pad.synthConfig!.parameters, [key]: value },
-                  },
-                });
-              };
-              const knobRow = (label: string, paramKey: string, def: number) => (
-                <div key={paramKey}>
-                  <label className="block text-[10px] text-text-muted mb-0.5">{label}</label>
-                  <input
-                    type="range" min={0} max={100} step={1}
-                    value={typeof params[paramKey] === 'number' ? params[paramKey] as number : def}
-                    onChange={(e) => updateDrumParam(paramKey, Number(e.target.value))}
-                    className="w-full h-1.5 accent-accent-warning"
-                  />
-                  <div className="text-[9px] text-text-muted text-right">{typeof params[paramKey] === 'number' ? Math.round(params[paramKey] as number) : def}%</div>
-                </div>
-              );
-              const controls: { label: string; key: string; def: number }[] = [];
-              if (drumType === 'kick') { controls.push({ label: 'Tone', key: 'tone', def: 50 }, { label: 'Decay', key: 'decay', def: 50 }); }
-              else if (drumType === 'snare') { controls.push({ label: 'Tone', key: 'tone', def: 50 }, { label: 'Snappy', key: 'snappy', def: 50 }); }
-              else if (drumType === 'openHat' || drumType === 'closedHat' || drumType === 'hihat') { controls.push({ label: 'Decay', key: 'decay', def: 50 }); }
-              else if (drumType === 'cymbal' || drumType === 'crash' || drumType === 'ride') { controls.push({ label: 'Tone', key: 'tone', def: 50 }, { label: 'Decay', key: 'decay', def: 50 }); }
-              else if (drumType === 'tom' || drumType === 'conga' || drumType === 'tomLow' || drumType === 'tomMid' || drumType === 'tomHigh' || drumType === 'congaLow' || drumType === 'congaMid' || drumType === 'congaHigh') { controls.push({ label: 'Tuning', key: 'tuning', def: 50 }); }
-              if (controls.length === 0) return null;
-              return (
-                <div className="border border-dark-border rounded-lg p-3 space-y-1">
-                  <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Drum Controls</div>
-                  {controls.map(c => knobRow(c.label, c.key, c.def))}
-                </div>
-              );
-            })()}
 
           </div>
         )}
@@ -591,19 +518,6 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                     options={[
                       { value: '0', label: 'Off' },
                       ...[1,2,3,4,5,6,7,8].map(g => ({ value: String(g), label: `Group ${g}` })),
-                    ]}
-                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                  zIndex={MODAL_DROPDOWN_Z}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Play Mode</label>
-                  <CustomSelect
-                    value={pad.playMode}
-                    onChange={(v) => handleUpdate({ playMode: v as PlayMode })}
-                    options={[
-                      { value: 'oneshot', label: 'One-Shot' },
-                      { value: 'sustain', label: 'Sustain' },
                     ]}
                     className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
                   zIndex={MODAL_DROPDOWN_Z}
