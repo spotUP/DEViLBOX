@@ -204,8 +204,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       await engine.ensureInstrumentReady(inst);
 
       const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback;
-      const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
-      const previewNote = isModSample ? (inst.sample?.baseNote || 'C3') : (isBass ? 'C3' : 'C4');
+      const previewNote = isModSample ? (inst.sample?.baseNote || 'C4') : 'C4';
 
       engine.triggerNoteAttack(inst.id, previewNote, Tone.now(), 0.8, inst);
       isPreviewingRef.current = true;

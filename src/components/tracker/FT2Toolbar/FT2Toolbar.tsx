@@ -523,18 +523,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop
+    // If already playing, instantly restart from position 0
     if (isPlaying) {
-      // WASM singleton engines: stop directly — turntable brake enters scratch mode
-      // which calls exitScratchModeAndStop, killing the engine via stopNativeEngines.
+      // WASM singleton engines: stop directly
       if (editorMode === 'jamcracker' || editorMode === 'musicline') {
-        // Save WASM position BEFORE stop clears it
         const wasmPos = useWasmPositionStore.getState();
         if (wasmPos.active) {
           setCurrentRow(wasmPos.row);
           useCursorStore.getState().cursor.rowIndex !== wasmPos.row &&
             useCursorStore.setState({ cursor: { ...useCursorStore.getState().cursor, rowIndex: wasmPos.row } });
-          // Also save the song position for MusicLine
           if (editorMode === 'musicline' && wasmPos.songPos >= 0) {
             setCurrentPosition(wasmPos.songPos, true);
           }
@@ -544,10 +541,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      // Standard formats: stop with turntable spin-down
-      getTrackerScratchController().triggerElectronicBrake(() => {
-        engine.releaseAll();
-      });
+      // Standard formats: instant restart from beginning
+      getTrackerReplayer().forcePosition(0, 0);
       return;
     }
 
@@ -596,7 +591,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop
+    // If already playing, instantly restart from current position row 0
     if (isPlaying) {
       if (editorMode2 === 'jamcracker') {
         getTrackerReplayer().stop();
@@ -604,9 +599,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      getTrackerScratchController().triggerElectronicBrake(() => {
-        engine.releaseAll();
-      });
+      const startPos = useTrackerStore.getState().currentPositionIndex;
+      getTrackerReplayer().forcePosition(startPos, 0);
       return;
     }
     setIsLooping(true);

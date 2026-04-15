@@ -37,6 +37,16 @@ import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2
 // HivelyEngine used via dynamic import
 // MusicLineEngine used via dynamic import
 
+// Cached LibopenmptEngine reference for zero-latency forcePosition seeks.
+// Populated on first dynamic import; thereafter synchronous access.
+let _cachedLibopenmpt: typeof import('@engine/libopenmpt/LibopenmptEngine') | null = null;
+function getLibopenmptSync() {
+  if (_cachedLibopenmpt) return _cachedLibopenmpt.LibopenmptEngine;
+  // Warm the cache (async, but only happens once)
+  import('@engine/libopenmpt/LibopenmptEngine').then(m => { _cachedLibopenmpt = m; }).catch(() => {});
+  return null;
+}
+
 // Extracted modules
 import {
   AMIGA_PAL_FREQUENCY, SEMITONE_RATIOS,
@@ -215,6 +225,9 @@ export interface ChannelState {
   gateHigh: boolean;             // Current gate state for 303-style gate handling
   lastPlayedNoteName: string | null; // Last triggered note name for same-pitch slide detection
   xmNote: number;                // Original XM note number (for synth instruments, avoids period conversion)
+
+  // Synth pitch tracking (for portamento/vibrato/arpeggio on synths)
+  _synthDetuneOffset?: number;   // Current detune offset in semitones (for 1xx/2xx portamento)
 
   // Audio nodes - player pool (pre-allocated, pre-connected)
   player: Tone.Player | null;       // Active player reference (for updatePeriod compatibility)
@@ -781,13 +794,12 @@ export class TrackerReplayer {
     // Tell usePatternPlayback to skip its next stop/restart cycle
     this.skipNextReload = true;
 
-    // Forward to libopenmpt if active
+    // Forward to libopenmpt synchronously if active (zero-latency seek)
     if (this.useLibopenmptPlayback) {
-      import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
-        if (LibopenmptEngine.hasInstance()) {
-          LibopenmptEngine.getInstance().seekTo(songPos, pattPos);
-        }
-      }).catch(() => {});
+      const Mpt = getLibopenmptSync();
+      if (Mpt?.hasInstance()) {
+        Mpt.getInstance().seekTo(songPos, pattPos);
+      }
     }
 
     // Warm restart: audio infra already set up from a previous play().
@@ -801,17 +813,16 @@ export class TrackerReplayer {
       this.coordinator.stateRing.clearLastDequeued();
       // Restart libopenmpt if this is a libopenmpt-backed format
       if (this.useLibopenmptPlayback) {
-        import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
-          if (LibopenmptEngine.hasInstance()) {
-            const mptEngine = LibopenmptEngine.getInstance();
-            if (!this._muted) {
-              mptEngine.play();
-              if (songPos > 0 || pattPos > 0) {
-                mptEngine.seekTo(songPos, pattPos);
-              }
+        const Mpt2 = getLibopenmptSync();
+        if (Mpt2?.hasInstance()) {
+          const mptEngine = Mpt2.getInstance();
+          if (!this._muted) {
+            mptEngine.play();
+            if (songPos > 0 || pattPos > 0) {
+              mptEngine.seekTo(songPos, pattPos);
             }
           }
-        }).catch(() => {});
+        }
       }
       this.startScheduler();
       // Ensure store reflects playing state
@@ -2000,6 +2011,8 @@ export class TrackerReplayer {
           this._suppressNotes = true;
           this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
           this.coordinator.markDispatchActive();
+          // Warm the cached reference for zero-latency forcePosition seeks
+          getLibopenmptSync();
 
           // Re-activate the edit bridge if it was reset by loadSong. This
           // handles fresh songs where initFreshSoundlib created the soundlib
@@ -2978,6 +2991,41 @@ export class TrackerReplayer {
         // XM uses note numbers directly; MOD uses Amiga periods
         const newNoteName = (this.useXMPeriods || is303Synth) ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
 
+        // XM: Apply CXX volume BEFORE triggerNote so the volume is used in velocity calculation
+        // Check all effect columns for CXX command
+        if (effect === 0xC) {
+          ch.volume = Math.min(64, param);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp2 === 0xC && row.eff2 !== undefined) {
+          ch.volume = Math.min(64, row.eff2);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp3 === 0xC && row.eff3 !== undefined) {
+          ch.volume = Math.min(64, row.eff3);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp4 === 0xC && row.eff4 !== undefined) {
+          ch.volume = Math.min(64, row.eff4);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp5 === 0xC && row.eff5 !== undefined) {
+          ch.volume = Math.min(64, row.eff5);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp6 === 0xC && row.eff6 !== undefined) {
+          ch.volume = Math.min(64, row.eff6);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp7 === 0xC && row.eff7 !== undefined) {
+          ch.volume = Math.min(64, row.eff7);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        if (row.effTyp8 === 0xC && row.eff8 !== undefined) {
+          ch.volume = Math.min(64, row.eff8);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+
         // Release previous synth note before triggering new one.
         // Native poly types (Organ, SuperSaw, etc.) use a shared PolySynth instance,
         // so the voice system's NNA CUT won't release them (same instrument check).
@@ -3266,6 +3314,11 @@ export class TrackerReplayer {
       case 0x8: // Set panning
         ch.panning = param;
         this.applyPanEffect(ch, param, time);
+        // Apply to synths
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          const pan = (param - 128) / 128; // 0-255 → -1 to 1
+          getToneEngine().applySynthPan(ch.sampleNum, pan, time, chIndex);
+        }
         break;
 
       case 0x9: // Sample offset - handled in note processing
@@ -3287,6 +3340,10 @@ export class TrackerReplayer {
       case 0xC: // Set volume
         ch.volume = Math.min(64, param);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        // Apply to synths
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          getToneEngine().applySynthVolume(ch.sampleNum, ch.volume / 64, time, chIndex);
+        }
         // PT2: setVisualsVolume runs on every tick 0 (intMusic line 1391)
         // Trigger VU meter update so volume-only rows (no note) still show activity
         if (chIndex !== undefined) {
@@ -3478,18 +3535,36 @@ export class TrackerReplayer {
           const slideParam = param & 0x0F;
           if (slideType === 1) {
             // X1x: Extra fine porta up
-            const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideUpSpeed;
-            ch.efPitchSlideUpSpeed = spd;
-            ch.period -= spd;
-            if (ch.period < 1) ch.period = 1;
-            this.updatePeriod(ch);
+            if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+              const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideUpSpeed;
+              ch.efPitchSlideUpSpeed = spd;
+              const speed = spd / 256; // Extra fine = 4x finer than fine
+              const currentDetune = ch._synthDetuneOffset ?? 0;
+              ch._synthDetuneOffset = currentDetune + speed;
+              getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+            } else {
+              const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideUpSpeed;
+              ch.efPitchSlideUpSpeed = spd;
+              ch.period -= spd;
+              if (ch.period < 1) ch.period = 1;
+              this.updatePeriod(ch);
+            }
           } else if (slideType === 2) {
             // X2x: Extra fine porta down
-            const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideDownSpeed;
-            ch.efPitchSlideDownSpeed = spd;
-            ch.period += spd;
-            if (ch.period > 31999) ch.period = 31999;
-            this.updatePeriod(ch);
+            if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+              const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideDownSpeed;
+              ch.efPitchSlideDownSpeed = spd;
+              const speed = spd / 256; // Extra fine = 4x finer than fine
+              const currentDetune = ch._synthDetuneOffset ?? 0;
+              ch._synthDetuneOffset = currentDetune - speed;
+              getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+            } else {
+              const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideDownSpeed;
+              ch.efPitchSlideDownSpeed = spd;
+              ch.period += spd;
+              if (ch.period > 31999) ch.period = 31999;
+              this.updatePeriod(ch);
+            }
           }
         } else if (this.onScratchEffect) {
           // DJ Scratch (non-XM mode)
@@ -3558,27 +3633,47 @@ export class TrackerReplayer {
         break;
 
       case 0x1: // Fine porta up
-        if (this.useXMPeriods) {
-          // FT2: uses speed memory, param * 4
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          // For synths: fine porta up
           if (y !== 0) ch.fPortaUpSpeed = y;
-          ch.period -= ch.fPortaUpSpeed * 4;
-          if (ch.period < 1) ch.period = 1;
+          const speed = ch.fPortaUpSpeed / 128; // Finer adjustment
+          const currentDetune = ch._synthDetuneOffset ?? 0;
+          ch._synthDetuneOffset = currentDetune + speed;
+          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, _chIndex);
         } else {
-          ch.period = Math.max(113, ch.period - y);
+          // Sample-based
+          if (this.useXMPeriods) {
+            // FT2: uses speed memory, param * 4
+            if (y !== 0) ch.fPortaUpSpeed = y;
+            ch.period -= ch.fPortaUpSpeed * 4;
+            if (ch.period < 1) ch.period = 1;
+          } else {
+            ch.period = Math.max(113, ch.period - y);
+          }
+          this.updatePeriod(ch);
         }
-        this.updatePeriod(ch);
         break;
 
       case 0x2: // Fine porta down
-        if (this.useXMPeriods) {
-          // FT2: uses speed memory, param * 4
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          // For synths: fine porta down
           if (y !== 0) ch.fPortaDownSpeed = y;
-          ch.period += ch.fPortaDownSpeed * 4;
-          if (ch.period > 31999) ch.period = 31999;
+          const speed = ch.fPortaDownSpeed / 128; // Finer adjustment
+          const currentDetune = ch._synthDetuneOffset ?? 0;
+          ch._synthDetuneOffset = currentDetune - speed;
+          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, _chIndex);
         } else {
-          ch.period = Math.min(856, ch.period + y);
+          // Sample-based
+          if (this.useXMPeriods) {
+            // FT2: uses speed memory, param * 4
+            if (y !== 0) ch.fPortaDownSpeed = y;
+            ch.period += ch.fPortaDownSpeed * 4;
+            if (ch.period > 31999) ch.period = 31999;
+          } else {
+            ch.period = Math.min(856, ch.period + y);
+          }
+          this.updatePeriod(ch);
         }
-        this.updatePeriod(ch);
         break;
 
       case 0x3: // Glissando control (E3x) — semitone portamento mode
@@ -3622,6 +3717,11 @@ export class TrackerReplayer {
       case 0x8: // Set panning (FT2: E8x sets panning to y * 0x11)
         ch.panning = y * 0x11;
         this.applyPanEffect(ch, ch.panning, time);
+        // Apply to synths
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          const pan = (ch.panning - 128) / 128; // 0-255 → -1 to 1
+          getToneEngine().applySynthPan(ch.sampleNum, pan, time, _chIndex);
+        }
         break;
 
       case 0x9: // Retrigger
@@ -3635,6 +3735,10 @@ export class TrackerReplayer {
           ch.volume = 0;
           ch.outVol = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
+          // Apply to synths
+          if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+            getToneEngine().applySynthVolume(ch.sampleNum, 0, time, _chIndex);
+          }
         }
         break;
 
@@ -3643,6 +3747,10 @@ export class TrackerReplayer {
         ch.fVolSlideUpSpeed = fvUp;
         ch.volume = Math.min(64, ch.volume + fvUp);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        // Apply to synths
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          getToneEngine().applySynthVolume(ch.sampleNum, ch.volume / 64, time, _chIndex);
+        }
         break;
       }
 
@@ -3651,6 +3759,10 @@ export class TrackerReplayer {
         ch.fVolSlideDownSpeed = fvDn;
         ch.volume = Math.max(0, ch.volume - fvDn);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        // Apply to synths
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          getToneEngine().applySynthVolume(ch.sampleNum, ch.volume / 64, time, _chIndex);
+        }
         break;
       }
 
@@ -3701,14 +3813,22 @@ export class TrackerReplayer {
         case 0x6: // Volume slide down
           ch.volume = Math.max(0, ch.volume - vcParam);
           ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+          // Apply to synths
+          if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+            getToneEngine().applySynthVolume(ch.sampleNum, ch.volume / 64, time, chIndex);
+          }
           break;
         case 0x7: // Volume slide up
           ch.volume = Math.min(64, ch.volume + vcParam);
           ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+          // Apply to synths
+          if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+            getToneEngine().applySynthVolume(ch.sampleNum, ch.volume / 64, time, chIndex);
+          }
           break;
         case 0xB: { // Vibrato (depth only, then run vibrato)
           if (vcParam > 0) ch.vibratoCmd = (ch.vibratoCmd & 0xF0) | vcParam;
-          this.doVibrato(ch);
+          this.doVibrato(ch, chIndex);
           break;
         }
         case 0xD: { // Panning slide left (FT2 bug: slide of 0 = set pan to 0)
@@ -3762,7 +3882,7 @@ export class TrackerReplayer {
 
     switch (effect) {
       case 0x0: // Arpeggio
-        if (param !== 0) this.doArpeggio(ch, param);
+        if (param !== 0) this.doArpeggio(ch, param, chIndex);
         break;
 
       case 0x1: // Portamento up (decrease period = raise pitch)
@@ -3788,29 +3908,29 @@ export class TrackerReplayer {
         break;
 
       case 0x3: // Tone portamento
-        this.doTonePortamento(ch);
+        this.doTonePortamento(ch, chIndex);
         break;
 
       case 0x4: // Vibrato
-        this.doVibrato(ch);
+        this.doVibrato(ch, chIndex);
         break;
 
       case 0x5: // Tone porta + volume slide
-        this.doTonePortamento(ch);
-        this.doVolumeSlide(ch, param, time);
+        this.doTonePortamento(ch, chIndex);
+        this.doVolumeSlide(ch, param, time, chIndex);
         break;
 
       case 0x6: // Vibrato + volume slide
-        this.doVibrato(ch);
-        this.doVolumeSlide(ch, param, time);
+        this.doVibrato(ch, chIndex);
+        this.doVolumeSlide(ch, param, time, chIndex);
         break;
 
       case 0x7: // Tremolo
-        this.doTremolo(ch, time);
+        this.doTremolo(ch, time, chIndex);
         break;
 
       case 0xA: // Volume slide
-        this.doVolumeSlide(ch, param, time);
+        this.doVolumeSlide(ch, param, time, chIndex);
         break;
 
       case 0xE: // Extended effects
@@ -3840,7 +3960,7 @@ export class TrackerReplayer {
         break;
 
       case 0x19: // Pan slide (Pxx)
-        this.doPanSlide(ch, ch.panSlide, time);
+        this.doPanSlide(ch, ch.panSlide, time, chIndex);
         break;
 
       case 0x14: { // Kxx - Key-off at tick (FT2: effect 20)
@@ -3863,7 +3983,9 @@ export class TrackerReplayer {
         break;
 
       case 0x1D: // Txy - Tremor (FT2: effect 29)
-        _doTremor(ch, param, time);
+        _doTremor(ch, param, time, ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler' 
+          ? (vol) => getToneEngine().applySynthVolume(ch.instrument!.id, vol, time, chIndex)
+          : undefined);
         break;
     }
   }
@@ -3891,31 +4013,53 @@ export class TrackerReplayer {
     }
 
     switch (effect) {
-      case 0x0: if (param !== 0 && ch.instrument?.synthType !== 'SonicArrangerSynth') this.doArpeggio(ch, param); break;
-      case 0x1: // Portamento up
-        if (this.useXMPeriods) {
-          ch.period -= ch.portaUpSpeed * 4;
-          if (ch.period < 1) ch.period = 1;
-        } else {
-          ch.period = Math.max(113, ch.period - ch.portaSpeed);
+      case 0x0: // Arpeggio
+        if (param !== 0 && ch.instrument?.synthType !== 'SonicArrangerSynth') {
+          this.doArpeggio(ch, param, chIndex);
         }
-        this.updatePeriod(ch);
+        break;
+      case 0x1: // Portamento up
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          // For synths: slide pitch up by speed semitones per tick
+          const speed = ch.portaUpSpeed / 64; // Convert to fractional semitones
+          const currentDetune = ch._synthDetuneOffset ?? 0;
+          ch._synthDetuneOffset = currentDetune + speed;
+          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+        } else {
+          // Sample-based portamento
+          if (this.useXMPeriods) {
+            ch.period -= ch.portaUpSpeed * 4;
+            if (ch.period < 1) ch.period = 1;
+          } else {
+            ch.period = Math.max(113, ch.period - ch.portaSpeed);
+          }
+          this.updatePeriod(ch);
+        }
         break;
       case 0x2: // Portamento down
-        if (this.useXMPeriods) {
-          ch.period += ch.portaDownSpeed * 4;
-          if (ch.period > 31999) ch.period = 31999;
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          // For synths: slide pitch down by speed semitones per tick
+          const speed = ch.portaDownSpeed / 64; // Convert to fractional semitones
+          const currentDetune = ch._synthDetuneOffset ?? 0;
+          ch._synthDetuneOffset = currentDetune - speed;
+          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
         } else {
-          ch.period = Math.min(856, ch.period + ch.portaSpeed);
+          // Sample-based portamento
+          if (this.useXMPeriods) {
+            ch.period += ch.portaDownSpeed * 4;
+            if (ch.period > 31999) ch.period = 31999;
+          } else {
+            ch.period = Math.min(856, ch.period + ch.portaSpeed);
+          }
+          this.updatePeriod(ch);
         }
-        this.updatePeriod(ch);
         break;
-      case 0x3: this.doTonePortamento(ch); break;
-      case 0x4: this.doVibrato(ch); break;
-      case 0x5: this.doTonePortamento(ch); this.doVolumeSlide(ch, param, time); break;
-      case 0x6: this.doVibrato(ch); this.doVolumeSlide(ch, param, time); break;
-      case 0x7: this.doTremolo(ch, time); break;
-      case 0xA: this.doVolumeSlide(ch, param, time); break;
+      case 0x3: this.doTonePortamento(ch, chIndex); break;
+      case 0x4: this.doVibrato(ch, chIndex); break;
+      case 0x5: this.doTonePortamento(ch, chIndex); this.doVolumeSlide(ch, param, time, chIndex); break;
+      case 0x6: this.doVibrato(ch, chIndex); this.doVolumeSlide(ch, param, time, chIndex); break;
+      case 0x7: this.doTremolo(ch, time, chIndex); break;
+      case 0xA: this.doVolumeSlide(ch, param, time, chIndex); break;
       case 0xE:
         if (x === 0x9 && y > 0) {
           // FT2 retrigNote: triggerNote(0,0,0,ch) + triggerInstrument(ch)
@@ -3928,6 +4072,10 @@ export class TrackerReplayer {
         } else if (x === 0xC && y === this.currentTick) {
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
+          // Apply to synths
+          if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+            getToneEngine().applySynthVolume(ch.sampleNum, 0, time, chIndex);
+          }
         } else if (x === 0xD && y === this.currentTick) {
           // FT2 noteDelay: triggers note (or key-off for note 97), resets volumes, applies vol column
           this.fireDelayedNote(ch, chIndex, time, accent, slide);
@@ -3950,14 +4098,18 @@ export class TrackerReplayer {
         break;
       }
 
-      case 0x19: this.doPanSlide(ch, ch.panSlide, time); break;
+      case 0x19: // Pan slide (Pxx)
+        this.doPanSlide(ch, ch.panSlide, time, chIndex);
+        break;
       case 0x1B: // Multi note retrigger (Rxy) — tick N
         // FT2: uses doMultiNoteRetrig with counter
         this.doMultiNoteRetrig(ch, chIndex, time);
         break;
 
       case 0x1D: // Txx - Tremor (FT2: effect 29)
-        _doTremor(ch, param, time);
+        _doTremor(ch, param, time, ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler'
+          ? (vol) => getToneEngine().applySynthVolume(ch.instrument!.id, vol, time, chIndex)
+          : undefined);
         break;
     }
   }
@@ -3982,28 +4134,116 @@ export class TrackerReplayer {
   // EFFECT IMPLEMENTATIONS (delegated to replayer/EffectHandlers.ts)
   // ==========================================================================
 
-  private doArpeggio(ch: ChannelState, param: number): void {
-    _doArpeggio(ch, param, this.currentTick, this.speed, this.useXMPeriods, this.linearPeriods,
-      (c, p) => this.updatePeriodDirect(c, p),
-      (b, s, f) => this.periodPlusSemitones(b, s, f));
+  private doArpeggio(ch: ChannelState, param: number, chIndex?: number): void {
+    // For synths, apply arpeggio as detune in cents
+    if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      const x = (param >> 4) & 0x0F;
+      const y = param & 0x0F;
+      const tick = this.currentTick % 3;
+      let semitoneOffset = 0;
+      
+      if (tick === 1) {
+        semitoneOffset = x;
+      } else if (tick === 2) {
+        semitoneOffset = y;
+      }
+      
+      getToneEngine().applySynthPitch(ch.sampleNum, semitoneOffset, Tone.now(), chIndex);
+    } else {
+      // Sample-based arpeggio via period modulation
+      _doArpeggio(ch, param, this.currentTick, this.speed, this.useXMPeriods, this.linearPeriods,
+        (c, p) => this.updatePeriodDirect(c, p),
+        (b, s, f) => this.periodPlusSemitones(b, s, f));
+    }
   }
 
-  private doTonePortamento(ch: ChannelState): void {
-    _doTonePortamento(ch, this.useXMPeriods, this.linearPeriods,
-      (c) => this.updatePeriod(c),
-      (c, p) => this.updatePeriodDirect(c, p));
+  private doTonePortamento(ch: ChannelState, chIndex?: number): void {
+    // For synths, slide frequency toward target note
+    if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      if (!ch.portaTarget || ch.portaTarget === ch.period) return;
+      
+      const speed = ch.portaSpeed || 1;
+      const currentDetune = ch._synthDetuneOffset ?? 0;
+      
+      // Calculate target in semitones from base note
+      // portaTarget is the target period, ch.period is current
+      // Lower period = higher pitch
+      const periodDiff = ch.period - ch.portaTarget;
+      const semitoneChange = periodDiff / 64; // Approximate conversion
+      
+      // Slide toward target
+      if (Math.abs(semitoneChange) < speed / 64) {
+        // Close enough - snap to target
+        ch._synthDetuneOffset = currentDetune + semitoneChange;
+        ch.period = ch.portaTarget;
+      } else {
+        // Slide by speed amount
+        const slideAmount = semitoneChange > 0 ? speed / 64 : -speed / 64;
+        ch._synthDetuneOffset = currentDetune + slideAmount;
+        ch.period -= Math.sign(semitoneChange) * speed;
+      }
+      
+      getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, Tone.now(), chIndex);
+    } else {
+      // Sample-based portamento
+      _doTonePortamento(ch, this.useXMPeriods, this.linearPeriods,
+        (c) => this.updatePeriod(c),
+        (c, p) => this.updatePeriodDirect(c, p));
+    }
   }
 
-  private doVibrato(ch: ChannelState): void {
-    _doVibrato(ch, this.useXMPeriods, (c, p) => this.updatePeriodDirect(c, p));
+  private doVibrato(ch: ChannelState, chIndex?: number): void {
+    // For synths, apply vibrato as pitch modulation
+    if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      // Calculate vibrato offset in semitones
+      const speed = (ch.vibratoCmd >> 4) & 0x0F;
+      const depth = ch.vibratoCmd & 0x0F;
+      const waveform = ch.waveControl & 0x03;
+      
+      let value: number;
+      if (waveform === 0) {
+        // Sine wave
+        const VIBRATO_TABLE = [
+          0, 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
+          255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24
+        ];
+        value = VIBRATO_TABLE[ch.vibratoPos & 31];
+      } else if (waveform === 1) {
+        // Ramp down
+        value = (ch.vibratoPos & 31) * 8;
+        if (ch.vibratoPos >= 32) value = 255 - value;
+      } else {
+        // Square
+        value = ch.vibratoPos < 32 ? 255 : 0;
+      }
+      
+      // Convert to semitones: depth controls range
+      // Max vibrato = depth * (255/128) / 12 semitones
+      const semitoneOffset = ((value - 128) / 128) * (depth / 12);
+      
+      getToneEngine().applySynthPitch(ch.sampleNum, semitoneOffset, Tone.now(), chIndex);
+      ch.vibratoPos = (ch.vibratoPos + speed) & 63;
+    } else {
+      // Sample-based vibrato via period modulation
+      _doVibrato(ch, this.useXMPeriods, (c, p) => this.updatePeriodDirect(c, p));
+    }
   }
 
-  private doTremolo(ch: ChannelState, time: number): void {
+  private doTremolo(ch: ChannelState, time: number, chIndex?: number): void {
     _doTremolo(ch, time, this.useXMPeriods);
+    // Apply to synths - tremolo modifies outVol for XM, ch.volume for MOD
+    if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      const vol = this.useXMPeriods ? ch.outVol : ch.volume;
+      getToneEngine().applySynthVolume(ch.sampleNum, vol / 64, time, chIndex);
+    }
   }
 
-  private doVolumeSlide(ch: ChannelState, param: number, time: number): void {
+  private doVolumeSlide(ch: ChannelState, param: number, time: number, chIndex?: number): void {
     _doVolumeSlide(ch, param, time);
+    // Apply to synths
+    if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      getToneEngine().applySynthVolume(ch.sampleNum, ch.volume / 64, time, chIndex);
+    }
   }
 
   /**
@@ -4019,8 +4259,13 @@ export class TrackerReplayer {
    * Pan slide (effect Pxx)
    * x = slide right, y = slide left
    */
-  private doPanSlide(ch: ChannelState, param: number, time: number): void {
+  private doPanSlide(ch: ChannelState, param: number, time: number, chIndex?: number): void {
     _doPanSlide(ch, param, time, (c, p, t) => this.applyPanEffect(c, p, t));
+    // Apply to synths
+    if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      const pan = (ch.panning - 128) / 128; // 0-255 → -1 to 1
+      getToneEngine().applySynthPan(ch.sampleNum, pan, time, chIndex);
+    }
   }
 
   private doMultiNoteRetrig(ch: ChannelState, chIndex: number, time: number): void {
@@ -4634,6 +4879,9 @@ export class TrackerReplayer {
     ch.macroReleased = false;
     ch.macroPitchOffset = 0;
     ch.macroArpNote = 0;
+
+    // Reset synth pitch offset on new note
+    ch._synthDetuneOffset = 0;
 
     if (!ch.instrument) {
       // No instrument assigned - try to use the first available instrument

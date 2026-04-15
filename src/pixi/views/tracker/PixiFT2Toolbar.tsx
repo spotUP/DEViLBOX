@@ -42,6 +42,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
@@ -344,11 +345,13 @@ export const PixiFT2Toolbar: React.FC = () => {
     }
     if (isPlayingSong) {
       if (shiftKeyRef.current) { getTrackerScratchController().triggerPowerCut(); return; }
-      stop(); return;
+      // Instant restart from position 0, row 0
+      getTrackerReplayer().forcePosition(0, 0);
+      return;
     }
     setIsLooping(false);
     await play().catch(() => {});
-  }, [isGT, isPlayingSong, stop, setIsLooping, play]);
+  }, [isGT, isPlayingSong, setIsLooping, play]);
 
   const handlePlayPattern = useCallback(async () => {
     // GT Ultra: delegate (pattern play = same as song play for GT)
@@ -365,7 +368,10 @@ export const PixiFT2Toolbar: React.FC = () => {
     }
     if (isPlayingPattern) {
       if (shiftKeyRef.current) { getTrackerScratchController().triggerPowerCut(); return; }
-      stop(); return;
+      // Instant restart from current position, row 0
+      const startPos = useTrackerStore.getState().currentPositionIndex;
+      getTrackerReplayer().forcePosition(startPos, 0);
+      return;
     }
     if (isPlaying) stop();
     setIsLooping(true);

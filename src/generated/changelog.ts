@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-15T10:46:24.404Z
+ * Generated: 2026-04-15T12:09:03.344Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5321';
-export const BUILD_NUMBER = '5321';
-export const BUILD_HASH = '00b6effcd';
+export const BUILD_VERSION = '1.0.5328';
+export const BUILD_NUMBER = '5328';
+export const BUILD_HASH = 'e2c9eca52';
 export const BUILD_DATE = '2026-04-15';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5321',
+    version: '1.0.5328',
     date: '2026-04-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Anti-click ramp on DubSiren gate transitions"
+      },
+      {
+        type: 'improvement',
+        "description": "PadGrid delegates to singleton useMIDIPadRouting hook"
+      },
+      {
+        type: 'improvement',
+        "description": "Enable MIDI drum pads in DJ and VJ views"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MIDI pads triggering navigation instead of drum sounds in DrumPad view"
+      },
+      {
+        type: 'fix',
+        "description": "Silence noisy startup console warnings"
+      },
+      {
+        type: 'fix',
+        "description": "Silence SysEx errors when MIDI opened without sysex permission"
+      },
+      {
+        type: 'fix',
+        "description": "Fix scratch stacking with immediate guard - prevent Zustand race condition"
+      },
       {
         type: 'fix',
         "description": "Fix DJ scratch volume stacking bug - prevent race condition"
@@ -204,40 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Tracker song loading bypasses import dialog"
-      },
-      {
-        type: 'feature',
-        "description": "Add full synth browser to drumpad context menu"
-      },
-      {
-        type: 'fix',
-        "description": "Tour DJ loading uses proper pipeline render path"
-      }
-    ]
-  },
-  {
-    version: '2026-04-14',
-    date: '2026-04-14',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Interactive hands-on tour with voice FX and subtitle fade"
-      },
-      {
-        type: 'feature',
-        "description": "Tour enhancements — demo song, Kraftwerk head, spotlight"
-      },
-      {
-        type: 'fix',
-        "description": "Tour skip resolves delay promise to prevent loop hang"
-      },
-      {
-        type: 'feature',
-        "description": "Guided tour with DECtalk voiceover and subtitles"
-      },
-      {
-        type: 'fix',
-        "description": "Fix ROM speech synths in drumpad context menu"
       }
     ]
   }
