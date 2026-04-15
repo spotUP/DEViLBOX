@@ -172,10 +172,13 @@ async function createAndSelectInstrument(
 ): Promise<number | null> {
   try {
     const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-    const id = useInstrumentStore.getState().createInstrument({
-      synthType: synthType as any,
-      name,
-    } as any);
+    const config: Record<string, unknown> = { synthType, name };
+    // TB303 needs its sub-config or the editor won't render
+    if (synthType === 'TB303' || synthType === 'Buzz3o3') {
+      const { DEFAULT_TB303 } = await import('@typedefs/instrument');
+      config.tb303 = { ...DEFAULT_TB303 };
+    }
+    const id = useInstrumentStore.getState().createInstrument(config as any);
     useInstrumentStore.getState().setCurrentInstrument(id);
     return id;
   } catch (err) {
