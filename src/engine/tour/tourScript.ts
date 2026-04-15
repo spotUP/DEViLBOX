@@ -1254,7 +1254,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-load-b',
     narration: 'Searching for another module. Loading deck B.',
-    action: () => searchAndLoadModland('walkman kansen', 'B'),
+    action: () => searchAndLoadModland('chromag', 'B'),
     postDelay: 2000,
   },
   {
@@ -1422,25 +1422,25 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Automation. Draw curves to control any parameter over time.',
     action: async () => {
       switchView('tracker');
-      await loadTrackerSong('/data/songs/formats/aces_high.ahx');
+      await loadTrackerSong('/data/songs/303-Demo.dbx');
     },
     spotlight: '[data-pattern-editor]',
     postDelay: 500,
   },
   {
     id: 'automation-volume',
-    narration: 'A sine wave on volume. Watch the lane appear.',
+    narration: 'A sine wave on the 303 cutoff. Watch the lane appear.',
     action: async () => {
-      await createAutomationCurve(0, 'volume', 'sine');
+      await createAutomationCurve(0, 'cutoff', 'sine');
     },
     spotlight: '[data-pattern-editor]',
     postDelay: 2000,
   },
   {
     id: 'automation-filter',
-    narration: 'Sawtooth on the filter cutoff.',
+    narration: 'Sawtooth on the resonance.',
     action: async () => {
-      await createAutomationCurve(1, 'cutoff', 'saw');
+      await createAutomationCurve(0, 'resonance', 'saw');
     },
     spotlight: '[data-pattern-editor]',
     postDelay: 2000,
