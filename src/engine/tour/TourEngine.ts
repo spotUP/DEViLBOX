@@ -126,6 +126,8 @@ class TourEngine {
   private aborted = false;
   private previousView: string = 'tracker';
   private headActive = false;
+  private savedDJVolume: number | null = null;
+  private savedTrackerVolume: number | null = null;
 
   // ── Public API ──────────────────────────────────────────────────────────
 
@@ -302,6 +304,9 @@ class TourEngine {
       useMIDIStore.getState().setShowKnobBar(false);
     });
 
+    // Restore music volume if ducked
+    this.unduckMusic();
+
     // Restore previous view
     useUIStore.getState().setActiveView(this.previousView as never);
 
@@ -388,10 +393,12 @@ class TourEngine {
       await this.waitIfPaused();
       if (this.aborted) return;
 
-      // Play audio
+      // Play audio — duck music while speaking
       store.setSpeaking(true);
       if (buffer && this.gainNode) {
+        this.duckMusic();
         await this.playBuffer(buffer);
+        this.unduckMusic();
       }
       store.setSpeaking(false);
       if (this.aborted) return;
@@ -442,6 +449,40 @@ class TourEngine {
       this.sourceNode = null;
     }
     useTourStore.getState().setSpeaking(false);
+  }
+
+  /** Duck music volume so speech is audible */
+  private duckMusic(): void {
+    try {
+      import('@/stores/useDJStore').then(({ useDJStore }) => {
+        const s = useDJStore.getState();
+        if (this.savedDJVolume === null) this.savedDJVolume = s.masterVolume;
+        s.setMasterVolume(Math.min(s.masterVolume, 0.25));
+      });
+      import('@/stores/useAudioStore').then(({ useAudioStore }) => {
+        const s = useAudioStore.getState();
+        if (this.savedTrackerVolume === null) this.savedTrackerVolume = s.masterVolume;
+        s.setMasterVolume(Math.max(s.masterVolume - 18, -60));
+      });
+    } catch { /* */ }
+  }
+
+  /** Restore music volume after speech */
+  private unduckMusic(): void {
+    try {
+      import('@/stores/useDJStore').then(({ useDJStore }) => {
+        if (this.savedDJVolume !== null) {
+          useDJStore.getState().setMasterVolume(this.savedDJVolume);
+          this.savedDJVolume = null;
+        }
+      });
+      import('@/stores/useAudioStore').then(({ useAudioStore }) => {
+        if (this.savedTrackerVolume !== null) {
+          useAudioStore.getState().setMasterVolume(this.savedTrackerVolume);
+          this.savedTrackerVolume = null;
+        }
+      });
+    } catch { /* */ }
   }
 
   private delay(ms: number): Promise<void> {
