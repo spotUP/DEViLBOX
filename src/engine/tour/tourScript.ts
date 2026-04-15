@@ -398,7 +398,77 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'tracker-explain',
     narration: 'Each column is a channel. Notes, instruments, and effects scroll as the song plays. Over 120 synth engines and 188 import formats.',
     spotlight: '[data-pattern-editor]',
+    postDelay: 2000,
+  },
+
+  // ── Master FX demo (song still playing) ──────────────────────────────
+  {
+    id: 'masterfx-intro',
+    narration: 'While it plays, let me add some master effects. Listen.',
+    action: async () => {
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      const { FX_PRESETS } = await import('@/constants/fxPresets');
+      // Apply "Analog Warmth" preset
+      const preset = FX_PRESETS.find(p => p.name === 'Analog Warmth');
+      if (preset) {
+        const effects = preset.effects.map((e, i) => ({
+          ...e,
+          id: `tour-fx-${Date.now()}-${i}`,
+          parameters: { ...e.parameters },
+        }));
+        useAudioStore.getState().setMasterEffects(effects);
+      }
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 4000,
+  },
+  {
+    id: 'masterfx-vinyl',
+    narration: 'Or how about vinyl.',
+    action: async () => {
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      const { FX_PRESETS } = await import('@/constants/fxPresets');
+      const preset = FX_PRESETS.find(p => p.name === 'Vinyl Press');
+      if (preset) {
+        const effects = preset.effects.map((e, i) => ({
+          ...e,
+          id: `tour-fx-${Date.now()}-${i}`,
+          parameters: { ...e.parameters },
+        }));
+        useAudioStore.getState().setMasterEffects(effects);
+      }
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 4000,
+  },
+  {
+    id: 'masterfx-lofi',
+    narration: 'Lo-fi radio.',
+    action: async () => {
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      const { FX_PRESETS } = await import('@/constants/fxPresets');
+      const preset = FX_PRESETS.find(p => p.name === 'Lo-Fi Radio');
+      if (preset) {
+        const effects = preset.effects.map((e, i) => ({
+          ...e,
+          id: `tour-fx-${Date.now()}-${i}`,
+          parameters: { ...e.parameters },
+        }));
+        useAudioStore.getState().setMasterEffects(effects);
+      }
+    },
+    spotlight: '[data-pattern-editor]',
     postDelay: 3000,
+  },
+  {
+    id: 'masterfx-clear',
+    narration: 'Back to clean. Over 60 mastering presets. Compression, reverb, delay, saturation, vinyl, lo-fi, dub, stereo widening.',
+    action: async () => {
+      const { useAudioStore } = await import('@/stores/useAudioStore');
+      useAudioStore.getState().setMasterEffects([]);
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 2000,
   },
   {
     id: 'tracker-stop',
@@ -807,9 +877,59 @@ export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 8: Mixer ────────────────────────────────────────────────────────
   {
     id: 'mixer-switch',
-    narration: 'The mixer. Per-channel faders, pan, mute, solo, and meters.',
-    action: () => switchView('mixer'),
-    postDelay: 1500,
+    narration: 'The mixer. Per-channel faders, pan, mute, solo, and real-time meters. Let me load a song and show you.',
+    action: async () => {
+      switchView('tracker');
+      await loadTrackerSong('aces_high.mod');
+      await trackerPlay();
+      // Brief pause before switching to mixer so patterns load
+      await new Promise(r => setTimeout(r, 500));
+      switchView('mixer');
+    },
+    postDelay: 2000,
+  },
+  {
+    id: 'mixer-solo',
+    narration: 'Solo a channel to hear just that part.',
+    action: async () => {
+      const { useMixerStore } = await import('@/stores/useMixerStore');
+      const mixer = useMixerStore.getState();
+      mixer.setChannelSolo(0, true);
+    },
+    postDelay: 3000,
+  },
+  {
+    id: 'mixer-unsolo',
+    narration: 'And bring it all back.',
+    action: async () => {
+      const { useMixerStore } = await import('@/stores/useMixerStore');
+      useMixerStore.getState().setChannelSolo(0, false);
+    },
+    postDelay: 2000,
+  },
+  {
+    id: 'mixer-mute',
+    narration: 'Mute channels to build breakdowns.',
+    action: async () => {
+      const { useMixerStore } = await import('@/stores/useMixerStore');
+      const mixer = useMixerStore.getState();
+      mixer.setChannelMute(1, true);
+      setTimeout(() => mixer.setChannelMute(2, true), 800);
+      setTimeout(() => mixer.setChannelMute(3, true), 1600);
+      // Unmute all after a while
+      setTimeout(() => {
+        mixer.setChannelMute(1, false);
+        mixer.setChannelMute(2, false);
+        mixer.setChannelMute(3, false);
+      }, 3500);
+    },
+    postDelay: 4500,
+  },
+  {
+    id: 'mixer-stop',
+    narration: '',
+    action: trackerStop,
+    postDelay: 300,
   },
 
   // ── Act 9: Closing (fast) ───────────────────────────────────────────────
