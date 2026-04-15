@@ -821,8 +821,13 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 1500,
   },
   {
-    id: 'acid-tweak',
+    id: 'acid-tweak-intro',
     narration: 'Cutoff. Resonance. Envelope mod. This is what makes the 303 scream.',
+    postDelay: 500,
+  },
+  {
+    id: 'acid-tweak',
+    narration: '',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const { getToneEngine } = await import('@/engine/ToneEngine');
@@ -980,6 +985,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-play-original',
     narration: 'Here is the original sample at its native pitch.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-play-original-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) await playSampleInstrument(id);
@@ -991,6 +1001,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-reverse',
     narration: 'Reverse. Flips the waveform backwards. Watch.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-reverse-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1015,6 +1030,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-normalize',
     narration: 'Normalize. Maximizes the volume to zero dB. See the waveform grow.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-normalize-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1030,6 +1050,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-fadein',
     narration: 'Fade in. Smoothly ramps the attack from silence.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-fadein-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1046,6 +1071,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-fadeout',
     narration: 'Fade out. Tapers the tail to nothing.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-fadeout-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1062,6 +1092,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-exciter',
     narration: 'Spectral exciter. Adds harmonic overtones for brightness and presence. Listen.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-exciter-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1078,6 +1113,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-transient',
     narration: 'Transient sharpening. Punches up the attack for more snap and bite.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-transient-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1094,6 +1134,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-amiga',
     narration: 'Amiga PAL 8-bit resampling. The authentic aliasing and crunch of the original hardware.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-amiga-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
@@ -1110,6 +1155,11 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'sample-restore',
     narration: 'Full undo. Back to the original in one click.',
+    postDelay: 500,
+  },
+  {
+    id: 'sample-restore-audio',
+    narration: '',
     action: async () => {
       const id = await getFirstSampleInstrument();
       if (id != null) {
