@@ -44,6 +44,9 @@ async function loadTrackerSong(filename: string): Promise<void> {
     const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
     const info = await loadModuleFile(file);
     await importTrackerModule(info, { useLibopenmpt: false });
+
+    // Give the engine a moment to finish setting up channels/instruments
+    await new Promise(r => setTimeout(r, 500));
   } catch (err) {
     console.warn('[Tour] Failed to load song:', err);
   }
@@ -51,7 +54,7 @@ async function loadTrackerSong(filename: string): Promise<void> {
 
 async function trackerPlay(): Promise<void> {
   const { useTransportStore } = await import('@/stores/useTransportStore');
-  useTransportStore.getState().play();
+  await useTransportStore.getState().play();
 }
 
 async function trackerStop(): Promise<void> {
@@ -501,12 +504,16 @@ export const TOUR_SCRIPT: TourStep[] = [
       await loadTrackerSong('aces_high.mod');
     },
     spotlight: '[data-pattern-editor]',
-    postDelay: 500,
+    postDelay: 800,
   },
   {
     id: 'tracker-play',
     narration: 'Here we go.',
-    action: trackerPlay,
+    action: async () => {
+      await trackerPlay();
+      // Give the replayer a moment to start producing audio
+      await new Promise(r => setTimeout(r, 300));
+    },
     spotlight: '[data-pattern-editor]',
     postDelay: 4000,
   },

@@ -123,6 +123,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   // ─── Refs ────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const playheadCanvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Tone.Player | null>(null);
@@ -139,6 +140,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const animationRef = useRef<number | null>(null);
   const isFileDraggingRef = useRef(false);
   const selectionDragStart = useRef<number>(-1);
+  const playbackPosRef = useRef(0);
 
   // ─── Instrument data ────────────────────────────────────────────
   const params = (instrument.parameters || {}) as Record<string, unknown>;
@@ -269,8 +271,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowSpectrumFilter,
     isPlaying,
     setIsPlaying,
-    playbackPosition,
-    setPlaybackPosition,
     isLoading,
     setIsLoading,
     error,
@@ -307,18 +307,54 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     reverse,
   } = editorParams;
 
+  // ─── Playhead overlay — refs for flicker-free direct canvas draws ──
+  const viewStartRef = useRef(viewStart);
+  const viewEndRef = useRef(viewEnd);
+  useEffect(() => { viewStartRef.current = viewStart; viewEndRef.current = viewEnd; }, [viewStart, viewEnd]);
+
+  /** Draw (or clear) the playhead line on the overlay canvas — no React state needed. */
+  const drawPlayhead = useCallback((pos: number) => {
+    playbackPosRef.current = pos;
+    const canvas = playheadCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = CANVAS_W;
+    const h = CANVAS_H;
+    if (canvas.width !== w * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.scale(dpr, dpr);
+    }
+    ctx.clearRect(0, 0, w, h);
+    if (pos <= 0) return;
+    const vs = viewStartRef.current;
+    const ve = viewEndRef.current;
+    const range = ve - vs;
+    if (range <= 0) return;
+    const x = ((pos - vs) / range) * w;
+    if (x < 0 || x > w) return;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }, []);
+
   // ─── Song playback position for this instrument (WASM + ToneEngine) ─────────
   const songPlayback = useInstrumentPlaybackState(
     instrument.id, instrument.synthType, audioBuffer?.duration,
   );
   useEffect(() => {
     if (songPlayback.isPlaying && songPlayback.position >= 0) {
-      setPlaybackPosition(songPlayback.position);
+      drawPlayhead(songPlayback.position);
       if (!isPlaying) setIsPlaying(true);
     } else if (!songPlayback.isPlaying && isPlaying && playerRef.current?.state !== 'started') {
-      setPlaybackPosition(0);
+      drawPlayhead(0);
     }
-  }, [songPlayback.isPlaying, songPlayback.position, isPlaying, setIsPlaying, setPlaybackPosition]);
+  }, [songPlayback.isPlaying, songPlayback.position, isPlaying, setIsPlaying, drawPlayhead]);
 
   // ─── Test-keyboard / external-MIDI playhead overlay ───────────────
   // When the user triggers notes via the test keyboard, test piano, or
@@ -371,22 +407,19 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             progress = loopStartNorm + loopElapsed / duration;
           }
 
-          // Cap the loop animation at 60s of wall-clock so a stale
-          // "attack ages ago" doesn't keep the playhead spinning forever.
           if (elapsed > 60) {
             lastSeenAttack = -1;
-            setPlaybackPosition(0);
+            drawPlayhead(0);
           } else {
-            setPlaybackPosition(progress);
+            drawPlayhead(progress);
           }
         } else {
-          // One-shot — animate over the sample's natural duration
           progress = elapsed / duration;
           if (progress >= 1) {
             lastSeenAttack = -1;
-            setPlaybackPosition(0);
+            drawPlayhead(0);
           } else {
-            setPlaybackPosition(progress);
+            drawPlayhead(progress);
           }
         }
       }
@@ -398,7 +431,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   }, [
     isPlaying, audioBuffer, instrument.id,
     loopEnabled, loopStart, loopEnd, loopType,
-    setPlaybackPosition,
+    drawPlayhead,
   ]);
 
   // ─── Sync loop params from parameters → sample config ────────────
@@ -563,7 +596,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       loopStart,
       loopEnd,
       loopType: loopType || 'forward',
-      playbackPosition,
+      playbackPosition: 0, // playhead drawn on overlay canvas for smooth animation
       granularPosition: isGranular ? (granular?.scanPosition ?? undefined) : undefined,
       activeDrag: dragTarget,
       showSpectrum,
@@ -572,11 +605,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       offsetMarkers,
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
+    // Re-draw playhead on overlay after waveform redraws (zoom, selection, etc.)
+    drawPlayhead(playbackPosRef.current);
   }, [
     audioBuffer, viewStart, viewEnd,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
-    playbackPosition, isGranular, granular, dragTarget, showSpectrum,
+    isGranular, granular, dragTarget, showSpectrum,
     showBeatSlicer, instrument.sample?.slices, selectedSliceId, offsetMarkers,
+    drawPlayhead,
   ]);
 
   // ─── Canvas draw: minimap ────────────────────────────────────────
@@ -939,7 +975,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       console.log('[SampleEditor] handlePlay: stopping playback');
       stopPreviewSources();
       setIsPlaying(false);
-      setPlaybackPosition(0);
+      drawPlayhead(0);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       return;
     }
@@ -1103,7 +1139,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         if (previewSourcesRef.current.includes(src)) {
           stopPreviewSources();
           setIsPlaying(false);
-          setPlaybackPosition(0);
+          drawPlayhead(0);
           if (animationRef.current) cancelAnimationFrame(animationRef.current);
         }
       };
@@ -1143,14 +1179,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         if (progress >= 1) return; // onended will clear state
       }
 
-      setPlaybackPosition(progress);
+      drawPlayhead(progress);
       animationRef.current = requestAnimationFrame(animate);
     };
     animate();
   }, [
     audioBuffer, isPlaying, playbackRate, reverse,
     loopEnabled, loopStart, loopEnd, loopType,
-    setIsPlaying, setPlaybackPosition, stopPreviewSources,
+    setIsPlaying, drawPlayhead, stopPreviewSources,
   ]);
 
   // ─── Keyboard shortcuts (focus-gated) ─────────────────────────────
@@ -1429,6 +1465,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
           onDoubleClick={(e) => { e.preventDefault(); selectAll(); }}
+        />
+        <canvas
+          ref={playheadCanvasRef}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          className="absolute inset-0 w-full h-[150px] pointer-events-none"
+          style={{ imageRendering: 'pixelated' }}
         />
         {isLoading && (
           <div className="absolute inset-0 bg-dark-bg/80 flex items-center justify-center">
