@@ -38,8 +38,63 @@ function synthesizeWav(text: string, voice: number, rate: number): Promise<Uint8
   return new Promise((resolve, reject) => {
     const id = msgId++;
     pending.set(id, { resolve, reject });
-    getWorker().postMessage({ id, text, voice, rate });
+    getWorker().postMessage({ id, text: phonemize(text), voice, rate });
   });
+}
+
+/**
+ * Phonemize text for DECtalk — improves pronunciation of technical terms.
+ * DECtalk supports inline phoneme notation: [:phoneme on] ... [:phoneme off]
+ * and stress markers: 1 = primary stress, 2 = secondary stress.
+ * Words not in the map pass through to DECtalk's default text-to-speech.
+ */
+const PHONEME_MAP: Record<string, string> = {
+  // App / project names
+  'DEViLBOX':     'devil box',
+  'devilbox':     'devil box',
+  'Modland':      'modd land',
+  'HVSC':         'H V S C',
+  'modland':      'modd land',
+  // Synth names
+  'TB-303':       'T B three oh three',
+  'TB303':        'T B three oh three',
+  'TR-808':       'T R eight oh eight',
+  'TR808':        'T R eight oh eight',
+  'TR-909':       'T R nine oh nine',
+  'TR909':        'T R nine oh nine',
+  'DX7':          'D X seven',
+  'DECtalk':      'deck talk',
+  'Amsynth':      'am synth',
+  'DuoSynth':     'doo oh synth',
+  // Tech terms
+  'WebAssembly':  'web assembly',
+  'WASM':         'wasm',
+  'NKS2':         'N K S two',
+  'NKS':          'N K S',
+  'MIDI':         'middy',
+  'SID':          'sid',
+  'BPM':          'B P M',
+  'VJ':           'V J',
+  'FX':           'effects',
+  'EQ':           'E Q',
+  'DJ':           'D J',
+  'CC':           'C C',
+  'Amiga':        'ah mee gah',
+  'Commodore':    'comma door',
+  // Music terms
+  'crossfading':  'cross fading',
+  'crossfade':    'cross fade',
+  'lo-fi':        'low fie',
+  'Lo-Fi':        'low fie',
+};
+
+function phonemize(text: string): string {
+  let result = text;
+  for (const [word, replacement] of Object.entries(PHONEME_MAP)) {
+    // Word-boundary-aware replacement (case-sensitive for acronyms)
+    result = result.replace(new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), replacement);
+  }
+  return result;
 }
 
 interface PreRenderedStep {
@@ -79,6 +134,10 @@ class TourEngine {
 
     const totalSteps = TOUR_SCRIPT.length;
     store.startTour(totalSteps);
+
+    // Ensure Tone.js audio context is started (requires user gesture — the Tour
+    // button click satisfies this). Without this, the tracker replayer won't produce audio.
+    await Tone.start();
 
     // Pre-render all speech
     store.setPreRendering(true, 0);
