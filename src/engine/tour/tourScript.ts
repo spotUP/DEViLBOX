@@ -37,13 +37,14 @@ async function loadTrackerSong(filename: string): Promise<void> {
     const buf = await resp.arrayBuffer();
     const file = new File([buf], filename, { type: 'application/octet-stream' });
 
-    // loadFile returns 'pending-import' for .mod/.xm/.it etc — it expects
-    // the import dialog to handle it.  Bypass that: prepare ModuleInfo and
-    // call importTrackerModule directly (the same function the dialog calls).
-    const { loadModuleFile } = await import('@/lib/import/ModuleLoader');
-    const { importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
-    const info = await loadModuleFile(file);
-    await importTrackerModule(info, { useLibopenmpt: false });
+    // Use the same loadFile path the file dialog uses — this handles format
+    // detection, state reset, instrument loading, and pattern order correctly.
+    const { loadFile } = await import('@/lib/file/UnifiedFileLoader');
+    const result = await loadFile(file, { requireConfirmation: false });
+
+    if (!result.success) {
+      console.warn('[Tour] loadFile failed:', result.error);
+    }
 
     // Give the engine a moment to finish setting up channels/instruments
     await new Promise(r => setTimeout(r, 500));
