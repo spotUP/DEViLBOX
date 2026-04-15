@@ -217,6 +217,17 @@ export class SP0250Synth extends MAMEBaseSynth {
         frameList.push(packed);
       }
     }
+    // Fade-out frames to prevent click at end of speech
+    if (frameList.length > 0) {
+      const last = frameList[frameList.length - 1];
+      // 3 frames ramping amplitude to zero (75ms fade-out)
+      for (let i = 3; i >= 1; i--) {
+        const fadedAmp = Math.max(1, Math.round(last[0] * i / 4));
+        frameList.push([fadedAmp, last[1], last[2], ...last.slice(3)]);
+      }
+      // Silent frame before stop
+      frameList.push([0x00, 0, 0, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10]);
+    }
     // Stop marker at end
     frameList.push([0xFF, 0, 0, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10]);
 
@@ -357,21 +368,34 @@ export class SP0250Synth extends MAMEBaseSynth {
       const count = this._vowelLoopSingle ? 40 : Math.max(1, Math.round(lpcFrame.durationMs / 25));
       const packed = [lpcFrame.amp, lpcFrame.pitch, lpcFrame.voiced ? 1 : 0,
         ...lpcFrame.filterF.flatMap((fv, i) => [fv, lpcFrame.filterB[i]])];
-      const numFrames = count + 1; // +1 for stop marker
-      const data = new Uint8Array(numFrames * 15);
+      // +5: main frames + 3 fade-out + 1 silent + 1 stop marker
+      const totalFrames = count + 5;
+      const data = new Uint8Array(totalFrames * 15);
       for (let i = 0; i < count; i++) {
         for (let j = 0; j < 15; j++) data[i * 15 + j] = packed[j];
       }
-      // Stop marker at end (amp=0xFF)
-      data[count * 15] = 0xFF;
+      // Fade-out frames to prevent click
+      let off = count;
+      for (let i = 3; i >= 1; i--) {
+        const fadedAmp = Math.max(1, Math.round(lpcFrame.amp * i / 4));
+        data[off * 15] = fadedAmp;
+        data[off * 15 + 1] = packed[1]; data[off * 15 + 2] = packed[2];
+        for (let j = 3; j < 15; j++) data[off * 15 + j] = packed[j];
+        off++;
+      }
+      // Silent frame
+      data[off * 15] = 0x00;
+      off++;
+      // Stop marker
+      data[off * 15] = 0xFF;
       const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-      this.workletNode.port.postMessage({ type: 'loadFrameBuffer', frameData: buffer, numFrames }, [buffer]);
+      this.workletNode.port.postMessage({ type: 'loadFrameBuffer', frameData: buffer, numFrames: totalFrames }, [buffer]);
       this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
       this._phonemeSpeechActive = true;
       this._phonemeSpeechTimer = setTimeout(() => {
         this._phonemeSpeechTimer = null;
         this._phonemeSpeechActive = false;
-      }, numFrames * 25 + 100);
+      }, totalFrames * 25 + 100);
       return;
     }
 
