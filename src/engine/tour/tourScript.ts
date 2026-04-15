@@ -363,6 +363,7 @@ async function restoreSample(instrumentId: number): Promise<void> {
  *  Uses direct Web Audio for reliable playback at the sample's native rate. */
 async function playSampleInstrument(instrumentId: number, durationMs = 3000): Promise<void> {
   const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+  const { getToneEngine } = await import('@/engine/ToneEngine');
   const Tone = await import('tone');
   const config = useInstrumentStore.getState().getInstrument(instrumentId);
   if (!config) return;
@@ -371,30 +372,17 @@ async function playSampleInstrument(instrumentId: number, durationMs = 3000): Pr
     await Tone.start();
   }
 
-  // Direct Web Audio path: decode the WAV and play at native sample rate.
-  // This avoids Tone.Sampler pitch issues with low-rate MOD samples (8363 Hz).
-  const rawBuf = config.sample?.audioBuffer;
-  if (rawBuf && rawBuf instanceof ArrayBuffer && rawBuf.byteLength > 0) {
-    try {
-      const { isWavBuffer, parseWavToAudioBuffer } = await import('@/utils/audio/wavParser');
-      const ctx = Tone.getContext().rawContext as AudioContext;
-      let decoded: AudioBuffer;
-      if (isWavBuffer(rawBuf)) {
-        // Manual parser handles low-rate WAVs that browser may reject
-        decoded = parseWavToAudioBuffer(rawBuf.slice(0));
-      } else {
-        decoded = await ctx.decodeAudioData(rawBuf.slice(0));
-      }
-      const source = ctx.createBufferSource();
-      source.buffer = decoded;
-      source.connect(ctx.destination);
-      source.start();
-      const playDuration = Math.min(durationMs, decoded.duration * 1000);
-      setTimeout(() => { try { source.stop(); } catch { /* */ } }, playDuration);
-      console.log(`[Tour] playSampleInstrument: direct playback id=${instrumentId} duration=${(playDuration / 1000).toFixed(1)}s sampleRate=${decoded.sampleRate}`);
-    } catch (err) {
-      console.warn('[Tour] Direct Web Audio playback failed:', err);
-    }
+  try {
+    const engine = getToneEngine();
+    await engine.ensureInstrumentReady(config);
+    await engine.awaitPendingLoads(5000);
+    // Play at C-4 (standard middle note) — ToneEngine handles sample rate pitch math
+    engine.triggerNoteAttack(instrumentId, 'C-4', 0, 0.85, config);
+    setTimeout(() => {
+      try { engine.triggerNoteRelease(instrumentId, 'C-4', 0, config); } catch { /* */ }
+    }, durationMs);
+  } catch (err) {
+    console.warn('[Tour] playSampleInstrument failed:', err);
   }
 }
 
