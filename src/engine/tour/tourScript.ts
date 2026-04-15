@@ -514,43 +514,7 @@ async function disengageDjFx(actionId: string): Promise<void> {
   }
 }
 
-/** Set up a DECtalk speech synth on a pad and trigger it */
-async function triggerSpeechPad(padId: number, text: string, voice = 0): Promise<void> {
-  try {
-    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
-    const { getToneEngine } = await import('@/engine/ToneEngine');
-    const { PAD_INSTRUMENT_BASE } = await import('@/types/drumpad');
 
-    // Configure the pad with DECtalk synth
-    useDrumPadStore.getState().updatePad(padId, {
-      name: 'DECtalk',
-      color: '#8b5cf6',
-      synthConfig: {
-        id: PAD_INSTRUMENT_BASE + padId,
-        name: `DECtalk Pad ${padId}`,
-        type: 'synth',
-        synthType: 'DECtalk',
-        effects: [],
-        volume: 0,
-        pan: 0,
-        dectalk: { text, voice, rate: 220, pitch: 0.5, volume: 0.8 },
-      },
-      instrumentNote: 'C4',
-    });
-
-    // Small delay for the synth to initialize and pre-render
-    await new Promise(r => setTimeout(r, 1500));
-
-    const instId = PAD_INSTRUMENT_BASE + padId;
-    const config = useDrumPadStore.getState().programs.get(
-      useDrumPadStore.getState().currentProgramId
-    )?.pads.find(p => p.id === padId)?.synthConfig;
-    if (!config) return;
-    getToneEngine().triggerNoteAttack(instId, 'C4', 0, 0.9, { ...config, id: instId });
-  } catch (err) {
-    console.warn(`[Tour] Failed to trigger speech pad:`, err);
-  }
-}
 
 // ── Modland / HVSC actions ──────────────────────────────────────────────────
 
