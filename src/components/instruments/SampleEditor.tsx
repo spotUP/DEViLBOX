@@ -312,8 +312,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const viewEndRef = useRef(viewEnd);
   useEffect(() => { viewStartRef.current = viewStart; viewEndRef.current = viewEnd; }, [viewStart, viewEnd]);
 
-  /** Draw (or clear) the playhead line on the overlay canvas — no React state needed. */
+  /** Draw (or clear) the playhead line with a trailing glow on the overlay canvas. */
   const drawPlayhead = useCallback((pos: number) => {
+    const prevPos = playbackPosRef.current;
     playbackPosRef.current = pos;
     const canvas = playheadCanvasRef.current;
     if (!canvas) return;
@@ -335,12 +336,32 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     if (range <= 0) return;
     const x = ((pos - vs) / range) * w;
     if (x < 0 || x > w) return;
+
+    // Trailing glow — fading gradient behind the playhead
+    const trailPx = 40;
+    const prevX = prevPos > 0 ? ((prevPos - vs) / range) * w : x;
+    const movingRight = x >= prevX;
+    const trailStart = movingRight ? x - trailPx : x + trailPx;
+    const grad = ctx.createLinearGradient(trailStart, 0, x, 0);
+    grad.addColorStop(0, 'rgba(251, 191, 36, 0)');
+    grad.addColorStop(1, 'rgba(251, 191, 36, 0.18)');
+    ctx.fillStyle = grad;
+    if (movingRight) {
+      ctx.fillRect(Math.max(0, trailStart), 0, Math.min(trailPx, x), h);
+    } else {
+      ctx.fillRect(x, 0, Math.min(trailPx, w - x), h);
+    }
+
+    // Soft glow behind the line
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 8;
     ctx.strokeStyle = '#fbbf24';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, h);
     ctx.stroke();
+    ctx.shadowBlur = 0;
   }, []);
 
   // ─── Song playback position for this instrument (WASM + ToneEngine) ─────────

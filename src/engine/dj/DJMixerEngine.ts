@@ -102,7 +102,10 @@ export class DJMixerEngine {
       this.masterGain.connect(this.chainGain);
       this.chainGain.connect(this.duckGain);
       this.duckGain.connect(this.limiter);
-      this.limiter.toDestination();
+      
+      // Connect limiter to Destination INPUT (not .toDestination())
+      // This allows DJ FX to tap from Destination OUTPUT
+      this.limiter.connect(Tone.getDestination().input as any);
       this.limiter.connect(this.masterMeter);
     } catch (err) {
       console.error('[DJMixerEngine] audio graph wiring failed:', err);
