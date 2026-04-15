@@ -4,7 +4,8 @@ import { SpeechSequencer } from '@/engine/speech/SpeechSequencer';
 import type { SpeechFrame } from '@/engine/speech/SpeechSequencer';
 import { getTractShape, type TractShape } from './PhonemeMap';
 import { textToPhonemes as simpleTextToPhonemes } from './SimpleReciter';
-import { espeakTextToIPA, parseEspeakIPA, isEspeakAvailable, preloadEspeak } from '@engine/speech/EspeakNG';
+// eSpeak-NG WASM is broken (Aborted() on init, freezes browser for ~10s).
+// SimpleReciter provides adequate phoneme conversion without the WASM overhead.
 import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 
 export interface PinkTromboneConfig {
@@ -113,9 +114,6 @@ export class PinkTromboneSynth implements DevilboxSynth {
     });
 
     PinkTromboneSynth._activeInstance = this;
-
-    // Defer eSpeak-NG preload to avoid freezing UI on first note
-    setTimeout(() => preloadEspeak(), 2000);
 
     // Speech sequencer: drives tract parameters from phoneme sequence
     this._speechSequencer = new SpeechSequencer<TractShape>(
@@ -259,22 +257,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
     if (!text.trim()) return;
     console.log('[PinkTrombone] speak() called with:', text);
 
-    // Try eSpeak-NG first (much better pronunciation), fall back to SimpleReciter
-    let phonemes: string[];
-    if (isEspeakAvailable()) {
-      const ipa = await espeakTextToIPA(text);
-      if (ipa) {
-        const tokens = parseEspeakIPA(ipa);
-        phonemes = tokens.map(t => t.code);
-        console.log('[PinkTrombone] eSpeak phonemes:', phonemes.join(' '));
-      } else {
-        phonemes = simpleTextToPhonemes(text);
-        console.log('[PinkTrombone] SimpleReciter phonemes:', phonemes.join(' '));
-      }
-    } else {
-      phonemes = simpleTextToPhonemes(text);
-      console.log('[PinkTrombone] SimpleReciter phonemes:', phonemes.join(' '));
-    }
+    const phonemes = simpleTextToPhonemes(text);
 
     if (phonemes.length === 0) return;
 
