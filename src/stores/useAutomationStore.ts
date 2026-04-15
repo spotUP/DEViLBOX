@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { checkFormatViolation, getActiveFormatLimits, isFormatChecksSuppressed } from '@/lib/formatCompatibility';
+import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
 import type { FormatConstraints } from '@/lib/formatCompatibility';
 import type {
   AutomationCurve,
@@ -211,11 +211,9 @@ export const useAutomationStore = create<AutomationStore>()(
     // Actions
     addCurve: (patternId, channelIndex, parameter) => {
       // Check if this parameter can be baked into native effects on export.
-      // Skip entirely when format checks are suppressed (e.g. during tour) to
-      // avoid infinite recursion: checkFormatViolation returns true → re-calls
-      // addCurve → canBake still false → infinite loop.
+      // Inline check mirrors getEffectMapping logic from AutomationBaker.
       const limits = getActiveFormatLimits();
-      if (limits && !isFormatChecksSuppressed()) {
+      if (limits) {
         const canBake = canBakeParameter(parameter, limits);
         if (!canBake) {
           void checkFormatViolation('automation',
