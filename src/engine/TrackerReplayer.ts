@@ -3538,7 +3538,6 @@ export class TrackerReplayer {
 
       case 0x21: // FT2: Extra fine portamento (X1x up, X2x down) / DJ Scratch (Xnn)
         if (this.useXMPeriods) {
-          // FT2 extra fine portamento — tick 0 only
           const slideType = (param >> 4) & 0x0F;
           const slideParam = param & 0x0F;
           if (slideType === 1) {
@@ -3546,10 +3545,15 @@ export class TrackerReplayer {
             if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
               const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideUpSpeed;
               ch.efPitchSlideUpSpeed = spd;
-              const speed = spd / 256; // Extra fine = 4x finer than fine
-              const currentDetune = ch._synthDetuneOffset ?? 0;
-              ch._synthDetuneOffset = currentDetune + speed;
-              getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+              ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) + spd / 256;
+              if (this.isSmoothPitchSupported(ch.instrument)) {
+                getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, time, chIndex);
+              } else {
+                const rounded = Math.round(ch._synthDetuneOffset);
+                if (rounded !== (ch.currentPitchOffset ?? 0)) {
+                  this.retriggerNoteAtPitch(ch, rounded, chIndex);
+                }
+              }
             } else {
               const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideUpSpeed;
               ch.efPitchSlideUpSpeed = spd;
@@ -3562,10 +3566,15 @@ export class TrackerReplayer {
             if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
               const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideDownSpeed;
               ch.efPitchSlideDownSpeed = spd;
-              const speed = spd / 256; // Extra fine = 4x finer than fine
-              const currentDetune = ch._synthDetuneOffset ?? 0;
-              ch._synthDetuneOffset = currentDetune - speed;
-              getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+              ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) - spd / 256;
+              if (this.isSmoothPitchSupported(ch.instrument)) {
+                getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, time, chIndex);
+              } else {
+                const rounded = Math.round(ch._synthDetuneOffset);
+                if (rounded !== (ch.currentPitchOffset ?? 0)) {
+                  this.retriggerNoteAtPitch(ch, rounded, chIndex);
+                }
+              }
             } else {
               const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideDownSpeed;
               ch.efPitchSlideDownSpeed = spd;
@@ -3642,16 +3651,20 @@ export class TrackerReplayer {
 
       case 0x1: // Fine porta up
         if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
-          // For synths: fine porta up
           if (y !== 0) ch.fPortaUpSpeed = y;
-          const speed = ch.fPortaUpSpeed / 128; // Finer adjustment
-          const currentDetune = ch._synthDetuneOffset ?? 0;
-          ch._synthDetuneOffset = currentDetune + speed;
-          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, _chIndex);
+          const speed = ch.fPortaUpSpeed / 128;
+          ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) + speed;
+          if (this.isSmoothPitchSupported(ch.instrument)) {
+            getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, time, _chIndex);
+          } else {
+            // WASM: retrigger if crossed a semitone boundary
+            const rounded = Math.round(ch._synthDetuneOffset);
+            if (rounded !== (ch.currentPitchOffset ?? 0)) {
+              this.retriggerNoteAtPitch(ch, rounded, _chIndex);
+            }
+          }
         } else {
-          // Sample-based
           if (this.useXMPeriods) {
-            // FT2: uses speed memory, param * 4
             if (y !== 0) ch.fPortaUpSpeed = y;
             ch.period -= ch.fPortaUpSpeed * 4;
             if (ch.period < 1) ch.period = 1;
@@ -3664,16 +3677,19 @@ export class TrackerReplayer {
 
       case 0x2: // Fine porta down
         if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
-          // For synths: fine porta down
           if (y !== 0) ch.fPortaDownSpeed = y;
-          const speed = ch.fPortaDownSpeed / 128; // Finer adjustment
-          const currentDetune = ch._synthDetuneOffset ?? 0;
-          ch._synthDetuneOffset = currentDetune - speed;
-          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, _chIndex);
+          const speed = ch.fPortaDownSpeed / 128;
+          ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) - speed;
+          if (this.isSmoothPitchSupported(ch.instrument)) {
+            getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, time, _chIndex);
+          } else {
+            const rounded = Math.round(ch._synthDetuneOffset);
+            if (rounded !== (ch.currentPitchOffset ?? 0)) {
+              this.retriggerNoteAtPitch(ch, rounded, _chIndex);
+            }
+          }
         } else {
-          // Sample-based
           if (this.useXMPeriods) {
-            // FT2: uses speed memory, param * 4
             if (y !== 0) ch.fPortaDownSpeed = y;
             ch.period += ch.fPortaDownSpeed * 4;
             if (ch.period > 31999) ch.period = 31999;
@@ -3894,25 +3910,54 @@ export class TrackerReplayer {
         break;
 
       case 0x1: // Portamento up (decrease period = raise pitch)
-        if (this.useXMPeriods) {
-          // FT2: separate speed memory, speed * 4, clamp to min 1
-          ch.period -= ch.portaUpSpeed * 4;
-          if (ch.period < 1) ch.period = 1;
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          // Synth: accumulate detune offset upward
+          const speed1 = this.useXMPeriods ? ch.portaUpSpeed : ch.portaSpeed;
+          const semitones1 = speed1 / 16; // Scale: speed 16 = 1 semitone/tick
+          ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) + semitones1;
+          if (this.isSmoothPitchSupported(ch.instrument)) {
+            getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, Tone.now(), chIndex);
+          } else {
+            // WASM: retrigger at rounded semitone offset
+            const rounded = Math.round(ch._synthDetuneOffset);
+            if (rounded !== (ch.currentPitchOffset ?? 0)) {
+              this.retriggerNoteAtPitch(ch, rounded, chIndex);
+            }
+          }
         } else {
-          ch.period = Math.max(113, ch.period - ch.portaSpeed);
+          if (this.useXMPeriods) {
+            ch.period -= ch.portaUpSpeed * 4;
+            if (ch.period < 1) ch.period = 1;
+          } else {
+            ch.period = Math.max(113, ch.period - ch.portaSpeed);
+          }
+          this.updatePeriod(ch);
         }
-        this.updatePeriod(ch);
         break;
 
       case 0x2: // Portamento down (increase period = lower pitch)
-        if (this.useXMPeriods) {
-          // FT2: separate speed memory, speed * 4, clamp to max 31999
-          ch.period += ch.portaDownSpeed * 4;
-          if (ch.period > 31999) ch.period = 31999;
+        if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+          // Synth: accumulate detune offset downward
+          const speed2 = this.useXMPeriods ? ch.portaDownSpeed : ch.portaSpeed;
+          const semitones2 = speed2 / 16;
+          ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) - semitones2;
+          if (this.isSmoothPitchSupported(ch.instrument)) {
+            getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, Tone.now(), chIndex);
+          } else {
+            const rounded = Math.round(ch._synthDetuneOffset);
+            if (rounded !== (ch.currentPitchOffset ?? 0)) {
+              this.retriggerNoteAtPitch(ch, rounded, chIndex);
+            }
+          }
         } else {
-          ch.period = Math.min(856, ch.period + ch.portaSpeed);
+          if (this.useXMPeriods) {
+            ch.period += ch.portaDownSpeed * 4;
+            if (ch.period > 31999) ch.period = 31999;
+          } else {
+            ch.period = Math.min(856, ch.period + ch.portaSpeed);
+          }
+          this.updatePeriod(ch);
         }
-        this.updatePeriod(ch);
         break;
 
       case 0x3: // Tone portamento
@@ -4028,13 +4073,18 @@ export class TrackerReplayer {
         break;
       case 0x1: // Portamento up
         if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
-          // For synths: slide pitch up by speed semitones per tick
-          const speed = ch.portaUpSpeed / 64; // Convert to fractional semitones
-          const currentDetune = ch._synthDetuneOffset ?? 0;
-          ch._synthDetuneOffset = currentDetune + speed;
-          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+          const speed1b = this.useXMPeriods ? ch.portaUpSpeed : ch.portaSpeed;
+          const semitones1b = speed1b / 16;
+          ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) + semitones1b;
+          if (this.isSmoothPitchSupported(ch.instrument)) {
+            getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, time, chIndex);
+          } else {
+            const rounded = Math.round(ch._synthDetuneOffset);
+            if (rounded !== (ch.currentPitchOffset ?? 0)) {
+              this.retriggerNoteAtPitch(ch, rounded, chIndex);
+            }
+          }
         } else {
-          // Sample-based portamento
           if (this.useXMPeriods) {
             ch.period -= ch.portaUpSpeed * 4;
             if (ch.period < 1) ch.period = 1;
@@ -4046,13 +4096,18 @@ export class TrackerReplayer {
         break;
       case 0x2: // Portamento down
         if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
-          // For synths: slide pitch down by speed semitones per tick
-          const speed = ch.portaDownSpeed / 64; // Convert to fractional semitones
-          const currentDetune = ch._synthDetuneOffset ?? 0;
-          ch._synthDetuneOffset = currentDetune - speed;
-          getToneEngine().applySynthPitch(ch.sampleNum, ch._synthDetuneOffset, time, chIndex);
+          const speed2b = this.useXMPeriods ? ch.portaDownSpeed : ch.portaSpeed;
+          const semitones2b = speed2b / 16;
+          ch._synthDetuneOffset = (ch._synthDetuneOffset ?? 0) - semitones2b;
+          if (this.isSmoothPitchSupported(ch.instrument)) {
+            getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset, time, chIndex);
+          } else {
+            const rounded = Math.round(ch._synthDetuneOffset);
+            if (rounded !== (ch.currentPitchOffset ?? 0)) {
+              this.retriggerNoteAtPitch(ch, rounded, chIndex);
+            }
+          }
         } else {
-          // Sample-based portamento
           if (this.useXMPeriods) {
             ch.period += ch.portaDownSpeed * 4;
             if (ch.period > 31999) ch.period = 31999;
@@ -4143,23 +4198,34 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private doArpeggio(ch: ChannelState, param: number, chIndex?: number): void {
-    // For synths, use note retriggering (works on ALL synths)
+    // FT2-style arpeggio: modulate frequency/period directly without retriggering
+    const x = (param >> 4) & 0x0F;
+    const y = param & 0x0F;
+    const tick = this.currentTick % 3;
+    let semitoneOffset = 0;
+    
+    if (tick === 1) {
+      semitoneOffset = x;
+    } else if (tick === 2) {
+      semitoneOffset = y;
+    }
+    
+    // For Tone.js synths: modulate frequency directly (no retriggering)
+    // For WASM synths: use note retriggering (noteOff+noteOn)
+    // Furnace synths are already excluded above (line ~3882)
     if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
-      const x = (param >> 4) & 0x0F;
-      const y = param & 0x0F;
-      const tick = this.currentTick % 3;
-      let semitoneOffset = 0;
+      const toneJSSynths = new Set(['Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'ToneAM',
+        'PluckSynth', 'MembraneSynth', 'MetalSynth', 'PolySynth', 'SuperSaw']);
       
-      if (tick === 1) {
-        semitoneOffset = x;
-      } else if (tick === 2) {
-        semitoneOffset = y;
+      if (toneJSSynths.has(ch.instrument.synthType)) {
+        // Tone.js: direct frequency modulation (smooth, no retriggering)
+        this.applySynthFrequencyOffset(ch, semitoneOffset, chIndex);
+      } else {
+        // WASM synths: note retriggering (monophonic noteOff+noteOn)
+        this.retriggerNoteAtPitch(ch, semitoneOffset, chIndex);
       }
-      
-      // Use note retriggering instead of detune
-      this.retriggerNoteAtPitch(ch, semitoneOffset, chIndex);
     } else {
-      // Sample-based arpeggio via period modulation
+      // For samples: modulate period (existing XM logic)
       _doArpeggio(ch, param, this.currentTick, this.speed, this.useXMPeriods, this.linearPeriods,
         (c, p) => this.updatePeriodDirect(c, p),
         (b, s, f) => this.periodPlusSemitones(b, s, f));
@@ -4167,41 +4233,64 @@ export class TrackerReplayer {
   }
 
   private doTonePortamento(ch: ChannelState, chIndex?: number): void {
-    // For synths, slide frequency toward target note using retriggering
+    // For synths, use smooth pitch on Tone.js synths, stepped retriggering on others
     if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
       if (!ch.portaTarget || ch.portaTarget === ch.period) return;
       
-      const currentOffset = ch.currentPitchOffset ?? 0;
-      
-      // Calculate target in semitones from base note
-      // portaTarget is the target period, ch.note is the original period
-      // Lower period = higher pitch, so we need to invert the relationship
-      // This is a rough approximation - for exact conversion we'd need the period table
-      const basePeriod = ch.note;
-      if (!basePeriod || basePeriod === 0) return;
-      
-      // Calculate semitone difference (rough approximation)
-      // In tracker formats, 1 semitone ≈ period change of ~6%
-      const periodRatio = ch.portaTarget / basePeriod;
-      const targetSemitones = Math.round(-12 * Math.log2(periodRatio));
-      
-      // Slide toward target by 1 semitone per tick (retriggering doesn't support smooth glide)
-      let newOffset = currentOffset;
-      if (targetSemitones > currentOffset) {
-        newOffset = currentOffset + 1;
-        if (newOffset > targetSemitones) newOffset = targetSemitones;
-      } else if (targetSemitones < currentOffset) {
-        newOffset = currentOffset - 1;
-        if (newOffset < targetSemitones) newOffset = targetSemitones;
+      if (this.isSmoothPitchSupported(ch.instrument)) {
+        // Smooth sliding for Tone.js synths
+        const speed = ch.tonePortaSpeed || 1;
+        const currentDetune = ch._synthDetuneOffset ?? 0;
+        
+        // Calculate target in semitones from base note
+        // portaTarget is the target period, ch.period is current
+        // Lower period = higher pitch
+        const periodDiff = ch.period - ch.portaTarget;
+        const semitoneChange = periodDiff / 64; // Approximate conversion
+        
+        // Slide toward target
+        if (Math.abs(semitoneChange) < speed / 64) {
+          // Close enough - snap to target
+          ch._synthDetuneOffset = currentDetune + semitoneChange;
+          ch.period = ch.portaTarget;
+        } else {
+          // Slide by speed amount
+          const slideAmount = semitoneChange > 0 ? speed / 64 : -speed / 64;
+          ch._synthDetuneOffset = currentDetune + slideAmount;
+          ch.period -= Math.sign(semitoneChange) * speed;
+        }
+        
+        getToneEngine().applySynthPitch(ch.instrument.id, ch._synthDetuneOffset ?? 0, Tone.now(), chIndex);
+      } else {
+        // Stepped retriggering for WASM/other synths
+        const currentOffset = ch.currentPitchOffset ?? 0;
+        
+        // Calculate target in semitones from base note
+        const basePeriod = ch.note;
+        if (!basePeriod || basePeriod === 0) return;
+        
+        // Calculate semitone difference (rough approximation)
+        const periodRatio = ch.portaTarget / basePeriod;
+        const targetSemitones = Math.round(-12 * Math.log2(periodRatio));
+        
+        // Slide toward target by 1 semitone per tick
+        let newOffset = currentOffset;
+        if (targetSemitones > currentOffset) {
+          newOffset = currentOffset + 1;
+          if (newOffset > targetSemitones) newOffset = targetSemitones;
+        } else if (targetSemitones < currentOffset) {
+          newOffset = currentOffset - 1;
+          if (newOffset < targetSemitones) newOffset = targetSemitones;
+        }
+        
+        // Update period to match offset (for when portamento stops)
+        if (newOffset === targetSemitones) {
+          ch.period = ch.portaTarget;
+        }
+        
+        // Retrigger at new pitch
+        this.retriggerNoteAtPitch(ch, newOffset, chIndex);
       }
-      
-      // Update period to match offset (for when portamento stops)
-      if (newOffset === targetSemitones) {
-        ch.period = ch.portaTarget;
-      }
-      
-      // Retrigger at new pitch
-      this.retriggerNoteAtPitch(ch, newOffset, chIndex);
     } else {
       // Sample-based portamento
       _doTonePortamento(ch, this.useXMPeriods, this.linearPeriods,
@@ -4211,7 +4300,7 @@ export class TrackerReplayer {
   }
 
   private doVibrato(ch: ChannelState, chIndex?: number): void {
-    // For synths, apply vibrato as note retriggering
+    // For synths, use smooth pitch on Tone.js synths, retriggering on others
     if (ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
       // Calculate vibrato offset in semitones
       const speed = (ch.vibratoCmd >> 4) & 0x0F;
@@ -4239,12 +4328,17 @@ export class TrackerReplayer {
       // Max vibrato = depth * (255/128) / 12 semitones
       const continuousOffset = ((value - 128) / 128) * (depth / 12);
       
-      // Round to nearest semitone for retriggering
-      // For smooth vibrato, keep small offsets (< 0.5 semitones) as 0
-      const semitoneOffset = Math.abs(continuousOffset) < 0.5 ? 0 : Math.round(continuousOffset);
+      // Use smooth pitch for Tone.js synths, retriggering for others
+      if (this.isSmoothPitchSupported(ch.instrument)) {
+        // Smooth detune for vibrato
+        getToneEngine().applySynthPitch(ch.instrument.id, continuousOffset, Tone.now(), chIndex);
+      } else {
+        // Round to nearest semitone for retriggering
+        // For smooth vibrato, keep small offsets (< 0.5 semitones) as 0
+        const semitoneOffset = Math.abs(continuousOffset) < 0.5 ? 0 : Math.round(continuousOffset);
+        this.retriggerNoteAtPitch(ch, semitoneOffset, chIndex);
+      }
       
-      // Use note retriggering instead of detune
-      this.retriggerNoteAtPitch(ch, semitoneOffset, chIndex);
       ch.vibratoPos = (ch.vibratoPos + speed) & 63;
     } else {
       // Sample-based vibrato via period modulation
@@ -5266,16 +5360,25 @@ export class TrackerReplayer {
    * @param ch Channel state
    * @param semitoneOffset Semitone offset from base note (0 = base pitch, +4 = major third up, etc.)
    * @param channelIndex Tracker channel index
+   * @param legato If true, don't release old note (for arpeggio - avoids clicks)
    */
-  private retriggerNoteAtPitch(ch: ChannelState, semitoneOffset: number, channelIndex?: number): void {
+  private retriggerNoteAtPitch(ch: ChannelState, semitoneOffset: number, channelIndex?: number, legato = false): void {
     // Only retrigger if pitch actually changed
-    if (ch.currentPitchOffset === semitoneOffset) return;
+    if (ch.currentPitchOffset === semitoneOffset) {
+      console.log(`  [Retrigger] Skip - offset unchanged (${semitoneOffset})`);
+      return;
+    }
     
     // Skip if no note state (note hasn't been triggered yet)
-    if (!ch.baseNote || ch.baseMidiNote === undefined || !ch.instrument) return;
+    if (!ch.baseNote || ch.baseMidiNote === undefined || !ch.instrument) {
+      console.log(`  [Retrigger] Skip - no note state (base=${ch.baseNote} midi=${ch.baseMidiNote})`);
+      return;
+    }
     
     // Skip if not a synth instrument
-    if (!ch.instrument.synthType || ch.instrument.synthType === 'Sampler') return;
+    if (!ch.instrument.synthType || ch.instrument.synthType === 'Sampler') {
+      return;
+    }
     
     const engine = getToneEngine();
     const time = Tone.now();
@@ -5284,11 +5387,11 @@ export class TrackerReplayer {
     const newMidiNote = ch.baseMidiNote + semitoneOffset;
     const newNoteName = midiToNote(newMidiNote);
     
-    // Release old note
+    // Release old note then attack new note (monophonic retriggering)
     if (ch.currentPlayingNote) {
       try {
         engine.triggerNoteRelease(ch.instrument.id, ch.currentPlayingNote, time, ch.instrument, channelIndex);
-      } catch { /* ignored */ }
+      } catch (_e) { /* ignore */ }
     }
     
     // Attack new note at offset pitch
@@ -5302,15 +5405,54 @@ export class TrackerReplayer {
         ch.instrument,
         ch.period,
         false, // accent
-        false, // slide (no slide for retriggering)
+        legato, // slide
         channelIndex
       );
-    } catch { /* ignored */ }
+    } catch (_e) { /* ignore */ }
     
     // Update state
     ch.currentPitchOffset = semitoneOffset;
     ch.currentPlayingNote = newNoteName;
     ch.lastPlayedNoteName = newNoteName;
+  }
+
+  /**
+   * Apply frequency offset to synth without retriggering (FT2-style effects)
+   * Now works properly with monophonic synth instances per tracker channel
+   * 
+   * @param ch Channel state  
+   * @param semitoneOffset Semitone offset from base note (0 = base pitch, +4 = major third up, etc.)
+   * @param channelIndex Tracker channel index
+   */
+  private applySynthFrequencyOffset(ch: ChannelState, semitoneOffset: number, channelIndex?: number): void {
+    if (!ch.baseNote || ch.baseMidiNote === undefined || !ch.instrument) return;
+    
+    const engine = getToneEngine();
+    const targetMidiNote = ch.baseMidiNote + semitoneOffset;
+    const targetFreq = Tone.Frequency(targetMidiNote, "midi").toFrequency();
+    
+    engine.applySynthFrequency(ch.instrument.id, targetFreq, channelIndex);
+  }
+
+  /**
+   * Check if instrument supports smooth pitch bend (has .detune parameter)
+   * 
+   * @param instrument Instrument config
+   * @returns true if synth supports smooth pitch via detune
+   */
+  private isSmoothPitchSupported(instrument?: InstrumentConfig): boolean {
+    if (!instrument || !instrument.synthType || instrument.synthType === 'Sampler') {
+      return false;
+    }
+    
+    // Tone.js synths that have .detune parameter
+    const smoothPitchSynths = new Set([
+      'Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'AMSynth', 'ToneAM',
+      'PluckSynth', 'MetalSynth', 'MembraneSynth',
+      'NoiseSynth', 'PolySynth', 'SuperSaw'
+    ]);
+    
+    return smoothPitchSynths.has(instrument.synthType);
   }
 
   private updatePeriod(ch: ChannelState): void {
