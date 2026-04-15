@@ -371,7 +371,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             className="fixed inset-0 z-[99990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-200"
             onMouseDown={(e) => { if (e.target === e.currentTarget) setShowPadEditor(false); }}
           >
-            <div className="max-w-3xl w-full mx-4 max-h-[85vh]">
+            <div className="max-w-6xl w-full mx-4 max-h-[95vh]">
               <PadEditor
                 padId={selectedPadId}
                 onClose={() => setShowPadEditor(false)}
