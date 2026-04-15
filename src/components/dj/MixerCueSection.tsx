@@ -104,6 +104,7 @@ export const MixerCueSection: React.FC = () => {
           value={cueMix}
           onChange={(e) => handleCueMixChange(parseFloat(e.target.value))}
           onDoubleClick={() => handleCueMixChange(0.5)}
+          onContextMenu={(e) => { e.preventDefault(); handleCueMixChange(0.5); }}
           className="w-full h-2 appearance-none bg-dark-bgTertiary rounded-full cursor-pointer
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-4
             [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-[#66ccff] [&::-webkit-slider-thumb]:border

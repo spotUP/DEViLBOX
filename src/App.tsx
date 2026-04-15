@@ -291,6 +291,38 @@ function App() {
     return () => navigator.usb.removeEventListener('connect', handleConnect);
   }, []);
 
+  // Auto-initialize MIDI on mount (zero-click setup)
+  useEffect(() => {
+    const midiStore = useMIDIStore.getState();
+    
+    // Only auto-init if not already initialized
+    if (!midiStore.isInitialized && midiStore.isSupported !== false) {
+      // Try to init MIDI in background
+      midiStore.init().then(success => {
+        if (success) {
+          console.log('✅ [App] MIDI auto-initialized successfully');
+          
+          // Auto-select device if only one available
+          const state = useMIDIStore.getState();
+          if (state.inputDevices.length === 1 && !state.selectedInputId) {
+            const deviceId = state.inputDevices[0].id;
+            state.selectInput(deviceId).then(() => {
+              console.log('✅ [App] Auto-selected MIDI device:', state.inputDevices[0].name);
+              
+              // Show toast notification
+              notify.success(`MIDI Connected: ${state.inputDevices[0].name}`, 3000);
+            });
+          }
+        } else {
+          // Init failed — likely permissions denied or not supported
+          console.log('⚠️ [App] MIDI auto-init failed (permissions or unsupported)');
+        }
+      }).catch(err => {
+        console.warn('[App] MIDI auto-init error:', err);
+      });
+    }
+  }, []); // Run once on mount
+
   // Detect new MIDI controller connection and show setup wizard
   useEffect(() => {
     const midiStore = useMIDIStore.getState();

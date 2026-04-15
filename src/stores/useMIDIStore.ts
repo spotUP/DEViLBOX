@@ -601,6 +601,31 @@ export const useMIDIStore = create<MIDIStore>()(
         set((state) => {
           state.selectedInputId = id;
         });
+
+        // Auto-apply NKS mappings if device selected
+        if (id) {
+          // Import dynamically to avoid circular dependency
+          import('../midi/NKSAutoMapper').then(({ applyNKSMappingsForSynth }) => {
+            try {
+              // Get current active instrument/synth
+              const instrumentStore = useInstrumentStore.getState();
+              const currentId = instrumentStore.currentInstrumentId;
+              const currentInstrument = instrumentStore.instruments.find(i => i.id === currentId);
+              
+              if (currentInstrument?.synthType) {
+                // Auto-apply NKS CC mappings for current synth
+                applyNKSMappingsForSynth(currentInstrument.synthType);
+                console.log(`✅ [useMIDIStore] Auto-applied NKS mappings for ${currentInstrument.synthType}`);
+              } else {
+                // Default to TB-303 if no instrument active
+                applyNKSMappingsForSynth('TB303');
+                console.log(`✅ [useMIDIStore] Auto-applied default NKS mappings (TB-303)`);
+              }
+            } catch (err) {
+              console.warn('[useMIDIStore] Failed to auto-apply NKS mappings:', err);
+            }
+          });
+        }
       },
 
       // Select output device
