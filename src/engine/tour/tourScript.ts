@@ -435,20 +435,33 @@ async function triggerDrumPad(padId: number, note?: string, velocity = 0.85): Pr
     const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
     const { getToneEngine } = await import('@/engine/ToneEngine');
     const { PAD_INSTRUMENT_BASE } = await import('@/types/drumpad');
+    const Tone = await import('tone');
+
+    // Ensure audio context is running
+    if (Tone.getContext().rawContext.state === 'suspended') {
+      await Tone.start();
+    }
 
     const store = useDrumPadStore.getState();
     const program = store.programs.get(store.currentProgramId);
     const pad = program?.pads.find(p => p.id === padId);
-    if (!pad?.synthConfig) return;
+    if (!pad?.synthConfig) {
+      console.warn(`[Tour] triggerDrumPad: pad ${padId} has no synthConfig`);
+      return;
+    }
 
     const instId = PAD_INSTRUMENT_BASE + pad.id;
     const config = { ...pad.synthConfig, id: instId };
     const n = note || pad.instrumentNote || 'C4';
-    getToneEngine().triggerNoteAttack(instId, n, 0, velocity, config);
-    // Auto-release after short time
+    const engine = getToneEngine();
+
+    // Ensure instrument is ready (loads WASM samples etc.)
+    await engine.ensureInstrumentReady(config);
+
+    engine.triggerNoteAttack(instId, n, 0, velocity, config);
     setTimeout(() => {
-      try { getToneEngine().triggerNoteRelease(instId, n, 0, config); } catch { /* */ }
-    }, 300);
+      try { engine.triggerNoteRelease(instId, n, 0, config); } catch { /* */ }
+    }, 500);
   } catch (err) {
     console.warn(`[Tour] Failed to trigger pad ${padId}:`, err);
   }
