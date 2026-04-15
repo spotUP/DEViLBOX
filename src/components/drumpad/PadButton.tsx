@@ -146,10 +146,16 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
     const handleTouchStart = (event: TouchEvent) => {
       event.preventDefault(); // safe: non-passive listener
-      const { pad, onSelect, onTrigger, calculateVelocity, flashTrigger } = touchHandlersRef.current;
+      const { pad, onSelect, onTrigger, calculateVelocity, flashTrigger, onEmptyPadClick } = touchHandlersRef.current;
 
-      if (!pad.sample && !pad.synthConfig && pad.instrumentId == null) {
-        onSelect(pad.id);
+      // Check if pad is empty (same check as line 90 hasActualData)
+      const isEmpty = !pad.sample && !pad.synthConfig && pad.instrumentId == null && !pad.djFxAction && !pad.scratchAction;
+      if (isEmpty) {
+        if (onEmptyPadClick) {
+          onEmptyPadClick(pad.id);
+        } else {
+          onSelect(pad.id);
+        }
         return;
       }
 

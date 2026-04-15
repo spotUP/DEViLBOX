@@ -141,7 +141,14 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     const program = programs.get(currentProgramId);
     const pad = program?.pads.find(p => p.id === padId);
     if (pad) {
-      set({ clipboardPad: { ...pad, layers: pad.layers.map(l => ({ ...l, sample: { ...l.sample } })) } });
+      set({ 
+        clipboardPad: { 
+          ...pad, 
+          layers: pad.layers.map(l => ({ ...l, sample: { ...l.sample } })),
+          // Deep copy synth config if present
+          synthConfig: pad.synthConfig ? { ...pad.synthConfig } : undefined,
+        } 
+      });
     }
   },
   pastePad: (targetPadId: number) => {
@@ -178,6 +185,10 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       layers: clipboardPad.layers.map(l => ({ ...l, sample: { ...l.sample } })),
       scratchAction: clipboardPad.scratchAction,
       djFxAction: clipboardPad.djFxAction,
+      // Copy synth config and instrument ID
+      synthConfig: clipboardPad.synthConfig ? { ...clipboardPad.synthConfig } : undefined,
+      instrumentId: clipboardPad.instrumentId,
+      instrumentNote: clipboardPad.instrumentNote,
     });
     get().saveToIndexedDB();
   },

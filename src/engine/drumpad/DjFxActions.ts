@@ -133,11 +133,10 @@ function createStutter(division: SyncDivision): DjFxAction {
 
       const masterNode = getMasterOutputNode();
       if (masterNode) {
-        // Disconnect master from destination and route through stutter
+        // Disconnect master from destination and route through stutter ONLY
         try { masterNode.disconnect(); } catch { /* */ }
         masterNode.connect(tap);
-        // Also maintain dry signal
-        masterNode.connect(ctx.destination);
+        // No dry signal - stutter is 100% wet
       }
 
       activeFx.set(this.id, {
