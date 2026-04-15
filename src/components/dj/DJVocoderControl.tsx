@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Settings } from 'lucide-react';
 import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPreset } from '@/stores/useVocoderStore';
 import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
@@ -44,6 +45,8 @@ export const DJVocoderControl: React.FC = () => {
   const engineRef = useRef<VocoderEngine | null>(null);
   const [showPanel, setShowPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const gearRef = useRef<HTMLButtonElement>(null);
+  const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
 
   // Close panel on click outside
   useEffect(() => {
@@ -322,7 +325,18 @@ export const DJVocoderControl: React.FC = () => {
 
       {/* Settings gear — opens dropdown with all vocoder settings */}
       <button
-        onPointerDown={(e) => { e.stopPropagation(); setShowPanel(v => !v); }}
+        ref={gearRef}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (!showPanel && gearRef.current) {
+            const rect = gearRef.current.getBoundingClientRect();
+            setPanelPos({
+              top: rect.bottom + 4,
+              right: Math.max(0, window.innerWidth - rect.right),
+            });
+          }
+          setShowPanel(v => !v);
+        }}
         className={`p-1 rounded transition-all ${
           showPanel
             ? 'text-accent-primary bg-accent-primary/10'
@@ -340,11 +354,12 @@ export const DJVocoderControl: React.FC = () => {
 
       {error && <span className="text-[10px] text-red-400">{error}</span>}
 
-      {/* ── Settings dropdown panel ──────────────────────────────────── */}
-      {showPanel && (
+      {/* ── Settings dropdown panel — portaled to escape overflow:hidden ── */}
+      {showPanel && createPortal(
         <div
           ref={panelRef}
-          className="absolute top-full right-0 mt-1 z-[99989] w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-3 space-y-3 text-xs font-mono"
+          style={{ position: 'fixed', top: panelPos.top, right: panelPos.right }}
+          className="z-[99991] w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-3 space-y-3 text-xs font-mono"
         >
           {/* Mic selector */}
           {devices.length > 0 && (
@@ -466,7 +481,7 @@ export const DJVocoderControl: React.FC = () => {
             </div>
           )}
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };
