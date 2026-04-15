@@ -37,6 +37,7 @@ interface MIDIStore {
   outputDevices: MIDIDeviceInfo[];
   selectedInputId: string | null;
   selectedOutputId: string | null;
+  lastDeviceId: string | null; // Persisted last device for auto-reconnect
 
   // CC Mapping
   ccMappings: CCMapping[];
@@ -195,6 +196,7 @@ export const useMIDIStore = create<MIDIStore>()(
       outputDevices: [],
       selectedInputId: null,
       selectedOutputId: null,
+      lastDeviceId: null, // Persisted for auto-reconnect
       ccMappings: [...DEFAULT_CC_MAPPINGS],
       isLearning: false,
       learningParameter: null,
@@ -519,12 +521,44 @@ export const useMIDIStore = create<MIDIStore>()(
 
             // Subscribe to device changes
             manager.onDeviceChange(() => {
-              get().refreshDevices();
-              // Auto-connect to first device if none selected
               const state = get();
-              if (!state.selectedInputId && state.inputDevices.length > 0) {
-                console.log('[useMIDIStore] Auto-connecting to first MIDI input:', state.inputDevices[0].name);
-                get().selectInput(state.inputDevices[0].id);
+              const prevDeviceCount = state.inputDevices.length;
+              
+              get().refreshDevices();
+              
+              const newState = get();
+              const newDeviceCount = newState.inputDevices.length;
+              
+              // Device disconnected
+              if (newDeviceCount < prevDeviceCount) {
+                const disconnectedId = state.selectedInputId;
+                if (disconnectedId && !newState.inputDevices.find(d => d.id === disconnectedId)) {
+                  import('@/stores/useNotificationStore').then(({ notify }) => {
+                    notify.warning('MIDI device disconnected', 3000);
+                  });
+                }
+              }
+              
+              // Device connected
+              if (newDeviceCount > prevDeviceCount) {
+                // Try to reconnect to last device if it's now available
+                if (newState.lastDeviceId && !newState.selectedInputId) {
+                  const lastDevice = newState.inputDevices.find(d => d.id === newState.lastDeviceId);
+                  if (lastDevice) {
+                    console.log('[useMIDIStore] Reconnecting to last device:', lastDevice.name);
+                    get().selectInput(lastDevice.id);
+                    import('@/stores/useNotificationStore').then(({ notify }) => {
+                      notify.success(`MIDI Reconnected: ${lastDevice.name}`, 3000);
+                    });
+                    return;
+                  }
+                }
+                
+                // Auto-connect to first device if none selected
+                if (!newState.selectedInputId && newState.inputDevices.length > 0) {
+                  console.log('[useMIDIStore] Auto-connecting to first MIDI input:', newState.inputDevices[0].name);
+                  get().selectInput(newState.inputDevices[0].id);
+                }
               }
               
               // Auto-show knob bar when devices are connected
@@ -600,6 +634,10 @@ export const useMIDIStore = create<MIDIStore>()(
 
         set((state) => {
           state.selectedInputId = id;
+          // Remember this device for auto-reconnect
+          if (id) {
+            state.lastDeviceId = id;
+          }
         });
 
         // Auto-apply NKS mappings if device selected
@@ -962,6 +1000,7 @@ export const useMIDIStore = create<MIDIStore>()(
         ccMappings: state.ccMappings,
         selectedInputId: state.selectedInputId,
         selectedOutputId: state.selectedOutputId,
+        lastDeviceId: state.lastDeviceId, // Persist for auto-reconnect
         controlledInstrumentId: state.controlledInstrumentId,
         knobBank: state.knobBank,
         showKnobBar: state.showKnobBar,
