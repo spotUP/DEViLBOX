@@ -561,7 +561,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <div className="flex-1 min-h-0 min-w-0 relative z-10 flex overflow-hidden">
 
         {/* Pattern Editor / Grid Sequencer - Flex item 1 */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden" data-tracker-editor="true">
           {viewMode === 'tracker' ? (
             (() => {
               // Determine if this is a custom format editor that can be popped out

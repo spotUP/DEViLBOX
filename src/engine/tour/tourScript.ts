@@ -386,6 +386,16 @@ async function playSampleInstrument(instrumentId: number, durationMs = 3000): Pr
       }
       const source = ctx.createBufferSource();
       source.buffer = decoded;
+      // Pitch up from baseNote to C4 so it sounds like pressing Q (not Z).
+      // MOD samples have baseNote "C3" (8363 Hz) — playing at 2x gives C4.
+      const baseNote = config.sample?.baseNote || 'C3';
+      const baseMatch = baseNote.match(/([A-G]#?)(-?\d+)/);
+      if (baseMatch) {
+        const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const baseMidi = (parseInt(baseMatch[2]) + 1) * 12 + noteNames.indexOf(baseMatch[1]);
+        const targetMidi = 60; // C4
+        source.playbackRate.value = Math.pow(2, (targetMidi - baseMidi) / 12);
+      }
       source.connect(ctx.destination);
       source.start();
       const playDuration = Math.min(durationMs, decoded.duration * 1000);
@@ -608,13 +618,13 @@ export const TOUR_SCRIPT: TourStep[] = [
       // Give the replayer a moment to start producing audio
       await new Promise(r => setTimeout(r, 300));
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 4000,
   },
   {
     id: 'tracker-explain',
     narration: 'Each column is a channel. Notes, instruments, and effects scroll as the song plays. Over 120 synth engines and 188 import formats.',
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 2000,
   },
 
@@ -635,7 +645,7 @@ export const TOUR_SCRIPT: TourStep[] = [
         useAudioStore.getState().setMasterEffects(effects);
       }
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 4000,
   },
   {
@@ -654,7 +664,7 @@ export const TOUR_SCRIPT: TourStep[] = [
         useAudioStore.getState().setMasterEffects(effects);
       }
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 4000,
   },
   {
@@ -673,7 +683,7 @@ export const TOUR_SCRIPT: TourStep[] = [
         useAudioStore.getState().setMasterEffects(effects);
       }
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 3000,
   },
   {
@@ -692,7 +702,7 @@ export const TOUR_SCRIPT: TourStep[] = [
         useAudioStore.getState().setMasterEffects(effects);
       }
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 5000,
   },
   {
@@ -702,7 +712,7 @@ export const TOUR_SCRIPT: TourStep[] = [
       const { useAudioStore } = await import('@/stores/useAudioStore');
       useAudioStore.getState().setMasterEffects([]);
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 2000,
   },
   {
@@ -1441,7 +1451,7 @@ export const TOUR_SCRIPT: TourStep[] = [
       switchView('tracker');
       await loadTrackerSong('/data/songs/303-Demo.dbx');
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 500,
   },
   {
@@ -1450,7 +1460,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     action: async () => {
       await createAutomationCurve(0, 'cutoff', 'sine');
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 2000,
   },
   {
@@ -1459,7 +1469,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     action: async () => {
       await createAutomationCurve(0, 'resonance', 'saw');
     },
-    spotlight: '[data-pattern-editor]',
+    spotlight: '[data-tracker-editor]',
     postDelay: 2000,
   },
   {
