@@ -1375,27 +1375,6 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 3500,
   },
   {
-    id: 'drumpad-speech-setup',
-    narration: 'Now watch this. I can put a speech synth on a pad.',
-    action: async () => {
-      // Switch back to 808 kit so we don't conflict with DJ FX actions
-      await loadDrumProgram('A-01');
-      await setDrumBank('A');
-      await triggerSpeechPad(13, 'devil box is alive. I am a drum pad now.', 0);
-    },
-    spotlight: '[data-pad-id]',
-    postDelay: 5000,
-  },
-  {
-    id: 'drumpad-speech-demo2',
-    narration: '',
-    action: async () => {
-      await triggerSpeechPad(14, 'Hello from Betty.', 1);
-    },
-    spotlight: '[data-pad-id]',
-    postDelay: 3500,
-  },
-  {
     id: 'drumpad-banks',
     narration: 'Four banks of sixteen pads. 128 total slots per program. Drag and drop any sample or synth.',
     postDelay: 1000,
