@@ -240,8 +240,23 @@ export const PadGrid: React.FC<PadGridProps> = ({
           SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
         }
         if (pad.djFxAction) {
-          // Quantize FX triggers for rhythmic effects (stutter, delay, tape stop)
-          // This prevents out-of-sync triggers during live performance
+          // ── DJ FX Quantization ──
+          // Rhythmic effects (stutter, delay, tape stop) snap to beat/bar boundaries
+          // to prevent out-of-sync triggers during live performance. Quantize mode
+          // is controlled via the Q button in DJ deck transport (bar/beat/off).
+          //
+          // Quantized effects:
+          //   - Stutter (1/8, 1/16, 1/32)
+          //   - Dub Echo (1/4)
+          //   - Tape Echo (1/8d)
+          //   - Ping Pong (1/8)
+          //   - Tape Stop (1/4 decel)
+          //   - Vinyl Brake
+          //
+          // Non-quantized effects (fire immediately):
+          //   - Filter sweeps (low/mid/high)
+          //   - Reverb throws
+          //   - Backspin
           const shouldQuantize = 
             pad.djFxAction.startsWith('fx_stutter') ||
             pad.djFxAction.startsWith('fx_dub_echo') ||
