@@ -646,24 +646,9 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'READY SET GO', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
-      { key: 'romSpeech', label: 'ROM Speech', group: 'ROM Speech', type: 'select', min: 0, max: 33, default: 0, formatValue: 'int', options: [
-        // Phrases first (values 0-3)
-        { value: 0, label: '▸ READY SET GO' },
-        { value: 1, label: '▸ 100 METER DASH' },
-        { value: 2, label: '▸ NEW RECORD' },
-        { value: 3, label: '▸ GAME OVER' },
-        // Individual words (values 4+, word index = value - 4)
-        { value: 4, label: 'READY' }, { value: 5, label: 'SET' }, { value: 6, label: 'GO' },
-        { value: 7, label: '100 METER' }, { value: 8, label: 'DASH' }, { value: 9, label: 'LONG JUMP' },
-        { value: 10, label: 'JAVELIN' }, { value: 11, label: 'HURDLES' }, { value: 12, label: 'HAMMER' },
-        { value: 13, label: 'HIGH JUMP' }, { value: 14, label: 'TIME' }, { value: 15, label: 'SCORE' },
-        { value: 16, label: 'POINTS' }, { value: 17, label: 'METERS' }, { value: 18, label: 'NEXT' },
-        { value: 19, label: 'BONUS' }, { value: 20, label: 'FOUL' }, { value: 21, label: 'RECORD' },
-        { value: 22, label: 'NEW RECORD' }, { value: 23, label: 'GAME OVER' },
-        { value: 24, label: 'ZERO' }, { value: 25, label: 'ONE' }, { value: 26, label: 'TWO' },
-        { value: 27, label: 'THREE' }, { value: 28, label: 'FOUR' }, { value: 29, label: 'FIVE' },
-        { value: 30, label: 'SIX' }, { value: 31, label: 'SEVEN' }, { value: 32, label: 'EIGHT' },
-        { value: 33, label: 'NINE' },
+      { key: 'romSpeech', label: 'ROM Speech', group: 'ROM Speech', type: 'select', min: 0, max: 62, default: 0, formatValue: 'int', options: [
+        { value: 0, label: '(Text-to-Speech)' },
+        ...Array.from({length: 62}, (_, i) => ({ value: i + 1, label: `Word ${i}` })),
       ]},
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'vowel', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
