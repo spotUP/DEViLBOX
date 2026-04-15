@@ -656,20 +656,30 @@ export class ToneEngine {
       return buffer;
     }
 
-    // If Uint8Array, convert to ArrayBuffer
+    // Normalize to ArrayBuffer
+    let arrayBuffer: ArrayBuffer;
     if (buffer instanceof Uint8Array) {
-      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-      return await Tone.getContext().rawContext.decodeAudioData(arrayBuffer);
-    }
-
-    // Verify it's actually an ArrayBuffer before trying to slice
-    if (!(buffer instanceof ArrayBuffer)) {
+      arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+    } else if (buffer instanceof ArrayBuffer) {
+      arrayBuffer = buffer;
+    } else {
       console.error('[ToneEngine] decodeAudioData: expected ArrayBuffer but got:', typeof buffer, buffer);
       throw new Error(`Invalid buffer type: ${typeof buffer}`);
     }
 
-    // ArrayBuffer - decode it (slice to create a copy for decoding)
-    return await Tone.getContext().rawContext.decodeAudioData(buffer.slice(0));
+    // Try browser's native decoder first (handles MP3, OGG, FLAC, etc.)
+    try {
+      return await Tone.getContext().rawContext.decodeAudioData(arrayBuffer.slice(0));
+    } catch {
+      // Native decoder failed — fall back to manual WAV parser for low sample
+      // rate WAVs (e.g. 8363 Hz from MOD/tracker imports) that browsers reject
+      const { isWavBuffer, parseWavToAudioBuffer } = await import('@/utils/audio/wavParser');
+      if (isWavBuffer(arrayBuffer)) {
+        return parseWavToAudioBuffer(arrayBuffer.slice(0));
+      }
+      // Not a WAV — re-throw original error
+      throw new Error('Unable to decode audio data');
+    }
   }
 
   /**
@@ -1083,7 +1093,8 @@ export class ToneEngine {
           if (ds.output instanceof GainNode) (ds.output as GainNode).gain.value = 0;
           ds.triggerAttack?.('C4', undefined, 0.01);
           setTimeout(() => {
-            ds.triggerRelease?.('C4');
+            // Monophonic synths don't take a note parameter in triggerRelease
+            ds.triggerRelease?.();
             if (savedGain !== null && ds.output instanceof GainNode) {
               (ds.output as GainNode).gain.value = savedGain;
             }
@@ -1647,9 +1658,16 @@ export class ToneEngine {
     // Preload creates instruments with key ${id}--1, but playback uses ${id}-${channel}
     // Reuse the shared instance instead of creating expensive new synths per channel
     // BUT: Don't reuse for live voice channels (100+) - those need separate instances for polyphony
+    // BUT: Don't reuse for Tone.js synths on tracker channels - they need per-channel
+    //       monophonic instances for proper pitch effect support (arpeggio, vibrato, portamento)
     const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
+    const isTrackerChannel = channelIndex !== undefined && channelIndex >= 0 && channelIndex < 100;
+    const isToneJSSynth = ['Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'ToneAM', 'PluckSynth', 'MembraneSynth', 'MetalSynth', 'NoiseSynth', 'PolySynth', 'SuperSaw'].includes(config.synthType || '');
+    const needsPerChannelInstance = isTrackerChannel && isToneJSSynth;
     const legacyKey = this.getInstrumentKey(instrumentId, -1);
-    if (!isSharedType && !isLiveVoiceChannel && this.instruments.has(legacyKey)) {
+    if (needsPerChannelInstance) {
+      // Skip legacy reuse — falls through to create per-channel MonoSynth
+    } else if (!isSharedType && !isLiveVoiceChannel && this.instruments.has(legacyKey)) {
       // Verify the stored type matches what's requested — if not, dispose the stale instance
       const storedLegacyType = this.instrumentSynthTypes.get(legacyKey);
       if (config.synthType && storedLegacyType && storedLegacyType !== config.synthType) {
@@ -1708,16 +1726,12 @@ export class ToneEngine {
 
     // Create new instrument based on config
     let instrument: Tone.ToneAudioNode | DevilboxSynth | null = null;
-
+    
     switch (config.synthType) {
       case 'Synth': {
-        // Adjust polyphony based on quality level for CPU savings
-        const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                               this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new Tone.PolySynth({
-          voice: Tone.Synth,
-          maxPolyphony: synthPolyphony,
-          options: {
+        if (isTrackerChannel) {
+          // Use MonoSynth for tracker channels - allows direct frequency modulation
+          instrument = new Tone.MonoSynth({
             oscillator: {
               type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
             } as any,
@@ -1727,9 +1741,29 @@ export class ToneEngine {
               sustain: (config.envelope?.sustain ?? 50) / 100,
               release: (config.envelope?.release ?? 1000) / 1000,
             },
-          },
-          volume: getNormalizedVolume('Synth', config.volume),
-        } as any);
+            volume: getNormalizedVolume('Synth', config.volume),
+          });
+        } else {
+          // Use PolySynth for non-tracker use (UI, live input, etc.)
+          const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                                 this.currentPerformanceQuality === 'medium' ? 8 : 4;
+          instrument = new Tone.PolySynth({
+            voice: Tone.Synth,
+            maxPolyphony: synthPolyphony,
+            options: {
+              oscillator: {
+                type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
+              } as any,
+              envelope: {
+                attack: (config.envelope?.attack ?? 10) / 1000,
+                decay: (config.envelope?.decay ?? 200) / 1000,
+                sustain: (config.envelope?.sustain ?? 50) / 100,
+                release: (config.envelope?.release ?? 1000) / 1000,
+              },
+            },
+            volume: getNormalizedVolume('Synth', config.volume),
+          } as any);
+        }
         break;
       }
 
@@ -1775,13 +1809,9 @@ export class ToneEngine {
         break;
 
       case 'FMSynth': {
-        // FMSynth is CPU-intensive, reduce polyphony on lower quality
-        const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                            this.currentPerformanceQuality === 'medium' ? 6 : 3;
-        instrument = new Tone.PolySynth({
-          voice: Tone.FMSynth,
-          maxPolyphony: fmPolyphony,
-          options: {
+        if (isTrackerChannel) {
+          // Use raw FMSynth for tracker channels
+          instrument = new Tone.FMSynth({
             oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
@@ -1790,20 +1820,35 @@ export class ToneEngine {
               release: (config.envelope?.release ?? 1000) / 1000,
             },
             modulationIndex: 10,
-          },
-          volume: getNormalizedVolume('FMSynth', config.volume),
-        } as any);
+            volume: getNormalizedVolume('FMSynth', config.volume),
+          });
+        } else {
+          // Use PolySynth wrapper for non-tracker use
+          const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                              this.currentPerformanceQuality === 'medium' ? 6 : 3;
+          instrument = new Tone.PolySynth({
+            voice: Tone.FMSynth,
+            maxPolyphony: fmPolyphony,
+            options: {
+              oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
+              envelope: {
+                attack: (config.envelope?.attack ?? 10) / 1000,
+                decay: (config.envelope?.decay ?? 200) / 1000,
+                sustain: (config.envelope?.sustain ?? 50) / 100,
+                release: (config.envelope?.release ?? 1000) / 1000,
+              },
+              modulationIndex: 10,
+            },
+            volume: getNormalizedVolume('FMSynth', config.volume),
+          } as any);
+        }
         break;
       }
 
       case 'ToneAM': {
-        // AMSynth has dual oscillators, reduce polyphony on lower quality
-        const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                            this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new Tone.PolySynth({
-          voice: Tone.AMSynth,
-          maxPolyphony: amPolyphony,
-          options: {
+        if (isTrackerChannel) {
+          // Use raw AMSynth for tracker channels
+          instrument = new Tone.AMSynth({
             oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
             envelope: {
               attack: (config.envelope?.attack ?? 10) / 1000,
@@ -1811,9 +1856,27 @@ export class ToneEngine {
               sustain: (config.envelope?.sustain ?? 50) / 100,
               release: (config.envelope?.release ?? 1000) / 1000,
             },
-          },
-          volume: getNormalizedVolume('ToneAM', config.volume),
-        } as any);
+            volume: getNormalizedVolume('ToneAM', config.volume),
+          });
+        } else {
+          // Use PolySynth wrapper for non-tracker use
+          const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                              this.currentPerformanceQuality === 'medium' ? 8 : 4;
+          instrument = new Tone.PolySynth({
+            voice: Tone.AMSynth,
+            maxPolyphony: amPolyphony,
+            options: {
+              oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
+              envelope: {
+                attack: (config.envelope?.attack ?? 10) / 1000,
+                decay: (config.envelope?.decay ?? 200) / 1000,
+                sustain: (config.envelope?.sustain ?? 50) / 100,
+                release: (config.envelope?.release ?? 1000) / 1000,
+              },
+            },
+            volume: getNormalizedVolume('ToneAM', config.volume),
+          } as any);
+        }
         break;
       }
 
@@ -2105,8 +2168,28 @@ export class ToneEngine {
       }
 
       // New synths - use InstrumentFactory for complex synths
-      case 'SuperSaw':
+      // For tracker channels, PolySynth/SuperSaw create MonoSynth for pitch effects
       case 'PolySynth':
+      case 'SuperSaw': {
+        if (isTrackerChannel) {
+          const oscType = config.polySynth?.oscillator?.type || config.oscillator?.type || 'sawtooth';
+          instrument = new Tone.MonoSynth({
+            oscillator: {
+              type: (oscType === 'noise' ? 'sawtooth' : oscType) as Tone.ToneOscillatorType,
+            } as any,
+            envelope: {
+              attack: (config.polySynth?.envelope?.attack ?? config.envelope?.attack ?? 50) / 1000,
+              decay: (config.polySynth?.envelope?.decay ?? config.envelope?.decay ?? 200) / 1000,
+              sustain: (config.polySynth?.envelope?.sustain ?? config.envelope?.sustain ?? 70) / 100,
+              release: (config.polySynth?.envelope?.release ?? config.envelope?.release ?? 1000) / 1000,
+            },
+            volume: getNormalizedVolume('Synth', config.volume),
+          });
+        } else {
+          instrument = InstrumentFactory.createInstrument(config);
+        }
+        break;
+      }
       case 'Organ':
       case 'DrumMachine':
       case 'TR808':
@@ -3185,6 +3268,16 @@ export class ToneEngine {
       ) {
         // These synths use triggerRelease(time) - no note parameter
         (instrument as any).triggerRelease(safeTime);
+      } else if (
+        // Tone.js monophonic synths (when NOT wrapped in PolySynth)
+        // These track the current note internally and don't need note parameter
+        instrument instanceof Tone.MonoSynth ||
+        instrument instanceof Tone.DuoSynth ||
+        instrument instanceof Tone.FMSynth ||
+        instrument instanceof Tone.AMSynth
+      ) {
+        // MonoSynth-style: triggerRelease(time)
+        instrument.triggerRelease(safeTime);
       } else {
         // PolySynth and others use triggerRelease(note, time)
         (instrument as any).triggerRelease(note, safeTime);
@@ -5251,55 +5344,82 @@ export class ToneEngine {
     const key = this.getInstrumentKey(instrumentId, channelIndex);
     const instrument = this.instruments.get(key);
     
-    if (!instrument) {
-      console.warn('🎵 applySynthPitch: No instrument for key', key);
-      return;
-    }
+    if (!instrument) return;
 
     const safeTime = this.getSafeTime(time) ?? Tone.now();
     const cents = semitones * 100;
 
-    // PolySynth: detune all voices
+    // PolySynth: detune all active voices AND the base instrument
     if (instrument instanceof Tone.PolySynth) {
-      console.log('🎵 Detuning PolySynth voices:', instrument._activeVoices.length, 'active');
-      instrument._activeVoices.forEach((voice: any) => {
-        if (voice.detune) {
-          voice.detune.setValueAtTime(cents, safeTime);
+      // Detune active voices
+      const activeVoices = (instrument as any)._activeVoices;
+      if (activeVoices && activeVoices.length > 0) {
+        activeVoices.forEach((voice: any) => {
+          if (voice.detune) {
+            voice.detune.setValueAtTime(cents, safeTime);
+          }
+        });
+      }
+      
+      // ALSO detune the PolySynth itself (for future notes)
+      if ('detune' in instrument && instrument.detune) {
+        const detune = instrument.detune as any;
+        if (typeof detune.setValueAtTime === 'function') {
+          if (rampTime) {
+            detune.linearRampToValueAtTime(cents, safeTime + rampTime);
+          } else {
+            detune.setValueAtTime(cents, safeTime);
+          }
+        } else if ('value' in detune) {
+          detune.value = cents;
         }
-      });
+      }
       return;
     }
 
     // Regular synths with .detune parameter
     if ('detune' in instrument && instrument.detune) {
-      const detuneParam = instrument.detune as unknown as Tone.Param<'cents'>;
-      console.log('🎵 Setting detune to', cents, 'cents on', instrument.constructor.name);
-      if (rampTime && typeof detuneParam.linearRampToValueAtTime === 'function') {
-        detuneParam.linearRampToValueAtTime(cents, safeTime + rampTime);
-      } else if (typeof detuneParam.setValueAtTime === 'function') {
-        detuneParam.setValueAtTime(cents, safeTime);
+      const detune = instrument.detune as any;
+      
+      if (typeof detune.setValueAtTime === 'function') {
+        // Param-based detune
+        if (rampTime && typeof detune.linearRampToValueAtTime === 'function') {
+          detune.linearRampToValueAtTime(cents, safeTime + rampTime);
+        } else {
+          detune.setValueAtTime(cents, safeTime);
+        }
+      } else if ('value' in detune) {
+        // Signal-based detune (MonoSynth, DuoSynth)
+        detune.value = cents;
       }
-    } else {
-      console.warn('⚠️ No detune on', instrument.constructor.name);
     }
   }
 
   /**
-   * Apply frequency effect to a synth instrument (for portamento)
+   * Apply frequency modulation to a synth (FT2-style effects: arpeggio, vibrato, etc.)
+   * Modulates the oscillator frequency directly without retriggering notes.
+   * This is how FastTracker 2 implements pitch effects - updates playback frequency, not note.
+   * 
    * @param instrumentId - Instrument ID
    * @param frequency - Target frequency in Hz
-   * @param time - Audio time
    * @param channelIndex - Channel index for per-channel synths
    * @param rampTime - If provided, ramp to the frequency over this duration
    */
-  public applySynthFrequency(instrumentId: number, frequency: number, time: number, channelIndex?: number, rampTime?: number): void {
+  public applySynthFrequency(instrumentId: number, frequency: number, channelIndex?: number, rampTime?: number): void {
     const key = this.getInstrumentKey(instrumentId, channelIndex);
-    const instrument = this.instruments.get(key);
+    let instrument = this.instruments.get(key);
+    
+    // Fallback: try legacy shared key if per-channel not found
+    if (!instrument && channelIndex !== undefined) {
+      const legacyKey = this.getInstrumentKey(instrumentId, -1);
+      instrument = this.instruments.get(legacyKey);
+    }
+    
     if (!instrument) return;
 
-    const safeTime = this.getSafeTime(time) ?? Tone.now();
+    const safeTime = this.getSafeTime() ?? Tone.now();
 
-    // Get frequency parameter (varies by synth type)
+    // Handle monophonic synths (MonoSynth, DuoSynth, FMSynth, AMSynth)
     let freqParam: Tone.Param<'frequency'> | undefined;
     
     if ('frequency' in instrument && instrument.frequency) {
@@ -5307,7 +5427,6 @@ export class ToneEngine {
     } else if ('oscillator' in instrument && (instrument as any).oscillator?.frequency) {
       freqParam = (instrument as any).oscillator.frequency;
     } else if ('voice0' in instrument && (instrument as any).voice0?.oscillator?.frequency) {
-      // DuoSynth has voice0 and voice1
       freqParam = (instrument as any).voice0.oscillator.frequency;
     }
 
@@ -5317,6 +5436,34 @@ export class ToneEngine {
       } else {
         freqParam.setValueAtTime(frequency, safeTime);
       }
+      return;
+    }
+
+    // PolySynth: Apply to all active voices (fallback for non-tracker use)
+    if (instrument instanceof Tone.PolySynth) {
+      const activeVoices = (instrument as any)._activeVoices;
+      if (activeVoices && activeVoices.length > 0) {
+        activeVoices.forEach((voice: any) => {
+          let voiceFreqParam: Tone.Param<'frequency'> | undefined;
+          
+          if (voice.frequency) {
+            voiceFreqParam = voice.frequency;
+          } else if (voice.oscillator?.frequency) {
+            voiceFreqParam = voice.oscillator.frequency;
+          } else if (voice.voice0?.oscillator?.frequency) {
+            voiceFreqParam = voice.voice0.oscillator.frequency;
+          }
+          
+          if (voiceFreqParam && typeof voiceFreqParam.setValueAtTime === 'function') {
+            if (rampTime && typeof voiceFreqParam.exponentialRampToValueAtTime === 'function') {
+              voiceFreqParam.exponentialRampToValueAtTime(Math.max(0.01, frequency), safeTime + rampTime);
+            } else {
+              voiceFreqParam.setValueAtTime(frequency, safeTime);
+            }
+          }
+        });
+      }
+      return;
     }
   }
 
