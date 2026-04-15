@@ -368,6 +368,122 @@ async function triggerSpeechPad(padId: number, text: string, voice = 0): Promise
   }
 }
 
+// ── Modland / HVSC actions ──────────────────────────────────────────────────
+
+/** Search Modland and load the first result into the DJ deck */
+async function searchAndLoadModland(query: string, deckId: 'A' | 'B'): Promise<void> {
+  try {
+    const { searchModland, downloadModlandFile } = await import('@/lib/modlandApi');
+    const results = await searchModland({ q: query, limit: 5 });
+    if (!results.results || results.results.length === 0) {
+      console.warn(`[Tour] No Modland results for "${query}"`);
+      return;
+    }
+    const file = results.results[0];
+    const buffer = await downloadModlandFile(file.full_path);
+    const filename = file.full_path.split('/').pop() || 'download.mod';
+
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
+    const { getDJEngine } = await import('@/engine/dj/DJEngine');
+    const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
+    const { useDJStore } = await import('@/stores/useDJStore');
+
+    const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+    const song = await parseModuleToSong(blob);
+    const bpmResult = detectBPM(song);
+
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: song.name || filename,
+      detectedBPM: bpmResult.bpm,
+      effectiveBPM: bpmResult.bpm,
+      analysisState: 'rendering',
+      isPlaying: false,
+    });
+
+    const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+    await getDJEngine().loadAudioToDeck(
+      deckId, result.wavData, filename,
+      song.name || filename, result.analysis?.bpm || bpmResult.bpm, song
+    );
+  } catch (err) {
+    console.warn(`[Tour] Modland search/load failed for "${query}":`, err);
+  }
+}
+
+/** Search HVSC and load the first result into DJ deck */
+async function searchAndLoadHVSC(query: string, deckId: 'A' | 'B'): Promise<void> {
+  try {
+    const { searchHVSC, downloadHVSCFile } = await import('@/lib/hvscApi');
+    const results = await searchHVSC(query, 5);
+    if (!results || results.length === 0) {
+      console.warn(`[Tour] No HVSC results for "${query}"`);
+      return;
+    }
+    const entry = results[0];
+    const buffer = await downloadHVSCFile(entry.path);
+    const filename = entry.path.split('/').pop() || 'download.sid';
+
+    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
+    const { getDJEngine } = await import('@/engine/dj/DJEngine');
+    const { useDJStore } = await import('@/stores/useDJStore');
+
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: entry.name || filename,
+      detectedBPM: 125,
+      effectiveBPM: 125,
+      analysisState: 'rendering',
+      isPlaying: false,
+    });
+
+    const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+    await getDJEngine().loadAudioToDeck(
+      deckId, result.wavData, filename,
+      entry.name || filename, result.analysis?.bpm || 125
+    );
+  } catch (err) {
+    console.warn(`[Tour] HVSC search/load failed for "${query}":`, err);
+  }
+}
+
+// ── Automation actions ──────────────────────────────────────────────────────
+
+/** Create a demo automation curve on a channel with a preset shape */
+async function createAutomationCurve(
+  channelIndex: number,
+  parameter: string,
+  presetId: string,
+): Promise<void> {
+  const { useAutomationStore } = await import('@/stores/useAutomationStore');
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+
+  const store = useAutomationStore.getState();
+  const trackerState = useTrackerStore.getState();
+  const patternId = `pattern-${trackerState.currentPatternIndex}`;
+
+  // Add curve
+  const curveId = store.addCurve(patternId, channelIndex, parameter);
+  if (!curveId) return;
+
+  // Apply a preset shape
+  const preset = store.presets.find(p => p.id === presetId);
+  if (preset) {
+    store.applyPreset(curveId, preset);
+  }
+
+  // Show the automation lane for this channel
+  store.setShowLane(channelIndex, true);
+  store.setActiveParameter(channelIndex, parameter);
+}
+
+/** Clear all automation curves (cleanup) */
+async function clearAllAutomation(): Promise<void> {
+  const { useAutomationStore } = await import('@/stores/useAutomationStore');
+  useAutomationStore.getState().reset();
+}
+
 export const TOUR_SCRIPT: TourStep[] = [
   // ── Act 1: Welcome (short!) ─────────────────────────────────────────────
   {
@@ -804,9 +920,44 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 3000,
   },
   {
-    id: 'dj-archives',
-    narration: 'You can also stream from Modland, 190,000 tracker modules. Or the High Voltage SID Collection, 80,000 Commodore 64 tunes.',
-    postDelay: 1000,
+    id: 'dj-archives-intro',
+    narration: 'Let me search the Modland archive. 190,000 tracker modules online.',
+    postDelay: 500,
+  },
+  {
+    id: 'dj-archives-modland',
+    narration: 'Searching for Jogeir Liljedahl. Loading into deck A.',
+    action: async () => {
+      await djStopAll();
+      await searchAndLoadModland('jogeir liljedahl', 'A');
+    },
+    postDelay: 1500,
+  },
+  {
+    id: 'dj-archives-play-mod',
+    narration: 'Straight from Modland.',
+    action: () => djPlay('A'),
+    postDelay: 4000,
+  },
+  {
+    id: 'dj-archives-hvsc',
+    narration: 'Now the HVSC. 80,000 Commodore 64 SID tunes. Searching Rob Hubbard.',
+    action: async () => {
+      await searchAndLoadHVSC('hubbard commando', 'B');
+    },
+    postDelay: 1500,
+  },
+  {
+    id: 'dj-archives-play-sid',
+    narration: 'Commodore 64 on deck B. Crossfading.',
+    action: async () => {
+      await djPlay('B');
+      // Crossfade from A to B over 3 seconds
+      for (let i = 0; i <= 20; i++) {
+        setTimeout(() => djSetCrossfader(i / 20), i * 150);
+      }
+    },
+    postDelay: 4000,
   },
   {
     id: 'dj-stop',
@@ -932,10 +1083,97 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 300,
   },
 
-  // ── Act 9: Closing (fast) ───────────────────────────────────────────────
+  // ── Act 9: Automation ──────────────────────────────────────────────────
+  {
+    id: 'automation-intro',
+    narration: 'Automation. Draw curves to control any parameter over time.',
+    action: async () => {
+      switchView('tracker');
+      // Load a song so we have patterns to automate
+      await loadTrackerSong('aces_high.mod');
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 500,
+  },
+  {
+    id: 'automation-volume',
+    narration: 'A sine wave on volume. Watch the lane appear.',
+    action: async () => {
+      await createAutomationCurve(0, 'volume', 'sine');
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 2000,
+  },
+  {
+    id: 'automation-filter',
+    narration: 'Sawtooth on the filter cutoff.',
+    action: async () => {
+      await createAutomationCurve(1, 'cutoff', 'saw');
+    },
+    spotlight: '[data-pattern-editor]',
+    postDelay: 2000,
+  },
+  {
+    id: 'automation-play',
+    narration: 'Hear it in action.',
+    action: trackerPlay,
+    postDelay: 5000,
+  },
+  {
+    id: 'automation-shapes',
+    narration: 'Sine, triangle, sawtooth, staircase, random. 12 preset shapes. Or draw freehand with the pencil tool.',
+    postDelay: 1500,
+  },
+  {
+    id: 'automation-cleanup',
+    narration: '',
+    action: async () => {
+      await trackerStop();
+      await clearAllAutomation();
+    },
+    postDelay: 300,
+  },
+
+  // ── Act 10: MIDI ───────────────────────────────────────────────────────
+  {
+    id: 'midi-intro',
+    narration: 'MIDI. Plug in any controller. Native Web MIDI, zero drivers.',
+    action: async () => {
+      switchView('tracker');
+      // Try to init MIDI to show device detection
+      const { useMIDIStore } = await import('@/stores/useMIDIStore');
+      await useMIDIStore.getState().init();
+    },
+    postDelay: 1000,
+  },
+  {
+    id: 'midi-features',
+    narration: 'NKS2 deep integration. Auto-mapped knobs for every synth. Light guide shows playable keys. CC learn for any parameter. Drum pads. DJ mode routing.',
+    postDelay: 2000,
+  },
+  {
+    id: 'midi-knobbar',
+    narration: 'The knob bar adapts to whatever synth is loaded. Page through parameter banks.',
+    action: async () => {
+      const { useMIDIStore } = await import('@/stores/useMIDIStore');
+      useMIDIStore.getState().setShowKnobBar(true);
+    },
+    postDelay: 2500,
+  },
+  {
+    id: 'midi-cleanup',
+    narration: '',
+    action: async () => {
+      const { useMIDIStore } = await import('@/stores/useMIDIStore');
+      useMIDIStore.getState().setShowKnobBar(false);
+    },
+    postDelay: 300,
+  },
+
+  // ── Act 11: Closing (fast) ─────────────────────────────────────────────
   {
     id: 'closing',
-    narration: 'DEViLBOX. 120 synth engines. 188 formats. Two massive music archives. All in your browser. Thanks for watching.',
+    narration: 'DEViLBOX. 120 synth engines. 188 formats. Two massive music archives. Automation. MIDI. All in your browser. Thanks for watching.',
     action: () => switchView('tracker'),
     postDelay: 2000,
   },
