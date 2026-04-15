@@ -8,8 +8,21 @@ import { loadTMS5220ROMs } from '@engine/mame/MAMEROMLoader';
 import { normalizeUrl } from '@/utils/urlUtils';
 
 /**
- * TMS5220 Parameter IDs (matching C++ enum)
+ * Global registry for ROM word names — avoids instrument store updates
+ * which trigger re-render loops (synth recreated → publishes → repeat).
+ * Key: chip name (e.g. "TMS5220"), Value: array of word names.
  */
+const _romWordRegistry = new Map<string, string[]>();
+let _romWordVersion = 0;
+
+export function getRomWordNames(chipName: string): string[] | undefined {
+  return _romWordRegistry.get(chipName);
+}
+
+export function getRomWordVersion(): number {
+  return _romWordVersion;
+}
+
 const TMS5220Param = {
   VOLUME: 0,
   CHIRP_TYPE: 1,
@@ -178,26 +191,11 @@ export class TMS5220Synth extends MAMEBaseSynth {
     console.log('[TMS5220] ROM data sent to WASM worklet');
   }
 
-  /** Publish ROM word names to the instrument store for dynamic dropdown labels */
+  /** Publish ROM word names to the global registry for UI consumption */
   private _publishRomWordNames(): void {
     if (this._romWords.length === 0) return;
-    const names = this._romWords.map(w => w.name).join(',');
-    const chipName = this.chipName;
-    const synthType = `MAME${chipName}`;
-    const altTypes = [synthType, chipName];
-
-    import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
-      const store = useInstrumentStore.getState();
-      const inst = store.instruments.find((i: { synthType?: string }) =>
-        altTypes.includes(i.synthType ?? '')
-      );
-      if (inst) {
-        const params = (inst as { parameters?: Record<string, unknown> }).parameters;
-        store.updateInstrument(inst.id, {
-          parameters: { ...params, _romWordNames: names },
-        });
-      }
-    }).catch(() => {});
+    _romWordRegistry.set(this.chipName, this._romWords.map(w => w.name));
+    _romWordVersion++;
   }
 
   /** Override message handler to send ROM when WASM is ready */

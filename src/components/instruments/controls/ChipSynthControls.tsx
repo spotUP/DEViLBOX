@@ -10,6 +10,7 @@ import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameter
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
+import { getRomWordNames } from '@engine/tms5220/TMS5220Synth';
 import type { SynthType } from '@typedefs/instrument';
 import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
@@ -285,14 +286,17 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     }
 
     if (param.type === 'select' && param.options) {
-      // Dynamic ROM word names override static labels for romSpeech selectors
+      // Dynamic ROM word names from global registry (avoids store re-render loop)
       let selectOptions = param.options.map(opt => ({ value: String(opt.value), label: opt.label }));
-      if (param.key === 'romSpeech' && typeof parameters._romWordNames === 'string') {
-        const romNames = (parameters._romWordNames as string).split(',');
-        selectOptions = [
-          { value: '0', label: '(Text-to-Speech)' },
-          ...romNames.map((name, i) => ({ value: String(i + 1), label: name })),
-        ];
+      if (param.key === 'romSpeech') {
+        const chipName = synthType.startsWith('MAME') ? synthType.slice(4) : synthType;
+        const romNames = getRomWordNames(chipName);
+        if (romNames && romNames.length > 0) {
+          selectOptions = [
+            { value: '0', label: '(Text-to-Speech)' },
+            ...romNames.map((name, i) => ({ value: String(i + 1), label: name })),
+          ];
+        }
       }
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
