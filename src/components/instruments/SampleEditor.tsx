@@ -522,14 +522,26 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         const ct = response.headers.get('content-type') || '';
         if (ct.includes('text/html')) throw new Error('Server returned HTML (404?)');
         const arrayBuffer = await response.arrayBuffer();
-        const { getDevilboxAudioContext } = await import('@utils/audio-context');
-        let ctx: AudioContext;
+        let buffer: AudioBuffer;
         try {
-          ctx = getDevilboxAudioContext();
+          const { getDevilboxAudioContext } = await import('@utils/audio-context');
+          let ctx: AudioContext;
+          try {
+            ctx = getDevilboxAudioContext();
+          } catch {
+            ctx = new AudioContext();
+          }
+          buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
         } catch {
-          ctx = new AudioContext();
+          // decodeAudioData can fail on low sample rate WAVs (e.g. 8363 Hz
+          // from MOD/tracker imports). Fall back to manual WAV parsing.
+          const { isWavBuffer, parseWavToAudioBuffer } = await import('@/utils/audio/wavParser');
+          if (isWavBuffer(arrayBuffer)) {
+            buffer = parseWavToAudioBuffer(arrayBuffer.slice(0));
+          } else {
+            throw new Error('Unable to decode audio data (not a WAV)');
+          }
         }
-        const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
         setAudioBuffer(buffer);
 
         if (!sampleInfo) {
