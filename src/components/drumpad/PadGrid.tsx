@@ -18,14 +18,12 @@ import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
-  onEmptyPadClick?: (padId: number) => void;
   selectedPadId: number | null;
   performanceMode?: boolean;
 }
 
 export const PadGrid: React.FC<PadGridProps> = ({
   onPadSelect,
-  onEmptyPadClick,
   selectedPadId,
   performanceMode = false,
 }) => {
@@ -225,7 +223,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   const contextMenuCallbacks = useMemo(() => ({
     onEdit: (id: number) => onPadSelect(id),
-    onWizard: (id: number) => onEmptyPadClick?.(id),
     onPreview: (id: number) => {
       const engine = engineRef.current;
       if (engine) {
@@ -244,9 +241,8 @@ export const PadGrid: React.FC<PadGridProps> = ({
     },
     onLoadSample: (id: number) => {
       onPadSelect(id);
-      onEmptyPadClick?.(id);
     },
-  }), [onPadSelect, onEmptyPadClick, engineRef]);
+  }), [onPadSelect, engineRef]);
 
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 
@@ -350,7 +346,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
             onTrigger={handlePadTrigger}
             onRelease={handlePadRelease}
             onSelect={onPadSelect}
-            onEmptyPadClick={onEmptyPadClick}
             onFocus={() => setFocusedPadId(pad.id)}
             onQuickAssign={handleQuickAssign}
           />
