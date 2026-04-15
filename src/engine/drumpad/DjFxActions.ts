@@ -385,17 +385,51 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
       filter.type = type;
       filter.Q.value = 8;
 
-      // Start position depends on filter type
+      // Define start and end frequencies for ping-pong sweep
+      let startFreq: number;
+      let endFreq: number;
+
       if (type === 'highpass') {
-        filter.frequency.value = 20;
-        filter.frequency.exponentialRampToValueAtTime(8000, ctx.currentTime + 2);
+        startFreq = 20;
+        endFreq = 8000;
       } else if (type === 'lowpass') {
-        filter.frequency.value = 20000;
-        filter.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 2);
+        startFreq = 20000;
+        endFreq = 200;
       } else {
-        filter.frequency.value = 500;
-        filter.frequency.exponentialRampToValueAtTime(5000, ctx.currentTime + 2);
+        startFreq = 500;
+        endFreq = 5000;
       }
+
+      // Create ping-pong sweep: start → end → start → end (loops)
+      const sweepDuration = 2; // 2 seconds per sweep
+      let sweepCount = 0;
+
+      const scheduleSweep = (fromFreq: number, toFreq: number, startTime: number) => {
+        filter.frequency.setValueAtTime(fromFreq, startTime);
+        filter.frequency.exponentialRampToValueAtTime(toFreq, startTime + sweepDuration);
+      };
+
+      // Initial position
+      filter.frequency.value = startFreq;
+
+      // Schedule alternating sweeps
+      const now = ctx.currentTime;
+      scheduleSweep(startFreq, endFreq, now);
+      scheduleSweep(endFreq, startFreq, now + sweepDuration);
+      scheduleSweep(startFreq, endFreq, now + sweepDuration * 2);
+      scheduleSweep(endFreq, startFreq, now + sweepDuration * 3);
+
+      // Continue scheduling sweeps via interval
+      const intervalId = setInterval(() => {
+        sweepCount++;
+        const nextTime = ctx.currentTime;
+        const isForward = sweepCount % 2 === 0;
+        scheduleSweep(
+          isForward ? startFreq : endFreq,
+          isForward ? endFreq : startFreq,
+          nextTime
+        );
+      }, sweepDuration * 1000);
 
       // Insert filter IN the signal chain (100% wet)
       masterNode.connect(filter);
@@ -403,7 +437,9 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
 
       activeFx.set(this.id, {
         nodes: [filter],
+        timer: intervalId,
         cleanup: () => {
+          clearInterval(intervalId);
           try {
             masterNode.disconnect();
             masterNode.connect(originalDestination);
@@ -417,6 +453,11 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
 
       const filter = state.nodes[0] as BiquadFilterNode;
       const ctx = getCtx();
+
+      // Clear the sweep interval
+      if (state.timer) {
+        clearInterval(state.timer as ReturnType<typeof setInterval>);
+      }
 
       // Cancel any scheduled automation
       filter.frequency.cancelScheduledValues(ctx.currentTime);
@@ -434,7 +475,8 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
       }
 
       // Cleanup after sweep completes
-      state.timer = setTimeout(() => cleanupFx(this.id), 600);
+      const cleanupTimer = setTimeout(() => cleanupFx(this.id), 600);
+      state.timer = cleanupTimer;
       activeFx.set(this.id, state);
     },
   };
