@@ -181,6 +181,9 @@ export class S14001ASynth extends MAMEBaseSynth {
       return;
     }
 
+    // ROM speech selected but not loaded yet — don't fall through to TTS
+    if (this._currentRomSpeech > 0) return;
+
     // TTS speech
     if (this._singMode && this._presetSequence.length > 0) {
       this._speakSinglePreset(note, velocity);

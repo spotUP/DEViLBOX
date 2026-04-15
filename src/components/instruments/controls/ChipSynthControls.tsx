@@ -285,12 +285,21 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
     }
 
     if (param.type === 'select' && param.options) {
+      // Dynamic ROM word names override static labels for romSpeech selectors
+      let selectOptions = param.options.map(opt => ({ value: String(opt.value), label: opt.label }));
+      if (param.key === 'romSpeech' && typeof parameters._romWordNames === 'string') {
+        const romNames = (parameters._romWordNames as string).split(',');
+        selectOptions = [
+          { value: '0', label: '(Text-to-Speech)' },
+          ...romNames.map((name, i) => ({ value: String(i + 1), label: name })),
+        ];
+      }
       return (
         <div key={paramKey} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <CustomSelect
             value={String(Math.round(Number(currentValue)))}
             onChange={(v) => onParamChange(paramKey, Number(v))}
-            options={param.options.map(opt => ({ value: String(opt.value), label: opt.label }))}
+            options={selectOptions}
             style={{
               background: isCyanTheme ? '#041010' : '#1e293b',
               color: textColor,
