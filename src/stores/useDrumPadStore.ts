@@ -11,7 +11,6 @@ import type {
   MIDIMapping,
   SampleData,
   PadBank,
-  PadMode,
 } from '../types/drumpad';
 import { createEmptyProgram, createEmptyPad, create808Program, create909Program, createDJFXProgram, getBankPads } from '../types/drumpad';
 import {
@@ -25,9 +24,7 @@ import { mpcResample, MODEL_CONFIGS } from '../engine/mpc-resampler/MpcResampler
 import type { MpcResampleOptions } from '../engine/mpc-resampler/MpcResamplerDSP';
 
 interface DrumPadStore extends DrumPadState {
-  // Pad mode
-  padMode: PadMode;
-  setPadMode: (mode: PadMode) => void;
+  // FX tracking
   activeFxPads: Set<number>;
   setFxPadActive: (padId: number, active: boolean) => void;
 
@@ -106,17 +103,7 @@ const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 let _schemaResetPending = false;
 
 export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
-  // Pad mode
-  padMode: 'samples' as PadMode,
-  setPadMode: (mode: PadMode) => {
-    const state = get();
-    // Clear active FX pads when switching away from djfx mode
-    if (state.padMode === 'djfx' && mode !== 'djfx') {
-      set({ padMode: mode, activeFxPads: new Set() });
-    } else {
-      set({ padMode: mode });
-    }
-  },
+  // FX tracking
   activeFxPads: new Set<number>(),
   setFxPadActive: (padId: number, active: boolean) => {
     const prev = get().activeFxPads;
@@ -521,7 +508,6 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           midiMappings: state.midiMappings || {},
           preferences: { ...DEFAULT_PREFERENCES, ...state.preferences },
           busLevels: state.busLevels || {},
-          padMode: state.padMode || 'samples',
         });
 
         if (process.env.NODE_ENV === 'development') {

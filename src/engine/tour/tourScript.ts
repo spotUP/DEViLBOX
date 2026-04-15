@@ -130,6 +130,54 @@ function disableHead(): void {
   useSpeechActivityStore.getState().speechStop();
 }
 
+// ── Instrument & Synth editing actions ────────────────────────────────────────
+
+/** Create a synth instrument and select it */
+async function createAndSelectInstrument(
+  synthType: string, name: string
+): Promise<number | null> {
+  try {
+    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+    const id = useInstrumentStore.getState().createInstrument({
+      synthType: synthType as any,
+      name,
+    } as any);
+    useInstrumentStore.getState().setCurrentInstrument(id);
+    return id;
+  } catch (err) {
+    console.warn(`[Tour] Failed to create instrument ${synthType}:`, err);
+    return null;
+  }
+}
+
+/** Open the instrument editor modal */
+async function openInstrumentEditor(instrumentId?: number): Promise<void> {
+  const { useUIStore: UI } = await import('@/stores/useUIStore');
+  UI.getState().openModal('instruments', instrumentId != null ? { instrumentId } : undefined);
+}
+
+/** Close any open modal */
+async function closeModals(): Promise<void> {
+  const { useUIStore: UI } = await import('@/stores/useUIStore');
+  UI.getState().closeModal();
+}
+
+/** Trigger a note on an instrument (for demo) */
+async function playInstrumentNote(instrumentId: number, note: string, durationMs = 500): Promise<void> {
+  try {
+    const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+    const { getToneEngine } = await import('@/engine/ToneEngine');
+    const config = useInstrumentStore.getState().getInstrument(instrumentId);
+    if (!config) return;
+    getToneEngine().triggerNoteAttack(instrumentId, note, 0, 0.85, config);
+    setTimeout(() => {
+      try { getToneEngine().triggerNoteRelease(instrumentId, note, 0, config); } catch { /* */ }
+    }, durationMs);
+  } catch (err) {
+    console.warn(`[Tour] Failed to play instrument note:`, err);
+  }
+}
+
 // ── DrumPad actions ──────────────────────────────────────────────────────────
 
 /** Trigger a synth-configured pad via ToneEngine (808/909 drum machines) */
@@ -295,7 +343,97 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 300,
   },
 
-  // ── Act 3: DrumPads — 808 demo, DJ FX, speech synth ────────────────────
+  // ── Act 3: Instrument & Synth Editing ──────────────────────────────────
+  {
+    id: 'synth-intro',
+    narration: 'Let me show you the synth engines. Over 120 to choose from.',
+    action: async () => {
+      switchView('tracker');
+      await createAndSelectInstrument('Amsynth', 'Tour Pad');
+    },
+    postDelay: 500,
+  },
+  {
+    id: 'synth-open-editor',
+    narration: 'Here is the instrument editor. Full parameter control.',
+    action: async () => {
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const id = useInstrumentStore.getState().currentInstrument;
+      await openInstrumentEditor(id);
+    },
+    postDelay: 2500,
+  },
+  {
+    id: 'synth-play-notes',
+    narration: '',
+    action: async () => {
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const id = useInstrumentStore.getState().currentInstrument;
+      // Play an ascending riff
+      const notes = ['C4', 'E4', 'G4', 'C5', 'G4', 'E4'];
+      for (let i = 0; i < notes.length; i++) {
+        setTimeout(() => playInstrumentNote(id, notes[i], 350), i * 300);
+      }
+    },
+    postDelay: 2500,
+  },
+  {
+    id: 'synth-close-switch',
+    narration: 'Let me switch to a different synth. How about a TB-303 acid bass line.',
+    action: async () => {
+      await closeModals();
+      await createAndSelectInstrument('TB303', 'Acid Bass');
+    },
+    postDelay: 500,
+  },
+  {
+    id: 'synth-303-editor',
+    narration: '',
+    action: async () => {
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const id = useInstrumentStore.getState().currentInstrument;
+      await openInstrumentEditor(id);
+    },
+    postDelay: 1000,
+  },
+  {
+    id: 'synth-303-play',
+    narration: '',
+    action: async () => {
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const id = useInstrumentStore.getState().currentInstrument;
+      // 303-style acid sequence
+      const notes = ['C2', 'C2', 'Eb2', 'F2', 'F2', 'Ab2', 'Bb2', 'C3'];
+      for (let i = 0; i < notes.length; i++) {
+        setTimeout(() => playInstrumentNote(id, notes[i], 180), i * 200);
+      }
+    },
+    postDelay: 2500,
+  },
+  {
+    id: 'synth-sample-intro',
+    narration: 'And of course, a full sample editor. Waveform view, loop points, slicing.',
+    action: async () => {
+      await closeModals();
+      // Select the first instrument from the loaded song (has samples)
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const instruments = useInstrumentStore.getState().instruments;
+      const sampleInst = instruments.find(i => i.type === 'sample');
+      if (sampleInst) {
+        useInstrumentStore.getState().setCurrentInstrument(sampleInst.id);
+        await openInstrumentEditor(sampleInst.id);
+      }
+    },
+    postDelay: 3000,
+  },
+  {
+    id: 'synth-cleanup',
+    narration: '',
+    action: closeModals,
+    postDelay: 300,
+  },
+
+  // ── Act 4: DrumPads — 808 demo, DJ FX, speech synth ────────────────────
   {
     id: 'drumpad-switch',
     narration: 'The drum pads. MPC-style, 16 pads, velocity sensitive. Let me play a beat.',

@@ -5,6 +5,7 @@
  * Each step: set subtitle → execute action → play audio → wait → advance.
  */
 
+import * as Tone from 'tone';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { useTourStore } from '@/stores/useTourStore';
 import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
@@ -88,8 +89,12 @@ class TourEngine {
     this.gainNode = audioContext.createGain();
     this.gainNode.gain.value = 1;
 
+    // Route through Tone.Destination so the VJ AudioDataBus analyser picks up
+    // the speech audio — this drives the Kraftwerk head mouth animation.
+    const toneDestInput = this.getToneDestinationInput(audioContext);
+
     // Build FX chain: gainNode → [dry → dest] + [reverbSend → convolver → dest] + [delaySend → delay → feedback loop → dest]
-    this.gainNode.connect(audioContext.destination);
+    this.gainNode.connect(toneDestInput);
 
     // Convolution reverb (algorithmic impulse)
     try {
@@ -99,7 +104,7 @@ class TourEngine {
       this.reverbSendNode.gain.value = 0.25; // wet amount
       this.gainNode.connect(this.reverbSendNode);
       this.reverbSendNode.connect(this.convolverNode);
-      this.convolverNode.connect(audioContext.destination);
+      this.convolverNode.connect(toneDestInput);
     } catch (err) {
       console.warn('[Tour] Reverb setup failed:', err);
     }
@@ -117,7 +122,7 @@ class TourEngine {
       this.delaySendNode.connect(this.delayNode);
       this.delayNode.connect(this.feedbackNode);
       this.feedbackNode.connect(this.delayNode); // feedback loop
-      this.delayNode.connect(audioContext.destination);
+      this.delayNode.connect(toneDestInput);
     } catch (err) {
       console.warn('[Tour] Delay setup failed:', err);
     }
@@ -375,6 +380,19 @@ class TourEngine {
       }
     }
     return buffer;
+  }
+
+  /** Get Tone.Destination's input node so speech audio feeds the VJ analyser */
+  private getToneDestinationInput(fallback: AudioContext): AudioNode {
+    try {
+      const dest = Tone.getDestination();
+      const input: AudioNode | undefined =
+        (dest as any).output?.input ??
+        (dest as any)._gainNode ??
+        (dest as any).input;
+      if (input) return input;
+    } catch { /* Tone not initialized yet */ }
+    return fallback.destination;
   }
 }
 
