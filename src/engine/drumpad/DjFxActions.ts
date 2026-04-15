@@ -109,48 +109,47 @@ function createStutter(division: SyncDivision): DjFxAction {
       const periodMs = bpmToMs(getBpm(), division);
       const periodSec = periodMs / 1000;
 
-      // Create buffer for stutter: record a chunk, then loop it
-      const bufferSize = Math.round(ctx.sampleRate * periodSec);
-      const stutterBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
-      const recorder = ctx.createScriptProcessor(bufferSize, 2, 2);
-      let captured = false;
+      // Use delay-based stutter instead of ScriptProcessor
+      // Create a very short delay that loops to create stutter effect
+      const delay = ctx.createDelay(1);
+      delay.delayTime.value = periodSec;
 
-      const stutterSource = ctx.createBufferSource();
-      const gain = ctx.createGain();
-      gain.gain.value = 1;
-      stutterSource.loop = true;
+      const feedback = ctx.createGain();
+      feedback.gain.value = 0.95; // High feedback to create loop
 
-      recorder.onaudioprocess = (e) => {
-        if (!captured) {
-          // Capture one chunk from the live audio
-          for (let ch = 0; ch < 2; ch++) {
-            stutterBuffer.copyToChannel(e.inputBuffer.getChannelData(ch), ch);
-          }
-          captured = true;
-          stutterSource.buffer = stutterBuffer;
-          stutterSource.connect(gain);
-          gain.connect(ctx.destination);
-          stutterSource.start();
-        }
-        // Pass through audio while recording
-        for (let ch = 0; ch < e.outputBuffer.numberOfChannels; ch++) {
-          e.outputBuffer.getChannelData(ch).set(e.inputBuffer.getChannelData(ch));
-        }
-      };
+      const wetGain = ctx.createGain();
+      wetGain.gain.value = 1;
 
-      // Connect recorder to master audio chain
+      // Create delay loop
+      delay.connect(feedback);
+      feedback.connect(delay);
+      delay.connect(wetGain);
+      wetGain.connect(ctx.destination);
+
+      // Tap from master
+      const tap = ctx.createGain();
+      tap.gain.value = 1;
+      tap.connect(delay);
+
       const masterNode = getMasterOutputNode();
       if (masterNode) {
-        masterNode.connect(recorder);
-        recorder.connect(ctx.destination);
+        // Disconnect master from destination and route through stutter
+        try { masterNode.disconnect(); } catch { /* */ }
+        masterNode.connect(tap);
+        // Also maintain dry signal
+        masterNode.connect(ctx.destination);
       }
 
       activeFx.set(this.id, {
-        nodes: [recorder, stutterSource, gain],
+        nodes: [delay, feedback, wetGain, tap],
         oscillator: undefined,
         cleanup: () => {
-          recorder.onaudioprocess = null;
-          try { masterNode?.disconnect(recorder); } catch { /* */ }
+          try {
+            if (masterNode) {
+              masterNode.disconnect();
+              masterNode.connect(ctx.destination);
+            }
+          } catch { /* */ }
         },
       });
     },
