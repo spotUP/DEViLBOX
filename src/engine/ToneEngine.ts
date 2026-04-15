@@ -114,7 +114,7 @@ import {
   registerSidechainResolver,
 } from './tone/MasterEffectsChain';
 import { captureLiveAudio, mixAndNormalize, MONO_WASM_SYNTHS } from '@/lib/audio/LiveCapture';
-import { notifyInstrumentAttack } from './instrumentPlaybackTracker';
+import { notifyInstrumentAttack, notifyInstrumentRelease } from './instrumentPlaybackTracker';
 import {
   type InstrumentEffectsContext,
   buildInstrumentEffectChain as _buildInstrumentEffectChain,
@@ -3045,6 +3045,7 @@ export class ToneEngine {
     config: InstrumentConfig,
     channelIndex?: number
   ): void {
+    notifyInstrumentRelease(instrumentId);
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument || !(instrument as any).triggerRelease) {
