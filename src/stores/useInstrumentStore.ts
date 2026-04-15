@@ -37,7 +37,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
-import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
+import { checkFormatViolation, getActiveFormatLimits, isFormatChecksSuppressed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
@@ -851,12 +851,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     createInstrument: (config) => {
-      // Format compat: synth instrument — deferred to export-time validation
-      // (synth instruments still work in DEViLBOX; only matters when exporting to native format)
-      // Format compat: instrument count check
+      // Format compat: instrument count check — skip when suppressed to
+      // avoid infinite recursion (checkFormatViolation returns true → re-calls createInstrument)
       const currentCount = get().instruments.length;
       const limits = getActiveFormatLimits();
-      if (limits && currentCount >= limits.maxInstruments) {
+      if (limits && !isFormatChecksSuppressed() && currentCount >= limits.maxInstruments) {
         void checkFormatViolation('instrumentCount',
           `Adding instrument ${currentCount + 1} exceeds ${limits.name} limit of ${limits.maxInstruments} instruments.`,
         ).then((ok) => { if (ok) get().createInstrument(config); });

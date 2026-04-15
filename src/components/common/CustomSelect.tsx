@@ -40,6 +40,8 @@ export interface CustomSelectProps {
   disabled?: boolean;
   /** Tooltip title */
   title?: string;
+  /** Custom z-index for dropdown menu (default: 100) */
+  zIndex?: number;
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -71,6 +73,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   style,
   disabled = false,
   title,
+  zIndex,
 }) => {
   const menuItems = useMemo<MenuItemType[]>(() => {
     return options.map((opt, i) => {
@@ -113,6 +116,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       className={className ?? defaultClassName}
       style={style}
       disabled={disabled}
+      zIndex={zIndex}
     >
       <span className="whitespace-nowrap" title={title}>{selectedLabel} ▾</span>
     </DropdownButton>
