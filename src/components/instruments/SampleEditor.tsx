@@ -997,9 +997,16 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       console.warn('[SampleEditor] handlePlay: no audioBuffer');
       return;
     }
+    
+    // Resume audio context FIRST (synchronously) before checking playback state
+    // This prevents the first keypress from being silent
     await Tone.start();
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
 
-    // Toggle: stop if currently playing
+    // Toggle: stop if currently playing (AFTER context resume)
     if (isPlaying || previewSourcesRef.current.length > 0) {
       console.log('[SampleEditor] handlePlay: stopping playback');
       stopPreviewSources();
@@ -1009,7 +1016,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       return;
     }
 
-    const ctx = Tone.getContext().rawContext as AudioContext;
     const duration = audioBuffer.duration;
     if (!duration || duration <= 0) {
       console.warn('[SampleEditor] cannot play: audioBuffer has no duration');

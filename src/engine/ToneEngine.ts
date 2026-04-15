@@ -2778,6 +2778,13 @@ export class ToneEngine {
       return;
     }
 
+    // Resume audio context if suspended (prevents first keypress silence)
+    // Do this synchronously before any timing checks
+    const ctx = this._nativeContext;
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => { /* safe to ignore - requires user gesture */ });
+    }
+
     // Get safe time for the attack.
     // isLive instruments (and SuperCollider which ignores the time param) always use immediate
     // triggering to bypass the Tone.js lookahead buffer and the getSafeTime null-check.
