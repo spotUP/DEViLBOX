@@ -223,6 +223,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const engine = getToneEngine();
         engine.ensureInstrumentReady(inst);
       });
+      // Apply per-instrument default octave (e.g. bass synths start at octave 2)
+      if (inst.defaultOctave !== undefined) {
+        import('./useEditorStore').then(({ useEditorStore }) => {
+          useEditorStore.getState().setCurrentOctave(inst.defaultOctave!);
+        }).catch(() => { /* ignore if store not ready */ });
+      }
       // Auto-enable 303 flag columns when selecting a TB-303/Buzz3o3 instrument
       if (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3') {
         import('./useEditorStore').then(({ useEditorStore }) => {

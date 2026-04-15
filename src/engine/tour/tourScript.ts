@@ -740,34 +740,249 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Let me switch to a different synth. How about a TB-303 acid bass line.',
     action: async () => {
       await closeModals();
-      await createAndSelectInstrument('TB303', 'Acid Bass');
     },
     postDelay: 500,
   },
   {
-    id: 'synth-303-editor',
-    narration: '',
+    id: 'acid-setup',
+    narration: 'I will import a classic acid pattern from a Behringer TD-3 sequence file. Phuture, Acid Trax. The record that started it all.',
     action: async () => {
+      const { useTrackerStore } = await import('@/stores/useTrackerStore');
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const id = useInstrumentStore.getState().currentInstrumentId;
-      if (id != null) await openInstrumentEditor(id);
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      const { useEditorStore } = await import('@/stores/useEditorStore');
+      const { stringNoteToXM } = await import('@/lib/xmConversions');
+      const { parseTD3File, convertTD3PatternToDbox } = await import('@/lib/import/TD3PatternLoader');
+
+      // Stop anything playing
+      useTransportStore.getState().stop();
+
+      // Create TB-303 instrument (id will be assigned)
+      const acid303Id = await createAndSelectInstrument('TB303', 'Acid 303');
+      if (acid303Id == null) return;
+
+      // Create a simple kick drum instrument
+      const kickId = useInstrumentStore.getState().createInstrument({
+        synthType: 'Synth',
+        name: 'Kick',
+        oscillator: { type: 'triangle', detune: 0, octave: 0 },
+        envelope: { attack: 1, decay: 200, sustain: 0, release: 50 },
+        pitchEnvelope: { enabled: true, amount: 48, attack: 0, decay: 40, sustain: 0, release: 10 },
+        volume: -4,
+        pan: 0,
+      } as any);
+
+      // Create a simple hihat instrument
+      const hihatId = useInstrumentStore.getState().createInstrument({
+        synthType: 'NoiseSynth',
+        name: 'HiHat',
+        envelope: { attack: 0.5, decay: 60, sustain: 0, release: 30 },
+        filter: { type: 'highpass', frequency: 8000, Q: 1 },
+        volume: -14,
+        pan: 0,
+      } as any);
+
+      // Normalize note strings to XM format (e.g., "C2" → "C-2", "D#2" stays "D#2")
+      const normNote = (n: string | null): string | null => {
+        if (!n) return null;
+        // If no sharp and second char is a digit, insert dash: "C2" → "C-2"
+        if (n.length === 2 && /^[A-G]\d$/.test(n)) return `${n[0]}-${n[1]}`;
+        return n;
+      };
+
+      // Fetch and parse the TD-3 pattern
+      let acidRows: Array<{ note: string | null; accent: boolean; slide: boolean }> = [];
+      try {
+        const resp = await fetch('/data/songs/behringer-td-3/Phuture \u200E- Acid Traxx.seq');
+        if (resp.ok) {
+          const buf = await resp.arrayBuffer();
+          const td3File = await parseTD3File(buf);
+          if (td3File.patterns.length > 0) {
+            const converted = convertTD3PatternToDbox(td3File.patterns[0], 2);
+            acidRows = converted.rows;
+          }
+        }
+      } catch (err) {
+        console.warn('[Tour] TD-3 import failed, using fallback pattern:', err);
+      }
+      // Fallback if import fails
+      if (acidRows.length === 0) {
+        acidRows = [
+          { note: 'C-2', accent: false, slide: false },
+          { note: 'C-2', accent: false, slide: false },
+          { note: null, accent: false, slide: false },
+          { note: 'C-2', accent: true, slide: false },
+          { note: 'D#2', accent: false, slide: true },
+          { note: 'C-2', accent: false, slide: false },
+          { note: null, accent: false, slide: false },
+          { note: 'C-2', accent: true, slide: false },
+          { note: 'G-2', accent: false, slide: true },
+          { note: 'F-2', accent: false, slide: true },
+          { note: 'D#2', accent: false, slide: false },
+          { note: 'C-2', accent: true, slide: false },
+          { note: null, accent: false, slide: false },
+          { note: 'C-2', accent: false, slide: false },
+          { note: 'D#2', accent: false, slide: true },
+          { note: 'C-2', accent: false, slide: false },
+        ];
+      }
+
+      // Build a 3-channel, 32-row pattern (2 bars at speed 6)
+      const patLength = 32;
+      const emptyCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+
+      // Channel 1: TB-303 acid pattern (repeat the 16-step TD-3 pattern twice)
+      const ch1Rows = [];
+      for (let i = 0; i < patLength; i++) {
+        const src = acidRows[i % acidRows.length];
+        if (src?.note) {
+          ch1Rows.push({
+            ...emptyCell,
+            note: stringNoteToXM(normNote(src.note)),
+            instrument: acid303Id,
+            flag1: src.accent ? 1 : undefined,
+            flag2: src.slide ? 2 : undefined,
+          });
+        } else {
+          ch1Rows.push({ ...emptyCell });
+        }
+      }
+
+      // Channel 2: 4-on-the-floor kick (every 4 rows at speed 6 = quarter notes)
+      const ch2Rows = [];
+      for (let i = 0; i < patLength; i++) {
+        if (i % 4 === 0) {
+          ch2Rows.push({ ...emptyCell, note: stringNoteToXM('C-2'), instrument: kickId });
+        } else {
+          ch2Rows.push({ ...emptyCell });
+        }
+      }
+
+      // Channel 3: 8th-note hihats (every 2 rows)
+      const ch3Rows = [];
+      for (let i = 0; i < patLength; i++) {
+        if (i % 2 === 0) {
+          ch3Rows.push({ ...emptyCell, note: stringNoteToXM('C-4'), instrument: hihatId });
+        } else {
+          ch3Rows.push({ ...emptyCell });
+        }
+      }
+
+      const pattern = {
+        id: 'acid-demo-pattern',
+        name: 'Acid Demo',
+        length: patLength,
+        channels: [
+          { id: 'ch-303', name: 'Acid 303', rows: ch1Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: acid303Id, color: '#ec4899' },
+          { id: 'ch-kick', name: 'Kick', rows: ch2Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: kickId, color: '#f59e0b' },
+          { id: 'ch-hat', name: 'HiHat', rows: ch3Rows, muted: false, solo: false, collapsed: false, volume: 80, pan: 0, instrumentId: hihatId, color: '#6ee7b7' },
+        ],
+      };
+
+      useTrackerStore.getState().loadPatterns([pattern as any]);
+      useTransportStore.getState().setBPM(138);
+      useTransportStore.getState().setSpeed(6);
+      useEditorStore.getState().setColumnVisibility({ flag1: true, flag2: true });
+
+      // Re-select the 303 so octave goes to 2
+      useInstrumentStore.getState().setCurrentInstrument(acid303Id);
     },
-    postDelay: 1000,
+    postDelay: 1500,
   },
   {
-    id: 'synth-303-play',
-    narration: '',
+    id: 'acid-play',
+    narration: 'Four on the floor kick, hi-hats, and the 303. Let it rip.',
+    action: async () => {
+      await trackerPlay();
+    },
+    postDelay: 4000,
+  },
+  {
+    id: 'acid-tweak',
+    narration: 'Now watch what happens when I start turning the knobs. Cutoff. Resonance. Envelope mod. This is what makes the 303 scream.',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const id = useInstrumentStore.getState().currentInstrumentId;
-      if (id == null) return;
-      // 303-style acid sequence
-      const notes = ['C2', 'C2', 'Eb2', 'F2', 'F2', 'Ab2', 'Bb2', 'C3'];
-      for (let i = 0; i < notes.length; i++) {
-        setTimeout(() => playInstrumentNote(id, notes[i], 180), i * 200);
+
+      const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
+      if (!inst) return;
+      const id = inst.id;
+
+      // Animate knob sweeps over ~10 seconds
+      // Phase 1 (0-3s): Sweep cutoff up from 0.3 → 0.9
+      // Phase 2 (3-6s): Crank resonance from 0.5 → 0.95
+      // Phase 3 (6-9s): Sweep envMod up from 0.5 → 0.95, decay down from 0.5 → 0.15
+      // Phase 4 (9-11s): Everything cranked — the scream
+      const steps = 60;
+      const intervalMs = 180;
+      let step = 0;
+
+      const tweakInterval = setInterval(() => {
+        if (step >= steps) {
+          clearInterval(tweakInterval);
+          return;
+        }
+        const t = step / steps; // 0 → 1
+
+        let cutoff: number, resonance: number, envMod: number, decay: number;
+
+        if (t < 0.3) {
+          // Phase 1: open the filter
+          const p = t / 0.3;
+          cutoff = 0.3 + p * 0.6;
+          resonance = 0.5;
+          envMod = 0.5;
+          decay = 0.5;
+        } else if (t < 0.6) {
+          // Phase 2: crank resonance
+          const p = (t - 0.3) / 0.3;
+          cutoff = 0.9 - p * 0.4; // bring cutoff back down to let reso shine
+          resonance = 0.5 + p * 0.45;
+          envMod = 0.5 + p * 0.2;
+          decay = 0.5;
+        } else if (t < 0.85) {
+          // Phase 3: envMod and decay for the scream
+          const p = (t - 0.6) / 0.25;
+          cutoff = 0.5 - p * 0.2;
+          resonance = 0.95;
+          envMod = 0.7 + p * 0.25;
+          decay = 0.5 - p * 0.35;
+        } else {
+          // Phase 4: full acid — everything cranked
+          cutoff = 0.3;
+          resonance = 0.95;
+          envMod = 0.95;
+          decay = 0.15;
+        }
+
+        useInstrumentStore.getState().updateInstrument(id, {
+          tb303: {
+            filter: { cutoff, resonance },
+            filterEnvelope: { envMod, decay },
+          },
+        });
+        step++;
+      }, intervalMs);
+    },
+    postDelay: 12000,
+  },
+  {
+    id: 'acid-stop',
+    narration: 'That is the sound of acid house. Born in Chicago, 1987.',
+    action: async () => {
+      await trackerStop();
+      // Reset 303 to defaults
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
+      if (inst) {
+        useInstrumentStore.getState().updateInstrument(inst.id, {
+          tb303: {
+            filter: { cutoff: 0.5, resonance: 0.5 },
+            filterEnvelope: { envMod: 0.5, decay: 0.5 },
+          },
+        });
       }
     },
-    postDelay: 2500,
+    postDelay: 2000,
   },
 
   // ── Act 3b: Sample Editor Deep Dive ─────────────────────────────────────
