@@ -38,19 +38,59 @@ async function loadTrackerSong(path: string): Promise<void> {
     const filename = path.split('/').pop() || 'song';
     const file = new File([buf], filename, { type: 'application/octet-stream' });
 
-    // loadFile() for .mod/.xm/.it returns 'pending-import' — expecting the
-    // ImportModuleDialog to handle it. We bypass that dialog by calling
-    // importTrackerModule directly (the same function the dialog calls).
-    const { loadFile, importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
-    const result = await loadFile(file, { requireConfirmation: false });
+    const { detectFormat } = await import('@/lib/import/FormatRegistry');
+    const fmt = detectFormat(filename);
 
-    if (result.success === 'pending-import') {
-      // Module needs the import pipeline — parse and import directly
-      const { loadModuleFile } = await import('@/lib/import/ModuleLoader');
-      const info = await loadModuleFile(file);
-      await importTrackerModule(info, { useLibopenmpt: false });
-    } else if (!result.success) {
-      console.warn('[Tour] loadFile failed:', result.error);
+    // Formats with a nativeParser (AHX/HVL, FC, Symphonie, etc.) must go
+    // through parseModuleToSong directly — loadModuleFile would try libopenmpt
+    // which doesn't support them.
+    if (fmt?.nativeParser) {
+      const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+      const { useTrackerStore } = await import('@/stores/useTrackerStore');
+      const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      const { useProjectStore } = await import('@/stores/useProjectStore');
+      const { useFormatStore } = await import('@/stores/useFormatStore');
+      const { getToneEngine } = await import('@/engine/ToneEngine');
+
+      const song = await parseModuleToSong(file);
+      const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+      const { loadInstruments } = useInstrumentStore.getState();
+      const { setBPM, setSpeed } = useTransportStore.getState();
+      const { setMetadata } = useProjectStore.getState();
+      const { applyEditorMode, setOriginalModuleData } = useFormatStore.getState();
+
+      loadInstruments(song.instruments);
+      loadPatterns(song.patterns);
+      setCurrentPattern(0);
+      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+      setOriginalModuleData({
+        base64: '',
+        format: (song.format || 'UNKNOWN') as any,
+        initialBPM: song.initialBPM,
+        initialSpeed: song.initialSpeed,
+        songLength: song.songLength,
+      } as any);
+      setBPM(song.initialBPM);
+      setSpeed(song.initialSpeed);
+      setMetadata({ name: song.name, author: '', description: `Imported from ${filename}` });
+      applyEditorMode(song);
+
+      const engine = getToneEngine();
+      const hasWasmSynths = song.instruments.some(i => i.synthType && i.synthType !== 'Sampler' && i.synthType !== 'Synth');
+      if (hasWasmSynths) await engine.preloadInstruments(song.instruments);
+    } else {
+      // Standard formats (MOD/XM/IT/S3M) — use loadFile + importTrackerModule
+      const { loadFile, importTrackerModule } = await import('@/lib/file/UnifiedFileLoader');
+      const result = await loadFile(file, { requireConfirmation: false });
+
+      if (result.success === 'pending-import') {
+        const { loadModuleFile } = await import('@/lib/import/ModuleLoader');
+        const info = await loadModuleFile(file);
+        await importTrackerModule(info, { useLibopenmpt: true });
+      } else if (!result.success) {
+        console.warn('[Tour] loadFile failed:', result.error);
+      }
     }
 
     // Give the engine a moment to finish setting up channels/instruments
