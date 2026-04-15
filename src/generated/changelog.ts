@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-14T14:05:21.093Z
+ * Generated: 2026-04-15T06:56:33.329Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5254';
-export const BUILD_NUMBER = '5254';
-export const BUILD_HASH = 'efee0b3b1';
-export const BUILD_DATE = '2026-04-14';
+export const BUILD_VERSION = '1.0.5287';
+export const BUILD_NUMBER = '5287';
+export const BUILD_HASH = '2452748fe';
+export const BUILD_DATE = '2026-04-15';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,147 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5254',
+    version: '1.0.5287',
+    date: '2026-04-15',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix drumpad bugs: stutter routing, copy/paste, touch handling"
+      },
+      {
+        type: 'feature',
+        "description": "Advanced sample editor demo, subtitle fade, Kraftwerk mouth fix"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace deprecated ScriptProcessor with delay-based stutter"
+      },
+      {
+        type: 'feature',
+        "description": "Interactive drumpad/synth demo, subtitle fade fix, Kraftwerk mouth"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove dead padMode code from drumpad store"
+      },
+      {
+        type: 'fix',
+        "description": "Cut/edit operations now update engine sample"
+      },
+      {
+        type: 'fix',
+        "description": "Fix stutter DJ FX not connecting to master audio"
+      },
+      {
+        type: 'feature',
+        "description": "Add preset selection to drumpad synth assignment"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker song loading bypasses import dialog"
+      },
+      {
+        type: 'feature',
+        "description": "Add full synth browser to drumpad context menu"
+      },
+      {
+        type: 'fix',
+        "description": "Tour DJ loading uses proper pipeline render path"
+      }
+    ]
+  },
+  {
+    version: '2026-04-14',
     date: '2026-04-14',
     changes: [
+      {
+        type: 'feature',
+        "description": "Interactive hands-on tour with voice FX and subtitle fade"
+      },
+      {
+        type: 'feature',
+        "description": "Tour enhancements — demo song, Kraftwerk head, spotlight"
+      },
+      {
+        type: 'fix',
+        "description": "Tour skip resolves delay promise to prevent loop hang"
+      },
+      {
+        type: 'feature',
+        "description": "Guided tour with DECtalk voiceover and subtitles"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ROM speech synths in drumpad context menu"
+      },
+      {
+        type: 'fix',
+        "description": "Make Kraftwerk head spikes visible — correct coordinate space"
+      },
+      {
+        type: 'feature',
+        "description": "Add all speech synths to drumpad context menu"
+      },
+      {
+        type: 'improvement',
+        "description": "Prevent drum pads from triggering on right-click"
+      },
+      {
+        type: 'feature',
+        "description": "Add full one-shot preset selection to pad context menu"
+      },
+      {
+        type: 'fix',
+        "description": "Deep audit — 6 issues fixed across VJ pipeline"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove mode tabs entirely - bank-based organization only"
+      },
+      {
+        type: 'fix',
+        "description": "Replace fade-to-black with preload strategy for smooth transitions"
+      },
+      {
+        type: 'improvement',
+        "description": "Show all DJ presets in all modes for better bank organization"
+      },
+      {
+        type: 'fix',
+        "description": "Hide shader compilation behind fade-to-black overlay"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove test file"
+      },
+      {
+        type: 'improvement',
+        "description": "Show empty pads as 'Empty' instead of mode mapping placeholders"
+      },
+      {
+        type: 'fix',
+        "description": "Hide pattern overlay for formats without real pattern data"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DJ FX pad display: show actual pad names/colors when loaded"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate frame drops during transitions and playback"
+      },
+      {
+        type: 'fix',
+        "description": "Playlist reorder selection, post-limiter metering, import error handling"
+      },
+      {
+        type: 'fix',
+        "description": "VJ popout now works - was missing from DOM mode render"
+      },
+      {
+        type: 'fix',
+        "description": "DJ/DrumPad audit round 4 - EQ kill clicks, atomic IDB save, AutoDJ resilience"
+      },
       {
         type: 'fix',
         "description": "Debug: add logging inside PopOutWindow conditional"
@@ -100,138 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Auto-repair SID playlists on store load"
-      },
-      {
-        type: 'fix',
-        "description": "Close AutoDJ dialog + playlist panel when starting Auto DJ"
-      },
-      {
-        type: 'fix',
-        "description": "HVSC SIDs can now be added to DJ playlists"
-      },
-      {
-        type: 'feature',
-        "description": "Add search + category filter to DJ FX preset selector"
-      },
-      {
-        type: 'feature',
-        "description": "Add HVSC (C64 SID) support to DJ auto-download pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "UADE companion support, Play from here, network abort for analyzer"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove MoogFilter diagnostic logging spam"
-      },
-      {
-        type: 'fix',
-        "description": "Dropdown menu matches trigger button width"
-      },
-      {
-        type: 'fix',
-        "description": "Audit all FX presets — fix 10 neural amp clipping/artefact risks"
-      },
-      {
-        type: 'fix',
-        "description": "Add 404 auto-fix to precache process"
-      },
-      {
-        type: 'feature',
-        "description": "Add WebSID C64 SID rendering to DJ view + sync AMIGA_EXTENSIONS"
-      },
-      {
-        type: 'fix',
-        "description": "BadCat Jazz squeaky glitch — reduce drive/level/wet"
-      },
-      {
-        type: 'fix',
-        "description": "High Gain Mesa beep — swap to Splawn OD, reduce drive/level"
-      },
-      {
-        type: 'fix',
-        "description": "Crunch Marshall beep — swap SM57 mic model to clean DI model"
-      },
-      {
-        type: 'fix',
-        "description": "Mark failed tracks as bad during precache, remove debug logging"
-      },
-      {
-        type: 'fix',
-        "description": "WAM prefetch uses fetch() not import(), suppress effect rebuild spam"
-      },
-      {
-        type: 'improvement',
-        "description": "Smooth FX knobs — direct engine calls + throttled store writes"
-      },
-      {
-        type: 'fix',
-        "description": "Add button render debug logging and red border"
-      },
-      {
-        type: 'fix',
-        "description": "MasterEffectConfigs not proxied in _masterFxCtx — knobs saw empty map"
-      },
-      {
-        type: 'fix',
-        "description": "Add debug logging for cache button visibility"
-      },
-      {
-        type: 'feature',
-        "description": "Add tooltips to all playlist buttons and show Re-test Bad always"
-      },
-      {
-        type: 'fix',
-        "description": "Dragonfly gain comp, eliminate double compensation, unwrap wet updates"
-      },
-      {
-        type: 'fix',
-        "description": "Remove debug logging from context menu handler"
-      },
-      {
-        type: 'feature',
-        "description": "Add data-track-index to virtual scroll wrapper div"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: dev scripts, service worker, vite config, remove tinyplayer.exe"
-      },
-      {
-        type: 'feature',
-        "description": "Drumpad context menu, DJ FX crossfade, volume normalization"
-      },
-      {
-        type: 'fix',
-        "description": "FX preset tuning, gain-comp unwrap, neural amp 2x, WAM caching, chain race fix"
-      },
-      {
-        type: 'fix',
-        "description": "Add debug logging to context menu handler"
-      },
-      {
-        type: 'fix',
-        "description": "Fix context menu using onContextMenuCapture handler"
-      },
-      {
-        type: 'fix',
-        "description": "Tame harsh FX presets + 4× neural amp downsampling"
-      },
-      {
-        type: 'feature',
-        "description": "Add onContextMenuCapture to prevent browser context menu"
-      },
-      {
-        type: 'fix',
-        "description": "Fix playlist context menu - remove duplicate handler"
-      },
-      {
-        type: 'fix',
-        "description": "Fix UADE crash during pre-rendered track loading"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite ShimmerReverb DSP — true allpass, 4-head pitch shifter, Hermite interp"
       }
     ]
   }

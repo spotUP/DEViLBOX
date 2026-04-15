@@ -4280,6 +4280,11 @@ export class ToneEngine {
    * Call this when instrument config changes
    */
   public invalidateInstrument(instrumentId: number): void {
+    const keysToRemove: number[] = [];
+    this.instruments.forEach((_inst, key) => {
+      if (this.instrumentIdFromKey(key) === instrumentId) keysToRemove.push(key);
+    });
+    console.log(`[ToneEngine] invalidateInstrument id=${instrumentId} disposing ${keysToRemove.length} instances`);
     this.disposeInstrument(instrumentId);
   }
 
