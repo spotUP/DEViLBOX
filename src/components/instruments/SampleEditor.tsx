@@ -161,6 +161,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const onPersistBuffer = useCallback(
     async (buffer: AudioBuffer, label: string) => {
       const dataUrl = await bufferToDataUrl(buffer);
+      console.log(`[SampleEditor] onPersistBuffer: label="${label}" bufDur=${buffer.duration.toFixed(3)}s dataUrlLen=${dataUrl.length} hasSample=${!!instrument.sample} sampleUrl=${instrument.sample?.url?.substring(0, 60)}...`);
       const updates: Parameters<typeof updateInstrument>[1] = {
         parameters: {
           ...instrument.parameters,
@@ -184,6 +185,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       if (instrument.sample) {
         updates.sample = { ...instrument.sample, url: dataUrl };
       }
+      console.log(`[SampleEditor] onPersistBuffer: updates.sample set=${!!updates.sample} newUrlLen=${dataUrl.length}`);
       updateInstrument(instrument.id, updates);
 
       // Write-back to UADE chip RAM when editing a UADE enhanced-mode sample.
