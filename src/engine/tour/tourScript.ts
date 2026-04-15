@@ -454,32 +454,6 @@ async function triggerDrumPad(padId: number, note?: string, velocity = 0.85): Pr
   }
 }
 
-/** Play a rhythmic pattern on 808 pads */
-async function play808Pattern(): Promise<void> {
-  // Simple boom-bap pattern: kick, hat, snare, hat (repeating)
-  const pattern = [
-    { pad: 1, delay: 0 },      // Kick
-    { pad: 5, delay: 200 },    // Closed hat
-    { pad: 2, delay: 400 },    // Snare
-    { pad: 5, delay: 600 },    // Closed hat
-    { pad: 1, delay: 800 },    // Kick
-    { pad: 5, delay: 1000 },   // Closed hat
-    { pad: 2, delay: 1200 },   // Snare
-    { pad: 6, delay: 1400 },   // Open hat
-    // Second bar — with toms and cowbell
-    { pad: 1, delay: 1600 },   // Kick
-    { pad: 5, delay: 1800 },   // Closed hat
-    { pad: 2, delay: 2000 },   // Snare
-    { pad: 12, delay: 2100 },  // Cowbell
-    { pad: 1, delay: 2400 },   // Kick
-    { pad: 8, delay: 2600 },   // Mid tom
-    { pad: 2, delay: 2800 },   // Snare
-    { pad: 3, delay: 3000 },   // Clap
-  ];
-  for (const hit of pattern) {
-    setTimeout(() => triggerDrumPad(hit.pad), hit.delay);
-  }
-}
 
 /** Switch to the 808 program */
 async function loadDrumProgram(programId: string): Promise<void> {
@@ -1197,7 +1171,16 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'drumpad-808-beat',
     narration: '',
-    action: play808Pattern,
+    action: async () => {
+      // Trigger a few individual hits to demonstrate the pads
+      await triggerDrumPad(1); // Kick
+      await new Promise(r => setTimeout(r, 300));
+      await triggerDrumPad(5); // Closed hat
+      await new Promise(r => setTimeout(r, 300));
+      await triggerDrumPad(2); // Snare
+      await new Promise(r => setTimeout(r, 300));
+      await triggerDrumPad(5); // Closed hat
+    },
     spotlight: '[data-pad-id]',
     postDelay: 3500,
   },
@@ -1258,7 +1241,7 @@ export const TOUR_SCRIPT: TourStep[] = [
   {
     id: 'dj-load-b',
     narration: 'Searching for another module. Loading deck B.',
-    action: () => searchAndLoadModland('4mat eternity', 'B'),
+    action: () => searchAndLoadModland('walkman kansen', 'B'),
     postDelay: 2000,
   },
   {
@@ -1318,10 +1301,10 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-archives-modland',
-    narration: 'Searching for Jogeir Liljedahl. Loading into deck A.',
+    narration: 'Searching for Lizardking. Loading into deck A.',
     action: async () => {
       await djStopAll();
-      await searchAndLoadModland('jogeir liljedahl', 'A');
+      await searchAndLoadModland('lizardking', 'A');
     },
     postDelay: 1500,
   },
@@ -1402,19 +1385,22 @@ export const TOUR_SCRIPT: TourStep[] = [
       switchView('vj');
     },
     showHead: true,
-    postDelay: 3000,
+    postDelay: 1500,
   },
   {
     id: 'vj-head-demo',
     narration: 'Hello. I am DEViLBOX. I can see you. Can you see me?',
     showHead: true,
-    postDelay: 2000,
+    postDelay: 1000,
   },
   {
     id: 'vj-cleanup',
     narration: '',
-    action: () => disableHead(),
-    postDelay: 100,
+    action: () => {
+      disableHead();
+      switchView('tracker');
+    },
+    postDelay: 500,
   },
 
   // ── Act 9: Automation ──────────────────────────────────────────────────
