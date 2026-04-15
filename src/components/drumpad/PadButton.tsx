@@ -300,9 +300,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
         {pad.muteGroup > 0 && (
           <span className="text-[8px] font-mono text-amber-400/70">M{pad.muteGroup}</span>
         )}
-        {pad.playMode === 'sustain' && (
-          <span className="text-[8px] font-mono text-blue-400/70">S</span>
-        )}
         {pad.reverse && (
           <span className="text-[8px] font-mono text-purple-400/70">R</span>
         )}
