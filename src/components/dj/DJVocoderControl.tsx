@@ -33,7 +33,7 @@ export const DJVocoderControl: React.FC = () => {
   const fxPreset = useVocoderStore(s => s.fx.preset);
   const globalPTT = useVocoderStore(s => s.pttActive);
   const [error, setError] = useState<string | null>(null);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [duckingEnabled, setDuckingEnabled] = useState(true);
   const [realTuneEnabled, setRealTuneEnabled] = useState(false);
   const [tuneKey, setTuneKey] = useState(0);
