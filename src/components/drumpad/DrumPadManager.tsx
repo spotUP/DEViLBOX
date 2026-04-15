@@ -49,6 +49,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
   const [selectedPadId, setSelectedPadId] = useState<number | null>(null);
   const [showSampleBrowser, setShowSampleBrowser] = useState(false);
   const [showPadEditor, setShowPadEditor] = useState(false);
+  const [padEditorShowSamples, setPadEditorShowSamples] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -344,6 +345,12 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 <PadGrid
                   onPadSelect={(id) => {
                     setSelectedPadId(id);
+                    setPadEditorShowSamples(false);
+                    setShowPadEditor(true);
+                  }}
+                  onLoadSample={(id) => {
+                    setSelectedPadId(id);
+                    setPadEditorShowSamples(true);
                     setShowPadEditor(true);
                   }}
                   selectedPadId={selectedPadId}
@@ -375,6 +382,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               <PadEditor
                 padId={selectedPadId}
                 onClose={() => setShowPadEditor(false)}
+                initialShowSampleBrowser={padEditorShowSamples}
               />
             </div>
           </div>

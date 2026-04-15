@@ -135,10 +135,6 @@ function buildLoadedPadMenu(
 
   // ── Pad config section ───────────────────────────────────────────────────
   items.push({
-    id: 'playmode', label: 'Play Mode',
-    submenu: buildPlayModeSubmenu(padId, pad.playMode, store),
-  });
-  items.push({
     id: 'mutegroup', label: 'Mute Group',
     submenu: buildMuteGroupSubmenu(padId, pad.muteGroup, store),
   });
@@ -648,27 +644,6 @@ function assignROMSpeech(
     instrumentNote: 'C4',
     playMode: 'oneshot',
   });
-}
-
-// ── Play Mode submenu ───────────────────────────────────────────────────────
-
-function buildPlayModeSubmenu(
-  padId: number,
-  current: string,
-  store: ReturnType<typeof useDrumPadStore.getState>,
-): MenuItemType[] {
-  return [
-    {
-      id: 'pm-oneshot', label: 'One-shot',
-      radio: true, checked: current === 'oneshot',
-      onClick: () => store.updatePad(padId, { playMode: 'oneshot' }),
-    },
-    {
-      id: 'pm-sustain', label: 'Sustain (hold to play)',
-      radio: true, checked: current === 'sustain',
-      onClick: () => store.updatePad(padId, { playMode: 'sustain' }),
-    },
-  ];
 }
 
 // ── Mute Group submenu ──────────────────────────────────────────────────────
