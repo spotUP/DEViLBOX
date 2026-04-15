@@ -44,6 +44,10 @@ class MIDIManager {
   private clockSyncEnabled: boolean = false;
   private clockSyncCallbacks: Set<(bpm: number) => void> = new Set();
   private transportCallbacks: Set<(command: 'start' | 'stop' | 'continue') => void> = new Set();
+  private sysexEnabled: boolean = false;
+
+  /** Whether SysEx messages can be sent (requires sysex permission at init) */
+  isSysexEnabled(): boolean { return this.sysexEnabled; }
 
   private constructor() {
     // Private constructor for singleton
@@ -85,6 +89,7 @@ class MIDIManager {
       console.log(`[MIDIManager] Initializing MIDI (mobile: ${isMobile}, sysex: ${!isMobile})`);
 
       this.midiAccess = await navigator.requestMIDIAccess({ sysex: !isMobile });
+      this.sysexEnabled = !isMobile;
 
       // Set up device tracking
       this.updateDevices();
@@ -519,22 +524,16 @@ class MIDIManager {
    * Send SysEx message
    */
   sendSysEx(data: Uint8Array): void {
-    if (!this.selectedOutputId) {
-      console.warn('[MIDIManager] No output device selected for SysEx');
-      return;
-    }
+    if (!this.sysexEnabled) return;
+    if (!this.selectedOutputId) return;
 
     const output = this.outputs.get(this.selectedOutputId);
-    if (!output) {
-      console.warn('[MIDIManager] Output device not found');
-      return;
-    }
+    if (!output) return;
 
     try {
       output.send(data);
-    } catch (error) {
-      console.error('[MIDIManager] Failed to send SysEx:', error);
-      throw error;
+    } catch {
+      // SysEx send can fail if permission was revoked or device disconnected — ignore
     }
   }
 
