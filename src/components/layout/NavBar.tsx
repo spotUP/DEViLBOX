@@ -129,6 +129,16 @@ const NavBarComponent: React.FC = () => {
             <Lightbulb size={14} />
             <span className="text-xs font-bold uppercase tracking-tight">Tips</span>
           </button>
+          {!tourActive && (
+            <button
+              onClick={handleStartTour}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 transition-colors"
+              title="Start guided tour (Ctrl+Shift+T)"
+            >
+              <Play size={14} />
+              <span className="text-xs font-bold uppercase tracking-tight">Tour</span>
+            </button>
+          )}
         </div>
 
         {/* Right: MIDI, Theme Switcher and Master Volume */}
@@ -206,20 +216,6 @@ const NavBarComponent: React.FC = () => {
             options={VIEW_OPTIONS.map((v) => ({ value: v.value, label: v.label }))}
             title="Switch view"
           />
-
-          {/* Guided Tour */}
-          {!tourActive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleStartTour}
-              icon={<Play size={14} />}
-              iconPosition="left"
-              title="Start guided tour (Ctrl+Shift+T)"
-            >
-              <span className="hidden sm:inline">Tour</span>
-            </Button>
-          )}
 
           {/* Settings */}
           <Button

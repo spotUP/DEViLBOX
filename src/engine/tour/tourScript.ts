@@ -606,7 +606,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Let me show you the synth engines. Over 120 to choose from.',
     action: async () => {
       switchView('tracker');
-      await createAndSelectInstrument('Amsynth', 'Tour Pad');
+      await createAndSelectInstrument('DuoSynth', 'Tour Lead');
     },
     postDelay: 500,
   },
@@ -627,10 +627,10 @@ export const TOUR_SCRIPT: TourStep[] = [
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const id = useInstrumentStore.getState().currentInstrumentId;
       if (id == null) return;
-      // Play an ascending riff
+      // Play an ascending riff — release each note before the next
       const notes = ['C4', 'E4', 'G4', 'C5', 'G4', 'E4'];
       for (let i = 0; i < notes.length; i++) {
-        setTimeout(() => playInstrumentNote(id, notes[i], 350), i * 300);
+        setTimeout(() => playInstrumentNote(id, notes[i], 250), i * 300);
       }
     },
     postDelay: 2500,

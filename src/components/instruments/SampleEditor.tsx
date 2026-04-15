@@ -53,7 +53,7 @@ import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
 import { UADEDebuggerPanel } from './controls/UADEDebuggerPanel';
 import { SampleLoopEditor } from './SampleLoopEditor';
 import { useInstrumentPlaybackState } from '../../hooks/useInstrumentPlaybackState';
-import { getInstrumentLastAttack } from '@/engine/instrumentPlaybackTracker';
+import { getInstrumentLastAttack, isInstrumentReleased } from '@/engine/instrumentPlaybackTracker';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -378,6 +378,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       if (lastAttack !== null && lastAttack !== lastSeenAttack) {
         lastSeenAttack = lastAttack;
         attackCtxTime = lastAttack;
+      }
+
+      // Clear playhead when key is released
+      if (lastSeenAttack > 0 && isInstrumentReleased(instrument.id)) {
+        lastSeenAttack = -1;
+        drawPlayhead(0);
+        rafId = requestAnimationFrame(tick);
+        return;
       }
 
       if (lastSeenAttack > 0) {
