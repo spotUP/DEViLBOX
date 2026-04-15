@@ -164,9 +164,9 @@ export class DubSirenSynth implements DevilboxSynth {
       this.signal.setValueAtTime(freq, t);
     }
 
-    // Open gate instantly (button press)
+    // Anti-click: 2ms exponential ramp (~6ms to 95%) instead of instant jump
     this.gate.gain.cancelScheduledValues(t);
-    this.gate.gain.setValueAtTime(1, t);
+    this.gate.gain.setTargetAtTime(1, t, 0.002);
   }
 
   /**
@@ -174,9 +174,9 @@ export class DubSirenSynth implements DevilboxSynth {
    */
   triggerRelease(time?: number) {
     const t = time || audioNow();
-    // Close gate instantly (button release)
+    // Anti-click: 2ms exponential ramp instead of instant jump
     this.gate.gain.cancelScheduledValues(t);
-    this.gate.gain.setValueAtTime(0, t);
+    this.gate.gain.setTargetAtTime(0, t, 0.002);
   }
 
   /**
