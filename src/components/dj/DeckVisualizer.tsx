@@ -34,9 +34,9 @@ import {
 
 /**
  * Visualizer-only modes (pattern is always an overlay, not a standalone mode).
- * Starts from index 1 of VISUALIZER_MODES to skip 'pattern'.
+ * Filters out 'pattern'. 'none' = blank background (default).
  */
-const VIZ_MODES = VISUALIZER_MODES.slice(1);
+const VIZ_MODES = VISUALIZER_MODES.filter(m => m !== 'pattern');
 const SLIDESHOW_INTERVAL_MS = 15_000; // 15s per mode in slideshow
 
 interface DeckVisualizerProps {
@@ -223,7 +223,12 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
         const audio = buildAudioData(viz.getWaveform, viz.getFFT);
         const time = performance.now() / 1000 - startTimeRef.current;
         const renderer = RENDERERS[mode as WebGLVisualizerMode];
-        if (renderer) renderer(cache, audio, state, time, drawW, drawH);
+        if (renderer) {
+          renderer(cache, audio, state, time, drawW, drawH);
+        } else {
+          gl.clearColor(0, 0, 0, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
       }
       rafRef.current = requestAnimationFrame(frame);
     };
