@@ -52,8 +52,10 @@ export const MixerCrossfader: React.FC = () => {
             step={0.005}
             value={position}
             onChange={handlePositionChange}
+            onContextMenu={(e) => { e.preventDefault(); DJActions.setCrossfader(0.5); }}
+            onDoubleClick={() => DJActions.setCrossfader(0.5)}
             className="crossfader-slider w-full"
-            title={`Crossfader — blend between Deck 1 and Deck 2`}
+            title={`Crossfader — blend between Deck 1 and Deck 2. Right-click to center.`}
             style={{
               appearance: 'none',
               WebkitAppearance: 'none',
