@@ -129,8 +129,8 @@ function createCollectionFromSynthPresets(
 }
 
 /**
- * Generate ROM word presets from MAME speech chip parameters.
- * Each ROM word becomes a selectable preset that sets the romWord parameter.
+ * Generate ROM speech presets from MAME speech chip parameters.
+ * Uses the merged romSpeech selector (phrases first, then words).
  */
 function createRomWordCollection(
   synthType: string,
@@ -139,56 +139,32 @@ function createRomWordCollection(
   const chipParams = (CHIP_SYNTH_DEFS as Record<string, any>)[synthType];
   if (!chipParams?.parameters) return { name: displayName, category: 'speech', presets: [] };
 
-  const romWordParam = chipParams.parameters.find((p: any) => p.key === 'romWord');
-  const romPhraseParam = chipParams.parameters.find((p: any) => p.key === 'romPhrase');
-  if (!romWordParam?.options && !romPhraseParam?.options) return { name: displayName, category: 'speech', presets: [] };
+  const romSpeechParam = chipParams.parameters.find((p: any) => p.key === 'romSpeech');
+  if (!romSpeechParam?.options) return { name: displayName, category: 'speech', presets: [] };
 
   const presets: PresetMetadata[] = [];
 
-  if (romWordParam?.options) {
-    for (const opt of romWordParam.options) {
-      presets.push({
-        id: `rom-${synthType.toLowerCase()}-word-${opt.value}`,
-        name: `${opt.label}`,
-        synthType,
-        category: 'speech',
-        description: `${chipParams.name} ROM word`,
-        tags: ['rom', 'speech'],
-        isFavorite: false,
-        config: {
-          type: 'synth' as const,
-          name: `${chipParams.shortName || chipParams.name} ${opt.label}`,
-          synthType: synthType as SynthType,
-          parameters: { mode: 1, romWord: opt.value, volume: 0.8 },
-          effects: [],
-          volume: -10,
-          pan: 0,
-        }
-      });
-    }
-  }
-
-  if (romPhraseParam?.options) {
-    for (const opt of romPhraseParam.options) {
-      presets.push({
-        id: `rom-${synthType.toLowerCase()}-phrase-${opt.value}`,
-        name: `[Phrase] ${opt.label}`,
-        synthType,
-        category: 'speech',
-        description: `${chipParams.name} ROM phrase`,
-        tags: ['rom', 'speech', 'phrase'],
-        isFavorite: false,
-        config: {
-          type: 'synth' as const,
-          name: `${chipParams.shortName || chipParams.name} ${opt.label}`,
-          synthType: synthType as SynthType,
-          parameters: { mode: 1, romPhrase: opt.value, volume: 0.8 },
-          effects: [],
-          volume: -10,
-          pan: 0,
-        }
-      });
-    }
+  for (const opt of romSpeechParam.options) {
+    const isPhrase = (opt.label as string).startsWith('▸');
+    const cleanLabel = isPhrase ? (opt.label as string).replace('▸ ', '') : opt.label;
+    presets.push({
+      id: `rom-${synthType.toLowerCase()}-${isPhrase ? 'phrase' : 'word'}-${opt.value}`,
+      name: isPhrase ? `[Phrase] ${cleanLabel}` : `${cleanLabel}`,
+      synthType,
+      category: 'speech',
+      description: `${chipParams.name} ROM ${isPhrase ? 'phrase' : 'word'}`,
+      tags: isPhrase ? ['rom', 'speech', 'phrase'] : ['rom', 'speech'],
+      isFavorite: false,
+      config: {
+        type: 'synth' as const,
+        name: `${chipParams.shortName || chipParams.name} ${cleanLabel}`,
+        synthType: synthType as SynthType,
+        parameters: { mode: 1, romSpeech: opt.value, volume: 0.8 },
+        effects: [],
+        volume: -10,
+        pan: 0,
+      }
+    });
   }
 
   return { name: displayName, category: 'speech', presets };

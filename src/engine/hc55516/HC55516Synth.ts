@@ -70,7 +70,8 @@ export class HC55516Synth extends MAMEBaseSynth {
   // ROM state
   private _romData: Uint8Array | null = null;
   private _romSentToWasm = false;
-  private _currentRomWord = 0;
+  private _currentRomSpeech = 0;  // merged selector: 0..6 = phrases, 7+ = words
+  private static readonly PHRASE_COUNT = 7;
 
   constructor() {
     super();
@@ -168,10 +169,9 @@ export class HC55516Synth extends MAMEBaseSynth {
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
 
-    // ROM speech mode: trigger ROM word on note-on
+    // ROM speech mode: trigger ROM speech on note-on
     if (this._romSentToWasm && this._mode === 1) {
-      const wordIndex = note >= 36 ? Math.min(note - 36, 8) : this._currentRomWord;
-      this._playROMWord(wordIndex);
+      this._playRomSpeech(this._currentRomSpeech);
       return;
     }
 
@@ -384,8 +384,19 @@ export class HC55516Synth extends MAMEBaseSynth {
     if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
-    if (param === 'romWord') { this._currentRomWord = Math.round(value); this._playROMWord(this._currentRomWord); }
-    if (param === 'romPhrase') this._playPhrase(Math.round(value));
+    if (param === 'romSpeech') {
+      this._currentRomSpeech = Math.round(value);
+      if (this._romSentToWasm) this._playRomSpeech(this._currentRomSpeech);
+    }
+  }
+
+  /** Play ROM speech — phrases (0..6) or individual words (7+) */
+  private _playRomSpeech(selection: number): void {
+    if (selection < HC55516Synth.PHRASE_COUNT) {
+      this._playPhrase(selection);
+    } else {
+      this._playROMWord(selection - HC55516Synth.PHRASE_COUNT);
+    }
   }
 
   /** Sinistar phrase sequences (word indices into SINISTAR_WORDS) */
