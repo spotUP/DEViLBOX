@@ -886,6 +886,25 @@ export const TOUR_SCRIPT: TourStep[] = [
 
       // Re-select the 303 so octave goes to 2
       useInstrumentStore.getState().setCurrentInstrument(acid303Id);
+
+      // Directly load the song into the replayer so playback works without
+      // waiting for the React usePatternPlayback effect to fire
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      const replayer = getTrackerReplayer();
+      const allInstruments = useInstrumentStore.getState().instruments;
+      replayer.loadSong({
+        name: 'Acid Demo',
+        format: 'XM',
+        patterns: [pattern as any],
+        instruments: allInstruments,
+        songPositions: [0],
+        songLength: 1,
+        restartPosition: 0,
+        numChannels: 3,
+        initialSpeed: 6,
+        initialBPM: 138,
+        linearPeriods: true,
+      });
     },
     postDelay: 1500,
   },
@@ -893,7 +912,13 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-play',
     narration: 'Four on the floor kick, hi-hats, and the 303. Let it rip.',
     action: async () => {
-      await trackerPlay();
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      const replayer = getTrackerReplayer();
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      // Set transport playing so the UI reflects playback state
+      useTransportStore.getState().play();
+      // Directly start the replayer
+      await replayer.play();
     },
     postDelay: 4000,
   },
@@ -969,7 +994,11 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-stop',
     narration: 'That is the sound of acid house. Born in Chicago, 1987.',
     action: async () => {
-      await trackerStop();
+      // Stop replayer directly + update transport state
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      getTrackerReplayer().stop();
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      useTransportStore.getState().stop();
       // Reset 303 to defaults
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
