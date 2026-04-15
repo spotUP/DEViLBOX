@@ -31,10 +31,10 @@ type BgMode =
   | { type: 'am'; preset: string; label: string };
 
 export const BG_MODES: BgMode[] = [
-  // WebGL modes (skip 'pattern', audioMotion, and circularSpectrum/radial)
+  // WebGL modes (skip 'pattern' and audioMotion)
   ...VISUALIZER_MODES
     .filter((m): m is WebGLVisualizerMode =>
-      m !== 'pattern' && !m.startsWith('am') && m !== 'circularSpectrum')
+      m !== 'pattern' && !m.startsWith('am'))
     .map((mode) => ({ type: 'webgl' as const, mode })),
   // audioMotion presets (no radial modes)
   { type: 'am', preset: 'ledBars',         label: 'LED BARS' },

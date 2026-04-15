@@ -37,7 +37,7 @@ type VizMode =
 const VIZ_MODES: VizMode[] = [
   'waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels',
   // Note: 'jingle' is not in the cycle — it is set programmatically when jingle plays
-  'mirror', 'radial', 'energy', 'logo', 'banner',
+  'mirror', 'energy', 'logo', 'banner',
   'circular', 'sineScroll', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular',
   'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar',
   'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo',

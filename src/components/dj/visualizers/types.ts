@@ -3,9 +3,8 @@
  */
 
 export const VISUALIZER_MODES = [
+  'none',
   'pattern',
-  'circularSpectrum',
-  'waveformTerrain',
   'starfield',
   // audioMotion modes
   'amLED',
@@ -33,9 +32,9 @@ export const VISUALIZER_MODES = [
 
 export type VisualizerMode = (typeof VISUALIZER_MODES)[number];
 
-/** WebGL-only modes (excludes 'pattern' and audioMotion 'am*' modes) */
+/** WebGL-only modes (excludes 'none', 'pattern' and audioMotion 'am*' modes) */
 export type WebGLVisualizerMode = Exclude<VisualizerMode,
-  | 'pattern'
+  | 'none' | 'pattern'
   | 'amLED' | 'amBars' | 'amMirror' | 'amGraphLine'
   | 'amRadial' | 'amRadialGraph' | 'amStereo' | 'amLumi'
   | 'amAlpha' | 'amOutline' | 'amDualVert' | 'amDualOverlay'
@@ -45,9 +44,8 @@ export type WebGLVisualizerMode = Exclude<VisualizerMode,
 >;
 
 export const MODE_LABELS: Record<VisualizerMode, string> = {
+  none: 'OFF',
   pattern: 'PATTERN',
-  circularSpectrum: 'RADIAL',
-  waveformTerrain: 'TERRAIN',
   starfield: 'STARFIELD',
   amLED: 'LED BARS',
   amBars: 'SMOOTH BARS',
