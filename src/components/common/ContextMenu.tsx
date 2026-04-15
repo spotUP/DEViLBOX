@@ -36,6 +36,8 @@ interface ContextMenuProps {
   className?: string;
   /** Minimum width in pixels (used by DropdownButton to match trigger width) */
   minWidth?: number;
+  /** Custom z-index (default: 100) */
+  zIndex?: number;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -44,6 +46,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
   className = '',
   minWidth,
+  zIndex = 100,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -151,7 +154,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ref={menuRef}
       data-context-menu
       className={`
-        fixed z-[100] min-w-[180px] w-max max-w-[calc(100vw-20px)] py-1 text-xs font-mono whitespace-nowrap
+        fixed min-w-[180px] w-max max-w-[calc(100vw-20px)] py-1 text-xs font-mono whitespace-nowrap
         bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl
         ${className}
       `}
@@ -161,6 +164,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         maxHeight: maxHeight ?? undefined,
         overflowY: maxHeight !== null ? 'auto' : undefined,
         minWidth: minWidth ?? undefined,
+        zIndex,
         // Prevent wheel from leaking through to the pattern editor below
         overscrollBehavior: 'contain',
       }}
@@ -296,6 +300,8 @@ interface DropdownButtonProps {
   className?: string;
   style?: React.CSSProperties;
   disabled?: boolean;
+  /** Custom z-index for dropdown menu (default: 100) */
+  zIndex?: number;
 }
 
 export const DropdownButton: React.FC<DropdownButtonProps> = ({
@@ -304,6 +310,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
   className = '',
   style,
   disabled = false,
+  zIndex,
 }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -346,6 +353,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
           position={position}
           onClose={handleClose}
           minWidth={triggerWidth}
+          zIndex={zIndex}
         />
       )}
     </>
