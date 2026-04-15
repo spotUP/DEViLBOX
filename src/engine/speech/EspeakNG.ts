@@ -28,21 +28,32 @@ async function ensureInitialized(): Promise<void> {
     try {
       const t0 = performance.now();
 
+      // Race against a timeout — WASM compilation can block the main thread
+      const timeoutMs = 5000;
       // @ts-expect-error -- no type declarations for this WASM package
-      const { default: EspeakModule } = await import('@echogarden/espeak-ng-emscripten');
+      const moduleImport = import('@echogarden/espeak-ng-emscripten')
+        .then(({ default: EspeakModule }: { default: () => Promise<any> }) => EspeakModule());
 
-      espeakModule = await EspeakModule();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('eSpeak-NG init timed out')), timeoutMs)
+      );
 
-      espeakWorker = new espeakModule.eSpeakNGWorker();
-      espeakWorker.set_voice('en');
+      espeakModule = await Promise.race([moduleImport, timeoutPromise]);
 
-      // Self-test: verify convert_to_phonemes works and log return type
-      const testResult = espeakWorker.convert_to_phonemes('hi', true);
-      console.log(`[eSpeak-NG] Self-test result type: ${typeof testResult}`, testResult);
-      if (testResult && typeof testResult === 'object') {
-        console.log(`[eSpeak-NG] Self-test keys:`, Object.keys(testResult));
+      // Self-test in its own try/catch — Emscripten abort() can be hard to catch
+      try {
+        const worker = new espeakModule.eSpeakNGWorker();
+        worker.set_voice('en');
+        worker.convert_to_phonemes('hi', true);
+        espeakWorker = worker;
+        console.log(`[eSpeak-NG] Initialized in ${(performance.now() - t0).toFixed(0)}ms`);
+      } catch (selfTestErr) {
+        console.warn('[eSpeak-NG] Self-test failed, disabling:', selfTestErr);
+        espeakModule = null;
+        initFailed = true;
+        initPromise = null;
+        return;
       }
-      console.log(`[eSpeak-NG] Initialized in ${(performance.now() - t0).toFixed(0)}ms`);
     } catch (e) {
       console.warn('[eSpeak-NG] Failed to initialize:', e);
       espeakModule = null;
