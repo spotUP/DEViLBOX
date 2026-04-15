@@ -281,25 +281,25 @@ export function useMIDIPadRouting() {
             DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
             setFxPadActive(padId, false);
           }
-          if (pad.playMode === 'sustain') {
-            _engine.stopPad(padId, pad.release / 1000);
-            if (pad.synthConfig || pad.instrumentId != null) {
-              try {
-                let instId: number;
-                let config: any;
-                if (pad.synthConfig) {
-                  instId = PAD_INSTRUMENT_BASE + pad.id;
-                  config = { ...pad.synthConfig, id: instId };
-                } else {
-                  instId = pad.instrumentId!;
-                  config = useInstrumentStore.getState().getInstrument(instId);
-                }
-                if (config) {
-                  const note = pad.instrumentNote || 'C4';
-                  getToneEngine().triggerNoteRelease(instId, note, 0, config);
-                }
-              } catch { /* ignore */ }
-            }
+          _engine.stopPad(padId, pad.release / 1000);
+          if (pad.synthConfig || pad.instrumentId != null) {
+            try {
+              let instId: number;
+              let config: any;
+              if (pad.synthConfig) {
+                instId = PAD_INSTRUMENT_BASE + pad.id;
+                config = { ...pad.synthConfig, id: instId };
+              } else {
+                instId = pad.instrumentId!;
+                config = useInstrumentStore.getState().getInstrument(instId);
+              }
+              const pending = _pendingReleases.get(instId);
+              if (pending) { clearTimeout(pending); _pendingReleases.delete(instId); }
+              if (config) {
+                const note = pad.instrumentNote || 'C4';
+                getToneEngine().triggerNoteRelease(instId, note, 0, config);
+              }
+            } catch { /* ignore */ }
           }
         }
       }
@@ -372,22 +372,20 @@ export function useMIDIPadRouting() {
 
         engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
 
-        if (pad.playMode === 'oneshot') {
-          const releaseDelayMs = Math.max(pad.decay, 100);
-          const existing = _pendingReleases.get(instId);
-          if (existing) clearTimeout(existing);
-          const timer = setTimeout(() => {
-            try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
-            _pendingReleases.delete(instId);
-          }, releaseDelayMs);
-          _pendingReleases.set(instId, timer);
-        }
+        // Auto-release as safety net (e.g. MIDI controllers without noteOff)
+        const releaseDelayMs = Math.max(pad.decay, 100);
+        const existing = _pendingReleases.get(instId);
+        if (existing) clearTimeout(existing);
+        const timer = setTimeout(() => {
+          try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
+          _pendingReleases.delete(instId);
+        }, releaseDelayMs);
+        _pendingReleases.set(instId, timer);
       } catch { /* ignore synth errors */ }
     }
 
-    if (pad.playMode === 'sustain') {
-      _heldPads.add(padId);
-    }
+    // Always track held state for release
+    _heldPads.add(padId);
 
     // Note repeat
     if (noteRepeatEnabled && _noteRepeat) {
@@ -412,26 +410,29 @@ export function useMIDIPadRouting() {
       setFxPadActive(padId, false);
     }
 
-    if (pad.playMode === 'sustain') {
-      _engine.stopPad(padId, pad.release / 1000);
+    // Stop sample playback
+    _engine.stopPad(padId, pad.release / 1000);
 
-      if (pad.synthConfig || pad.instrumentId != null) {
-        try {
-          let instId: number;
-          let config: any;
-          if (pad.synthConfig) {
-            instId = PAD_INSTRUMENT_BASE + pad.id;
-            config = { ...pad.synthConfig, id: instId };
-          } else {
-            instId = pad.instrumentId!;
-            config = useInstrumentStore.getState().getInstrument(instId);
-          }
-          if (config) {
-            const note = pad.instrumentNote || 'C4';
-            getToneEngine().triggerNoteRelease(instId, note, 0, config);
-          }
-        } catch { /* ignore */ }
-      }
+    // Release synth note and cancel any pending auto-release
+    if (pad.synthConfig || pad.instrumentId != null) {
+      try {
+        let instId: number;
+        let config: any;
+        if (pad.synthConfig) {
+          instId = PAD_INSTRUMENT_BASE + pad.id;
+          config = { ...pad.synthConfig, id: instId };
+        } else {
+          instId = pad.instrumentId!;
+          config = useInstrumentStore.getState().getInstrument(instId);
+        }
+        // Cancel auto-release timer since user released manually
+        const pending = _pendingReleases.get(instId);
+        if (pending) { clearTimeout(pending); _pendingReleases.delete(instId); }
+        if (config) {
+          const note = pad.instrumentNote || 'C4';
+          getToneEngine().triggerNoteRelease(instId, note, 0, config);
+        }
+      } catch { /* ignore */ }
     }
   }, [currentProgram, setFxPadActive]);
 
