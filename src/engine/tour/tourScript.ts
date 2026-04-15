@@ -58,8 +58,31 @@ async function loadDJTrack(deckId: 'A' | 'B', filename: string): Promise<void> {
     const resp = await fetch(`/data/songs/exports/${filename}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const buf = await resp.arrayBuffer();
+
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { getDJPipeline } = await import('@/engine/dj/DJPipeline');
     const { getDJEngine } = await import('@/engine/dj/DJEngine');
-    await getDJEngine().loadAudioToDeck(deckId, buf, filename, filename.replace(/\.\w+$/, ''));
+    const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
+    const { useDJStore } = await import('@/stores/useDJStore');
+
+    const blob = new File([buf], filename, { type: 'application/octet-stream' });
+    const song = await parseModuleToSong(blob);
+    const bpmResult = detectBPM(song);
+
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: song.name || filename,
+      detectedBPM: bpmResult.bpm,
+      effectiveBPM: bpmResult.bpm,
+      analysisState: 'rendering',
+      isPlaying: false,
+    });
+
+    const result = await getDJPipeline().loadOrEnqueue(buf, filename, deckId, 'high');
+    await getDJEngine().loadAudioToDeck(
+      deckId, result.wavData, filename,
+      song.name || filename, result.analysis?.bpm || bpmResult.bpm, song
+    );
   } catch (err) {
     console.warn(`[Tour] Failed to load DJ track ${filename}:`, err);
   }
