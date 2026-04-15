@@ -201,9 +201,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'AE', 'UH', 'ER'],
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
@@ -286,9 +283,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'],
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
@@ -339,9 +333,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     presetCount: 8,
     presetNames: ['AH', 'EE', 'OH', 'OO', 'SH', 'ZH', 'NG', 'PA'],
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
@@ -513,9 +504,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       romType: 'tms5220',
     },
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'HELLO WORLD', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
@@ -550,9 +538,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       romType: 's14001a',
     },
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'INTRUDER ALERT', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
@@ -605,9 +590,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       romType: 'vlm5030',
     },
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'READY SET GO', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
@@ -659,9 +641,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       romType: 'hc55516',
     },
     parameters: [
-      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
-        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
-      ]},
       { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
       { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'I HUNGER', placeholder: 'Type text and press Speak' },
       { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
