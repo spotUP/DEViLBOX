@@ -22,6 +22,7 @@ import type { NKSParameter } from '../midi/performance/types';
 import { isDJContext } from '../midi/MIDIContextRouter';
 import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
 import { midiToXMNote } from '../lib/xmConversions';
+import { useUIStore } from './useUIStore';
 
 // Guard against double handler registration (e.g., React StrictMode or HMR)
 let midiNoteHandlerRegistered = false;
@@ -281,6 +282,12 @@ export const useMIDIStore = create<MIDIStore>()(
                   return;
                 }
 
+                // In DrumPad view, notes 36-43 (MPK Mini pads) are handled by PadGrid directly
+                const activeView = useUIStore.getState().activeView;
+                if (activeView === 'drumpad' && message.note >= 36 && message.note <= 43) {
+                  return;
+                }
+
                 // Check if note matches bank switch (Akai MPK Mini Pads: 36, 37, 38, 39)
                 if (message.note === 36) { store.setKnobBank('303'); return; }
                 if (message.note === 37) { store.setKnobBank('Siren'); return; }
@@ -415,6 +422,12 @@ export const useMIDIStore = create<MIDIStore>()(
                 // EXCLUSIVE: Check if this note is handled by the PadMappingManager
                 const padManager = getPadMappingManager();
                 if (padManager.getMapping(message.channel, message.note)) {
+                  return;
+                }
+
+                // In DrumPad view, notes 36-43 are handled by PadGrid directly
+                const activeView = useUIStore.getState().activeView;
+                if (activeView === 'drumpad' && message.note >= 36 && message.note <= 43) {
                   return;
                 }
 
