@@ -358,47 +358,41 @@ async function restoreSample(instrumentId: number): Promise<void> {
   getToneEngine().invalidateInstrument(instrumentId);
 }
 
-/** Play the currently selected sample instrument at its natural pitch */
-async function playSampleInstrument(instrumentId: number, durationMs = 1500): Promise<void> {
+/** Play the currently selected sample instrument at its natural pitch.
+ *  Uses direct Web Audio for reliable playback at the sample's native rate. */
+async function playSampleInstrument(instrumentId: number, durationMs = 3000): Promise<void> {
   const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-  const { getToneEngine } = await import('@/engine/ToneEngine');
   const Tone = await import('tone');
   const config = useInstrumentStore.getState().getInstrument(instrumentId);
   if (!config) return;
 
-  // Ensure audio context is running
   if (Tone.getContext().state !== 'running') {
     await Tone.start();
   }
 
-  // Try ToneEngine path first
-  try {
-    await getToneEngine().ensureInstrumentReady(config);
-    await getToneEngine().awaitPendingLoads(5000);
-    const note = config.sample?.baseNote || 'C4';
-    getToneEngine().triggerNoteAttack(instrumentId, note, 0, 0.85, config);
-    setTimeout(() => {
-      try { getToneEngine().triggerNoteRelease(instrumentId, note, 0, config); } catch { /* */ }
-    }, durationMs);
-    return;
-  } catch (err) {
-    console.warn('[Tour] ToneEngine sample playback failed, trying direct path:', err);
-  }
-
-  // Fallback: decode and play via raw Web Audio API
+  // Direct Web Audio path: decode the WAV and play at native sample rate.
+  // This avoids Tone.Sampler pitch issues with low-rate MOD samples (8363 Hz).
   const rawBuf = config.sample?.audioBuffer;
   if (rawBuf && rawBuf instanceof ArrayBuffer && rawBuf.byteLength > 0) {
     try {
+      const { isWavBuffer, parseWavToAudioBuffer } = await import('@/utils/audio/wavParser');
       const ctx = Tone.getContext().rawContext as AudioContext;
-      const decoded = await ctx.decodeAudioData(rawBuf.slice(0));
+      let decoded: AudioBuffer;
+      if (isWavBuffer(rawBuf)) {
+        // Manual parser handles low-rate WAVs that browser may reject
+        decoded = parseWavToAudioBuffer(rawBuf.slice(0));
+      } else {
+        decoded = await ctx.decodeAudioData(rawBuf.slice(0));
+      }
       const source = ctx.createBufferSource();
       source.buffer = decoded;
       source.connect(ctx.destination);
       source.start();
-      setTimeout(() => { try { source.stop(); } catch { /* */ } }, durationMs);
-      console.log(`[Tour] playSampleInstrument: direct Web Audio playback for id=${instrumentId}`);
-    } catch (err2) {
-      console.warn('[Tour] Direct Web Audio playback also failed:', err2);
+      const playDuration = Math.min(durationMs, decoded.duration * 1000);
+      setTimeout(() => { try { source.stop(); } catch { /* */ } }, playDuration);
+      console.log(`[Tour] playSampleInstrument: direct playback id=${instrumentId} duration=${(playDuration / 1000).toFixed(1)}s sampleRate=${decoded.sampleRate}`);
+    } catch (err) {
+      console.warn('[Tour] Direct Web Audio playback failed:', err);
     }
   }
 }
@@ -804,11 +798,28 @@ export const TOUR_SCRIPT: TourStep[] = [
       // Stop anything playing
       useTransportStore.getState().stop();
 
+      // Stop and dispose all native WASM engines (Hively, UADE, etc.) that may still
+      // be running from the previous song. Without this, the HivelyEngine singleton
+      // keeps its audio graph alive and the old HivelySynth instruments remain active.
+      const { stopNativeEngines, clearRunningEngineKeys } = await import('@/engine/replayer/NativeEngineRouting');
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      const replayer = getTrackerReplayer();
+      stopNativeEngines(replayer.song, replayer.routedNativeEngines, null);
+      clearRunningEngineKeys();
+
       // Clear format-specific data from previous AHX song and switch to classic editor.
       // Without this, usePatternPlayback still sees hivelyNative and routes to the
       // Hively playback engine instead of the XM replayer for our acid pattern.
       const { useFormatStore } = await import('@/stores/useFormatStore');
       useFormatStore.getState().applyEditorMode({});
+
+      // Clear ALL old instruments (AHX HivelySynths etc.) before creating acid instruments.
+      // Without this, the 34 AHX instruments remain in the store and get included in the
+      // song object, polluting the instrumentMap and causing processRow to trigger
+      // HivelySynth notes instead of the 303.
+      const { getToneEngine } = await import('@/engine/ToneEngine');
+      getToneEngine().disposeAllInstruments();
+      useInstrumentStore.getState().loadInstruments([]);
 
       // Create TB-303 instrument (id will be assigned)
       const acid303Id = await createAndSelectInstrument('TB303', 'Acid 303');
@@ -1375,7 +1386,7 @@ export const TOUR_SCRIPT: TourStep[] = [
       await triggerSpeechPad(13, 'devil box is alive. I am a drum pad now.', 0);
     },
     spotlight: '[data-pad-id]',
-    postDelay: 4000,
+    postDelay: 5000,
   },
   {
     id: 'drumpad-speech-demo2',
@@ -1401,8 +1412,8 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-load-a',
-    narration: 'Searching Modland for Analog Vibes by Jesper Kyd. Loading into deck A.',
-    action: () => searchAndLoadModland('jesper kyd analogue', 'A'),
+    narration: 'Searching Modland for a classic ProTracker module. Loading into deck A.',
+    action: () => searchAndLoadModland('jogeir liljedahl', 'A'),
     spotlight: '[data-dj-deck-drop]',
     postDelay: 2000,
   },
@@ -1414,8 +1425,8 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-load-b',
-    narration: 'Searching Modland for Anthrox Intro by Walkman. Loading deck B.',
-    action: () => searchAndLoadModland('walkman anthrox', 'B'),
+    narration: 'Searching for another module. Loading deck B.',
+    action: () => searchAndLoadModland('4mat eternity', 'B'),
     postDelay: 2000,
   },
   {
