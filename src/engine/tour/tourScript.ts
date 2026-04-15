@@ -358,8 +358,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Here is the instrument editor. Full parameter control.',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const id = useInstrumentStore.getState().currentInstrument;
-      await openInstrumentEditor(id);
+      const id = useInstrumentStore.getState().currentInstrumentId;
+      if (id != null) await openInstrumentEditor(id);
     },
     postDelay: 2500,
   },
@@ -368,7 +368,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: '',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const id = useInstrumentStore.getState().currentInstrument;
+      const id = useInstrumentStore.getState().currentInstrumentId;
+      if (id == null) return;
       // Play an ascending riff
       const notes = ['C4', 'E4', 'G4', 'C5', 'G4', 'E4'];
       for (let i = 0; i < notes.length; i++) {
@@ -391,8 +392,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: '',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const id = useInstrumentStore.getState().currentInstrument;
-      await openInstrumentEditor(id);
+      const id = useInstrumentStore.getState().currentInstrumentId;
+      if (id != null) await openInstrumentEditor(id);
     },
     postDelay: 1000,
   },
@@ -401,7 +402,8 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: '',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
-      const id = useInstrumentStore.getState().currentInstrument;
+      const id = useInstrumentStore.getState().currentInstrumentId;
+      if (id == null) return;
       // 303-style acid sequence
       const notes = ['C2', 'C2', 'Eb2', 'F2', 'F2', 'Ab2', 'Bb2', 'C3'];
       for (let i = 0; i < notes.length; i++) {
@@ -507,7 +509,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 1000,
   },
 
-  // ── Act 4: DJ View — load two tracks and mix ──────────────────────────
+  // ── Act 5: DJ View — load two tracks and mix ──────────────────────────
   {
     id: 'dj-switch',
     narration: 'Now let us DJ. Switching to the dual deck mixer.',
@@ -601,7 +603,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 300,
   },
 
-  // ── Act 5: Speech Synths (the meta moment) ──────────────────────────────
+  // ── Act 6: Speech Synths (the meta moment) ──────────────────────────────
   {
     id: 'speech-meta',
     narration: 'By the way, this voice? DECtalk. Running as WebAssembly. The same voice Stephen Hawking used.',
@@ -630,7 +632,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 800,
   },
 
-  // ── Act 6: VJ + Kraftwerk head ──────────────────────────────────────────
+  // ── Act 7: VJ + Kraftwerk head ──────────────────────────────────────────
   {
     id: 'vj-switch',
     narration: 'The VJ view. Real-time Milkdrop visualizations, and the Kraftwerk 3D head. Watch it sync to my voice.',
@@ -654,7 +656,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 100,
   },
 
-  // ── Act 7: Mixer ────────────────────────────────────────────────────────
+  // ── Act 8: Mixer ────────────────────────────────────────────────────────
   {
     id: 'mixer-switch',
     narration: 'The mixer. Per-channel faders, pan, mute, solo, and meters.',
@@ -662,7 +664,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     postDelay: 1500,
   },
 
-  // ── Act 8: Closing (fast) ───────────────────────────────────────────────
+  // ── Act 9: Closing (fast) ───────────────────────────────────────────────
   {
     id: 'closing',
     narration: 'DEViLBOX. 120 synth engines. 188 formats. Two massive music archives. All in your browser. Thanks for watching.',
