@@ -205,60 +205,50 @@ export const PadGrid: React.FC<PadGridProps> = ({
         if (pad.sample) {
           engineRef.current.triggerPad(pad, curvedVelocity);
         }
-        if (pad.synthConfig) {
+        if (pad.synthConfig || pad.instrumentId != null) {
           try {
             const engine = getToneEngine();
             const note = pad.instrumentNote || 'C3';
             const normalizedVel = curvedVelocity / 127;
-            const padInstId = PAD_INSTRUMENT_BASE + pad.id;
-            const config = { ...pad.synthConfig, id: padInstId };
             
-            // Debug logging
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[PadGrid] Triggering pad ${pad.id} "${pad.name}":`, {
-                note,
-                synthType: config.synthType,
-                drumType: config.drumMachine?.drumType,
-                io808Type: config.parameters?.io808Type,
-                tr909Type: config.parameters?.tr909Type,
-                velocity: normalizedVel,
-              });
+            // Determine instrument ID and config
+            let instId: number;
+            let config: any;
+            
+            if (pad.synthConfig) {
+              instId = PAD_INSTRUMENT_BASE + pad.id;
+              config = { ...pad.synthConfig, id: instId };
+              
+              // Debug logging for pad synths
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[PadGrid] Triggering pad ${pad.id} "${pad.name}":`, {
+                  note,
+                  synthType: config.synthType,
+                  drumType: config.drumMachine?.drumType,
+                  io808Type: config.parameters?.io808Type,
+                  tr909Type: config.parameters?.tr909Type,
+                  velocity: normalizedVel,
+                });
+              }
+            } else {
+              instId = pad.instrumentId!;
+              config = useInstrumentStore.getState().getInstrument(instId);
+              if (!config) return; // Instrument not found
             }
             
-            engine.triggerNoteAttack(padInstId, note, 0, normalizedVel, config);
+            // Trigger note
+            engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
+            
+            // Auto-release for oneshot mode
             if (pad.playMode === 'oneshot') {
               const releaseDelayMs = Math.max(pad.decay, 100);
-              const existingTimer = pendingReleasesRef.current.get(padInstId);
+              const existingTimer = pendingReleasesRef.current.get(instId);
               if (existingTimer) clearTimeout(existingTimer);
               const timer = setTimeout(() => {
-                try { engine.triggerNoteRelease(padInstId, note, 0, config); } catch { /* ignore */ }
-                pendingReleasesRef.current.delete(padInstId);
+                try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
+                pendingReleasesRef.current.delete(instId);
               }, releaseDelayMs);
-              pendingReleasesRef.current.set(padInstId, timer);
-            }
-          } catch (err) {
-            console.warn('[PadGrid] Pad synth trigger failed:', err);
-          }
-        } else if (pad.instrumentId != null) {
-          try {
-            const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
-            if (config) {
-              const engine = getToneEngine();
-              const note = pad.instrumentNote || 'C3';
-              const normalizedVel = curvedVelocity / 127;
-              engine.triggerNoteAttack(pad.instrumentId, note, 0, normalizedVel, config);
-              if (pad.playMode === 'oneshot') {
-                const releaseDelayMs = Math.max(pad.decay, 100);
-                const existingTimer = pendingReleasesRef.current.get(pad.instrumentId);
-                if (existingTimer) clearTimeout(existingTimer);
-                const timer = setTimeout(() => {
-                  try {
-                    engine.triggerNoteRelease(pad.instrumentId!, note, 0, config);
-                  } catch { /* ignore release errors */ }
-                  pendingReleasesRef.current.delete(pad.instrumentId!);
-                }, releaseDelayMs);
-                pendingReleasesRef.current.set(pad.instrumentId, timer);
-              }
+              pendingReleasesRef.current.set(instId, timer);
             }
           } catch (err) {
             console.warn('[PadGrid] Synth trigger failed:', err);
@@ -305,20 +295,24 @@ export const PadGrid: React.FC<PadGridProps> = ({
         if (pad.playMode === 'sustain') {
           // Release sample voice
           engineRef.current.stopPad(padId, pad.release / 1000);
+          
           // Release synth voice
-          if (pad.synthConfig) {
+          if (pad.synthConfig || pad.instrumentId != null) {
             try {
-              const padInstId = PAD_INSTRUMENT_BASE + pad.id;
-              const config = { ...pad.synthConfig, id: padInstId };
-              const note = pad.instrumentNote || 'C3';
-              getToneEngine().triggerNoteRelease(padInstId, note, 0, config);
-            } catch { /* ignore release errors */ }
-          } else if (pad.instrumentId != null) {
-            try {
-              const config = useInstrumentStore.getState().getInstrument(pad.instrumentId);
+              let instId: number;
+              let config: any;
+              
+              if (pad.synthConfig) {
+                instId = PAD_INSTRUMENT_BASE + pad.id;
+                config = { ...pad.synthConfig, id: instId };
+              } else {
+                instId = pad.instrumentId!;
+                config = useInstrumentStore.getState().getInstrument(instId);
+              }
+              
               if (config) {
                 const note = pad.instrumentNote || 'C3';
-                getToneEngine().triggerNoteRelease(pad.instrumentId, note, 0, config);
+                getToneEngine().triggerNoteRelease(instId, note, 0, config);
               }
             } catch { /* ignore release errors */ }
           }
