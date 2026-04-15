@@ -10,6 +10,7 @@ import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { useTourStore } from '@/stores/useTourStore';
 import { useSpeechActivityStore } from '@/stores/useSpeechActivityStore';
 import { useUIStore } from '@/stores/useUIStore';
+import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
 import { TOUR_SCRIPT, type TourStep } from './tourScript';
 
 // Import the DECtalk worker-based synthesizer directly
@@ -134,6 +135,10 @@ class TourEngine {
 
     this.aborted = false;
     this.previousView = useUIStore.getState().activeView;
+
+    // Suppress format compatibility warnings for the entire tour — the tour
+    // creates instruments, automation etc. that may exceed native format limits
+    suppressFormatChecks();
 
     const totalSteps = TOUR_SCRIPT.length;
     store.startTour(totalSteps);
@@ -299,6 +304,9 @@ class TourEngine {
 
     // Restore previous view
     useUIStore.getState().setActiveView(this.previousView as never);
+
+    // Restore format compatibility checks
+    restoreFormatChecks();
 
     store.stopTour();
     console.log('[Tour] Stopped');
