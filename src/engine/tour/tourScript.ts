@@ -209,6 +209,15 @@ async function getFirstSampleInstrument(): Promise<number | null> {
   return best.id;
 }
 
+/**
+ * Parse a WAV ArrayBuffer into an AudioBuffer WITHOUT using decodeAudioData.
+ * Re-exported from shared utility for use in tour functions.
+ */
+async function parseWavForTour(wavData: ArrayBuffer): Promise<AudioBuffer> {
+  const { parseWavToAudioBuffer } = await import('@/utils/audio/wavParser');
+  return parseWavToAudioBuffer(wavData);
+}
+
 /** Apply a WaveformProcessor operation to an instrument's sample (visually updates editor) */
 async function applySampleOperation(
   instrumentId: number,
@@ -222,9 +231,9 @@ async function applySampleOperation(
     const inst = useInstrumentStore.getState().getInstrument(instrumentId);
     if (!inst?.sample?.audioBuffer) return;
 
-    // Decode the stored ArrayBuffer to an AudioBuffer
-    const ctx = new OfflineAudioContext(1, 1, 44100);
-    const audioBuffer = await ctx.decodeAudioData(
+    // Parse WAV manually instead of using decodeAudioData — avoids browser
+    // EncodingError on low sample rate WAVs (8363 Hz MOD samples)
+    const audioBuffer = await parseWavForTour(
       (inst.sample.audioBuffer as ArrayBuffer).slice(0)
     );
 
@@ -252,10 +261,12 @@ async function applySampleOperation(
         return;
     }
 
-    // Encode back and update in store — also create a blob URL so the
+    // Encode back to WAV and update in store — also create a blob URL so the
     // SampleEditor waveform display sees the change (it watches sample.url,
     // not sample.audioBuffer directly)
-    const arrayBuffer = await getToneEngine().encodeAudioData(result);
+    // CRITICAL: Use WaveformProcessor.bufferToWav (proper WAV with header), NOT
+    // ToneEngine.encodeAudioData (raw Float32 PCM — browser can't decode it).
+    const arrayBuffer = await WaveformProcessor.bufferToWav(result);
     const blob = new Blob([arrayBuffer.slice(0)], { type: 'audio/wav' });
     const blobUrl = URL.createObjectURL(blob);
     useInstrumentStore.getState().updateInstrument(instrumentId, {
@@ -285,8 +296,8 @@ async function applySampleEnhancement(
     const inst = useInstrumentStore.getState().getInstrument(instrumentId);
     if (!inst?.sample?.audioBuffer) return;
 
-    const ctx = new OfflineAudioContext(1, 1, 44100);
-    const audioBuffer = await ctx.decodeAudioData(
+    // Parse WAV manually (same as applySampleOperation — avoids decodeAudioData issues)
+    const audioBuffer = await parseWavForTour(
       (inst.sample.audioBuffer as ArrayBuffer).slice(0)
     );
 
@@ -308,7 +319,8 @@ async function applySampleEnhancement(
         return;
     }
 
-    const arrayBuffer = await getToneEngine().encodeAudioData(processed.buffer);
+    const { WaveformProcessor } = await import('@/lib/audio/WaveformProcessor');
+    const arrayBuffer = await WaveformProcessor.bufferToWav(processed.buffer);
     const blob = new Blob([arrayBuffer.slice(0)], { type: 'audio/wav' });
     const blobUrl = URL.createObjectURL(blob);
     useInstrumentStore.getState().updateInstrument(instrumentId, {
@@ -569,7 +581,6 @@ async function searchAndLoadModland(query: string, deckId: 'A' | 'B'): Promise<v
   }
 }
 
-/** Search HVSC and load the first result into DJ deck */
 // ── Automation actions ──────────────────────────────────────────────────────
 
 /** Create a demo automation curve on a channel with a preset shape */
@@ -950,25 +961,9 @@ export const TOUR_SCRIPT: TourStep[] = [
       // Re-select the 303 so octave goes to 2
       useInstrumentStore.getState().setCurrentInstrument(acid303Id);
 
-      // Pre-load the song into the replayer so acid-play works reliably.
-      // The React usePatternPlayback effect doesn't always fire between
-      // rapid tour steps, so we load the song directly.
-      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-      const replayer = getTrackerReplayer();
-      const allInstruments = useInstrumentStore.getState().instruments;
-      replayer.loadSong({
-        name: 'Acid Demo',
-        format: 'XM',
-        patterns: [pattern as any],
-        instruments: allInstruments,
-        songPositions: [0],
-        songLength: 1,
-        restartPosition: 0,
-        numChannels: 3,
-        initialSpeed: 6,
-        initialBPM: 138,
-        linearPeriods: true,
-      });
+      // NOTE: Don't call replayer.loadSong() here — let the React usePatternPlayback
+      // effect handle it when acid-play sets isPlaying=true. Calling both creates a
+      // race condition where two loadSong/play sequences compete via _playGeneration.
     },
     postDelay: 1500,
   },
@@ -992,9 +987,10 @@ export const TOUR_SCRIPT: TourStep[] = [
       };
       replayer.onSongEnd = () => {};
 
-      // Start transport (UI state) and replayer (audio) together
+      // Let the React usePatternPlayback effect handle loadSong + replayer.play().
+      // DO NOT call replayer.play() directly — that creates a race condition with
+      // the effect's own loadSong/play, causing both to abort via _playGeneration.
       await useTransportStore.getState().play();
-      await replayer.play();
     },
     postDelay: 4000,
   },
@@ -1100,13 +1096,13 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-stop',
     narration: 'That is the sound of acid house. Born in Chicago, 1987.',
     action: async () => {
-      // Stop replayer directly + transport state (mirrors acid-play's direct approach)
+      // Stop playback via transport (triggers React effect → replayer.stop())
+      await trackerStop();
+      // Clean up replayer callbacks
       const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
       const replayer = getTrackerReplayer();
-      replayer.stop();
       replayer.onRowChange = null;
       replayer.onSongEnd = null;
-      await trackerStop();
       await closeModals();
       // Collapse the synth panel back
       useUIStore.getState().setKnobPanelCollapsed(true);
@@ -1494,9 +1490,9 @@ export const TOUR_SCRIPT: TourStep[] = [
   },
   {
     id: 'dj-archives-hvsc',
-    narration: 'Now another classic. Searching Jochen Hippel on Modland.',
+    narration: 'Now another classic. Searching Karsten Obarski on Modland.',
     action: async () => {
-      await searchAndLoadModland('jochen hippel', 'B');
+      await searchAndLoadModland('karsten obarski amegas', 'B');
     },
     postDelay: 1500,
   },
