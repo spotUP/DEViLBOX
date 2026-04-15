@@ -21,6 +21,8 @@ import { getDjFxByCategory, type DjFxActionId } from '@/engine/drumpad/DjFxActio
 import { DEFAULT_SCRATCH_PADS } from '@/constants/djPadModeDefaults';
 import { DJ_ONE_SHOT_PRESETS } from '@/constants/djOneShotPresets';
 import { ONE_SHOT_PRESETS_BY_CATEGORY } from '@/constants/djOneShotPresetsByCategory';
+import { SYNTH_CATEGORIES, getSynthInfo } from '@/constants/synthCategories';
+import type { SynthType } from '@/types/instrument';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -369,89 +371,79 @@ function buildQuickAssignSubmenu(
 ): MenuItemType[] {
   const items: MenuItemType[] = [];
 
-  // Group synth presets by machine
-  const groups = new Map<string, typeof SYNTH_QUICK_PRESETS>();
-  for (const preset of SYNTH_QUICK_PRESETS) {
-    const key = preset.machine === '808' ? 'TR-808' : 'TR-909';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(preset);
-  }
+  // Build categorized menu from SYNTH_CATEGORIES
+  for (const category of SYNTH_CATEGORIES) {
+    const synthItems = category.synths.map((synthInfo) => ({
+      id: `qa-${synthInfo.type.toLowerCase()}`,
+      label: synthInfo.name,
+      onClick: () => assignGeneralSynth(padId, synthInfo.type, store),
+    }));
 
-  for (const [groupLabel, presets] of groups) {
     items.push({
-      id: `qa-group-${groupLabel}`, label: groupLabel,
-      submenu: presets.map((p) => ({
-        id: `qa-${p.label.replace(/\s+/g, '-').toLowerCase()}`,
-        label: p.label.replace(/^(808|909)\s/, ''),
-        onClick: () => assignSynthPreset(padId, p, store),
-      })),
+      id: `qa-cat-${category.id}`,
+      label: category.name,
+      submenu: synthItems,
     });
   }
 
-  // Add Speech options
-  items.push({
-    id: 'qa-group-speech', label: 'Speech',
-    submenu: [
-      {
-        id: 'qa-sam',
-        label: 'SAM (Commodore)...',
-        onClick: () => assignSpeechSynth(padId, 'Sam', store),
-      },
-      {
-        id: 'qa-v2speech',
-        label: 'V2 Speech (Ronan/Lisa)...',
-        onClick: () => assignSpeechSynth(padId, 'V2Speech', store),
-      },
-      {
-        id: 'qa-dectalk',
-        label: 'DECtalk (Stephen Hawking)...',
-        onClick: () => assignSpeechSynth(padId, 'DECtalk', store),
-      },
-      {
-        id: 'qa-pinktrombone',
-        label: 'Pink Trombone (Vocal Tract)...',
-        onClick: () => assignSpeechSynth(padId, 'PinkTrombone', store),
-      },
-      { id: 'qa-speech-divider-1', label: '─────', disabled: true },
-      {
-        id: 'qa-mamesp0250',
-        label: 'GI SP0250 (Arcade)...',
-        onClick: () => assignROMSpeech(padId, 'MAMESP0250', store),
-      },
-      {
-        id: 'qa-mametms5220',
-        label: 'TI TMS5220 (Speak & Spell)...',
-        onClick: () => assignROMSpeech(padId, 'MAMETMS5220', store),
-      },
-      {
-        id: 'qa-mamevotrax',
-        label: 'Votrax SC-01 (Classic)...',
-        onClick: () => assignROMSpeech(padId, 'MAMEVotrax', store),
-      },
-      {
-        id: 'qa-mamemea8000',
-        label: 'Philips MEA8000 (LPC)...',
-        onClick: () => assignROMSpeech(padId, 'MAMEMEA8000', store),
-      },
-      {
-        id: 'qa-mames14001a',
-        label: 'S14001A (Berzerk)...',
-        onClick: () => assignROMSpeech(padId, 'MAMES14001A', store),
-      },
-      {
-        id: 'qa-mamevlm5030',
-        label: 'Sanyo VLM5030 (Konami)...',
-        onClick: () => assignROMSpeech(padId, 'MAMEVLM5030', store),
-      },
-      {
-        id: 'qa-mamehc55516',
-        label: 'Harris HC55516 (Sinistar)...',
-        onClick: () => assignROMSpeech(padId, 'MAMEHC55516', store),
-      },
-    ],
-  });
-
   return items;
+}
+
+function assignGeneralSynth(
+  padId: number,
+  synthType: SynthType,
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  const synthInfo = getSynthInfo(synthType);
+  const synthName = synthInfo?.name || synthType;
+
+  // Special handling for speech synths - prompt for text
+  if (synthType === 'Sam' || synthType === 'V2Speech' || synthType === 'DECtalk' || synthType === 'PinkTrombone') {
+    return assignSpeechSynth(padId, synthType, store);
+  }
+
+  // Special handling for ROM speech synths
+  if (synthType === 'MAMESP0250' || synthType === 'MAMETMS5220' || synthType === 'MAMEVotrax' || 
+      synthType === 'MAMEMEA8000' || synthType === 'MAMES14001A' || synthType === 'MAMEVLM5030' || 
+      synthType === 'MAMEHC55516') {
+    return assignROMSpeech(padId, synthType, store);
+  }
+
+  // Special handling for TR-808/TR-909 - assign kick by default
+  if (synthType === 'TR808') {
+    return assignSynthPreset(padId, {
+      label: '808 Kick',
+      machine: '808',
+      drumType: 'kick',
+      subType: 'kick',
+      note: 'C4',
+    }, store);
+  }
+  if (synthType === 'TR909') {
+    return assignSynthPreset(padId, {
+      label: '909 Kick',
+      machine: '909',
+      drumType: 'kick',
+      subType: 'kick',
+      note: 'C4',
+    }, store);
+  }
+
+  // Default: create basic synth config
+  store.updatePad(padId, {
+    name: synthName,
+    synthConfig: {
+      id: PAD_INSTRUMENT_BASE + padId,
+      name: synthName,
+      type: 'synth',
+      synthType,
+      effects: [],
+      volume: 0,
+      pan: 0,
+    },
+    instrumentNote: 'C4',
+    playMode: 'oneshot',
+  });
 }
 
 function assignSynthPreset(
