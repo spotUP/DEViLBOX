@@ -138,11 +138,19 @@ function createStutter(division: SyncDivision): DjFxAction {
         }
       };
 
+      // Connect recorder to master audio chain
+      const masterNode = getMasterOutputNode();
+      if (masterNode) {
+        masterNode.connect(recorder);
+        recorder.connect(ctx.destination);
+      }
+
       activeFx.set(this.id, {
         nodes: [recorder, stutterSource, gain],
         oscillator: undefined,
         cleanup: () => {
           recorder.onaudioprocess = null;
+          try { masterNode?.disconnect(recorder); } catch { /* */ }
         },
       });
     },
