@@ -933,6 +933,26 @@ export const TOUR_SCRIPT: TourStep[] = [
 
       // Re-select the 303 so octave goes to 2
       useInstrumentStore.getState().setCurrentInstrument(acid303Id);
+
+      // Pre-load the song into the replayer so acid-play works reliably.
+      // The React usePatternPlayback effect doesn't always fire between
+      // rapid tour steps, so we load the song directly.
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      const replayer = getTrackerReplayer();
+      const allInstruments = useInstrumentStore.getState().instruments;
+      replayer.loadSong({
+        name: 'Acid Demo',
+        format: 'XM',
+        patterns: [pattern as any],
+        instruments: allInstruments,
+        songPositions: [0],
+        songLength: 1,
+        restartPosition: 0,
+        numChannels: 3,
+        initialSpeed: 6,
+        initialBPM: 138,
+        linearPeriods: true,
+      });
     },
     postDelay: 1500,
   },
@@ -940,7 +960,25 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-play',
     narration: 'Four on the floor kick, hi-hats, and the 303. Let it rip.',
     action: async () => {
-      await trackerPlay();
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      const { useTransportStore } = await import('@/stores/useTransportStore');
+      const { useTrackerStore } = await import('@/stores/useTrackerStore');
+
+      const replayer = getTrackerReplayer();
+
+      // Set up onRowChange callback for UI scrolling BEFORE play()
+      replayer.onRowChange = (row, patternNum, _position) => {
+        const store = useTrackerStore.getState();
+        if (patternNum !== store.currentPatternIndex) {
+          store.setCurrentPattern(patternNum, true);
+        }
+        useTransportStore.getState().setCurrentRow(row);
+      };
+      replayer.onSongEnd = () => {};
+
+      // Start transport (UI state) and replayer (audio) together
+      await useTransportStore.getState().play();
+      await replayer.play();
     },
     postDelay: 4000,
   },
@@ -959,16 +997,20 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'Cutoff. Resonance. Envelope mod. This is what makes the 303 scream.',
     action: async () => {
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
+      const { getToneEngine } = await import('@/engine/ToneEngine');
+      const { DB303Synth } = await import('@/engine/db303');
 
       const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
       if (!inst) return;
       const id = inst.id;
 
+      // Get the live DB303Synth instance for direct parameter control
+      const engine = getToneEngine();
+      const key = engine.getInstrumentKey(id, -1);
+      const synthInstance = engine.instruments.get(key);
+      const is303 = synthInstance instanceof DB303Synth;
+
       // Animate knob sweeps over ~10 seconds
-      // Phase 1 (0-3s): Sweep cutoff up from 0.3 → 0.9
-      // Phase 2 (3-6s): Crank resonance from 0.5 → 0.95
-      // Phase 3 (6-9s): Sweep envMod up from 0.5 → 0.95, decay down from 0.5 → 0.15
-      // Phase 4 (9-11s): Everything cranked — the scream
       const steps = 60;
       const intervalMs = 180;
       let step = 0;
@@ -992,7 +1034,7 @@ export const TOUR_SCRIPT: TourStep[] = [
         } else if (t < 0.6) {
           // Phase 2: crank resonance
           const p = (t - 0.3) / 0.3;
-          cutoff = 0.9 - p * 0.4; // bring cutoff back down to let reso shine
+          cutoff = 0.9 - p * 0.4;
           resonance = 0.5 + p * 0.45;
           envMod = 0.5 + p * 0.2;
           decay = 0.5;
@@ -1011,12 +1053,26 @@ export const TOUR_SCRIPT: TourStep[] = [
           decay = 0.15;
         }
 
-        useInstrumentStore.getState().updateInstrument(id, {
-          tb303: {
-            filter: { cutoff, resonance },
-            filterEnvelope: { envMod, decay },
-          },
-        });
+        // Set params directly on the WASM synth for instant audio response
+        if (is303) {
+          (synthInstance as InstanceType<typeof DB303Synth>).set('cutoff', cutoff);
+          (synthInstance as InstanceType<typeof DB303Synth>).set('resonance', resonance);
+          (synthInstance as InstanceType<typeof DB303Synth>).set('envMod', envMod);
+          (synthInstance as InstanceType<typeof DB303Synth>).set('decay', decay);
+        }
+
+        // Update store so UI knobs reflect the changes (use full tb303 config to avoid shallow merge issues)
+        const current = useInstrumentStore.getState().getInstrument(id);
+        if (current?.tb303) {
+          const tb = current.tb303;
+          useInstrumentStore.getState().updateInstrument(id, {
+            tb303: {
+              ...tb,
+              filter: { ...tb.filter, cutoff, resonance },
+              filterEnvelope: { ...tb.filterEnvelope, envMod, decay },
+            },
+          });
+        }
         step++;
       }, intervalMs);
     },
@@ -1026,16 +1082,24 @@ export const TOUR_SCRIPT: TourStep[] = [
     id: 'acid-stop',
     narration: 'That is the sound of acid house. Born in Chicago, 1987.',
     action: async () => {
+      // Stop replayer directly + transport state (mirrors acid-play's direct approach)
+      const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
+      const replayer = getTrackerReplayer();
+      replayer.stop();
+      replayer.onRowChange = null;
+      replayer.onSongEnd = null;
       await trackerStop();
       await closeModals();
       // Reset 303 to defaults
       const { useInstrumentStore } = await import('@/stores/useInstrumentStore');
       const inst = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
-      if (inst) {
+      if (inst?.tb303) {
+        const tb = inst.tb303;
         useInstrumentStore.getState().updateInstrument(inst.id, {
           tb303: {
-            filter: { cutoff: 0.5, resonance: 0.5 },
-            filterEnvelope: { envMod: 0.5, decay: 0.5 },
+            ...tb,
+            filter: { ...tb.filter, cutoff: 0.5, resonance: 0.5 },
+            filterEnvelope: { ...tb.filterEnvelope, envMod: 0.5, decay: 0.5 },
           },
         });
       }
