@@ -225,6 +225,16 @@ class TourEngine {
       }
     });
 
+    // Clear automation curves the tour created
+    import('@/stores/useAutomationStore').then(({ useAutomationStore }) => {
+      useAutomationStore.getState().reset();
+    });
+
+    // Hide MIDI knob bar if it was shown
+    import('@/stores/useMIDIStore').then(({ useMIDIStore }) => {
+      useMIDIStore.getState().setShowKnobBar(false);
+    });
+
     // Restore previous view
     useUIStore.getState().setActiveView(this.previousView as never);
 
