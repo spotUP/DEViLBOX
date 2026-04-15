@@ -132,6 +132,7 @@ export const TrackScopesStrip: React.FC = memo(() => {
 
       // Fallback: master waveform from Tone.js analyser (for non-WASM formats)
       let masterWaveform: Float32Array | null = null;
+      let channelLevels: number[] | null = null;
       if (!useOsc && playing) {
         try {
           if (!analysersEnabledRef.current) {
@@ -142,6 +143,9 @@ export const TrackScopesStrip: React.FC = memo(() => {
           if (raw instanceof Float32Array) {
             masterWaveform = raw;
           }
+          // Per-channel audio levels to gate master waveform fallback —
+          // only show waveform on channels that actually have audio output
+          channelLevels = getToneEngine().getChannelLevels(nc);
         } catch { /* engine not ready */ }
       }
 
@@ -175,13 +179,11 @@ export const TrackScopesStrip: React.FC = memo(() => {
         if (useOsc && oscSnapshot && oscSnapshot[i] && oscSnapshot[i]!.length > 0) {
           drawWaveform(ctx, x, y, w, h, oscSnapshot[i]!, color, false);
         }
-        // Fallback: slice of master waveform (each channel gets a different segment)
+        // Fallback: master waveform on channels with actual audio output only
         else if (masterWaveform && masterWaveform.length > 0) {
-          const segLen = Math.floor(masterWaveform.length / nc);
-          const start = i * segLen;
-          const segment = masterWaveform.subarray(start, start + segLen);
-          if (segment.length > 0) {
-            drawWaveform(ctx, x, y, w, h, segment, color, true);
+          const hasAudio = channelLevels ? channelLevels[i] > 0 : true;
+          if (hasAudio) {
+            drawWaveform(ctx, x, y, w, h, masterWaveform, color, true);
           }
         }
 
