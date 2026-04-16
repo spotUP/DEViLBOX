@@ -339,32 +339,38 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const contextKnobs = React.useMemo((): KnobAssignment[] => {
     if (isDJ) return (DJ_KNOB_BANKS[djKnobPage] ?? []) as KnobAssignment[];
 
-    // Start with synth-specific params from NKS2 (auto-detected from current instrument)
-    const synthParams = nksKnobAssignments.length > 0 ? [...nksKnobAssignments] : [];
+    const hasSynth = nksKnobAssignments.length > 0;
+    const enabledFx = masterEffects.filter(fx => fx.enabled !== false);
 
-    // Always-relevant mixer knobs
-    const mixerKnobs: KnobAssignment[] = [
-      { cc: 70, param: 'mixer.filterPosition', label: 'Filter' },
-      { cc: 71, param: 'mixer.filterResonance', label: 'Reso' },
-      { cc: 72, param: 'mixer.volume', label: 'Volume' },
-      { cc: 73, param: 'mixer.pan', label: 'Pan' },
-    ];
+    // Nothing loaded — no synth, no FX → empty (hides bar)
+    if (!hasSynth && enabledFx.length === 0) return [];
 
-    // Master FX knobs — only for effects that are actually loaded
-    const fxKnobs: KnobAssignment[] = masterEffects
-      .filter(fx => fx.enabled !== false)
-      .slice(0, 3)
-      .map((fx, i) => ({
+    const all: KnobAssignment[] = [];
+
+    // Synth-specific params (auto-detected from current instrument via NKS2)
+    if (hasSynth) all.push(...nksKnobAssignments);
+
+    // Per-instrument mixer: filter/reso always work, volume/pan need an instrument
+    if (hasSynth) {
+      all.push(
+        { cc: 70, param: 'mixer.filterPosition', label: 'Filter' },
+        { cc: 71, param: 'mixer.filterResonance', label: 'Reso' },
+        { cc: 72, param: 'mixer.volume', label: 'Volume' },
+        { cc: 73, param: 'mixer.pan', label: 'Pan' },
+      );
+    }
+
+    // Master FX wet knobs — only for effects that are actually loaded
+    for (let i = 0; i < Math.min(enabledFx.length, 3); i++) {
+      all.push({
         cc: 74 + i,
         param: `masterFx.slot${i}.wet` as KnobAssignment['param'],
-        label: `${fx.type.substring(0, 6)} Wet`,
-      }));
+        label: `${enabledFx[i].type.substring(0, 6)} Wet`,
+      });
+    }
 
-    // Master volume always available
-    const masterKnob: KnobAssignment = { cc: 77, param: 'masterFx.masterVolume', label: 'Master' };
-
-    // Combine: synth params first, then mixer, then FX, then master
-    const all = [...synthParams, ...mixerKnobs, ...fxKnobs, masterKnob];
+    // Master volume — always relevant when anything is producing audio
+    all.push({ cc: 77, param: 'masterFx.masterVolume', label: 'Master' });
 
     // Deduplicate by param
     const seen = new Set<string>();
@@ -407,8 +413,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
 
   return (
     <div className="flex flex-col">
-      {/* MIDI Knob Controls - Expanded */}
-      {activeView !== 'vj' && showKnobBar && (
+      {/* MIDI Knob Controls - Expanded (hidden when nothing to control) */}
+      {activeView !== 'vj' && showKnobBar && contextKnobs.length > 0 && (
         <div className="bg-dark-bgTertiary border-t border-dark-border px-4 py-2 flex items-center gap-2">
           {/* Page nav left */}
           {showPageNav && (
@@ -423,7 +429,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
 
           {/* Context label */}
           <div className="text-[9px] font-bold text-text-muted uppercase tracking-widest whitespace-nowrap min-w-[60px]">
-            {isDJ ? DJ_KNOB_PAGE_NAMES[djKnobPage] : nksActiveSynthType || 'Mixer'}
+            {isDJ ? DJ_KNOB_PAGE_NAMES[djKnobPage] : nksActiveSynthType || 'Master FX'}
           </div>
 
           {/* Knobs */}
@@ -485,8 +491,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
 
         {/* Right: MIDI Device, Audio State & Tips */}
         <div className="flex items-center gap-4">
-          {/* Knob Bar Toggle */}
-          {activeView !== 'vj' && (
+          {/* Knob Bar Toggle — only show when there are knobs to control */}
+          {activeView !== 'vj' && (contextKnobs.length > 0 || hasMIDIDevice) && (
             <>
               <button
                 onClick={() => setShowKnobBar(!showKnobBar)}
