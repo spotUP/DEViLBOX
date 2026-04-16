@@ -140,6 +140,53 @@ export class AutomationPlayer {
 
     const engine = getToneEngine();
 
+    // ── Mixer targets (channel-level, applies at ToneEngine mixer) ──
+    if (parameter.startsWith('mixer.')) {
+      if (channelIndex === undefined) return;
+      try {
+        switch (shortName) {
+          case 'volume': {
+            // 0-1 → -40..0 dB (same mapping as generic Tone.js volume)
+            const volumeDb = -40 + value * 40;
+            engine.setChannelVolume(channelIndex, volumeDb);
+            break;
+          }
+          case 'pan':
+            engine.setChannelPan(channelIndex, value * 2 - 1); // 0-1 → -1 to 1
+            break;
+          case 'mute':
+            engine.setChannelMute(channelIndex, value >= 0.5);
+            break;
+        }
+      } catch (error) {
+        console.error(`Failed to apply mixer automation for ${parameter}:`, error);
+      }
+      return;
+    }
+
+    // ── Global targets (transport/master level) ──
+    if (parameter.startsWith('global.')) {
+      try {
+        switch (shortName) {
+          case 'masterVolume': {
+            // 0-1 → -40..0 dB
+            const masterDb = -40 + value * 40;
+            engine.setMasterVolume(masterDb);
+            break;
+          }
+          case 'bpm': {
+            // Map 0-1 to 20-999 BPM range
+            const bpm = 20 + value * (999 - 20);
+            Tone.getTransport().bpm.value = bpm;
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to apply global automation for ${parameter}:`, error);
+      }
+      return;
+    }
+
     // Try composite key first (instrumentId<<16 | channelIndex), then fall back to instrumentId<<16 | 0xFFFF (-1)
     let instrument = null;
     if (channelIndex !== undefined) {

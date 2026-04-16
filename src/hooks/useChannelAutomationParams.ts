@@ -7,11 +7,18 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useInstrumentStore } from '@stores';
-import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { getNKSParametersForSynth, MIXER_NKS_PARAMETERS, GLOBAL_NKS_PARAMETERS } from '@/midi/performance/synthParameterMaps';
 import { NKSSection } from '@/midi/performance/types';
 import type { NKSParameter } from '@/midi/performance/types';
 import type { SynthType } from '@typedefs/instrument';
 import { getToneEngine } from '@/engine/ToneEngine';
+
+/** Editor modes where synth-internal params are NOT accessible (WASM owns playback) */
+const WASM_PLAYBACK_MODES = new Set([
+  'hively', 'klystrack', 'tfmx', 'musicline', 'jamcracker',
+  'goattracker', 'sidfactory2', 'cheesecutter', 'sc68',
+]);
 
 export interface AutomatableParamInfo {
   key: string;         // NKS param id — used as automation curve key
@@ -149,8 +156,25 @@ export function getAutomatableParamsForChannel(
   const instrument = useInstrumentStore.getState().getInstrument(channel.instrumentId);
   if (!instrument) return [];
 
-  const nksParams = getNKSParametersForSynth(instrument.synthType as SynthType);
-  return nksToAutomatable(nksParams);
+  const editorMode = useFormatStore.getState().editorMode;
+  const isWasmFormat = WASM_PLAYBACK_MODES.has(editorMode);
+
+  // Synth-specific params (skipped for WASM playback formats)
+  let params: AutomatableParamInfo[] = [];
+  if (!isWasmFormat) {
+    const nksParams = getNKSParametersForSynth(instrument.synthType as SynthType);
+    params = nksToAutomatable(nksParams);
+  }
+
+  // Always append mixer + global params (work at the ToneEngine layer)
+  const mixerParams = nksToAutomatable(MIXER_NKS_PARAMETERS);
+  const globalParams = nksToAutomatable(GLOBAL_NKS_PARAMETERS);
+  const existingKeys = new Set(params.map(p => p.key));
+  for (const p of [...mixerParams, ...globalParams]) {
+    if (!existingKeys.has(p.key)) params.push(p);
+  }
+
+  return params;
 }
 
 /** React hook: subscribes to stores with targeted selectors, memoized */
@@ -174,17 +198,25 @@ export function useChannelAutomationParams(channelIndex: number): {
     })
   );
 
+  // Subscribe to editorMode for format-aware filtering
+  const editorMode = useFormatStore((s) => s.editorMode);
+
   return useMemo(() => {
     if (!instrumentInfo)
       return { params: [], groups: [], synthType: null, instrumentName: null };
 
+    const isWasmFormat = WASM_PLAYBACK_MODES.has(editorMode);
+
     // Try dynamic params first (VST Bridge synths with 700+ params)
-    const dynamicParams = instrumentId !== null
+    const dynamicParams = !isWasmFormat && instrumentId !== null
       ? getDynamicParamsForInstrument(instrumentId)
       : null;
 
     let params: AutomatableParamInfo[];
-    if (dynamicParams && dynamicParams.length > 0) {
+    if (isWasmFormat) {
+      // WASM formats: only mixer + global (synth internals not accessible)
+      params = [];
+    } else if (dynamicParams && dynamicParams.length > 0) {
       // Merge: static NKS params first (curated), then dynamic ones not already covered
       const nksParams = nksToAutomatable(getNKSParametersForSynth(instrumentInfo.synthType as SynthType));
       const nksKeys = new Set(nksParams.map(p => p.key));
@@ -195,6 +227,14 @@ export function useChannelAutomationParams(channelIndex: number): {
       params = nksToAutomatable(nksParams);
     }
 
+    // Always append mixer + global params
+    const mixerParams = nksToAutomatable(MIXER_NKS_PARAMETERS);
+    const globalParams = nksToAutomatable(GLOBAL_NKS_PARAMETERS);
+    const existingKeys = new Set(params.map(p => p.key));
+    for (const p of [...mixerParams, ...globalParams]) {
+      if (!existingKeys.has(p.key)) params.push(p);
+    }
+
     const groups = groupParamsBySection(params);
 
     return {
@@ -203,5 +243,5 @@ export function useChannelAutomationParams(channelIndex: number): {
       synthType: instrumentInfo.synthType,
       instrumentName: instrumentInfo.name,
     };
-  }, [instrumentInfo, instrumentId]);
+  }, [instrumentInfo, instrumentId, editorMode]);
 }
