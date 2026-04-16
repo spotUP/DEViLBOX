@@ -226,7 +226,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             { value: 'tracker', label: 'Tracker' },
             { value: 'grid', label: 'Grid' },
           ]}
-          className="px-3 py-1.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
         />
 
         {/* Pattern Order */}
@@ -266,7 +265,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
                 value: String(idx),
                 label: (idx + 1).toString().padStart(2, '0'),
               }))}
-              className="px-3 py-1.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
             />
           </>
         )}
