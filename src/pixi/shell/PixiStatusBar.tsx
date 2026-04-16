@@ -550,10 +550,10 @@ interface KnobPanelProps {
 }
 
 const BANK_DEFS: { id: KnobBankMode; label: string }[] = [
-  { id: '303',   label: '303/Synth' },
-  { id: 'Siren', label: 'Dub Siren' },
-  { id: 'FX',    label: 'Effects'   },
-  { id: 'Mixer', label: 'Mixer'     },
+  { id: '303',      label: '303/Synth' },
+  { id: 'Siren',    label: 'Dub Siren' },
+  { id: 'FX',       label: 'Effects'   },
+  { id: 'MasterFX', label: 'Master FX' },
 ];
 
 const KnobPanel: React.FC<KnobPanelProps> = ({ width, height, knobBank, setKnobBank, assignments }) => {

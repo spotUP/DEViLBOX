@@ -292,7 +292,7 @@ export const useMIDIStore = create<MIDIStore>()(
                 if (message.note === 36) { store.setKnobBank('303'); return; }
                 if (message.note === 37) { store.setKnobBank('Siren'); return; }
                 if (message.note === 38) { store.setKnobBank('FX'); return; }
-                if (message.note === 39) { store.setKnobBank('Mixer'); return; }
+                if (message.note === 39) { store.setKnobBank('MasterFX'); return; }
 
                 // Pad Bank B: page switching (notes 40-41)
                 if (message.note === 40) {
