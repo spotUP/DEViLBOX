@@ -26,6 +26,8 @@ export interface SampleData {
   sampleRate: number;
   reversedBuffer?: AudioBuffer;
   originalAudioBuffer?: AudioBuffer;
+  /** URL the sample was loaded from (built-in pack path, e.g. '/data/samples/packs/...') — enables re-fetch on environment restore */
+  sourceUrl?: string;
 }
 
 export interface SampleLayer {
