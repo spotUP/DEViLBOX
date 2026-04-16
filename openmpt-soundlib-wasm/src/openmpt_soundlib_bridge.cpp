@@ -92,9 +92,12 @@ int osl_create_new(int modtype, int numChannels, int numPatterns) {
     }
     g_sf->Create(mt, static_cast<CHANNELINDEX>(numChannels));
 
-    // Create initial patterns
+    // Create initial patterns and set up order list.
+    // Both are required — without the order list, libopenmpt sees 0 orders
+    // and read_float_stereo returns 0 frames immediately.
     for (int i = 0; i < numPatterns; i++) {
         g_sf->Patterns.Insert(i, 64);
+        g_sf->Order().push_back(static_cast<PATTERNINDEX>(i));
     }
     return 1;
 }
@@ -235,7 +238,12 @@ int32_t osl_get_order_pattern(int32_t order) {
 EMSCRIPTEN_KEEPALIVE
 void osl_set_order(int32_t order, int32_t pattern) {
     if (!g_sf || order < 0) return;
-    g_sf->Order()[static_cast<ORDERINDEX>(order)] = static_cast<PATTERNINDEX>(pattern);
+    auto idx = static_cast<ORDERINDEX>(order);
+    // Grow the order list if needed — operator[] on std::vector is UB past size()
+    if (idx >= g_sf->Order().GetLength()) {
+        g_sf->Order().resize(idx + 1);
+    }
+    g_sf->Order()[idx] = static_cast<PATTERNINDEX>(pattern);
 }
 
 EMSCRIPTEN_KEEPALIVE
