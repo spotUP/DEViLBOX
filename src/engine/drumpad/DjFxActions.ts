@@ -14,12 +14,17 @@
 import * as Tone from 'tone';
 import { bpmToMs, type SyncDivision } from '../bpmSync';
 import { useTransportStore } from '../../stores/useTransportStore';
+import { useDJStore } from '../../stores/useDJStore';
+import { getDJEngine } from '../dj/DJEngine';
+import { filterSweep, filterReset, echoOut, instantEQKill, cancelAllAutomation } from '../dj/DJQuantizedFX';
+import { beatJump } from '../dj/DJBeatJump';
+import type { DeckId } from '../dj/DeckEngine';
 
 // ─── Types ────────────────────────────────────────────────────────
 
 export type DjFxActionId =
   // Stutter / Glitch
-  | 'fx_stutter_8th' | 'fx_stutter_16th' | 'fx_stutter_32nd'
+  | 'fx_stutter_4' | 'fx_stutter_8' | 'fx_stutter_16'
   // Delay / Echo
   | 'fx_dub_echo' | 'fx_tape_echo' | 'fx_ping_pong'
   // Filter
@@ -33,7 +38,13 @@ export type DjFxActionId =
   // Tape / Vinyl
   | 'fx_tape_stop' | 'fx_vinyl_brake' | 'fx_half_speed'
   // One-shot sounds
-  | 'fx_dub_siren' | 'fx_air_horn' | 'fx_laser' | 'fx_noise_riser';
+  | 'fx_dub_siren' | 'fx_air_horn' | 'fx_laser' | 'fx_noise_riser'
+  // Deck FX (real DJ engine effects targeting the active deck)
+  | 'fx_deck_hpf_sweep' | 'fx_deck_lpf_sweep' | 'fx_deck_filter_reset'
+  | 'fx_deck_echo_out'
+  | 'fx_deck_kill_lo' | 'fx_deck_kill_mid' | 'fx_deck_kill_hi'
+  | 'fx_deck_brake'
+  | 'fx_deck_jump_m4' | 'fx_deck_jump_m1' | 'fx_deck_jump_p1' | 'fx_deck_jump_p4';
 
 export interface DjFxAction {
   id: DjFxActionId;
@@ -1097,12 +1108,180 @@ function createNoiseRiser(): DjFxAction {
   };
 }
 
+// ─── Deck-Targeted FX (real DJ engine) ────────────────────────────
+
+/** Returns the first playing deck (A > B > C), defaulting to A. */
+function getActiveDeckId(): DeckId {
+  try {
+    const { decks } = useDJStore.getState();
+    if (decks.B.isPlaying && !decks.A.isPlaying) return 'B';
+    if (decks.C.isPlaying && !decks.A.isPlaying && !decks.B.isPlaying) return 'C';
+  } catch { /* store not ready */ }
+  return 'A';
+}
+
+// Track cancel functions for deck sweeps so disengage can stop them
+const deckSweepCancels = new Map<string, () => void>();
+
+function createDeckFilterSweep(direction: 'hpf' | 'lpf'): DjFxAction {
+  const target = direction === 'hpf' ? -0.85 : 0.85;
+  const id = direction === 'hpf' ? 'fx_deck_hpf_sweep' : 'fx_deck_lpf_sweep';
+  return {
+    id: id as DjFxActionId,
+    name: direction === 'hpf' ? 'HPF Sweep' : 'LPF Sweep',
+    category: 'filter',
+    mode: 'momentary',
+    engage() {
+      const deckId = getActiveDeckId();
+      const cancel = filterSweep(deckId, target, 4);
+      deckSweepCancels.set(this.id, cancel);
+    },
+    disengage() {
+      const cancel = deckSweepCancels.get(this.id);
+      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+      const deckId = getActiveDeckId();
+      filterReset(deckId);
+    },
+  };
+}
+
+function createDeckFilterReset(): DjFxAction {
+  return {
+    id: 'fx_deck_filter_reset',
+    name: 'Filter Reset',
+    category: 'filter',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      filterReset(deckId);
+      cancelAllAutomation();
+    },
+    disengage() { /* one-shot — nothing to undo */ },
+  };
+}
+
+function createDeckEchoOut(): DjFxAction {
+  return {
+    id: 'fx_deck_echo_out',
+    name: 'Echo Out',
+    category: 'delay',
+    mode: 'momentary',
+    engage() {
+      const deckId = getActiveDeckId();
+      const cancel = echoOut(deckId, 8);
+      deckSweepCancels.set(this.id, cancel);
+    },
+    disengage() {
+      const cancel = deckSweepCancels.get(this.id);
+      if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+    },
+  };
+}
+
+function createDeckEQKill(band: 'low' | 'mid' | 'high'): DjFxAction {
+  const bandLabel = band === 'low' ? 'Lo' : band === 'mid' ? 'Mid' : 'Hi';
+  const id = `fx_deck_kill_${band === 'low' ? 'lo' : band === 'mid' ? 'mid' : 'hi'}` as DjFxActionId;
+  return {
+    id,
+    name: `Kill ${bandLabel}`,
+    category: 'filter',
+    mode: 'momentary',
+    engage() {
+      const deckId = getActiveDeckId();
+      instantEQKill(deckId, band, true);
+    },
+    disengage() {
+      const deckId = getActiveDeckId();
+      instantEQKill(deckId, band, false);
+    },
+  };
+}
+
+function createDeckBrake(): DjFxAction {
+  return {
+    id: 'fx_deck_brake',
+    name: 'Brake',
+    category: 'tape',
+    mode: 'momentary',
+    engage() {
+      const deckId = getActiveDeckId();
+      try {
+        const deck = getDJEngine().getDeck(deckId);
+        // Decelerate playback to simulate vinyl brake
+        if (deck.playbackMode === 'audio') {
+          const ctx = getCtx();
+          const now = ctx.currentTime;
+          const node = deck.audioPlayer as any;
+          if (node?._source?.playbackRate) {
+            const rate = node._source.playbackRate;
+            rate.cancelScheduledValues(now);
+            rate.setValueAtTime(rate.value, now);
+            rate.linearRampToValueAtTime(0.01, now + 1.2);
+          }
+        } else {
+          // Tracker: ramp tempo multiplier down
+          let mult = 1.0;
+          const interval = setInterval(() => {
+            mult *= 0.92;
+            if (mult < 0.02) {
+              clearInterval(interval);
+              try { deck.pause(); } catch { /* */ }
+              return;
+            }
+            try {
+              deck.replayer.setTempoMultiplier(mult);
+              deck.replayer.setPitchMultiplier(mult);
+            } catch { /* */ }
+          }, 30);
+          activeFx.set(this.id, { nodes: [], timer: interval as unknown as ReturnType<typeof setTimeout> });
+        }
+      } catch { /* engine not ready */ }
+    },
+    disengage() {
+      cleanupFx(this.id);
+      const deckId = getActiveDeckId();
+      try {
+        const deck = getDJEngine().getDeck(deckId);
+        if (deck.playbackMode === 'audio') {
+          const ctx = getCtx();
+          const node = deck.audioPlayer as any;
+          if (node?._source?.playbackRate) {
+            node._source.playbackRate.cancelScheduledValues(ctx.currentTime);
+            node._source.playbackRate.setValueAtTime(1, ctx.currentTime);
+          }
+        } else {
+          deck.replayer.setTempoMultiplier(1);
+          deck.replayer.setPitchMultiplier(1);
+        }
+      } catch { /* engine not ready */ }
+    },
+  };
+}
+
+function createDeckBeatJump(beats: number): DjFxAction {
+  const sign = beats > 0 ? 'p' : 'm';
+  const abs = Math.abs(beats);
+  const id = `fx_deck_jump_${sign}${abs}` as DjFxActionId;
+  const label = beats > 0 ? `Jump +${abs}` : `Jump −${abs}`;
+  return {
+    id,
+    name: label,
+    category: 'tape',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      beatJump(deckId, beats);
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
 // ─── Registry ─────────────────────────────────────────────────────
 
 const stutterActions = [
+  createStutter('1/4'),
   createStutter('1/8'),
   createStutter('1/16'),
-  createStutter('1/32'),
 ];
 
 export const DJ_FX_ACTIONS: DjFxAction[] = [
@@ -1133,6 +1312,19 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createAirHorn(),
   createLaser(),
   createNoiseRiser(),
+  // Deck FX (real DJ engine)
+  createDeckFilterSweep('hpf'),
+  createDeckFilterSweep('lpf'),
+  createDeckFilterReset(),
+  createDeckEchoOut(),
+  createDeckEQKill('low'),
+  createDeckEQKill('mid'),
+  createDeckEQKill('high'),
+  createDeckBrake(),
+  createDeckBeatJump(-4),
+  createDeckBeatJump(-1),
+  createDeckBeatJump(1),
+  createDeckBeatJump(4),
 ];
 
 export const DJ_FX_ACTION_MAP: Record<DjFxActionId, DjFxAction> = Object.fromEntries(

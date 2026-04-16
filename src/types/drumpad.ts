@@ -140,7 +140,7 @@ export function createEmptyPad(id: number): DrumPad {
     id,
     sample: null,
     name: `Pad ${id}`,
-    level: 100,
+    level: 127,
     tune: 0,
     pan: 0,
     output: 'stereo',
@@ -155,7 +155,7 @@ export function createEmptyPad(id: number): DrumPad {
     filterAttack: 0,
     filterDecay: 50,
     filterEnvAmount: 0,
-    veloToLevel: 100,
+    veloToLevel: 70,
     veloToAttack: 0,
     veloToStart: 0,
     veloToFilter: 0,
@@ -391,32 +391,32 @@ export function create909Program(): DrumProgram {
 }
 
 /**
- * Factory preset: DJ FX Kit — Momentary performance effects on pads
+ * Factory preset: DJ FX Kit — Real DJ deck effects + performance FX
  */
 export function createDJFXProgram(): DrumProgram {
   const program = createEmptyProgram('C-01', 'DJ FX');
 
   const fxPads: { name: string; color: string; action: DjFxActionId }[] = [
-    // Row 1: Stutter & Echo
-    { name: 'Stutter 1/8',  color: '#ef4444', action: 'fx_stutter_8th' },
-    { name: 'Stutter 1/16', color: '#f97316', action: 'fx_stutter_16th' },
-    { name: 'Stutter 1/32', color: '#eab308', action: 'fx_stutter_32nd' },
-    { name: 'Dub Echo',     color: '#22c55e', action: 'fx_dub_echo' },
-    // Row 2: Delay & Filter
-    { name: 'Tape Echo',    color: '#14b8a6', action: 'fx_tape_echo' },
-    { name: 'Ping Pong',    color: '#06b6d4', action: 'fx_ping_pong' },
-    { name: 'HP Sweep',     color: '#3b82f6', action: 'fx_filter_hp_sweep' },
-    { name: 'LP Sweep',     color: '#6366f1', action: 'fx_filter_lp_sweep' },
-    // Row 3: Modulation & FX
-    { name: 'Reverb Wash',  color: '#8b5cf6', action: 'fx_reverb_wash' },
-    { name: 'Flanger',      color: '#a855f7', action: 'fx_flanger' },
-    { name: 'Phaser',       color: '#d946ef', action: 'fx_phaser' },
-    { name: 'Ring Mod',     color: '#ec4899', action: 'fx_ring_mod' },
-    // Row 4: Wild FX & Sounds
-    { name: 'Bitcrush',     color: '#f43f5e', action: 'fx_bitcrush' },
+    // Row 1: Deck filter & echo (real DJ engine effects)
+    { name: 'HPF Sweep',    color: '#3b82f6', action: 'fx_deck_hpf_sweep' },
+    { name: 'LPF Sweep',    color: '#6366f1', action: 'fx_deck_lpf_sweep' },
+    { name: 'Echo Out',     color: '#22c55e', action: 'fx_deck_echo_out' },
+    { name: 'Brake',        color: '#ef4444', action: 'fx_deck_brake' },
+    // Row 2: EQ kills & filter reset (real DJ engine effects)
+    { name: 'Kill Lo',      color: '#f97316', action: 'fx_deck_kill_lo' },
+    { name: 'Kill Mid',     color: '#eab308', action: 'fx_deck_kill_mid' },
+    { name: 'Kill Hi',      color: '#a3e635', action: 'fx_deck_kill_hi' },
+    { name: 'Filt Reset',   color: '#14b8a6', action: 'fx_deck_filter_reset' },
+    // Row 3: Beat jumps (real DJ engine effects)
+    { name: 'Jump −4',      color: '#8b5cf6', action: 'fx_deck_jump_m4' },
+    { name: 'Jump −1',      color: '#a855f7', action: 'fx_deck_jump_m1' },
+    { name: 'Jump +1',      color: '#d946ef', action: 'fx_deck_jump_p1' },
+    { name: 'Jump +4',      color: '#ec4899', action: 'fx_deck_jump_p4' },
+    // Row 4: Performance FX & sounds (master bus)
+    { name: 'Stutter 1/8',  color: '#f43f5e', action: 'fx_stutter_8' },
     { name: 'Dub Siren',    color: '#fb923c', action: 'fx_dub_siren' },
     { name: 'Air Horn',     color: '#fbbf24', action: 'fx_air_horn' },
-    { name: 'Noise Riser',  color: '#a3e635', action: 'fx_noise_riser' },
+    { name: 'Noise Riser',  color: '#06b6d4', action: 'fx_noise_riser' },
   ];
 
   fxPads.forEach((fx, i) => {
