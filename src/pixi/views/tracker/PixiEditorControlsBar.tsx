@@ -40,7 +40,6 @@ const PASTE_MODE_OPTIONS: SelectOption[] = [
 const TRACKER_SUB_MODES = [
   { value: 'tracker', label: 'Tracker' },
   { value: 'grid', label: 'Grid' },
-  { value: 'tb303', label: 'TB-303' },
 ];
 
 // ─── Genre Analysis Badge ─────────────────────────────────────────────────────
@@ -512,7 +511,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   // ── Pixi-specific handlers ────────────────────────────────────────────────
   const handleViewModeChange = useCallback((val: string) => {
     // Local sub-modes stay in tracker view; global views use shared switchView
-    if (val === 'tracker' || val === 'grid' || val === 'tb303') {
+    if (val === 'tracker' || val === 'grid') {
       setTimeout(() => onViewModeChange(val as TrackerViewMode), 0);
     } else {
       switchView(val);
