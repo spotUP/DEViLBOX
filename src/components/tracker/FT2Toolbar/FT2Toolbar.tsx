@@ -54,14 +54,11 @@ interface FT2ToolbarProps {
   onShowPatterns?: () => void;
   onShowExport?: () => void;
   onShowHelp?: (tab?: string) => void;
-  onShowMasterFX?: () => void;
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
-  onShowPatternOrder?: () => void;
   onShowFindReplace?: () => void;
   showFindReplace?: boolean;
   showPatterns?: boolean;
-  showMasterFX?: boolean;
   showInstrumentFX?: boolean;
   compact?: boolean;
 }
@@ -69,12 +66,9 @@ interface FT2ToolbarProps {
 export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   onShowExport,
   onShowHelp,
-  onShowMasterFX,
   onShowInstruments,
-  onShowPatternOrder,
   onShowFindReplace,
   showFindReplace,
-  showMasterFX,
 }) => {
   const {
     patterns,
@@ -735,10 +729,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
         <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} title="Import module file">Import</Button>
-        <Button variant="ghost" size="sm" onClick={onShowPatternOrder} title="Pattern order list">Order</Button>
         <Button variant={showFindReplace ? 'primary' : 'ghost'} size="sm" onClick={onShowFindReplace} title="Find & replace (Ctrl+F)">Find</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
-        <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX} title="Master effects chain">Master FX</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.()} title="Help & keyboard shortcuts (?)">Help</Button>
         <Button variant={showAbout ? 'primary' : 'ghost'} size="sm" onClick={() => setShowAbout(true)} title="About DEViLBOX">About</Button>

@@ -69,13 +69,11 @@ interface TrackerViewProps {
   onShowExport?: () => void;
   onShowHelp?: (tab?: string) => void;
   onShowMasterFX?: () => void;
-  onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
   onShowImportModule?: () => void;
   onShowPatterns?: () => void;
   onShowDrumpads?: () => void;
   showMasterFX?: boolean;
-  showInstrumentFX?: boolean;
   showImportModule?: boolean;
   showPatterns?: boolean;
 }
@@ -125,12 +123,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   onShowExport,
   onShowHelp,
   onShowMasterFX,
-  onShowInstrumentFX,
   onShowInstruments,
   onShowImportModule,
   onShowDrumpads,
   showMasterFX,
-  showInstrumentFX,
   showImportModule: externalShowImportModule,
 }) => {
   const { isMobile, width: windowWidth } = useResponsive();
@@ -518,14 +514,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           <FT2Toolbar
             onShowExport={onShowExport}
             onShowHelp={onShowHelp}
-            onShowMasterFX={onShowMasterFX}
-            onShowInstrumentFX={onShowInstrumentFX}
             onShowInstruments={onShowInstruments}
-            onShowPatternOrder={() => setShowPatternOrder(true)}
             onShowFindReplace={() => setShowFindReplace(v => !v)}
             showFindReplace={showFindReplace}
-            showMasterFX={showMasterFX}
-            showInstrumentFX={showInstrumentFX}
           />
         </div>
       )}

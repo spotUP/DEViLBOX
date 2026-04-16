@@ -241,9 +241,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── Modal handlers ────────────────────────────────────────────────────────
   const handleShowExport      = useCallback(() => useUIStore.getState().openModal('export'), []);
   const handleShowHelp        = useCallback((tab?: string) => useUIStore.getState().openModal('help', { initialTab: tab ?? 'shortcuts' }), []);
-  const handleShowMasterFX    = useCallback(() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }, []);
   const handleShowInstruments  = useCallback(() => useUIStore.getState().openModal('instruments'), []);
-  const handleShowPatternOrder = useCallback(() => useUIStore.getState().openModal('patternOrder'), []);
   const handleShowDrumpads     = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
 
   // ── File operations ───────────────────────────────────────────────────────
@@ -600,7 +598,6 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} />
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
         <PixiButton label="Import"      variant="ghost" size="sm" onClick={handleImportFile} />
-        <PixiButton label="Order"       variant="ghost" size="sm" onClick={handleShowPatternOrder} />
         <PixiButton
           label="FX Search"
           variant={showFXSearchReplace ? 'ft2' : 'ghost'}
@@ -611,14 +608,6 @@ export const PixiFT2Toolbar: React.FC = () => {
         />
         <PixiButton label="Instruments" variant="ghost" size="sm" onClick={handleShowInstruments} />
         <PixiButton label="Pads"        variant="ghost" size="sm" onClick={handleShowDrumpads} />
-        <PixiButton
-          label="Master FX"
-          variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
-          color={modalOpen === 'masterFx' ? 'blue' : 'default'}
-          size="sm"
-          active={modalOpen === 'masterFx'}
-          onClick={handleShowMasterFX}
-        />
         <PixiButton
           label="Inst FX"
           variant={modalOpen === 'instrumentFx' ? 'ft2' : 'ghost'}
