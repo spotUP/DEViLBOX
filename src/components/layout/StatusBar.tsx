@@ -3,7 +3,7 @@
  * Shows tracker info in tracker/arrangement views, DJ info in DJ view.
  */
 
-import React, { useEffect, useRef, useState as useReactState } from 'react';
+import React, { useCallback, useEffect, useRef, useState as useReactState } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore, useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -13,7 +13,7 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { KnobAssignment } from '@/midi/knobBanks';
-import { getKnobBankForSynth } from '@/midi/knobBanks';
+import { getKnobBankForSynth, getKnobPageName } from '@/midi/knobBanks';
 import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '@/midi/djKnobBanks';
 import { Knob } from '@/components/controls/Knob';
 import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
@@ -323,6 +323,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     isInitialized, inputDevices, selectedInputId,
     showKnobBar, setShowKnobBar, knobValues, setKnobValue,
     nksKnobAssignments, nksKnobTotalPages, nksActiveSynthType,
+    nksKnobPage, nextKnobPage, prevKnobPage,
   } = useMIDIStore();
 
   const hasMIDIDevice = isInitialized && inputDevices.length > 0;
@@ -388,12 +389,39 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     });
   }, [isDJ, djKnobPage, nksKnobAssignments, nksActiveSynthType, masterEffects]);
 
-  // Paginate: 8 knobs per page
+  // Curated banks use MIDI store pagination; NKS2/generic use local pagination
+  const hasCuratedBank = !!(nksActiveSynthType
+    && getKnobBankForSynth(nksActiveSynthType as import('@/types/instrument').SynthType));
+  const useStorePaging = hasCuratedBank && nksKnobTotalPages > 1;
+
+  // Local pagination for NKS2/generic banks that exceed 8 knobs
   const [knobPage, setKnobPage] = useReactState(0);
-  const totalKnobPages = Math.max(1, Math.ceil(contextKnobs.length / 8));
-  const pageStart = knobPage * 8;
-  const pageKnobs = contextKnobs.slice(pageStart, pageStart + 8);
-  const showPageNav = totalKnobPages > 1 || (!isDJ && nksKnobTotalPages > 1);
+  const localTotalPages = Math.max(1, Math.ceil(contextKnobs.length / 8));
+
+  // Effective page state — curated banks use MIDI store, others use local
+  const effectivePage = useStorePaging ? nksKnobPage : knobPage;
+  const effectiveTotalPages = useStorePaging ? nksKnobTotalPages : localTotalPages;
+  const pageKnobs = useStorePaging ? contextKnobs : contextKnobs.slice(effectivePage * 8, effectivePage * 8 + 8);
+  const showPageNav = effectiveTotalPages > 1;
+
+  // Page label: curated banks show page name, others show synth type
+  const pageLabel = isDJ
+    ? DJ_KNOB_PAGE_NAMES[djKnobPage]
+    : useStorePaging
+      ? getKnobPageName(nksActiveSynthType as import('@/types/instrument').SynthType, nksKnobPage)
+      : nksActiveSynthType || 'Master FX';
+
+  const handlePrevPage = useCallback(() => {
+    if (isDJ) setDJKnobPage(Math.max(0, djKnobPage - 1));
+    else if (useStorePaging) prevKnobPage();
+    else setKnobPage(Math.max(0, knobPage - 1));
+  }, [isDJ, djKnobPage, setDJKnobPage, useStorePaging, prevKnobPage, knobPage]);
+
+  const handleNextPage = useCallback(() => {
+    if (isDJ) setDJKnobPage(Math.min(DJ_KNOB_PAGE_NAMES.length - 1, djKnobPage + 1));
+    else if (useStorePaging) nextKnobPage();
+    else setKnobPage(Math.min(localTotalPages - 1, knobPage + 1));
+  }, [isDJ, djKnobPage, setDJKnobPage, useStorePaging, nextKnobPage, knobPage, localTotalPages]);
 
   // Reset page when context changes
   useEffect(() => {
@@ -426,7 +454,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
           {/* Page nav left */}
           {showPageNav && (
             <button
-              onClick={() => isDJ ? setDJKnobPage(Math.max(0, djKnobPage - 1)) : setKnobPage(Math.max(0, knobPage - 1))}
+              onClick={handlePrevPage}
               className="p-1 text-text-muted hover:text-accent-primary transition-colors"
               title="Previous page"
             >
@@ -434,9 +462,9 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
             </button>
           )}
 
-          {/* Context label */}
+          {/* Context label — shows page name for curated banks */}
           <div className="text-[9px] font-bold text-text-muted uppercase tracking-widest whitespace-nowrap min-w-[60px]">
-            {isDJ ? DJ_KNOB_PAGE_NAMES[djKnobPage] : nksActiveSynthType || 'Master FX'}
+            {pageLabel}
           </div>
 
           {/* Knobs */}
@@ -468,10 +496,10 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
           {showPageNav && (
             <div className="flex items-center gap-1">
               <span className="text-[9px] text-text-muted font-mono whitespace-nowrap">
-                {(isDJ ? djKnobPage : knobPage) + 1}/{isDJ ? DJ_KNOB_PAGE_NAMES.length : totalKnobPages}
+                {effectivePage + 1}/{effectiveTotalPages}
               </span>
               <button
-                onClick={() => isDJ ? setDJKnobPage(Math.min(DJ_KNOB_PAGE_NAMES.length - 1, djKnobPage + 1)) : setKnobPage(Math.min(totalKnobPages - 1, knobPage + 1))}
+                onClick={handleNextPage}
                 className="p-1 text-text-muted hover:text-accent-primary transition-colors"
                 title="Next page"
               >
