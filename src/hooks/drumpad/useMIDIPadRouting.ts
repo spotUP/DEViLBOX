@@ -189,6 +189,16 @@ let _refCount = 0;
 const _heldPads = new Set<number>();
 const _pendingReleases = new Map<number, ReturnType<typeof setTimeout>>();
 
+/** Returns the currently held pad IDs (for joystick modulation routing) */
+export function getHeldDrumPads(): number[] {
+  return Array.from(_heldPads);
+}
+
+/** Returns the singleton DrumPadEngine instance (for direct voice filter modulation) */
+export function getDrumPadEngine(): DrumPadEngine | null {
+  return _engine;
+}
+
 function getOrCreateEngine(): DrumPadEngine {
   if (!_engine) {
     const ctx = getAudioContext();

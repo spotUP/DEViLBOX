@@ -20,3 +20,8 @@ export function getMIDIContext(): MIDIContext {
 export function isDJContext(): boolean {
   return useUIStore.getState().activeView === 'dj';
 }
+
+/** Check if drumpad view is active for MIDI routing */
+export function isDrumPadContext(): boolean {
+  return useUIStore.getState().activeView === 'drumpad';
+}

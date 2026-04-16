@@ -826,3 +826,100 @@ export function syncDJParamToStore(param: string, normalized: number): void {
 export function resetDJRouteCache(): void {
   _djRouteCache = null;
 }
+
+// ============================================================================
+// DRUMPAD JOYSTICK MODULATION
+// ============================================================================
+
+import { getDrumPadXYMapping } from '../drumpadXYMap';
+import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
+import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
+import type { DrumPadXYMapping } from '../drumpadXYMap';
+
+/**
+ * Apply joystick XY modulation to held drum pads.
+ *
+ * @param normalizedX - Joystick X axis (0-1, from pitch bend)
+ * @param normalizedY - Joystick Y axis (0-1, from mod wheel CC 1)
+ * @param heldPadIds  - Array of currently held pad IDs
+ */
+export function routeDrumPadModulation(
+  normalizedX: number | null,
+  normalizedY: number | null,
+  heldPadIds: number[],
+): void {
+  if (heldPadIds.length === 0) return;
+
+  const store = useDrumPadStore.getState();
+  const program = store.programs.get(store.currentProgramId);
+  if (!program) return;
+
+  for (const padId of heldPadIds) {
+    const pad = program.pads.find(p => p.id === padId);
+    if (!pad) continue;
+
+    const synthType = pad.synthConfig?.synthType;
+    const mapping = getDrumPadXYMapping(synthType);
+
+    if (normalizedX !== null) {
+      applyDrumPadAxis(mapping.x, normalizedX, padId);
+    }
+    if (normalizedY !== null) {
+      applyDrumPadAxis(mapping.y, normalizedY, padId);
+    }
+  }
+}
+
+function applyDrumPadAxis(
+  axis: DrumPadXYMapping['x'],
+  normalized: number,
+  padId: number,
+): void {
+  // Denormalize value based on curve
+  let value: number;
+  if (axis.curve === 'log') {
+    value = axis.min * Math.pow(axis.max / axis.min, normalized);
+  } else {
+    value = axis.min + normalized * (axis.max - axis.min);
+  }
+
+  if (axis.target === 'pad') {
+    // Modulate the pad's built-in filter via DrumPadEngine voice
+    applyPadFilterParam(padId, axis.param, value);
+  } else {
+    // Modulate via synth engine (routeParameterToEngine)
+    const instId = PAD_INSTRUMENT_BASE + padId;
+    routeParameterToEngine(axis.param, normalized, instId);
+  }
+}
+
+/**
+ * Directly modulate a DrumPadEngine voice's filter params.
+ * This works for sample-only pads and as the universal fallback.
+ */
+function applyPadFilterParam(padId: number, param: string, value: number): void {
+  const engine = getDrumPadEngine();
+  if (!engine) return;
+
+  const filterNode = engine.getVoiceFilter(padId);
+  if (!filterNode) return;
+
+  const now = filterNode.context.currentTime;
+  switch (param) {
+    case 'cutoff':
+      filterNode.frequency.setTargetAtTime(
+        Math.max(20, Math.min(20000, value)),
+        now,
+        0.01, // 10ms smoothing
+      );
+      break;
+    case 'resonance':
+      filterNode.Q.setTargetAtTime(
+        (value / 100) * 20,
+        now,
+        0.01,
+      );
+      break;
+  }
+}
