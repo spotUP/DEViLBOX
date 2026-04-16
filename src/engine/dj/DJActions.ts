@@ -67,6 +67,11 @@ export async function togglePlay(
 
   if (isPlaying) {
     // ── PAUSE ──
+    // If Auto DJ is active, pause it so its poll guard doesn't
+    // immediately resume the deck the user just paused.
+    if (store.autoDJEnabled) {
+      getAutoDJ().pause();
+    }
     if (spinDownMs > 0) {
       // Spin-down: gradually decelerate then stop
       try {
