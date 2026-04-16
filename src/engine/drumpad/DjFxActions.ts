@@ -1069,7 +1069,29 @@ function createNoiseRiser(): DjFxAction {
       });
     },
     disengage() {
-      cleanupFx(this.id);
+      const state = activeFx.get(this.id);
+      if (!state) return;
+      const ctx = getCtx();
+      const now = ctx.currentTime;
+      const fadeTime = 1.2;
+
+      const gainNode = state.nodes.find(n => n instanceof GainNode) as GainNode | undefined;
+      const filterNode = state.nodes.find(n => n instanceof BiquadFilterNode) as BiquadFilterNode | undefined;
+
+      if (gainNode) {
+        gainNode.gain.cancelScheduledValues(now);
+        gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
+      }
+      // Sweep filter back down for the "falling" effect
+      if (filterNode) {
+        filterNode.frequency.cancelScheduledValues(now);
+        filterNode.frequency.setValueAtTime(filterNode.frequency.value, now);
+        filterNode.frequency.exponentialRampToValueAtTime(200, now + fadeTime);
+      }
+
+      const timer = setTimeout(() => cleanupFx(this.id), fadeTime * 1000 + 50);
+      state.timer = timer as unknown as ReturnType<typeof setTimeout>;
     },
   };
 }
