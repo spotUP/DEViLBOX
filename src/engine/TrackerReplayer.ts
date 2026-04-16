@@ -1979,8 +1979,14 @@ export class TrackerReplayer {
         const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
         if (gen !== this._playGeneration) return;
         await osl.destroyModule();
-        const ok = await osl.createNewModule(1 /* XM */, this.song.numChannels || 4, this.song.patterns.length || 1);
+        const numPat = this.song.patterns.length || 1;
+        const ok = await osl.createNewModule(1 /* XM */, this.song.numChannels || 4, numPat);
         if (ok) {
+          // Set up order list — without this libopenmpt sees 0 orders and
+          // read_float_stereo returns 0 immediately, ending playback.
+          for (let i = 0; i < numPat; i++) {
+            await osl.setOrderPattern(i, i);
+          }
           const data = await osl.saveModule('xm');
           if (data && gen === this._playGeneration) {
             this.song.libopenmptFileData = data;
