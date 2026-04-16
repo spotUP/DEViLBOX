@@ -18,7 +18,7 @@
   "scripts": {
     "postinstall": "bash scripts/patch-espeak.sh",
     "start": "npm run dev",
-    "prebuild": "rm -rf public/dist dist 2>/dev/null; node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
+    "prebuild": "node -e \"const fs=require('fs');['public/dist','dist'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch{}})\" && node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
     "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
     "dev": "pkill -f 'node.*vite' 2>/dev/null || true && npm run asbuild && vitest run && vite",
     "dev:fullstack": "./dev.sh",
