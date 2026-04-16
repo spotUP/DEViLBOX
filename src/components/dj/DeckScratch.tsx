@@ -18,7 +18,6 @@ import { useDJStore } from '@/stores/useDJStore';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
 import {
   playDeckPattern,
-  stopDeckPattern,
   finishDeckPatternCycle,
   startDeckFaderLFO,
   stopDeckFaderLFO,
@@ -95,8 +94,8 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
       // Tap: one-shot — let current cycle finish then stop
       finishDeckPatternCycle(deckId);
     } else {
-      // Hold release: stop immediately
-      stopDeckPattern(deckId);
+      // Hold release: finish current cycle gracefully (no abrupt cut)
+      finishDeckPatternCycle(deckId);
     }
     // Always clear active state so button goes inactive immediately
     useDJStore.getState().setDeckPattern(deckId, null);
