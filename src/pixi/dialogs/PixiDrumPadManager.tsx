@@ -49,7 +49,7 @@ import {
 
 /* ── Scratch action handlers ────────────────────────────────────────────────── */
 
-const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
+const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => boolean> = {
   scratch_baby: djScratchBaby,
   scratch_trans: djScratchTrans,
   scratch_flare: djScratchFlare,
@@ -412,7 +412,8 @@ export const PixiDrumPadManager: React.FC = () => {
       const pad = currentProgram.pads.find(p => p.id === padId);
       if (pad) {
         if (pad.scratchAction) {
-          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
+          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(true);
+          heldPadsRef.current.add(padId); // track for release
         }
         if (pad.sample) {
           engineRef.current.triggerPad(pad, velocity);
@@ -437,8 +438,13 @@ export const PixiDrumPadManager: React.FC = () => {
     noteRepeatRef.current?.stopRepeat(padId);
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad && pad.playMode === 'sustain') {
-        engineRef.current.stopPad(padId, pad.release / 1000);
+      if (pad) {
+        if (pad.scratchAction) {
+          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
+        }
+        if (pad.playMode === 'sustain') {
+          engineRef.current.stopPad(padId, pad.release / 1000);
+        }
       }
     }
   }, [currentProgram]);
