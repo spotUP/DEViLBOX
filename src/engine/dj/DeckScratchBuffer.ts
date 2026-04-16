@@ -104,7 +104,16 @@ export class DeckScratchBuffer {
       return;
     }
 
+    // Disconnect filter→channelGain direct Tone.js connection and wire captureNode
+    // INLINE: filter → captureNode → channelGain. The captureNode passes audio
+    // through transparently while writing to the ring buffer. Wiring it inline
+    // (instead of as a dead-end tap) ensures the Web Audio pull-based graph
+    // actually calls captureNode.process() — without this, the ring buffer
+    // stays empty and backward scratch is silent.
+    try { filter.disconnect(outputNode); } catch { /* may not be connected yet */ }
     nativeFilter.connect(this.captureNode);
+    this.captureNode.connect(nativeChannel);
+
     this.playbackGain.connect(nativeChannel);
   }
 
