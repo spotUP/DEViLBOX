@@ -1965,17 +1965,16 @@ export class TrackerReplayer {
     // where async init clobbers a concurrently-imported real module.
     //
     // IMPORTANT: skip this if a native WASM engine already started (suppressNotes
-    // or coordinator.hasActiveDispatch), OR if the song has instruments with synth
-    // types that handle their own audio (V2, TB303, etc. — these play through
-    // ToneEngine's per-instrument path, not through libopenmpt). Without this
-    // check, V2M/V2 songs get a spurious libopenmpt XM that produces
-    // "[LibopenmptEngine] Worklet error: dur" console spam.
-    const hasNonSamplerSynths = this.song.instruments.some(inst =>
+    // or coordinator.hasActiveDispatch), OR if ALL non-sampler synths are native
+    // whole-player types (V2, HVL, UADE, etc.) that handle their own audio.
+    // Songs with replaced instruments (TB-303, FM, etc.) still need the soundlib
+    // so the libopenmpt path fires fireHybridNotesForRow().
+    const hasOnlyNativePlayerSynths = this.song.instruments.some(inst =>
       inst.synthType && inst.synthType !== 'Sampler' && inst.synthType !== 'Player'
-    );
+    ) && this._replacedInstruments.size === 0;
     if (!this.song.libopenmptFileData && !this.useWasmSequencer && !this.song.furnaceNative
         && !this._suppressNotes && !this.coordinator.hasActiveDispatch
-        && !hasNonSamplerSynths) {
+        && !hasOnlyNativePlayerSynths) {
       try {
         const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
         if (gen !== this._playGeneration) return;
