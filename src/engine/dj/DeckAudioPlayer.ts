@@ -206,10 +206,21 @@ export class DeckAudioPlayer {
     this._rateChangeTime = Tone.now();
     this._rateTrackingActive = wasPlaying;
     if (wasPlaying) {
+      // Snapshot old sources before stop — all of these are "dying" sources.
+      const activeSources = (this.player as any)._activeSources as Set<any>;
+      const oldSources = new Set(activeSources);
+
       // Stop current source then start fresh from new offset.
-      // Use immediate stop to prevent overlapping source nodes.
       this.player.stop();
       this.player.start(undefined, clamped);
+
+      // Remove old sources from _activeSources so that subsequent
+      // playbackRate changes (which call cancelStop() on ALL _activeSources)
+      // don't resurrect them. The old sources still complete their scheduled
+      // gain→0 fadeout and dispose themselves via their own internal timeouts.
+      for (const s of oldSources) {
+        activeSources.delete(s);
+      }
     } else {
       this._pendingOffset = clamped;
       this._rateTrackingActive = false;
