@@ -957,9 +957,17 @@ export class DeckEngine {
     this.decayRafId = requestAnimationFrame(animate);
   }
 
-  /** Get the channel gain AudioParam for fader automation */
+  /** Get the channel gain AudioParam for fader automation.
+   *  Also marks the Tone.js Signal as overridden so its internal value (1.0)
+   *  doesn't sum on top of our scheduled values. */
   getChannelGainParam(): AudioParam {
+    (this.channelGain.gain as unknown as { overridden: boolean }).overridden = true;
     return (this.channelGain.gain as unknown as { _param: AudioParam })._param;
+  }
+
+  /** Release the channel gain AudioParam from direct scheduling back to Tone.js control. */
+  releaseChannelGainParam(): void {
+    (this.channelGain.gain as unknown as { overridden: boolean }).overridden = false;
   }
 
   /** Play a named scratch pattern (with optional beat quantization) */
