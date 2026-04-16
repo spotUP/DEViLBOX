@@ -840,3 +840,34 @@ void hively_set_track_step(int32 trackIdx, int32 stepIdx,
     s->stp_FXb        = fxb;
     s->stp_FXbParam   = fxbParam;
 }
+
+/* ---- Per-voice parameter automation ---- */
+
+/*
+ * Set a voice parameter for live automation.
+ * paramId selects which field to write:
+ *   0 = vc_FilterSpeed      (int16, -128..127)
+ *   1 = vc_FilterLowerLimit  (int16, 0..63)
+ *   2 = vc_FilterUpperLimit  (int16, 0..63)
+ *   3 = vc_VibratoSpeed      (int16, 0..63)
+ *   4 = vc_VibratoDepth      (int16, 0..15)
+ *   5 = vc_SquareSpeed       (int16, TODO range)
+ *   6 = vc_Pan               (uint32, 0..255)
+ *
+ * Values are raw integers matching the struct field ranges.
+ */
+EMSCRIPTEN_KEEPALIVE
+void hively_set_voice_param(int ch, int paramId, int value) {
+    if (!g_tune || ch < 0 || ch >= MAX_CHANNELS) return;
+    struct hvl_voice *vc = &g_tune->ht_Voices[ch];
+    switch (paramId) {
+        case 0: vc->vc_FilterSpeed      = (int16)value; vc->vc_FilterOn = 1; break;
+        case 1: vc->vc_FilterLowerLimit  = (int16)value; break;
+        case 2: vc->vc_FilterUpperLimit  = (int16)value; break;
+        case 3: vc->vc_VibratoSpeed      = (int16)value; break;
+        case 4: vc->vc_VibratoDepth      = (int16)value; break;
+        case 5: vc->vc_SquareWait        = (int16)value; break;
+        case 6: vc->vc_Pan               = (uint32)value; break;
+        default: break;
+    }
+}
