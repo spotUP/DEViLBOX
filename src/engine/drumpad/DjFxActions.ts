@@ -475,20 +475,18 @@ function createFilterSweep(type: 'highpass' | 'lowpass' | 'bandpass'): DjFxActio
       // Cancel any scheduled automation
       filter.frequency.cancelScheduledValues(ctx.currentTime);
 
-      // Sweep back to neutral position over 0.5s, then cleanup
+      // Sweep back to neutral position over 2s (same speed as sweep-in)
+      const sweepBack = 2;
       if (type === 'highpass') {
-        // Sweep back down to 20Hz (fully open)
-        filter.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.5);
+        filter.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + sweepBack);
       } else if (type === 'lowpass') {
-        // Sweep back up to 20kHz (fully open)
-        filter.frequency.exponentialRampToValueAtTime(20000, ctx.currentTime + 0.5);
+        filter.frequency.exponentialRampToValueAtTime(20000, ctx.currentTime + sweepBack);
       } else {
-        // Bandpass sweep back to center
-        filter.frequency.exponentialRampToValueAtTime(500, ctx.currentTime + 0.5);
+        filter.frequency.exponentialRampToValueAtTime(500, ctx.currentTime + sweepBack);
       }
 
       // Cleanup after sweep completes
-      const cleanupTimer = setTimeout(() => cleanupFx(this.id), 600);
+      const cleanupTimer = setTimeout(() => cleanupFx(this.id), sweepBack * 1000 + 100);
       state.timer = cleanupTimer;
       activeFx.set(this.id, state);
     },
@@ -1138,10 +1136,13 @@ function createDeckFilterSweep(direction: 'hpf' | 'lpf'): DjFxAction {
       deckSweepCancels.set(this.id, cancel);
     },
     disengage() {
+      // Cancel the forward sweep
       const cancel = deckSweepCancels.get(this.id);
       if (cancel) { cancel(); deckSweepCancels.delete(this.id); }
+      // Sweep back to center at the same speed (4 beats)
       const deckId = getActiveDeckId();
-      filterReset(deckId);
+      const returnCancel = filterSweep(deckId, 0, 4);
+      deckSweepCancels.set(this.id + '_return', returnCancel);
     },
   };
 }
