@@ -62,7 +62,7 @@ export interface FileItem {
   cloudId?: string;
 }
 
-export type FileSource = 'demo' | 'cloud' | 'modland' | 'hvsc';
+export type FileSource = 'demo' | 'cloud' | 'online' | 'modland' | 'hvsc';
 
 // Helper to detect tracker module files (binary formats)
 export const TRACKER_EXTENSIONS = [
@@ -273,7 +273,7 @@ export function useFileNavigation({
 
   // Quick-nav keyboard handler: 0-9, a-z jump to matching file
   useEffect(() => {
-    if (!isOpen || fileSource === 'modland' || fileSource === 'hvsc') return;
+    if (!isOpen || fileSource === 'modland' || fileSource === 'hvsc' || fileSource === 'online') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if an input/select/textarea is focused
@@ -334,7 +334,7 @@ export function useFileNavigation({
   // Load files based on view mode
   const loadFiles = useCallback(async () => {
     // Modland and HVSC tabs handle their own data loading
-    if (fileSource === 'modland' || fileSource === 'hvsc') return;
+    if (fileSource === 'modland' || fileSource === 'hvsc' || fileSource === 'online') return;
 
     setIsLoading(true);
     setError(null);
