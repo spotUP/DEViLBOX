@@ -894,6 +894,11 @@ export class ScratchPlayback {
     return this.patternTimeoutId !== null && this.activePattern === null;
   }
 
+  /** Whether the fader LFO is currently active (for reverb send logic). */
+  get isFaderLFOActive(): boolean {
+    return this.faderLFOActive;
+  }
+
   /**
    * Let the current cycle complete then stop (tap/one-shot mode).
    * If the pattern is waiting for a quantize beat, cancel it immediately.

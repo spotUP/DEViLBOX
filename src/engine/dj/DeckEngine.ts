@@ -2,6 +2,7 @@
  * DeckEngine - One DJ deck: owns a TrackerReplayer + audio chain
  *
  * Audio chain: TrackerReplayer.masterGain → deckGain → EQ3 → filter → channelGain → output
+ *                                                                  ↘ reverbSend → reverb → output (bypasses fader gate)
  *
  * The output node is provided by the DJMixerEngine (crossfader input).
  */
@@ -137,6 +138,14 @@ export class DeckEngine {
   private _rawDeckGainParam: AudioParam | null = null;
   private _brickwallLimiter: DynamicsCompressorNode | null = null;
 
+  // Scratch/LFO reverb send — taps audio pre-fader, feeds through a short
+  // reverb that bypasses the channelGain gate, creating a reverb tail that
+  // bleeds through during fader chops.
+  private _reverbSend: GainNode | null = null;
+  private _reverbNode: ConvolverNode | null = null;
+  private _reverbWet: GainNode | null = null;
+  private _reverbActive = false;
+
   /**
    * Safely ramp deckGain to a target value using the RAW native AudioParam.
    * Completely bypasses Tone.Signal to avoid any automation corruption.
@@ -213,6 +222,28 @@ export class DeckEngine {
       limiter.connect(nativeMeterInput);
     } else {
       this.channelGain.connect(this.meter);
+    }
+
+    // Scratch/LFO reverb send: taps pre-fader audio → short reverb → limiter
+    // Bypasses channelGain so reverb tail bleeds through during fader chops.
+    // Send gain starts at 0 (silent) — enabled when scratch/LFO effects are active.
+    try {
+      this._reverbSend = ctx.createGain();
+      this._reverbSend.gain.value = 0;
+      this._reverbNode = ctx.createConvolver();
+      this._reverbNode.buffer = DeckEngine._createReverbIR(ctx, 0.6, 4000);
+      this._reverbWet = ctx.createGain();
+      this._reverbWet.gain.value = 0.25; // 25% wet level
+
+      const nativeLPF = getNativeAudioNode(this.filterLPF as unknown as Record<string, unknown>);
+      if (nativeLPF) {
+        nativeLPF.connect(this._reverbSend);
+      }
+      this._reverbSend.connect(this._reverbNode);
+      this._reverbNode.connect(this._reverbWet);
+      this._reverbWet.connect(limiter);
+    } catch (err) {
+      console.warn('[DeckEngine] reverb send setup failed:', err);
     }
 
     // Create TrackerReplayer connected to our deckGain input
@@ -1012,6 +1043,7 @@ export class DeckEngine {
     }
 
     this.scratchPlayback.play(pattern, onWaiting);
+    this._enableReverbSend();
   }
 
   /** Stop the currently looping scratch pattern and restore speed to the pitch-slider value */
@@ -1019,6 +1051,8 @@ export class DeckEngine {
     this.scratchPlayback.stopPattern();
     this._endPatternScratch();
     clearPatternGuard(this.id); // Clear guard when manually stopped
+    // Only disable reverb if fader LFO isn't also active
+    if (!this.scratchPlayback.isFaderLFOActive) this._disableReverbSend();
     // Only restore if the jog wheel isn't actively being held (it has its own restore path)
     if (!this._isScratchActive) {
       this._decayToRest(300);
@@ -1066,16 +1100,56 @@ export class DeckEngine {
   /** Start fader LFO at given division (synced to current effective BPM) */
   startFaderLFO(division: FaderLFODivision): void {
     this.scratchPlayback.startFaderLFO(this.getEffectiveBPM(), division);
+    this._enableReverbSend();
   }
 
   /** Stop fader LFO */
   stopFaderLFO(): void {
     this.scratchPlayback.stopFaderLFO();
+    // Only disable reverb if no pattern scratch is also active
+    if (!this.patternScratchActive) this._disableReverbSend();
   }
 
   /** Called by DJDeck RAF when effectiveBPM changes — relays to ScratchPlayback for LFO resync */
   notifyBPMChange(bpm: number): void {
     this.scratchPlayback.onBPMChange(bpm);
+  }
+
+  // ── Scratch/LFO reverb send ────────────────────────────────────────
+
+  /** Generate a short exponentially-decaying noise impulse response for reverb. */
+  static _createReverbIR(ctx: AudioContext, durationSec: number, decayHz: number): AudioBuffer {
+    const len = Math.floor(ctx.sampleRate * durationSec);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        // Exponential decay × white noise
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate / decayHz));
+      }
+    }
+    return ir;
+  }
+
+  /** Fade in the reverb send (called when scratch/LFO effects activate). */
+  private _enableReverbSend(): void {
+    if (this._reverbActive || !this._reverbSend) return;
+    this._reverbActive = true;
+    const now = Tone.getContext().rawContext.currentTime;
+    this._reverbSend.gain.cancelScheduledValues(now);
+    this._reverbSend.gain.setValueAtTime(this._reverbSend.gain.value, now);
+    this._reverbSend.gain.linearRampToValueAtTime(1, now + 0.05);
+  }
+
+  /** Fade out the reverb send (called when effects deactivate). */
+  private _disableReverbSend(): void {
+    if (!this._reverbActive || !this._reverbSend) return;
+    this._reverbActive = false;
+    const now = Tone.getContext().rawContext.currentTime;
+    this._reverbSend.gain.cancelScheduledValues(now);
+    this._reverbSend.gain.setValueAtTime(this._reverbSend.gain.value, now);
+    // Slow fade-out (500ms) so the reverb tail finishes naturally
+    this._reverbSend.gain.linearRampToValueAtTime(0, now + 0.5);
   }
 
   /** Get current scratch state for UI feedback (turntable spin, pattern scroll, fader indicators).
@@ -1369,5 +1443,8 @@ export class DeckEngine {
     this.eq3.dispose();
     this.deckGain.dispose();
     try { this._brickwallLimiter?.disconnect(); } catch { /* already disconnected */ }
+    try { this._reverbSend?.disconnect(); } catch { /* already disconnected */ }
+    try { this._reverbNode?.disconnect(); } catch { /* already disconnected */ }
+    try { this._reverbWet?.disconnect(); } catch { /* already disconnected */ }
   }
 }
