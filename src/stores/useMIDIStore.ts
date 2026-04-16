@@ -21,6 +21,7 @@ import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
 import { isDJContext } from '../midi/MIDIContextRouter';
 import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
+import { getDJControllerMapper } from '../midi/DJControllerMapper';
 import { midiToXMNote } from '../lib/xmConversions';
 import { useUIStore } from './useUIStore';
 
@@ -459,8 +460,8 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Pitch Bend (X-axis on MPK Mini joystick)
               if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
-                // DJ context: pitch bend = crossfader
-                if (isDJContext()) {
+                // DJ context: pitch bend = crossfader (only when no DJ preset active)
+                if (isDJContext() && !getDJControllerMapper().hasActivePreset()) {
                   const normalized = (message.pitchBend + 8192) / 16383;
                   routeDJParameter('dj.crossfader', normalized);
                   return;
@@ -480,8 +481,8 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
-                  // DJ context: mod wheel = master filter sweep
-                  if (isDJContext()) {
+                  // DJ context: mod wheel = master filter sweep (only when no DJ preset active)
+                  if (isDJContext() && !getDJControllerMapper().hasActivePreset()) {
                     routeDJParameter('dj.deckA.filter', message.value / 127);
                     return;
                   }
@@ -502,8 +503,8 @@ export const useMIDIStore = create<MIDIStore>()(
                 if (message.cc >= 70 && message.cc <= 77) {
                   const knobIndex = message.cc - 70;
 
-                  // DJ context: route to DJ knob bank
-                  if (isDJContext()) {
+                  // DJ context: route to DJ knob bank (unless DJControllerMapper preset handles it)
+                  if (isDJContext() && !getDJControllerMapper().hasActivePreset()) {
                     const djAssignment = DJ_KNOB_BANKS[store.djKnobPage]?.[knobIndex];
                     if (djAssignment) {
                       routeDJParameter(djAssignment.param, message.value / 127);
