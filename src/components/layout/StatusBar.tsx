@@ -15,7 +15,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { KNOB_BANKS } from '@/midi/knobBanks';
 import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '@/midi/djKnobBanks';
 import type { KnobBankMode } from '@/midi/types';
-import { Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp } from 'lucide-react';
+import { Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 
 interface StatusBarProps {}
 
@@ -326,13 +326,12 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     { id: '303', label: '303/Synth', icon: Settings },
     { id: 'Siren', label: 'Dub Siren', icon: Activity },
     { id: 'FX', label: 'Effects', icon: Waves },
+    { id: 'Mixer', label: 'Mixer', icon: Filter },
     { id: 'MasterFX', label: 'Master FX', icon: Sliders },
   ];
 
   const isDJ = activeView === 'dj';
-  const currentAssignments = hasMIDIDevice
-    ? isDJ ? DJ_KNOB_BANKS[djKnobPage] ?? [] : KNOB_BANKS[knobBank]
-    : [];
+  const currentAssignments = isDJ ? DJ_KNOB_BANKS[djKnobPage] ?? [] : KNOB_BANKS[knobBank];
 
   // Auto-select DJ knob page when a deck starts playing
   useEffect(() => {
@@ -355,7 +354,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   return (
     <div className="flex flex-col">
       {/* MIDI Knob Controls - Expanded */}
-      {activeView !== 'vj' && hasMIDIDevice && showKnobBar && (
+      {activeView !== 'vj' && showKnobBar && (
         <div className="bg-dark-bgTertiary border-t border-dark-border px-4 py-2 flex flex-col gap-2">
           {/* Bank Tabs */}
           <div className="flex items-center gap-1">
@@ -441,16 +440,16 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
 
         {/* Right: MIDI Device, Audio State & Tips */}
         <div className="flex items-center gap-4">
-          {/* MIDI Device Status */}
-          {hasMIDIDevice && activeView !== 'vj' && (
+          {/* Knob Bar Toggle */}
+          {activeView !== 'vj' && (
             <>
               <button
                 onClick={() => setShowKnobBar(!showKnobBar)}
                 className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-accent-primary transition-colors"
-                title={showKnobBar ? "Hide MIDI controls" : "Show MIDI controls"}
+                title={showKnobBar ? "Hide knob bank" : "Show knob bank"}
               >
-                <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></span>
-                <span className="font-bold uppercase">{deviceName}</span>
+                {hasMIDIDevice && <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse"></span>}
+                <span className="font-bold uppercase">{hasMIDIDevice ? deviceName : 'Knobs'}</span>
                 {showKnobBar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
               </button>
               <div className="w-px h-3 bg-border opacity-50"></div>
