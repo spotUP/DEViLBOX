@@ -1286,9 +1286,12 @@ export class DeckEngine {
 
   setLineLoop(size: number): void {
     const currentRow = this.replayer.getCurrentRow();
-    // Quantize to nearest beat boundary (round to nearest, not always down)
-    const startRow = Math.round(currentRow / size) * size;
-    this.replayer.setLineLoop(startRow, size);
+    const patLen = this.replayer.getCurrentPatternLength();
+    // Cap loop size to pattern length
+    const effectiveSize = Math.min(size, patLen);
+    // Quantize DOWN to nearest boundary so the loop captures the current phrase
+    const startRow = Math.floor(currentRow / effectiveSize) * effectiveSize;
+    this.replayer.setLineLoop(startRow, effectiveSize);
   }
 
   clearLineLoop(): void {
