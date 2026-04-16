@@ -325,6 +325,34 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
             points.push({ row: i, value: Math.random() });
           }
           break;
+
+        case 'sweepUp':
+          for (let i = 0; i < patternLength; i++) {
+            const t = i / (patternLength - 1);
+            const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            points.push({ row: i, value: eased });
+          }
+          break;
+
+        case 'sweepDown':
+          for (let i = 0; i < patternLength; i++) {
+            const t = i / (patternLength - 1);
+            const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            points.push({ row: i, value: 1 - eased });
+          }
+          break;
+
+        case 'buildDrop': {
+          const buildEnd = Math.floor(patternLength * 0.75);
+          for (let i = 0; i <= buildEnd; i++) {
+            const t = i / buildEnd;
+            const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            points.push({ row: i, value: eased });
+          }
+          points.push({ row: buildEnd + 1, value: 0 });
+          points.push({ row: patternLength - 1, value: 0 });
+          break;
+        }
       }
 
       points.forEach((point) => addPoint(curve.id, point.row, point.value));
@@ -447,6 +475,27 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
             className="px-3 py-1 text-xs font-mono bg-ft2-bg text-ft2-textDim border border-ft2-border hover:bg-ft2-button"
           >
             Random
+          </button>
+          <button
+            onClick={() => applyShape('sweepUp')}
+            className="px-3 py-1 text-xs font-mono bg-ft2-bg text-accent-primary border border-ft2-border hover:bg-ft2-button"
+            title="DJ-style filter sweep up (quadratic ease)"
+          >
+            Sweep ↑
+          </button>
+          <button
+            onClick={() => applyShape('sweepDown')}
+            className="px-3 py-1 text-xs font-mono bg-ft2-bg text-accent-primary border border-ft2-border hover:bg-ft2-button"
+            title="DJ-style filter sweep down (quadratic ease)"
+          >
+            Sweep ↓
+          </button>
+          <button
+            onClick={() => applyShape('buildDrop')}
+            className="px-3 py-1 text-xs font-mono bg-ft2-bg text-accent-primary border border-ft2-border hover:bg-ft2-button"
+            title="DJ build-up then sharp drop"
+          >
+            Build&Drop
           </button>
         </div>
 
