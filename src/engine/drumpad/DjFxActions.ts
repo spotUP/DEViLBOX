@@ -108,8 +108,43 @@ function cleanupFx(id: DjFxActionId): void {
 
 // ─── Stutter Effects ──────────────────────────────────────────────
 
+/**
+ * Get seconds until next division boundary for beat-phase alignment.
+ * Tries DJ deck elapsed position first, falls back to transport position.
+ */
+function getBeatOffsetSec(periodSec: number): number {
+  const periodMs = periodSec * 1000;
+  if (periodMs <= 0) return 0;
+
+  let elapsedMs = 0;
+  try {
+    // Try DJ deck position first (most accurate when DJing)
+    const djState = useDJStore.getState();
+    const deckId = djState.decks.A.isPlaying ? 'A' : djState.decks.B.isPlaying ? 'B' : null;
+    if (deckId) {
+      const deck = getDJEngine().getDeck(deckId);
+      elapsedMs = deck.playbackMode === 'audio'
+        ? deck.audioPlayer.getPosition() * 1000
+        : deck.replayer.getElapsedMs();
+    }
+  } catch { /* fallback below */ }
+
+  if (elapsedMs <= 0) {
+    // Fallback: derive from transport BPM + AudioContext time
+    const bpm = getBpm();
+    const beatSec = 60 / bpm;
+    const ctx = getCtx();
+    elapsedMs = (ctx.currentTime % beatSec) * 1000;
+  }
+
+  const phaseMs = elapsedMs % periodMs;
+  return phaseMs > 0 ? (periodMs - phaseMs) / 1000 : 0;
+}
+
 function createStutter(division: SyncDivision): DjFxAction {
   const divLabel = division.replace('1/', '');
+  let scheduleTimer: ReturnType<typeof setTimeout> | null = null;
+
   return {
     id: `fx_stutter_${divLabel}` as DjFxActionId,
     name: `Stutter ${division}`,
@@ -119,43 +154,58 @@ function createStutter(division: SyncDivision): DjFxAction {
       cleanupFx(this.id);
       const ctx = getCtx();
       const periodSec = bpmToMs(getBpm(), division) / 1000;
-      const stutterHz = 1 / periodSec;
+      const ramp = 0.003; // 3ms anti-click ramp (matches DJ fader LFO)
 
       const masterNode = getMasterOutputNode();
       if (!masterNode) return;
 
-      // Gate approach: square-wave LFO modulates a gain node to chop audio
+      // Insert a gain gate on the master bus
       const gate = ctx.createGain();
-      gate.gain.value = 0;
+      gate.gain.value = 1;
 
-      // Square-wave LFO at the stutter rate
-      const lfo = ctx.createOscillator();
-      lfo.type = 'square';
-      lfo.frequency.value = stutterHz;
-
-      // Scale LFO (-1..+1) to gain (0..1) via a shaper
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.value = 0.5;
-      const lfoOffset = ctx.createConstantSource();
-      lfoOffset.offset.value = 0.5;
-
-      lfo.connect(lfoGain);
-      lfoGain.connect(gate.gain);
-      lfoOffset.connect(gate.gain);
-      lfo.start();
-      lfoOffset.start();
-
-      // Route: master → gate → destination (replacing direct connection)
       try { masterNode.disconnect(); } catch { /* */ }
       masterNode.connect(gate);
       gate.connect(ctx.destination);
 
+      // Schedule beat-aligned AudioParam automation (same approach as DJ fader LFO)
+      const scheduleChops = () => {
+        const now = ctx.currentTime;
+        const offsetSec = getBeatOffsetSec(periodSec);
+        const totalChops = 64; // ~8 bars look-ahead
+
+        gate.gain.cancelScheduledValues(now);
+        gate.gain.setValueAtTime(1, now);
+        for (let i = 0; i < totalChops; i++) {
+          const t = now + offsetSec + i * periodSec;
+          // Beat lands here — audio OPEN so beats punch through
+          gate.gain.setValueAtTime(1, t);
+          // Close on the off-beat
+          const mid = t + periodSec * 0.5;
+          gate.gain.setValueAtTime(1, mid - ramp);
+          gate.gain.linearRampToValueAtTime(0, mid);
+          // Re-open before next beat
+          const reopen = t + periodSec - ramp;
+          gate.gain.setValueAtTime(0, reopen);
+          gate.gain.linearRampToValueAtTime(1, reopen + ramp);
+        }
+
+        const totalMs = (offsetSec + totalChops * periodSec) * 1000;
+        scheduleTimer = setTimeout(() => {
+          if (activeFx.has(this.id)) scheduleChops();
+        }, Math.max(50, totalMs - 300));
+      };
+      scheduleChops();
+
       activeFx.set(this.id, {
-        nodes: [gate, lfoGain],
-        oscillator: lfo,
+        nodes: [gate],
         cleanup: () => {
-          try { lfoOffset.stop(); } catch { /* */ }
-          try { lfoOffset.disconnect(); } catch { /* */ }
+          if (scheduleTimer) clearTimeout(scheduleTimer);
+          scheduleTimer = null;
+          // Snap gate to 1 before reconnecting master
+          try {
+            gate.gain.cancelScheduledValues(ctx.currentTime);
+            gate.gain.setValueAtTime(1, ctx.currentTime);
+          } catch { /* */ }
           try {
             if (masterNode) {
               masterNode.disconnect();
