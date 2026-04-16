@@ -359,14 +359,10 @@ export class PinkTromboneSynth implements DevilboxSynth {
     }
   }
 
-  public triggerRelease(note?: string | number, _time?: number): void {
+  public triggerRelease(_time?: number): void {
     if (!this._workletNode) return;
-    if (note !== undefined) {
-      const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      this._workletNode.port.postMessage({ type: 'noteOff', note: midi });
-    } else {
-      this._workletNode.port.postMessage({ type: 'allNotesOff' });
-    }
+    // Engine calls triggerRelease(time) with no note — release all voices
+    this._workletNode.port.postMessage({ type: 'allNotesOff' });
   }
 
   public triggerAttackRelease(note: string | number, _duration: number | string, _time?: number, velocity: number = 1): void {
