@@ -479,7 +479,7 @@ export const useSettingsStore = create<SettingsStore>()(
       },
       performanceQuality: 'high',
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)
-      stereoSeparation: 20,  // Default: 20% (classic Amiga-style narrow separation)
+      stereoSeparation: 50,  // Default: 50% (maps to libopenmpt's default 100/200)
       stereoSeparationMode: 'pt2' as const,
       modplugSeparation: 100,       // Default: 100% = normal stereo (identity)
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
@@ -694,7 +694,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 4,
+      version: 5,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 2) {
@@ -710,6 +710,11 @@ export const useSettingsStore = create<SettingsStore>()(
           // v4: PSM default changed from 'uade' to 'native' (native PSMParser).
           const fe = s.formatEngine as Record<string, unknown> | undefined;
           if (fe && fe.psm === 'uade') fe.psm = 'native';
+        }
+        if (version < 5) {
+          // v5: Stereo separation default changed from 20 (Amiga narrow) to 50
+          // (matches libopenmpt default 100/200). Only migrate if still at old default.
+          if (s.stereoSeparation === 20) s.stereoSeparation = 50;
         }
         return s;
       },
