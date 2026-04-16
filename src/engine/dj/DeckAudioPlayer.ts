@@ -442,7 +442,11 @@ export class DeckAudioPlayer {
       }
       const pos = this.getPosition();
       if (pos >= this._loopOut) {
-        this.seek(this._loopIn);
+        // Wrap with offset preservation to avoid drift
+        const overshoot = pos - this._loopOut;
+        const loopLen = this._loopOut - this._loopIn;
+        const wrapped = this._loopIn + (loopLen > 0 ? overshoot % loopLen : 0);
+        this.seek(wrapped);
       }
       this._loopCheckTimer = requestAnimationFrame(check);
     };
