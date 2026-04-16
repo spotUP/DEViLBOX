@@ -14,6 +14,7 @@ import { immer } from 'zustand/middleware/immer';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
 import type { EffectConfig } from '@/types/instrument/effects';
+import type { DJEnvironment } from '@/types/djEnvironment';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,8 +60,10 @@ export interface DJPlaylist {
   createdAt: number;
   updatedAt: number;
   tracks: PlaylistTrack[];
-  /** Master FX chain saved with this playlist — applied when Auto DJ starts */
+  /** @deprecated Use environment.masterEffects instead. Kept for backward compat. */
   masterEffects?: EffectConfig[];
+  /** Full DJ environment snapshot — crossfader, volumes, Auto DJ, master FX, drumpads */
+  environment?: DJEnvironment;
 }
 
 interface DJPlaylistState {
@@ -97,6 +100,8 @@ interface DJPlaylistState {
   clearTrackBadFlag: (playlistId: string, index: number) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
   setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
+  /** Save current DJ environment snapshot to the active playlist */
+  saveEnvironmentToPlaylist: (playlistId: string) => void;
 
   // ── Selection actions ─────────────────────────────────────────────────
   selectTrack: (index: number) => void;
@@ -199,11 +204,33 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       },
 
       setActivePlaylist: (playlistId: string | null) => {
+        // Save environment to the current active playlist before switching
+        const currentId = _get().activePlaylistId;
+        if (currentId) {
+          _get().saveEnvironmentToPlaylist(currentId);
+        }
+
         set((state) => {
           state.activePlaylistId = playlistId;
           state.selectedTrackIndices = [];
           state.focusedTrackIndex = -1;
         });
+
+        // Restore environment from the newly activated playlist
+        if (playlistId) {
+          const playlist = _get().playlists.find((p: DJPlaylist) => p.id === playlistId);
+          if (playlist?.environment) {
+            import('@/lib/dj/djEnvironment').then(({ restoreDJEnvironment }) => {
+              restoreDJEnvironment(playlist.environment!);
+              console.log(`[DJPlaylist] Restored DJ environment from "${playlist.name}"`);
+            });
+          } else if (playlist?.masterEffects) {
+            // Backward compat: restore just master effects from old format
+            import('@/stores/useAudioStore').then(({ useAudioStore }) => {
+              useAudioStore.getState().setMasterEffects(playlist.masterEffects!);
+            });
+          }
+        }
       },
 
       updatePlaylistDescription: (playlistId: string, description: string) => {
@@ -450,6 +477,23 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
         });
         syncPlaylists();
+      },
+
+      saveEnvironmentToPlaylist: (playlistId: string) => {
+        // Lazy import to avoid circular dependency
+        import('@/lib/dj/djEnvironment').then(({ snapshotDJEnvironment }) => {
+          const env = snapshotDJEnvironment();
+          set((state) => {
+            const p = state.playlists.find((pl) => pl.id === playlistId);
+            if (p) {
+              p.environment = env;
+              // Also keep masterEffects in sync for backward compat
+              p.masterEffects = env.masterEffects ? JSON.parse(JSON.stringify(env.masterEffects)) : undefined;
+              p.updatedAt = Date.now();
+            }
+          });
+          syncPlaylists();
+        });
       },
 
       // ── Selection actions ─────────────────────────────────────────────
