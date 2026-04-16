@@ -73,11 +73,18 @@ const BABY_SCRATCH: ScratchPattern = {
   interpolateVelocity: true,
   trueReverse: false,         // speed modulation only — no direction switching pauses
   frames: [
-    { timeFraction: 0,    velocity: 0.2,  faderGain: 1 },  // slow (low pitch)
+    // Dip 1 → push 1: fader cut at dip creates sharp "wik" articulation
+    { timeFraction: 0,    velocity: 0.2,  faderGain: 0 },  // dip — fader CLOSED (masks turnaround)
+    { timeFraction: 0.04, velocity: 0.8,  faderGain: 1 },  // accelerating — fader OPENS (sharp cut-in)
     { timeFraction: 0.20, velocity: 2.4,  faderGain: 1 },  // peak forward push (high pitch)
-    { timeFraction: 0.40, velocity: 0.2,  faderGain: 1 },  // slow (low pitch)
+    { timeFraction: 0.36, velocity: 0.8,  faderGain: 1 },  // decelerating
+    // Dip 2 → push 2: same fader cut pattern
+    { timeFraction: 0.40, velocity: 0.2,  faderGain: 0 },  // dip — fader CLOSED
+    { timeFraction: 0.44, velocity: 0.8,  faderGain: 1 },  // accelerating — fader OPENS
     { timeFraction: 0.60, velocity: 1.8,  faderGain: 1 },  // second push (slightly lower peak)
-    { timeFraction: 0.80, velocity: 0.2,  faderGain: 1 },  // slow (low pitch)
+    { timeFraction: 0.76, velocity: 0.8,  faderGain: 1 },  // decelerating
+    // Dip 3: closed (wraps to dip 1 on loop)
+    { timeFraction: 0.80, velocity: 0.2,  faderGain: 0 },  // dip — fader CLOSED
   ],
 };
 
@@ -310,18 +317,20 @@ const TEAR: ScratchPattern = {
   quantize: false,
   interpolateVelocity: true,
   frames: [
-    // Sound 1: forward push
-    { timeFraction: 0,    velocity: 0,    faderGain: 1 },
+    // Sound 1: forward push (fader cut at start masks loop seam)
+    { timeFraction: 0,    velocity: 0,    faderGain: 0 },  // direction change — fader CLOSED
+    { timeFraction: 0.03, velocity: 0.5,  faderGain: 1 },  // fader OPENS
     { timeFraction: 0.12, velocity: 2.0,  faderGain: 1 },  // forward push
-    // TEAR: record comes to rest briefly
+    // TEAR: record comes to rest briefly (audible — fader stays open)
     { timeFraction: 0.25, velocity: 0,    faderGain: 1 },  // STOP — the tear!
     { timeFraction: 0.32, velocity: 0,    faderGain: 1 },  // hold the rest
     // Sound 2: resume forward
     { timeFraction: 0.45, velocity: 2.0,  faderGain: 1 },  // resume forward
-    { timeFraction: 0.55, velocity: 0,    faderGain: 1 },  // decelerate to zero
+    { timeFraction: 0.53, velocity: 0.3,  faderGain: 0 },  // fader CLOSES before direction change
     // Sound 3: backward pull
+    { timeFraction: 0.58, velocity: -0.3, faderGain: 1 },  // fader OPENS, backward begins
     { timeFraction: 0.70, velocity: -1.2, faderGain: 1 },  // backward drag
-    { timeFraction: 0.90, velocity: 0,    faderGain: 1 },  // decelerate
+    { timeFraction: 0.90, velocity: 0,    faderGain: 0 },  // fader CLOSES before loop restart
   ],
 };
 

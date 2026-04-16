@@ -8,7 +8,6 @@
 import React, { useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
-import { getQuantizeMode } from '@/engine/dj/DJQuantizedFX';
 import * as DJActions from '@/engine/dj/DJActions';
 
 interface MixerEQProps {
@@ -65,10 +64,13 @@ export const MixerEQBandKnob: React.FC<{
     DJActions.setDeckEQ(deckId, band, dB);
   }, [deckId, band]);
 
-  const handleKillToggle = useCallback(() => {
-    const current = useDJStore.getState().decks[deckId][killKey];
-    DJActions.setDeckEQKill(deckId, band, !current);
-  }, [deckId, band, killKey]);
+  const handleKillDown = useCallback(() => {
+    DJActions.setDeckEQKill(deckId, band, true);
+  }, [deckId, band]);
+
+  const handleKillUp = useCallback(() => {
+    DJActions.setDeckEQKill(deckId, band, false);
+  }, [deckId, band]);
 
   const formatEQ = useCallback((val: number) => {
     if (val === 0) return '0';
@@ -80,7 +82,9 @@ export const MixerEQBandKnob: React.FC<{
 
   const killButton = (
     <button
-      onClick={handleKillToggle}
+      onPointerDown={handleKillDown}
+      onPointerUp={handleKillUp}
+      onPointerLeave={handleKillUp}
       className={`
         w-4 h-4 rounded-sm text-[7px] font-black leading-none
         flex items-center justify-center flex-shrink-0
@@ -91,7 +95,7 @@ export const MixerEQBandKnob: React.FC<{
             : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover border border-dark-border'
         }
       `}
-      title={`${killActive ? 'Unmute' : 'Kill'} ${label} (${getQuantizeMode() !== 'off' ? 'quantized' : 'instant'})`}
+      title={`Hold to kill ${label}`}
     >
       K
     </button>
