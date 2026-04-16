@@ -211,3 +211,141 @@ export const TUNEFISH_NKS_PARAMETERS: NKSParameter[] = [
   { id: 'tunefish.eqHigh', name: 'EQ High', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 2, index: 6, isAutomatable: true, accessibilityName: 'Equalizer High Band' },
   { id: 'tunefish.genSpread', name: 'Spread', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 2, index: 7, isAutomatable: true, accessibilityName: 'Generator Stereo Spread' },
 ];
+
+// ─────────────────────────────────────────────────────
+// WASM Replayer NKS Maps — Automatable Internal Params
+// ─────────────────────────────────────────────────────
+
+// SoundMon — Brian Postma wavetable synth
+// Params route via SoundMonEngine.setInstrumentParam() → _sm_set_instrument_param()
+export const SOUNDMON_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'soundmon.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Instrument Volume' },
+  { id: 'soundmon.lfoSpeed', name: 'LFO Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'LFO Speed' },
+  { id: 'soundmon.lfoDepth', name: 'LFO Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'LFO Depth' },
+  { id: 'soundmon.lfoDelay', name: 'LFO Delay', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'LFO Delay Time' },
+  { id: 'soundmon.adsrSpeed', name: 'ADSR Speed', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'ADSR Envelope Speed' },
+  { id: 'soundmon.adsrControl', name: 'ADSR Ctrl', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'ADSR Envelope Control' },
+  { id: 'soundmon.waveTable', name: 'Wave Table', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '', formatString: '%.0f', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Wave Table Select' },
+  { id: 'soundmon.egControl', name: 'EG Control', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '', formatString: '%.0f', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Envelope Generator Control' },
+];
+
+// SidMon — SID-like synthesis (vibrato, filter, arpeggio)
+// Params route via SidMonSynth.set() → SidMonEngine.sendMessage('setParam') → _smn_set_param()
+export const SIDMON_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'sidmon.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Instrument Volume' },
+  { id: 'sidmon.vibSpeed', name: 'Vib Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Vibrato Speed' },
+  { id: 'sidmon.vibDepth', name: 'Vib Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Vibrato Depth' },
+  { id: 'sidmon.vibDelay', name: 'Vib Delay', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Vibrato Delay Time' },
+  { id: 'sidmon.arpSpeed', name: 'Arp Speed', section: NKSSection.ARP, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Arpeggio Speed' },
+  { id: 'sidmon.filterCutoff', name: 'Filter Cut', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Filter Cutoff' },
+  { id: 'sidmon.filterResonance', name: 'Filter Res', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Filter Resonance' },
+];
+
+// Sonic Arranger — 18-mode wavetable synthesis + ADSR/AMF tables
+// Params route via SonicArrangerEngine.setInstrumentParam() → _sa_set_instrument_param()
+export const SONIC_ARRANGER_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'sonicarranger.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Instrument Volume' },
+  { id: 'sonicarranger.vibratoSpeed', name: 'Vib Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Vibrato Speed' },
+  { id: 'sonicarranger.vibratoLevel', name: 'Vib Level', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Vibrato Level' },
+  { id: 'sonicarranger.vibratoDelay', name: 'Vib Delay', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Vibrato Delay' },
+  { id: 'sonicarranger.portamentoSpeed', name: 'Portamento', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Portamento Speed' },
+  { id: 'sonicarranger.fineTuning', name: 'Fine Tune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Fine Tuning' },
+  { id: 'sonicarranger.effect', name: 'Effect', section: NKSSection.EFFECTS, type: NKSParameterType.INT, min: 0, max: 17, defaultValue: 0, page: 0, index: 6, isAutomatable: true, accessibilityName: 'Synthesis Effect Type' },
+  { id: 'sonicarranger.effectArg1', name: 'FX Arg 1', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Effect Argument 1' },
+];
+
+// CheeseCutter — SID 6581/8580 via direct register writes
+// Params route via CheeseCutterEngine.writeByte() → worklet 'writeByte' → _cc_write_byte()
+export const CHEESECUTTER_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'cheesecutter.filterCutoff', name: 'Filter Cut', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'SID Filter Cutoff' },
+  { id: 'cheesecutter.filterResonance', name: 'Filter Res', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'SID Filter Resonance' },
+  { id: 'cheesecutter.filterMode', name: 'Filter Mode', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 1, page: 0, index: 2, isAutomatable: true, accessibilityName: 'SID Filter Mode (LP/BP/HP)' },
+  { id: 'cheesecutter.masterVolume', name: 'Master Vol', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'SID Master Volume' },
+  { id: 'cheesecutter.voice1PulseWidth', name: 'V1 PW', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Voice 1 Pulse Width' },
+  { id: 'cheesecutter.voice2PulseWidth', name: 'V2 PW', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Voice 2 Pulse Width' },
+  { id: 'cheesecutter.voice3PulseWidth', name: 'V3 PW', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Voice 3 Pulse Width' },
+];
+
+// Hively — HVL/AHX tracker filter + vibrato + PWM
+// Params route via HivelySynth.set() → HivelyEngine.sendMessage('setVoiceParam') → _hively_set_voice_param()
+export const HIVELY_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'hively.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Channel Volume' },
+  { id: 'hively.filterSpeed', name: 'Filter Spd', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Filter Sweep Speed' },
+  { id: 'hively.filterLower', name: 'Filter Lo', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Filter Lower Limit' },
+  { id: 'hively.filterUpper', name: 'Filter Hi', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Filter Upper Limit' },
+  { id: 'hively.vibratoSpeed', name: 'Vib Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Vibrato Speed' },
+  { id: 'hively.vibratoDepth', name: 'Vib Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Vibrato Depth' },
+  { id: 'hively.squareSpeed', name: 'PWM Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Square PWM Speed' },
+  { id: 'hively.pan', name: 'Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Stereo Panning' },
+];
+
+// OctaMED — volume + waveform select (minimal params, replayer owns synthesis)
+export const OCTAMED_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'octamed.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Channel Volume' },
+];
+
+// GTUltra — GoatTracker Ultra SID instrument params
+// Params route via GTUltraEngine setter methods
+export const GTULTRA_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'gtultra.attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 0, page: 0, index: 0, isAutomatable: true, accessibilityName: 'Attack (SID AD high nibble)' },
+  { id: 'gtultra.decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 9, page: 0, index: 1, isAutomatable: true, accessibilityName: 'Decay (SID AD low nibble)' },
+  { id: 'gtultra.sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 0, page: 0, index: 2, isAutomatable: true, accessibilityName: 'Sustain (SID SR high nibble)' },
+  { id: 'gtultra.release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 0, page: 0, index: 3, isAutomatable: true, accessibilityName: 'Release (SID SR low nibble)' },
+  { id: 'gtultra.firstwave', name: 'Waveform', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 255, defaultValue: 65, page: 0, index: 4, isAutomatable: true, accessibilityName: 'First Waveform Byte' },
+  { id: 'gtultra.vibdelay', name: 'Vib Delay', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 255, defaultValue: 0, page: 0, index: 5, isAutomatable: true, accessibilityName: 'Vibrato Delay Ticks' },
+  { id: 'gtultra.gatetimer', name: 'Gate Time', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 255, defaultValue: 2, page: 0, index: 6, isAutomatable: true, accessibilityName: 'Gate Timer Ticks' },
+];
+
+// PreTracker — volume only (transpiled 68k replayer, no internal hooks)
+export const PRETRACKER_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'pretracker.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Channel Volume' },
+];
+
+// ASAP — Atari POKEY volume + distortion per channel
+// Params route via AsapEngine → worklet → _asap_wasm_set_pokey_register()
+export const ASAP_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'asap.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'POKEY Channel Volume' },
+  { id: 'asap.distortion', name: 'Distortion', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 10, page: 0, index: 1, isAutomatable: true, accessibilityName: 'POKEY Distortion Mode' },
+];
+
+// PxTone — master volume control
+export const PXTONE_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'pxtone.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Master Volume' },
+];
+
+// Organya — Cave Story wavetable volume + pan + tempo
+export const ORGANYA_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'organya.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Channel Volume' },
+  { id: 'organya.pan', name: 'Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Stereo Panning' },
+  { id: 'organya.tempo', name: 'Tempo', section: NKSSection.SEQUENCER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Playback Tempo' },
+];
+
+// OpenMPT/libopenmpt — channel volume/pan + global volume
+export const OPENMPT_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'openmpt.channelVolume', name: 'Chan Vol', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Channel Volume' },
+  { id: 'openmpt.channelPan', name: 'Chan Pan', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Channel Panning' },
+  { id: 'openmpt.globalVolume', name: 'Global Vol', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Global Master Volume' },
+];
+
+// Klystrack — full chiptune synthesis (SID-style + FM + wavetable)
+// Params route via KlysEngine.setInstrumentParam() → worklet → _klys_set_instrument_param()
+export const KLYSTRACK_NKS_PARAMETERS: NKSParameter[] = [
+  // Page 0: ADSR + basic
+  { id: 'klystrack.attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.1, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Envelope Attack' },
+  { id: 'klystrack.decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Envelope Decay' },
+  { id: 'klystrack.sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Envelope Sustain' },
+  { id: 'klystrack.release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Envelope Release' },
+  { id: 'klystrack.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Instrument Volume' },
+  { id: 'klystrack.pulseWidth', name: 'Pulse Width', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Pulse Width' },
+  { id: 'klystrack.finetune', name: 'Fine Tune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Fine Tuning' },
+  { id: 'klystrack.slideSpeed', name: 'Slide Spd', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Slide Speed' },
+  // Page 1: Filter + vibrato + PWM
+  { id: 'klystrack.cutoff', name: 'Filter Cut', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 1, index: 0, isAutomatable: true, accessibilityName: 'Filter Cutoff' },
+  { id: 'klystrack.resonance', name: 'Filter Res', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 1, isAutomatable: true, accessibilityName: 'Filter Resonance' },
+  { id: 'klystrack.vibratoSpeed', name: 'Vib Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 2, isAutomatable: true, accessibilityName: 'Vibrato Speed' },
+  { id: 'klystrack.vibratoDepth', name: 'Vib Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 3, isAutomatable: true, accessibilityName: 'Vibrato Depth' },
+  { id: 'klystrack.pwmSpeed', name: 'PWM Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 4, isAutomatable: true, accessibilityName: 'PWM Modulation Speed' },
+  { id: 'klystrack.pwmDepth', name: 'PWM Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 5, isAutomatable: true, accessibilityName: 'PWM Modulation Depth' },
+  { id: 'klystrack.fmMod', name: 'FM Mod', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 6, isAutomatable: true, accessibilityName: 'FM Modulation Depth' },
+  { id: 'klystrack.fmFeedback', name: 'FM Fdbk', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 7, isAutomatable: true, accessibilityName: 'FM Feedback Amount' },
+];
