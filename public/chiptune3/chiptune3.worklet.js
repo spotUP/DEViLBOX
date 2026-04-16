@@ -115,6 +115,9 @@ class MPT extends AudioWorkletProcessor {
 			pattern: libopenmpt._openmpt_module_get_current_pattern(this.modulePtr),
 			row: libopenmpt._openmpt_module_get_current_row(this.modulePtr),
 			audioTime: currentTime,
+			// Speed/tempo for tick-level synth effect processing
+			speed: libopenmpt._openmpt_module_get_current_speed(this.modulePtr),
+			tempo: libopenmpt._openmpt_module_get_current_tempo(this.modulePtr),
 		}
 
 		// Per-channel VU levels (mono max of L/R)
@@ -128,7 +131,8 @@ class MPT extends AudioWorkletProcessor {
 			msg.chLevels = chLevels
 		}
 
-		// Per-channel state (note, instrument, volume, frequency, panning, active) — once per row
+		// Per-channel state — sent once per row change
+		// Layout per channel: [note, instrument, volcmd, vol, effect, param]
 		const curRow = msg.row
 		const curOrder = msg.order
 		if (curRow !== this.lastStateRow || curOrder !== this.lastStateOrder) {
@@ -146,14 +150,10 @@ class MPT extends AudioWorkletProcessor {
 					const base = i * 6
 					chState[base + 0] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 0) // note
 					chState[base + 1] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 1) // instrument
-					chState[base + 2] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 3) // vol
-					chState[base + 3] = 0 // frequency not available without new API
-					chState[base + 4] = 0 // panning not available without new API
-					const vu = Math.max(
-						libopenmpt._openmpt_module_get_current_channel_vu_left(this.modulePtr, i),
-						libopenmpt._openmpt_module_get_current_channel_vu_right(this.modulePtr, i)
-					)
-					chState[base + 5] = vu > 0 ? 1 : 0 // active = has VU output
+					chState[base + 2] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 2) // volcmd
+					chState[base + 3] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 3) // vol
+					chState[base + 4] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 4) // effect
+					chState[base + 5] = libopenmpt._openmpt_module_get_pattern_row_channel_command(this.modulePtr, pat, row, i, 5) // param
 				}
 				msg.chState = chState
 			}

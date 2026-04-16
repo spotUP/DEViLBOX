@@ -5078,6 +5078,10 @@ export class ToneEngine {
   public handlePastNoteAction(channelIndex: number, action: number): void { _handlePastNoteAction(this._channelCtx, channelIndex, action); }
   public setChannelPitch(channelIndex: number, pitchMultiplier: number): void { _setChannelPitch(this._channelCtx, channelIndex, pitchMultiplier); }
   public setChannelFrequency(channelIndex: number, frequency: number): void { _setChannelFrequency(this._channelCtx, channelIndex, frequency); }
+  /** Get the last note frequency triggered on a channel (for SynthEffectProcessor) */
+  public getChannelLastNoteFrequency(channelIndex: number): number {
+    return this.channelLastNote.get(channelIndex)?.frequency ?? 0;
+  }
   public initChannelPitch(channelIndex: number, instrumentKey: number, baseFrequency: number, basePlaybackRate: number = 1): void { _initChannelPitch(this._channelCtx, channelIndex, instrumentKey, baseFrequency, basePlaybackRate); }
   public clearChannelPitch(channelIndex: number): void { _clearChannelPitch(this._channelCtx, channelIndex); }
   public setChannelMute(channelIndex: number, muted: boolean): void { _setChannelMute(this._channelCtx, channelIndex, muted); }
