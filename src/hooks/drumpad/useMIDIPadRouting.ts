@@ -318,9 +318,9 @@ export function useMIDIPadRouting() {
 
     const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
 
-    // Scratch actions
+    // Scratch actions (start on note-on, stop on note-off via releasePad)
     if (pad.scratchAction) {
-      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
+      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(true);
     }
 
     // DJ FX with quantization
@@ -408,6 +408,11 @@ export function useMIDIPadRouting() {
     if (pad.djFxAction) {
       DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
       setFxPadActive(padId, false);
+    }
+
+    // Stop scratch action on release (finish current cycle gracefully)
+    if (pad.scratchAction) {
+      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
     }
 
     // Stop sample playback
