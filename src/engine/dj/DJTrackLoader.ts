@@ -103,6 +103,7 @@ export async function loadPreRenderedTrackToDeck(
       preRendered.trackName,
       preRendered.bpm,
       undefined, // Do NOT pass song - we only want audio playback, no UADE reinit
+      preRendered.waveformPeaks, // Skip expensive peak recomputation
     );
     console.log(`[DJTrackLoader] Pre-rendered track loaded successfully`);
     return true;

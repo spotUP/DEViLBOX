@@ -381,13 +381,13 @@ export class DeckEngine {
    * Load an audio file (MP3, WAV, FLAC, etc.) for playback.
    * Switches the deck to 'audio' playback mode.
    */
-  async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+  async loadAudioFile(buffer: ArrayBuffer, filename: string, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
     // Stop any current playback
     this.replayer.stop();
     this.audioPlayer.stop();
     this._playbackMode = 'audio';
 
-    return this.audioPlayer.loadAudioFile(buffer, filename);
+    return this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
   }
 
   get playbackMode(): PlaybackMode {

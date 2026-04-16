@@ -26,7 +26,6 @@ export const MixerCueSection: React.FC = () => {
   const cueMix = useDJStore((s) => s.cueMix);
   const cueDeviceId = useDJStore((s) => s.cueDeviceId);
   const cueDeviceName = useDJStore((s) => s.cueDeviceName);
-  const headphoneSetupDone = useDJStore((s) => s.headphoneSetupDone);
 
   const [showSetup, setShowSetup] = useState(false);
 
