@@ -29,9 +29,10 @@ export type LibopenmptPositionCallback = (order: number, pattern: number, row: n
 export interface LibopenmptChannelState {
   note: number;
   instrument: number;
-  volume: number;       // 0-16384 (nRealVolume, post-processing)
-  frequency: number;    // Hz, after portamento/vibrato/arpeggio
-  panning: number;      // 0-256 (nRealPan)
+  volcmd: number;       // Volume column command type (openmpt volcmd enum)
+  volume: number;       // Volume column parameter
+  effect: number;       // Effect column command (0=none, 1=Axx, etc.)
+  param: number;        // Effect column parameter
   active: boolean;
 }
 
@@ -52,9 +53,13 @@ export class LibopenmptEngine {
   private _onPosition: LibopenmptPositionCallback | null = null;
   private _onEnded: (() => void) | null = null;
   private _onChannelState: ((state: LibopenmptChannelState[], time: number) => void) | null = null;
+  /** Unthrottled per-position callback for tick-level synth effect processing */
+  private _onPositionTick: ((audioTime: number, row: number, order: number, speed: number, tempo: number) => void) | null = null;
   private _durationSeconds: number = 0;
   private _lastOrder: number = 0;
   private _lastRow: number = 0;
+  private _lastSpeed: number = 6;
+  private _lastTempo: number = 125;
   private _onTransportEvent: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null = null;
 
   /** Per-channel effect isolation: tracks which slots are active and their channel masks. */
@@ -144,12 +149,16 @@ export class LibopenmptEngine {
   }
 
   private handleMessage(msg: MessageEvent): void {
-    const { cmd, order, pattern, row, chLevels, chState, audioTime } = msg.data;
+    const { cmd, order, pattern, row, chLevels, chState, audioTime, speed, tempo } = msg.data;
     switch (cmd) {
       case 'pos':
         this._lastOrder = order;
         this._lastRow = row;
+        this._lastSpeed = speed ?? 6;
+        this._lastTempo = tempo ?? 125;
         if (this._playing) this._onPosition?.(order, pattern, row, audioTime);
+        // Unthrottled tick callback for SynthEffectProcessor (fires every ~2.9ms)
+        if (this._playing) this._onPositionTick?.(audioTime, row, order, this._lastSpeed, this._lastTempo);
         if (chLevels) {
           try {
             const engine = getToneEngine();
@@ -174,10 +183,11 @@ export class LibopenmptEngine {
             state.push({
               note: arr[base + 0],
               instrument: arr[base + 1],
-              volume: arr[base + 2],
-              frequency: arr[base + 3],
-              panning: arr[base + 4],
-              active: arr[base + 5] !== 0,
+              volcmd: arr[base + 2],
+              volume: arr[base + 3],
+              effect: arr[base + 4],
+              param: arr[base + 5],
+              active: true, // Active determined by VU levels separately
             });
           }
           const rawCtx = this.output.context as AudioContext;
@@ -263,6 +273,11 @@ export class LibopenmptEngine {
   /** Set callback for per-row channel state updates (note, instrument, volume, frequency, panning, active). */
   set onChannelState(cb: ((state: LibopenmptChannelState[], time: number) => void) | null) {
     this._onChannelState = cb;
+  }
+
+  /** Set unthrottled position callback for tick-level synth effect processing (~344/sec). */
+  set onPositionTick(cb: ((audioTime: number, row: number, order: number, speed: number, tempo: number) => void) | null) {
+    this._onPositionTick = cb;
   }
 
   /** Duration of the loaded module in seconds (0 if unknown). */
@@ -381,6 +396,12 @@ export class LibopenmptEngine {
   isPlaying(): boolean {
     return this._playing;
   }
+
+  /** Current speed (ticks per row) as reported by libopenmpt */
+  getCurrentSpeed(): number { return this._lastSpeed; }
+
+  /** Current tempo (BPM) as reported by libopenmpt */
+  getCurrentTempo(): number { return this._lastTempo; }
 
   /**
    * Whether this engine has already wired its output into a destination
