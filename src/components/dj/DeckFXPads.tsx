@@ -43,9 +43,9 @@ const FX_PADS: PadDef[] = [
   { id: 'lpf-sweep', label: 'LPF', sublabel: '▼', color: 'blue', activeColor: 'blue', mode: 'momentary' },
   { id: 'filter-reset', label: 'FLT', sublabel: 'RST', color: 'gray', activeColor: 'green', mode: 'momentary' },
   { id: 'echo-out', label: 'ECHO', sublabel: 'OUT', color: 'amber', activeColor: 'red', mode: 'toggle' },
-  { id: 'kill-low', label: 'KILL', sublabel: 'LO', color: 'orange', activeColor: 'red', mode: 'toggle' },
-  { id: 'kill-mid', label: 'KILL', sublabel: 'MID', color: 'gray', activeColor: 'red', mode: 'toggle' },
-  { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 'cyan', activeColor: 'red', mode: 'toggle' },
+  { id: 'kill-low', label: 'KILL', sublabel: 'LO', color: 'orange', activeColor: 'red', mode: 'momentary' },
+  { id: 'kill-mid', label: 'KILL', sublabel: 'MID', color: 'gray', activeColor: 'red', mode: 'momentary' },
+  { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 'cyan', activeColor: 'red', mode: 'momentary' },
   { id: 'brake', label: 'BRK', sublabel: '⏎', color: 'rose', activeColor: 'rose', mode: 'momentary' },
 ];
 
@@ -169,16 +169,12 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       case 'kill-mid':
       case 'kill-hi': {
         const band = BAND_MAP[padId];
-        const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
-        const current = useDJStore.getState().decks[deckId][killKey];
-        const newKill = !current;
-        useDJStore.getState().setDeckEQKill(deckId, band, newKill);
+        useDJStore.getState().setDeckEQKill(deckId, band, true);
         if (getQuantizeMode() !== 'off') {
-          cancelFn = quantizedEQKill(deckId, band, newKill);
+          cancelFn = quantizedEQKill(deckId, band, true);
         } else {
-          instantEQKill(deckId, band, newKill);
+          instantEQKill(deckId, band, true);
         }
-        if (!newKill) cancelPad(padId);
         break;
       }
       case 'brake': {
@@ -240,6 +236,16 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       if (pad.id === 'hpf-sweep' || pad.id === 'lpf-sweep') {
         cancelPad(pad.id);
         filterReset(deckId);
+      } else if (pad.id === 'kill-low' || pad.id === 'kill-mid' || pad.id === 'kill-hi') {
+        // Release kill — unmute the band
+        const band = BAND_MAP[pad.id];
+        cancelPad(pad.id);
+        useDJStore.getState().setDeckEQKill(deckId, band, false);
+        if (getQuantizeMode() !== 'off') {
+          quantizedEQKill(deckId, band, false);
+        } else {
+          instantEQKill(deckId, band, false);
+        }
       }
     }
   }, [deckId, cancelPad]);
@@ -292,7 +298,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               key={pad.id}
               onPointerDown={() => handlePadDown(pad)}
               onPointerUp={() => handlePadUp(pad)}
-              onPointerLeave={() => pad.mode === 'momentary' && handlePadUp(pad)}
+              onPointerLeave={() => (pad.mode === 'momentary') && handlePadUp(pad)}
               className="relative flex flex-col items-center justify-center rounded-md select-none touch-none overflow-hidden transform-gpu will-change-transform"
               style={{
                 height: 40,

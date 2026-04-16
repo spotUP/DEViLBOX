@@ -39,9 +39,9 @@ const FX_PADS: PadDef[] = [
   { id: 'lpf-sweep', label: 'LPF', sublabel: '\u25BC', color: 0x3b82f6, activeColor: 0x3b82f6, mode: 'momentary' },
   { id: 'filter-reset', label: 'FLT', sublabel: 'RST', color: 0x6b7280, activeColor: 0x22c55e, mode: 'momentary' },
   { id: 'echo-out', label: 'ECHO', sublabel: 'OUT', color: 0xf59e0b, activeColor: 0xef4444, mode: 'toggle' },
-  { id: 'kill-low', label: 'KILL', sublabel: 'LO', color: 0xf97316, activeColor: 0xef4444, mode: 'toggle' },
-  { id: 'kill-mid', label: 'KILL', sublabel: 'MID', color: 0x6b7280, activeColor: 0xef4444, mode: 'toggle' },
-  { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 0x06b6d4, activeColor: 0xef4444, mode: 'toggle' },
+  { id: 'kill-low', label: 'KILL', sublabel: 'LO', color: 0xf97316, activeColor: 0xef4444, mode: 'momentary' },
+  { id: 'kill-mid', label: 'KILL', sublabel: 'MID', color: 0x6b7280, activeColor: 0xef4444, mode: 'momentary' },
+  { id: 'kill-hi', label: 'KILL', sublabel: 'HI', color: 0x06b6d4, activeColor: 0xef4444, mode: 'momentary' },
   { id: 'brake', label: 'BRK', sublabel: '\u23CE', color: 0xf43f5e, activeColor: 0xf43f5e, mode: 'momentary' },
 ];
 
@@ -123,16 +123,12 @@ export const PixiDeckFXPads: React.FC<PixiDeckFXPadsProps> = ({ deckId }) => {
       case 'kill-mid':
       case 'kill-hi': {
         const band = BAND_MAP[padId];
-        const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
-        const current = useDJStore.getState().decks[deckId][killKey];
-        const newKill = !current;
-        useDJStore.getState().setDeckEQKill(deckId, band, newKill);
+        useDJStore.getState().setDeckEQKill(deckId, band, true);
         if (getQuantizeMode() !== 'off') {
-          cancelFn = quantizedEQKill(deckId, band, newKill);
+          cancelFn = quantizedEQKill(deckId, band, true);
         } else {
-          instantEQKill(deckId, band, newKill);
+          instantEQKill(deckId, band, true);
         }
-        if (!newKill) cancelPad(padId);
         break;
       }
       case 'brake': {
@@ -182,6 +178,15 @@ export const PixiDeckFXPads: React.FC<PixiDeckFXPadsProps> = ({ deckId }) => {
       if (pad.id === 'hpf-sweep' || pad.id === 'lpf-sweep') {
         cancelPad(pad.id);
         filterReset(deckId);
+      } else if (pad.id === 'kill-low' || pad.id === 'kill-mid' || pad.id === 'kill-hi') {
+        const band = BAND_MAP[pad.id];
+        cancelPad(pad.id);
+        useDJStore.getState().setDeckEQKill(deckId, band, false);
+        if (getQuantizeMode() !== 'off') {
+          quantizedEQKill(deckId, band, false);
+        } else {
+          instantEQKill(deckId, band, false);
+        }
       }
     }
   }, [deckId, cancelPad]);
