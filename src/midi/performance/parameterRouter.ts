@@ -10,8 +10,10 @@
  */
 
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import { useAudioStore } from '../../stores/useAudioStore';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getChannelFilterManager } from '../../engine/ChannelFilterManager';
+import { getDJEngine } from '../../engine/dj/DJEngine';
 import type { MappableParameter } from '../types';
 
 // ============================================================================
@@ -618,7 +620,6 @@ export function registerRoute(param: string, route: ParameterRoute): void {
 
 function routeMasterFXParameter(param: string, normalizedValue: number): void {
   try {
-    const { useAudioStore } = require('../../stores/useAudioStore');
     const audioStore = useAudioStore.getState();
     const engine = getToneEngine();
 
@@ -686,9 +687,6 @@ let _djRouteCache: Record<string, DJRouteHandler> | null = null;
 
 function getDJRoutes(): Record<string, DJRouteHandler> {
   if (_djRouteCache) return _djRouteCache;
-
-  // Lazy import to avoid circular dependency — DJEngine may not be initialized at module load
-  const { getDJEngine } = require('../../engine/dj/DJEngine');
 
   _djRouteCache = {
     // Crossfader: 0-1 maps directly
