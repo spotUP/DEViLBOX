@@ -263,3 +263,6 @@ adplug-wasm/build/
 sonic-arranger-wasm/test_sa
 sonic-arranger-wasm/test_sa.dSYM/
 sonic-arranger-wasm/test_sa.c
+
+# Test songs (deployed separately to Hetzner)
+public/data/songs/test-songs/
