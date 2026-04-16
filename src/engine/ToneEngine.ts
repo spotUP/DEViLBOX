@@ -172,7 +172,6 @@ export class ToneEngine {
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   public blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
-  private masterLimiter: DynamicsCompressorNode | null = null; // Soft limiter on master bus
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
   // FFT for frequency visualization
@@ -366,9 +365,11 @@ export class ToneEngine {
     this.amigaFilter = new AmigaFilter();
 
     // Master output channel with volume/pan control
+    // channelCount: 2 required to preserve stereo (default is 1 = mono downmix!)
     this.masterChannel = new Tone.Channel({
-      volume: -6,
+      volume: 0,
       pan: 0,
+      channelCount: 2,
     }).toDestination();
 
     // Analyzers for visualization (created but not connected by default)
@@ -392,29 +393,12 @@ export class ToneEngine {
       () => this.blepInput,
     );
 
-    // Default routing (AmigaFilter bypassed — libopenmpt has its own filter emulation):
-    //   masterInput → masterEffectsInput → blepInput → masterLimiter → masterChannel
-    //   synthBus ──→ masterEffectsInput → blepInput → masterLimiter → masterChannel
+    // Default routing (clean passthrough — no limiter, no filter):
+    //   masterInput → masterEffectsInput → blepInput → masterChannel
+    //   synthBus ──→ masterEffectsInput → blepInput → masterChannel
     this.masterInput.connect(this.masterEffectsInput);
     this.masterEffectsInput.connect(this.blepInput);
-
-    // Soft limiter prevents clipping — transparent brick-wall at -1dB
-    try {
-      const ctx = Tone.getContext().rawContext as AudioContext;
-      this.masterLimiter = ctx.createDynamicsCompressor();
-      this.masterLimiter.threshold.value = -1;   // Start compressing at -1 dB (just prevents clipping)
-      this.masterLimiter.knee.value = 3;          // Tight knee for transparent limiting
-      this.masterLimiter.ratio.value = 20;        // Brick-wall above threshold
-      this.masterLimiter.attack.value = 0.001;    // 1ms attack
-      this.masterLimiter.release.value = 0.05;    // 50ms release (no audible pumping)
-      // Insert limiter between blepInput and masterChannel using Tone.js connect
-      Tone.connect(this.blepInput, this.masterLimiter);
-      Tone.connect(this.masterLimiter, this.masterChannel);
-    } catch {
-      // Fallback: direct connection without limiter
-      this.masterLimiter = null;
-      this.blepInput.connect(this.masterChannel);
-    }
+    this.blepInput.connect(this.masterChannel);
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
     this.synthBus = new Tone.Gain(1);
