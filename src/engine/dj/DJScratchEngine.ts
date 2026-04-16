@@ -918,25 +918,42 @@ export class ScratchPlayback {
 
   private _scheduleFaderLFO(bpm: number, division: FaderLFODivision): void {
     try {
-      const gain = this.getDeck().getChannelGainParam();
+      const deck = this.getDeck();
+      const gain = deck.getChannelGainParam();
       const ctx  = Tone.getContext().rawContext as AudioContext;
       const periodSec = (60 / bpm) * LFO_DIVISION_BEATS[division];
       const now = ctx.currentTime;
-      const ramp = 0.0015; // 1.5ms anti-click ramp
+      const ramp = 0.003; // 3ms anti-click ramp
+
+      // Beat-phase alignment: calculate time until next division boundary
+      // so the LFO snaps to the beat grid rather than starting at an arbitrary point.
+      let elapsedMs = 0;
+      try {
+        elapsedMs = deck.playbackMode === 'audio'
+          ? deck.audioPlayer.getPosition() * 1000
+          : deck.replayer.getElapsedMs();
+      } catch { /* fallback to 0 */ }
+      const periodMs = periodSec * 1000;
+      const phaseMs = periodMs > 0 ? (elapsedMs % periodMs) : 0;
+      const offsetSec = phaseMs > 0 ? (periodMs - phaseMs) / 1000 : 0;
 
       // 4 bars look-ahead
       const totalDivisions = Math.round(16 / LFO_DIVISION_BEATS[division]);
       gain.cancelScheduledValues(now);
+      // Hold current value until first aligned beat
+      gain.setValueAtTime(1, now);
       for (let i = 0; i < totalDivisions; i++) {
-        const t = now + i * periodSec;
-        gain.setValueAtTime(0, t);
-        gain.linearRampToValueAtTime(1, t + ramp);
+        const t = now + offsetSec + i * periodSec;
+        // ON phase: gain drops to 0 (fader closes)
+        gain.setValueAtTime(1, t);
+        gain.linearRampToValueAtTime(0, t + ramp);
+        // OFF phase: gain back to 1 (fader opens)
         const off = t + periodSec * 0.5;
-        gain.setValueAtTime(1, off);
-        gain.linearRampToValueAtTime(0, off + ramp);
+        gain.setValueAtTime(0, off);
+        gain.linearRampToValueAtTime(1, off + ramp);
       }
 
-      const totalMs = totalDivisions * periodSec * 1000;
+      const totalMs = (offsetSec + totalDivisions * periodSec) * 1000;
       this.faderLFOTimeoutId = setTimeout(() => {
         if (this.faderLFOActive && this.currentLFODivision === division) {
           // Always use fresh BPM on reschedule so LFO stays synced
@@ -959,8 +976,11 @@ export class ScratchPlayback {
       const deck = this.getDeck();
       const gain = deck.getChannelGainParam();
       const ctx  = Tone.getContext().rawContext as AudioContext;
-      gain.cancelScheduledValues(ctx.currentTime);
-      gain.linearRampToValueAtTime(1, ctx.currentTime + 0.02);
+      const now  = ctx.currentTime;
+      // Cancel all scheduled values, snap gain to current value, then ramp to 1
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(1, now + 0.005);
       deck.releaseChannelGainParam();
     } catch { /* engine not ready */ }
   }
