@@ -615,36 +615,38 @@ export class DeckEngine {
 
     // Pattern scratch: forward phases use audio source at variable rate,
     // backward phases use ring-buffer reverse playback.
-    // Dead zone (±0.1) around zero prevents rapid direction switching during
-    // smooth velocity interpolation zero-crossings.
+    // Pattern scratches use a tight dead zone (±0.02) because the velocity curve
+    // is smooth and algorithmic — no jitter. This eliminates the perceptible pause
+    // at zero-crossings that a wider dead zone (0.1) would cause.
     if (this.patternScratchActive) {
       const absV = Math.abs(v);
       const isAudio = this._playbackMode === 'audio';
 
-      if (absV < 0.1) {
-        // Dead zone: hold current direction at minimum rate.
+      if (absV < 0.02) {
+        // Tight dead zone: hold current direction at near-zero rate.
+        // Brief enough to be imperceptible during smooth zero-crossings.
         if (this.patternScratchDir === 1) {
           if (isAudio) {
-            this.audioPlayer.setPlaybackRate(0.15);
+            this.audioPlayer.setPlaybackRate(0.02);
           } else {
-            this.replayer.setTempoMultiplier(0.15);
-            this.replayer.setPitchMultiplier(0.15);
+            this.replayer.setTempoMultiplier(0.02);
+            this.replayer.setPitchMultiplier(0.02);
           }
         } else {
-          this._accumulateBackwardDisplacement(0.05);
-          this.scratchBuffer?.setRate(-0.05);
+          this._accumulateBackwardDisplacement(0.02);
+          this.scratchBuffer?.setRate(-0.02);
         }
         return;
       }
 
       if (v > 0) {
         // ── FORWARD: audio at scratch speed ──
-        const fwdRate = Math.max(0.15, v);
+        const fwdRate = Math.max(0.02, v);
         if (this.patternScratchDir === -1) {
           // Transition backward → forward
           this.scratchBuffer?.silenceAndStop();
           this.scratchBuffer?.unfreezeCapture();
-          this._rampDeckGain(1, 0.005);
+          this._rampDeckGain(1, 0.002);
           this.patternScratchDir = 1;
         }
         if (isAudio) {
