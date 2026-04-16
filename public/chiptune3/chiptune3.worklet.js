@@ -217,6 +217,19 @@ class MPT extends AudioWorkletProcessor {
 		switch (msg.data.cmd) {
 			case 'config':
 				Object.assign(this.config, v)
+				// Apply stereo separation immediately to the running module
+				if (v.stereoSeparation !== undefined && this.modulePtr) {
+					libopenmpt._openmpt_module_set_render_param(this.modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, v.stereoSeparation)
+					this.forEachIsolationSlot_(s => {
+						if (s.modulePtr) libopenmpt._openmpt_module_set_render_param(s.modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, v.stereoSeparation)
+					})
+				}
+				if (v.interpolationFilter !== undefined && this.modulePtr) {
+					libopenmpt._openmpt_module_set_render_param(this.modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, v.interpolationFilter)
+					this.forEachIsolationSlot_(s => {
+						if (s.modulePtr) libopenmpt._openmpt_module_set_render_param(s.modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, v.interpolationFilter)
+					})
+				}
 				break
 			case 'play':
 				this.play(v, false)
