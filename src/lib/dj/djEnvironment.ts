@@ -25,7 +25,9 @@ function serializePad(pad: DrumPad): SerializableDrumPad {
   return {
     ...rest,
     sampleName: sample?.name ?? null,
+    sampleSourceUrl: sample?.sourceUrl ?? null,
     layerNames: (layers ?? []).map((l) => l.sample?.name ?? ''),
+    layerSourceUrls: (layers ?? []).map((l) => l.sample?.sourceUrl ?? ''),
   };
 }
 
@@ -131,26 +133,25 @@ export function restoreDJEnvironment(env: DJEnvironment): void {
   }
 }
 
-/** Restore drumpad config (pads params, NOT audio samples) */
+/** Restore drumpad config — re-fetches built-in samples from sourceUrl */
 function restoreDrumpadEnvironment(drumEnv: DJEnvironment['drumpad']): void {
   const store = useDrumPadStore.getState();
 
-  // Restore programs — merge pad configs onto existing pads (preserving audio samples)
+  // Restore programs — merge pad configs onto existing pads
   if (drumEnv.programs) {
     const currentPrograms = store.programs;
     for (const [id, savedProg] of Object.entries(drumEnv.programs)) {
       const existing = currentPrograms.get(id);
       if (existing) {
-        // Merge pad configs onto existing pads, preserving sample/layer audio data
+        // Merge pad configs onto existing pads, preserving existing audio data initially
         const mergedPads = existing.pads.map((existingPad, i) => {
           const savedPad = savedProg.pads[i];
           if (!savedPad) return existingPad;
-          // Apply all non-audio fields from saved pad
-          const { sampleName, layerNames, ...padConfig } = savedPad;
+          const { sampleName, sampleSourceUrl, layerNames, layerSourceUrls, ...padConfig } = savedPad;
           return {
             ...existingPad,
             ...padConfig,
-            // Keep existing audio data
+            // Keep existing audio data (may be replaced by async re-fetch below)
             sample: existingPad.sample,
             layers: existingPad.layers,
           };
@@ -163,8 +164,10 @@ function restoreDrumpadEnvironment(drumEnv: DJEnvironment['drumpad']): void {
           mpcResample: savedProg.mpcResample,
           pads: mergedPads,
         });
+
+        // Async: re-fetch built-in samples for pads that have a sourceUrl
+        reloadBuiltInSamples(savedProg.pads);
       }
-      // If program doesn't exist locally, we can't create it without audio data
     }
   }
 
@@ -188,6 +191,47 @@ function restoreDrumpadEnvironment(drumEnv: DJEnvironment['drumpad']): void {
   if (drumEnv.noteRepeatEnabled !== undefined) store.setNoteRepeatEnabled(drumEnv.noteRepeatEnabled);
   if (drumEnv.noteRepeatRate !== undefined) store.setNoteRepeatRate(drumEnv.noteRepeatRate);
   if (drumEnv.currentBank) store.setBank(drumEnv.currentBank);
+}
+
+/** Check if a URL points to a built-in sample (served from /data/samples/) */
+function isBuiltInSampleUrl(url: string): boolean {
+  return url.startsWith('/data/samples/') || url.startsWith('data/samples/');
+}
+
+/** Re-fetch built-in samples for pads and load them via the store */
+async function reloadBuiltInSamples(savedPads: SerializableDrumPad[]): Promise<void> {
+  // Dynamically import to get normalizeUrl and audio context
+  const [{ normalizeUrl }, { getAudioContext }] = await Promise.all([
+    import('@/utils/urlUtils'),
+    import('@/audio/AudioContextSingleton'),
+  ]);
+  const store = useDrumPadStore.getState();
+  const audioContext = getAudioContext();
+
+  for (const savedPad of savedPads) {
+    if (savedPad.sampleSourceUrl && isBuiltInSampleUrl(savedPad.sampleSourceUrl)) {
+      // Check if the pad already has the right sample loaded
+      const currentPad = store.programs.get(store.currentProgramId)?.pads.find(p => p.id === savedPad.id);
+      if (currentPad?.sample?.sourceUrl === savedPad.sampleSourceUrl) continue;
+
+      try {
+        const resp = await fetch(normalizeUrl(savedPad.sampleSourceUrl));
+        if (!resp.ok) continue;
+        const arrayBuffer = await resp.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        await store.loadSampleToPad(savedPad.id, {
+          id: `env_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          name: savedPad.sampleName || savedPad.name,
+          audioBuffer,
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+          sourceUrl: savedPad.sampleSourceUrl,
+        });
+      } catch (err) {
+        console.warn(`[DJEnvironment] Failed to reload sample for pad ${savedPad.id}:`, err);
+      }
+    }
+  }
 }
 
 // ── Standalone export/import ─────────────────────────────────────────────────
