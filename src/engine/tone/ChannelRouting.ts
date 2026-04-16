@@ -3,6 +3,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
 import { TrackerEnvelope } from '../TrackerEnvelope';
 import { getChannelEffectsManager } from '../ChannelEffectsManager';
+import { getChannelFilterManager } from '../ChannelFilterManager';
 
 // Voice state type (mirrors ToneEngine.ts interface)
 export interface VoiceState {
@@ -176,10 +177,15 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const chainInput = mgr.getChainInput(channelIndex);
     const chainOutput = mgr.getChainOutput(channelIndex);
 
-    // Connect: input → [effect chain] → channel → meter + masterInput
-    // Effects are PRE-FADER (before volume/pan) — standard insert position
+    // Get per-channel automation filter (HPF → LPF, transparent at position 0)
+    const filterMgr = getChannelFilterManager();
+    const filterInput = filterMgr.getInput(channelIndex);
+    const filterOutput = filterMgr.getOutput(channelIndex);
+
+    // Connect: input → [effect chain] → HPF → LPF → channel → meter + masterInput
     input.connect(chainInput);
-    chainOutput.connect(channel);
+    chainOutput.connect(filterInput);
+    filterOutput.connect(channel);
     channel.connect(meter);
     channel.connect(ctx.masterInput);
 
@@ -625,6 +631,9 @@ export function isChannelMuted(ctx: ChannelRoutingContext, channelIndex: number)
  * Dispose channel outputs
  */
 export function disposeChannelOutputs(ctx: ChannelRoutingContext): void {
+  // Dispose per-channel automation filters
+  getChannelFilterManager().disposeAll();
+
   ctx.channelOutputs.forEach((channelOutput, channelIndex) => {
     try {
       channelOutput.meter.dispose();
