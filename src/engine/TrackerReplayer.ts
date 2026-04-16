@@ -821,10 +821,30 @@ export class TrackerReplayer {
     this.nudgeTicksRemaining = tickCount;
   }
 
+  /** Get length of the pattern at the current song position */
+  getCurrentPatternLength(): number {
+    if (!this.song) return 64;
+    const patternNum = this.song.songPositions[this.songPos];
+    if (this.accessor.getMode() !== 'classic') {
+      return this.accessor.getPatternLength(this.songPos);
+    }
+    return this.song.patterns[patternNum]?.length ?? 64;
+  }
+
   /** Set line-level loop (quantized to rows within current pattern) */
   setLineLoop(startRow: number, size: number): void {
-    this.lineLoopStart = startRow;
-    this.lineLoopEnd = startRow + size - 1;
+    const patLen = this.getCurrentPatternLength();
+    // Clamp start and end to valid pattern rows
+    const clampedStart = Math.max(0, Math.min(startRow, patLen - 1));
+    let clampedEnd = clampedStart + size - 1;
+    if (clampedEnd >= patLen) {
+      clampedEnd = patLen - 1;
+    }
+    // Ensure at least 1 row in the loop
+    if (clampedEnd < clampedStart) clampedEnd = clampedStart;
+
+    this.lineLoopStart = clampedStart;
+    this.lineLoopEnd = clampedEnd;
     this.lineLoopActive = true;
     // Save ghost position for slip mode
     if (this.slipEnabled) {
@@ -3303,7 +3323,10 @@ export class TrackerReplayer {
     // DJ line loop: if active, wrap within loop boundaries
     if (this.lineLoopActive && this.lineLoopStart >= 0) {
       this.pattPos++;
-      if (this.pattPos > this.lineLoopEnd) {
+      // Safety: clamp to pattern length in case pattern changed
+      const patLen = this.getCurrentPatternLength();
+      const safeEnd = Math.min(this.lineLoopEnd, patLen - 1);
+      if (this.pattPos > safeEnd) {
         this.pattPos = this.lineLoopStart;
       }
       // Notify and return early — don't do normal advancement
