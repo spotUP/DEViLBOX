@@ -96,12 +96,8 @@ export class DeckEngine {
   // Pattern scratch state — when a scratch preset button is active, the tracker
   // plays live at scratch speed during forward phases (full audio quality) and
   // switches to ring-buffer reverse playback for backward phases.
-  // On pattern end we seek back to the saved position.
   private patternScratchActive = false;
   private patternScratchDir: 1 | -1 = 1;  // current direction in pattern scratch
-  private patternStartSongPos = 0;
-  private patternStartPattPos = 0;
-  private patternStartAudioPos = 0; // audio player position (seconds) at pattern start
 
   // Reverse scratch state
   private scratchBuffer: DeckScratchBuffer | null = null;
@@ -975,12 +971,6 @@ export class DeckEngine {
       this.decayRafId = null;
     }
 
-    // Save position so we can return here when the scratch ends.
-    this.patternStartSongPos = this.replayer.getSongPos();
-    this.patternStartPattPos = this.replayer.getPattPos();
-    if (this._playbackMode === 'audio') {
-      this.patternStartAudioPos = this.audioPlayer.getPosition();
-    }
     this.patternScratchActive = true;
     this.patternScratchDir = 1;  // start in forward mode
 
@@ -1026,13 +1016,11 @@ export class DeckEngine {
       this._rampDeckGain(1, 0.005);
     }
 
+    // Don't seek back — let the music continue from its current position.
+    // Scratches are beat-synced and the DJ expects seamless flow back to normal playback.
     if (this._playbackMode === 'audio') {
-      // Seek audio player back to where the scratch started
-      this.audioPlayer.seek(this.patternStartAudioPos);
       this.audioPlayer.setPlaybackRate(this.restMultiplier);
     } else {
-      // Seek replayer back so the song resumes seamlessly
-      this.replayer.seekTo(this.patternStartSongPos, this.patternStartPattPos);
       this.replayer.setTempoMultiplier(this.restMultiplier);
       this.replayer.setPitchMultiplier(this.restMultiplier);
     }
