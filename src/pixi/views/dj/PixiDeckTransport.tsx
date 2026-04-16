@@ -1,6 +1,6 @@
 /**
- * PixiDeckTransport — Play/Cue/Sync/Quantize/KeyLock buttons for a DJ deck.
- * Matches DOM DeckTransport.tsx: 5 buttons in a row.
+ * PixiDeckTransport — Play/Cue/Sync/Quantize buttons for a DJ deck.
+ * Matches DOM DeckTransport.tsx: 4 buttons in a row.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -9,7 +9,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiLabel } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
-import { ICON_PLAY, ICON_PAUSE, ICON_DISC_3, ICON_LINK, ICON_LOCK } from '../../utils/lucideIcons';
+import { ICON_PLAY, ICON_PAUSE, ICON_DISC_3, ICON_LINK } from '../../utils/lucideIcons';
 import { getLucideTexture, preloadLucideIcons } from '../../utils/lucideToTexture';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 import * as DJActions from '@/engine/dj/DJActions';
@@ -31,7 +31,6 @@ function ensureTransportIconsPreloaded(): void {
     { name: 'transport-pause', iconNode: ICON_PAUSE, size: ICON_SIZE, color: 0xffffff },
     { name: 'transport-disc3', iconNode: ICON_DISC_3, size: ICON_SIZE, color: 0xffffff },
     { name: 'transport-link', iconNode: ICON_LINK, size: ICON_SIZE, color: 0xffffff },
-    { name: 'transport-lock', iconNode: ICON_LOCK, size: 14, color: 0xffffff },
   ]);
 }
 
@@ -39,7 +38,6 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
   const theme = usePixiTheme();
   const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const cuePoint = useDJStore(s => s.decks[deckId].cuePoint);
-  const keyLockEnabled = useDJStore(s => s.decks[deckId].keyLockEnabled);
   const pendingAction = useDJStore(s => s.decks[deckId].pendingAction);
   const playPending = pendingAction?.kind === 'play';
   const cuePending = pendingAction?.kind === 'cue';
@@ -72,10 +70,6 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
     setQMode(next);
   }, [qMode]);
 
-  const handleKeyLock = useCallback(() => {
-    DJActions.setDeckKeyLock(deckId, !keyLockEnabled);
-  }, [deckId, keyLockEnabled]);
-
   const playTex = useMemo(() => getLucideTexture(
     isPlaying ? 'transport-pause' : 'transport-play',
     isPlaying ? ICON_PAUSE : ICON_PLAY,
@@ -84,7 +78,6 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
 
   const cueTex = useMemo(() => getLucideTexture('transport-disc3', ICON_DISC_3, ICON_SIZE, 0xffffff), []);
   const syncTex = useMemo(() => getLucideTexture('transport-link', ICON_LINK, ICON_SIZE, 0xffffff), []);
-  const lockTex = useMemo(() => getLucideTexture('transport-lock', ICON_LOCK, 14, 0xffffff), []);
 
   // Quantize button colors matching DOM
   const qColor = qMode === 'off'
@@ -93,9 +86,6 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
       ? 0x8b5cf6  // violet
       : 0xd946ef; // fuchsia
   const qLabel = qMode === 'off' ? 'Q' : qMode === 'beat' ? 'Q:BT' : 'Q:BR';
-
-  // Key lock button color matching DOM (amber)
-  const keyLockColor = keyLockEnabled ? theme.warning.color : theme.textMuted.color;
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
@@ -131,14 +121,6 @@ export const PixiDeckTransport: React.FC<PixiDeckTransportProps> = ({ deckId }) 
         color={qColor}
         isActive={qMode !== 'off'}
         onClick={handleQuantizeCycle}
-      />
-
-      {/* Key Lock (master tempo) */}
-      <PixiTransportButton
-        iconTexture={lockTex}
-        color={keyLockColor}
-        isActive={keyLockEnabled}
-        onClick={handleKeyLock}
       />
     </pixiContainer>
   );
