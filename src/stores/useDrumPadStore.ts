@@ -12,7 +12,7 @@ import type {
   SampleData,
   PadBank,
 } from '../types/drumpad';
-import { createEmptyProgram, createEmptyPad, create808Program, create909Program, createDJFXProgram, getBankPads } from '../types/drumpad';
+import { createEmptyProgram, createEmptyPad, create808Program, create909Program, createDJFXProgram, createDJCompleteProgram, getBankPads } from '../types/drumpad';
 import {
   saveAllPrograms,
   loadAllPrograms,
@@ -125,6 +125,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     ['A-01', create808Program()],
     ['B-01', create909Program()],
     ['C-01', createDJFXProgram()],
+    ['D-01', createDJCompleteProgram()],
   ]),
   currentProgramId: 'A-01',
   midiMappings: {},
