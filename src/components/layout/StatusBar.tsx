@@ -13,6 +13,7 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { KnobAssignment } from '@/midi/knobBanks';
+import { getKnobBankForSynth } from '@/midi/knobBanks';
 import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '@/midi/djKnobBanks';
 import { Knob } from '@/components/controls/Knob';
 import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
@@ -345,12 +346,21 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     // Nothing loaded — no synth, no FX → empty (hides bar)
     if (!hasSynth && enabledFx.length === 0) return [];
 
+    // Curated legacy banks (303, Synare, etc.) are self-contained — use as-is.
+    // The page system handles additional knob pages.
+    const hasCuratedBank = nksActiveSynthType
+      ? getKnobBankForSynth(nksActiveSynthType as import('@/types/instrument').SynthType) !== null
+      : false;
+
+    if (hasSynth && hasCuratedBank) {
+      return nksKnobAssignments;
+    }
+
+    // NKS2-generated or no-bank synths: append mixer + FX + master
     const all: KnobAssignment[] = [];
 
-    // Synth-specific params (auto-detected from current instrument via NKS2)
     if (hasSynth) all.push(...nksKnobAssignments);
 
-    // Per-instrument mixer: filter/reso always work, volume/pan need an instrument
     if (hasSynth) {
       all.push(
         { cc: 70, param: 'mixer.filterPosition', label: 'Filter' },
@@ -360,7 +370,6 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
       );
     }
 
-    // Master FX wet knobs — only for effects that are actually loaded
     for (let i = 0; i < Math.min(enabledFx.length, 3); i++) {
       all.push({
         cc: 74 + i,
@@ -369,17 +378,15 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
       });
     }
 
-    // Master volume — always relevant when anything is producing audio
     all.push({ cc: 77, param: 'masterFx.masterVolume', label: 'Master' });
 
-    // Deduplicate by param
     const seen = new Set<string>();
     return all.filter(k => {
       if (seen.has(k.param)) return false;
       seen.add(k.param);
       return true;
     });
-  }, [isDJ, djKnobPage, nksKnobAssignments, masterEffects]);
+  }, [isDJ, djKnobPage, nksKnobAssignments, nksActiveSynthType, masterEffects]);
 
   // Paginate: 8 knobs per page
   const [knobPage, setKnobPage] = useReactState(0);
