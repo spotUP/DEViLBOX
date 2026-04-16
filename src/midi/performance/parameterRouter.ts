@@ -11,6 +11,7 @@
 
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { getToneEngine } from '../../engine/ToneEngine';
+import { getChannelFilterManager } from '../../engine/ChannelFilterManager';
 import type { MappableParameter } from '../types';
 
 // ============================================================================
@@ -43,7 +44,15 @@ interface EffectRoute {
   transform?: (normalized: number) => number;
 }
 
-type ParameterRoute = ConfigRoute | VSTBridgeRoute | EffectRoute;
+interface ChannelFilterRoute {
+  type: 'channelFilter';
+  /** Which filter parameter to control */
+  filterParam: 'position' | 'resonance';
+  /** Transform normalized 0-1 value */
+  transform?: (normalized: number) => number;
+}
+
+type ParameterRoute = ConfigRoute | VSTBridgeRoute | EffectRoute | ChannelFilterRoute;
 
 // ============================================================================
 // Route Tables
@@ -226,6 +235,10 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
   // ── Mixer ─────────────────────────────────────────────────────────
   'mixer.volume': { type: 'config', path: 'volume', transform: n => -60 + (n * 60) },
   'mixer.pan':    { type: 'config', path: 'pan',    transform: n => -100 + (n * 200) },
+
+  // ── Channel Filters (DJ-style sweeps for ALL channels) ──────────
+  'mixer.filterPosition':  { type: 'channelFilter', filterParam: 'position',  transform: n => n * 2 - 1 }, // 0-1 → -1..+1
+  'mixer.filterResonance': { type: 'channelFilter', filterParam: 'resonance' }, // 0-1 pass-through
 
   // ── Master FX (placeholder — routed via routeMasterFXParameter) ──
   // These are handled specially since they target the master effects chain
@@ -475,7 +488,25 @@ export function routeParameterToEngine(
 
   const route = PARAMETER_ROUTES[param];
   if (!route) {
-    console.warn(`[parameterRouter] No route for parameter: ${param}`);
+    // Fallback: try sending directly to the current synth engine.
+    // This handles WASM replayer params (hively, klystrack, sidmon, etc.)
+    // that have NKS maps but no explicit route table entry.
+    const instrumentStore = useInstrumentStore.getState();
+    const targetId = instrumentId ?? instrumentStore.currentInstrumentId;
+    if (targetId !== undefined && targetId !== null) {
+      // Strip synth prefix: 'hively.filterSpeed' → 'filterSpeed'
+      const shortParam = param.includes('.') ? param.split('.').pop()! : param;
+      sendDirectToSynth(targetId, shortParam, normalizedValue);
+    }
+    return;
+  }
+
+  // Channel filter routes don't need an instrument lookup
+  if (route.type === 'channelFilter') {
+    const filterValue = route.transform ? route.transform(normalizedValue) : normalizedValue;
+    const filterManager = getChannelFilterManager();
+    // Apply to ALL active channels (global sweep from MIDI knob)
+    filterManager.setAll(route.filterParam, filterValue);
     return;
   }
 
