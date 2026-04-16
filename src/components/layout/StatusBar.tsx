@@ -326,7 +326,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     { id: '303', label: '303/Synth', icon: Settings },
     { id: 'Siren', label: 'Dub Siren', icon: Activity },
     { id: 'FX', label: 'Effects', icon: Waves },
-    { id: 'Mixer', label: 'Mixer', icon: Sliders },
+    { id: 'MasterFX', label: 'Master FX', icon: Sliders },
   ];
 
   const isDJ = activeView === 'dj';
