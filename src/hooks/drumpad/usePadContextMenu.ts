@@ -248,6 +248,7 @@ function buildDjFxSubmenu(
 
   // Grouped by category
   const categoryLabels: Record<string, string> = {
+    deck: 'Deck FX',
     stutter: 'Stutter / Glitch',
     delay: 'Delay / Echo',
     filter: 'Filter',
