@@ -234,6 +234,11 @@ export function resetFormatViolations(): void {
   _confirmedViolations.clear();
 }
 
+/** Check if a violation type has already been confirmed by the user. */
+export function isViolationConfirmed(type: ViolationType): boolean {
+  return _confirmedViolations.has(type);
+}
+
 // ── Format Detection ────────────────────────────────────────────────────────
 
 /** Detect the active native format from the format store */

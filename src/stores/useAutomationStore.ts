@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
+import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import type { FormatConstraints } from '@/lib/formatCompatibility';
 import type {
   AutomationCurve,
@@ -226,7 +226,7 @@ export const useAutomationStore = create<AutomationStore>()(
       const limits = getActiveFormatLimits();
       if (limits) {
         const canBake = canBakeParameter(parameter, limits);
-        if (!canBake) {
+        if (!canBake && !isViolationConfirmed('automation')) {
           void checkFormatViolation('automation',
             `"${parameter}" automation cannot be exported to ${limits.name} format — no equivalent effect command exists.`,
           ).then((ok) => { if (ok) get().addCurve(patternId, channelIndex, parameter); });
