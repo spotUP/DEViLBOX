@@ -54,13 +54,12 @@ export interface ScratchPattern {
 // ============================================================================
 
 /**
- * Baby Scratch — BPM-synced, smooth velocity curves for human feel.
+ * Baby Scratch — BPM-synced speed modulation for fluid, continuous feel.
  *
- * Velocity interpolation creates a sine-like curve: accelerate → peak → decelerate
- * through the zero-crossing, then reverse. This naturally solves three problems:
- * 1. Smooth zero-crossings eliminate scraping artifacts at direction changes
- * 2. The accelerate/decelerate curve feels like a real hand on vinyl
- * 3. BPM-synced duration locks the scratch rhythm to the track
+ * Uses trueReverse: false — the record always moves forward but at varying
+ * speed, creating the characteristic pitch rise/fall "wika wika" sound
+ * without any direction-switching gaps. This matches how Hydroplane works
+ * (which the user confirmed sounds great).
  *
  * One beat per cycle: at 125 BPM → 480ms, at 170 BPM → 353ms.
  */
@@ -72,18 +71,13 @@ const BABY_SCRATCH: ScratchPattern = {
   loop: true,
   quantize: false,
   interpolateVelocity: true,
+  trueReverse: false,         // speed modulation only — no direction switching pauses
   frames: [
-    // Steep zero-crossing into forward push
-    { timeFraction: 0,    velocity: -0.15, faderGain: 1 },  // tail end of backward (smooth loop seam)
-    { timeFraction: 0.03, velocity: 0.4,  faderGain: 1 },  // quick transition through zero
-    { timeFraction: 0.20, velocity: 2.4,  faderGain: 1 },  // peak forward push
-    { timeFraction: 0.40, velocity: 0.4,  faderGain: 1 },  // decelerating
-    // Steep zero-crossing into backward drag
-    { timeFraction: 0.47, velocity: 0.15, faderGain: 1 },  // approaching zero
-    { timeFraction: 0.53, velocity: -0.3, faderGain: 1 },  // quick cross into backward
-    { timeFraction: 0.70, velocity: -1.2, faderGain: 1 },  // peak backward drag
-    { timeFraction: 0.90, velocity: -0.4, faderGain: 1 },  // decelerating
-    { timeFraction: 0.97, velocity: -0.15, faderGain: 1 },  // approaching zero for loop seam
+    { timeFraction: 0,    velocity: 0.2,  faderGain: 1 },  // slow (low pitch)
+    { timeFraction: 0.20, velocity: 2.4,  faderGain: 1 },  // peak forward push (high pitch)
+    { timeFraction: 0.40, velocity: 0.2,  faderGain: 1 },  // slow (low pitch)
+    { timeFraction: 0.60, velocity: 1.8,  faderGain: 1 },  // second push (slightly lower peak)
+    { timeFraction: 0.80, velocity: 0.2,  faderGain: 1 },  // slow (low pitch)
   ],
 };
 
@@ -233,7 +227,7 @@ const ORBIT: ScratchPattern = {
 const CHIRP: ScratchPattern = {
   name: 'Chirp',
   shortName: 'Chirp',
-  durationBeats: 0.5,         // fast baby scratch — half beat per cycle
+  durationBeats: 0.25,         // fast chirp — quarter beat per cycle
   durationMs: null,
   loop: true,
   quantize: false,
@@ -260,13 +254,13 @@ const CHIRP: ScratchPattern = {
 const STAB: ScratchPattern = {
   name: 'Stab',
   shortName: 'Stab',
-  durationBeats: 0.25,       // 1/16th note — tight rhythmic stab
+  durationBeats: 0.5,         // eighth note — enough time for audible burst + silent rewind
   durationMs: null,
   loop: true,
   quantize: false,
   frames: [
-    { timeFraction: 0,    velocity: 3.0,   faderGain: 1 },  // forward burst, fader open
-    { timeFraction: 0.39, velocity: -1.0,  faderGain: 0 },  // fader closed, rewind to start
+    { timeFraction: 0,    velocity: 2.5,   faderGain: 1 },  // forward burst, fader open
+    { timeFraction: 0.50, velocity: -1.0,  faderGain: 0 },  // fader closed, rewind to start
   ],
 };
 
@@ -873,10 +867,12 @@ export class ScratchPlayback {
 
     if (!this.faderLFOActive) {
       try {
-        const gain = this.getDeck().getChannelGainParam();
+        const deck = this.getDeck();
+        const gain = deck.getChannelGainParam();
         const ctx  = Tone.getContext().rawContext as AudioContext;
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(1, ctx.currentTime);
+        deck.releaseChannelGainParam();
       } catch { /* engine not ready */ }
     }
   }
@@ -948,10 +944,12 @@ export class ScratchPlayback {
       this.faderLFOTimeoutId = null;
     }
     try {
-      const gain = this.getDeck().getChannelGainParam();
+      const deck = this.getDeck();
+      const gain = deck.getChannelGainParam();
       const ctx  = Tone.getContext().rawContext as AudioContext;
       gain.cancelScheduledValues(ctx.currentTime);
       gain.linearRampToValueAtTime(1, ctx.currentTime + 0.02);
+      deck.releaseChannelGainParam();
     } catch { /* engine not ready */ }
   }
 
