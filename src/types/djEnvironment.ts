@@ -19,7 +19,10 @@ export const DJ_ENV_VERSION = 1;
 /** DrumPad with audio samples stripped out (not JSON-serializable) */
 export type SerializableDrumPad = Omit<DrumPad, 'sample' | 'layers'> & {
   sampleName: string | null;
+  /** URL for built-in samples (e.g. '/data/samples/packs/...') — enables re-fetch on restore */
+  sampleSourceUrl: string | null;
   layerNames: string[];
+  layerSourceUrls: string[];
 };
 
 /** DrumProgram with serializable pads */

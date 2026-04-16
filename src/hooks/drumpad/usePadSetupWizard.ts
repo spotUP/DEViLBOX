@@ -171,6 +171,7 @@ export function usePadSetupWizard() {
           audioBuffer,
           duration: audioBuffer.duration,
           sampleRate: audioBuffer.sampleRate,
+          sourceUrl: sampleUrl,
         };
         await useDrumPadStore.getState().loadSampleToPad(padId, sampleData);
       } catch (err) {

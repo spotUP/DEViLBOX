@@ -481,6 +481,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
         audioBuffer,
         duration: audioBuffer.duration,
         sampleRate: audioBuffer.sampleRate,
+        sourceUrl: sampleInfo.url,
       };
 
       onSelectSample(sampleData);
