@@ -64,6 +64,26 @@ export class GeonkickSynth implements DevilboxSynth {
     this.triggerAttack(note, time, velocity);
   }
 
+  set(param: string, value: number): void {
+    if (this._disposed) return;
+    const eng = this.engine;
+    switch (param) {
+      case 'length': eng.setLength(value); break;
+      case 'amplitude': eng.setKickAmplitude(value); break;
+      case 'limiter': eng.setLimiter(value); break;
+      case 'filterCutoff': eng.setFilterCutoff(value); break;
+      case 'filterQ': eng.setFilterFactor(value); break;
+      case 'distDrive': eng.setDistortionDrive(value); break;
+      case 'distVolume': eng.setDistortionVolume(value); break;
+      case 'osc0Freq': eng.setOscillatorFrequency(0, value); break;
+      case 'osc0Amp': eng.setOscillatorAmplitude(0, value); break;
+      case 'osc1Freq': eng.setOscillatorFrequency(1, value); break;
+      case 'osc1Amp': eng.setOscillatorAmplitude(1, value); break;
+      case 'osc2Freq': eng.setOscillatorFrequency(2, value); break;
+      case 'osc2Amp': eng.setOscillatorAmplitude(2, value); break;
+    }
+  }
+
   dispose(): void {
     // Engine is a singleton shared across channels — never dispose it
     // from a per-instrument wrapper, only mark this wrapper as inactive.

@@ -1276,6 +1276,104 @@ export const TUNEFISH_NKS_PARAMETERS: NKSParameter[] = [
 ];
 
 // ============================================================================
+// DX7 (Yamaha DX7 FM — cycle-accurate WASM)
+// ============================================================================
+export const DX7_NKS_PARAMETERS: NKSParameter[] = [
+  // Page 0: Operator levels & algorithm
+  { id: 'dx7.algorithm', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 0, page: 0, index: 0, isAutomatable: true, accessibilityName: 'FM Algorithm' },
+  { id: 'dx7.feedback', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 1, isAutomatable: true, accessibilityName: 'Operator Feedback Level' },
+  { id: 'dx7.op1Level', name: 'OP1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page: 0, index: 2, isAutomatable: true, accessibilityName: 'Operator 1 Output Level' },
+  { id: 'dx7.op2Level', name: 'OP2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page: 0, index: 3, isAutomatable: true, accessibilityName: 'Operator 2 Output Level' },
+  { id: 'dx7.op3Level', name: 'OP3 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page: 0, index: 4, isAutomatable: true, accessibilityName: 'Operator 3 Output Level' },
+  { id: 'dx7.op4Level', name: 'OP4 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page: 0, index: 5, isAutomatable: true, accessibilityName: 'Operator 4 Output Level' },
+  { id: 'dx7.op5Level', name: 'OP5 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page: 0, index: 6, isAutomatable: true, accessibilityName: 'Operator 5 Output Level' },
+  { id: 'dx7.op6Level', name: 'OP6 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 99, page: 0, index: 7, isAutomatable: true, accessibilityName: 'Operator 6 Output Level' },
+  // Page 1: LFO & global
+  { id: 'dx7.lfoSpeed', name: 'LFO Speed', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 35, page: 1, index: 0, isAutomatable: true, accessibilityName: 'LFO Speed' },
+  { id: 'dx7.lfoDelay', name: 'LFO Delay', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 1, index: 1, isAutomatable: true, accessibilityName: 'LFO Delay Time' },
+  { id: 'dx7.lfoPMD', name: 'LFO Pitch', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 1, index: 2, isAutomatable: true, accessibilityName: 'LFO Pitch Modulation Depth' },
+  { id: 'dx7.lfoAMD', name: 'LFO Amp', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 1, index: 3, isAutomatable: true, accessibilityName: 'LFO Amplitude Modulation Depth' },
+  { id: 'dx7.lfoWaveform', name: 'LFO Wave', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 0, valueStrings: ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'S&H'], page: 1, index: 4, isAutomatable: true, accessibilityName: 'LFO Waveform' },
+  { id: 'dx7.transpose', name: 'Transpose', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 48, defaultValue: 24, page: 1, index: 5, isAutomatable: true, accessibilityName: 'Transpose Semitones' },
+  { id: 'dx7.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 1, index: 6, ccNumber: 7, isAutomatable: true, accessibilityName: 'Master Volume' },
+  { id: 'dx7.program', name: 'Program', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 0, page: 1, index: 7, isAutomatable: true, accessibilityName: 'Voice Program Number' },
+];
+
+// ============================================================================
+// OPL3 (Nuked OPL3 YMF262 FM — 18 channels)
+// ============================================================================
+export const OPL3_NKS_PARAMETERS: NKSParameter[] = [
+  // Page 0: Operator 1 (modulator)
+  { id: 'opl3.op1Attack', name: 'Op1 Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 1, page: 0, index: 0, isAutomatable: true, accessibilityName: 'Operator 1 Attack Rate' },
+  { id: 'opl3.op1Decay', name: 'Op1 Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 4, page: 0, index: 1, isAutomatable: true, accessibilityName: 'Operator 1 Decay Rate' },
+  { id: 'opl3.op1Sustain', name: 'Op1 Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 2, page: 0, index: 2, isAutomatable: true, accessibilityName: 'Operator 1 Sustain Level' },
+  { id: 'opl3.op1Release', name: 'Op1 Release', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 5, page: 0, index: 3, isAutomatable: true, accessibilityName: 'Operator 1 Release Rate' },
+  { id: 'opl3.op1Level', name: 'Op1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 63, defaultValue: 32, page: 0, index: 4, isAutomatable: true, accessibilityName: 'Operator 1 Output Level' },
+  { id: 'opl3.op1Multi', name: 'Op1 Multi', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 1, page: 0, index: 5, isAutomatable: true, accessibilityName: 'Operator 1 Frequency Multiplier' },
+  { id: 'opl3.op1Waveform', name: 'Op1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['Sine', 'HalfSine', 'AbsSine', 'PulseSine', 'SineEven', 'AbsSineE', 'Square', 'DerSaw'], page: 0, index: 6, isAutomatable: true, accessibilityName: 'Operator 1 Waveform' },
+  { id: 'opl3.feedback', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 7, isAutomatable: true, accessibilityName: 'Operator Feedback Level' },
+  // Page 1: Operator 2 (carrier)
+  { id: 'opl3.op2Attack', name: 'Op2 Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 1, page: 1, index: 0, isAutomatable: true, accessibilityName: 'Operator 2 Attack Rate' },
+  { id: 'opl3.op2Decay', name: 'Op2 Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 4, page: 1, index: 1, isAutomatable: true, accessibilityName: 'Operator 2 Decay Rate' },
+  { id: 'opl3.op2Sustain', name: 'Op2 Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 2, page: 1, index: 2, isAutomatable: true, accessibilityName: 'Operator 2 Sustain Level' },
+  { id: 'opl3.op2Release', name: 'Op2 Release', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 5, page: 1, index: 3, isAutomatable: true, accessibilityName: 'Operator 2 Release Rate' },
+  { id: 'opl3.op2Level', name: 'Op2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 63, defaultValue: 0, page: 1, index: 4, isAutomatable: true, accessibilityName: 'Operator 2 Output Level' },
+  { id: 'opl3.op2Multi', name: 'Op2 Multi', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 15, defaultValue: 1, page: 1, index: 5, isAutomatable: true, accessibilityName: 'Operator 2 Frequency Multiplier' },
+  { id: 'opl3.op2Waveform', name: 'Op2 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['Sine', 'HalfSine', 'AbsSine', 'PulseSine', 'SineEven', 'AbsSineE', 'Square', 'DerSaw'], page: 1, index: 6, isAutomatable: true, accessibilityName: 'Operator 2 Waveform' },
+  { id: 'opl3.connection', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 1, defaultValue: 0, valueStrings: ['FM', 'Additive'], page: 1, index: 7, isAutomatable: true, accessibilityName: 'FM/Additive Algorithm Mode' },
+];
+
+// ============================================================================
+// GEONKICK (Percussion Synth — 3 oscillators + filter + distortion)
+// ============================================================================
+export const GEONKICK_NKS_PARAMETERS: NKSParameter[] = [
+  // Page 0: Kick shape
+  { id: 'geonkick.length', name: 'Length', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0.05, max: 4, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Kick Length' },
+  { id: 'geonkick.amplitude', name: 'Amplitude', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Kick Amplitude' },
+  { id: 'geonkick.limiter', name: 'Limiter', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1.5, defaultValue: 1, formatString: '%.2f', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Output Limiter' },
+  { id: 'geonkick.filterCutoff', name: 'Filter', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 20, max: 20000, defaultValue: 5000, unit: 'Hz', formatString: '%.0f', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Filter Cutoff' },
+  { id: 'geonkick.filterQ', name: 'Filter Q', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0.1, max: 20, defaultValue: 1, formatString: '%.1f', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Filter Resonance' },
+  { id: 'geonkick.distDrive', name: 'Drive', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 10, defaultValue: 0, formatString: '%.1f', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Distortion Drive' },
+  { id: 'geonkick.distVolume', name: 'Dist Vol', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 2, defaultValue: 1, formatString: '%.2f', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Distortion Volume' },
+  { id: 'geonkick.osc0Freq', name: 'Osc1 Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 20, max: 20000, defaultValue: 200, unit: 'Hz', formatString: '%.0f', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Oscillator 1 Frequency' },
+  // Page 1: Oscillators
+  { id: 'geonkick.osc0Amp', name: 'Osc1 Amp', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 1, index: 0, isAutomatable: true, accessibilityName: 'Oscillator 1 Amplitude' },
+  { id: 'geonkick.osc1Freq', name: 'Osc2 Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 20, max: 20000, defaultValue: 400, unit: 'Hz', formatString: '%.0f', page: 1, index: 1, isAutomatable: true, accessibilityName: 'Oscillator 2 Frequency' },
+  { id: 'geonkick.osc1Amp', name: 'Osc2 Amp', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 1, index: 2, isAutomatable: true, accessibilityName: 'Oscillator 2 Amplitude' },
+  { id: 'geonkick.osc2Freq', name: 'Noise Freq', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 20, max: 20000, defaultValue: 1000, unit: 'Hz', formatString: '%.0f', page: 1, index: 3, isAutomatable: true, accessibilityName: 'Noise Oscillator Frequency' },
+  { id: 'geonkick.osc2Amp', name: 'Noise Amp', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 1, index: 4, isAutomatable: true, accessibilityName: 'Noise Oscillator Amplitude' },
+];
+
+// ============================================================================
+// OPENWURLI (Wurlitzer 200A Physical Model — WASM)
+// ============================================================================
+export const OPENWURLI_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'openwurli.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.8, unit: '%', formatString: '%.0f%%', page: 0, index: 0, ccNumber: 7, isAutomatable: true, accessibilityName: 'Master Volume' },
+  { id: 'openwurli.tremoloDepth', name: 'Tremolo', section: NKSSection.MODULATION, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Tremolo Depth' },
+  { id: 'openwurli.speakerCharacter', name: 'Character', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Speaker Character' },
+  { id: 'openwurli.mlpEnabled', name: 'MLP Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 1, page: 0, index: 3, isAutomatable: true, accessibilityName: 'Machine Learning Model Enable' },
+  { id: 'openwurli.velocityCurve', name: 'Vel Curve', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, formatString: '%.2f', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Velocity Response Curve' },
+];
+
+// ============================================================================
+// MIXER PARAMETERS (universal — works for ALL formats and synth types)
+// Applied at the ToneEngine mixer layer, not the synth
+// ============================================================================
+export const MIXER_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'mixer.volume', name: 'Ch Volume', section: NKSSection.MIXER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, ccNumber: 7, isAutomatable: true, accessibilityName: 'Channel Volume' },
+  { id: 'mixer.pan', name: 'Ch Pan', section: NKSSection.MIXER, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, formatString: '%.2f', page: 0, index: 1, ccNumber: 10, isAutomatable: true, accessibilityName: 'Channel Pan' },
+  { id: 'mixer.mute', name: 'Ch Mute', section: NKSSection.MIXER, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 2, isAutomatable: true, accessibilityName: 'Channel Mute' },
+];
+
+// ============================================================================
+// GLOBAL PARAMETERS (transport/master — applies to entire song)
+// ============================================================================
+export const GLOBAL_NKS_PARAMETERS: NKSParameter[] = [
+  { id: 'global.masterVolume', name: 'Master Vol', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Master Volume' },
+  { id: 'global.bpm', name: 'BPM', section: NKSSection.SEQUENCER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: 'bpm', formatString: '%.0f', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Tempo BPM' },
+];
+
+// ============================================================================
 // GENERIC PARAMETERS (for synths without specific mapping)
 // ============================================================================
 export const GENERIC_NKS_PARAMETERS: NKSParameter[] = [
@@ -1294,6 +1392,10 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
   'Synare': SYNARE_NKS_PARAMETERS,
   'V2': V2_NKS_PARAMETERS,
   'Sam': SAM_NKS_PARAMETERS,
+  'DX7': DX7_NKS_PARAMETERS,
+  'OPL3': OPL3_NKS_PARAMETERS,
+  'Geonkick': GEONKICK_NKS_PARAMETERS,
+  'OpenWurli': OPENWURLI_NKS_PARAMETERS,
 
   // Tone.js synths
   'MonoSynth': MONOSYNTH_NKS_PARAMETERS,
@@ -1369,6 +1471,7 @@ export const SYNTH_PARAMETER_MAPS: Partial<Record<SynthType, NKSParameter[]>> = 
 
   // Furnace Computer chips
   'FurnaceC64': FURNACE_C64_NKS_PARAMETERS,
+  'FurnaceSID3': FURNACE_C64_NKS_PARAMETERS,
   'FurnaceSID6581': FURNACE_C64_NKS_PARAMETERS,
   'FurnaceSID8580': FURNACE_C64_NKS_PARAMETERS,
   'FurnaceAY': FURNACE_PSG_NKS_PARAMETERS,

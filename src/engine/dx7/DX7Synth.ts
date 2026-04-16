@@ -442,6 +442,21 @@ export class DX7Synth implements DevilboxSynth {
         break;
       }
       case 'program': this.selectVoice(value); break;
+      // NKS automation params → VCED SysEx
+      case 'op1Level': this.setVcedParam(0 * 21 + 14, Math.round(value)); break;
+      case 'op2Level': this.setVcedParam(1 * 21 + 14, Math.round(value)); break;
+      case 'op3Level': this.setVcedParam(2 * 21 + 14, Math.round(value)); break;
+      case 'op4Level': this.setVcedParam(3 * 21 + 14, Math.round(value)); break;
+      case 'op5Level': this.setVcedParam(4 * 21 + 14, Math.round(value)); break;
+      case 'op6Level': this.setVcedParam(5 * 21 + 14, Math.round(value)); break;
+      case 'algorithm': this.setVcedParam(134, Math.round(value)); break;
+      case 'feedback': this.setVcedParam(135, Math.round(value)); break;
+      case 'lfoSpeed': this.setVcedParam(137, Math.round(value)); break;
+      case 'lfoDelay': this.setVcedParam(138, Math.round(value)); break;
+      case 'lfoPMD': this.setVcedParam(139, Math.round(value)); break;
+      case 'lfoAMD': this.setVcedParam(140, Math.round(value)); break;
+      case 'lfoWaveform': this.setVcedParam(142, Math.round(value)); break;
+      case 'transpose': this.setVcedParam(144, Math.round(value)); break;
     }
   }
 
