@@ -98,6 +98,7 @@ interface DJPlaylistState {
   markTrackPlayed: (playlistId: string, index: number) => void;
   markTrackBad: (playlistId: string, index: number, reason: string) => void;
   clearTrackBadFlag: (playlistId: string, index: number) => void;
+  clearAllBadFlags: (playlistId: string) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
   setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
   /** Save current DJ environment snapshot to the active playlist */
@@ -214,6 +215,27 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           state.activePlaylistId = playlistId;
           state.selectedTrackIndices = [];
           state.focusedTrackIndex = -1;
+
+          // Auto-clear stale bad flags (>1 hour old) — timeouts are transient
+          if (playlistId) {
+            const p = state.playlists.find((pl) => pl.id === playlistId);
+            if (p) {
+              const staleThreshold = Date.now() - 60 * 60 * 1000; // 1 hour
+              let cleared = 0;
+              for (const track of p.tracks) {
+                if (track.isBad && track.badTimestamp && track.badTimestamp < staleThreshold) {
+                  track.isBad = false;
+                  track.badReason = undefined;
+                  track.badTimestamp = undefined;
+                  track.badFailCount = 0;
+                  cleared++;
+                }
+              }
+              if (cleared > 0) {
+                console.log(`[DJPlaylist] Auto-cleared ${cleared} stale bad flags in "${p.name}"`);
+              }
+            }
+          }
         });
 
         // Restore environment from the newly activated playlist
@@ -445,6 +467,26 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             track.badTimestamp = undefined;
             track.badFailCount = 0;
             console.log(`[DJPlaylist] Cleared bad flag for track ${index}: ${track.trackName}`);
+          }
+        });
+      },
+
+      clearAllBadFlags: (playlistId: string) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (!p) return;
+          let cleared = 0;
+          for (const track of p.tracks) {
+            if (track.isBad) {
+              track.isBad = false;
+              track.badReason = undefined;
+              track.badTimestamp = undefined;
+              track.badFailCount = 0;
+              cleared++;
+            }
+          }
+          if (cleared > 0) {
+            console.log(`[DJPlaylist] Cleared bad flags for ${cleared} tracks in ${p.name}`);
           }
         });
       },

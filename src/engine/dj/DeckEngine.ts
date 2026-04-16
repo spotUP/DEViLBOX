@@ -26,11 +26,18 @@ export type PlaybackMode = 'tracker' | 'audio';
 // When scratch patterns change playback rates dramatically, sample buffers can end at
 // times that violate Tone.js's chronological ordering requirement. The assertion is
 // purely bookkeeping — swallowing it has no functional impact on audio output.
+// If the original throws, we still clean up _activeSources to prevent source accumulation.
 const _origOnSourceEnd = (Tone.Player.prototype as any)._onSourceEnd;
 if (_origOnSourceEnd && !(Tone.Player.prototype as any).__scratchPatched) {
   (Tone.Player.prototype as any).__scratchPatched = true;
-  (Tone.Player.prototype as any)._onSourceEnd = function (...args: any[]) {
-    try { return _origOnSourceEnd.apply(this, args); } catch { /* suppress */ }
+  (Tone.Player.prototype as any)._onSourceEnd = function (source: any) {
+    try {
+      return _origOnSourceEnd.call(this, source);
+    } catch {
+      // Original threw (StateTimeline assertion) — manually clean up the source
+      // to prevent accumulation in _activeSources.
+      (this as any)._activeSources?.delete?.(source);
+    }
   };
 }
 

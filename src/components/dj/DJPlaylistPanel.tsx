@@ -1371,12 +1371,20 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                 </>
               )}
               {badTrackCount > 0 && (
-                <button onClick={handleRetestBadTracks}
-                  disabled={retestingBad}
-                  title="Re-test all tracks marked as bad (clears bad flag and attempts reload)"
-                  className="flex items-center gap-1 px-2 py-0.5 rounded border border-red-700 bg-red-900/20 text-red-400 hover:bg-red-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
-                  {retestingBad ? 'Testing...' : `Re-test Bad (${badTrackCount})`}
-                </button>
+                <>
+                  <button onClick={handleRetestBadTracks}
+                    disabled={retestingBad}
+                    title="Re-test all tracks marked as bad (clears bad flag and attempts reload)"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded border border-red-700 bg-red-900/20 text-red-400 hover:bg-red-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-auto">
+                    {retestingBad ? 'Testing...' : `Re-test Bad (${badTrackCount})`}
+                  </button>
+                  <button
+                    onClick={() => activePlaylistId && useDJPlaylistStore.getState().clearAllBadFlags(activePlaylistId)}
+                    title="Clear all bad marks without re-testing — tracks will be retried on next load"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded border border-yellow-700 bg-yellow-900/20 text-yellow-400 hover:bg-yellow-900/40 transition-all">
+                    Clear Marks
+                  </button>
+                </>
               )}
             </div>
           )}

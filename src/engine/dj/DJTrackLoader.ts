@@ -37,7 +37,7 @@ export interface PreRenderedTrack {
  * Returns pre-rendered data that can be loaded instantly via loadPreRenderedTrackToDeck().
  */
 export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedTrack | null> {
-  const PRERENDER_TIMEOUT_MS = 15000;
+  const PRERENDER_TIMEOUT_MS = 30000;
   const timeoutPromise = new Promise<PreRenderedTrack | null>((_, reject) => {
     setTimeout(() => reject(new Error('Track pre-render timeout')), PRERENDER_TIMEOUT_MS);
   });
@@ -222,7 +222,7 @@ export async function loadPlaylistTrackToDeck(
   deckId: DeckId,
 ): Promise<boolean> {
   // Timeout wrapper - abort if loading takes too long (UADE crash, network hang, etc.)
-  const LOAD_TIMEOUT_MS = 15000; // 15 seconds
+  const LOAD_TIMEOUT_MS = 30000; // 30 seconds
   const timeoutPromise = new Promise<boolean>((_, reject) => {
     setTimeout(() => reject(new Error('Track load timeout')), LOAD_TIMEOUT_MS);
   });
