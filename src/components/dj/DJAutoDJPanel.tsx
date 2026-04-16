@@ -11,7 +11,7 @@ import { useDJStore, type AutoDJStatus } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ, pauseAutoDJ, resumeAutoDJ, playAutoDJFromIndex } from '@/engine/dj/DJActions';
-import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
+import { analyzePlaylist, playlistNeedsAnalysis, trackHasRemoteSource, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -101,7 +101,10 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const skippedCount = activePlaylist
     ? activePlaylist.tracks.filter(t => t.analysisSkipped).length
     : 0;
-  const pendingCount = trackCount - analyzedCount - skippedCount;
+  const localCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => !t.analysisSkipped && !trackHasRemoteSource(t) && (t.bpm === 0 || !t.musicalKey || t.energy == null)).length
+    : 0;
+  const pendingCount = trackCount - analyzedCount - skippedCount - localCount;
 
   // 404 fix dialog state
   const [fixDialog, setFixDialog] = useState<{
