@@ -53,7 +53,7 @@ export interface DeckState {
   keyLockEnabled: boolean;    // Key lock (master tempo) — pitch slider changes tempo only
 
   // EQ
-  eqLow: number;              // dB (-24 to +6)
+  eqLow: number;              // dB (-12 to +12)
   eqMid: number;
   eqHigh: number;
   eqLowKill: boolean;
