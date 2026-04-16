@@ -87,10 +87,10 @@ export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
   fxPad('Kill Hi',      'Deck',        DJ_DECK_FX,     'fx_deck_kill_hi'),
   fxPad('Filt Reset',   'Deck',        DJ_FILTER,      'fx_deck_filter_reset'),
   // Row 3: Beat jumps (real DJ engine effects)
+  fxPad('Jump −16',     'Deck',        DJ_MODULATION,  'fx_deck_jump_m16'),
   fxPad('Jump −4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_m4'),
-  fxPad('Jump −1',      'Deck',        DJ_MODULATION,  'fx_deck_jump_m1'),
-  fxPad('Jump +1',      'Deck',        DJ_MODULATION,  'fx_deck_jump_p1'),
   fxPad('Jump +4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_p4'),
+  fxPad('Jump +16',     'Deck',        DJ_MODULATION,  'fx_deck_jump_p16'),
   // Row 4: Performance FX & sounds (master bus)
   fxPad('Stutter 1/8',  'Stutter',     DJ_STUTTER,     'fx_stutter_8'),
   fxPad('Dub Siren',    'Delay',       DJ_DELAY,       'fx_dub_siren'),

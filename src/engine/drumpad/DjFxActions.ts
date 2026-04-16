@@ -44,7 +44,8 @@ export type DjFxActionId =
   | 'fx_deck_echo_out'
   | 'fx_deck_kill_lo' | 'fx_deck_kill_mid' | 'fx_deck_kill_hi'
   | 'fx_deck_brake'
-  | 'fx_deck_jump_m4' | 'fx_deck_jump_m1' | 'fx_deck_jump_p1' | 'fx_deck_jump_p4';
+  | 'fx_deck_jump_m16' | 'fx_deck_jump_m4' | 'fx_deck_jump_m1'
+  | 'fx_deck_jump_p1' | 'fx_deck_jump_p4' | 'fx_deck_jump_p16';
 
 export interface DjFxAction {
   id: DjFxActionId;
@@ -1301,10 +1302,12 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createDeckEQKill('mid'),
   createDeckEQKill('high'),
   createDeckBrake(),
+  createDeckBeatJump(-16),
   createDeckBeatJump(-4),
   createDeckBeatJump(-1),
   createDeckBeatJump(1),
   createDeckBeatJump(4),
+  createDeckBeatJump(16),
 ];
 
 export const DJ_FX_ACTION_MAP: Record<DjFxActionId, DjFxAction> = Object.fromEntries(
