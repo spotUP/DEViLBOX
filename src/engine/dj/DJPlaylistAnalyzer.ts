@@ -49,10 +49,20 @@ export type OnFixNeeded = (
 ) => Promise<string | null>;
 
 /**
- * Check if a playlist track is missing metadata needed for smart sorting.
+ * Check if a track has a remote source that allows server-side analysis.
+ */
+export function trackHasRemoteSource(track: PlaylistTrack): boolean {
+  return track.fileName.startsWith('modland:') || track.fileName.startsWith('hvsc:');
+}
+
+/**
+ * Check if a playlist track is missing metadata AND can be analyzed.
+ * Only remote tracks (modland:/hvsc:) can be analyzed — local files
+ * already had BPM detected at import time and can't be re-downloaded.
  */
 export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
   if (track.analysisSkipped) return false;
+  if (!trackHasRemoteSource(track)) return false;
   return track.bpm === 0 || !track.musicalKey || track.energy == null;
 }
 
@@ -87,7 +97,7 @@ export async function analyzePlaylist(
 
   const tracksToAnalyze = playlist.tracks
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => trackNeedsAnalysis(track) && (track.fileName.startsWith('modland:') || track.fileName.startsWith('hvsc:')));
+    .filter(({ track }) => trackNeedsAnalysis(track));
 
   if (tracksToAnalyze.length === 0) return { analyzed: 0, failed: 0, total: 0, failures: [] } as AnalysisResult;
 

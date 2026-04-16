@@ -1122,7 +1122,7 @@ export class TrackerReplayer {
 
       // Fire the note — it sustains until the next note, note-off, or instrument switch.
       // No scheduled release. This matches tracker behavior: notes ring until explicitly stopped.
-      this.processRow(ch, channel, row, time);
+      this.processHybridRow(ch, channel, row, time);
     }
 
     // NOTE: We intentionally do NOT call updateWasmMuteMask() here.
@@ -1133,11 +1133,143 @@ export class TrackerReplayer {
     // libopenmpt becomes the soundlib and we can silence samples directly.
   }
 
-  // fireHybridNotesFromChannelState removed — channel state from worklet
-  // requires a libopenmpt WASM rebuild that's currently blocked by Emscripten
-  // AudioWorklet compatibility issues. All hybrid note firing goes through
-  // fireHybridNotesForRow() via onPosition callbacks. Processed pitch/volume
-  // from libopenmpt's channel state will be added when the WASM rebuild is resolved.
+  /**
+   * Lightweight row processor for hybrid synth note triggering.
+   *
+   * Called ONLY from fireHybridNotesForRow() for replaced-instrument channels.
+   * Handles: note triggers, note-off, CXX volume, TB-303 slide/accent/mute/hammer,
+   * SonicArranger WASM effects. Skips all tick-level effect initialization
+   * (portamento targets, vibrato params, etc.) — those will be handled by
+   * SynthEffectProcessor once it exists.
+   */
+  private processHybridRow(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
+    if (!this.song) return;
+
+    // TB-303 flag columns: 0=none, 1=accent, 2=slide, 3=mute, 4=hammer
+    const accent = (row.flag1 === 1 || row.flag2 === 1);
+    const slide = (row.flag1 === 2 || row.flag2 === 2);
+    const mute = (row.flag1 === 3 || row.flag2 === 3);
+    const hammer = (row.flag1 === 4 || row.flag2 === 4);
+
+    // Mute: silence this channel (TT-303 extension)
+    if (mute) {
+      ch.gainNode.gain.setValueAtTime(0, time);
+      if (ch.player) {
+        try { ch.player.stop(time); } catch { /* ignored */ }
+        ch.player = null;
+      }
+      return;
+    }
+
+    // Parse effect for CXX volume detection
+    const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
+    const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
+
+    // Instrument lookup
+    const instNum = row.instrument ?? 0;
+    if (instNum > 0) {
+      const instrument = this.instrumentMap.get(instNum);
+      if (instrument) {
+        ch.instrument = instrument;
+        ch.sampleNum = instNum;
+      }
+    }
+
+    // SonicArranger synth: route per-row WASM effects
+    if (ch.instrument?.synthType === 'SonicArrangerSynth') {
+      const engine = getToneEngine();
+      const saInst = engine.getInstrument(ch.instrument.id, ch.instrument, chIndex);
+      if (saInst && typeof (saInst as any).set === 'function') {
+        if (row.note > 0 && row.note < 97) {
+          (saInst as any).set('speedCounter', 0);
+        }
+        if (row.saArpTable !== undefined) {
+          (saInst as any).set('arpeggioTable', row.saArpTable);
+        }
+        const arpEffArg = (effect === 0 && param !== 0) ? param : 0;
+        (saInst as any).set('effectArpArg', arpEffArg);
+
+        const saEff = row.saEffect ?? 0;
+        const saArg = row.saEffectArg ?? 0;
+        (saInst as any).set('setSlideSpeed', 0);
+        (saInst as any).set('volumeSlide', 0);
+        switch (saEff) {
+          case 0x1: (saInst as any).set('setSlideSpeed', saArg); break;
+          case 0x2: (saInst as any).set('restartAdsr', saArg); break;
+          case 0x4: (saInst as any).set('setVibrato', saArg); break;
+          case 0x7: (saInst as any).set('setPortamento', saArg); break;
+          case 0x8: (saInst as any).set('skipPortamento', 0); break;
+          case 0xA: (saInst as any).set('volumeSlide', saArg); break;
+          case 0x9:
+            if (saArg > 0 && saArg <= 128) this._saTrackLen = saArg;
+            break;
+        }
+      }
+    }
+
+    const noteValue = row.note;
+    const rawPeriod = row.period;
+    const prob = row.probability;
+    const probabilitySkip = prob !== undefined && prob > 0 && prob < 100 && Math.random() * 100 >= prob;
+
+    // Note-off
+    if (noteValue === 97) {
+      ch.previousSlideFlag = false;
+      this.releaseMacros(ch);
+      this.stopChannel(ch, chIndex, time);
+      return;
+    }
+
+    // Normal note trigger
+    if (noteValue && noteValue > 0 && noteValue < 97 && !probabilitySkip) {
+      ch.xmNote = noteValue;
+
+      // Determine playback period/pitch
+      const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
+      ch.note = usePeriod;
+      ch.period = ch.note;
+
+      // TB-303 slide semantics
+      const effectiveSlide = slide || hammer;
+      const slideActive = ch.previousSlideFlag && noteValue !== null && !hammer;
+
+      // Resolve note name (synths use XM note numbers directly)
+      const isSynthInstrument = ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler';
+      const newNoteName = (this.useXMPeriods || isSynthInstrument)
+        ? xmNoteToNoteName(noteValue)
+        : periodToNoteName(usePeriod);
+
+      // Apply CXX (set volume) from all effect columns before triggering
+      if (effect === 0xC) {
+        ch.volume = Math.min(64, param);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      }
+      for (const [eTyp, eVal] of [
+        [row.effTyp2, row.eff2], [row.effTyp3, row.eff3], [row.effTyp4, row.eff4],
+        [row.effTyp5, row.eff5], [row.effTyp6, row.eff6], [row.effTyp7, row.eff7],
+        [row.effTyp8, row.eff8],
+      ]) {
+        if (eTyp === 0xC && eVal !== undefined) {
+          ch.volume = Math.min(64, eVal);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+      }
+
+      // Release previous synth note (unless sliding)
+      if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+        try {
+          getToneEngine().triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, time, ch.instrument, chIndex);
+        } catch { /* ignored */ }
+      }
+      ch.lastPlayedNoteName = newNoteName;
+
+      // Trigger the synth note
+      this.triggerNote(ch, time, 0, chIndex, accent, slideActive, effectiveSlide, hammer);
+
+      // Update slide flag for next row
+      ch.previousSlideFlag = (slide || hammer) ?? false;
+    }
+  }
 
   // ==========================================================================
   // WASM SEQUENCER CELL SYNC
