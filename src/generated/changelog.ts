@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-16T19:56:39.213Z
+ * Generated: 2026-04-16T20:38:47.850Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5443';
-export const BUILD_NUMBER = '5443';
-export const BUILD_HASH = '9ce132d80';
+export const BUILD_VERSION = '1.0.5454';
+export const BUILD_NUMBER = '5454';
+export const BUILD_HASH = '9bd6b41bc';
 export const BUILD_DATE = '2026-04-16';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,53 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5443',
+    version: '1.0.5454',
     date: '2026-04-16',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add DJ-style filter sweep presets"
+      },
+      {
+        type: 'improvement',
+        "description": "Move Order and Master FX from FT2 toolbar to pattern editor header"
+      },
+      {
+        type: 'feature',
+        "description": "Add reverb send for scratch/LFO fader effects"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove TB-303 from sub-mode dropdown (no longer exists)"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify drumpad stutter with DJ fader LFO scheduling"
+      },
+      {
+        type: 'feature',
+        "description": "Add Tracker/Grid/TB-303 sub-mode toggle to DOM editor controls bar"
+      },
+      {
+        type: 'fix',
+        "description": "Fix LFO/Transformer/Crab phase: open on beats, mute on off-beats"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove Mixer knob bank, replace with MasterFX"
+      },
+      {
+        type: 'improvement',
+        "description": "Auto-detect format editors on file load, remove from dropdown"
+      },
+      {
+        type: 'improvement',
+        "description": "Integrate Grid editor into Pattern editor as toggle"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove Mixer view from navigable views"
+      },
       {
         type: 'fix',
         "description": "Fix LFO beat sync and anti-click ramps"
@@ -188,50 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add headphone cue setup wizard for DJ view"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Auto DJ Analyze button not working for local files"
-      },
-      {
-        type: 'fix',
-        "description": "Fix sweeps to sweep back at same speed as sweep in"
-      },
-      {
-        type: 'fix',
-        "description": "Fix beat jumps: use detectedBPM, bigger jump amounts"
-      },
-      {
-        type: 'fix',
-        "description": "Fix deck brake to use setDeckPitch with rAF animation"
-      },
-      {
-        type: 'improvement',
-        "description": "Group deck FX actions into dedicated Deck FX category"
-      },
-      {
-        type: 'fix',
-        "description": "Treat zero-duration module as warning, not fatal error"
-      },
-      {
-        type: 'improvement',
-        "description": "Rewrite stutter FX to use LFO gate instead of broken delay loop"
-      },
-      {
-        type: 'feature',
-        "description": "Add fade-out and filter sweep-down to noise riser on release"
-      },
-      {
-        type: 'fix',
-        "description": "Fix confirm dialog colors to use design tokens, remove Empty Kit"
-      },
-      {
-        type: 'fix',
-        "description": "Fix drumpad programs resurrecting after delete"
-      },
-      {
-        type: 'fix',
-        "description": "Stop button actually stops instead of restarting from pos 0"
       }
     ]
   }

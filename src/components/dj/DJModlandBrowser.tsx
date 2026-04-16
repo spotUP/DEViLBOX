@@ -38,6 +38,7 @@ import {
   type RatingMap,
 } from '@/lib/ratingsApi';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { AuthModal } from '@/components/dialogs/AuthModal';
 import { StarRating } from '@/components/shared/StarRating';
 import { CustomSelect } from '@components/common/CustomSelect';
 
@@ -86,6 +87,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const [ratings, setRatings] = useState<RatingMap>({});
 
   const isLoggedIn = useAuthStore(s => !!s.token);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -214,7 +216,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   // ── Rate handler ──────────────────────────────────────────────────────
 
   const handleRate = useCallback(async (item: OnlineResult, star: number) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
     const itemKey = item.key;
     const ratingSource = item.source;
     // Optimistic update
@@ -462,6 +464,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const isDownloading = (key: string) => downloadingPaths.has(key);
 
   return (
+    <>
     <div
       ref={panelRef}
       className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px] relative z-[99990]"
@@ -576,7 +579,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                       avg={ratings[file.key]?.avg ?? file.avg_rating ?? 0}
                       count={ratings[file.key]?.count ?? file.vote_count ?? 0}
                       userRating={ratings[file.key]?.userRating}
-                      onRate={isLoggedIn ? (star) => handleRate(file, star) : undefined}
+                      onRate={(star) => handleRate(file, star)}
                     />
                   </div>
                 </div>
@@ -668,5 +671,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         </div>
       )}
     </div>
+    <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    </>
   );
 };
