@@ -8,6 +8,7 @@ import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
 import { DB303Synth as JC303Synth } from './db303/DB303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
+import { getChannelFilterManager } from './ChannelFilterManager';
 import { isDevilboxSynth } from '@typedefs/synth';
 import type { TrackerCell, Pattern } from '@typedefs';
 import { interpolateAutomationValue } from '@typedefs/automation';
@@ -156,6 +157,12 @@ export class AutomationPlayer {
             break;
           case 'mute':
             engine.setChannelMute(channelIndex, value >= 0.5);
+            break;
+          case 'filterPosition':
+            getChannelFilterManager().setPosition(channelIndex, value);
+            break;
+          case 'filterResonance':
+            getChannelFilterManager().setResonance(channelIndex, value);
             break;
         }
       } catch (error) {
