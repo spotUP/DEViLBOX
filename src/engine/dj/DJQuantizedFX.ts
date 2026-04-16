@@ -607,8 +607,8 @@ export function bassSwapTransition(
         if (cancelled) return;
         // At midpoint: kill outgoing bass, ensure incoming bass is full
         try {
-          getDJEngine().getDeck(fromDeck).setEQ('low', -24);
-          useDJStore.getState().setDeckEQ(fromDeck, 'low', -24);
+          getDJEngine().getDeck(fromDeck).setEQ('low', -12);
+          useDJStore.getState().setDeckEQ(fromDeck, 'low', -12);
         } catch { /* */ }
 
         // Phase 2 (second half): complete crossfade

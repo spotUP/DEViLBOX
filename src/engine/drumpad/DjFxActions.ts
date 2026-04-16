@@ -1240,6 +1240,24 @@ function createDeckBrake(): DjFxAction {
   };
 }
 
+function createHalfSpeed(): DjFxAction {
+  return {
+    id: 'fx_half_speed',
+    name: 'Half Speed',
+    category: 'tape',
+    mode: 'momentary',
+    engage() {
+      const deckId = getActiveDeckId();
+      // -12 semitones = half speed (one octave down)
+      useDJStore.getState().setDeckPitch(deckId, -12);
+    },
+    disengage() {
+      const deckId = getActiveDeckId();
+      useDJStore.getState().setDeckPitch(deckId, 0);
+    },
+  };
+}
+
 function createDeckBeatJump(beats: number): DjFxAction {
   const sign = beats > 0 ? 'p' : 'm';
   const abs = Math.abs(beats);
@@ -1289,6 +1307,7 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   // Tape / Vinyl
   createTapeStop(),
   createVinylBrake(),
+  createHalfSpeed(),
   // One-shot sounds
   createDubSiren(),
   createAirHorn(),

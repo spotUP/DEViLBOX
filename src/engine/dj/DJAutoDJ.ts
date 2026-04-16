@@ -66,6 +66,12 @@ class DJAutoDJ {
   // Network-down backoff — exponential delay between retry attempts
   private preloadFailCount = 0;
   private lastPreloadFailTime = 0;
+  // Transition resilience — timeout + crossfader guard
+  private transitionStartTime = 0;
+  private lastCrossfaderValue = -1;
+  private crossfaderStuckCount = 0;
+  private static readonly TRANSITION_TIMEOUT_MS = 30_000;
+  private static readonly CROSSFADER_STUCK_POLLS = 10; // 5 seconds at 500ms
 
 
   // ── Public API ───────────────────────────────────────────────────────────
@@ -312,6 +318,13 @@ class DJAutoDJ {
 
     switch (status) {
       case 'playing': {
+        // ── Pause guard: if active deck got paused externally, resume it ──
+        if (!this.isActiveDeckPlaying(store)) {
+          console.warn(`[AutoDJ] Active deck ${this.activeDeck} paused externally — resuming`);
+          try { getDJEngine().getDeck(this.activeDeck).play(); } catch { /* */ }
+          store.setDeckPlaying(this.activeDeck, true);
+        }
+
         // Detect stale position — browser throttling can freeze audioPosition
         if (Math.abs(timeRemaining - this.lastTimeRemaining) < 0.1) {
           this.staleCount++;
@@ -337,6 +350,13 @@ class DJAutoDJ {
       }
 
       case 'transition-pending': {
+        // ── Pause guard: if active deck got paused externally, resume it ──
+        if (!this.isActiveDeckPlaying(store)) {
+          console.warn(`[AutoDJ] Active deck ${this.activeDeck} paused during transition-pending — resuming`);
+          try { getDJEngine().getDeck(this.activeDeck).play(); } catch { /* */ }
+          store.setDeckPlaying(this.activeDeck, true);
+        }
+
         // Check if it's time to start the transition
         const transitionDuration = this.getTransitionDurationSec();
         if (this.pollCount % 4 === 0) {
@@ -350,6 +370,21 @@ class DJAutoDJ {
       }
 
       case 'transitioning': {
+        // ── Transition timeout guard ──
+        const transElapsed = Date.now() - this.transitionStartTime;
+        if (transElapsed > DJAutoDJ.TRANSITION_TIMEOUT_MS) {
+          console.warn(`[AutoDJ] Transition timed out after ${(transElapsed / 1000).toFixed(0)}s — force completing`);
+          // Force crossfader to target position
+          const targetCf = this.idleDeck === 'B' ? 1 : 0;
+          try { getDJEngine().setCrossfader(targetCf); } catch { /* */ }
+          store.setCrossfader(targetCf);
+          // Stop outgoing deck
+          try { getDJEngine().getDeck(this.activeDeck).stop(); } catch { /* */ }
+          store.setDeckPlaying(this.activeDeck, false);
+          this.completeTransition();
+          break;
+        }
+
         // Check if the transition is done.
         // Read engine state directly — store state depends on rAF-based
         // useDeckStateSync which browsers throttle when DJView is hidden
@@ -366,9 +401,26 @@ class DJAutoDJ {
         const crossfaderDone = this.idleDeck === 'B' ? crossfader >= 0.98
           : this.idleDeck === 'A' ? crossfader <= 0.02 : false;
 
+        // ── Crossfader stuck guard ──
+        // If user dragged crossfader away from target, force it back
+        if (Math.abs(crossfader - this.lastCrossfaderValue) < 0.01) {
+          this.crossfaderStuckCount++;
+        } else {
+          this.crossfaderStuckCount = 0;
+        }
+        this.lastCrossfaderValue = crossfader;
+
+        if (this.crossfaderStuckCount >= DJAutoDJ.CROSSFADER_STUCK_POLLS && !crossfaderDone) {
+          const targetCf = this.idleDeck === 'B' ? 1 : 0;
+          console.warn(`[AutoDJ] Crossfader stuck at ${crossfader.toFixed(2)} for ${this.crossfaderStuckCount} polls — forcing to ${targetCf}`);
+          try { getDJEngine().setCrossfader(targetCf); } catch { /* */ }
+          store.setCrossfader(targetCf);
+          this.crossfaderStuckCount = 0;
+        }
+
         if (this.pollCount % 4 === 0) {
           const incomingPlaying = store.decks[this.idleDeck].isPlaying;
-          console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone}`);
+          console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone} elapsed=${(transElapsed / 1000).toFixed(0)}s`);
         }
 
         // Complete when crossfader is done AND outgoing has stopped
@@ -554,6 +606,9 @@ class DJAutoDJ {
     // Mark incoming deck as playing in the store
     store.setDeckPlaying(this.idleDeck, true);
     store.setAutoDJStatus('transitioning');
+    this.transitionStartTime = Date.now();
+    this.lastCrossfaderValue = -1;
+    this.crossfaderStuckCount = 0;
 
     const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
     const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
@@ -805,5 +860,14 @@ class DJAutoDJ {
     }
     this.shuffleOrder = indices;
     this.shufflePosition = 0;
+  }
+
+  /** Check if the active deck is actually playing (reads engine first, falls back to store). */
+  private isActiveDeckPlaying(store: ReturnType<typeof useDJStore.getState>): boolean {
+    try {
+      return getDJEngine().getDeck(this.activeDeck).isPlaying();
+    } catch {
+      return store.decks[this.activeDeck].isPlaying;
+    }
   }
 }
