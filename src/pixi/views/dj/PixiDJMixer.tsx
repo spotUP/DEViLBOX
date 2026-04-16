@@ -97,10 +97,12 @@ const EQBandRow: React.FC<{
   isKilled: boolean;
   side: 'left' | 'right';
 }> = ({ deckId, band, label, value, isKilled, side }) => {
-  const handleKillToggle = useCallback(() => {
-    const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqLowKill' | 'eqMidKill' | 'eqHighKill';
-    const current = useDJStore.getState().decks[deckId][killKey];
-    DJActions.setDeckEQKill(deckId, band, !current);
+  const handleKillDown = useCallback(() => {
+    DJActions.setDeckEQKill(deckId, band, true);
+  }, [deckId, band]);
+
+  const handleKillUp = useCallback(() => {
+    DJActions.setDeckEQKill(deckId, band, false);
   }, [deckId, band]);
 
   const killBtn = (
@@ -112,7 +114,8 @@ const EQBandRow: React.FC<{
       active={isKilled}
       width={20}
       height={20}
-      onClick={handleKillToggle}
+      onPointerDown={handleKillDown}
+      onPointerUp={handleKillUp}
     />
   );
 

@@ -49,6 +49,8 @@ interface PixiButtonProps {
   height?: number;
   tooltip?: string;
   onClick?: () => void;
+  onPointerDown?: () => void;
+  onPointerUp?: () => void;
   layout?: Record<string, unknown>;
 }
 
@@ -111,6 +113,8 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   width: widthProp,
   height: heightProp,
   onClick,
+  onPointerDown: onPointerDownProp,
+  onPointerUp: onPointerUpProp,
   layout,
 }) => {
   const theme = usePixiTheme();
@@ -193,11 +197,12 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   }, [disabled, tooltipText, showTooltip, theme.accent.color]);
   const handlePointerOut = useCallback(() => {
     setHovered(false);
+    if (pressed) onPointerUpProp?.();
     setPressed(false);
     if (tooltipText) hideTooltip();
-  }, [tooltipText, hideTooltip]);
-  const handlePointerDown = useCallback(() => { if (!disabled) setPressed(true); }, [disabled]);
-  const handlePointerUp = useCallback(() => { setPressed(false); }, []);
+  }, [tooltipText, hideTooltip, pressed, onPointerUpProp]);
+  const handlePointerDown = useCallback(() => { if (!disabled) { setPressed(true); onPointerDownProp?.(); } }, [disabled, onPointerDownProp]);
+  const handlePointerUp = useCallback(() => { setPressed(false); onPointerUpProp?.(); }, [onPointerUpProp]);
   const handleClick = useCallback(() => {
     if (!disabled && !loading) onClick?.();
   }, [disabled, loading, onClick]);
