@@ -549,24 +549,28 @@ class Voice {
   applyParams(params) {
     if (params.tenseness !== undefined)
       this.synth.glottis.targetTenseness = params.tenseness;
-    if (params.tongueIndex !== undefined)
-      this.synth.tractShaper.tongueIndex = params.tongueIndex;
-    if (params.tongueDiameter !== undefined)
-      this.synth.tractShaper.tongueDiameter = params.tongueDiameter;
-    if (params.lipDiameter !== undefined) {
-      // Set lip segments directly
-      for (let i = this.synth.tract.lipStart; i < this.synth.tract.n; i++) {
-        this.synth.tractShaper.targetDiameter[i] = params.lipDiameter;
-      }
-    }
     if (params.velumTarget !== undefined)
       this.synth.tractShaper.velumTarget = params.velumTarget;
     if (params.vibratoAmount !== undefined)
       this.synth.glottis.vibratoAmount = params.vibratoAmount;
     if (params.vibratoFrequency !== undefined)
       this.synth.glottis.vibratoFrequency = params.vibratoFrequency;
+
+    // 1. Set tongue shape first — this determines the base tract diameter
+    if (params.tongueIndex !== undefined)
+      this.synth.tractShaper.tongueIndex = params.tongueIndex;
+    if (params.tongueDiameter !== undefined)
+      this.synth.tractShaper.tongueDiameter = params.tongueDiameter;
+    // Rebuild base tract from tongue position
+    this.synth.tractShaper.shapeMainTract();
+
+    // 2. Apply lip/constriction AFTER shapeMainTract so they aren't overwritten
+    if (params.lipDiameter !== undefined) {
+      for (let i = this.synth.tract.lipStart; i < this.synth.tract.n; i++) {
+        this.synth.tractShaper.targetDiameter[i] = params.lipDiameter;
+      }
+    }
     if (params.constrictionIndex !== undefined && params.constrictionDiameter !== undefined) {
-      // Apply constriction at a specific point in the tract
       const idx = Math.floor(params.constrictionIndex);
       if (idx >= 2 && idx < this.synth.tract.n - 2) {
         this.synth.tractShaper.targetDiameter[idx] = params.constrictionDiameter;
@@ -574,8 +578,6 @@ class Voice {
         this.synth.tractShaper.targetDiameter[idx + 1] = params.constrictionDiameter;
       }
     }
-    // Update tongue shape after params change
-    this.synth.tractShaper.shapeMainTract();
   }
 }
 
