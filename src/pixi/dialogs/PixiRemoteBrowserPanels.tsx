@@ -40,6 +40,7 @@ import {
   type RatingMap,
 } from '@/lib/ratingsApi';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { PixiAuthModal } from './PixiAuthModal';
 import type { PixiListItemRating } from '../components/PixiList';
 import { tintBg } from '../colors';
 
@@ -86,6 +87,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [ratings, setRatings] = useState<RatingMap>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
@@ -169,7 +171,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
   }, [onLoadTrackerModule, onClose]);
 
   const handleRate = useCallback(async (id: string, star: number) => {
-    if (!isLoggedIn) return; // silently ignore if not logged in
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
     const key = id; // id === full_path
     try {
       if (star === 0) {
@@ -212,6 +214,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
   const listH = height - SEARCH_H - PAD * 2;
 
   return (
+    <>
     <Div layout={{ width, height, flexDirection: 'column' }}>
       {/* Search bar */}
       <Div
@@ -307,7 +310,7 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
                 const file = results.find(r => r.full_path === id);
                 if (file) handleLoad(file);
               }}
-              onRate={isLoggedIn ? handleRate : undefined}
+              onRate={handleRate}
             />
 
             {hasMore && (
@@ -332,6 +335,8 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
         )}
       </Div>
     </Div>
+    <PixiAuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    </>
   );
 };
 
@@ -365,6 +370,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<HVSCEntry[]>([]);
   const [ratings, setRatings] = useState<RatingMap>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
@@ -456,7 +462,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
   }, [browseDirectory, handleLoad]);
 
   const handleRate = useCallback(async (id: string, star: number) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
     try {
       if (star === 0) {
         const res = await removeRating('hvsc', id);
@@ -508,6 +514,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
   const listH = height - SEARCH_H - PAD * 2;
 
   return (
+    <>
     <Div layout={{ width, height, flexDirection: 'column' }}>
       {/* Search bar */}
       <Div
@@ -601,7 +608,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
               const entry = displayEntries.find(e => e.path === id);
               if (entry) handleEntryClick(entry);
             }}
-            onRate={isLoggedIn ? handleRate : undefined}
+            onRate={handleRate}
           />
         )}
 
@@ -614,5 +621,7 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
         )}
       </Div>
     </Div>
+    <PixiAuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    </>
   );
 };
