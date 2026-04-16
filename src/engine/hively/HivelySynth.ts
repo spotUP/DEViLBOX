@@ -196,26 +196,33 @@ export class HivelySynth implements DevilboxSynth {
         this.output.gain.value = Math.max(0, Math.min(1, value));
         break;
       case 'filterSpeed':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'filterSpeed', value: Math.round(value * 64) });
+        this._setAllVoices(0, Math.round(value * 64));
         break;
       case 'filterLower':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'filterLower', value: Math.round(value * 63) });
+        this._setAllVoices(1, Math.round(value * 63));
         break;
       case 'filterUpper':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'filterUpper', value: Math.round(value * 63) });
+        this._setAllVoices(2, Math.round(value * 63));
         break;
       case 'vibratoSpeed':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'vibratoSpeed', value: Math.round(value * 64) });
+        this._setAllVoices(3, Math.round(value * 63));
         break;
       case 'vibratoDepth':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'vibratoDepth', value: Math.round(value * 64) });
+        this._setAllVoices(4, Math.round(value * 15));
         break;
       case 'squareSpeed':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'squareSpeed', value: Math.round(value * 64) });
+        this._setAllVoices(5, Math.round(value * 64));
         break;
       case 'pan':
-        this.engine.sendMessage({ type: 'setVoiceParam', param: 'pan', value: Math.round(value * 255) });
+        this._setAllVoices(6, Math.round(value * 255));
         break;
+    }
+  }
+
+  /** Send a voice param to all channels (Hively has 4-8 channels) */
+  private _setAllVoices(paramId: number, value: number): void {
+    for (let ch = 0; ch < 8; ch++) {
+      this.engine.sendMessage({ type: 'setVoiceParam', channel: ch, paramId, value });
     }
   }
 
