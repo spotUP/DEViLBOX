@@ -67,7 +67,7 @@ export interface ScratchPattern {
 const BABY_SCRATCH: ScratchPattern = {
   name: 'Baby Scratch',
   shortName: 'Baby',
-  durationBeats: 1,           // one beat per cycle — locks to track rhythm
+  durationBeats: 0.5,          // half beat per cycle — 2× per beat
   durationMs: null,
   loop: true,
   quantize: false,
@@ -87,7 +87,7 @@ const BABY_SCRATCH: ScratchPattern = {
 const TRANSFORMER: ScratchPattern = {
   name: 'Transformer',
   shortName: 'Trans',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -112,7 +112,7 @@ const TRANSFORMER: ScratchPattern = {
 const FLARE: ScratchPattern = {
   name: 'Flare',
   shortName: 'Flare',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -144,7 +144,7 @@ const FLARE: ScratchPattern = {
 const HYDROPLANE: ScratchPattern = {
   name: 'Hydroplane',
   shortName: 'Hydro',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -169,7 +169,7 @@ const HYDROPLANE: ScratchPattern = {
 const CRAB: ScratchPattern = {
   name: 'Crab',
   shortName: 'Crab',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -191,7 +191,7 @@ const CRAB: ScratchPattern = {
 const ORBIT: ScratchPattern = {
   name: 'Orbit',
   shortName: 'Orbit',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -226,7 +226,7 @@ const ORBIT: ScratchPattern = {
 const CHIRP: ScratchPattern = {
   name: 'Chirp',
   shortName: 'Chirp',
-  durationBeats: 0.5,         // fast baby scratch — half beat per cycle
+  durationBeats: 0.25,         // fast baby scratch — quarter beat per cycle
   durationMs: null,
   loop: true,
   quantize: false,
@@ -253,7 +253,7 @@ const CHIRP: ScratchPattern = {
 const STAB: ScratchPattern = {
   name: 'Stab',
   shortName: 'Stab',
-  durationBeats: 0.25,       // 1/16th note — tight rhythmic stab
+  durationBeats: 0.125,       // 1/32nd note — tight rhythmic stab
   durationMs: null,
   loop: true,
   quantize: false,
@@ -272,7 +272,7 @@ const STAB: ScratchPattern = {
 const SCRIBBLE: ScratchPattern = {
   name: 'Scribble',
   shortName: 'Scrbl',
-  durationBeats: 0.25,       // 1/16th note — rapid machine-gun stutter per beat subdivision
+  durationBeats: 0.125,       // 1/32nd note — rapid machine-gun stutter
   durationMs: null,
   loop: true,
   quantize: false,
@@ -303,7 +303,7 @@ const SCRIBBLE: ScratchPattern = {
 const TEAR: ScratchPattern = {
   name: 'Tear',
   shortName: 'Tear',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -338,7 +338,7 @@ const TEAR: ScratchPattern = {
 const UZI: ScratchPattern = {
   name: 'Uzi',
   shortName: 'Uzi',
-  durationBeats: 0.125,      // 1/32nd note — extremely fast buzz per beat subdivision
+  durationBeats: 0.0625,      // 1/64th note — extremely fast buzz
   durationMs: null,
   loop: true,
   quantize: false,
@@ -371,7 +371,7 @@ const UZI: ScratchPattern = {
 const TWIDDLE: ScratchPattern = {
   name: 'Twiddle',
   shortName: 'Twdl',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -413,7 +413,7 @@ const TWIDDLE: ScratchPattern = {
 const EIGHT_FINGER_CRAB: ScratchPattern = {
   name: '8-Finger Crab',
   shortName: '8Crb',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -436,7 +436,7 @@ const EIGHT_FINGER_CRAB: ScratchPattern = {
 const FLARE_3CLICK: ScratchPattern = {
   name: '3-Click Flare',
   shortName: '3Flr',
-  durationBeats: 1,
+  durationBeats: 0.5,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -470,7 +470,7 @@ const FLARE_3CLICK: ScratchPattern = {
 const LASER: ScratchPattern = {
   name: 'Laser',
   shortName: 'Laser',
-  durationBeats: 0.25,       // 1/16th note — rhythmic laser hits
+  durationBeats: 0.125,       // 1/32nd note — rhythmic laser hits
   durationMs: null,
   loop: true,
   quantize: false,
@@ -496,7 +496,7 @@ const LASER: ScratchPattern = {
 const PHASER_SCRATCH: ScratchPattern = {
   name: 'Phaser',
   shortName: 'Phasr',
-  durationBeats: 0.25,       // 1/16th note — tight rhythmic zap
+  durationBeats: 0.125,       // 1/32nd note — tight rhythmic zap
   durationMs: null,
   loop: true,
   quantize: false,
@@ -524,7 +524,7 @@ const PHASER_SCRATCH: ScratchPattern = {
 const TWEAK: ScratchPattern = {
   name: 'Tweak',
   shortName: 'Tweak',
-  durationBeats: 2,
+  durationBeats: 1,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -552,7 +552,7 @@ const TWEAK: ScratchPattern = {
 const DRAG: ScratchPattern = {
   name: 'Drag',
   shortName: 'Drag',
-  durationBeats: 2,
+  durationBeats: 1,
   durationMs: null,
   loop: true,
   quantize: false,
@@ -579,7 +579,7 @@ const DRAG: ScratchPattern = {
 const VIBRATO: ScratchPattern = {
   name: 'Vibrato',
   shortName: 'Vibr',
-  durationBeats: 0.25,       // 1/16th note — vibrato oscillation synced to beat subdivisions
+  durationBeats: 0.125,       // 1/32nd note — vibrato oscillation synced to beat subdivisions
   durationMs: null,
   loop: true,
   quantize: false,
