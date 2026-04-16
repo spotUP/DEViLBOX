@@ -43,7 +43,10 @@ export type AutomationShape =
   | 'saw'
   | 'reverseSaw'
   | 'square'
-  | 'random';
+  | 'random'
+  | 'sweepUp'
+  | 'sweepDown'
+  | 'buildDrop';
 
 export interface AutomationPreset {
   id: string;
@@ -245,5 +248,45 @@ export const AUTOMATION_PRESETS: AutomationPreset[] = [
       row: i * 4,
       value: Math.floor(i / 2) / 7,
     })),
+  },
+  // ── DJ-style filter sweeps (quadratic ease-in-out from DJQuantizedFX) ──
+  {
+    id: 'sweep-up',
+    name: 'DJ Sweep Up',
+    shape: 'sweepUp',
+    points: Array.from({ length: 64 }, (_, i) => {
+      const t = i / 63;
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      return { row: i, value: eased };
+    }),
+  },
+  {
+    id: 'sweep-down',
+    name: 'DJ Sweep Down',
+    shape: 'sweepDown',
+    points: Array.from({ length: 64 }, (_, i) => {
+      const t = i / 63;
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      return { row: i, value: 1 - eased };
+    }),
+  },
+  {
+    id: 'build-drop',
+    name: 'Build & Drop',
+    shape: 'buildDrop',
+    points: (() => {
+      const pts: AutomationPoint[] = [];
+      // Sweep up to 1 over first 75% of pattern using DJ easing
+      const buildEnd = 47; // ~75% of 64
+      for (let i = 0; i <= buildEnd; i++) {
+        const t = i / buildEnd;
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        pts.push({ row: i, value: eased });
+      }
+      // Sharp drop
+      pts.push({ row: 48, value: 0 });
+      pts.push({ row: 63, value: 0 });
+      return pts;
+    })(),
   },
 ];
