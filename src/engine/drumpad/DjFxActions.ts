@@ -49,7 +49,7 @@ export type DjFxActionId =
 export interface DjFxAction {
   id: DjFxActionId;
   name: string;
-  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot';
+  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck';
   mode: 'momentary' | 'oneshot'; // momentary = hold to engage, oneshot = fire and forget
   engage: () => void;
   disengage: () => void;
@@ -1128,8 +1128,8 @@ function createDeckFilterSweep(direction: 'hpf' | 'lpf'): DjFxAction {
   const id = direction === 'hpf' ? 'fx_deck_hpf_sweep' : 'fx_deck_lpf_sweep';
   return {
     id: id as DjFxActionId,
-    name: direction === 'hpf' ? 'HPF Sweep' : 'LPF Sweep',
-    category: 'filter',
+    name: direction === 'hpf' ? 'Deck HPF' : 'Deck LPF',
+    category: 'deck',
     mode: 'momentary',
     engage() {
       const deckId = getActiveDeckId();
@@ -1148,8 +1148,8 @@ function createDeckFilterSweep(direction: 'hpf' | 'lpf'): DjFxAction {
 function createDeckFilterReset(): DjFxAction {
   return {
     id: 'fx_deck_filter_reset',
-    name: 'Filter Reset',
-    category: 'filter',
+    name: 'Deck Filter Reset',
+    category: 'deck',
     mode: 'oneshot',
     engage() {
       const deckId = getActiveDeckId();
@@ -1163,8 +1163,8 @@ function createDeckFilterReset(): DjFxAction {
 function createDeckEchoOut(): DjFxAction {
   return {
     id: 'fx_deck_echo_out',
-    name: 'Echo Out',
-    category: 'delay',
+    name: 'Deck Echo Out',
+    category: 'deck',
     mode: 'momentary',
     engage() {
       const deckId = getActiveDeckId();
@@ -1183,8 +1183,8 @@ function createDeckEQKill(band: 'low' | 'mid' | 'high'): DjFxAction {
   const id = `fx_deck_kill_${band === 'low' ? 'lo' : band === 'mid' ? 'mid' : 'hi'}` as DjFxActionId;
   return {
     id,
-    name: `Kill ${bandLabel}`,
-    category: 'filter',
+    name: `Deck Kill ${bandLabel}`,
+    category: 'deck',
     mode: 'momentary',
     engage() {
       const deckId = getActiveDeckId();
@@ -1200,8 +1200,8 @@ function createDeckEQKill(band: 'low' | 'mid' | 'high'): DjFxAction {
 function createDeckBrake(): DjFxAction {
   return {
     id: 'fx_deck_brake',
-    name: 'Brake',
-    category: 'tape',
+    name: 'Deck Brake',
+    category: 'deck',
     mode: 'momentary',
     engage() {
       const deckId = getActiveDeckId();
@@ -1262,11 +1262,11 @@ function createDeckBeatJump(beats: number): DjFxAction {
   const sign = beats > 0 ? 'p' : 'm';
   const abs = Math.abs(beats);
   const id = `fx_deck_jump_${sign}${abs}` as DjFxActionId;
-  const label = beats > 0 ? `Jump +${abs}` : `Jump −${abs}`;
+  const label = beats > 0 ? `Deck +${abs}` : `Deck −${abs}`;
   return {
     id,
     name: label,
-    category: 'tape',
+    category: 'deck',
     mode: 'oneshot',
     engage() {
       const deckId = getActiveDeckId();
