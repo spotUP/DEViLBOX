@@ -939,7 +939,10 @@ export class ScratchPlayback {
       const totalMs = totalDivisions * periodSec * 1000;
       this.faderLFOTimeoutId = setTimeout(() => {
         if (this.faderLFOActive && this.currentLFODivision === division) {
-          this._scheduleFaderLFO(bpm, division);
+          // Always use fresh BPM on reschedule so LFO stays synced
+          const freshBPM = this.getEffectiveBPM();
+          this.scheduledLFOBPM = freshBPM;
+          this._scheduleFaderLFO(freshBPM, division);
         }
       }, Math.max(50, totalMs - 200));
     } catch { /* engine not ready */ }
