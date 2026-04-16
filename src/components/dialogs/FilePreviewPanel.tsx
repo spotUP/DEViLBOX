@@ -31,6 +31,7 @@ import {
 } from '@/lib/ratingsApi';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { StarRating } from '@/components/shared/StarRating';
+import { AuthModal } from '@/components/dialogs/AuthModal';
 
 // ── Modland Panel ────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
   const [modlandHasMore, setModlandHasMore] = useState(false);
   const [modlandDownloading, setModlandDownloading] = useState<Set<string>>(new Set());
   const [modlandRatings, setModlandRatings] = useState<RatingMap>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   const modlandSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
   const modlandSearchRef = useRef<HTMLInputElement>(null);
@@ -154,7 +156,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
   );
 
   const handleModlandRate = useCallback(async (key: string, star: number) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
     try {
       if (star === 0) {
         const res = await removeRating('modland', key);
@@ -258,7 +260,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                         avg={avg}
                         count={count}
                         userRating={r?.userRating}
-                        onRate={isLoggedIn ? (star) => handleModlandRate(file.full_path, star) : undefined}
+                        onRate={(star) => handleModlandRate(file.full_path, star)}
                       />
                     );
                   })()}
@@ -307,11 +309,10 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
           )}
         </div>
       </div>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </>
   );
 };
-
-// ── HVSC Panel ───────────────────────────────────────────────────────────
 
 interface HVSCPanelProps {
   isOpen: boolean;
@@ -328,6 +329,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
   const [hvscSearchResults, setHvscSearchResults] = useState<HVSCEntry[]>([]);
   const [hvscDownloading, setHvscDownloading] = useState<Set<string>>(new Set());
   const [hvscRatings, setHvscRatings] = useState<RatingMap>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   const hvscSearchRef = useRef<HTMLInputElement>(null);
   const hvscSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
@@ -448,7 +450,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
   }, [browseHVSCDirectory, handleHVSCLoad]);
 
   const handleHvscRate = useCallback(async (key: string, star: number) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
     try {
       if (star === 0) {
         const res = await removeRating('hvsc', key);
@@ -539,7 +541,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                           avg={avg}
                           count={count}
                           userRating={r?.userRating}
-                          onRate={isLoggedIn ? (star) => handleHvscRate(entry.path, star) : undefined}
+                          onRate={(star) => handleHvscRate(entry.path, star)}
                         />
                       );
                     })()}
@@ -627,7 +629,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                           avg={avg}
                           count={count}
                           userRating={r?.userRating}
-                          onRate={isLoggedIn ? (star) => handleHvscRate(entry.path, star) : undefined}
+                          onRate={(star) => handleHvscRate(entry.path, star)}
                         />
                       );
                     })()}
@@ -664,6 +666,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
           )}
         </div>
       </div>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </>
   );
 };

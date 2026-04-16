@@ -3,7 +3,7 @@
  * Used by InstrumentContextMenu, PatternContextMenu, and others.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -21,14 +21,35 @@ interface ConfirmDialogProps {
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen, title, message, confirmLabel = 'Confirm', danger = false, alertOnly = false, onConfirm, onClose,
 }) => {
+  // Guard against double-fire (Enter key + button click on same frame)
+  const handledRef = useRef(false);
+
+  // Reset guard when dialog opens/closes
+  useEffect(() => {
+    handledRef.current = false;
+  }, [isOpen]);
+
+  const doConfirm = useCallback(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    onConfirm();
+    // onConfirm already closes the dialog via _confirm() — do NOT call onClose()
+  }, [onConfirm]);
+
+  const doCancel = useCallback(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    onClose();
+  }, [onClose]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      onClose();
+      doCancel();
     } else if (e.key === 'Enter') {
-      onConfirm();
-      onClose();
+      e.preventDefault(); // Prevent button click from also firing
+      doConfirm();
     }
-  }, [onClose, onConfirm]);
+  }, [doCancel, doConfirm]);
 
   useEffect(() => {
     if (isOpen) {
@@ -42,7 +63,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return createPortal(
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-[999999]"
-      onClick={onClose}
+      onClick={doCancel}
     >
       <div
         className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl p-4 min-w-[300px] max-w-[400px]"
@@ -51,17 +72,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
           <button
-            onClick={onClose}
+            onClick={doCancel}
             className="p-1 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded"
           >
             <X size={14} />
           </button>
         </div>
-        <p className="text-sm text-text-secondary mb-4">{message}</p>
+        <p className="text-sm text-text-secondary mb-4 whitespace-pre-line">{message}</p>
         <div className="flex justify-end gap-2">
           {!alertOnly && (
             <button
-              onClick={onClose}
+              onClick={doCancel}
               className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary
                        hover:bg-dark-bgTertiary rounded transition-colors"
             >
@@ -69,10 +90,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             </button>
           )}
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
+            onClick={doConfirm}
             className={`px-3 py-1.5 text-sm rounded transition-colors ${
               danger
                 ? 'bg-accent-error text-text-primary hover:bg-accent-error/80'
