@@ -257,11 +257,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
 
   return (
-    <div className="flex flex-col gap-2 p-4">
+    <div className="flex flex-col gap-2 p-3 h-full overflow-hidden">
       {/* Program info + export/import (hidden in performance mode) */}
       {!performanceMode && (
-      <div className="flex items-center justify-between mb-2">
-        <div>
+      <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
           <div className="text-sm font-bold text-text-primary">{currentProgram.name}</div>
           <div className="text-xs text-text-muted font-mono">{currentProgram.id}</div>
         </div>
@@ -318,7 +318,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
       )}
 
       {/* Bank selector */}
-      <div className="flex items-center gap-1 mb-1">
+      <div className="flex items-center gap-1 shrink-0">
         <span className="text-[10px] font-mono text-text-muted mr-1">BANK</span>
         {bankButtons.map(bank => (
           <button
@@ -335,10 +335,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
         ))}
       </div>
 
-      {/* Responsive Pad Grid (4x4 landscape, 2x8 portrait) */}
+      {/* Responsive Pad Grid (4x4 landscape, 2x8 portrait) — fills remaining height */}
       <div
         ref={gridRef}
-        className={`grid ${performanceMode ? 'gap-3' : 'gap-2'} ${gridCols === 2 ? 'grid-cols-2' : 'grid-cols-4'}`}
+        className={`grid flex-1 min-h-0 ${performanceMode ? 'gap-3' : 'gap-1.5'} ${gridCols === 2 ? 'grid-cols-2' : 'grid-cols-4'}`}
+        style={{ gridTemplateRows: `repeat(${gridCols === 2 ? 8 : 4}, 1fr)` }}
         role="grid"
         aria-label="Drum pad grid"
       >
@@ -360,7 +361,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
       {/* Keyboard hint (hidden in performance mode) */}
       {!performanceMode && (
-        <div className="text-[10px] text-text-muted text-center mt-2 font-mono">
+        <div className="text-[10px] text-text-muted text-center font-mono shrink-0">
           Click/Enter to trigger • Shift+Click to select • Arrow keys to navigate
         </div>
       )}
