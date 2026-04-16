@@ -14,6 +14,7 @@ import { useAudioStore } from '../../stores/useAudioStore';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getChannelFilterManager } from '../../engine/ChannelFilterManager';
 import { getDJEngine } from '../../engine/dj/DJEngine';
+import { useDJStore } from '../../stores/useDJStore';
 import type { MappableParameter } from '../types';
 
 // ============================================================================
@@ -747,6 +748,60 @@ export function routeDJParameter(param: string, normalizedValue: number): void {
     } catch {
       // DJ engine not initialized — ignore silently
     }
+  }
+  // Sync to store so UI knobs reflect the change
+  syncDJParamToStore(param, normalizedValue);
+}
+
+/**
+ * Update the DJ Zustand store so React knobs reflect MIDI changes.
+ * Shared by both useMIDIStore (generic controllers) and DJControllerMapper (DJ presets).
+ */
+export function syncDJParamToStore(param: string, normalized: number): void {
+  const store = useDJStore.getState();
+  switch (param) {
+    case 'dj.crossfader':
+      store.setCrossfader(normalized);
+      break;
+    case 'dj.deckA.volume':
+      store.setDeckVolume('A', normalized * 1.5);
+      break;
+    case 'dj.deckB.volume':
+      store.setDeckVolume('B', normalized * 1.5);
+      break;
+    case 'dj.masterVolume':
+      store.setMasterVolume(normalized * 1.5);
+      break;
+    case 'dj.deckA.pitch':
+      store.setDeckPitch('A', -6 + normalized * 12);
+      break;
+    case 'dj.deckB.pitch':
+      store.setDeckPitch('B', -6 + normalized * 12);
+      break;
+    case 'dj.deckA.eqHi':
+      store.setDeckEQ('A', 'high', -24 + normalized * 30);
+      break;
+    case 'dj.deckA.eqMid':
+      store.setDeckEQ('A', 'mid', -24 + normalized * 30);
+      break;
+    case 'dj.deckA.eqLow':
+      store.setDeckEQ('A', 'low', -24 + normalized * 30);
+      break;
+    case 'dj.deckB.eqHi':
+      store.setDeckEQ('B', 'high', -24 + normalized * 30);
+      break;
+    case 'dj.deckB.eqMid':
+      store.setDeckEQ('B', 'mid', -24 + normalized * 30);
+      break;
+    case 'dj.deckB.eqLow':
+      store.setDeckEQ('B', 'low', -24 + normalized * 30);
+      break;
+    case 'dj.deckA.filter':
+      store.setDeckFilter('A', -1 + normalized * 2);
+      break;
+    case 'dj.deckB.filter':
+      store.setDeckFilter('B', -1 + normalized * 2);
+      break;
   }
 }
 

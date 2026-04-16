@@ -244,9 +244,6 @@ class DJControllerMapper {
     if (mapping.invert) normalized = 1 - normalized;
 
     routeDJParameter(mapping.param, normalized);
-
-    // Also update the store for UI feedback
-    this.syncParamToStore(mapping.param, normalized);
   }
 
   /**
@@ -551,55 +548,6 @@ class DJControllerMapper {
   /**
    * Sync DJ parameter changes back to the Zustand store for UI feedback.
    */
-  private syncParamToStore(param: string, normalized: number): void {
-    const store = useDJStore.getState();
-
-    switch (param) {
-      case 'dj.crossfader':
-        store.setCrossfader(normalized);
-        break;
-      case 'dj.deckA.volume':
-        store.setDeckVolume('A', normalized * 1.5);
-        break;
-      case 'dj.deckB.volume':
-        store.setDeckVolume('B', normalized * 1.5);
-        break;
-      case 'dj.masterVolume':
-        store.setMasterVolume(normalized * 1.5);
-        break;
-      case 'dj.deckA.pitch':
-        store.setDeckPitch('A', -6 + normalized * 12);
-        break;
-      case 'dj.deckB.pitch':
-        store.setDeckPitch('B', -6 + normalized * 12);
-        break;
-      case 'dj.deckA.eqHi':
-        store.setDeckEQ('A', 'high', -24 + normalized * 30);
-        break;
-      case 'dj.deckA.eqMid':
-        store.setDeckEQ('A', 'mid', -24 + normalized * 30);
-        break;
-      case 'dj.deckA.eqLow':
-        store.setDeckEQ('A', 'low', -24 + normalized * 30);
-        break;
-      case 'dj.deckB.eqHi':
-        store.setDeckEQ('B', 'high', -24 + normalized * 30);
-        break;
-      case 'dj.deckB.eqMid':
-        store.setDeckEQ('B', 'mid', -24 + normalized * 30);
-        break;
-      case 'dj.deckB.eqLow':
-        store.setDeckEQ('B', 'low', -24 + normalized * 30);
-        break;
-      case 'dj.deckA.filter':
-        store.setDeckFilter('A', -1 + normalized * 2);
-        break;
-      case 'dj.deckB.filter':
-        store.setDeckFilter('B', -1 + normalized * 2);
-        break;
-    }
-  }
-
   /**
    * Activate a momentary loop roll (auto-releases when pad is released).
    * Loop roll is a performance technique where a small loop plays momentarily
