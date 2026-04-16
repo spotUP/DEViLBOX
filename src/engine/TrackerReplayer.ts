@@ -621,6 +621,10 @@ export class TrackerReplayer {
   // Used by updateWasmMuteMask() to mute channels playing replaced instruments.
   private _activeWasmEngine: { setMuteMask(mask: number): void } | null = null;
 
+  // Tick-level effect processor for synth instruments in hybrid mode.
+  // Created when libopenmpt starts and replaced instruments exist.
+  private _synthEffectProcessor: import('./replayer/SynthEffectProcessor').SynthEffectProcessor | null = null;
+
   // SonicArranger dynamic track length (effect 0x9): overrides pattern length
   // Reset to 0 on each pattern advance; 0 = use normal pattern length
   private _saTrackLen = 0;
@@ -786,6 +790,7 @@ export class TrackerReplayer {
       if (Mpt?.hasInstance()) {
         Mpt.getInstance().seekTo(songPos, pattPos);
       }
+      this._synthEffectProcessor?.reset();
     }
 
     // Warm restart: audio infra already set up from a previous play().
@@ -2112,6 +2117,54 @@ export class TrackerReplayer {
           // Warm the cached reference for zero-latency forcePosition seeks
           getLibopenmptSync();
 
+          // Wire SynthEffectProcessor for tick-level effects on replaced instruments
+          if (this._replacedInstruments.size > 0) {
+            try {
+              const { SynthEffectProcessor } = await import('./replayer/SynthEffectProcessor');
+              if (gen !== this._playGeneration) return;
+              const replayer = this;
+              this._synthEffectProcessor = new SynthEffectProcessor({
+                getReplacedInstruments: () => replayer._replacedInstruments,
+                getPatternCell: (channel: number, row: number) => {
+                  const storePatterns = useTrackerStore.getState().patterns;
+                  const patternNum = replayer.song?.songPositions[replayer.songPos];
+                  if (patternNum == null) return null;
+                  const pat = storePatterns[patternNum];
+                  return pat?.channels[channel]?.rows[row] ?? null;
+                },
+                getChannelCount: () => replayer.channels.length,
+                applySynthFrequency: (instrumentId, frequency, channelIndex, rampTime) => {
+                  try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
+                  catch { /* ToneEngine not ready */ }
+                },
+                setChannelGain: (channelIndex, gain, _time) => {
+                  const ch = replayer.channels[channelIndex];
+                  if (ch?.gainNode) {
+                    try { ch.gainNode.gain.setValueAtTime(gain, Tone.now()); }
+                    catch { /* ignored */ }
+                  }
+                },
+                getChannelBaseFrequency: (channelIndex) => {
+                  try { return getToneEngine().getChannelLastNoteFrequency(channelIndex); }
+                  catch { return 0; }
+                },
+                getChannelInstrumentId: (channelIndex) => {
+                  const ch = replayer.channels[channelIndex];
+                  if (!ch) return 0;
+                  return typeof ch.instrument === 'number' ? ch.instrument
+                    : ch.instrument != null && typeof ch.instrument === 'object' && 'id' in ch.instrument
+                      ? (ch.instrument as { id: number }).id : 0;
+                },
+              });
+              mptEngine.onPositionTick = (audioTime, row, order, speed, tempo) => {
+                replayer._synthEffectProcessor?.process(audioTime, row, order, speed, tempo);
+              };
+              _log('[TrackerReplayer] SynthEffectProcessor wired for', this._replacedInstruments.size, 'replaced instruments');
+            } catch (err) {
+              _warn('[TrackerReplayer] SynthEffectProcessor init failed:', err);
+            }
+          }
+
           // Re-activate the edit bridge if it was reset by loadSong. This
           // handles fresh songs where initFreshSoundlib created the soundlib
           // module but loadSong's bridge.reset() deactivated it. The soundlib
@@ -2303,11 +2356,17 @@ export class TrackerReplayer {
     // Stop libopenmpt playback if active
     if (this.useLibopenmptPlayback) {
       this.useLibopenmptPlayback = false;
+      // Reset SynthEffectProcessor
+      if (this._synthEffectProcessor) {
+        this._synthEffectProcessor.reset();
+        this._synthEffectProcessor = null;
+      }
       try {
         import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
           if (LibopenmptEngine.hasInstance()) {
             const engine = LibopenmptEngine.getInstance();
             engine.onPosition = null;
+            engine.onPositionTick = null;
             engine.onEnded = null;
             engine.stop();
           }
