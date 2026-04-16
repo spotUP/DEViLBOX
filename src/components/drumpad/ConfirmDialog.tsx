@@ -36,19 +36,19 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const variantStyles = {
     danger: {
-      icon: 'text-red-400',
-      button: 'bg-red-600 hover:bg-red-700',
-      border: 'border-red-500/50',
+      icon: 'text-accent-error',
+      button: 'bg-accent-error hover:bg-accent-error/80',
+      border: 'border-accent-error/50',
     },
     warning: {
-      icon: 'text-yellow-400',
-      button: 'bg-yellow-600 hover:bg-yellow-700',
-      border: 'border-yellow-500/50',
+      icon: 'text-accent-warning',
+      button: 'bg-accent-warning hover:bg-accent-warning/80',
+      border: 'border-accent-warning/50',
     },
     info: {
-      icon: 'text-blue-400',
-      button: 'bg-blue-600 hover:bg-blue-700',
-      border: 'border-blue-500/50',
+      icon: 'text-accent-primary',
+      button: 'bg-accent-primary hover:bg-accent-primary/80',
+      border: 'border-accent-primary/50',
     },
   };
 

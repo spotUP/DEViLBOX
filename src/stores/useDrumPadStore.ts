@@ -100,7 +100,7 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
 };
 
 // Bump this when factory presets or stored schema changes — discards stale data
-const DRUMPAD_SCHEMA_VERSION = 14;
+const DRUMPAD_SCHEMA_VERSION = 15;
 const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 
 // Set when schema migration clears old data — prevents IndexedDB from overwriting factory presets
@@ -125,7 +125,6 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     ['A-01', create808Program()],
     ['B-01', create909Program()],
     ['C-01', createDJFXProgram()],
-    ['D-01', createEmptyProgram('D-01', 'Empty Kit')],
   ]),
   currentProgramId: 'A-01',
   midiMappings: {},
