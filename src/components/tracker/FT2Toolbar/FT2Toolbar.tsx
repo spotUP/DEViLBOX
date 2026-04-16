@@ -523,7 +523,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, instantly restart from position 0
+    // If already playing, stop playback
     if (isPlaying) {
       // WASM singleton engines: stop directly
       if (editorMode === 'jamcracker' || editorMode === 'musicline') {
@@ -541,8 +541,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      // Standard formats: instant restart from beginning
-      getTrackerReplayer().forcePosition(0, 0);
+      // Standard formats: stop playback
+      getTrackerReplayer().stop();
+      stop();
+      engine.releaseAll();
       return;
     }
 
@@ -591,7 +593,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, instantly restart from current position row 0
+    // If already playing, stop playback
     if (isPlaying) {
       if (editorMode2 === 'jamcracker') {
         getTrackerReplayer().stop();
@@ -599,8 +601,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      const startPos = useTrackerStore.getState().currentPositionIndex;
-      getTrackerReplayer().forcePosition(startPos, 0);
+      getTrackerReplayer().stop();
+      stop();
+      engine.releaseAll();
       return;
     }
     setIsLooping(true);
