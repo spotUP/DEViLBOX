@@ -162,11 +162,11 @@ export class ToneEngine {
   private static itFilterWorkletLoaded: boolean = false; // Track if ITFilter worklet is loaded
   private static itFilterWorkletPromise: Promise<void> | null = null; // Promise for ITFilter loading
 
-  // Master routing chain:
-  // - Tracker instruments → masterInput → amigaFilter ─→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
-  // - DevilboxSynths → synthBus ───────────────────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
+  // Master routing chain (AmigaFilter bypassed — players have their own):
+  // - Tracker instruments → masterInput → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
+  // - DevilboxSynths → synthBus ────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
   public masterInput: Tone.Gain; // Where tracker instruments connect
-  public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths (skips AmigaFilter)
+  public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths
   private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
   private masterMeter: Tone.Meter; // Level meter at masterEffectsInput merge point
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
@@ -392,11 +392,10 @@ export class ToneEngine {
       () => this.blepInput,
     );
 
-    // Default routing:
-    //   masterInput → amigaFilter → masterEffectsInput → blepInput → masterLimiter → masterChannel
-    //   synthBus ──────────────────→ masterEffectsInput → blepInput → masterLimiter → masterChannel
-    this.masterInput.connect(this.amigaFilter);
-    this.amigaFilter.connect(this.masterEffectsInput);
+    // Default routing (AmigaFilter bypassed — libopenmpt has its own filter emulation):
+    //   masterInput → masterEffectsInput → blepInput → masterLimiter → masterChannel
+    //   synthBus ──→ masterEffectsInput → blepInput → masterLimiter → masterChannel
+    this.masterInput.connect(this.masterEffectsInput);
     this.masterEffectsInput.connect(this.blepInput);
 
     // Soft limiter prevents clipping — transparent brick-wall at -1dB
