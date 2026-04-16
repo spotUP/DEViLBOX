@@ -95,6 +95,11 @@ class DJControllerMapper {
     return this.activePreset;
   }
 
+  /** True when a DJ controller preset is active (so useMIDIStore should skip DJ knob bank routing) */
+  hasActivePreset(): boolean {
+    return this.activePreset !== null;
+  }
+
   /**
    * Register our MIDI message handler with MIDIManager.
    * Called once — persists across preset changes.
