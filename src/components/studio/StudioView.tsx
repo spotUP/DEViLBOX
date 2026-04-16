@@ -212,12 +212,10 @@ export const StudioView: React.FC = () => {
             onShowExport={() => openModal('export')}
             onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
             onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
-            onShowInstrumentFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
             onShowInstruments={() => openModal('instruments')}
             onShowDrumpads={() => openModal('drumpads')}
             showPatterns={false}
             showMasterFX={false}
-            showInstrumentFX={false}
           />
         </Suspense>
       </Panel>

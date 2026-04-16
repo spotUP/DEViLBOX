@@ -1204,12 +1204,10 @@ function App() {
                     onShowExport={() => openModal('export')}
                     onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
                     onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
-                    onShowInstrumentFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'instrumentFx') { s.closeModal(); } else { s.openModal('instrumentFx'); } }}
                     onShowInstruments={() => openModal('instruments')}
                     onShowDrumpads={() => openModal('drumpads')}
                     showPatterns={showPatterns}
                     showMasterFX={modalOpen === 'masterFx'}
-                    showInstrumentFX={modalOpen === 'instrumentFx'}
                   />
                 </div>
               </>
