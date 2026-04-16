@@ -195,6 +195,27 @@ export class HivelySynth implements DevilboxSynth {
       case 'volume':
         this.output.gain.value = Math.max(0, Math.min(1, value));
         break;
+      case 'filterSpeed':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'filterSpeed', value: Math.round(value * 64) });
+        break;
+      case 'filterLower':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'filterLower', value: Math.round(value * 63) });
+        break;
+      case 'filterUpper':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'filterUpper', value: Math.round(value * 63) });
+        break;
+      case 'vibratoSpeed':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'vibratoSpeed', value: Math.round(value * 64) });
+        break;
+      case 'vibratoDepth':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'vibratoDepth', value: Math.round(value * 64) });
+        break;
+      case 'squareSpeed':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'squareSpeed', value: Math.round(value * 64) });
+        break;
+      case 'pan':
+        this.engine.sendMessage({ type: 'setVoiceParam', param: 'pan', value: Math.round(value * 255) });
+        break;
     }
   }
 

@@ -87,6 +87,45 @@ export class GTUltraSynth implements DevilboxSynth {
     engine.jamNoteOff(this._lastChannel);
   }
 
+  set(param: string, value: number): void {
+    const engine = useGTUltraStore.getState().engine;
+    if (!engine) return;
+    const i = this._instrumentIndex;
+    switch (param) {
+      // ADSR: automation sends full combined byte (0-1 → 0-255)
+      case 'attack': {
+        // Attack is high nibble of AD byte; preserve decay (low nibble)
+        const ad = Math.round(value * 15) << 4; // sets attack, clears decay
+        engine.setInstrumentAD(i, ad);
+        break;
+      }
+      case 'decay': {
+        // Decay is low nibble — set it standalone (attack cleared)
+        engine.setInstrumentAD(i, Math.round(value * 15));
+        break;
+      }
+      case 'sustain': {
+        const sr = Math.round(value * 15) << 4;
+        engine.setInstrumentSR(i, sr);
+        break;
+      }
+      case 'release': {
+        engine.setInstrumentSR(i, Math.round(value * 15));
+        break;
+      }
+      case 'firstwave': engine.setInstrumentFirstwave(i, Math.round(value * 255)); break;
+      case 'vibdelay': engine.setInstrumentVibdelay(i, Math.round(value * 255)); break;
+      case 'gatetimer': engine.setInstrumentGatetimer(i, Math.round(value * 255)); break;
+    }
+  }
+
+  get(param: string): number | undefined {
+    switch (param) {
+      case 'volume': return this.output.gain.value;
+    }
+    return undefined;
+  }
+
   dispose(): void {
     this.output.disconnect();
   }

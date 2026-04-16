@@ -132,34 +132,34 @@ export class SidMonSynth implements DevilboxSynth {
       case 'volume':
         this.output.gain.value = Math.max(0, Math.min(1, value));
         break;
-      case 'vibDepth':
-        if (this._playerHandle >= 0) {
-          this.engine.sendMessage({
-            type: 'setParam',
-            handle: this._playerHandle,
-            paramId: 6,
-            value: Math.max(0, Math.min(1, value / 63)),
-          });
-        }
-        break;
       case 'vibSpeed':
         if (this._playerHandle >= 0) {
-          this.engine.sendMessage({
-            type: 'setParam',
-            handle: this._playerHandle,
-            paramId: 5,
-            value: Math.max(0, Math.min(1, value / 63)),
-          });
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 5, value });
+        }
+        break;
+      case 'vibDepth':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 6, value });
+        }
+        break;
+      case 'vibDelay':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 7, value });
+        }
+        break;
+      case 'arpSpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 8, value });
         }
         break;
       case 'filterCutoff':
         if (this._playerHandle >= 0) {
-          this.engine.sendMessage({
-            type: 'setParam',
-            handle: this._playerHandle,
-            paramId: 16,
-            value: Math.max(0, Math.min(1, value / 255)),
-          });
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 16, value });
+        }
+        break;
+      case 'filterResonance':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 17, value });
         }
         break;
     }
