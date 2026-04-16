@@ -259,7 +259,9 @@ interface DJState {
   // Headphone cueing
   cueMode: CueMode;
   cueDeviceId: string | null;
+  cueDeviceName: string | null;
   cueVolume: number;
+  headphoneSetupDone: boolean;
 
   // Pipeline (background render + analysis)
   pipelineActive: boolean;
@@ -335,8 +337,9 @@ interface DJActions {
 
   // Headphone cueing
   setCueMode: (mode: CueMode) => void;
-  setCueDevice: (deviceId: string | null) => void;
+  setCueDevice: (deviceId: string | null, deviceName?: string | null) => void;
   setCueVolume: (volume: number) => void;
+  setHeadphoneSetupDone: (done: boolean) => void;
 
   // Auto DJ
   setAutoDJEnabled: (enabled: boolean) => void;
@@ -370,7 +373,9 @@ export const useDJStore = create<DJStore>()(
 
     cueMode: 'none' as CueMode,
     cueDeviceId: null,
+    cueDeviceName: null,
     cueVolume: 1,
+    headphoneSetupDone: false,
 
     // Pipeline
     pipelineActive: false,
@@ -634,14 +639,20 @@ export const useDJStore = create<DJStore>()(
         state.cueMode = mode;
       }),
 
-    setCueDevice: (deviceId) =>
+    setCueDevice: (deviceId, deviceName) =>
       set((state) => {
         state.cueDeviceId = deviceId;
+        state.cueDeviceName = deviceName ?? null;
       }),
 
     setCueVolume: (volume) =>
       set((state) => {
         state.cueVolume = Math.max(0, Math.min(1.5, volume));
+      }),
+
+    setHeadphoneSetupDone: (done) =>
+      set((state) => {
+        state.headphoneSetupDone = done;
       }),
 
     setPipelineState: (queue, currentTask) =>

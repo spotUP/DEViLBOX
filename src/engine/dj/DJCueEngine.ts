@@ -187,6 +187,47 @@ export class DJCueEngine {
   }
 
   // ==========================================================================
+  // TEST TONE (for headphone setup wizard)
+  // ==========================================================================
+
+  /** Play a short test tone to a specific audio output device.
+   *  Used by the headphone setup wizard so the user can identify their headphones. */
+  static async playTestTone(deviceId: string): Promise<void> {
+    const ctx = new AudioContext();
+    try {
+      // Create a short 880Hz beep (A5) — 3 quick pips
+      for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.value = 0.3;
+
+        const dest = ctx.createMediaStreamDestination();
+        osc.connect(gain);
+        gain.connect(dest);
+
+        const audio = new Audio();
+        audio.srcObject = dest.stream;
+        await (audio as any).setSinkId(deviceId);
+        await audio.play();
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+        await new Promise(r => setTimeout(r, 200));
+
+        audio.pause();
+        audio.srcObject = null;
+        osc.disconnect();
+        gain.disconnect();
+        dest.disconnect();
+      }
+    } finally {
+      await ctx.close();
+    }
+  }
+
+  // ==========================================================================
   // CLEANUP
   // ==========================================================================
 
