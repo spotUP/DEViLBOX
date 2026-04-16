@@ -62,29 +62,23 @@ This runs `tsc -b --force` which catches errors that `npx tsc --noEmit` misses:
 
 ---
 
-## CRITICAL: DOM/Pixi UI Architecture Rules
+## CRITICAL: UI Architecture Rules
 
-**!!! SINGLE SOURCE OF TRUTH — NO DUPLICATED CODE — NO DOM OVERLAYS !!!**
+**!!! SINGLE SOURCE OF TRUTH — NO DUPLICATED CODE !!!**
 
-### Shared Data, Separate Renderers
+### Architecture
 
-DEViLBOX has two rendering modes: DOM (React HTML) and Pixi/GL (WebGL).
-Both **MUST** share the same data/logic layer but render natively in their own system.
+DEViLBOX uses DOM (React HTML) rendering exclusively.
 
-**Architecture:**
 ```
-Stores + Hooks (shared)  →  DOM Components (React HTML/canvas)
-                          →  Pixi Components (WebGL scene graph)
+Stores + Hooks (shared data)  →  DOM Components (React HTML/canvas)
 ```
 
 ### Rules
 
-1. **Share stores and hooks** — `useGTUltraStore`, `useGTUltraFormatData`, etc. are the single source of truth for data. Both DOM and Pixi views consume them.
-2. **Never duplicate logic** — Data transforms, cell change handlers, adapter functions live in shared hooks/utils (e.g., `useGTUltraFormatData.ts`, `gtuAdapter.ts`). Renderers only handle presentation.
-3. **Never use DOM overlays in the Pixi/GL UI** — `PixiDOMOverlay` breaks CRT shaders and post-processing effects. All Pixi views must render natively using Pixi components.
-4. **Pattern editors are modular** — Use `PatternEditorCanvas` (DOM) and `PixiPatternEditor`/format-specific grid (Pixi) with shared format channel data from the adapter layer.
-5. **DOM is the source of truth — always fix DOM first, then GL** — The user tests in DOM mode. When they report a UI issue, ALWAYS check and fix the DOM component first (`src/components/`), then apply the same fix to the Pixi/GL equivalent (`src/pixi/`). Never fix GL without first verifying DOM is correct. Every new UI component, dialog, or view MUST be implemented in both DOM and GL. The GL version must be visually 1:1 with the DOM version.
-6. **Always use design tokens — NEVER hardcode colors** — DOM components use Tailwind token classes from `tailwind.config.js` — NEVER raw Tailwind colors (`text-red-400`, `bg-blue-500`). Pixi/GL components use `theme.*` from `usePixiTheme()` — NEVER hardcoded hex values. The only exceptions are intentional decorative palettes (channel colors, hot cue colors, oscilloscope voice colors). **See the exact token class reference below.**
+1. **Share stores and hooks** — `useGTUltraStore`, `useGTUltraFormatData`, etc. are the single source of truth for data. Components consume them.
+2. **Never duplicate logic** — Data transforms, cell change handlers, adapter functions live in shared hooks/utils (e.g., `useGTUltraFormatData.ts`, `gtuAdapter.ts`). Components only handle presentation.
+3. **Always use design tokens — NEVER hardcode colors** — DOM components use Tailwind token classes from `tailwind.config.js` — NEVER raw Tailwind colors (`text-red-400`, `bg-blue-500`). The only exceptions are intentional decorative palettes (channel colors, hot cue colors, oscilloscope voice colors). **See the exact token class reference below.**
 
 ### Tailwind Token Class Reference (MANDATORY)
 
@@ -491,53 +485,6 @@ Find the first tick where commands diverge. The diverging command reveals which 
 Schema versioning in `src/hooks/useProjectPersistence.ts` — bump `SCHEMA_VERSION` when
 changing default instrument configs or stored data structures. Old data is discarded on load.
 See the version history comments in that file.
-
----
-
-## CRITICAL: No Emojis — Use FontAudio Flat Icons
-
-**!!! NEVER USE EMOJI CHARACTERS IN THE PIXI UI !!!**
-
-The app uses **FontAudio flat icons** (`PixiIcon` component) for all iconography.
-Emoji characters (💡, ✨, ✕, ◀, ▶, ⚙, 📁, 🔒, etc.) render inconsistently across
-platforms, break bitmap font batching, and look unprofessional.
-
-### Icon System
-
-- **Component:** `<PixiIcon name="close" size={14} color={0xffffff} layout={{}} />`
-- **Button icon:** `<PixiButton icon="close" label="" variant="ghost" />`
-- **Import:** `import { PixiIcon } from '../components'` (or `'../../components'`)
-- **Icon map:** `src/pixi/fontaudioIcons.ts` — 155 FontAudio icons
-
-### Common Icon Mappings
-
-| Need | Icon Name | Notes |
-|------|-----------|-------|
-| Close/dismiss | `close` | Use for all X buttons |
-| Previous/left | `prev` | Navigation arrows |
-| Next/right | `next` | Navigation arrows |
-| Play | `play` | Playback |
-| Stop | `stop` | Playback |
-| Save | `save` | File operations |
-| Open/folder | `open` | File browser |
-| Lock | `lock` | Read-only / locked |
-| Unlock | `unlock` | Editable |
-| Settings/config | `preset-a` | Gear-like concept |
-| Tips/energy | `thunderbolt` | Lightbulb replacement |
-| Disk/storage | `diskio` | File/changelog |
-| Undo | `undo` | Edit history |
-| Redo | `redo` | Edit history |
-| Copy | `copy` | Clipboard |
-| Paste | `paste` | Clipboard |
-
-### Rules
-
-1. **NEVER** use Unicode emoji (💡✨📜⚙📁🔒 etc.) in any Pixi component
-2. **NEVER** use Unicode arrows (◀▶⬆⬇) — use `prev`, `next`, `caret-left`, `caret-right`
-3. **NEVER** use Unicode symbols (✕✗✘) for close — use `PixiIcon name="close"`
-4. **ALWAYS** use `PixiIcon` or `PixiButton icon=` for visual indicators
-5. For text labels that need no icon, use plain text — no emoji prefixes
-6. If FontAudio doesn't have a suitable icon, use a styled text character (e.g., "i" for info)
 
 ---
 
