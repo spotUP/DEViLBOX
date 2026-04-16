@@ -895,7 +895,9 @@ export const useFormatStore = create<FormatStore>()(
       // a GoatTracker file while on 'grid' would leave the custom
       // editor invisible until the user manually switched views.
       if (newEditorMode !== 'classic') {
-        useUIStore.getState().setTrackerViewMode('tracker');
+        const ui = useUIStore.getState();
+        ui.setActiveView('tracker');
+        ui.setTrackerViewMode('tracker');
       }
       // Populate SF2 store when SF2 format is detected
       if (song.sf2StoreData) {

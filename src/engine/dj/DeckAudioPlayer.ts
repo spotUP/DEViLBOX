@@ -376,8 +376,14 @@ export class DeckAudioPlayer {
     }
 
     if (this._loopIn !== null && this._loopOut !== null && this._loopOut > this._loopIn) {
+      // Use Tone.Player's native loop for sample-accurate boundaries
+      this.player.loop = true;
+      this.player.loopStart = this._loopIn;
+      this.player.loopEnd = this._loopOut;
+      // Safety net: rAF fallback catches edge cases (rate changes near boundary)
       this.startLoopCheck();
     } else {
+      this.player.loop = false;
       this.stopLoopCheck();
     }
   }
@@ -385,11 +391,15 @@ export class DeckAudioPlayer {
   getLoopIn(): number | null { return this._loopIn; }
   getLoopOut(): number | null { return this._loopOut; }
 
-  /** Start polling to detect when playback crosses loopOut and seek back to loopIn */
+  /**
+   * Safety-net polling for loop boundaries.
+   * Primary loop is handled by Tone.Player's native Web Audio loop (sample-accurate).
+   * This catches edge cases like rate changes near the loop boundary.
+   */
   private startLoopCheck(): void {
     this.stopLoopCheck();
     const check = () => {
-      if (!this._loaded || this._disposed) return; // player is gone — don't reschedule
+      if (!this._loaded || this._disposed) return;
       if (this._loopIn === null || this._loopOut === null) {
         this.stopLoopCheck();
         return;
