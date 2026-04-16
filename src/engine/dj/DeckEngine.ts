@@ -109,6 +109,9 @@ export class DeckEngine {
   private backwardDisplacementMs = 0;   // accumulated backward travel (ms of audio)
   private lastBackwardVelocityTime = 0; // performance.now() of last backward velocity update
   private lastBackwardRate = 0;         // rate at last backward velocity update
+  // Direction-switch cooldown: prevents gain accumulation from rapid back/forth jog gestures
+  private _lastJogDirSwitchTime = 0;
+  private static readonly JOG_DIR_SWITCH_COOLDOWN_MS = 20;
   private songTimeIndex: number[] = [];
   /** Per-song-position rowMs value (accounts for Fxx speed/BPM changes) */
   private songRowMs: number[] = [];
@@ -595,6 +598,7 @@ export class DeckEngine {
       this.decayRafId = null;
     }
     this.scratchDirection = 1; // Reset for fresh scratch session
+    this._lastJogDirSwitchTime = 0; // Reset cooldown for fresh scratch session
     // restMultiplier always tracks the pitch slider — no extra save needed
 
     // Slip mode: save position for snap-back when scratch ends
@@ -679,27 +683,51 @@ export class DeckEngine {
     }
 
     // Jog wheel scratch: full pitch + tempo control
+    // Direction-switch cooldown prevents gain accumulation from rapid back/forth jog gestures.
+    // During cooldown, stay in the current direction at minimum speed.
+    const now = performance.now();
+    const canSwitchDir = (now - this._lastJogDirSwitchTime) >= DeckEngine.JOG_DIR_SWITCH_COOLDOWN_MS;
+
     if (this._playbackMode === 'audio') {
       // Audio mode: manipulate audioPlayer rate, not replayer
       if (v >= 0) {
         if (this.scratchDirection === -1) {
-          this._switchToForward(Math.max(0.15, v));
+          if (canSwitchDir) {
+            this._lastJogDirSwitchTime = now;
+            this._switchToForward(Math.max(0.15, v));
+          } else {
+            // Cooldown: stay backward at minimum speed
+            this._accumulateBackwardDisplacement(0.15);
+            this.scratchBuffer?.setScratchRate(-0.15);
+          }
         } else {
           this.audioPlayer.setPlaybackRate(Math.max(0.15, v));
         }
       } else {
         if (this.scratchDirection !== -1) {
-          this._switchToBackward(Math.abs(v));
+          if (canSwitchDir) {
+            this._lastJogDirSwitchTime = now;
+            this._switchToBackward(Math.abs(v));
+          } else {
+            // Cooldown: stay forward at minimum speed
+            this.audioPlayer.setPlaybackRate(0.15);
+          }
         } else {
           this._accumulateBackwardDisplacement(Math.abs(v));
-          this.scratchBuffer?.setRate(-Math.abs(v));
+          this.scratchBuffer?.setScratchRate(-Math.abs(v));
         }
       }
     } else {
       // Tracker mode: manipulate replayer
       if (v >= 0) {
         if (this.scratchDirection === -1) {
-          this._switchToForward(Math.max(0.15, v));
+          if (canSwitchDir) {
+            this._lastJogDirSwitchTime = now;
+            this._switchToForward(Math.max(0.15, v));
+          } else {
+            this._accumulateBackwardDisplacement(0.15);
+            this.scratchBuffer?.setScratchRate(-0.15);
+          }
         } else {
           const fwdRate = Math.max(0.15, v);
           this.replayer.setPitchMultiplier(fwdRate);
@@ -707,10 +735,17 @@ export class DeckEngine {
         }
       } else {
         if (this.scratchDirection !== -1) {
-          this._switchToBackward(Math.abs(v));
+          if (canSwitchDir) {
+            this._lastJogDirSwitchTime = now;
+            this._switchToBackward(Math.abs(v));
+          } else {
+            // Cooldown: stay forward at minimum speed
+            this.replayer.setTempoMultiplier(0.15);
+            this.replayer.setPitchMultiplier(0.15);
+          }
         } else {
           this._accumulateBackwardDisplacement(Math.abs(v));
-          this.scratchBuffer?.setRate(-Math.abs(v));
+          this.scratchBuffer?.setScratchRate(-Math.abs(v));
         }
       }
     }
@@ -802,10 +837,13 @@ export class DeckEngine {
     // Stop any running preset scratch pattern
     this.scratchPlayback.stopPattern();
 
-    // Fade out forward chain
+    // Hard-zero BOTH audio paths to prevent overlap during rapid switching
     this._setDeckGain(0);
+    const now = Tone.getContext().rawContext.currentTime;
+    this.scratchBuffer.playbackGain.gain.cancelScheduledValues(now);
+    this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
 
-    // Start reverse audio
+    // Start reverse audio (startReverse ramps scratch buffer gain from 0→1)
     this.scratchBuffer.startReverse(rate);
 
     this.scratchDirection = -1;
@@ -877,7 +915,7 @@ export class DeckEngine {
     if (this._playbackMode === 'audio') {
       this.audioPlayer.seek(targetMs / 1000);
       this.audioPlayer.setPlaybackRate(fwdRate);
-      this._rampDeckGain(1, 0.02);
+      this._rampDeckGain(1, 0.002);
       if (!this.audioPlayer.isCurrentlyPlaying()) {
         this.audioPlayer.resume();
       }
@@ -902,7 +940,7 @@ export class DeckEngine {
         this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
       }
       this.replayer.resume();
-      this._rampDeckGain(1, 0.02);
+      this._rampDeckGain(1, 0.002);
       this.replayer.setPitchMultiplier(fwdRate);
       this.replayer.setTempoMultiplier(fwdRate);
     }
