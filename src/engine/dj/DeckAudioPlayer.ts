@@ -230,6 +230,11 @@ export class DeckAudioPlayer {
   /**
    * Set playback rate (for pitch/tempo). 1.0 = normal speed.
    * Checkpoints position before applying new rate so getPosition() stays accurate.
+   *
+   * IMPORTANT: Sets rate directly on the underlying AudioBufferSourceNode(s) to
+   * bypass Tone.Player's playbackRate setter, which calls cancelStop() on ALL
+   * _activeSources — resurrecting zombie sources that should be fading out.
+   * This caused the flanger/doubling effect during rapid scratching.
    */
   setPlaybackRate(rate: number): void {
     const clamped = Math.max(0, Math.min(4, rate)); // 0x to 4x — covers any realistic scratch or pitch bend
@@ -249,7 +254,38 @@ export class DeckAudioPlayer {
       this._rateChangeTime = now;
     }
     this._playbackRate = clamped;
-    this.player.playbackRate = clamped;
+
+    // Bypass Tone.Player's playbackRate setter to avoid cancelStop() on zombie sources.
+    // Set _playbackRate directly and apply rate only to the newest source.
+    (this.player as any)._playbackRate = clamped;
+    const activeSources: Set<any> = (this.player as any)._activeSources;
+    if (activeSources && activeSources.size > 0) {
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      const now = ctx.currentTime;
+
+      // If multiple sources exist, keep only the newest one and force-stop
+      // the rest. This prevents zombie source accumulation during rapid
+      // scratch operations (seek/stop/start cycles).
+      if (activeSources.size > 1) {
+        const sources = Array.from(activeSources);
+        const newest = sources[sources.length - 1];
+        for (let i = 0; i < sources.length - 1; i++) {
+          try {
+            sources[i].stop(now);
+            activeSources.delete(sources[i]);
+          } catch { /* already disposed */ }
+        }
+        try {
+          newest.playbackRate.setValueAtTime(clamped, now);
+        } catch { /* source may be disposed */ }
+      } else {
+        activeSources.forEach((source: any) => {
+          try {
+            source.playbackRate.setValueAtTime(clamped, now);
+          } catch { /* source may be disposed */ }
+        });
+      }
+    }
   }
 
   getPlaybackRate(): number {
