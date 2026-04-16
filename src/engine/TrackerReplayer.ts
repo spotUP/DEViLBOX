@@ -2268,7 +2268,7 @@ export class TrackerReplayer {
           adplugPlayer.onPosition = (order: number, row: number, audioTime?: number) => {
             if (!this.playing || !this.song) return;
             if (order >= 0 && order < (this.song.songPositions?.length ?? 0)) {
-              this.coordinator.dispatchEnginePosition(row, order, audioTime, false);
+              this.coordinator.dispatchEnginePosition(row, order, audioTime, true);
             }
           };
 
