@@ -283,10 +283,10 @@ export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
 // ============================================================================
 
 /**
- * Set an EQ band value in dB (clamped -24 to +6).
+ * Set an EQ band value in dB (clamped -12 to +12).
  */
 export function setDeckEQ(deckId: DeckId, band: 'low' | 'mid' | 'high', dB: number): void {
-  const clamped = Math.max(-24, Math.min(6, dB));
+  const clamped = Math.max(-12, Math.min(12, dB));
   useDJStore.getState().setDeckEQ(deckId, band, clamped);
   try {
     getDJEngine().getDeck(deckId).setEQ(band, clamped);

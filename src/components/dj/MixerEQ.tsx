@@ -106,8 +106,8 @@ export const MixerEQBandKnob: React.FC<{
       {side === 'left' && killButton}
       <Knob
         value={eqValue}
-        min={-24}
-        max={6}
+        min={-12}
+        max={12}
         onChange={handleChange}
         label={label}
         size="sm"
@@ -116,7 +116,7 @@ export const MixerEQBandKnob: React.FC<{
         defaultValue={0}
         formatValue={formatEQ}
         hideValue
-        title={`Deck ${deckNum} EQ ${label} — ${bandDesc} (-24 to +6 dB)`}
+        title={`Deck ${deckNum} EQ ${label} — ${bandDesc} (-12 to +12 dB)`}
       />
       {side === 'right' && killButton}
     </div>

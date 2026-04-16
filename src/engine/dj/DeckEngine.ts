@@ -1111,7 +1111,7 @@ export class DeckEngine {
   // ==========================================================================
 
   setEQ(band: 'low' | 'mid' | 'high', dB: number): void {
-    const clamped = Math.max(-24, Math.min(6, dB));
+    const clamped = Math.max(-12, Math.min(12, dB));
     this.eqValues[band] = clamped;
     if (!this.eqKillState[band]) {
       this.eq3[band].value = clamped;
