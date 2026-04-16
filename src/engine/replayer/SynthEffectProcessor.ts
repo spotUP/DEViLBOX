@@ -105,6 +105,10 @@ interface EffectChannelState {
   // Volume slide
   volSlideSpeed: number;    // +x up, -y down (with memory)
 
+  // Fine portamento (effect memory)
+  finePortaUpSpeed: number;
+  finePortaDownSpeed: number;
+
   // Current effect
   effectType: number;
   effectParam: number;
@@ -194,11 +198,18 @@ export class SynthEffectProcessor {
 
       state.instrumentId = instId;
 
-      // Get base frequency from ToneEngine (set by fireHybridNotesForRow → triggerNote)
-      const baseFreq = this.deps.getChannelBaseFrequency(ch);
-      if (baseFreq > 0) {
-        state.baseFrequency = baseFreq;
-        state.currentFrequency = baseFreq;
+      // Only reset base/current frequency when a new note triggers (not on empty rows).
+      // For tone portamento (3xx/5xy), the note sets portaTarget instead — don't reset.
+      const fx = cell.effTyp ?? 0;
+      const hasNote = cell.note > 0 && cell.note < 97;
+      const isTonePorta = fx === FX_TONE_PORTA || fx === FX_TONE_PORTA_VOL_SLIDE;
+
+      if (hasNote && !isTonePorta) {
+        const baseFreq = this.deps.getChannelBaseFrequency(ch);
+        if (baseFreq > 0) {
+          state.baseFrequency = baseFreq;
+          state.currentFrequency = baseFreq;
+        }
       }
 
       // Parse volume column (direct set volume 0x10-0x50 range in XM)
@@ -208,7 +219,6 @@ export class SynthEffectProcessor {
       }
 
       // Parse primary effect column
-      const fx = cell.effTyp ?? 0;
       const param = cell.eff ?? 0;
       state.effectType = fx;
       state.effectParam = param;
@@ -283,11 +293,13 @@ export class SynthEffectProcessor {
         const subParam = param & 0x0F;
         switch (subCmd) {
           case EFX_FINE_PORTA_UP:
-            state.currentFrequency *= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, subParam * 4);
+            if (subParam !== 0) state.finePortaUpSpeed = subParam;
+            state.currentFrequency *= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, state.finePortaUpSpeed * 4);
             this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
             break;
           case EFX_FINE_PORTA_DOWN:
-            state.currentFrequency /= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, subParam * 4);
+            if (subParam !== 0) state.finePortaDownSpeed = subParam;
+            state.currentFrequency /= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, state.finePortaDownSpeed * 4);
             this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
             break;
           case EFX_VIBRATO_WAVEFORM:
@@ -302,6 +314,13 @@ export class SynthEffectProcessor {
             state.currentVolume = Math.max(0, state.currentVolume - subParam);
             state.baseVolume = state.currentVolume;
             this.deps.setChannelGain(ch, state.currentVolume / 64, time);
+            break;
+          case EFX_NOTE_CUT:
+            // EC0 fires immediately on tick 0 (FT2 behavior)
+            if (subParam === 0) {
+              state.currentVolume = 0;
+              this.deps.setChannelGain(ch, 0, time);
+            }
             break;
         }
         break;
@@ -429,7 +448,9 @@ export class SynthEffectProcessor {
 
     // Convert period delta to frequency multiplier
     const periodDelta = (waveValue * state.vibratoDepth) >> 5;
-    const sign = (state.vibratoPos & 0x80) ? -1 : 1;
+    // In XM, positive period delta (first half 0-127) → period UP → freq DOWN,
+    // so we negate: freq multiplier uses -periodDelta for the first half.
+    const sign = (state.vibratoPos & 0x80) ? 1 : -1;
     const freqMultiplier = Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, sign * periodDelta);
 
     const freq = state.baseFrequency * freqMultiplier;
@@ -511,6 +532,8 @@ function createDefaultState(instrumentId: number): EffectChannelState {
     arpeggioX: 0,
     arpeggioY: 0,
     volSlideSpeed: 0,
+    finePortaUpSpeed: 0,
+    finePortaDownSpeed: 0,
     effectType: 0,
     effectParam: 0,
   };
