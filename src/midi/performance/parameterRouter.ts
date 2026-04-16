@@ -530,10 +530,13 @@ export function routeParameterToEngine(
   switch (route.type) {
     case 'config': {
       // Send to synth engine for immediate audio response.
-      // Extract the LEAF param name from the store path — synth.set() expects
-      // bare names like 'cutoff', 'volume', 'pan', NOT namespaced keys like
-      // 'mixer.volume' or nested paths like 'tb303.filter.cutoff'.
-      const synthParam = route.path.split('.').pop()!;
+      // Strip namespace prefix from the route key for synth.set().
+      // Route keys like 'cutoff', 'accent' → no change (TB303 set() expects these).
+      // Namespaced keys like 'mixer.volume' → 'volume', 'synare.tune' → 'tune'.
+      // NOTE: Do NOT use route.path here — path is the store's nested config path
+      // (e.g. 'tb303.accent.amount') which differs from the synth param name ('accent').
+      const dotIdx = param.indexOf('.');
+      const synthParam = dotIdx >= 0 ? param.substring(dotIdx + 1) : param;
       // Synths expect 0-1 normalized values — they do their own internal
       // conversion (Hz, dB, etc.). Don't send the route transform output.
       sendDirectToSynth(instrument.id, synthParam, normalizedValue);
