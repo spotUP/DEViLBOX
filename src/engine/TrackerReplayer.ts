@@ -32,7 +32,6 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
-import { noteToMidi } from '@/lib/xmConversions';
 // HivelyEngine used via dynamic import
 // MusicLineEngine used via dynamic import
 
@@ -131,16 +130,11 @@ export interface ChannelState {
 
   // Sample state
   sampleNum: number;             // Current sample/instrument number
-  sampleOffset: number;          // Sample offset memory (9xx)
   finetune: number;              // Finetune: -8 to +7 (MOD) or -128 to +127 (XM)
   relativeNote: number;          // XM sample relative note (-96 to +95)
 
-  // Effect memory
+  // Effect memory (used by hybrid dispatch + SynthEffectProcessor)
   portaSpeed: number;            // Portamento speed (1xx, 2xx) - MOD shared
-  portaUpSpeed: number;          // FT2: separate portamento up speed memory
-  portaDownSpeed: number;        // FT2: separate portamento down speed memory
-  fPortaUpSpeed: number;         // FT2: fine portamento up speed memory (E1x)
-  fPortaDownSpeed: number;       // FT2: fine portamento down speed memory (E2x)
   portaTarget: number;           // Tone portamento target (3xx)
   tonePortaSpeed: number;        // Tone portamento speed
   vibratoPos: number;            // Vibrato position
@@ -150,32 +144,14 @@ export interface ChannelState {
   tremoloSpeed: number;          // FT2: stored separately, = (param & 0xF0) >> 2
   tremoloDepth: number;          // FT2: stored separately
   waveControl: number;           // Waveform control
-  retrigCount: number;           // Retrigger counter
-  retrigVolSlide: number;        // Retrigger volume slide (IT Rxy)
-  patternLoopRow: number;        // Pattern loop start row
-  patternLoopCount: number;      // Pattern loop counter
   glissandoMode: boolean;        // E3x: true = semitone portamento
   tremorPos: number;             // Tremor state: bit 7 = on/off, bits 0-6 = counter
   tremorParam: number;           // Tremor parameter memory (Txy)
-  efPitchSlideUpSpeed: number;   // Extra fine porta up speed memory (X1x)
-  efPitchSlideDownSpeed: number; // Extra fine porta down speed memory (X2x)
-  prevEffTyp: number;            // Previous row's effect type (for arpeggio/vibrato period reset)
-  prevEffParam: number;          // Previous row's effect parameter
   noteRetrigSpeed: number;       // FT2 Rxy: retrigger speed memory
   noteRetrigVol: number;         // FT2 Rxy: retrigger volume slide memory
   noteRetrigCounter: number;     // FT2 Rxy: retrigger tick counter
   volColumnVol: number;          // FT2: volume column byte from current row (for Rxy quirk)
-  oldVol: number;                // FT2: sample default volume from last triggerNote (for resetVolumes)
-  oldPan: number;                // FT2: sample default panning from last triggerNote (for resetVolumes)
-  rowInst: number;               // FT2: instrument number from current row (for EDx noteDelay)
-  _delayedNote?: number;         // EDx: saved note from delayed row (tick 0)
-  _delayedPeriod?: number;       // EDx: saved period from delayed row (tick 0)
-  _delayedVolume?: number;       // EDx: saved volume from delayed row (tick 0)
-  _tremoloThisTick?: boolean;    // Set by doTremolo, prevents outVol overwrite in envelope processing
   volSlideSpeed: number;         // FT2: volume slide speed memory (Axx)
-  fVolSlideUpSpeed: number;      // FT2: fine volume slide up memory (EAx)
-  fVolSlideDownSpeed: number;    // FT2: fine volume slide down memory (EBx)
-  globalVolSlide: number;        // Global volume slide memory (Hxx)
   panSlide: number;              // Pan slide memory (Pxx)
 
   // Macro state (Furnace instruments)
@@ -183,42 +159,24 @@ export interface ChannelState {
   macroReleased: boolean;        // Whether note has been released
   macroPitchOffset: number;      // Current pitch offset from macros
   macroArpNote: number;          // Current arpeggio note offset
-  macroDuty: number;             // Current duty cycle from macro
-  macroWaveform: number;         // Current waveform from macro
 
-  // XM envelope state (FT2's fixaEnvelopeVibrato)
+  // XM key-off state
   keyOff: boolean;               // Key-off flag — triggers fadeout + envelope release
-  fadeoutVol: number;            // Fadeout volume (0-32768, starts at 32768 on note trigger)
-  fadeoutSpeed: number;          // Fadeout speed from instrument (0-4095)
-  volEnvTick: number;            // Volume envelope tick counter
-  volEnvPos: number;             // Volume envelope point index
-  fVolEnvValue: number;          // Volume envelope interpolated value (0-64)
-  fVolEnvDelta: number;          // Volume envelope per-tick delta
-  panEnvTick: number;            // Panning envelope tick counter
-  panEnvPos: number;             // Panning envelope point index
-  fPanEnvValue: number;          // Panning envelope interpolated value (0-64)
-  fPanEnvDelta: number;          // Panning envelope per-tick delta
-  autoVibPos: number;            // Auto-vibrato position (0-255 wrapping)
-  autoVibAmp: number;            // Auto-vibrato amplitude (fixed point, upper 8 bits = depth)
-  autoVibSweep: number;         // Auto-vibrato sweep increment
+
+  // Output volumes (used by hybrid dispatch)
   outVol: number;                // FT2 output volume = ch.volume (0-64)
   outPan: number;                // FT2 output panning (0-255)
-  fFinalVol: number;             // Final computed volume after envelopes (0-1)
-  finalPan: number;              // Final computed panning after envelopes (0-255)
-  finalPeriod: number;           // Final period after auto-vibrato
 
   // TB-303 specific state
   previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
-  gateHigh: boolean;             // Current gate state for 303-style gate handling
   lastPlayedNoteName: string | null; // Last triggered note name for same-pitch slide detection
   xmNote: number;                // Original XM note number (for synth instruments, avoids period conversion)
 
   // Synth pitch tracking (for portamento/vibrato/arpeggio on synths)
   _synthDetuneOffset?: number;   // Current detune offset in semitones (for 1xx/2xx portamento)
-  
+
   // Note retriggering state (for synth pitch effects via note attack/release)
   baseNote?: string;             // Original note name (e.g., "C-4") before pitch effects
-  baseMidiNote?: number;         // Original MIDI note number (e.g., 60) before pitch effects
   currentPitchOffset?: number;   // Current semitone offset applied (0 for base pitch)
   currentPlayingNote?: string;   // Currently playing note name after pitch offset
   currentVelocity?: number;      // Current velocity for retriggering
@@ -226,7 +184,6 @@ export interface ChannelState {
   // Audio nodes - player pool (pre-allocated, pre-connected)
   player: Tone.Player | null;       // Active player reference (for updatePeriod compatibility)
   playerPool: Tone.Player[];        // Pre-allocated player pool
-  activePlayerIdx: number;           // Current active player index in pool
   gainNode: Tone.Gain;
   panNode: Tone.Panner;
   muteGain: Tone.Gain;              // Dedicated mute/solo gain (always 0 or 1)
@@ -1695,14 +1652,9 @@ export class TrackerReplayer {
       panning: 128,
       basePan,
       sampleNum: 0,
-      sampleOffset: 0,
       finetune: 0,
       relativeNote: 0,
       portaSpeed: 0,
-      portaUpSpeed: 0,
-      portaDownSpeed: 0,
-      fPortaUpSpeed: 0,
-      fPortaDownSpeed: 0,
       portaTarget: 0,
       tonePortaSpeed: 0,
       vibratoPos: 0,
@@ -1712,61 +1664,27 @@ export class TrackerReplayer {
       tremoloSpeed: 0,
       tremoloDepth: 0,
       waveControl: 0,
-      retrigCount: 0,
-      retrigVolSlide: 0,
-      patternLoopRow: 0,
-      patternLoopCount: 0,
       glissandoMode: false,
       tremorPos: 0,
       tremorParam: 0,
-      efPitchSlideUpSpeed: 0,
-      efPitchSlideDownSpeed: 0,
-      prevEffTyp: 0,
-      prevEffParam: 0,
       noteRetrigSpeed: 0,
       noteRetrigVol: 0,
       noteRetrigCounter: 0,
       volColumnVol: 0,
-      oldVol: 64,
-      oldPan: 128,
-      rowInst: 0,
       volSlideSpeed: 0,
-      fVolSlideUpSpeed: 0,
-      fVolSlideDownSpeed: 0,
-      globalVolSlide: 0,
       panSlide: 0,
       macroPos: 0,
       macroReleased: false,
       macroPitchOffset: 0,
       macroArpNote: 0,
-      macroDuty: 0,
-      macroWaveform: 0,
       keyOff: false,
-      fadeoutVol: 32768,
-      fadeoutSpeed: 0,
-      volEnvTick: 0,
-      volEnvPos: 0,
-      fVolEnvValue: 0,
-      fVolEnvDelta: 0,
-      panEnvTick: 0,
-      panEnvPos: 0,
-      fPanEnvValue: 0,
-      fPanEnvDelta: 0,
-      autoVibPos: 0,
-      autoVibAmp: 0,
-      autoVibSweep: 0,
       outVol: 64,
       outPan: 128,
-      fFinalVol: 1.0,
-      finalPan: 128,
-      finalPeriod: 0,
       previousSlideFlag: false,
-      gateHigh: false,
       lastPlayedNoteName: null,
       xmNote: 0,
       player: null,
       playerPool,
-      activePlayerIdx: 0,
       gainNode,
       panNode,
       muteGain,
@@ -2117,52 +2035,52 @@ export class TrackerReplayer {
           // Warm the cached reference for zero-latency forcePosition seeks
           getLibopenmptSync();
 
-          // Wire SynthEffectProcessor for tick-level effects on replaced instruments
-          if (this._replacedInstruments.size > 0) {
-            try {
-              const { SynthEffectProcessor } = await import('./replayer/SynthEffectProcessor');
-              if (gen !== this._playGeneration) return;
-              const replayer = this;
-              this._synthEffectProcessor = new SynthEffectProcessor({
-                getReplacedInstruments: () => replayer._replacedInstruments,
-                getPatternCell: (channel: number, row: number) => {
-                  const storePatterns = useTrackerStore.getState().patterns;
-                  const patternNum = replayer.song?.songPositions[replayer.songPos];
-                  if (patternNum == null) return null;
-                  const pat = storePatterns[patternNum];
-                  return pat?.channels[channel]?.rows[row] ?? null;
-                },
-                getChannelCount: () => replayer.channels.length,
-                applySynthFrequency: (instrumentId, frequency, channelIndex, rampTime) => {
-                  try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
-                  catch { /* ToneEngine not ready */ }
-                },
-                setChannelGain: (channelIndex, gain, _time) => {
-                  const ch = replayer.channels[channelIndex];
-                  if (ch?.gainNode) {
-                    try { ch.gainNode.gain.setValueAtTime(gain, Tone.now()); }
-                    catch { /* ignored */ }
-                  }
-                },
-                getChannelBaseFrequency: (channelIndex) => {
-                  try { return getToneEngine().getChannelLastNoteFrequency(channelIndex); }
-                  catch { return 0; }
-                },
-                getChannelInstrumentId: (channelIndex) => {
-                  const ch = replayer.channels[channelIndex];
-                  if (!ch) return 0;
-                  return typeof ch.instrument === 'number' ? ch.instrument
-                    : ch.instrument != null && typeof ch.instrument === 'object' && 'id' in ch.instrument
-                      ? (ch.instrument as { id: number }).id : 0;
-                },
-              });
-              mptEngine.onPositionTick = (audioTime, row, order, speed, tempo) => {
-                replayer._synthEffectProcessor?.process(audioTime, row, order, speed, tempo);
-              };
-              _log('[TrackerReplayer] SynthEffectProcessor wired for', this._replacedInstruments.size, 'replaced instruments');
-            } catch (err) {
-              _warn('[TrackerReplayer] SynthEffectProcessor init failed:', err);
-            }
+          // Wire SynthEffectProcessor for tick-level effects on replaced instruments.
+          // Always created (even if no instruments replaced yet) so mid-playback
+          // replacements get tick-level effects immediately.
+          try {
+            const { SynthEffectProcessor } = await import('./replayer/SynthEffectProcessor');
+            if (gen !== this._playGeneration) return;
+            const replayer = this;
+            this._synthEffectProcessor = new SynthEffectProcessor({
+              getReplacedInstruments: () => replayer._replacedInstruments,
+              getPatternCell: (channel: number, row: number) => {
+                const storePatterns = useTrackerStore.getState().patterns;
+                const patternNum = replayer.song?.songPositions[replayer.songPos];
+                if (patternNum == null) return null;
+                const pat = storePatterns[patternNum];
+                return pat?.channels[channel]?.rows[row] ?? null;
+              },
+              getChannelCount: () => replayer.channels.length,
+              applySynthFrequency: (instrumentId, frequency, channelIndex, rampTime) => {
+                try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
+                catch { /* ToneEngine not ready */ }
+              },
+              setChannelGain: (channelIndex, gain, _time) => {
+                const ch = replayer.channels[channelIndex];
+                if (ch?.gainNode) {
+                  try { ch.gainNode.gain.setValueAtTime(gain, Tone.now()); }
+                  catch { /* ignored */ }
+                }
+              },
+              getChannelBaseFrequency: (channelIndex) => {
+                try { return getToneEngine().getChannelLastNoteFrequency(channelIndex); }
+                catch { return 0; }
+              },
+              getChannelInstrumentId: (channelIndex) => {
+                const ch = replayer.channels[channelIndex];
+                if (!ch) return 0;
+                return typeof ch.instrument === 'number' ? ch.instrument
+                  : ch.instrument != null && typeof ch.instrument === 'object' && 'id' in ch.instrument
+                    ? (ch.instrument as { id: number }).id : 0;
+              },
+            });
+            mptEngine.onPositionTick = (audioTime, row, order, speed, tempo) => {
+              replayer._synthEffectProcessor?.process(audioTime, row, order, speed, tempo);
+            };
+            _log('[TrackerReplayer] SynthEffectProcessor wired');
+          } catch (err) {
+            _warn('[TrackerReplayer] SynthEffectProcessor init failed:', err);
           }
 
           // Re-activate the edit bridge if it was reset by loadSong. This
@@ -2814,7 +2732,6 @@ export class TrackerReplayer {
     
     // Store base note state for pitch effect retriggering
     ch.baseNote = noteName;
-    ch.baseMidiNote = noteToMidi(noteName);
     ch.currentPitchOffset = 0;
     ch.currentPlayingNote = noteName;
     
