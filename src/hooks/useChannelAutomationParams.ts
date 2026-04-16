@@ -16,7 +16,7 @@ import { getToneEngine } from '@/engine/ToneEngine';
 
 /** Editor modes where synth-internal params are NOT accessible (WASM owns playback) */
 const WASM_PLAYBACK_MODES = new Set([
-  'hively', 'klystrack', 'tfmx', 'musicline', 'jamcracker',
+  'tfmx', 'musicline', 'jamcracker',
   'goattracker', 'sidfactory2', 'cheesecutter', 'sc68',
 ]);
 
