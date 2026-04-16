@@ -27,8 +27,9 @@ export function beatJump(deckId: DeckId, beats: number): void {
       const beatGrid = state.beatGrid;
 
       if (!beatGrid || beatGrid.bpm <= 0) {
-        // No beat grid — fall back to fixed time jump (assume 120 BPM)
-        const jumpSec = beats * 0.5; // 120 BPM = 0.5s per beat
+        // No beat grid — use detected BPM or fallback to 120
+        const bpm = state.detectedBPM || state.effectiveBPM || 120;
+        const jumpSec = beats * (60 / bpm);
         if (deck.playbackMode === 'audio') {
           const newPos = Math.max(0, state.audioPosition + jumpSec);
           deck.audioPlayer.seek(newPos);

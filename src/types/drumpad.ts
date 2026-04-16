@@ -408,10 +408,10 @@ export function createDJFXProgram(): DrumProgram {
     { name: 'Kill Hi',      color: '#a3e635', action: 'fx_deck_kill_hi' },
     { name: 'Filt Reset',   color: '#14b8a6', action: 'fx_deck_filter_reset' },
     // Row 3: Beat jumps (real DJ engine effects)
-    { name: 'Jump −4',      color: '#8b5cf6', action: 'fx_deck_jump_m4' },
-    { name: 'Jump −1',      color: '#a855f7', action: 'fx_deck_jump_m1' },
-    { name: 'Jump +1',      color: '#d946ef', action: 'fx_deck_jump_p1' },
-    { name: 'Jump +4',      color: '#ec4899', action: 'fx_deck_jump_p4' },
+    { name: 'Jump −16',     color: '#8b5cf6', action: 'fx_deck_jump_m16' },
+    { name: 'Jump −4',      color: '#a855f7', action: 'fx_deck_jump_m4' },
+    { name: 'Jump +4',      color: '#d946ef', action: 'fx_deck_jump_p4' },
+    { name: 'Jump +16',     color: '#ec4899', action: 'fx_deck_jump_p16' },
     // Row 4: Performance FX & sounds (master bus)
     { name: 'Stutter 1/8',  color: '#f43f5e', action: 'fx_stutter_8' },
     { name: 'Dub Siren',    color: '#fb923c', action: 'fx_dub_siren' },
