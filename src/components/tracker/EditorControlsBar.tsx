@@ -217,6 +217,18 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <AVPSubsongSelector />
         <ModuleInfoButton />
 
+        {/* Sub-mode toggle (Tracker / Grid / TB-303) */}
+        <CustomSelect
+          value={viewMode}
+          onChange={(v) => _onViewModeChange(v as TrackerViewMode)}
+          options={[
+            { value: 'tracker', label: 'Tracker' },
+            { value: 'grid', label: 'Grid' },
+            { value: 'tb303', label: 'TB-303' },
+          ]}
+          className="px-3 py-1.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+        />
+
         {/* Channel Selector (grid and piano roll views) */}
         {viewMode === 'grid' && (
           <>
