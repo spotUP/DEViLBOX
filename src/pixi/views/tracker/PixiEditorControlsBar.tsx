@@ -496,6 +496,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   // ── Shared hook ───────────────────────────────────────────────────────────
   const c = useEditorControls();
 
+  // ── Modal state for active highlights ────────────────────────────────────
+  const modalOpen = useUIStore(s => s.modalOpen);
+
   // ── Paste mode & mask ─────────────────────────────────────────────────────
   const pasteMode = useEditorStore((s) => s.pasteMode);
   const setPasteMode = useEditorStore((s) => s.setPasteMode);
@@ -549,6 +552,26 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         width={64}
         height={24}
         layout={{ display: viewMode !== 'tracker' ? 'flex' : 'none' }}
+      />
+
+      {/* Pattern Order */}
+      <PixiButton
+        label="Order"
+        variant={modalOpen === 'patternOrder' ? 'ft2' : 'ghost'}
+        color={modalOpen === 'patternOrder' ? 'blue' : undefined}
+        size="sm"
+        active={modalOpen === 'patternOrder'}
+        onClick={() => useUIStore.getState().openModal('patternOrder')}
+      />
+
+      {/* Master FX */}
+      <PixiButton
+        label="Master FX"
+        variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
+        color={modalOpen === 'masterFx' ? 'blue' : undefined}
+        size="sm"
+        active={modalOpen === 'masterFx'}
+        onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
       />
 
       <Sep />

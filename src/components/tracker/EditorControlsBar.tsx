@@ -71,6 +71,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
 
   // DOM-only: UI store for view-mode switching and groove dialog command
+  const modalOpen = useUIStore(s => s.modalOpen);
   const dialogOpen = useUIStore(s => s.dialogOpen);
   const closeDialogCommand = useUIStore(s => s.closeDialogCommand);
 
@@ -227,6 +228,32 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           ]}
           className="px-3 py-1.5 rounded-md text-[10px] font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
         />
+
+        {/* Pattern Order */}
+        <button
+          onClick={() => useUIStore.getState().openModal('patternOrder')}
+          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+            modalOpen === 'patternOrder'
+              ? 'bg-accent-primary/20 text-accent-primary'
+              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+          }`}
+          title="Pattern order list"
+        >
+          Order
+        </button>
+
+        {/* Master FX */}
+        <button
+          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
+          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+            modalOpen === 'masterFx'
+              ? 'bg-accent-primary/20 text-accent-primary'
+              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+          }`}
+          title="Master effects chain"
+        >
+          Master FX
+        </button>
 
         {/* Channel Selector (grid and piano roll views) */}
         {viewMode === 'grid' && (
