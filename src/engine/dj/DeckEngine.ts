@@ -1286,8 +1286,8 @@ export class DeckEngine {
 
   setLineLoop(size: number): void {
     const currentRow = this.replayer.getCurrentRow();
-    // Quantize to beat boundary
-    const startRow = Math.floor(currentRow / size) * size;
+    // Quantize to nearest beat boundary (round to nearest, not always down)
+    const startRow = Math.round(currentRow / size) * size;
     this.replayer.setLineLoop(startRow, size);
   }
 
