@@ -38,7 +38,6 @@ import { WorkbenchCameraControls } from './WorkbenchCameraControls';
 import { PixiTrackerView } from '../views/PixiTrackerView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiInstrumentEditor } from '../views/PixiInstrumentEditor';
-import { PixiMixerView } from '../views/PixiMixerView';
 import { PixiMasterFxView } from '../views/PixiMasterFxView';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 
@@ -101,7 +100,6 @@ const WINDOW_CONTENT: Record<string, { title: string; component: React.Component
   // that interfere with PixiJS when always-mounted. VJ is conditionally mounted
   // as a full-screen view in PixiMainLayout instead.
   instrument:  { title: 'Instrument Editor',component: PixiInstrumentEditorWindow },
-  mixer:       { title: 'Mixer',            component: PixiMixerView },
   'master-fx': { title: 'Master FX',        component: PixiMasterFxView },
 };
 

@@ -26,7 +26,7 @@ export interface TourStep {
   showHead?: boolean;
 }
 
-function switchView(view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio'): void {
+function switchView(view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'studio'): void {
   useUIStore.getState().setActiveView(view);
 }
 

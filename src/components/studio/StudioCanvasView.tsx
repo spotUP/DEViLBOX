@@ -26,9 +26,6 @@ const UnifiedInstrumentEditor = lazy(() =>
 const TestKeyboard = lazy(() =>
   import('../instruments/shared/TestKeyboard').then(m => ({ default: m.TestKeyboard }))
 );
-const MixerContent = lazy(() =>
-  import('../panels/MixerPanel').then(m => ({ default: m.MixerView }))
-);
 const MasterEffectsPanel = lazy(() =>
   import('../effects/MasterEffectsPanel').then(m => ({ default: m.MasterEffectsPanel }))
 );
@@ -43,7 +40,7 @@ const DJView = lazy(() =>
 
 // ─── Panel Layout ───────────────────────────────────────────────────────────
 
-type StudioPanelId = 'tracker' | 'instrument' | 'mixer' | 'masterFx' | 'instrumentFx' | 'dj';
+type StudioPanelId = 'tracker' | 'instrument' | 'masterFx' | 'instrumentFx' | 'dj';
 
 interface PanelLayout {
   x: number;
@@ -59,7 +56,6 @@ const PANEL_MIN_H = 150;
 const PANEL_MIN_WIDTHS: Record<StudioPanelId, number> = {
   tracker: 600,
   instrument: 800,
-  mixer: 400,
   masterFx: 300,
   instrumentFx: 300,
   dj: 800,
@@ -80,8 +76,7 @@ function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelI
   const fxH = Math.max(400, Math.round(viewH * 0.40));
   const fxY = pad + topH + GAP;
 
-  // Row 3: Mixer + DJ
-  const mixerW = Math.max(700, Math.min(900, Math.round(viewW * 0.45)));
+  // Row 3: DJ
   const djW = Math.max(1000, Math.round(viewW * 0.50));
   const row3H = Math.max(500, Math.round(viewH * 0.45));
   const row3Y = fxY + fxH + GAP;
@@ -91,8 +86,7 @@ function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelI
     instrument:   { x: pad + trackerW + GAP, y: pad, w: instrW, h: topH },
     masterFx:     { x: pad, y: fxY, w: fxW, h: fxH },
     instrumentFx: { x: pad + fxW + GAP, y: fxY, w: fxW, h: fxH },
-    mixer:        { x: pad, y: row3Y, w: mixerW, h: row3H },
-    dj:           { x: pad + mixerW + GAP, y: row3Y, w: djW, h: row3H },
+    dj:           { x: pad, y: row3Y, w: djW, h: row3H },
   };
 }
 
@@ -102,7 +96,6 @@ const DEFAULT_PANELS: Record<StudioPanelId, PanelLayout> = computeDefaultPanels(
 const PANEL_LABELS: Record<StudioPanelId, string> = {
   tracker: 'TRACKER',
   instrument: 'INSTRUMENT',
-  mixer: 'MIXER',
   masterFx: 'MASTER FX',
   instrumentFx: 'INSTRUMENT FX',
   dj: 'DJ',
@@ -111,7 +104,6 @@ const PANEL_LABELS: Record<StudioPanelId, string> = {
 const PANEL_COLORS: Record<StudioPanelId, string> = {
   tracker: 'border-2 border-blue-500/40',
   instrument: 'border-2 border-purple-500/40',
-  mixer: 'border-2 border-green-500/40',
   masterFx: 'border-2 border-orange-500/40',
   instrumentFx: 'border-2 border-pink-500/40',
   dj: 'border-2 border-red-500/40',
@@ -375,8 +367,8 @@ export const StudioCanvasView: React.FC = () => {
 
   // Panel layouts
   const [panels, setPanels] = useState<Record<StudioPanelId, PanelLayout>>({ ...DEFAULT_PANELS });
-  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, mixer: false, masterFx: false, instrumentFx: false, dj: false });
-  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['dj', 'mixer', 'masterFx', 'instrumentFx', 'instrument', 'tracker']); // last = frontmost
+  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, masterFx: false, instrumentFx: false, dj: false });
+  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['dj', 'masterFx', 'instrumentFx', 'instrument', 'tracker']); // last = frontmost
   const initializedRef = useRef(false);
 
   // Auto-size panels and fit-to-view on first mount
@@ -574,7 +566,7 @@ export const StudioCanvasView: React.FC = () => {
 
   // Dynamic panel order — only includes visible (non-collapsed) panels,
   // sorted by spatial position (top-to-bottom, left-to-right)
-  const ALL_PANELS: StudioPanelId[] = ['tracker', 'instrument', 'masterFx', 'instrumentFx', 'mixer', 'dj'];
+  const ALL_PANELS: StudioPanelId[] = ['tracker', 'instrument', 'masterFx', 'instrumentFx', 'dj'];
   const visiblePanels = useMemo(() =>
     ALL_PANELS
       .filter(id => !collapsed[id])
@@ -723,14 +715,6 @@ export const StudioCanvasView: React.FC = () => {
 
       <DraggablePanel id="instrumentFx" layout={panels.instrumentFx} camera={camera}collapsed={collapsed.instrumentFx} zIndex={zOrder.indexOf('instrumentFx')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
         <InstrumentFxPanelContent />
-      </DraggablePanel>
-
-      <DraggablePanel id="mixer" layout={panels.mixer} camera={camera}collapsed={collapsed.mixer} zIndex={zOrder.indexOf('mixer')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
-          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading mixer...</div>}>
-            <MixerContent />
-          </Suspense>
-        </div>
       </DraggablePanel>
 
       <DraggablePanel id="dj" layout={panels.dj} camera={camera} collapsed={collapsed.dj} zIndex={zOrder.indexOf('dj')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
