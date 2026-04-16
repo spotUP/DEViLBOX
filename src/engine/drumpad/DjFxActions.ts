@@ -1198,6 +1198,7 @@ function createDeckEQKill(band: 'low' | 'mid' | 'high'): DjFxAction {
 }
 
 function createDeckBrake(): DjFxAction {
+  let brakeRaf = 0;
   return {
     id: 'fx_deck_brake',
     name: 'Deck Brake',
@@ -1207,53 +1208,32 @@ function createDeckBrake(): DjFxAction {
       const deckId = getActiveDeckId();
       try {
         const deck = getDJEngine().getDeck(deckId);
-        // Decelerate playback to simulate vinyl brake
-        if (deck.playbackMode === 'audio') {
-          const ctx = getCtx();
-          const now = ctx.currentTime;
-          const node = deck.audioPlayer as any;
-          if (node?._source?.playbackRate) {
-            const rate = node._source.playbackRate;
-            rate.cancelScheduledValues(now);
-            rate.setValueAtTime(rate.value, now);
-            rate.linearRampToValueAtTime(0.01, now + 1.2);
+        const state = useDJStore.getState().decks[deckId];
+        const bpm = state.beatGrid?.bpm || state.detectedBPM || state.effectiveBPM || 120;
+        const durationMs = (2 * 60 / bpm) * 1000;
+
+        const startTime = performance.now();
+        const animate = () => {
+          const elapsed = performance.now() - startTime;
+          const progress = Math.min(1, elapsed / durationMs);
+          const rate = 1 - progress * progress; // quadratic deceleration
+          useDJStore.getState().setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
+          if (progress < 1) {
+            brakeRaf = requestAnimationFrame(animate);
+          } else {
+            try { deck.pause(); } catch { /* */ }
+            useDJStore.getState().setDeckPlaying(deckId, false);
+            useDJStore.getState().setDeckPitch(deckId, 0);
           }
-        } else {
-          // Tracker: ramp tempo multiplier down
-          let mult = 1.0;
-          const interval = setInterval(() => {
-            mult *= 0.92;
-            if (mult < 0.02) {
-              clearInterval(interval);
-              try { deck.pause(); } catch { /* */ }
-              return;
-            }
-            try {
-              deck.replayer.setTempoMultiplier(mult);
-              deck.replayer.setPitchMultiplier(mult);
-            } catch { /* */ }
-          }, 30);
-          activeFx.set(this.id, { nodes: [], timer: interval as unknown as ReturnType<typeof setTimeout> });
-        }
+        };
+        brakeRaf = requestAnimationFrame(animate);
       } catch { /* engine not ready */ }
     },
     disengage() {
-      cleanupFx(this.id);
+      cancelAnimationFrame(brakeRaf);
+      brakeRaf = 0;
       const deckId = getActiveDeckId();
-      try {
-        const deck = getDJEngine().getDeck(deckId);
-        if (deck.playbackMode === 'audio') {
-          const ctx = getCtx();
-          const node = deck.audioPlayer as any;
-          if (node?._source?.playbackRate) {
-            node._source.playbackRate.cancelScheduledValues(ctx.currentTime);
-            node._source.playbackRate.setValueAtTime(1, ctx.currentTime);
-          }
-        } else {
-          deck.replayer.setTempoMultiplier(1);
-          deck.replayer.setPitchMultiplier(1);
-        }
-      } catch { /* engine not ready */ }
+      useDJStore.getState().setDeckPitch(deckId, 0);
     },
   };
 }
