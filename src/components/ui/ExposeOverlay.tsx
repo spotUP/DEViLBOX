@@ -10,7 +10,6 @@ import { useUIStore } from '@stores/useUIStore';
 
 const EXPOSE_VIEWS = [
   { id: 'tracker',     label: 'Tracker',  icon: '♫', color: '#60a5fa' },
-  { id: 'mixer',       label: 'Mixer',    icon: '☰', color: '#a78bfa' },
   { id: 'dj',          label: 'DJ',       icon: '◎', color: '#fb923c' },
   { id: 'vj',          label: 'VJ',       icon: '◈', color: '#f472b6' },
   { id: 'studio',      label: 'Studio',   icon: '⊞', color: '#fbbf24' },

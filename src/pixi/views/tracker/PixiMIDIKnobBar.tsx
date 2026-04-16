@@ -23,7 +23,7 @@ const BANKS: { id: KnobBankMode; label: string }[] = [
   { id: '303', label: '303' },
   { id: 'Siren', label: 'SIR' },
   { id: 'FX', label: 'FX' },
-  { id: 'Mixer', label: 'MIX' },
+  { id: 'MasterFX', label: 'MFX' },
 ];
 
 export const PixiMIDIKnobBar: React.FC<PixiMIDIKnobBarProps> = ({ width }) => {

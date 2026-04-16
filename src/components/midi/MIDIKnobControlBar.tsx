@@ -18,7 +18,7 @@ export const MIDIKnobControlBar: React.FC = () => {
     { id: '303', label: '303/Synth', icon: Settings },
     { id: 'Siren', label: 'Dub Siren', icon: Activity },
     { id: 'FX', label: 'Effects', icon: Waves },
-    { id: 'Mixer', label: 'Mixer', icon: Sliders },
+    { id: 'MasterFX', label: 'Master FX', icon: Sliders },
   ];
 
   const currentAssignments = KNOB_BANKS[knobBank];

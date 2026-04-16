@@ -120,16 +120,6 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 76, param: 'biphase.feedback', label: 'Phase FB' },
     { cc: 77, param: 'biphase.routing', label: 'Routing' },
   ],
-  'Mixer': [
-    { cc: 70, param: 'mixer.volume', label: 'Vol 1' },
-    { cc: 71, param: 'mixer.volume', label: 'Vol 2' },
-    { cc: 72, param: 'mixer.volume', label: 'Vol 3' },
-    { cc: 73, param: 'mixer.volume', label: 'Vol 4' },
-    { cc: 74, param: 'mixer.pan', label: 'Pan 1' },
-    { cc: 75, param: 'mixer.pan', label: 'Pan 2' },
-    { cc: 76, param: 'mixer.pan', label: 'Pan 3' },
-    { cc: 77, param: 'mixer.pan', label: 'Pan 4' },
-  ],
   'MasterFX': [
     { cc: 70, param: 'masterFx.slot0.wet', label: 'FX1 Wet' },
     { cc: 71, param: 'masterFx.slot0.param0', label: 'FX1 P1' },
@@ -340,8 +330,8 @@ export function getKnobAssignmentsForSynth(synthType: SynthType): KnobAssignment
     return nks2Bank;
   }
 
-  // 3. Last resort: mixer controls
-  return KNOB_BANKS['Mixer'];
+  // 3. Last resort: master effects controls
+  return KNOB_BANKS['MasterFX'];
 }
 
 /**
@@ -378,7 +368,7 @@ export function getKnobAssignmentsForPage(synthType: SynthType, page: number): K
   // NKS2: get all performance params (up to 16), slice into 8-knob pages
   const allParams = getPerformanceParams(synthType);
   if (allParams.length === 0) {
-    return page === 0 ? KNOB_BANKS['Mixer'] : [];
+    return page === 0 ? KNOB_BANKS['MasterFX'] : [];
   }
 
   const start = page * 8;
