@@ -4,6 +4,11 @@ import type { DevilboxSynth } from '@typedefs/synth';
 import { isDevilboxSynth } from '@typedefs/synth';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { InstrumentAnalyser } from '../InstrumentAnalyser';
+import { getChannelFilterManager } from '../ChannelFilterManager';
+
+// Channel indices 1000+ are reserved for native synth global filters,
+// avoiding collision with per-channel voice indices (0-63).
+const NATIVE_SYNTH_FILTER_BASE = 1000;
 
 export interface InstrumentEffectsContext {
   instrumentEffectChains: Map<number, {
@@ -30,6 +35,29 @@ export interface InstrumentEffectsContext {
  */
 export function clearConnectedNativeOutputs(): void {
   // No-op: permanent native connections (SunVox etc.) survive song changes.
+}
+
+/**
+ * Connect effect chain output to destination, inserting a channel filter
+ * for native (WASM) synths. Tone.js instruments already have per-channel
+ * filters wired in ChannelRouting, but native synths bypass that path.
+ */
+function connectToDestWithFilter(
+  output: Tone.Gain,
+  dest: Tone.ToneAudioNode,
+  isNative: boolean,
+  instrumentId: number,
+): void {
+  if (isNative) {
+    const filterMgr = getChannelFilterManager();
+    const channelIdx = NATIVE_SYNTH_FILTER_BASE + instrumentId;
+    const filterInput = filterMgr.getInput(channelIdx);
+    const filterOutput = filterMgr.getOutput(channelIdx);
+    output.connect(filterInput);
+    filterOutput.connect(dest);
+  } else {
+    output.connect(dest);
+  }
 }
 
 export async function buildInstrumentEffectChain(
@@ -101,10 +129,10 @@ export async function buildInstrumentEffectChain(
     const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId);
 
     if (activeAnalyser) {
-      output.connect(activeAnalyser.input);
+      connectToDestWithFilter(output, activeAnalyser.input, isNativeSynth, instrumentId);
     } else {
       const dest = ctx.getInstrumentOutputDestination(instrumentId, isNativeSynth);
-      output.connect(dest);
+      connectToDestWithFilter(output, dest, isNativeSynth, instrumentId);
     }
 
     ctx.instrumentEffectChains.set(key, { effects: [], output });
@@ -151,11 +179,11 @@ export async function buildInstrumentEffectChain(
 
   if (activeAnalyser) {
     console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to analyser');
-    output.connect(activeAnalyser.input);
+    connectToDestWithFilter(output, activeAnalyser.input, isNativeSynth, instrumentId2);
   } else {
     const dest = ctx.getInstrumentOutputDestination(instrumentId2, isNativeSynth);
     console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to destination (native:', isNativeSynth, ')');
-    output.connect(dest);
+    connectToDestWithFilter(output, dest, isNativeSynth, instrumentId2);
   }
 
   ctx.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });

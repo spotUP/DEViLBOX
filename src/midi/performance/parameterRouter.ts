@@ -289,8 +289,8 @@ function flushSynthUpdates(): void {
         }
       });
     }
-  } catch {
-    // Engine not initialized yet
+  } catch (e) {
+    console.warn('[KnobRoute] flush error:', e);
   }
   _pendingSynthUpdates.clear();
 }
@@ -491,12 +491,10 @@ export function routeParameterToEngine(
   const route = PARAMETER_ROUTES[param];
   if (!route) {
     // Fallback: try sending directly to the current synth engine.
-    // This handles WASM replayer params (hively, klystrack, sidmon, etc.)
-    // that have NKS maps but no explicit route table entry.
+    // Strips namespace prefix (e.g. 'hively.filterSpeed' → 'filterSpeed')
     const instrumentStore = useInstrumentStore.getState();
     const targetId = instrumentId ?? instrumentStore.currentInstrumentId;
     if (targetId !== undefined && targetId !== null) {
-      // Strip synth prefix: 'hively.filterSpeed' → 'filterSpeed'
       const shortParam = param.includes('.') ? param.split('.').pop()! : param;
       sendDirectToSynth(targetId, shortParam, normalizedValue);
     }
@@ -530,9 +528,16 @@ export function routeParameterToEngine(
 
   switch (route.type) {
     case 'config': {
-      // Send parameter directly to the synth engine for immediate audio response
-      sendDirectToSynth(instrument.id, param, value);
-      // Also update the store (throttled) for UI persistence
+      // Send to synth engine for immediate audio response.
+      // Extract the LEAF param name from the store path — synth.set() expects
+      // bare names like 'cutoff', 'volume', 'pan', NOT namespaced keys like
+      // 'mixer.volume' or nested paths like 'tb303.filter.cutoff'.
+      const synthParam = route.path.split('.').pop()!;
+      // Synths expect 0-1 normalized values — they do their own internal
+      // conversion (Hz, dB, etc.). Don't send the route transform output.
+      sendDirectToSynth(instrument.id, synthParam, normalizedValue);
+      // Also update the store (throttled) for UI persistence — store uses
+      // the TRANSFORMED value (dB, Hz, etc.) for Tone.js compatibility.
       const update = buildNestedUpdate(route.path, value, instrument as unknown as Record<string, unknown>);
       scheduleConfigUpdate(instrument.id, update as Record<string, unknown>);
       break;
