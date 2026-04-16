@@ -122,7 +122,7 @@ const EQBandRow: React.FC<{
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
       {side === 'left' && killBtn}
-      <PixiKnob value={value} min={-24} max={6} defaultValue={0} size="sm" label={label} bipolar onChange={(v) => DJActions.setDeckEQ(deckId, band, v)} />
+      <PixiKnob value={value} min={-12} max={12} defaultValue={0} size="sm" label={label} bipolar onChange={(v) => DJActions.setDeckEQ(deckId, band, v)} />
       {side === 'right' && killBtn}
     </pixiContainer>
   );

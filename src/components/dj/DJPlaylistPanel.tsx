@@ -123,6 +123,19 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 
 const TRACK_ROW_HEIGHT = 32;
 
+// ── DJ FX Presets (per-song master FX override) ─────────────────────────────
+
+export const DJ_FX_PRESETS = [
+  { key: 'reverb-wash',  label: 'Reverb',   effects: [{ type: 'Reverb' as const, wet: 60, params: { decay: 4, preDelay: 0.02 } }] },
+  { key: 'delay-echo',   label: 'Echo',     effects: [{ type: 'PingPongDelay' as const, wet: 40, params: { delayTime: '8n', feedback: 0.3 } }] },
+  { key: 'chorus-wide',  label: 'Chorus',   effects: [{ type: 'Chorus' as const, wet: 50, params: { frequency: 1.5, delayTime: 3.5, depth: 0.7 } }] },
+  { key: 'phaser',       label: 'Phaser',   effects: [{ type: 'Phaser' as const, wet: 50, params: { frequency: 0.5, octaves: 3, baseFrequency: 350 } }] },
+  { key: 'bitcrush',     label: 'Crush',    effects: [{ type: 'BitCrusher' as const, wet: 80, params: { bits: 8 } }] },
+  { key: 'flanger',      label: 'Flanger',  effects: [{ type: 'Chorus' as const, wet: 60, params: { frequency: 0.2, delayTime: 1, depth: 1 } }] },
+  { key: 'distortion',   label: 'Dist',     effects: [{ type: 'Distortion' as const, wet: 50, params: { distortion: 0.4 } }] },
+  { key: 'space-echo',   label: 'Space',    effects: [{ type: 'Reverb' as const, wet: 40, params: { decay: 6, preDelay: 0.05 } }, { type: 'PingPongDelay' as const, wet: 30, params: { delayTime: '4n', feedback: 0.4 } }] },
+] as const;
+
 // ── Sortable Track Row ──────────────────────────────────────────────────────
 
 interface SortableTrackRowProps {
@@ -135,10 +148,14 @@ interface SortableTrackRowProps {
   isAutoDJCurrent: boolean;
   isAutoDJNext: boolean;
   thirdDeckActive: boolean;
+  isPreviewing: boolean;
   onLoadToDeck: (track: PlaylistTrack, deckId: 'A' | 'B' | 'C', index: number) => void;
   onRemove: (index: number) => void;
   onClick: (index: number, e: React.MouseEvent) => void;
   onDoubleClick: (track: PlaylistTrack, index: number) => void;
+  onPreview: (track: PlaylistTrack, index: number) => void;
+  onStopPreview: () => void;
+  onSetFxPreset: (index: number, preset: string | undefined) => void;
 }
 
 const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
@@ -151,10 +168,14 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
   isAutoDJCurrent,
   isAutoDJNext,
   thirdDeckActive,
+  isPreviewing,
   onLoadToDeck,
   onRemove,
   onClick,
   onDoubleClick,
+  onPreview,
+  onStopPreview,
+  onSetFxPreset,
 }) => {
   const {
     attributes,
@@ -233,7 +254,32 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
       {track.duration > 0 && (
         <span className="text-xs font-mono text-text-muted/30 shrink-0">{formatDuration(track.duration)}</span>
       )}
+      {/* Per-song FX preset indicator */}
+      {track.masterFxPreset && (
+        <span className="text-[9px] font-mono text-purple-400 shrink-0 px-0.5 bg-purple-400/10 rounded" title={`FX: ${DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset)?.label ?? track.masterFxPreset}`}>
+          FX
+        </span>
+      )}
       <span className={`flex items-center gap-0.5 shrink-0 transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* Preview button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
+          className={`px-1 text-xs font-mono font-bold transition-colors ${isPreviewing ? 'text-green-400 hover:text-green-300' : 'text-text-muted/60 hover:text-text-muted'}`}
+          title={isPreviewing ? 'Stop preview' : 'Preview track'}
+        >{isPreviewing ? '■' : '▸'}</button>
+        {/* FX preset selector */}
+        <select
+          value={track.masterFxPreset || ''}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => { e.stopPropagation(); onSetFxPreset(index, e.target.value || undefined); }}
+          className="text-[9px] bg-transparent border border-dark-border/50 rounded text-text-muted/60 hover:text-text-muted px-0.5 max-w-[48px] cursor-pointer"
+          title="Per-song master FX preset"
+        >
+          <option value="">FX</option>
+          {DJ_FX_PRESETS.map(p => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+        </select>
         <button
           onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'A', index); }}
           className="px-1 text-xs font-mono font-bold text-blue-400 hover:text-blue-300 transition-colors"
@@ -316,6 +362,11 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [editTrack, setEditTrack] = useState<{ index: number; track: PlaylistTrack } | null>(null);
+  const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
+  const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
+  const previewGainRef = useRef<GainNode | null>(null);
+
+  const updateTrackMeta = useDJPlaylistStore((s) => s.updateTrackMeta);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -778,6 +829,27 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       setLoadingDeckId(deckId);
       try {
         await loadTrackToDeck(track, deckId);
+        // Apply per-song master FX preset if set
+        if (track.masterFxPreset) {
+          const preset = DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset);
+          if (preset) {
+            try {
+              const { useAudioStore } = await import('@/stores/useAudioStore');
+              const effectConfigs = preset.effects.map((fx, i) => ({
+                id: `persong-${preset.key}-${i}`,
+                category: 'tonejs' as const,
+                type: fx.type,
+                enabled: true,
+                wet: fx.wet,
+                parameters: fx.params as Record<string, number | string>,
+              }));
+              useAudioStore.getState().setMasterEffects(effectConfigs);
+              console.log(`[DJPlaylistPanel] Applied per-song FX preset: ${preset.label}`);
+            } catch (err) {
+              console.warn('[DJPlaylistPanel] Failed to apply per-song FX:', err);
+            }
+          }
+        }
       } finally {
         setLoadingTrackIndex(null);
         setLoadingDeckId(null);
@@ -785,6 +857,51 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     },
     [loadTrackToDeck],
   );
+
+  // ── Preview playback (loads to idle deck for audition) ────────────────────
+
+  const stopPreview = useCallback(() => {
+    if (previewPlayerRef.current) {
+      try { previewPlayerRef.current.stop(); } catch { /* already stopped */ }
+      previewPlayerRef.current = null;
+    }
+    if (previewGainRef.current) {
+      previewGainRef.current.disconnect();
+      previewGainRef.current = null;
+    }
+    setPreviewingIndex(null);
+  }, []);
+
+  const handlePreview = useCallback(async (track: PlaylistTrack, index: number) => {
+    // Stop any existing preview
+    stopPreview();
+
+    // Load to whichever deck is idle (not playing) using our existing load infrastructure
+    const store = useDJStore.getState();
+    const idleDeck: 'A' | 'B' = store.decks.A.isPlaying ? 'B' : 'A';
+
+    setPreviewingIndex(index);
+    try {
+      await loadTrackToDeck(track, idleDeck);
+      // Start playback on that deck
+      try {
+        getDJEngine().getDeck(idleDeck).play();
+        useDJStore.getState().setDeckPlaying(idleDeck, true);
+      } catch { /* engine not ready */ }
+    } catch {
+      setPreviewingIndex(null);
+    }
+  }, [loadTrackToDeck, stopPreview]);
+
+  // Clean up preview on unmount
+  useEffect(() => stopPreview, [stopPreview]);
+
+  // ── Per-song FX preset ────────────────────────────────────────────────────
+
+  const handleSetFxPreset = useCallback((index: number, preset: string | undefined) => {
+    if (!activePlaylistId) return;
+    updateTrackMeta(activePlaylistId, index, { masterFxPreset: preset });
+  }, [activePlaylistId, updateTrackMeta]);
 
   // ── Drop files onto playlist ──────────────────────────────────────────────
 
@@ -1439,10 +1556,14 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                           isAutoDJCurrent={autoDJEnabled && realIndex === autoDJCurrentIdx}
                           isAutoDJNext={autoDJEnabled && realIndex === autoDJNextIdx}
                           thirdDeckActive={thirdDeckActive}
+                          isPreviewing={previewingIndex === realIndex}
                           onLoadToDeck={(t, d, _i) => loadTrackWithProgress(t, d, realIndex)}
                           onRemove={(i) => removeTrack(activePlaylist.id, getRealIndex(i))}
                           onClick={handleTrackClick}
                           onDoubleClick={handleTrackDoubleClick}
+                          onPreview={handlePreview}
+                          onStopPreview={stopPreview}
+                          onSetFxPreset={handleSetFxPreset}
                         />
                       </div>
                     );

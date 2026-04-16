@@ -51,6 +51,8 @@ export interface PlaylistTrack {
   badTimestamp?: number;
   /** Number of consecutive load failures */
   badFailCount?: number;
+  /** Per-song master FX preset key — overrides global master FX when this song plays */
+  masterFxPreset?: string;
 }
 
 export interface DJPlaylist {
@@ -94,7 +96,7 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   markTrackBad: (playlistId: string, index: number, reason: string) => void;
   clearTrackBadFlag: (playlistId: string, index: number) => void;
