@@ -218,7 +218,7 @@ export const useMIDIStore = create<MIDIStore>()(
       djKnobPage: 0,
       djKnobTotalPages: DJ_KNOB_BANKS.length,
       showPatternDialog: false,
-      showKnobBar: false, // Start hidden until device connected
+      showKnobBar: true, // Always visible — shows parameter assignments
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
 
       // Initialize MIDI
