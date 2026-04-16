@@ -17,7 +17,7 @@ import type { DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import type { ScratchActionId } from '@/types/drumpad';
 import { DJ_FX_CATEGORY_COLORS, ONE_SHOT_CATEGORY_COLORS } from '@/constants/djPadModeDefaults';
 import { DJ_ONE_SHOT_PRESETS } from '@/constants/djOneShotPresets';
-import { colorToHex } from '@/pixi/colors';
+import { colorToHex } from '@/utils/colors';
 import { SYNTH_QUICK_PRESETS, type SynthQuickPreset } from './useDJQuickAssignData';
 import { SAMPLE_CATEGORY_LABELS, type SampleCategory } from '@/types/samplePack';
 import type { SampleData } from '@/types/drumpad';

@@ -38,8 +38,6 @@ import { MIDIControllerWizard } from '@components/dialogs/MIDIControllerWizard';
 import { NKSSetupWizard } from '@components/dialogs/NKSSetupWizard';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
-import { PatternMatchModal } from '@components/modland/PatternMatchModal';
-import { PatternMatchButton } from '@components/modland/PatternMatchButton';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
@@ -48,8 +46,6 @@ import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { useDevServerStatus } from '@hooks/useDevServerStatus';
 import { DevServerDownBanner } from '@components/ui/DevServerDownBanner';
-import { MobileMenu } from '@components/layout/MobileMenu';
-import { useResponsive } from '@contexts/ResponsiveContext';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { useGlobalPTT } from '@hooks/useGlobalPTT';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
@@ -88,9 +84,6 @@ const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => (
 const ModuleInfoModal = lazy(() => import('@components/dialogs/ModuleInfoModal').then(m => ({ default: m.ModuleInfoModal })));
 const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog })));
-const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
-const DJ3DOverlay = lazy(() => import('./components/dj/DJ3DOverlay').then(m => ({ default: m.DJ3DOverlay })));
-const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
 const StudioCanvasView = lazy(() => import('./components/studio/StudioCanvasView').then(m => ({ default: m.StudioCanvasView })));
 
 // Module-level flag — resets on every page load (sessionStorage persists through reloads)
@@ -122,8 +115,7 @@ async function playStartupJingle(): Promise<void> {
 const DesignSystemPage = lazy(() => import('./components/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
 const IsolatedComponent = lazy(() => import('./components/design-system/IsolatedComponent').then(m => ({ default: m.IsolatedComponent })));
 
-/** Wrapper that intercepts #/design-system before App mounts its hooks.
- *  Also handles ?_renderMode=dom|webgl for split-screen comparison iframes. */
+/** Wrapper that intercepts #/design-system before App mounts its hooks. */
 function AppRouter() {
   const [isDesignSystem, setIsDesignSystem] = useState(window.location.hash === '#/design-system');
   useEffect(() => {
@@ -132,21 +124,16 @@ function AppRouter() {
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  // Handle ?_renderMode=dom|webgl from split-screen comparison iframes
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const forceMode = params.get('_renderMode');
-    if (forceMode === 'dom' || forceMode === 'webgl') {
-      useSettingsStore.getState().setRenderMode(forceMode);
-    }
     // Handle ?view=xxx or #/_view=xxx to switch to a specific view
+    const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
     const hashMatch = window.location.hash.match(/_view=(\w+)/);
     const requestedView = viewParam || hashMatch?.[1];
     if (requestedView) {
       setTimeout(() => {
         useUIStore.getState().setActiveView(requestedView as never);
-      }, 500); // delay to let app initialize
+      }, 500);
     }
   }, []);
 
@@ -154,14 +141,29 @@ function AppRouter() {
     return <Suspense fallback={<div style={{ background: '#121218', color: '#6b6b80', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading design system...</div>}><DesignSystemPage /></Suspense>;
   }
 
-  // Component isolation mode for split-screen comparison (DOM only — GL needs full app)
+  // Component isolation mode for split-screen comparison
   const params = new URLSearchParams(window.location.search);
   const isolate = params.get('_isolate');
-  const forceMode = params.get('_renderMode');
-  if (isolate && forceMode !== 'webgl') {
+  if (isolate) {
     return <Suspense fallback={<div style={{ background: '#0d0d0d', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'monospace' }}>Loading {isolate}...</div>}><IsolatedComponent name={isolate} /></Suspense>;
   }
   return <App />;
+}
+
+/** Thin wrapper to subscribe to the modland contribution modal store */
+function ModlandContributionWrapper() {
+  const isOpen = useModlandContributionModal((s) => s.isOpen);
+  const filename = useModlandContributionModal((s) => s.filename);
+  const hash = useModlandContributionModal((s) => s.hash);
+  return (
+    <ModlandContributionModal
+      isOpen={isOpen}
+      onClose={() => useModlandContributionModal.getState().closeModal()}
+      onDismiss={() => useModlandContributionModal.getState().dismissForFile()}
+      filename={filename}
+      hash={hash}
+    />
+  );
 }
 
 function App() {
@@ -198,7 +200,6 @@ function App() {
   const [pendingSongFile, setPendingSongFile]             = useState<File | null>(null);
   const [pendingInstrumentFile, setPendingInstrumentFile] = useState<File | null>(null);
   const djModeActive = useDJStore(s => s.djModeActive);
-  const deckViewMode = useDJStore(s => s.deckViewMode);
   const pendingTD3File = useUIStore(s => s.pendingTD3File);
 
   // Modal state from store (single source of truth for DOM + WebGL)
@@ -814,223 +815,6 @@ function App() {
     }
   };
 
-  // WebGL render mode — render PixiJS UI instead of DOM
-  const renderMode = useSettingsStore(state => state.renderMode);
-  const { isMobile } = useResponsive();
-
-  // Extract hook calls that appear in the webgl branch JSX — must be called
-  // unconditionally to satisfy React's rules of hooks (same count every render).
-  const modlandIsOpen = useModlandContributionModal((s) => s.isOpen);
-  const modlandFilename = useModlandContributionModal((s) => s.filename);
-  const modlandHash = useModlandContributionModal((s) => s.hash);
-
-  // Disable WebGL/PixiJS on mobile — too heavy for phones, causes overheating.
-  // Mobile gets the lighter DOM-based React UI instead.
-  if (renderMode === 'webgl' && !isMobile) {
-    return (
-      <Suspense fallback={
-        <div className="h-screen w-screen flex items-center justify-center bg-dark-bg">
-          <span className="text-text-muted font-mono text-sm">Loading WebGL UI...</span>
-        </div>
-      }>
-        <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop}>
-          <PixiApp />
-          {/* DJ 3D overlay — Three.js rendered in DOM tree, on top of Pixi canvas */}
-          {activeView === 'dj' && deckViewMode === '3d' && (
-            <div className="fixed inset-0 z-10" style={{ top: 36, background: 'rgba(10,10,14,0.97)' }}>
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading 3D views...</div>}>
-                <DJ3DOverlay />
-              </Suspense>
-            </div>
-          )}
-          {/* Mobile menu overlay for GL mode */}
-          {isMobile && (
-            <MobileMenu
-              onShowSettings={() => openModal('settings')}
-              onShowExport={() => openModal('export')}
-              onShowHelp={() => openModal('help')}
-              onShowMasterFX={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
-              onShowPatterns={() => togglePatterns()}
-              onLoad={() => openModal('fileBrowser')}
-              onSave={() => saveProject()}
-              onNew={() => useUIStore.getState().openNewSongWizard()}
-              onShowInstruments={() => openModal('instruments')}
-              onShowPatternOrder={() => openModal('patternOrder')}
-              onShowDrumpads={() => openModal('drumpads')}
-              onShowGrooveSettings={() => openModal('grooveSettings')}
-              onShowAuth={() => openModal('auth')}
-            />
-          )}
-          {/* Store-driven overlays — render null when inactive */}
-          <ToastNotification />
-          <SynthErrorDialog />
-          <RomUploadDialog />
-          <USBSIDWizard />
-          <MIDIControllerWizard />
-          <NKSSetupWizard />
-          <ModlandContributionModal
-            isOpen={modlandIsOpen}
-            onClose={() => useModlandContributionModal.getState().closeModal()}
-            onDismiss={() => useModlandContributionModal.getState().dismissForFile()}
-            filename={modlandFilename}
-            hash={modlandHash}
-          />
-          <PatternMatchModal />
-          <PatternMatchButton />
-          {isDevServerDown && <DevServerDownBanner />}
-          {updateAvailable && !updateDismissed && (
-            <UpdateNotification
-              onRefresh={refresh}
-              onDismiss={() => setUpdateDismissed(true)}
-              currentVersion={currentVersion.buildNumber}
-              latestVersion={latestVersion?.buildNumber || 'unknown'}
-            />
-          )}
-          <WebGLModalBridge />
-          <PeerMouseCursor />
-          <PeerVideoWindow />
-          <AIPanel />
-
-          {/* Effect Parameter Editor Modal */}
-          <Suspense fallback={null}>
-            {editingEffect && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
-                <div className="max-w-md w-full mx-4 animate-slide-in-up">
-                  <EffectParameterEditor
-                    effect={editingEffect.effect}
-                    onUpdateParameter={handleUpdateEffectParameter}
-                    onUpdateWet={handleUpdateEffectWet}
-                    onClose={() => setEditingEffect(null)}
-                  />
-                </div>
-              </div>
-            )}
-          </Suspense>
-
-          {/* .dbx project preview dialog */}
-          <ImportDBXDialog
-            isOpen={pendingSongFile !== null}
-            file={pendingSongFile}
-            onCancel={() => setPendingSongFile(null)}
-            onConfirm={async () => {
-              if (pendingSongFile) await loadSongFile(pendingSongFile);
-              setPendingSongFile(null);
-            }}
-          />
-
-          {/* .dbi instrument preview dialog */}
-          <ImportInstrumentDialog
-            isOpen={pendingInstrumentFile !== null}
-            file={pendingInstrumentFile}
-            onCancel={() => setPendingInstrumentFile(null)}
-            onConfirm={async () => {
-              if (pendingInstrumentFile) await loadFile(pendingInstrumentFile);
-              setPendingInstrumentFile(null);
-            }}
-          />
-
-          {/* TD-3 pattern import dialog (replace/append choice) */}
-          <ImportTD3Dialog
-            isOpen={!!pendingTD3File}
-            onClose={() => useUIStore.getState().setPendingTD3File(null)}
-            initialFile={pendingTD3File}
-            onImport={async (file, replacePatterns) => {
-              useUIStore.getState().setPendingTD3File(null);
-              const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
-              if (result.success === true) notify.success(result.message);
-              else if (result.success === false) void showAlert({ title: 'Load Failed', message: result.error || 'Could not load file' });
-            }}
-          />
-
-          {/* Pop-out windows — rendered outside WebGL canvas as separate browser windows */}
-          {instrumentEditorPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setInstrumentEditorPoppedOut(false)}
-                title="DEViLBOX — Instrument Editor"
-                width={1000}
-                height={800}
-              >
-                <InstrumentEditorPopout />
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {hardwareUiPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setHardwareUiPoppedOut(false)}
-                title="DEViLBOX — Hardware UI"
-                width={800}
-                height={600}
-              >
-                <HardwareUIPopout />
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {masterEffectsPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setMasterEffectsPoppedOut(false)}
-                title="DEViLBOX — Master Effects"
-                width={1000}
-                height={800}
-              >
-                <MasterEffectsModal isOpen={true} onClose={() => setMasterEffectsPoppedOut(false)} />
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {instrumentEffectsPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setInstrumentEffectsPoppedOut(false)}
-                title="DEViLBOX — Instrument Effects"
-                width={1000}
-                height={800}
-              >
-                <InstrumentEffectsModal isOpen={true} onClose={() => setInstrumentEffectsPoppedOut(false)} />
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {oscilloscopePoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setOscilloscopePoppedOut(false)}
-                title="DEViLBOX — Visualizer"
-                width={800}
-                height={500}
-              >
-                <OscilloscopePopout />
-              </PopOutWindow>
-            </Suspense>
-          )}
-          {/* VJ Popout Window */}
-          {vjPoppedOut && (
-            <Suspense fallback={null}>
-              <PopOutWindow
-                isOpen={true}
-                onClose={() => setVJPoppedOut(false)}
-                title="DEViLBOX — VJ"
-                width={1280}
-                height={720}
-              >
-                <DJErrorBoundary viewName="VJ">
-                  <div className="h-screen w-screen bg-black">
-                    <VJView isPopout />
-                  </div>
-                </DJErrorBoundary>
-              </PopOutWindow>
-            </Suspense>
-          )}
-        </GlobalDragDropHandler>
-      </Suspense>
-    );
-  }
-
   if (initError) {
     return (
       <div className="h-screen flex items-center justify-center bg-dark-bg text-text-primary">
@@ -1512,6 +1296,9 @@ function App() {
 
       {/* ROM Upload Dialog - Shows when ROM-dependent synths can't auto-load ROMs */}
       <RomUploadDialog />
+
+      {/* Modland contribution modal */}
+      <ModlandContributionWrapper />
 
       {/* Dev server down banner */}
       {isDevServerDown && <DevServerDownBanner />}

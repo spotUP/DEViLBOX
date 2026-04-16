@@ -28,7 +28,7 @@ import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper'
 
 // Extracted sub-modules
 import { SynthTypeDispatcher, type EditorMode } from './SynthTypeDispatcher';
-import { getSynthLayout } from '@/pixi/views/instruments/layouts';
+import { getSynthLayout } from '@/constants/synthLayouts';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS

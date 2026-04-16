@@ -7,7 +7,7 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
-import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/pixi/views/instruments/synthPanelTypes';
+import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/types/synthPanel';
 
 interface DOMSynthPanelProps {
   layout: SynthPanelLayout;

@@ -38,7 +38,7 @@ import { DEFAULT_ZYNADDSUBFX } from '@engine/zynaddsubfx/ZynAddSubFXSynth';
 import { deepMerge } from '@lib/migration';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
-import { getSynthLayout } from '@/pixi/views/instruments/layouts';
+import { getSynthLayout } from '@/constants/synthLayouts';
 
 // ─── Lazy imports ────────────────────────────────────────────────────────────
 

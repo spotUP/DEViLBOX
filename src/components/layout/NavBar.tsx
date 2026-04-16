@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Download, LogIn, LogOut, Cloud, Users, Monitor, Settings, Lightbulb, Play } from 'lucide-react';
+import { Plus, X, Download, LogIn, LogOut, Cloud, Users, Settings, Lightbulb, Play } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -240,20 +240,6 @@ const NavBarComponent: React.FC = () => {
               title="Download Desktop App"
             >
               <span className="hidden sm:inline uppercase whitespace-nowrap">Desktop App</span>
-            </Button>
-          )}
-
-          {/* Switch to DOM mode — only shown when running in GL/WebGL mode */}
-          {n.renderMode === 'webgl' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={n.handleSwitchToDom}
-              icon={<Monitor size={14} />}
-              iconPosition="left"
-              title="Switch to DOM rendering mode"
-            >
-              <span className="hidden sm:inline">DOM</span>
             </Button>
           )}
 
