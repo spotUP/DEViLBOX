@@ -11,7 +11,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useThemeStore } from '@stores';
-import { seekDeckAudio } from '@/engine/dj/DJActions';
+import { seekDeckAudio, startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import { markSeek } from './seekGuard';
@@ -201,22 +201,7 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId, hasPeaks]);
 
-  // ── Beat snap helper ─────────────────────────────────────────────────────
-
-  /** Snap a seek position to the nearest beat if within 150ms */
-  const snapToNearestBeat = useCallback((seekSec: number): number => {
-    const beats = useDJStore.getState().decks[deckId].beatGrid?.beats;
-    if (!beats || beats.length === 0) return seekSec;
-    let nearest = beats[0], minDist = Math.abs(seekSec - nearest);
-    for (const b of beats) {
-      const dist = Math.abs(seekSec - b);
-      if (dist < minDist) { minDist = dist; nearest = b; }
-      if (b > seekSec + 0.2) break; // sorted, stop early
-    }
-    return minDist < 0.15 ? nearest : seekSec;
-  }, [deckId]);
-
-  // ── Click / drag to seek ─────────────────────────────────────────────────
+  // ── Click / drag to scratch ──────────────────────────────────────────────
 
   const seekToFraction = useCallback((fraction: number) => {
     const durationMs = useDJStore.getState().decks[deckId].durationMs;
@@ -229,8 +214,10 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   }, [deckId]);
 
   const isDraggingRef = useRef(false);
-  const dragStartXRef = useRef(0);       // mouse X at drag start
-  const dragStartPosRef = useRef(0);     // audioPosition (seconds) at drag start
+  const lastXRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const velocityRef = useRef(0);
+  const decayRafRef = useRef(0);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const container = containerRef.current;
@@ -245,42 +232,59 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
       return;
     }
 
-    // Scrolling waveform zone → drag to scrub
+    // Scrolling waveform zone → drag to scratch
     e.preventDefault();
     isDraggingRef.current = true;
+    lastXRef.current = e.clientX;
+    lastTimeRef.current = performance.now();
+    velocityRef.current = 0;
 
-    const state = useDJStore.getState().decks[deckId];
-    dragStartXRef.current = e.clientX;
-    dragStartPosRef.current = state.audioPosition;
+    if (decayRafRef.current) {
+      cancelAnimationFrame(decayRafRef.current);
+      decayRafRef.current = 0;
+    }
 
-    const WINDOW_SEC = 10;
-    const durationSec = state.durationMs / 1000;
-
-    const calcSeekSec = (clientX: number) => {
-      const dx = clientX - dragStartXRef.current;
-      // Dragging left = moving forward in time (waveform scrolls left)
-      // Dragging right = moving backward
-      const deltaSec = -(dx / rect.width) * WINDOW_SEC;
-      return Math.max(0, Math.min(durationSec - 0.01, dragStartPosRef.current + deltaSec));
-    };
+    startScratch(deckId);
+    setScratchVelocity(deckId, 0);
 
     const onMouseMove = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
-      const seekSec = snapToNearestBeat(calcSeekSec(ev.clientX));
-      markSeek(deckId);
-      useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
+      const now = performance.now();
+      const dt = Math.max(1, now - lastTimeRef.current) / 1000;
+      const dx = ev.clientX - lastXRef.current;
+      // Horizontal drag → scratch velocity. Right = forward, left = backward.
+      // Scale so ~300px/s drag ≈ 1× speed
+      const v = Math.max(-4, Math.min(4, (dx / dt) / 300));
+      velocityRef.current = v;
+      setScratchVelocity(deckId, v);
+      lastXRef.current = ev.clientX;
+      lastTimeRef.current = now;
     };
 
-    const onMouseUp = (ev: MouseEvent) => {
-      if (isDraggingRef.current) {
-        isDraggingRef.current = false;
-        // Snap to beat on release for clean alignment
-        const seekSec = snapToNearestBeat(calcSeekSec(ev.clientX));
-        const dur = useDJStore.getState().decks[deckId].durationMs / 1000;
-        if (dur > 0) seekToFraction(seekSec / dur);
-      }
+    const onMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+
+      // Momentum decay back to 1× over 300ms (cubic ease-out)
+      const fromV = velocityRef.current;
+      const startTime = performance.now();
+      const DECAY_MS = 300;
+      const decay = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(1, elapsed / DECAY_MS);
+        const eased = 1 - (1 - t) * (1 - t) * (1 - t);
+        const v = fromV + (1 - fromV) * eased;
+        setScratchVelocity(deckId, v);
+        if (t < 1) {
+          decayRafRef.current = requestAnimationFrame(decay);
+        } else {
+          decayRafRef.current = 0;
+          stopScratch(deckId, 0);
+        }
+      };
+      decayRafRef.current = requestAnimationFrame(decay);
     };
 
     document.addEventListener('mousemove', onMouseMove);
