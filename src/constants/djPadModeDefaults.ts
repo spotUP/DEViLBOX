@@ -1,8 +1,7 @@
 /**
  * DJ Pad Mode Defaults — default pad mappings for the 4 DJ pad modes.
  *
- * Uses design-system color constants from pixi/colors.ts for consistent
- * theming across DOM and GL renderers.
+ * Uses design-system color constants from utils/colors.ts for consistent theming.
  */
 
 import type { DjFxActionId } from '../engine/drumpad/DjFxActions';
@@ -13,7 +12,7 @@ import {
   DJ_SCRATCH, DJ_SCRATCH_ADV, DJ_SCRATCH_EXP, DJ_SCRATCH_CTL,
   DJ_DECK_FX,
   colorToHex,
-} from '../pixi/colors';
+} from '../utils/colors';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 

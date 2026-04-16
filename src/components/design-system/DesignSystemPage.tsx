@@ -4,7 +4,7 @@
  * Access via: http://localhost:5173/#/design-system
  *
  * Organized from atomic components → composite panels → full views.
- * Shows both DOM and Pixi component variants side by side where applicable.
+ * Visual catalog of all UI components.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -458,77 +458,6 @@ const ProViewMock: React.FC = () => (
 );
 
 // ── Main Page ──
-// ── Split-Screen Live Comparison ──
-const SPLIT_VIEWS = [
-  { id: 'tracker', label: 'Tracker' },
-  { id: 'mixer', label: 'Mixer' },
-  { id: 'dj', label: 'DJ' },
-  { id: 'studio', label: 'Studio' },
-  { id: 'drumpad', label: 'Pads' },
-];
-
-const SplitScreenComparison: React.FC = () => {
-  const [showSplit, setShowSplit] = useState(false);
-  const [view, setView] = useState('tracker');
-
-  const baseUrl = window.location.origin;
-  const domUrl = `${baseUrl}/?_renderMode=dom#/_view=${view}`;
-  const glUrl = `${baseUrl}/?_renderMode=webgl#/_view=${view}`;
-
-  if (!showSplit) {
-    return (
-      <button
-        onClick={() => setShowSplit(true)}
-        style={{
-          padding: '8px 20px', fontSize: 12, fontFamily: 'inherit', border: '1px solid #6366f1',
-          borderRadius: 6, cursor: 'pointer', background: '#6366f120', color: '#6366f1', fontWeight: 'bold',
-        }}
-      >
-        Open Side-by-Side Comparison
-      </button>
-    );
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#0a0a10', display: 'flex', flexDirection: 'column' }}>
-      {/* Toolbar */}
-      <div style={{ height: 40, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', background: '#1a1a24', borderBottom: '1px solid #2a2a3a' }}>
-        <span style={{ fontSize: 13, fontWeight: 'bold', color: '#e2e2e8' }}>DOM vs WebGL</span>
-        <div style={{ display: 'flex', gap: 3 }}>
-          {SPLIT_VIEWS.map(({ id, label }) => (
-            <button key={id} onClick={() => setView(id)} style={{
-              padding: '3px 10px', fontSize: 10, fontFamily: 'inherit', border: 'none', borderRadius: 3, cursor: 'pointer',
-              background: view === id ? '#6366f1' : '#22222e', color: view === id ? '#fff' : '#6b6b80',
-            }}>{label}</button>
-          ))}
-        </div>
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 9, color: '#44445a' }}>Both iframes load the full app — interact with either side</span>
-        <button onClick={() => setShowSplit(false)} style={{
-          padding: '4px 12px', fontSize: 11, fontFamily: 'inherit', border: '1px solid #2a2a3a',
-          borderRadius: 4, cursor: 'pointer', background: '#22222e', color: '#e2e2e8',
-        }}>Close</button>
-      </div>
-
-      {/* Split panes */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '2px solid #6366f1' }}>
-          <div style={{ height: 22, flexShrink: 0, background: '#10b98120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#10b981', fontWeight: 'bold' }}>
-            DOM (React/HTML) — Source of Truth
-          </div>
-          <iframe key={`dom-${view}`} src={domUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="DOM" />
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ height: 22, flexShrink: 0, background: '#6366f120', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#6366f1', fontWeight: 'bold' }}>
-            WebGL (Pixi) — Should Match DOM
-          </div>
-          <iframe key={`gl-${view}`} src={glUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="WebGL" />
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ── Back to App link ──
 const BackToApp: React.FC = () => (
   <a
@@ -547,10 +476,9 @@ export const DesignSystemPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 4 }}>DEViLBOX Design System</h1>
-            <p style={{ fontSize: 12, color: '#6b6b80', marginBottom: 0 }}>Visual catalog of all UI components — DOM and Pixi renderers</p>
+            <p style={{ fontSize: 12, color: '#6b6b80', marginBottom: 0 }}>Visual catalog of all UI components</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <SplitScreenComparison />
             <BackToApp />
           </div>
         </div>

@@ -205,8 +205,6 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
   const channelColorBlend = useSettingsStore((s) => s.channelColorBlend);
   const setChannelColorBlend = useSettingsStore((s) => s.setChannelColorBlend);
-  const renderMode = useSettingsStore((s) => s.renderMode);
-  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
   const crtEnabled = useSettingsStore((s) => s.crtEnabled);
   const setCrtEnabled = useSettingsStore((s) => s.setCrtEnabled);
   const crtParams = useSettingsStore((s) => s.crtParams);
@@ -402,7 +400,6 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     wobbleWindows, setWobbleWindows,
     trackerVisualBg, setTrackerVisualBg, trackerVisualMode, setTrackerVisualMode,
     channelColorBlend, setChannelColorBlend,
-    renderMode, setRenderMode,
     crtEnabled, setCrtEnabled, crtParams, setCrtParam, resetCrtParams,
     lensEnabled, setLensEnabled, lensPreset, setLensPreset,
     lensParams, setLensParam, resetLensParams,
