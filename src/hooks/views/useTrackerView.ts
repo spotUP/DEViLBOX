@@ -13,6 +13,7 @@
 
 import { useCallback } from 'react';
 import { useTrackerStore, useInstrumentStore, useUIStore, useFormatStore } from '@stores';
+import { useCursorStore } from '@stores/useCursorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
@@ -29,11 +30,20 @@ export function useTrackerView() {
 
   // ── View mode ─────────────────────────────────────────────────────────────
   const viewMode = useUIStore((s) => s.trackerViewMode);
-  const setViewMode = useUIStore((s) => s.setTrackerViewMode);
+  const rawSetViewMode = useUIStore((s) => s.setTrackerViewMode);
 
   // ── Grid channel ──────────────────────────────────────────────────────────
   const gridChannelIndex = useUIStore((s) => s.gridChannelIndex);
   const setGridChannelIndex = useUIStore((s) => s.setGridChannelIndex);
+
+  // When switching to grid mode, auto-sync grid channel to cursor position
+  const setViewMode = useCallback((mode: typeof viewMode) => {
+    if (mode === 'grid') {
+      const cursorCh = useCursorStore.getState().cursor.channelIndex;
+      setGridChannelIndex(cursorCh);
+    }
+    rawSetViewMode(mode);
+  }, [rawSetViewMode, setGridChannelIndex]);
 
   // ── Editor mode ───────────────────────────────────────────────────────────
   const editorMode = useFormatStore((s) => s.editorMode);
