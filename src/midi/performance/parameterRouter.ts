@@ -670,13 +670,13 @@ function getDJRoutes(): Record<string, DJRouteHandler> {
     // Master volume: 0-1 maps to 0-1.5
     'dj.masterVolume': (v) => getDJEngine().mixer.setMasterVolume(v * 1.5),
 
-    // EQ: 0-1 maps to -24dB to +6dB range
-    'dj.deckA.eqHi': (v) => getDJEngine().deckA.setEQ('high', -24 + v * 30),
-    'dj.deckA.eqMid': (v) => getDJEngine().deckA.setEQ('mid', -24 + v * 30),
-    'dj.deckA.eqLow': (v) => getDJEngine().deckA.setEQ('low', -24 + v * 30),
-    'dj.deckB.eqHi': (v) => getDJEngine().deckB.setEQ('high', -24 + v * 30),
-    'dj.deckB.eqMid': (v) => getDJEngine().deckB.setEQ('mid', -24 + v * 30),
-    'dj.deckB.eqLow': (v) => getDJEngine().deckB.setEQ('low', -24 + v * 30),
+    // EQ: 0-1 maps to -12dB to +12dB range
+    'dj.deckA.eqHi': (v) => getDJEngine().deckA.setEQ('high', -12 + v * 24),
+    'dj.deckA.eqMid': (v) => getDJEngine().deckA.setEQ('mid', -12 + v * 24),
+    'dj.deckA.eqLow': (v) => getDJEngine().deckA.setEQ('low', -12 + v * 24),
+    'dj.deckB.eqHi': (v) => getDJEngine().deckB.setEQ('high', -12 + v * 24),
+    'dj.deckB.eqMid': (v) => getDJEngine().deckB.setEQ('mid', -12 + v * 24),
+    'dj.deckB.eqLow': (v) => getDJEngine().deckB.setEQ('low', -12 + v * 24),
 
     // Filter: 0-1 maps to -1..+1 (center = off, left = HPF, right = LPF)
     'dj.deckA.filter': (v) => getDJEngine().deckA.setFilterPosition(-1 + v * 2),
