@@ -625,3 +625,328 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
     </>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Unified Online Panel (merged Modland + HVSC)
+// ---------------------------------------------------------------------------
+
+type OnlineSearchSource = 'all' | 'modland' | 'hvsc';
+
+interface OnlineResult {
+  source: 'modland' | 'hvsc';
+  key: string;
+  filename: string;
+  format: string;
+  author: string;
+  avg_rating?: number;
+  vote_count?: number;
+}
+
+function modlandToOnlineResult(f: ModlandFile): OnlineResult {
+  return { source: 'modland', key: f.full_path, filename: f.filename, format: f.format, author: f.author, avg_rating: f.avg_rating, vote_count: f.vote_count };
+}
+
+function hvscToOnlineResult(e: HVSCEntry): OnlineResult {
+  return { source: 'hvsc', key: e.path, filename: e.name, format: 'SID', author: e.author || '', avg_rating: e.avg_rating, vote_count: e.vote_count };
+}
+
+interface OnlinePanelProps {
+  isOpen: boolean;
+  width: number;
+  height: number;
+  onLoadTrackerModule: (buffer: ArrayBuffer, filename: string) => Promise<void>;
+  onClose: () => void;
+}
+
+const ONLINE_LIMIT = 50;
+
+export const PixiOnlinePanel: React.FC<OnlinePanelProps> = ({
+  isOpen,
+  width,
+  height,
+  onLoadTrackerModule,
+  onClose,
+}) => {
+  const theme = usePixiTheme();
+
+  useModalClose({ isOpen, onClose });
+
+  const [query, setQuery] = useState('');
+  const [source, setSource] = useState<OnlineSearchSource>('all');
+  const [format, setFormat] = useState('');
+  const [results, setResults] = useState<OnlineResult[]>([]);
+  const [formats, setFormats] = useState<ModlandFormat[]>([]);
+  const [status, setStatus] = useState<ModlandStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [ratings, setRatings] = useState<RatingMap>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const isLoggedIn = useAuthStore(s => !!s.token);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getModlandStatus().then(setStatus).catch(() => {});
+    getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch(() => {});
+  }, [isOpen]);
+
+  const doSearch = useCallback(async (q: string, fmt: string, src: OnlineSearchSource, newOffset: number, append: boolean) => {
+    if (!q && !fmt) {
+      if (!append) setResults([]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      let combined: OnlineResult[] = [];
+      let moreResults = false;
+
+      if (src === 'all' || src === 'modland') {
+        const data = await searchModland({ q: q || undefined, format: fmt || undefined, limit: ONLINE_LIMIT, offset: newOffset });
+        combined.push(...data.results.map(modlandToOnlineResult));
+        if (data.results.length === ONLINE_LIMIT) moreResults = true;
+      }
+
+      if ((src === 'all' || src === 'hvsc') && q && !fmt) {
+        try {
+          const hvscResults = await searchHVSC(q, ONLINE_LIMIT, newOffset);
+          combined.push(...hvscResults.filter(e => !e.isDirectory).map(hvscToOnlineResult));
+          if (hvscResults.length === ONLINE_LIMIT) moreResults = true;
+        } catch { /* HVSC may be unavailable */ }
+      }
+
+      if (src === 'all') combined.sort((a, b) => a.filename.localeCompare(b.filename));
+
+      if (append) {
+        setResults(prev => [...prev, ...combined]);
+      } else {
+        setResults(combined);
+      }
+      setHasMore(moreResults);
+      setOffset(newOffset);
+
+      const modlandKeys = combined.filter(r => r.source === 'modland').map(r => r.key);
+      const hvscKeys = combined.filter(r => r.source === 'hvsc').map(r => r.key);
+      const ratingPromises: Promise<RatingMap>[] = [];
+      if (modlandKeys.length > 0) ratingPromises.push(batchGetRatings('modland', modlandKeys));
+      if (hvscKeys.length > 0) ratingPromises.push(batchGetRatings('hvsc', hvscKeys));
+      if (ratingPromises.length > 0) {
+        Promise.all(ratingPromises).then(maps => {
+          const merged = Object.assign({}, ...maps);
+          setRatings(prev => append ? { ...prev, ...merged } : merged);
+        }).catch(() => {});
+      } else if (!append) {
+        setRatings({});
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => doSearch(query, format, source, 0, false), 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [query, format, source, doSearch]);
+
+  const loadMore = useCallback(() => {
+    doSearch(query, format, source, offset + ONLINE_LIMIT, true);
+  }, [query, format, source, offset, doSearch]);
+
+  const handleLoad = useCallback(async (item: OnlineResult) => {
+    setLoading(true);
+    setError(null);
+    try {
+      let buffer: ArrayBuffer;
+      if (item.source === 'hvsc') {
+        buffer = await downloadHVSCFile(item.key);
+      } else {
+        const [modBuffer, companion] = await Promise.all([
+          downloadModlandFile(item.key),
+          downloadTFMXCompanion(item.key),
+        ]);
+        buffer = modBuffer;
+        if (companion) {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        }
+      }
+      await onLoadTrackerModule(buffer, item.filename);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download');
+    } finally {
+      setLoading(false);
+    }
+  }, [onLoadTrackerModule, onClose]);
+
+  const handleRate = useCallback(async (id: string, star: number) => {
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
+    const item = results.find(r => r.key === id);
+    if (!item) return;
+    try {
+      if (star === 0) {
+        const res = await removeRating(item.source, id);
+        setRatings(prev => ({ ...prev, [id]: { avg: res.avg, count: res.count } }));
+      } else {
+        const res = await setRating(item.source, id, star);
+        setRatings(prev => ({ ...prev, [id]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
+      }
+    } catch { /* ignore */ }
+  }, [isLoggedIn, results]);
+
+  const sourceOptions: SelectOption[] = useMemo(() => [
+    { value: 'all', label: 'All Sources' },
+    { value: 'modland', label: 'Modland' },
+    { value: 'hvsc', label: 'HVSC (SID)' },
+  ], []);
+
+  const formatOptions: SelectOption[] = useMemo(() => {
+    const opts: SelectOption[] = [{ value: '', label: 'All formats' }];
+    formats.forEach(f => opts.push({ value: f.format, label: `${f.format} (${f.count.toLocaleString()})` }));
+    return opts;
+  }, [formats]);
+
+  const listItems = useMemo(() =>
+    results.map(item => {
+      const r = ratings[item.key];
+      const ratingData = r || (item.avg_rating != null
+        ? { avg: item.avg_rating, count: item.vote_count ?? 0 }
+        : undefined);
+      return {
+        id: item.key,
+        label: item.filename,
+        sublabel: `${item.format} — ${item.author} (${item.source === 'hvsc' ? 'HVSC' : 'Modland'})`,
+        dotColor: item.source === 'hvsc' ? theme.accent.color : theme.success.color,
+        rating: ratingData ? { avg: ratingData.avg, count: ratingData.count, userRating: r?.userRating } as PixiListItemRating : undefined,
+      };
+    }),
+    [results, ratings],
+  );
+
+  const listH = height - SEARCH_H - PAD * 2;
+
+  return (
+    <>
+    <Div layout={{ width, height, flexDirection: 'column' }}>
+      <Div
+        layout={{
+          width,
+          height: SEARCH_H,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingLeft: PAD,
+          paddingRight: PAD,
+          backgroundColor: theme.bgTertiary.color,
+          borderBottomWidth: 1,
+          borderColor: theme.border.color,
+        }}
+      >
+        <Txt className="text-xs font-mono text-text-muted" layout={{}}>
+          {status?.status === 'ready' ? `${status.totalFiles.toLocaleString()} files` : ''}
+        </Txt>
+
+        <PixiPureTextInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Search modules & SIDs..."
+          width={Math.max(100, width - 500)}
+          height={26}
+          fontSize={11}
+        />
+
+        <PixiSelect
+          options={sourceOptions}
+          value={source}
+          onChange={(v) => setSource(v as OnlineSearchSource)}
+          width={120}
+          height={26}
+        />
+
+        {source !== 'hvsc' && (
+          <PixiSelect
+            options={formatOptions}
+            value={format}
+            onChange={setFormat}
+            width={200}
+            height={26}
+            searchable
+          />
+        )}
+      </Div>
+
+      <Div layout={{ flex: 1, padding: PAD, flexDirection: 'column' }}>
+        {error && (
+          <Div
+            layout={{
+              width: width - PAD * 2,
+              padding: 8,
+              marginBottom: 8,
+              backgroundColor: tintBg(theme.error.color),
+              borderWidth: 1,
+              borderColor: theme.error.color,
+              borderRadius: 4,
+              flexDirection: 'row',
+              gap: 6,
+              alignItems: 'center',
+            }}
+          >
+            <PixiIcon name="warning" size={12} color={theme.error.color} layout={{}} />
+            <Txt className="text-xs font-mono text-accent-error">{error}</Txt>
+          </Div>
+        )}
+
+        {results.length === 0 && !loading ? (
+          <Div layout={{ flex: 1, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 8 }}>
+            <PixiIcon name="speaker" size={28} color={theme.textMuted.color} layout={{}} />
+            <Txt className="text-sm font-mono text-text-muted">
+              {query || format ? 'No results found' : 'Search online music archives'}
+            </Txt>
+            <Txt className="text-xs font-mono text-text-muted" layout={{}}>
+              190K+ tracker modules &bull; 80K+ C64 SID tunes
+            </Txt>
+          </Div>
+        ) : (
+          <Div layout={{ flexDirection: 'column', gap: 4 }}>
+            <PixiList
+              items={listItems}
+              width={width - PAD * 2}
+              height={listH - (hasMore ? 36 : 0)}
+              itemHeight={ITEM_H}
+              selectedId={null}
+              onSelect={(id) => {
+                const item = results.find(r => r.key === id);
+                if (item) handleLoad(item);
+              }}
+              onRate={handleRate}
+            />
+
+            {hasMore && (
+              <PixiButton
+                label={loading ? 'Loading...' : 'Load more results'}
+                variant="ghost"
+                size="sm"
+                disabled={loading}
+                onClick={loadMore}
+                layout={{ alignSelf: 'center', marginTop: 4 }}
+              />
+            )}
+          </Div>
+        )}
+
+        {loading && results.length === 0 && (
+          <Div layout={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Txt className="text-sm font-mono text-accent-primary">Loading...</Txt>
+          </Div>
+        )}
+      </Div>
+    </Div>
+    <PixiAuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    </>
+  );
+};

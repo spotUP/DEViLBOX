@@ -17,7 +17,7 @@ import { PixiIcon } from '../components/PixiIcon';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { useFileNavigation, isTrackerModule, type FileSource, type FileItem, getLastFileSource, setLastFileSource } from '@/components/dialogs/useFileNavigation';
 import { hasElectronFS } from '@utils/electron';
-import { PixiModlandPanel, PixiHVSCPanel } from './PixiRemoteBrowserPanels';
+import { PixiOnlinePanel } from './PixiRemoteBrowserPanels';
 import { tintBg } from '../colors';
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
   const listW = MODAL_W - LIST_PAD * 2;
 
   const isLoadDisabled = mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory);
-  const isModlandOrHvsc = fileSource === 'modland' || fileSource === 'hvsc';
+  const isModlandOrHvsc = fileSource === 'online';
 
   return (
     <GlModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
@@ -259,18 +259,10 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         )}
         {mode === 'load' && onLoadTrackerModule && (
           <SourceTab
-            label="Modland"
+            label="Online"
             icon="globe"
-            active={fileSource === 'modland'}
-            onSelect={() => handleSourceChange('modland')}
-          />
-        )}
-        {mode === 'load' && onLoadTrackerModule && (
-          <SourceTab
-            label="HVSC"
-            icon="diskio"
-            active={fileSource === 'hvsc'}
-            onSelect={() => handleSourceChange('hvsc')}
+            active={fileSource === 'online'}
+            onSelect={() => handleSourceChange('online')}
           />
         )}
 
@@ -308,16 +300,8 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
       )}
 
       {/* Content area */}
-      {fileSource === 'modland' && onLoadTrackerModule ? (
-        <PixiModlandPanel
-          isOpen={isOpen}
-          width={MODAL_W}
-          height={MODAL_H - HEADER_H - TABS_H - FOOTER_H}
-          onLoadTrackerModule={async (buf, fn) => { onLoadTrackerModule(buf, fn); }}
-          onClose={onClose}
-        />
-      ) : fileSource === 'hvsc' && onLoadTrackerModule ? (
-        <PixiHVSCPanel
+      {fileSource === 'online' && onLoadTrackerModule ? (
+        <PixiOnlinePanel
           isOpen={isOpen}
           width={MODAL_W}
           height={MODAL_H - HEADER_H - TABS_H - FOOTER_H}

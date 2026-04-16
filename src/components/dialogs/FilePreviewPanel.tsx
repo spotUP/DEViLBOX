@@ -1,6 +1,7 @@
 /**
- * FilePreviewPanel - Remote file browsing panels (Modland + HVSC)
- * for the FileBrowser dialog.
+ * FilePreviewPanel - Remote file browsing panels for the FileBrowser dialog.
+ * OnlinePanel merges Modland + HVSC into a single unified search view.
+ * Legacy ModlandPanel + HVSCPanel kept for backwards compatibility.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -662,6 +663,315 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
           {hvscLoading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 size={20} className="animate-spin text-blue-400" />
+            </div>
+          )}
+        </div>
+      </div>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    </>
+  );
+};
+
+// ── Unified Online Panel ─────────────────────────────────────────────────
+
+type SearchSource = 'all' | 'modland' | 'hvsc';
+
+interface OnlineResult {
+  source: 'modland' | 'hvsc';
+  key: string;
+  filename: string;
+  format: string;
+  author: string;
+  avg_rating?: number;
+  vote_count?: number;
+}
+
+function modlandToResult(f: ModlandFile): OnlineResult {
+  return { source: 'modland', key: f.full_path, filename: f.filename, format: f.format, author: f.author, avg_rating: f.avg_rating, vote_count: f.vote_count };
+}
+
+function hvscToResult(e: HVSCEntry): OnlineResult {
+  return { source: 'hvsc', key: e.path, filename: e.name, format: 'SID', author: e.author || '', avg_rating: e.avg_rating, vote_count: e.vote_count };
+}
+
+interface OnlinePanelProps {
+  isOpen: boolean;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
+  onClose: () => void;
+}
+
+const ONLINE_LIMIT = 50;
+
+export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerModule, onClose }) => {
+  const [query, setQuery] = useState('');
+  const [source, setSource] = useState<SearchSource>('all');
+  const [format, setFormat] = useState('');
+  const [results, setResults] = useState<OnlineResult[]>([]);
+  const [formats, setFormats] = useState<ModlandFormat[]>([]);
+  const [status, setStatus] = useState<ModlandStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [downloading, setDownloading] = useState<Set<string>>(new Set());
+  const [ratings, setRatings] = useState<RatingMap>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const isLoggedIn = useAuthStore(s => !!s.token);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getModlandStatus().then(setStatus).catch(() => {});
+    getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch(() => {});
+    setTimeout(() => searchRef.current?.focus(), 100);
+  }, [isOpen]);
+
+  const doSearch = useCallback(async (q: string, fmt: string, src: SearchSource, newOffset: number, append: boolean) => {
+    if (!q && !fmt) {
+      if (!append) setResults([]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      let combined: OnlineResult[] = [];
+      let moreResults = false;
+
+      if (src === 'all' || src === 'modland') {
+        const data = await searchModland({ q: q || undefined, format: fmt || undefined, limit: ONLINE_LIMIT, offset: newOffset });
+        combined.push(...data.results.map(modlandToResult));
+        if (data.results.length === ONLINE_LIMIT) moreResults = true;
+      }
+
+      if ((src === 'all' || src === 'hvsc') && q && !fmt) {
+        try {
+          const hvscResults = await searchHVSC(q, ONLINE_LIMIT, newOffset);
+          combined.push(...hvscResults.filter(e => !e.isDirectory).map(hvscToResult));
+          if (hvscResults.length === ONLINE_LIMIT) moreResults = true;
+        } catch { /* HVSC may be unavailable */ }
+      }
+
+      if (src === 'all') combined.sort((a, b) => a.filename.localeCompare(b.filename));
+
+      if (append) {
+        setResults(prev => [...prev, ...combined]);
+      } else {
+        setResults(combined);
+      }
+      setHasMore(moreResults);
+      setOffset(newOffset);
+
+      const modlandKeys = combined.filter(r => r.source === 'modland').map(r => r.key);
+      const hvscKeys = combined.filter(r => r.source === 'hvsc').map(r => r.key);
+      const ratingPromises: Promise<RatingMap>[] = [];
+      if (modlandKeys.length > 0) ratingPromises.push(batchGetRatings('modland', modlandKeys));
+      if (hvscKeys.length > 0) ratingPromises.push(batchGetRatings('hvsc', hvscKeys));
+      if (ratingPromises.length > 0) {
+        Promise.all(ratingPromises).then(maps => {
+          const merged = Object.assign({}, ...maps);
+          setRatings(prev => append ? { ...prev, ...merged } : merged);
+        }).catch(() => {});
+      } else if (!append) {
+        setRatings({});
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      doSearch(query, format, source, 0, false);
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [query, format, source, doSearch]);
+
+  const loadMore = useCallback(() => {
+    doSearch(query, format, source, offset + ONLINE_LIMIT, true);
+  }, [query, format, source, offset, doSearch]);
+
+  const handleLoad = useCallback(async (item: OnlineResult) => {
+    if (!onLoadTrackerModule) return;
+    setDownloading(prev => new Set(prev).add(item.key));
+    setError(null);
+    try {
+      let buffer: ArrayBuffer;
+      if (item.source === 'hvsc') {
+        buffer = await downloadHVSCFile(item.key);
+      } else {
+        const [modBuffer, companion] = await Promise.all([
+          downloadModlandFile(item.key),
+          downloadTFMXCompanion(item.key),
+        ]);
+        buffer = modBuffer;
+        if (companion) {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        }
+      }
+      await onLoadTrackerModule(buffer, item.filename);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download');
+    } finally {
+      setDownloading(prev => { const s = new Set(prev); s.delete(item.key); return s; });
+    }
+  }, [onLoadTrackerModule, onClose]);
+
+  const handleRate = useCallback(async (item: OnlineResult, star: number) => {
+    if (!isLoggedIn) { setShowAuthModal(true); return; }
+    try {
+      if (star === 0) {
+        const res = await removeRating(item.source, item.key);
+        setRatings(prev => ({ ...prev, [item.key]: { avg: res.avg, count: res.count } }));
+      } else {
+        const res = await setRating(item.source, item.key, star);
+        setRatings(prev => ({ ...prev, [item.key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
+      }
+    } catch { /* ignore */ }
+  }, [isLoggedIn]);
+
+  return (
+    <>
+      <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border flex gap-2 items-center">
+        <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
+          {status?.status === 'ready' && (
+            <span>{status.totalFiles.toLocaleString()} files</span>
+          )}
+        </div>
+        <div className="flex-1 relative">
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Search modules & SIDs..."
+            className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
+                       rounded text-text-primary placeholder:text-text-muted/40
+                       focus:border-accent-primary focus:outline-none transition-colors"
+          />
+        </div>
+        <CustomSelect
+          value={source}
+          onChange={(v) => setSource(v as SearchSource)}
+          options={[
+            { value: 'all', label: 'All Sources' },
+            { value: 'modland', label: 'Modland' },
+            { value: 'hvsc', label: 'HVSC (SID)' },
+          ]}
+        />
+        {source !== 'hvsc' && (
+          <CustomSelect
+            value={format}
+            onChange={(v) => setFormat(v)}
+            options={[
+              { value: '', label: 'All formats' },
+              ...formats.map((f) => ({
+                value: f.format,
+                label: `${f.format} (${f.count.toLocaleString()})`,
+              })),
+            ]}
+          />
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-auto p-4">
+        <div className="flex flex-col gap-1">
+          {error && (
+            <div className="flex items-center gap-1.5 text-accent-error text-xs font-mono px-3 py-2 mb-2 bg-accent-error/10 rounded border border-accent-error/20">
+              <AlertCircle size={12} />
+              {error}
+            </div>
+          )}
+
+          {results.length === 0 && !loading ? (
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+              <Globe size={32} className="mb-3 opacity-40" />
+              <p className="text-sm font-mono">
+                {query || format ? 'No results found' : 'Search online music archives'}
+              </p>
+              <p className="text-xs text-text-muted/60 mt-1">
+                190K+ tracker modules &bull; 80K+ C64 SID tunes
+              </p>
+            </div>
+          ) : (
+            <>
+              {results.map((item) => (
+                <div
+                  key={`${item.source}:${item.key}`}
+                  className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
+                             hover:bg-dark-bgHover hover:border-dark-border transition-colors group cursor-pointer"
+                  onDoubleClick={() => handleLoad(item)}
+                >
+                  <FileAudio size={16} className="text-text-muted flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-text-primary text-sm font-mono truncate">{item.filename}</div>
+                    <div className="flex gap-3 text-xs text-text-muted items-center">
+                      <span className={item.source === 'hvsc' ? 'text-accent-highlight/70' : 'text-accent-success/70'}>{item.format}</span>
+                      <span>{item.author}</span>
+                      <span className="text-text-muted/40">{item.source === 'hvsc' ? 'HVSC' : 'Modland'}</span>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const r = ratings[item.key];
+                    const avg = r?.avg ?? item.avg_rating ?? 0;
+                    const count = r?.count ?? item.vote_count ?? 0;
+                    return (
+                      <StarRating
+                        avg={avg}
+                        count={count}
+                        userRating={r?.userRating}
+                        onRate={(star) => handleRate(item, star)}
+                      />
+                    );
+                  })()}
+
+                  {downloading.has(item.key) ? (
+                    <Loader2 size={14} className="animate-spin text-accent-primary flex-shrink-0" />
+                  ) : (
+                    <button
+                      onClick={() => handleLoad(item)}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
+                                 bg-accent-primary/10 text-accent-primary border border-accent-primary/30
+                                 hover:bg-accent-primary/20 hover:text-accent-highlight transition-colors
+                                 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                    >
+                      <Download size={12} />
+                      Load
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {hasMore && (
+                <button
+                  onClick={loadMore}
+                  disabled={loading}
+                  className="mt-2 py-2 text-xs font-mono text-text-secondary bg-dark-bgTertiary
+                             border border-dark-borderLight rounded hover:bg-dark-bgHover
+                             hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-1">
+                      <Loader2 size={12} className="animate-spin" /> Loading...
+                    </span>
+                  ) : (
+                    'Load more results'
+                  )}
+                </button>
+              )}
+            </>
+          )}
+
+          {loading && results.length === 0 && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 size={20} className="animate-spin text-accent-primary" />
             </div>
           )}
         </div>

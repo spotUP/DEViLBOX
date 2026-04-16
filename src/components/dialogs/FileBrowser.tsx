@@ -11,7 +11,7 @@ import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardD
 import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
 import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from './useFileNavigation';
-import { ModlandPanel, HVSCPanel } from './FilePreviewPanel';
+import { OnlinePanel } from './FilePreviewPanel';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface FileBrowserProps {
@@ -130,39 +130,21 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </button>
           )}
 
-          {/* Modland Tab - only in load mode */}
+          {/* Online Tab — unified Modland + HVSC (only in load mode) */}
           {mode === 'load' && onLoadTrackerModule && (
             <button
               onClick={() => {
-                setFileSource('modland');
+                setFileSource('online');
                 nav.setSelectedFile(null);
               }}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                fileSource === 'modland'
-                  ? 'text-green-400 border-b-2 border-green-400 bg-dark-bgSecondary'
+                fileSource === 'online'
+                  ? 'text-accent-primary border-b-2 border-accent-primary bg-dark-bgSecondary'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
               <Globe size={14} />
-              Modland
-            </button>
-          )}
-
-          {/* HVSC Tab - only in load mode */}
-          {mode === 'load' && onLoadTrackerModule && (
-            <button
-              onClick={() => {
-                setFileSource('hvsc');
-                nav.setSelectedFile(null);
-              }}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                fileSource === 'hvsc'
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-dark-bgSecondary'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              <FileAudio size={14} />
-              HVSC
+              Online
             </button>
           )}
 
@@ -190,11 +172,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           )}
         </div>
 
-        {/* Modland / HVSC panels render their own toolbar + content */}
-        {fileSource === 'modland' ? (
-          <ModlandPanel isOpen={isOpen} onLoadTrackerModule={onLoadTrackerModule} onClose={onClose} />
-        ) : fileSource === 'hvsc' ? (
-          <HVSCPanel isOpen={isOpen} onLoadTrackerModule={onLoadTrackerModule} onClose={onClose} />
+        {/* Online panel renders its own toolbar + content */}
+        {fileSource === 'online' ? (
+          <OnlinePanel isOpen={isOpen} onLoadTrackerModule={onLoadTrackerModule} onClose={onClose} />
         ) : (
           <>
             {/* Breadcrumb / Current Path */}
@@ -389,7 +369,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* Footer */}
         <div className="flex-shrink-0 flex items-center gap-4 px-4 py-3 border-t border-dark-border">
-          {mode === 'save' && fileSource !== 'modland' && (
+          {mode === 'save' && fileSource !== 'online' && (
             <input
               type="text"
               value={nav.saveFilename}
@@ -403,9 +383,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             onClick={onClose}
             className="px-4 py-2 text-text-muted hover:text-text-primary"
           >
-            {(fileSource === 'modland' || fileSource === 'hvsc') ? 'Close' : 'Cancel'}
+            {fileSource === 'online' ? 'Close' : 'Cancel'}
           </button>
-          {fileSource !== 'modland' && fileSource !== 'hvsc' && (
+          {fileSource !== 'online' && (
             <button
               onClick={mode === 'load' ? nav.handleLoad : nav.handleSave}
               disabled={mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory)}
