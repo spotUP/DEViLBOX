@@ -601,6 +601,9 @@ export class TrackerReplayer {
   // libopenmpt playback: when active, audio comes from the libopenmpt worklet
   // and TrackerReplayer only forwards position updates to the UI.
   private useLibopenmptPlayback = false;
+  // Synchronous cleanup for libopenmpt engine — nulls callbacks and stops the
+  // worklet without a deferred import. Set during play(), called during stop().
+  private _libopenmptCleanup: (() => void) | null = null;
 
   // AdPlug streaming player: when active, audio comes from AdPlug WASM worklet.
   // Set when an OPL3-only song has extracted patterns + streaming player loaded.
@@ -1989,8 +1992,8 @@ export class TrackerReplayer {
             bridge.markLoaded('xm');
           }
         }
-      } catch {
-        // Soundlib not available — fall through to TS scheduler
+      } catch (err) {
+        console.warn('[TrackerReplayer] Phase 5.4: soundlib creation failed:', err);
       }
     }
 
@@ -2032,6 +2035,14 @@ export class TrackerReplayer {
           this._suppressNotes = true;
           this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
           this.coordinator.markDispatchActive();
+          // Synchronous cleanup closure — avoids the deferred import().then() race
+          // that could null callbacks AFTER the next play() sets new ones.
+          this._libopenmptCleanup = () => {
+            mptEngine.onPosition = null;
+            mptEngine.onPositionTick = null;
+            mptEngine.onEnded = null;
+            mptEngine.stop();
+          };
           // Warm the cached reference for zero-latency forcePosition seeks
           getLibopenmptSync();
 
@@ -2271,7 +2282,7 @@ export class TrackerReplayer {
       } catch { /* ignored */ }
     }
 
-    // Stop libopenmpt playback if active
+    // Stop libopenmpt playback if active — synchronous to avoid race with next play()
     if (this.useLibopenmptPlayback) {
       this.useLibopenmptPlayback = false;
       // Reset SynthEffectProcessor
@@ -2279,17 +2290,10 @@ export class TrackerReplayer {
         this._synthEffectProcessor.reset();
         this._synthEffectProcessor = null;
       }
-      try {
-        import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
-          if (LibopenmptEngine.hasInstance()) {
-            const engine = LibopenmptEngine.getInstance();
-            engine.onPosition = null;
-            engine.onPositionTick = null;
-            engine.onEnded = null;
-            engine.stop();
-          }
-        });
-      } catch { /* ignored */ }
+      if (this._libopenmptCleanup) {
+        this._libopenmptCleanup();
+        this._libopenmptCleanup = null;
+      }
     }
 
     // Stop AdPlug streaming player if active
