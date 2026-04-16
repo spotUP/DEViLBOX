@@ -779,28 +779,40 @@ export function syncDJParamToStore(param: string, normalized: number): void {
       store.setDeckPitch('B', -6 + normalized * 12);
       break;
     case 'dj.deckA.eqHi':
-      store.setDeckEQ('A', 'high', -24 + normalized * 30);
+      store.setDeckEQ('A', 'high', -12 + normalized * 24);
       break;
     case 'dj.deckA.eqMid':
-      store.setDeckEQ('A', 'mid', -24 + normalized * 30);
+      store.setDeckEQ('A', 'mid', -12 + normalized * 24);
       break;
     case 'dj.deckA.eqLow':
-      store.setDeckEQ('A', 'low', -24 + normalized * 30);
+      store.setDeckEQ('A', 'low', -12 + normalized * 24);
       break;
     case 'dj.deckB.eqHi':
-      store.setDeckEQ('B', 'high', -24 + normalized * 30);
+      store.setDeckEQ('B', 'high', -12 + normalized * 24);
       break;
     case 'dj.deckB.eqMid':
-      store.setDeckEQ('B', 'mid', -24 + normalized * 30);
+      store.setDeckEQ('B', 'mid', -12 + normalized * 24);
       break;
     case 'dj.deckB.eqLow':
-      store.setDeckEQ('B', 'low', -24 + normalized * 30);
+      store.setDeckEQ('B', 'low', -12 + normalized * 24);
       break;
     case 'dj.deckA.filter':
       store.setDeckFilter('A', -1 + normalized * 2);
       break;
     case 'dj.deckB.filter':
       store.setDeckFilter('B', -1 + normalized * 2);
+      break;
+    case 'dj.deckA.filterQ':
+      store.setDeckState('A', { filterResonance: 0.5 + normalized * 14.5 });
+      break;
+    case 'dj.deckB.filterQ':
+      store.setDeckState('B', { filterResonance: 0.5 + normalized * 14.5 });
+      break;
+    case 'dj.deckA.scratchVelocity':
+      store.setDeckState('A', { scratchVelocity: -4 + normalized * 8 });
+      break;
+    case 'dj.deckB.scratchVelocity':
+      store.setDeckState('B', { scratchVelocity: -4 + normalized * 8 });
       break;
   }
 }
