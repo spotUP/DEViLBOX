@@ -17,6 +17,7 @@ import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { useEditorStore } from '@/stores/useEditorStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
 import { isSupportedFormat, detectFormat } from '@/lib/import/FormatRegistry';
@@ -675,16 +676,9 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
       }
 
-      // Switch to GoatTracker editor mode
+      // Switch to GoatTracker editor mode (applyEditorMode auto-switches to tracker view)
       const songBytes = new Uint8Array(gtBuf);
       applyEditorMode({ goatTrackerData: songBytes });
-
-      // Ensure tracker view is visible
-      const { useUIStore } = await import('@stores/useUIStore');
-      const uiState = useUIStore.getState();
-      uiState.setActiveView('tracker');
-      uiState.setTrackerViewMode('tracker');
-
 
       return {
         success: true,
@@ -1227,6 +1221,9 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
       setMetadata({ name, author: '', description: `Imported from ${file.name} (${generators.length} instruments, ${extractedModules.length} modules)` });
       applyEditorMode({});
 
+      // Auto-switch to SunVox channel view
+      useUIStore.getState().setActiveView('tracker');
+      useUIStore.getState().setTrackerViewMode('sunvox');
 
       return { success: true, message: `Loaded SunVox: ${name} — ${generators.length} instruments, ${patternsToLoad.length} pattern(s)` };
     }
@@ -1275,9 +1272,12 @@ async function loadSongFile(file: File, options: FileLoadOptions, preReadBuffer?
     // Create enough pattern order positions to cover ~10 minutes of playback.
     setPatternOrder([0, 0, 0, 0, 0]);
     setMetadata({ name, author: '', description: `Imported from ${file.name}` });
-    // Reset to classic editor mode — clears stale musicline/furnace/hively state
-    // from any previously-loaded file (otherwise the wrong viewer renders).
     applyEditorMode({});
+
+    // Auto-switch to SunVox channel view
+    useUIStore.getState().setActiveView('tracker');
+    useUIStore.getState().setTrackerViewMode('sunvox');
+
     return { success: true, message: `Loaded SunVox project: ${name}` };
   }
 
