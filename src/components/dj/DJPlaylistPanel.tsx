@@ -648,6 +648,40 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
     downloadFile(exportToJSON(activePlaylist), `${activePlaylist.name}.json`, 'application/json');
   }, [activePlaylist]);
 
+  const handleExportDJSetup = useCallback(() => {
+    import('@/lib/dj/djEnvironment').then(({ exportDJEnvironmentJSON }) => {
+      const json = exportDJEnvironmentJSON();
+      const name = activePlaylist?.name || 'dj-setup';
+      downloadFile(json, `${name}.djenv.json`, 'application/json');
+    });
+  }, [activePlaylist]);
+
+  const handleImportDJSetup = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.djenv.json,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const { parseDJEnvironmentJSON, restoreDJEnvironment } = await import('@/lib/dj/djEnvironment');
+        const env = parseDJEnvironmentJSON(text);
+        restoreDJEnvironment(env);
+        console.log('[DJPlaylist] Imported DJ environment from file');
+      } catch (err) {
+        console.error('[DJPlaylist] Failed to import DJ environment:', err);
+      }
+    };
+    input.click();
+  }, []);
+
+  const handleSaveDJSetup = useCallback(() => {
+    if (!activePlaylist) return;
+    useDJPlaylistStore.getState().saveEnvironmentToPlaylist(activePlaylist.id);
+    console.log(`[DJPlaylist] Saved DJ environment to "${activePlaylist.name}"`);
+  }, [activePlaylist]);
+
   // ── Load track to deck ────────────────────────────────────────────────────
 
   const pickFreeDeck = useCallback((): 'A' | 'B' => {
@@ -1200,7 +1234,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                 className="p-1 text-text-muted hover:text-text-primary transition-colors" title="Export (click=JSON, right-click=M3U)">
                 <Download size={10} />
               </button>
-              <div className="hidden group-hover:flex absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded shadow-xl min-w-[100px] flex-col">
+              <div className="hidden group-hover:flex absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded shadow-xl min-w-[120px] flex-col">
                 <button onClick={handleExportJSON}
                   className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
                   Export JSON
@@ -1208,6 +1242,19 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                 <button onClick={handleExportM3U}
                   className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
                   Export M3U
+                </button>
+                <div className="border-t border-dark-border my-0.5" />
+                <button onClick={handleSaveDJSetup}
+                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                  Save DJ Setup
+                </button>
+                <button onClick={handleExportDJSetup}
+                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                  Export DJ Setup
+                </button>
+                <button onClick={handleImportDJSetup}
+                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-text-secondary hover:bg-dark-bgTertiary transition-colors">
+                  Import DJ Setup
                 </button>
               </div>
             </div>
