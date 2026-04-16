@@ -916,6 +916,22 @@ export class ScratchPlayback {
     this._scheduleFaderLFO(bpm, division);
   }
 
+  /**
+   * Calculate seconds until the next period boundary so scheduling
+   * aligns to the beat grid rather than starting at wall-clock time.
+   */
+  private _getBeatOffsetSec(deck: DeckEngine, periodSec: number): number {
+    let elapsedMs = 0;
+    try {
+      elapsedMs = deck.playbackMode === 'audio'
+        ? deck.audioPlayer.getPosition() * 1000
+        : deck.replayer.getElapsedMs();
+    } catch { /* fallback to 0 */ }
+    const periodMs = periodSec * 1000;
+    const phaseMs = periodMs > 0 ? (elapsedMs % periodMs) : 0;
+    return phaseMs > 0 ? (periodMs - phaseMs) / 1000 : 0;
+  }
+
   private _scheduleFaderLFO(bpm: number, division: FaderLFODivision): void {
     try {
       const deck = this.getDeck();
@@ -927,15 +943,7 @@ export class ScratchPlayback {
 
       // Beat-phase alignment: calculate time until next division boundary
       // so the LFO snaps to the beat grid rather than starting at an arbitrary point.
-      let elapsedMs = 0;
-      try {
-        elapsedMs = deck.playbackMode === 'audio'
-          ? deck.audioPlayer.getPosition() * 1000
-          : deck.replayer.getElapsedMs();
-      } catch { /* fallback to 0 */ }
-      const periodMs = periodSec * 1000;
-      const phaseMs = periodMs > 0 ? (elapsedMs % periodMs) : 0;
-      const offsetSec = phaseMs > 0 ? (periodMs - phaseMs) / 1000 : 0;
+      const offsetSec = this._getBeatOffsetSec(deck, periodSec);
 
       // 4 bars look-ahead
       const totalDivisions = Math.round(16 / LFO_DIVISION_BEATS[division]);
@@ -944,13 +952,17 @@ export class ScratchPlayback {
       gain.setValueAtTime(1, now);
       for (let i = 0; i < totalDivisions; i++) {
         const t = now + offsetSec + i * periodSec;
-        // ON phase: gain drops to 0 (fader closes)
+        // Beat lands here — keep audio OPEN (gain=1) so beats punch through.
+        // Mute happens on the off-beat (between beats) to preserve the groove.
         gain.setValueAtTime(1, t);
-        gain.linearRampToValueAtTime(0, t + ramp);
-        // OFF phase: gain back to 1 (fader opens)
-        const off = t + periodSec * 0.5;
-        gain.setValueAtTime(0, off);
-        gain.linearRampToValueAtTime(1, off + ramp);
+        const mid = t + periodSec * 0.5;
+        // Off-beat: close fader
+        gain.setValueAtTime(1, mid - ramp);
+        gain.linearRampToValueAtTime(0, mid);
+        // Re-open before next beat
+        const reopen = t + periodSec - ramp;
+        gain.setValueAtTime(0, reopen);
+        gain.linearRampToValueAtTime(1, reopen + ramp);
       }
 
       const totalMs = (offsetSec + totalDivisions * periodSec) * 1000;
@@ -1013,22 +1025,30 @@ export class ScratchPlayback {
       this.patternFaderTimeoutId = null;
     }
     try {
-      const gain = this.getDeck().getChannelGainParam();
+      const deck = this.getDeck();
+      const gain = deck.getChannelGainParam();
       const ctx  = Tone.getContext().rawContext as AudioContext;
       // 4 chops per beat, 40% open duty cycle (crisper than 50%)
       const chopPeriodSec = (60 / bpm) / 4;
       const now = ctx.currentTime;
-      const ramp = 0.0015;
+      const ramp = 0.003;
+      const offsetSec = this._getBeatOffsetSec(deck, chopPeriodSec);
       gain.cancelScheduledValues(now);
+      gain.setValueAtTime(1, now);
       for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
-        const t = now + i * chopPeriodSec;
-        gain.setValueAtTime(0, t);
-        gain.linearRampToValueAtTime(1, t + ramp);
-        const off = t + chopPeriodSec * 0.40;
-        gain.setValueAtTime(1, off);
-        gain.linearRampToValueAtTime(0, off + ramp);
+        const t = now + offsetSec + i * chopPeriodSec;
+        // Beat chop lands here — audio OPEN so beats punch through
+        gain.setValueAtTime(1, t);
+        // Close in the middle (off-beat)
+        const mid = t + chopPeriodSec * 0.40;
+        gain.setValueAtTime(1, mid - ramp);
+        gain.linearRampToValueAtTime(0, mid);
+        // Re-open before next chop
+        const reopen = t + chopPeriodSec - ramp;
+        gain.setValueAtTime(0, reopen);
+        gain.linearRampToValueAtTime(1, reopen + ramp);
       }
-      const totalMs = PATTERN_FADER_LOOKAHEAD * chopPeriodSec * 1000;
+      const totalMs = (offsetSec + PATTERN_FADER_LOOKAHEAD * chopPeriodSec) * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
         this.patternFaderTimeoutId = null;
         if (this.activePattern === TRANSFORMER) {
@@ -1044,22 +1064,30 @@ export class ScratchPlayback {
       this.patternFaderTimeoutId = null;
     }
     try {
-      const gain = this.getDeck().getChannelGainParam();
+      const deck = this.getDeck();
+      const gain = deck.getChannelGainParam();
       const ctx  = Tone.getContext().rawContext as AudioContext;
       // 4 finger taps per beat, 28% open duty cycle (very staccato)
       const tapPeriodSec = (60 / bpm) / 4;
       const now = ctx.currentTime;
-      const ramp = 0.0015;
+      const ramp = 0.003;
+      const offsetSec = this._getBeatOffsetSec(deck, tapPeriodSec);
       gain.cancelScheduledValues(now);
+      gain.setValueAtTime(1, now);
       for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
-        const t = now + i * tapPeriodSec;
-        gain.setValueAtTime(0, t);
-        gain.linearRampToValueAtTime(1, t + ramp);
-        const off = t + tapPeriodSec * 0.28;
-        gain.setValueAtTime(1, off);
-        gain.linearRampToValueAtTime(0, off + ramp);
+        const t = now + offsetSec + i * tapPeriodSec;
+        // Tap lands here — audio OPEN
+        gain.setValueAtTime(1, t);
+        // Close between taps
+        const mid = t + tapPeriodSec * 0.28;
+        gain.setValueAtTime(1, mid - ramp);
+        gain.linearRampToValueAtTime(0, mid);
+        // Re-open before next tap
+        const reopen = t + tapPeriodSec - ramp;
+        gain.setValueAtTime(0, reopen);
+        gain.linearRampToValueAtTime(1, reopen + ramp);
       }
-      const totalMs = PATTERN_FADER_LOOKAHEAD * tapPeriodSec * 1000;
+      const totalMs = (offsetSec + PATTERN_FADER_LOOKAHEAD * tapPeriodSec) * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
         this.patternFaderTimeoutId = null;
         if (this.activePattern === CRAB) {
@@ -1075,22 +1103,30 @@ export class ScratchPlayback {
       this.patternFaderTimeoutId = null;
     }
     try {
-      const gain = this.getDeck().getChannelGainParam();
+      const deck = this.getDeck();
+      const gain = deck.getChannelGainParam();
       const ctx  = Tone.getContext().rawContext as AudioContext;
       // 8 taps per beat (both hands), 20% open duty cycle (very rapid staccato)
       const tapPeriodSec = (60 / bpm) / 8;
       const now = ctx.currentTime;
-      const ramp = 0.0015;
+      const ramp = 0.003;
+      const offsetSec = this._getBeatOffsetSec(deck, tapPeriodSec);
       gain.cancelScheduledValues(now);
+      gain.setValueAtTime(1, now);
       for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
-        const t = now + i * tapPeriodSec;
-        gain.setValueAtTime(0, t);
-        gain.linearRampToValueAtTime(1, t + ramp);
-        const off = t + tapPeriodSec * 0.20;
-        gain.setValueAtTime(1, off);
-        gain.linearRampToValueAtTime(0, off + ramp);
+        const t = now + offsetSec + i * tapPeriodSec;
+        // Tap lands here — audio OPEN
+        gain.setValueAtTime(1, t);
+        // Close between taps
+        const mid = t + tapPeriodSec * 0.20;
+        gain.setValueAtTime(1, mid - ramp);
+        gain.linearRampToValueAtTime(0, mid);
+        // Re-open before next tap
+        const reopen = t + tapPeriodSec - ramp;
+        gain.setValueAtTime(0, reopen);
+        gain.linearRampToValueAtTime(1, reopen + ramp);
       }
-      const totalMs = PATTERN_FADER_LOOKAHEAD * tapPeriodSec * 1000;
+      const totalMs = (offsetSec + PATTERN_FADER_LOOKAHEAD * tapPeriodSec) * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
         this.patternFaderTimeoutId = null;
         if (this.activePattern === EIGHT_FINGER_CRAB) {
