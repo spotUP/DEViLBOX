@@ -10,9 +10,10 @@
  * - Backward phases: visual row offset simulates backward scrolling
  */
 
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { startScratch, setScratchVelocity, stopScratch } from '@/engine/dj/DJActions';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
 import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
 
@@ -97,8 +98,77 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     ? ((pattPos - Math.round(visualOffset)) % numRows + numRows) % numRows
     : pattPos;
 
+  // ── Vertical drag to scratch ──────────────────────────────────────────────
+  const isDraggingRef = useRef(false);
+  const lastYRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const velocityRef = useRef(0);
+  const decayRafRef = useRef(0);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (!patternData) return;
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    isDraggingRef.current = true;
+    lastYRef.current = e.clientY;
+    lastTimeRef.current = performance.now();
+    velocityRef.current = 0;
+
+    if (decayRafRef.current) {
+      cancelAnimationFrame(decayRafRef.current);
+      decayRafRef.current = 0;
+    }
+
+    startScratch(deckId);
+    setScratchVelocity(deckId, 0);
+  }, [deckId, patternData]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastTimeRef.current) / 1000;
+    const dy = e.clientY - lastYRef.current;
+    // Drag up = forward (positive velocity), drag down = backward
+    const v = Math.max(-4, Math.min(4, (-dy / dt) / 200));
+    velocityRef.current = v;
+    setScratchVelocity(deckId, v);
+    lastYRef.current = e.clientY;
+    lastTimeRef.current = now;
+  }, [deckId]);
+
+  const handlePointerUp = useCallback(() => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+
+    // Momentum decay back to 1× over 300ms (cubic ease-out)
+    const fromV = velocityRef.current;
+    const startTime = performance.now();
+    const DECAY_MS = 300;
+    const decay = () => {
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(1, elapsed / DECAY_MS);
+      const eased = 1 - (1 - t) * (1 - t) * (1 - t);
+      const v = fromV + (1 - fromV) * eased;
+      setScratchVelocity(deckId, v);
+      if (t < 1) {
+        decayRafRef.current = requestAnimationFrame(decay);
+      } else {
+        decayRafRef.current = 0;
+        stopScratch(deckId, 0);
+      }
+    };
+    decayRafRef.current = requestAnimationFrame(decay);
+  }, [deckId]);
+
   return (
-    <div className="bg-dark-bg border border-dark-border rounded-sm overflow-hidden w-full h-full">
+    <div
+      className="bg-dark-bg border border-dark-border rounded-sm overflow-hidden w-full h-full"
+      style={{ cursor: patternData ? 'grab' : 'default', touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       {patternData ? (
         <ReadOnlyPatternCanvas
           pattern={patternData}

@@ -831,9 +831,44 @@ export class TrackerReplayer {
     return this.song.patterns[patternNum]?.length ?? 64;
   }
 
+  /** Get effective pattern length considering Dxx (pattern break) effects.
+   *  Scans all channels for the earliest Dxx in the current pattern. */
+  getEffectivePatternLength(): number {
+    const nominal = this.getCurrentPatternLength();
+    if (!this.song) return nominal;
+    const patternNum = this.song.songPositions[this.songPos];
+    const pattern = this.song.patterns[patternNum];
+    if (!pattern) return nominal;
+
+    const channels = pattern.channels;
+    if (!channels || channels.length === 0) return nominal;
+
+    let earliest = nominal;
+    for (let row = 0; row < nominal && row < earliest; row++) {
+      for (let ch = 0; ch < channels.length; ch++) {
+        const cell = channels[ch]?.rows?.[row];
+        if (!cell) continue;
+        // Check primary effect column (effTyp, or parse legacy string)
+        const eff = cell.effTyp ?? (cell.effect ? parseInt(cell.effect[0], 16) : 0);
+        if (eff === 0xD) {
+          earliest = Math.min(earliest, row);
+          break;
+        }
+        // Check extra effect columns
+        if (cell.effTyp2 === 0xD || cell.effTyp3 === 0xD || cell.effTyp4 === 0xD ||
+            cell.effTyp5 === 0xD || cell.effTyp6 === 0xD || cell.effTyp7 === 0xD ||
+            cell.effTyp8 === 0xD) {
+          earliest = Math.min(earliest, row);
+          break;
+        }
+      }
+    }
+    return earliest;
+  }
+
   /** Set line-level loop (quantized to rows within current pattern) */
   setLineLoop(startRow: number, size: number): void {
-    const patLen = this.getCurrentPatternLength();
+    const patLen = this.getEffectivePatternLength();
     // Clamp start and end to valid pattern rows
     const clampedStart = Math.max(0, Math.min(startRow, patLen - 1));
     let clampedEnd = clampedStart + size - 1;
@@ -3329,6 +3364,10 @@ export class TrackerReplayer {
       if (this.pattPos > safeEnd) {
         this.pattPos = this.lineLoopStart;
       }
+      // Clear any Dxx/Bxx flags that accumulated during the loop —
+      // they must not fire when the loop is eventually cleared.
+      this.posJumpFlag = false;
+      this.pBreakPos = 0;
       // Notify and return early — don't do normal advancement
       if (this.onRowChange && this.song) {
         const pattNum = this.song.songPositions[this.songPos];
