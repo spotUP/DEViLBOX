@@ -216,7 +216,7 @@ class MPT extends AudioWorkletProcessor {
 		const v = msg.data.val
 		switch (msg.data.cmd) {
 			case 'config':
-				this.config = v
+				Object.assign(this.config, v)
 				break
 			case 'play':
 				this.play(v, false)
