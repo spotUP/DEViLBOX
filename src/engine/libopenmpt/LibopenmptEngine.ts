@@ -205,8 +205,14 @@ export class LibopenmptEngine {
         this._onEnded?.();
         break;
       case 'err':
-        console.error('[LibopenmptEngine] Worklet error:', msg.data.val);
-        this._playing = false;
+        // 'dur' means the module has 0 duration — normal for empty songs.
+        // Only treat non-dur errors as fatal.
+        if (msg.data.val === 'dur') {
+          console.warn('[LibopenmptEngine] Module has zero duration (empty song)');
+        } else {
+          console.error('[LibopenmptEngine] Worklet error:', msg.data.val);
+          this._playing = false;
+        }
         break;
       case 'isolationReady':
         console.log(`[LibopenmptEngine] Isolation slot ${msg.data.slotIndex} ready:`, {

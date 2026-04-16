@@ -83,6 +83,7 @@ export const DJ_SCRATCH      = 0x06b6d4; // cyan (same as KNOB_CYAN)
 export const DJ_SCRATCH_ADV  = 0x0891b2; // darker cyan
 export const DJ_SCRATCH_EXP  = 0x0e7490; // deep cyan
 export const DJ_SCRATCH_CTL  = 0xef4444; // red (stop/control)
+export const DJ_DECK_FX      = 0x22c55e; // green (deck-targeted effects)
 
 // ─── UI Element Colors ──────────────────────────────────────────────────────
 

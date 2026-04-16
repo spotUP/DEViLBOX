@@ -11,6 +11,7 @@ import {
   DJ_STUTTER, DJ_DELAY, DJ_FILTER, DJ_REVERB, DJ_MODULATION,
   DJ_DISTORTION, DJ_TAPE, DJ_ONESHOT,
   DJ_SCRATCH, DJ_SCRATCH_ADV, DJ_SCRATCH_EXP, DJ_SCRATCH_CTL,
+  DJ_DECK_FX,
   colorToHex,
 } from '../pixi/colors';
 
@@ -45,6 +46,7 @@ export const DJ_FX_CATEGORY_COLORS: Record<string, number> = {
   'Modulation': DJ_MODULATION,
   'Distortion': DJ_DISTORTION,
   'Tape': DJ_TAPE,
+  'Deck': DJ_DECK_FX,
 };
 
 export const ONE_SHOT_CATEGORY_COLORS: Record<string, number> = {
@@ -74,26 +76,26 @@ function scPad(label: string, category: string, colorNum: number, actionId: Scra
 // ─── Default DJ FX Pads (16) ─────────────────────────────────────────────────
 
 export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
-  // Row 1: Stutter x3, Delay x1
-  fxPad('Stutter 1/8',  'Stutter',     DJ_STUTTER,     'fx_stutter_8th'),
-  fxPad('Stutter 1/16', 'Stutter',     DJ_STUTTER,     'fx_stutter_16th'),
-  fxPad('Stutter 1/32', 'Stutter',     DJ_STUTTER,     'fx_stutter_32nd'),
-  fxPad('Dub Echo',     'Delay',       DJ_DELAY,       'fx_dub_echo'),
-  // Row 2: Delay x2, Filter x2
-  fxPad('Tape Echo',    'Delay',       DJ_DELAY,       'fx_tape_echo'),
-  fxPad('Ping Pong',    'Delay',       DJ_DELAY,       'fx_ping_pong'),
-  fxPad('HP Sweep',     'Filter',      DJ_FILTER,      'fx_filter_hp_sweep'),
-  fxPad('LP Sweep',     'Filter',      DJ_FILTER,      'fx_filter_lp_sweep'),
-  // Row 3: Reverb x1, Modulation x3
-  fxPad('Reverb Wash',  'Reverb',      DJ_REVERB,      'fx_reverb_wash'),
-  fxPad('Flanger',      'Modulation',  DJ_MODULATION,  'fx_flanger'),
-  fxPad('Phaser',       'Modulation',  DJ_MODULATION,  'fx_phaser'),
-  fxPad('Ring Mod',     'Modulation',  DJ_MODULATION,  'fx_ring_mod'),
-  // Row 4: Tape x2, Distortion x2
-  fxPad('Tape Stop',    'Tape',        DJ_TAPE,        'fx_tape_stop'),
-  fxPad('Vinyl Brake',  'Tape',        DJ_TAPE,        'fx_vinyl_brake'),
-  fxPad('Bitcrush',     'Distortion',  DJ_DISTORTION,  'fx_bitcrush'),
-  fxPad('Overdrive',    'Distortion',  DJ_DISTORTION,  'fx_overdrive'),
+  // Row 1: Deck filter & echo (real DJ engine effects)
+  fxPad('HPF Sweep',    'Deck',        DJ_DECK_FX,     'fx_deck_hpf_sweep'),
+  fxPad('LPF Sweep',    'Deck',        DJ_DECK_FX,     'fx_deck_lpf_sweep'),
+  fxPad('Echo Out',     'Deck',        DJ_DELAY,       'fx_deck_echo_out'),
+  fxPad('Brake',        'Deck',        DJ_DISTORTION,  'fx_deck_brake'),
+  // Row 2: EQ kills & filter reset (real DJ engine effects)
+  fxPad('Kill Lo',      'Deck',        DJ_STUTTER,     'fx_deck_kill_lo'),
+  fxPad('Kill Mid',     'Deck',        DJ_DELAY,       'fx_deck_kill_mid'),
+  fxPad('Kill Hi',      'Deck',        DJ_DECK_FX,     'fx_deck_kill_hi'),
+  fxPad('Filt Reset',   'Deck',        DJ_FILTER,      'fx_deck_filter_reset'),
+  // Row 3: Beat jumps (real DJ engine effects)
+  fxPad('Jump −4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_m4'),
+  fxPad('Jump −1',      'Deck',        DJ_MODULATION,  'fx_deck_jump_m1'),
+  fxPad('Jump +1',      'Deck',        DJ_MODULATION,  'fx_deck_jump_p1'),
+  fxPad('Jump +4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_p4'),
+  // Row 4: Performance FX & sounds (master bus)
+  fxPad('Stutter 1/8',  'Stutter',     DJ_STUTTER,     'fx_stutter_8'),
+  fxPad('Dub Siren',    'Delay',       DJ_DELAY,       'fx_dub_siren'),
+  fxPad('Air Horn',     'Delay',       DJ_ONESHOT,     'fx_air_horn'),
+  fxPad('Noise Riser',  'Filter',      DJ_FILTER,      'fx_noise_riser'),
 ];
 
 // ─── Default One-Shot Pads (16) ──────────────────────────────────────────────
