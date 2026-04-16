@@ -176,7 +176,7 @@ export class DJEngine {
    * Load an audio file (MP3, WAV, FLAC, etc.) to a deck.
    * Switches the deck to audio playback mode.
    */
-  async loadAudioToDeck(id: DeckId, buffer: ArrayBuffer, filename: string, trackName?: string, bpm?: number, song?: TrackerSong): Promise<AudioFileInfo> {
+  async loadAudioToDeck(id: DeckId, buffer: ArrayBuffer, filename: string, trackName?: string, bpm?: number, song?: TrackerSong, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
     console.log(`[DJEngine] loadAudioToDeck: ${filename}, buffer size: ${buffer.byteLength} bytes`);
     const deck = this.getDeck(id);
 
@@ -188,7 +188,7 @@ export class DJEngine {
       await deck.loadSong(song);
     }
 
-    const info = await deck.loadAudioFile(buffer, filename);
+    const info = await deck.loadAudioFile(buffer, filename, precomputedPeaks);
     console.log(`[DJEngine] loadAudioFile returned: duration=${info.duration.toFixed(2)}s, sampleRate=${info.sampleRate}, channels=${info.numberOfChannels}`);
 
     // Record track load event

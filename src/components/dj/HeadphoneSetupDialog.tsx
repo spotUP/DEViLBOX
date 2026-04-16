@@ -25,7 +25,7 @@ export const HeadphoneSetupDialog: React.FC<HeadphoneSetupDialogProps> = ({ isOp
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [testingDeviceId, setTestingDeviceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [, setPermissionGranted] = useState(false);
 
   const supportsMultiOutput = DJCueEngine.supportsSetSinkId();
 
