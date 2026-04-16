@@ -1448,6 +1448,11 @@ export class TrackerReplayer {
       for (const ch of this.channels) {
         this.applyChannelPan(ch);
       }
+      // When libopenmpt handles mixing, per-channel panning has no effect.
+      // Route through the StereoSeparationNode instead (0-100 → 0-200 scale).
+      if (this.useLibopenmptPlayback) {
+        this.separationNode.setSeparation(this.stereoSeparation * 2);
+      }
     }
   }
 
@@ -1463,10 +1468,15 @@ export class TrackerReplayer {
   setStereoSeparationMode(mode: 'pt2' | 'modplug'): void {
     this.stereoMode = mode;
     if (mode === 'pt2') {
-      // Bypass the post-mix node (identity) and restore per-channel pan scaling
-      this.separationNode.setSeparation(100);
-      for (const ch of this.channels) {
-        this.applyChannelPan(ch);
+      // When libopenmpt handles mixing, use the StereoSeparationNode (0-100 → 0-200)
+      // instead of per-channel pan scaling (which libopenmpt ignores).
+      if (this.useLibopenmptPlayback) {
+        this.separationNode.setSeparation(this.stereoSeparation * 2);
+      } else {
+        this.separationNode.setSeparation(100); // identity — pan scaling handles it
+        for (const ch of this.channels) {
+          this.applyChannelPan(ch);
+        }
       }
     } else {
       // Activate post-mix node; set all channels to full (unscaled) basePan
