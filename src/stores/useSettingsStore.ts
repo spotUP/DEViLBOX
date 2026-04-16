@@ -479,9 +479,9 @@ export const useSettingsStore = create<SettingsStore>()(
       },
       performanceQuality: 'high',
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)
-      stereoSeparation: 50,  // Default: 50% (maps to libopenmpt's default 100/200)
+      stereoSeparation: 25,  // Default: 25% — rich mono (slight stereo cues, no harsh Amiga LRRL)
       stereoSeparationMode: 'pt2' as const,
-      modplugSeparation: 100,       // Default: 100% = normal stereo (identity)
+      modplugSeparation: 50,        // Default: 50/200 — equivalent rich mono for ModPlug mode
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
@@ -694,7 +694,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 5,
+      version: 6,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 2) {
@@ -715,6 +715,12 @@ export const useSettingsStore = create<SettingsStore>()(
           // v5: Stereo separation default changed from 20 (Amiga narrow) to 50
           // (matches libopenmpt default 100/200). Only migrate if still at old default.
           if (s.stereoSeparation === 20) s.stereoSeparation = 50;
+        }
+        if (version < 6) {
+          // v6: Stereo defaults to "rich mono" — 25% PT2 / 50 ModPlug.
+          // Migrate users still at old v5 default (50/100).
+          if (s.stereoSeparation === 50) s.stereoSeparation = 25;
+          if (s.modplugSeparation === 100) s.modplugSeparation = 50;
         }
         return s;
       },
