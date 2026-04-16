@@ -7,18 +7,18 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 /**
  * Toggle play/stop - Space bar in most trackers
+ * Uses electronic brake for turntable-style spindown on stop.
  */
 export function playStopToggle(): boolean {
   const store = useTransportStore.getState();
 
   if (store.isPlaying) {
-    getTrackerReplayer().stop();
-    store.stop();
-    getToneEngine().stop();
+    getTrackerScratchController().triggerElectronicBrake();
   } else {
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     // before engine.init() which does async WASM loading
@@ -117,12 +117,9 @@ export function playSong(): boolean {
 }
 
 /**
- * Stop playback
+ * Stop playback with turntable-style electronic brake spindown.
  */
 export function stopPlayback(): boolean {
-  getTrackerReplayer().stop();
-  const { stop } = useTransportStore.getState();
-  stop();
-  getToneEngine().stop();
+  getTrackerScratchController().triggerElectronicBrake();
   return true;
 }

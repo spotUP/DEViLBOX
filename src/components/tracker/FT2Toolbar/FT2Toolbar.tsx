@@ -523,9 +523,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop playback
+    // If already playing, stop with turntable brake
     if (isPlaying) {
-      // WASM singleton engines: stop directly
+      // WASM singleton engines: stop directly (no scratch buffer support)
       if (editorMode === 'jamcracker' || editorMode === 'musicline') {
         const wasmPos = useWasmPositionStore.getState();
         if (wasmPos.active) {
@@ -541,10 +541,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      // Standard formats: stop playback
-      getTrackerReplayer().stop();
-      stop();
-      engine.releaseAll();
+      // Standard formats: turntable-style electronic brake spindown
+      getTrackerScratchController().triggerElectronicBrake();
       return;
     }
 
@@ -593,7 +591,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       return;
     }
 
-    // If already playing, stop playback
+    // If already playing, stop with turntable brake
     if (isPlaying) {
       if (editorMode2 === 'jamcracker') {
         getTrackerReplayer().stop();
@@ -601,9 +599,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         engine.stop();
         return;
       }
-      getTrackerReplayer().stop();
-      stop();
-      engine.releaseAll();
+      // Standard formats: turntable-style electronic brake spindown
+      getTrackerScratchController().triggerElectronicBrake();
       return;
     }
     setIsLooping(true);
@@ -692,7 +689,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 onContextMenu={(e) => {
                   if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
                 }}
-                title={isPlayingSong ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
+                title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
                 className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
               <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
                 onClick={(e) => {
@@ -708,7 +705,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 onContextMenu={(e) => {
                   if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
                 }}
-                title={isPlayingPattern ? 'Click: Stop · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
+                title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
                 className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
               <Button
                 variant={asidEnabled ? 'primary' : 'default'}
