@@ -2013,11 +2013,9 @@ export class TrackerReplayer {
         // Resolve the destination node (stereo separation input). Always
         // pass it so the engine reconnects if TrackerReplayer was recreated
         // by HMR with a new separationNode (the singleton engine persists).
-        // Skip for DJ decks — they manage their own routing chain.
-        let destination: AudioNode | null = null;
+        const { getNativeAudioNode } = await import('@/utils/audio-context');
+        const destination: AudioNode | null = getNativeAudioNode(this.separationNode.inputTone as any);
         if (!this.isDJDeck) {
-          const { getNativeAudioNode } = await import('@/utils/audio-context');
-          destination = getNativeAudioNode(this.separationNode.inputTone as any);
           this.routedNativeEngines.add('LibopenmptSynth');
         }
 
