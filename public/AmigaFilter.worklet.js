@@ -9,6 +9,7 @@ class AmigaFilterProcessor extends AudioWorkletProcessor {
     super();
     
     this.ledEnabled = true;
+    this.enabled = false;  // Bypassed by default — enable for Amiga MOD playback
     
     // Coefficients (will be updated on initialization)
     this.hp_a1 = 0;
@@ -41,6 +42,8 @@ class AmigaFilterProcessor extends AudioWorkletProcessor {
         this.lp2_b2 = lp2.b2;
       } else if (event.data.type === 'SET_LED') {
         this.ledEnabled = event.data.enabled;
+      } else if (event.data.type === 'SET_ENABLED') {
+        this.enabled = event.data.enabled;
       }
     };
   }
@@ -50,6 +53,14 @@ class AmigaFilterProcessor extends AudioWorkletProcessor {
     const output = outputs[0];
 
     if (!input || !input[0]) return true;
+
+    // When disabled, pass audio through unmodified
+    if (!this.enabled) {
+      for (let c = 0; c < input.length; c++) {
+        if (output[c]) output[c].set(input[c]);
+      }
+      return true;
+    }
 
     const channelCount = input.length;
     const sampleCount = input[0].length;

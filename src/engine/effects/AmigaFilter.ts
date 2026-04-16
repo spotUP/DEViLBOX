@@ -26,6 +26,7 @@ export class AmigaFilter extends Tone.ToneAudioNode {
   private lp2_b2 = 0;
 
   private _ledFilterEnabled = true;
+  private _filterEnabled = false;  // Bypassed by default — enable for Amiga MOD playback
   private _sampleRate: number;
 
   input: Tone.Gain;
@@ -240,6 +241,19 @@ export class AmigaFilter extends Tone.ToneAudioNode {
     this._ledFilterEnabled = value;
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'SET_LED', enabled: value });
+    }
+  }
+
+  /** Enable/disable the entire Amiga hardware filter (RC + LED).
+   *  When disabled, the worklet passes audio through unmodified. */
+  get filterEnabled(): boolean {
+    return this._filterEnabled;
+  }
+
+  set filterEnabled(value: boolean) {
+    this._filterEnabled = value;
+    if (this._worklet) {
+      this._worklet.port.postMessage({ type: 'SET_ENABLED', enabled: value });
     }
   }
 

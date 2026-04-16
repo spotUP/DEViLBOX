@@ -399,15 +399,15 @@ export class ToneEngine {
     this.amigaFilter.connect(this.masterEffectsInput);
     this.masterEffectsInput.connect(this.blepInput);
 
-    // Soft limiter prevents clipping — gentle compression above -3dB
+    // Soft limiter prevents clipping — transparent brick-wall at -1dB
     try {
       const ctx = Tone.getContext().rawContext as AudioContext;
       this.masterLimiter = ctx.createDynamicsCompressor();
-      this.masterLimiter.threshold.value = -3;   // Start compressing at -3 dB
-      this.masterLimiter.knee.value = 6;          // Soft knee for transparent limiting
-      this.masterLimiter.ratio.value = 12;        // Aggressive above threshold
-      this.masterLimiter.attack.value = 0.002;    // 2ms attack (fast, catches transients)
-      this.masterLimiter.release.value = 0.15;    // 150ms release
+      this.masterLimiter.threshold.value = -1;   // Start compressing at -1 dB (just prevents clipping)
+      this.masterLimiter.knee.value = 3;          // Tight knee for transparent limiting
+      this.masterLimiter.ratio.value = 20;        // Brick-wall above threshold
+      this.masterLimiter.attack.value = 0.001;    // 1ms attack
+      this.masterLimiter.release.value = 0.05;    // 50ms release (no audible pumping)
       // Insert limiter between blepInput and masterChannel using Tone.js connect
       Tone.connect(this.blepInput, this.masterLimiter);
       Tone.connect(this.masterLimiter, this.masterChannel);
@@ -1286,6 +1286,7 @@ export class ToneEngine {
    */
   public setAmigaFilter(enabled: boolean): void {
     this.amigaFilterEnabled = enabled;
+    this.amigaFilter.filterEnabled = enabled;
     this.amigaFilter.ledFilterEnabled = enabled;
   }
 
