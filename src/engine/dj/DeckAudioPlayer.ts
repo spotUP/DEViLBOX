@@ -64,7 +64,7 @@ export class DeckAudioPlayer {
 
   private _loadVersion = 0;
 
-  async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+  async loadAudioFile(buffer: ArrayBuffer, filename: string, precomputedPeaks?: Float32Array): Promise<AudioFileInfo> {
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
     if (buffer.byteLength > MAX_FILE_SIZE) {
       throw new Error(`File too large (${(buffer.byteLength / 1024 / 1024).toFixed(0)} MB, max ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
@@ -115,8 +115,13 @@ export class DeckAudioPlayer {
     this._numberOfChannels = audioBuffer.numberOfChannels;
     this._loaded = true;
 
-    // Compute waveform peaks for overview display
-    this._waveformPeaks = this.computeWaveformPeaks(audioBuffer, 800);
+    // Use pre-computed peaks if available (from background pre-render),
+    // otherwise compute them asynchronously with yielding to avoid UI jank
+    if (precomputedPeaks && precomputedPeaks.length > 0) {
+      this._waveformPeaks = precomputedPeaks;
+    } else {
+      this._waveformPeaks = await this.computeWaveformPeaksAsync(audioBuffer, 800);
+    }
 
     return {
       duration: this._duration,
@@ -306,28 +311,35 @@ export class DeckAudioPlayer {
    * Compute downsampled waveform peaks for overview display.
    * Returns a Float32Array of peak amplitudes (0 to 1).
    */
-  private computeWaveformPeaks(audioBuffer: AudioBuffer, numBins: number): Float32Array {
+  /** Compute waveform peaks asynchronously, yielding to the main thread
+   *  between chunks to avoid blocking the UI during transitions. */
+  private async computeWaveformPeaksAsync(audioBuffer: AudioBuffer, numBins: number): Promise<Float32Array> {
     const peaks = new Float32Array(numBins);
     const samplesPerBin = Math.floor(audioBuffer.length / numBins);
-
-    // Use first channel (or mix down if stereo)
     const channel0 = audioBuffer.getChannelData(0);
     const channel1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
 
-    for (let bin = 0; bin < numBins; bin++) {
-      const start = bin * samplesPerBin;
-      const end = Math.min(start + samplesPerBin, audioBuffer.length);
-      let maxAmp = 0;
+    const BINS_PER_CHUNK = 100; // ~100 bins per frame, keeps each chunk < 2ms
 
-      for (let i = start; i < end; i++) {
-        let sample = Math.abs(channel0[i]);
-        if (channel1) {
-          sample = (sample + Math.abs(channel1[i])) / 2;
+    for (let chunkStart = 0; chunkStart < numBins; chunkStart += BINS_PER_CHUNK) {
+      const chunkEnd = Math.min(chunkStart + BINS_PER_CHUNK, numBins);
+      for (let bin = chunkStart; bin < chunkEnd; bin++) {
+        const start = bin * samplesPerBin;
+        const end = Math.min(start + samplesPerBin, audioBuffer.length);
+        let maxAmp = 0;
+        for (let i = start; i < end; i++) {
+          let sample = Math.abs(channel0[i]);
+          if (channel1) {
+            sample = (sample + Math.abs(channel1[i])) / 2;
+          }
+          if (sample > maxAmp) maxAmp = sample;
         }
-        if (sample > maxAmp) maxAmp = sample;
+        peaks[bin] = maxAmp;
       }
-
-      peaks[bin] = maxAmp;
+      // Yield to main thread between chunks
+      if (chunkEnd < numBins) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
 
     return peaks;
