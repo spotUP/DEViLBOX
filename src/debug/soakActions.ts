@@ -115,7 +115,7 @@ const soakActions: Record<string, SoakActionFn> = {
    */
   async switchView(args) {
     const view = args.view as string;
-    useUIStore.getState().setActiveView(view as 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio');
+    useUIStore.getState().setActiveView(view as 'tracker' | 'dj' | 'drumpad' | 'vj' | 'studio');
     return { ok: true, view };
   },
 

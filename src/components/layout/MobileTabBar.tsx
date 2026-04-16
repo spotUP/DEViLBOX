@@ -5,14 +5,13 @@
  */
 
 import React, { useCallback, useState, useRef } from 'react';
-import { Grid3X3, Music2, Sliders, Disc3 } from 'lucide-react';
+import { Grid3X3, Music2, Disc3 } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
-import { useMixerStore } from '@stores/useMixerStore';
 import { haptics } from '@/utils/haptics';
 import { MOBILE_TAB_BAR_VIEWS } from '@/constants/viewOptions';
 
-export type MobileTab = 'tracker' | 'instruments' | 'mixer' | 'drumpad';
+export type MobileTab = 'tracker' | 'instruments' | 'drumpad';
 
 interface MobileTabBarProps {
   onShowInstruments?: () => void;
@@ -34,7 +33,6 @@ interface QuickAction {
 // Icons for tab bar views (keyed by view value)
 const TAB_ICONS: Record<string, React.ReactNode> = {
   tracker: <Grid3X3 size={20} />,
-  mixer: <Sliders size={20} />,
   drumpad: <Disc3 size={20} />,
 };
 
@@ -57,12 +55,6 @@ function getQuickActions(tabId: MobileTab): QuickAction[] {
         { label: 'New Pattern', action: () => useTrackerStore.getState().addPattern() },
         { label: 'Duplicate Pattern', action: () => useTrackerStore.getState().duplicatePattern(useTrackerStore.getState().currentPatternIndex) },
         { label: 'Clear Pattern', action: () => useTrackerStore.getState().clearPattern(), destructive: true },
-      ];
-    case 'mixer':
-      return [
-        { label: 'Reset All Volumes', action: () => { const s = useMixerStore.getState(); for (let i = 0; i < 16; i++) s.setChannelVolume(i, 0.8); } },
-        { label: 'Unsolo All', action: () => { const s = useMixerStore.getState(); for (let i = 0; i < 16; i++) s.setChannelSolo(i, false); } },
-        { label: 'Unmute All', action: () => { const s = useMixerStore.getState(); for (let i = 0; i < 16; i++) s.setChannelMute(i, false); } },
       ];
     default:
       return [];

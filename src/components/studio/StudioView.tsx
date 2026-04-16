@@ -18,16 +18,12 @@ const TrackerView = lazy(() =>
 const UnifiedInstrumentEditor = lazy(() =>
   import('../instruments/editors/UnifiedInstrumentEditor').then(m => ({ default: m.UnifiedInstrumentEditor }))
 );
-const MixerContent = lazy(() =>
-  import('../panels/MixerPanel').then(m => ({ default: m.MixerView }))
-);
 
-type PanelId = 'tracker' | 'instrument' | 'mixer';
+type PanelId = 'tracker' | 'instrument';
 
 const PANEL_LABELS: Record<PanelId, string> = {
   tracker: 'Tracker',
   instrument: 'Instrument',
-  mixer: 'Mixer',
 };
 
 const PANEL_MIN_W = 200;
@@ -185,20 +181,17 @@ export const StudioView: React.FC = () => {
   const [collapsed, setCollapsed] = useState<Record<PanelId, boolean>>({
     tracker: false,
     instrument: false,
-    mixer: false,
   });
 
   // Panel widths as percentages of remaining space (after collapsed panels)
   const containerRef = useRef<HTMLDivElement>(null);
   const [trackerW, setTrackerW] = useState<number | null>(null);
-  const [instrumentW, setInstrumentW] = useState<number | null>(null);
 
   // Initialize widths on first render
   useEffect(() => {
     if (containerRef.current && trackerW === null) {
       const total = containerRef.current.clientWidth;
       setTrackerW(Math.round(total * 0.45));
-      setInstrumentW(Math.round(total * 0.30));
     }
   }, [trackerW]);
 
@@ -206,12 +199,8 @@ export const StudioView: React.FC = () => {
     setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  const handleDivider1 = useCallback((dx: number) => {
-    setTrackerW(prev => Math.max(PANEL_MIN_W, (prev ?? 400) + dx));
-  }, []);
-
   const handleDivider2 = useCallback((dx: number) => {
-    setInstrumentW(prev => Math.max(PANEL_MIN_W, (prev ?? 300) + dx));
+    setTrackerW(prev => Math.max(PANEL_MIN_W, (prev ?? 400) + dx));
   }, []);
 
   return (
@@ -233,20 +222,11 @@ export const StudioView: React.FC = () => {
         </Suspense>
       </Panel>
 
-      {!collapsed.tracker && !collapsed.instrument && <ResizeDivider onDrag={handleDivider1} />}
+      {!collapsed.tracker && !collapsed.instrument && <ResizeDivider onDrag={handleDivider2} />}
 
-      {/* Instrument editor panel */}
-      <Panel id="instrument" collapsed={collapsed.instrument} onToggle={() => togglePanel('instrument')} width={collapsed.instrument ? undefined : (instrumentW ?? undefined)}>
+      {/* Instrument editor takes remaining space */}
+      <Panel id="instrument" collapsed={collapsed.instrument} onToggle={() => togglePanel('instrument')}>
         <InstrumentPanel />
-      </Panel>
-
-      {!collapsed.instrument && !collapsed.mixer && <ResizeDivider onDrag={handleDivider2} />}
-
-      {/* Mixer panel — takes remaining space */}
-      <Panel id="mixer" collapsed={collapsed.mixer} onToggle={() => togglePanel('mixer')}>
-        <Suspense fallback={<LoadingFallback label="mixer" />}>
-          <MixerContent />
-        </Suspense>
       </Panel>
     </div>
   );

@@ -20,7 +20,6 @@ type ExposeView = { id: string; label: string; icon: string; color: number };
 function buildExposeViews(theme: ReturnType<typeof usePixiTheme>): ExposeView[] {
   return [
     { id: 'tracker',     label: 'Tracker',  icon: '♫', color: theme.accentHighlight.color },
-    { id: 'mixer',       label: 'Mixer',    icon: '☰', color: theme.accentSecondary.color },
     { id: 'dj',          label: 'DJ',       icon: '◎', color: theme.warning.color },
     { id: 'vj',          label: 'VJ',       icon: '◈', color: theme.error.color },
     { id: 'studio',      label: 'Studio',   icon: '⊞', color: theme.warning.color },
