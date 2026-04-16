@@ -48,13 +48,14 @@ export const DJVocoderControl: React.FC = () => {
   const gearRef = useRef<HTMLButtonElement>(null);
   const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
 
-  // Close panel on click outside
+  // Close panel on click outside (exclude the gear button itself)
   useEffect(() => {
     if (!showPanel) return;
     const handlePointerDown = (e: PointerEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setShowPanel(false);
-      }
+      const target = e.target as Node;
+      if (gearRef.current?.contains(target)) return; // gear toggles via its own handler
+      if (panelRef.current?.contains(target)) return; // click inside panel
+      setShowPanel(false);
     };
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
@@ -326,7 +327,7 @@ export const DJVocoderControl: React.FC = () => {
       {/* Settings gear — opens dropdown with all vocoder settings */}
       <button
         ref={gearRef}
-        onPointerDown={(e) => {
+        onClick={(e) => {
           e.stopPropagation();
           if (!showPanel && gearRef.current) {
             const rect = gearRef.current.getBoundingClientRect();
@@ -342,7 +343,7 @@ export const DJVocoderControl: React.FC = () => {
             ? 'text-accent-primary bg-accent-primary/10'
             : 'text-text-muted hover:text-text-primary'
         }`}
-        title="Mic &amp; vocoder settings"
+        title="Mic & vocoder settings"
       >
         <Settings size={12} />
         {activeFeatureCount > 0 && (
