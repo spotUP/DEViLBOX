@@ -106,43 +106,44 @@ function createStutter(division: SyncDivision): DjFxAction {
     engage() {
       cleanupFx(this.id);
       const ctx = getCtx();
-      const periodMs = bpmToMs(getBpm(), division);
-      const periodSec = periodMs / 1000;
-
-      // Use delay-based stutter instead of ScriptProcessor
-      // Create a very short delay that loops to create stutter effect
-      const delay = ctx.createDelay(1);
-      delay.delayTime.value = periodSec;
-
-      const feedback = ctx.createGain();
-      feedback.gain.value = 0.95; // High feedback to create loop
-
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 1;
-
-      // Create delay loop
-      delay.connect(feedback);
-      feedback.connect(delay);
-      delay.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      // Tap from master
-      const tap = ctx.createGain();
-      tap.gain.value = 1;
-      tap.connect(delay);
+      const periodSec = bpmToMs(getBpm(), division) / 1000;
+      const stutterHz = 1 / periodSec;
 
       const masterNode = getMasterOutputNode();
-      if (masterNode) {
-        // Disconnect master from destination and route through stutter ONLY
-        try { masterNode.disconnect(); } catch { /* */ }
-        masterNode.connect(tap);
-        // No dry signal - stutter is 100% wet
-      }
+      if (!masterNode) return;
+
+      // Gate approach: square-wave LFO modulates a gain node to chop audio
+      const gate = ctx.createGain();
+      gate.gain.value = 0;
+
+      // Square-wave LFO at the stutter rate
+      const lfo = ctx.createOscillator();
+      lfo.type = 'square';
+      lfo.frequency.value = stutterHz;
+
+      // Scale LFO (-1..+1) to gain (0..1) via a shaper
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0.5;
+      const lfoOffset = ctx.createConstantSource();
+      lfoOffset.offset.value = 0.5;
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(gate.gain);
+      lfoOffset.connect(gate.gain);
+      lfo.start();
+      lfoOffset.start();
+
+      // Route: master → gate → destination (replacing direct connection)
+      try { masterNode.disconnect(); } catch { /* */ }
+      masterNode.connect(gate);
+      gate.connect(ctx.destination);
 
       activeFx.set(this.id, {
-        nodes: [delay, feedback, wetGain, tap],
-        oscillator: undefined,
+        nodes: [gate, lfoGain],
+        oscillator: lfo,
         cleanup: () => {
+          try { lfoOffset.stop(); } catch { /* */ }
+          try { lfoOffset.disconnect(); } catch { /* */ }
           try {
             if (masterNode) {
               masterNode.disconnect();
