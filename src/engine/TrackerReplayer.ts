@@ -1214,6 +1214,126 @@ export class TrackerReplayer {
     }
   }
 
+  /**
+   * Process row-level notes and effects for pure synth songs (no WASM engine).
+   * Called from processTick on tick 0 when _suppressNotes is false.
+   * Handles: note triggers (via processHybridRow), Fxx speed/tempo, Bxx position
+   * jump, Dxx pattern break, F00 stop, CXX volume.
+   */
+  private processRowForSynths(time: number): void {
+    if (!this.song) return;
+
+    const storePatterns = useTrackerStore.getState().patterns;
+    const patternNum = this.song.songPositions[this.songPos];
+    const livePattern = storePatterns[patternNum];
+    if (!livePattern) return;
+
+    for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
+      const channel = this.channels[ch];
+      const row = livePattern.channels[ch]?.rows[this.pattPos];
+      if (!row) continue;
+
+      // Process row-level effects (Fxx, Bxx, Dxx) for all channels
+      const effect = row.effTyp ?? (row.effect ? parseInt(row.effect[0], 16) : 0);
+      const param = row.eff ?? (row.effect ? parseInt(row.effect.substring(1), 16) : 0);
+
+      if (effect === 0xF && param > 0) {
+        // Fxx: Set speed (1-31) or tempo (32+)
+        if (param < 32) {
+          this.speed = param;
+        } else {
+          this.bpm = param;
+        }
+      } else if (effect === 0xB) {
+        // Bxx: Position jump
+        this.songPos = param - 1; // advanceRow will increment
+        this.posJumpFlag = true;
+      } else if (effect === 0xD) {
+        // Dxx: Pattern break (BCD in MOD, hex in XM)
+        const breakRow = this.useXMPeriods ? param : ((param >> 4) * 10 + (param & 0xF));
+        this.pBreakPos = breakRow;
+        this.posJumpFlag = true;
+      } else if (effect === 0xF && param === 0) {
+        // F00: Stop song
+        this.stop();
+        return;
+      }
+
+      // Also scan extra effect columns for Fxx/Bxx/Dxx
+      for (const [eTyp, eVal] of [
+        [row.effTyp2, row.eff2], [row.effTyp3, row.eff3], [row.effTyp4, row.eff4],
+        [row.effTyp5, row.eff5], [row.effTyp6, row.eff6], [row.effTyp7, row.eff7],
+        [row.effTyp8, row.eff8],
+      ]) {
+        if (eTyp === 0xF && eVal !== undefined && eVal > 0) {
+          if (eVal < 32) this.speed = eVal; else this.bpm = eVal;
+        } else if (eTyp === 0xB && eVal !== undefined) {
+          this.songPos = eVal - 1;
+          this.posJumpFlag = true;
+        } else if (eTyp === 0xD && eVal !== undefined) {
+          this.pBreakPos = this.useXMPeriods ? eVal : ((eVal >> 4) * 10 + (eVal & 0xF));
+          this.posJumpFlag = true;
+        }
+      }
+
+      // Determine instrument ID
+      const instNum = row.instrument ?? 0;
+      if (instNum > 0) {
+        const instrument = this.instrumentMap.get(instNum);
+        if (instrument) {
+          channel.instrument = instrument;
+          channel.sampleNum = instNum;
+        }
+      }
+
+      // Get the effective instrument
+      const chanInst = typeof channel.instrument === 'number' ? channel.instrument
+        : channel.instrument != null && typeof channel.instrument === 'object' && 'id' in channel.instrument
+          ? (channel.instrument as { id: number }).id : 0;
+      const inst = chanInst ? this.instrumentMap.get(chanInst) : null;
+      const isSynth = inst?.synthType && inst.synthType !== 'Sampler';
+
+      // Note-off
+      if (row.note === 97) {
+        if (isSynth && inst) {
+          try {
+            const noteName = channel.lastPlayedNoteName || 'C4';
+            getToneEngine().triggerNoteRelease(inst.id, noteName, time, inst, ch);
+          } catch { /* ignored */ }
+        }
+        this.stopChannel(channel, ch, time);
+        continue;
+      }
+
+      // Trigger synth notes via processHybridRow
+      if (row.note > 0 && row.note < 97 && isSynth) {
+        this.processHybridRow(ch, channel, row, time);
+      }
+    }
+
+    // Trigger VU meters
+    const engine = getToneEngine();
+    if (!this.meterCallbacks) {
+      this.meterCallbacks = [];
+      this.meterStaging = new Float64Array(64);
+      for (let i = 0; i < 64; i++) {
+        const idx = i;
+        this.meterCallbacks[i] = () => {
+          engine.triggerChannelMeter(idx, this.meterStaging[idx]);
+        };
+      }
+    }
+    for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
+      const row = livePattern.channels[ch]?.rows[this.pattPos];
+      if (row && row.note > 0 && row.note < 97) {
+        const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
+          ? row.volume / 64 : 0.7;
+        this.meterStaging[ch] = vol;
+        Tone.Draw.schedule(this.meterCallbacks[ch], time);
+      }
+    }
+  }
+
   // ==========================================================================
   // WASM SEQUENCER CELL SYNC
   // ==========================================================================
@@ -2584,9 +2704,12 @@ export class TrackerReplayer {
       this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0, tickInterval * this.speed);
     }
 
-    // Note/effect processing removed — all audio handled by WASM engines.
-    // Hybrid synth notes are triggered by fireHybridNotesForRow() via
-    // WASM engine position callbacks (libopenmpt, UADE, Hively, etc.).
+    // Note processing: when no WASM engine is active (_suppressNotes = false),
+    // the TS scheduler drives note triggering for synth instruments. WASM-backed
+    // formats handle notes via fireHybridNotesForRow() from engine callbacks.
+    if (!this._suppressNotes && this.currentTick === 0) {
+      this.processRowForSynths(safeTime);
+    }
 
     // Notify tick processing
     if (this.onTickProcess) {
