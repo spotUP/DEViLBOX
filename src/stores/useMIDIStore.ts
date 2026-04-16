@@ -16,12 +16,13 @@ import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
 import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
-import { routeParameterToEngine, routeDJParameter } from '../midi/performance/parameterRouter';
+import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation } from '../midi/performance/parameterRouter';
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
-import { isDJContext } from '../midi/MIDIContextRouter';
+import { isDJContext, isDrumPadContext } from '../midi/MIDIContextRouter';
 import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
 import { getDJControllerMapper } from '../midi/DJControllerMapper';
+import { getHeldDrumPads } from '../hooks/drumpad/useMIDIPadRouting';
 import { midiToXMNote } from '../lib/xmConversions';
 import { useUIStore } from './useUIStore';
 
@@ -460,17 +461,26 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Pitch Bend (X-axis on MPK Mini joystick)
               if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
+                const normalizedPB = (message.pitchBend + 8192) / 16383;
+
+                // Drumpad context: modulate held pad's synth params
+                if (isDrumPadContext()) {
+                  const heldPads = getHeldDrumPads();
+                  if (heldPads.length > 0) {
+                    routeDrumPadModulation(normalizedPB, null, heldPads);
+                    return;
+                  }
+                }
+
                 // DJ context: pitch bend = crossfader (only when no DJ preset active)
                 if (isDJContext() && !getDJControllerMapper().hasActivePreset()) {
-                  const normalized = (message.pitchBend + 8192) / 16383;
-                  routeDJParameter('dj.crossfader', normalized);
+                  routeDJParameter('dj.crossfader', normalizedPB);
                   return;
                 }
                 // Tracker context: joystick mapping
                 const joyMap = JOYSTICK_MAP[store.knobBank];
                 if (joyMap?.x) {
-                  // Map -8192..8191 to 0..127 for updateBankParameter
-                  const midiValue = Math.round(((message.pitchBend + 8192) / 16383) * 127);
+                  const midiValue = Math.round(normalizedPB * 127);
                   updateBankParameter(joyMap.x.param, midiValue);
                 }
                 return;
@@ -481,9 +491,20 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
+                  const normalizedMW = message.value / 127;
+
+                  // Drumpad context: modulate held pad's synth params
+                  if (isDrumPadContext()) {
+                    const heldPads = getHeldDrumPads();
+                    if (heldPads.length > 0) {
+                      routeDrumPadModulation(null, normalizedMW, heldPads);
+                      return;
+                    }
+                  }
+
                   // DJ context: mod wheel = master filter sweep (only when no DJ preset active)
                   if (isDJContext() && !getDJControllerMapper().hasActivePreset()) {
-                    routeDJParameter('dj.deckA.filter', message.value / 127);
+                    routeDJParameter('dj.deckA.filter', normalizedMW);
                     return;
                   }
                   // Tracker context: joystick mapping

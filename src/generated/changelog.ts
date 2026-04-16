@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-16T20:38:47.850Z
+ * Generated: 2026-04-16T22:26:55.717Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5454';
-export const BUILD_NUMBER = '5454';
-export const BUILD_HASH = '9bd6b41bc';
+export const BUILD_VERSION = '1.0.5475';
+export const BUILD_NUMBER = '5475';
+export const BUILD_HASH = '60a12e58c';
 export const BUILD_DATE = '2026-04-16';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,95 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5454',
+    version: '1.0.5475',
+    date: '2026-04-17',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Update CLAUDE.md — remove GL/Pixi rules"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove Pixi npm dependencies"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove GL rendering mode from app shell"
+      },
+      {
+        type: 'feature',
+        "description": "Hively voice param automation — C bridge + WASM rebuild"
+      },
+      {
+        type: 'feature',
+        "description": "Universal channel filter automation for all 188+ formats"
+      },
+      {
+        type: 'improvement',
+        "description": "Delete src/pixi/ — remove entire GL/WebGL UI (351 files, ~99K LOC)"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract shared utilities from pixi/ before GL removal"
+      },
+      {
+        type: 'feature',
+        "description": "Add format test songs collection (181 files)"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: clean up test files, move 303-Demo to songs/devilbox/"
+      }
+    ]
+  },
+  {
+    version: '2026-04-16',
     date: '2026-04-16',
     changes: [
+      {
+        type: 'feature',
+        "description": "Wire WASM replayer automation — NKS params + synth set() for 13 engines"
+      },
+      {
+        type: 'feature',
+        "description": "Scratch on waveform/pattern displays, fix line loop Dxx awareness"
+      },
+      {
+        type: 'fix',
+        "description": "DJ line loops respect pattern length and snap correctly"
+      },
+      {
+        type: 'improvement',
+        "description": "WASM replayer automation plan — 26 engines audited"
+      },
+      {
+        type: 'fix',
+        "description": "Backward scratch silence — wire captureNode inline"
+      },
+      {
+        type: 'fix',
+        "description": "DJ loop sync, quantization, and button UX"
+      },
+      {
+        type: 'feature',
+        "description": "Format-aware automation with mixer/global params and synth NKS maps"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DJ scratch flanger/doubling from zombie audio sources"
+      },
+      {
+        type: 'fix',
+        "description": "Use default CustomSelect styling for tracker controls bar"
+      },
+      {
+        type: 'feature',
+        "description": "Prompt login when unauthenticated user tries to rate"
+      },
+      {
+        type: 'feature',
+        "description": "Complete automation lane toolset"
+      },
       {
         type: 'feature',
         "description": "Add DJ-style filter sweep presets"
@@ -148,90 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Eliminate deferred stop race causing intermittent silent playback"
-      },
-      {
-        type: 'feature',
-        "description": "Add fader cuts to Baby/Tear scratches, convert EQ mute to hold-down"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Transformer/Crab fader (Signal override), tune Chirp/Stab timing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix baby scratch pause: tighter dead zone + steeper zero-crossings"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert \"Double scratch pattern speed — all patterns now 2× faster\""
-      },
-      {
-        type: 'fix',
-        "description": "Fix osl_create_new: set up order list + fix osl_set_order OOB write"
-      },
-      {
-        type: 'improvement',
-        "description": "Double scratch pattern speed — all patterns now 2× faster"
-      },
-      {
-        type: 'improvement',
-        "description": "Beat-sync all scratch patterns to BPM and beat grid"
-      },
-      {
-        type: 'feature',
-        "description": "Add scratch actions to drum pads with hold-to-scratch semantics"
-      },
-      {
-        type: 'fix',
-        "description": "Fix empty song ending immediately: set up order list for fresh XM"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve baby scratch: hold to loop, graceful release"
-      },
-      {
-        type: 'fix',
-        "description": "Fix source accumulation in scratch monkey-patch and playlist bad-flag persistence"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent synth playback + 4 SynthEffectProcessor bugs"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DJ scratch creating two offset copies of the song"
-      },
-      {
-        type: 'improvement',
-        "description": "Slim ChannelState: remove 46 dead fields, delete orphaned EffectHandlers.ts"
-      },
-      {
-        type: 'improvement',
-        "description": "Restore turntable-style stop in tracker view"
-      },
-      {
-        type: 'improvement',
-        "description": "Save and restore built-in sample pack references in DJ environment"
-      },
-      {
-        type: 'feature',
-        "description": "SynthEffectProcessor — tick-level effects for hybrid synth instruments"
-      },
-      {
-        type: 'improvement',
-        "description": "Save full DJ environment with playlists (drumpads, master FX, settings)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Mix Now UI freeze: skip waveform peak recomputation for pre-rendered tracks"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove dead TS sequencer code from TrackerReplayer (~2800 lines)"
-      },
-      {
-        type: 'feature',
-        "description": "Add headphone cue setup wizard for DJ view"
       }
     ]
   }

@@ -380,4 +380,12 @@ export class DrumPadEngine {
     this.outputs.forEach(output => output.disconnect());
     this.outputs.clear();
   }
+
+  /**
+   * Get a voice's filter node for real-time modulation (joystick etc.)
+   * Returns null if pad has no active voice or no filter.
+   */
+  getVoiceFilter(padId: number): BiquadFilterNode | null {
+    return this.voices.get(padId)?.filterNode ?? null;
+  }
 }
