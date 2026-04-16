@@ -62,7 +62,6 @@ export class DeckEngine {
   private eq3: Tone.EQ3;
   private filterHPF: Tone.Filter;
   private filterLPF: Tone.Filter;
-  private pitchShift: Tone.PitchShift;  // For key lock (compensates pitch when tempo changes)
   readonly channelGain: Tone.Gain;
 
   // Meter for VU display
@@ -124,9 +123,8 @@ export class DeckEngine {
   private filterPosition = 0;  // -1 (HPF) to 0 (off) to +1 (LPF)
   private filterResonance = 1; // Q value
 
-  // Key lock state
-  private keyLockEnabled = false;
-  private currentPitchSemitones = 0;
+  // Current pitch state (for hot-swap)
+  private _currentPitchSemitones = 0;
 
   // Slip mode for audio playback + scratch
   private _slipEnabled = false;
@@ -164,7 +162,7 @@ export class DeckEngine {
   constructor(options: DeckEngineOptions) {
     this.id = options.id;
 
-    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → output)
+    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → HPF → LPF → channelGain → output)
     this.deckGain = new Tone.Gain(1);
     // Cache raw native AudioParam to bypass Tone.Signal for scratch gain transitions
     const nativeGain = getNativeAudioNode(this.deckGain as unknown as Record<string, unknown>);
@@ -174,26 +172,23 @@ export class DeckEngine {
     this.eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
     this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -24 });
     this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -24 });
-    this.pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0 });
     this.channelGain = new Tone.Gain(1);
     this.meter = new Tone.Meter({ smoothing: 0.8 });
     this.waveformAnalyser = new Tone.Analyser('waveform', 256);
     this.fftAnalyser = new Tone.FFT(1024);
 
-    // Wire: deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → limiter → [output + meter + analyser]
+    // Wire: deckGain → EQ3 → HPF → LPF → channelGain → limiter → [output + meter + analyser]
     try {
       this.deckGain.connect(this.eq3);
       this.eq3.connect(this.filterHPF);
       this.filterHPF.connect(this.filterLPF);
-      this.filterLPF.connect(this.pitchShift);
-      this.pitchShift.connect(this.channelGain);
+      this.filterLPF.connect(this.channelGain);
     } catch (err) {
       console.error('[DeckEngine] audio chain wiring failed:', err);
     }
 
     // Brick-wall limiter — prevents output from exceeding 0 dBFS regardless of
-    // internal gain transients from rapid scratch transitions, PitchShift granular
-    // artifacts, or Player source overlap. Every real DJ mixer has one.
+    // internal gain transients from rapid scratch transitions or Player source overlap.
     const ctx = Tone.getContext().rawContext as AudioContext;
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -1;   // Start limiting at -1 dBFS
@@ -265,7 +260,7 @@ export class DeckEngine {
   async hotSwapToAudio(wavData: ArrayBuffer, filename: string): Promise<void> {
     const wasPlaying = this.isPlaying();
     const positionSec = this.replayer.getElapsedMs() / 1000;
-    const pitch = this.currentPitchSemitones;
+    const pitch = this._currentPitchSemitones;
 
     console.log(`[DeckEngine] Hot-swapping ${filename} from tracker to audio stream at ${positionSec.toFixed(2)}s`);
 
@@ -309,9 +304,6 @@ export class DeckEngine {
       this.scratchBuffer = new DeckScratchBuffer(ctx, bufferId);
       await this.scratchBuffer.init();
       // Capture from LPF output, play back directly to channelGain.
-      // Do NOT route through pitchShift — its internal delay buffers retain
-      // audio from the normal chain after deckGain goes to 0, causing volume
-      // boost when combined with scratch buffer output.
       this.scratchBuffer.wireIntoChain(this.filterLPF, this.channelGain);
       this.scratchBufferReady = true;
     } catch (err) {
@@ -466,7 +458,7 @@ export class DeckEngine {
   setPitch(semitones: number): void {
     const multiplier = Math.pow(2, semitones / 12);
     this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
-    this.currentPitchSemitones = semitones;
+    this._currentPitchSemitones = semitones;
 
     if (this._playbackMode === 'audio') {
       this.audioPlayer.setPlaybackRate(multiplier);
@@ -482,13 +474,6 @@ export class DeckEngine {
       // Ensure audio player is reset
       this.audioPlayer.setPlaybackRate(1.0);
     }
-
-    // Key lock: compensate pitch shift to maintain original key
-    if (this.keyLockEnabled && Math.abs(semitones) > 0.01) {
-      this.pitchShift.pitch = -semitones;
-    } else if (!this.keyLockEnabled) {
-      this.pitchShift.pitch = 0;
-    }
   }
 
   /** Temporary BPM bump for beat matching */
@@ -496,21 +481,9 @@ export class DeckEngine {
     this.replayer.setNudge(offset, ticks);
   }
 
-  /** Enable/disable key lock (master tempo). When on, pitch changes only affect tempo. */
-  setKeyLock(enabled: boolean): void {
-    this.keyLockEnabled = enabled;
-    if (enabled && Math.abs(this.currentPitchSemitones) > 0.01) {
-      // Apply compensating pitch shift
-      this.pitchShift.pitch = -this.currentPitchSemitones;
-    } else {
-      // Disable pitch compensation
-      this.pitchShift.pitch = 0;
-    }
-  }
-
-  getKeyLock(): boolean {
-    return this.keyLockEnabled;
-  }
+  /** Key lock removed — was causing echo artifacts from granular delay buffer. */
+  setKeyLock(_enabled: boolean): void { /* no-op */ }
+  getKeyLock(): boolean { return false; }
 
   // ==========================================================================
   // SCRATCH
@@ -1173,7 +1146,7 @@ export class DeckEngine {
   setFilterPosition(position: number): void {
     this.filterPosition = Math.max(-1, Math.min(1, position));
 
-    // Both filters are always in the chain: eq3 → HPF → LPF → pitchShift
+    // Both filters are always in the chain: eq3 → HPF → LPF → channelGain
     // At center (0): HPF@20Hz + LPF@20kHz = transparent bypass
     // Moving right (+): LPF sweeps down from 20kHz to 100Hz, HPF stays at 20Hz
     // Moving left (-): HPF sweeps up from 20Hz to 10kHz, LPF stays at 20kHz
@@ -1393,7 +1366,6 @@ export class DeckEngine {
     this.channelGain.dispose();
     this.filterHPF.dispose();
     this.filterLPF.dispose();
-    this.pitchShift.dispose();
     this.eq3.dispose();
     this.deckGain.dispose();
     try { this._brickwallLimiter?.disconnect(); } catch { /* already disconnected */ }

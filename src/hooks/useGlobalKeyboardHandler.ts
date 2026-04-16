@@ -1917,14 +1917,10 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       }
 
       // Global push-to-talk: hold T (any view except tracker)
-      // or hold Space in DJ/VJ views (Space is play_stop_toggle in tracker but
-      // irrelevant in DJ/VJ where deck buttons control playback).
       {
         const view = useUIStore.getState().activeView;
         const noMods = !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
-        const isPTTKey =
-          (e.code === 'Space' && noMods && (view === 'dj' || view === 'vj')) ||
-          (e.code === 'KeyT' && noMods && view !== 'tracker');
+        const isPTTKey = e.code === 'KeyT' && noMods && view !== 'tracker';
         if (isPTTKey && !e.repeat) {
           console.log('[GlobalPTT]', e.code, 'keydown in', view, '— activating PTT');
           e.preventDefault();
@@ -2004,7 +2000,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       }
 
       // Release PTT when the PTT key is released
-      if ((e.code === 'KeyT' || e.code === 'Space') && useVocoderStore.getState().pttActive) {
+      if (e.code === 'KeyT' && useVocoderStore.getState().pttActive) {
         e.preventDefault();
         useVocoderStore.getState().setPTT(false);
         return;

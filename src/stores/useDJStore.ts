@@ -161,10 +161,7 @@ const defaultDeckState: DeckState = {
   pitchOffset: 0,
   effectiveBPM: 125,
   repitchLock: false,
-  // Key lock ON by default — pitch slider changes tempo without changing key,
-  // so BPM-matching never makes a track sound nasal/dopey or clash in pitch
-  // with the other deck. Toggleable per-deck via the Lock button.
-  keyLockEnabled: true,
+  keyLockEnabled: false,
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
@@ -594,9 +591,9 @@ export const useDJStore = create<DJStore>()(
         state.decks[deck].slipEnabled = enabled;
       }),
 
-    setDeckKeyLock: (deck, enabled) =>
-      set((state) => {
-        state.decks[deck].keyLockEnabled = enabled;
+    setDeckKeyLock: (_deck, _enabled) =>
+      set(() => {
+        // Key lock removed — PitchShift caused echo artifacts
       }),
 
     toggleDeckChannel: (deck, channel) =>
