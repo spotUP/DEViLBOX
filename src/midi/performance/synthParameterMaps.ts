@@ -1370,6 +1370,8 @@ export const MIXER_NKS_PARAMETERS: NKSParameter[] = [
   { id: 'mixer.volume', name: 'Ch Volume', section: NKSSection.MIXER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 0, ccNumber: 7, isAutomatable: true, accessibilityName: 'Channel Volume' },
   { id: 'mixer.pan', name: 'Ch Pan', section: NKSSection.MIXER, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, formatString: '%.2f', page: 0, index: 1, ccNumber: 10, isAutomatable: true, accessibilityName: 'Channel Pan' },
   { id: 'mixer.mute', name: 'Ch Mute', section: NKSSection.MIXER, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 0, index: 2, isAutomatable: true, accessibilityName: 'Channel Mute' },
+  { id: 'mixer.filterPosition', name: 'Filter Pos', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, formatString: '%.2f', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Channel Filter Position (-1 HP, 0 bypass, +1 LP)' },
+  { id: 'mixer.filterResonance', name: 'Filter Res', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.05, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Channel Filter Resonance' },
 ];
 
 // ============================================================================
