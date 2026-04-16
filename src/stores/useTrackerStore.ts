@@ -16,7 +16,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
-import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
+import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { useHistoryStore } from './useHistoryStore';
@@ -1251,7 +1251,7 @@ export const useTrackerStore = create<TrackerStore>()(
     addPattern: (length = DEFAULT_PATTERN_LENGTH) => {
       const patCount = get().patterns.length;
       const limits = getActiveFormatLimits();
-      if (limits && patCount >= limits.maxPatterns) {
+      if (limits && patCount >= limits.maxPatterns && !isViolationConfirmed('patternCount')) {
         void checkFormatViolation('patternCount',
           `Adding pattern ${patCount + 1} exceeds ${limits.name} limit of ${limits.maxPatterns} patterns.`,
         ).then((ok) => { if (ok) get().addPattern(length); });
@@ -1314,7 +1314,7 @@ export const useTrackerStore = create<TrackerStore>()(
 
     resizePattern: (index, newLength) => {
       const limits = getActiveFormatLimits();
-      if (limits && newLength > limits.maxPatternLength) {
+      if (limits && newLength > limits.maxPatternLength && !isViolationConfirmed('patternLength')) {
         void checkFormatViolation('patternLength',
           `Resizing to ${newLength} rows exceeds ${limits.name} limit of ${limits.maxPatternLength} rows.`,
         ).then((ok) => { if (ok) get().resizePattern(index, newLength); });
@@ -1463,7 +1463,7 @@ export const useTrackerStore = create<TrackerStore>()(
       // Format compat: check channel count
       const currentChannels = get().patterns[0]?.channels.length ?? 0;
       const limits = getActiveFormatLimits();
-      if (limits && currentChannels >= limits.maxChannels) {
+      if (limits && currentChannels >= limits.maxChannels && !isViolationConfirmed('channelCount')) {
         void checkFormatViolation('channelCount',
           `Adding channel ${currentChannels + 1} exceeds ${limits.name} limit of ${limits.maxChannels} channels.`,
         ).then((ok) => { if (ok) get().addChannel(); });
@@ -1885,7 +1885,7 @@ export const useTrackerStore = create<TrackerStore>()(
     addToOrder: (patternIndex, position) => {
       const orderLen = get().patternOrder.length;
       const limits = getActiveFormatLimits();
-      if (limits && orderLen >= limits.maxPositions) {
+      if (limits && orderLen >= limits.maxPositions && !isViolationConfirmed('positionCount')) {
         void checkFormatViolation('positionCount',
           `Adding position ${orderLen + 1} exceeds ${limits.name} limit of ${limits.maxPositions} positions.`,
         ).then((ok) => { if (ok) get().addToOrder(patternIndex, position); });

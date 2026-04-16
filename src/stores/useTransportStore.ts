@@ -8,7 +8,7 @@ import * as Tone from 'tone';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useInstrumentStore } from './useInstrumentStore';
-import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
+import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -155,7 +155,7 @@ export const useTransportStore = create<TransportStore>()(
     // Actions
     setBPM: (bpm) => {
       const limits = getActiveFormatLimits();
-      if (limits && (bpm < limits.bpmRange[0] || bpm > limits.bpmRange[1])) {
+      if (limits && (bpm < limits.bpmRange[0] || bpm > limits.bpmRange[1]) && !isViolationConfirmed('bpmRange')) {
         void checkFormatViolation('bpmRange',
           `BPM ${bpm} is outside ${limits.name} range of ${limits.bpmRange[0]}-${limits.bpmRange[1]}.`,
         ).then((ok) => { if (ok) useTransportStore.getState().setBPM(bpm); });
@@ -428,7 +428,7 @@ export const useTransportStore = create<TransportStore>()(
     setGrooveTemplate: (templateId) => {
       if (templateId !== 'straight') {
         const limits = getActiveFormatLimits();
-        if (limits && !limits.supportsGroove) {
+        if (limits && !limits.supportsGroove && !isViolationConfirmed('groove')) {
           void checkFormatViolation('groove',
             `Groove templates are not supported in ${limits.name} format.`,
           ).then((ok) => { if (ok) useTransportStore.getState().setGrooveTemplate(templateId); });

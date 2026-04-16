@@ -37,7 +37,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
-import { checkFormatViolation, getActiveFormatLimits } from '@/lib/formatCompatibility';
+import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
@@ -859,7 +859,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     createInstrument: (config) => {
       const currentCount = get().instruments.length;
       const limits = getActiveFormatLimits();
-      if (limits && currentCount >= limits.maxInstruments) {
+      if (limits && currentCount >= limits.maxInstruments && !isViolationConfirmed('instrumentCount')) {
         void checkFormatViolation('instrumentCount',
           `Adding instrument ${currentCount + 1} exceeds ${limits.name} limit of ${limits.maxInstruments} instruments.`,
         ).then((ok) => { if (ok) get().createInstrument(config); });
