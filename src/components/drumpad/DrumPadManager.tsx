@@ -312,8 +312,8 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               </div>
             </div>
           ) : (
-          <div className="flex-1 overflow-auto">
-            <div className="flex flex-col gap-3 p-4 h-full">
+          <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+            <div className="flex flex-col gap-2 px-4 pt-3 pb-1 shrink-0">
               {/* Compact program bar */}
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-text-muted shrink-0">PGM</span>
@@ -340,8 +340,10 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                   Del
                 </button>
               </div>
-              {/* Pad grid — full width, double-click to edit */}
-              <div className="bg-dark-bg border border-dark-border rounded-lg flex-1">
+            </div>
+            {/* Pad grid — fills remaining height */}
+            <div className="flex-1 min-h-0 px-4 pb-3">
+              <div className="bg-dark-bg border border-dark-border rounded-lg h-full">
                 <PadGrid
                   onPadSelect={(id) => {
                     setSelectedPadId(id);

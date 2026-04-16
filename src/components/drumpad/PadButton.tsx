@@ -72,16 +72,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
   }, []);
 
   // Calculate velocity based on click/touch position
-  const calculateVelocity = useCallback((clientY: number, target: Element): number => {
-    // Simple velocity calculation based on Y position in pad
-    const rect = target.getBoundingClientRect();
-    const relativeY = (clientY - rect.top) / rect.height;
-
-    // Bottom of pad = higher velocity, top = lower velocity
-    const baseVelocity = Math.floor((1 - relativeY) * 127);
-
-    // Clamp to valid range
-    return Math.max(1, Math.min(127, baseVelocity));
+  const calculateVelocity = useCallback((_clientY: number, _target: Element): number => {
+    // Mouse/touch always triggers at full velocity — only MIDI controllers send real velocity
+    return 127;
   }, []);
 
   // A pad is "loaded" if it has actual sound source assigned
@@ -243,7 +236,6 @@ export const PadButton: React.FC<PadButtonProps> = ({
         ${className}
       `}
       style={{
-        aspectRatio: '4 / 3',
         transition: isPressed ? 'transform 50ms' : 'transform 120ms',
       }}
       onMouseDown={handleMouseDown}
