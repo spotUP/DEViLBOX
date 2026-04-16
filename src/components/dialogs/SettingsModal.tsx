@@ -163,25 +163,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               <section>
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">DISPLAY</h3>
                 <div className="space-y-3">
-                  {/* UI Render Mode */}
-                  {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <label className="text-ft2-text text-xs font-mono">UI Render Mode:</label>
-                        <span className="text-[9px] text-ft2-textDim font-mono">Switch between DOM and WebGL rendering</span>
-                      </div>
-                      <CustomSelect
-                        value={s.renderMode}
-                        onChange={(v) => s.setRenderMode(v as 'dom' | 'webgl')}
-                        options={[
-                          { value: 'dom', label: 'DOM (React)' },
-                          { value: 'webgl', label: 'WebGL (PixiJS)' },
-                        ]}
-                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1"
-                      />
-                    </div>
-                  )}
-
                   {/* Number Format */}
                   <div className="flex items-center justify-between">
                     <label className="text-ft2-text text-xs font-mono">Number Format:</label>

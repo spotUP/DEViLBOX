@@ -19,7 +19,7 @@ import { GTU_COLUMNS } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTOrderMatrix, GT_ORDER_MATRIX_HEIGHT, GT_ORDER_MATRIX_COLLAPSED_HEIGHT } from './GTOrderMatrix';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
-import { useGTDAWKeyboardHandler } from '../../pixi/views/gtultra/daw/useGTDAWKeyboardHandler';
+import { useGTDAWKeyboardHandler } from '../../hooks/useGTDAWKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';

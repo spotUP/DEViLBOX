@@ -10,7 +10,6 @@ import { useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
-import { useSettingsStore } from '@stores/useSettingsStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useAIStore } from '@stores/useAIStore';
@@ -56,10 +55,6 @@ export function useNavBar() {
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const setTheme = useThemeStore((s) => s.setTheme);
   const getCurrentTheme = useThemeStore((s) => s.getCurrentTheme);
-
-  // ── Settings store ───────────────────────────────────────────────────────
-  const renderMode = useSettingsStore((s) => s.renderMode);
-  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
 
   // ── UI store ─────────────────────────────────────────────────────────────
   const activeView = useUIStore((s) => s.activeView);
@@ -172,10 +167,6 @@ export function useNavBar() {
     requestAnimationFrame(() => useUIStore.getState().openModal('moduleInfo'));
   }, []);
 
-  const handleSwitchToDom = useCallback(() => {
-    setRenderMode('dom');
-  }, [setRenderMode]);
-
   const handleExpose = useCallback(() => {
     if (isStudio) toggleWorkbenchExpose();
     else toggleViewExpose();
@@ -209,9 +200,6 @@ export function useNavBar() {
     currentTheme,
     themeOptions,
     themes,
-    // Settings
-    renderMode,
-    setRenderMode,
     // UI / view
     activeView,
     setActiveView,
@@ -238,7 +226,6 @@ export function useNavBar() {
     handleOpenAuth,
     handleOpenDownload,
     handleOpenModuleInfo,
-    handleSwitchToDom,
     handleExpose,
     handleSwitchView,
   };

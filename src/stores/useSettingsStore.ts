@@ -269,9 +269,6 @@ interface SettingsStore {
   lensPreset:  string;   // LensPreset key
   lensParams:  { barrel: number; chromatic: number; vignette: number };
 
-  // Render Mode
-  renderMode: 'dom' | 'webgl';  // UI rendering: 'dom' = React/Tailwind, 'webgl' = PixiJS
-
   // Startup jingle
   welcomeJingleEnabled: boolean;
 
@@ -304,7 +301,6 @@ interface SettingsStore {
   setCustomBannerImage: (dataUrl: string | null) => void;
   setWobbleWindows: (enabled: boolean) => void;
   setMaxHeadroomMode: (enabled: boolean) => void;
-  setRenderMode: (mode: 'dom' | 'webgl') => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
   setCrtEnabled:  (enabled: boolean) => void;
   setCrtParam:    (param: keyof CRTParams, value: number) => void;
@@ -499,7 +495,6 @@ export const useSettingsStore = create<SettingsStore>()(
       lensEnabled: false,
       lensPreset: 'off',
       lensParams: { barrel: 0, chromatic: 0, vignette: 0 },
-      renderMode: 'dom' as const,  // Default: DOM rendering (GL UI is experimental)
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
 
       // SID Hardware defaults
@@ -659,14 +654,6 @@ export const useSettingsStore = create<SettingsStore>()(
           state.maxHeadroomMode = maxHeadroomMode;
         }),
 
-      setRenderMode: (renderMode) =>
-        set((state) => {
-          // Block WebGL mode on mobile phones — GL UI doesn't work on mobile
-          if (renderMode === 'webgl' && /iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent)) {
-            return;
-          }
-          state.renderMode = renderMode;
-        }),
 
     setWelcomeJingleEnabled: (v) =>
       set((state) => { state.welcomeJingleEnabled = v; }),
@@ -697,10 +684,6 @@ export const useSettingsStore = create<SettingsStore>()(
       version: 6,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
-        if (version < 2) {
-          // v2: workbench becomes the default UI
-          s.renderMode = 'dom';
-        }
         if (version < 3) {
           // v3: 88 format engine defaults changed from 'native' to 'uade'.
           // Clear persisted formatEngine so all formats get fresh defaults.
@@ -731,8 +714,6 @@ export const useSettingsStore = create<SettingsStore>()(
         return {
           ...current,
           ...p,
-          // Always use the hardcoded default for renderMode — never restore from storage
-          renderMode: current.renderMode,
           formatEngine: {
             ...current.formatEngine,
             ...(p.formatEngine ?? {}),
@@ -769,7 +750,6 @@ export const useSettingsStore = create<SettingsStore>()(
         sidHardwareMode: state.sidHardwareMode,
         sidEngine: state.sidEngine,
         welcomeJingleEnabled: state.welcomeJingleEnabled,
-        // renderMode intentionally not persisted — always start in DOM mode
       }),
     }
   )

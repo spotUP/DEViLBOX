@@ -71,7 +71,7 @@ import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHea
 import { DOMSynthPanel } from '../controls/DOMSynthPanel';
 const LiveFilterCurve = lazy(() => import('../../visualization/LiveFilterCurve').then(m => ({ default: m.LiveFilterCurve })));
 import { EnvelopeVisualization } from '@components/instruments/shared';
-import { getSynthLayout } from '@/pixi/views/instruments/layouts';
+import { getSynthLayout } from '@/constants/synthLayouts';
 
 // ============================================================================
 // LAZY-LOADED CONTROL COMPONENTS
