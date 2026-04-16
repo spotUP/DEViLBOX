@@ -35,7 +35,7 @@ export type TB303Parameter =
   | 'filterTracking'
   | 'filterFM';
 
-export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Furnace' | 'V2' | 'Synare' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX';
+export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Furnace' | 'V2' | 'Synare' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX' | 'Mixer';
 
 export type MappableParameter =
   | TB303Parameter
@@ -110,6 +110,8 @@ export type MappableParameter =
   // Mixer
   | 'mixer.volume'
   | 'mixer.pan'
+  | 'mixer.filterPosition'
+  | 'mixer.filterResonance'
   // Furnace FM
   | 'furnace.algorithm'
   | 'furnace.feedback'
