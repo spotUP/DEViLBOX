@@ -130,6 +130,16 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 76, param: 'masterFx.masterVolume', label: 'Master' },
     { cc: 77, param: 'masterFx.limiterCeiling', label: 'Limiter' },
   ],
+  'Mixer': [
+    { cc: 70, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 71, param: 'mixer.filterResonance', label: 'Reso' },
+    { cc: 72, param: 'mixer.volume', label: 'Volume' },
+    { cc: 73, param: 'mixer.pan', label: 'Pan' },
+    { cc: 74, param: 'masterFx.slot0.wet', label: 'FX1 Wet' },
+    { cc: 75, param: 'masterFx.slot1.wet', label: 'FX2 Wet' },
+    { cc: 76, param: 'masterFx.slot2.wet', label: 'FX3 Wet' },
+    { cc: 77, param: 'masterFx.masterVolume', label: 'Master' },
+  ],
 };
 
 /**

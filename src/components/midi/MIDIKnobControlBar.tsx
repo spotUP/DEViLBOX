@@ -2,10 +2,15 @@ import React from 'react';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
-import { Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp } from 'lucide-react';
+import { Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
 export const MIDIKnobControlBar: React.FC = () => {
-  const { knobBank, setKnobBank, isInitialized, inputDevices, selectedInputId, showKnobBar, setShowKnobBar } = useMIDIStore();
+  const {
+    knobBank, setKnobBank, isInitialized, inputDevices, selectedInputId,
+    showKnobBar, setShowKnobBar,
+    nksKnobAssignments, nksKnobPage, nksKnobTotalPages, nksActiveSynthType,
+    nextKnobPage, prevKnobPage,
+  } = useMIDIStore();
 
   // Only show if MIDI is initialized and there are connected input devices
   if (!isInitialized || inputDevices.length === 0) return null;
@@ -18,10 +23,14 @@ export const MIDIKnobControlBar: React.FC = () => {
     { id: '303', label: '303/Synth', icon: Settings },
     { id: 'Siren', label: 'Dub Siren', icon: Activity },
     { id: 'FX', label: 'Effects', icon: Waves },
+    { id: 'Mixer', label: 'Mixer', icon: Filter },
     { id: 'MasterFX', label: 'Master FX', icon: Sliders },
   ];
 
-  const currentAssignments = KNOB_BANKS[knobBank];
+  // Use NKS2 dynamic assignments if available, otherwise legacy bank
+  const hasNKS2 = nksKnobAssignments.length > 0 && nksActiveSynthType;
+  const currentAssignments = hasNKS2 ? nksKnobAssignments : KNOB_BANKS[knobBank];
+  const bankLabel = hasNKS2 ? nksActiveSynthType : knobBank;
 
   return (
     <div className="bg-dark-bgTertiary border-t border-dark-border shadow-inner">
@@ -85,22 +94,59 @@ export const MIDIKnobControlBar: React.FC = () => {
           </div>
 
           {/* Knob Assignment Grid */}
-          <div className="grid grid-cols-8 gap-2">
-            {currentAssignments.map((assignment: KnobAssignment, index: number) => (
-              <div 
-                key={index} 
-                className="flex flex-col items-center p-1.5 rounded bg-dark-bgSecondary border border-dark-border relative group overflow-hidden"
+          <div className="flex items-center gap-2">
+            {/* Page nav (left) */}
+            {hasNKS2 && nksKnobTotalPages > 1 && (
+              <button
+                onClick={() => prevKnobPage()}
+                className="p-1 text-text-muted hover:text-accent-primary transition-colors"
+                title="Previous knob page"
               >
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-accent-primary/20 group-hover:bg-accent-primary/50 transition-colors"></div>
-                <span className="text-[8px] font-mono text-text-muted mb-1 flex items-center gap-1">
-                  <Disc size={8} /> K{index + 1} (CC {assignment.cc})
+                <ChevronLeft size={14} />
+              </button>
+            )}
+
+            {/* Knobs */}
+            <div className="grid grid-cols-8 gap-2 flex-1">
+              {currentAssignments.map((assignment: KnobAssignment, index: number) => (
+                <div 
+                  key={index} 
+                  className="flex flex-col items-center p-1.5 rounded bg-dark-bgSecondary border border-dark-border relative group overflow-hidden"
+                >
+                  <div className="absolute top-0 left-0 w-full h-[2px] bg-accent-primary/20 group-hover:bg-accent-primary/50 transition-colors"></div>
+                  <span className="text-[8px] font-mono text-text-muted mb-1 flex items-center gap-1">
+                    <Disc size={8} /> K{index + 1} (CC {assignment.cc})
+                  </span>
+                  <span className="text-[10px] font-bold text-accent-primary uppercase truncate w-full text-center">
+                    {assignment.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Page nav (right) + page indicator */}
+            {hasNKS2 && nksKnobTotalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-text-muted font-mono whitespace-nowrap">
+                  {nksKnobPage + 1}/{nksKnobTotalPages}
                 </span>
-                <span className="text-[10px] font-bold text-accent-primary uppercase truncate w-full text-center">
-                  {assignment.label}
-                </span>
+                <button
+                  onClick={() => nextKnobPage()}
+                  className="p-1 text-text-muted hover:text-accent-primary transition-colors"
+                  title="Next knob page"
+                >
+                  <ChevronRight size={14} />
+                </button>
               </div>
-            ))}
+            )}
           </div>
+
+          {/* Active synth label */}
+          {hasNKS2 && (
+            <div className="text-[9px] text-text-muted text-center font-mono uppercase tracking-wider">
+              {bankLabel}
+            </div>
+          )}
         </div>
       )}
     </div>
