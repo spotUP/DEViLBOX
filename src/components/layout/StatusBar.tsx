@@ -321,8 +321,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     djKnobPage, setDJKnobPage,
     isInitialized, inputDevices, selectedInputId,
     showKnobBar, setShowKnobBar, knobValues, setKnobValue,
-    nksKnobAssignments, nksKnobPage, nksKnobTotalPages, nksActiveSynthType,
-    nextKnobPage, prevKnobPage,
+    nksKnobAssignments, nksKnobTotalPages, nksActiveSynthType,
   } = useMIDIStore();
 
   const hasMIDIDevice = isInitialized && inputDevices.length > 0;
