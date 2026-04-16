@@ -8,6 +8,40 @@ This plan catalogs every WASM replayer's automatable state and prioritizes imple
 
 ---
 
+## Implementation Status (Updated 2026-07-08)
+
+### ✅ Phase 1 COMPLETE — TS-Only Wiring (no WASM rebuild needed)
+
+All NKS parameter maps created and synth `set()` methods wired:
+
+| Engine | Params | Routing | Status |
+|--------|--------|---------|--------|
+| **SoundMon** | 8 (volume, LFO speed/depth/delay, ADSR, waveTable, egControl) | `setInstrumentParam()` | ✅ Done |
+| **SidMon** | 7 (volume, vibrato speed/depth/delay, arpSpeed, filterCutoff/Res) | `sendMessage('setParam')` | ✅ Done |
+| **SonicArranger** | 8 (volume, vibrato, portamento, fineTune, effect, effectArg1) | `setInstrumentParam()` | ✅ Done |
+| **Klystrack** | 16 (ADSR, volume, pulseWidth, filter cutoff/res, vibrato, PWM, FM) | `setInstrumentParam()` | ✅ Done |
+| **GTUltra** | 7 (ADSR, firstwave, vibdelay, gatetimer) | `setInstrumentAD/SR/etc()` | ✅ Done |
+| **Hively** | 8 (volume, filter speed/lower/upper, vibrato speed/depth, squareSpeed, pan) | `sendMessage('setVoiceParam')` ¹ | ✅ TS done |
+
+¹ Hively TS wiring done; C bridge `hively_set_voice_param()` + worklet handler needed for params to reach WASM
+
+### 📋 Phase 2 — NKS Maps Pre-Registered (C Bridge Work Pending)
+
+These engines have NKS parameter arrays registered in `synthParameterMaps.ts` but need C bridge additions + WASM rebuild for params to actually work:
+
+| Engine | Params | What's Needed |
+|--------|--------|---------------|
+| **Hively** | 7 voice params | Add `hively_set_voice_param()` to HivelyWrapper.c + worklet handler |
+| **CheeseCutter** | 7 (filter, pulse width, volume) | Wire InstrumentFactory + SID register wrappers |
+| **OctaMED** | 1 (volume) | Volume works via gain node; more params need C setters |
+| **PreTracker** | 1 (volume) | Volume works via gain node |
+| **ASAP** | 2 (volume, distortion) | Add POKEY register write setters |
+| **PxTone** | 1 (volume) | Add master volume setter |
+| **Organya** | 3 (volume, pan, tempo) | Add pan/tempo setters |
+| **OpenMPT** | 3 (channelVol, channelPan, globalVol) | Add channel vol/pan/global vol setters |
+
+---
+
 ## Current State Summary
 
 ### Already Fully Automated (no work needed)
