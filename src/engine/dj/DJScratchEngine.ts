@@ -73,10 +73,17 @@ const BABY_SCRATCH: ScratchPattern = {
   quantize: false,
   interpolateVelocity: true,
   frames: [
-    { timeFraction: 0,    velocity: 0,    faderGain: 1 },  // zero crossing (loop seam)
-    { timeFraction: 0.25, velocity: 2.4,  faderGain: 1 },  // peak forward push
-    { timeFraction: 0.5,  velocity: 0,    faderGain: 1 },  // zero crossing
-    { timeFraction: 0.75, velocity: -1.2, faderGain: 1 },  // peak backward drag
+    // Steep zero-crossing into forward push
+    { timeFraction: 0,    velocity: -0.15, faderGain: 1 },  // tail end of backward (smooth loop seam)
+    { timeFraction: 0.03, velocity: 0.4,  faderGain: 1 },  // quick transition through zero
+    { timeFraction: 0.20, velocity: 2.4,  faderGain: 1 },  // peak forward push
+    { timeFraction: 0.40, velocity: 0.4,  faderGain: 1 },  // decelerating
+    // Steep zero-crossing into backward drag
+    { timeFraction: 0.47, velocity: 0.15, faderGain: 1 },  // approaching zero
+    { timeFraction: 0.53, velocity: -0.3, faderGain: 1 },  // quick cross into backward
+    { timeFraction: 0.70, velocity: -1.2, faderGain: 1 },  // peak backward drag
+    { timeFraction: 0.90, velocity: -0.4, faderGain: 1 },  // decelerating
+    { timeFraction: 0.97, velocity: -0.15, faderGain: 1 },  // approaching zero for loop seam
   ],
 };
 
