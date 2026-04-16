@@ -46,7 +46,11 @@ export type AutomationShape =
   | 'random'
   | 'sweepUp'
   | 'sweepDown'
-  | 'buildDrop';
+  | 'buildDrop'
+  | 'lfo1_4'
+  | 'lfo1_8'
+  | 'lfo1_16'
+  | 'lfo1_32';
 
 export interface AutomationPreset {
   id: string;
@@ -97,7 +101,10 @@ export function interpolateAutomationValue(
     const t = (row - before.row) / (after.row - before.row);
     const diff = after.value - before.value;
 
-    switch (interpolation) {
+    // Per-point curveType override takes priority over global interpolation
+    const segInterp = before.curveType ?? interpolation;
+
+    switch (segInterp) {
       case 'linear':
         return before.value + diff * t;
       case 'exponential':
