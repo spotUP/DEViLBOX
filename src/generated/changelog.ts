@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-16T13:15:45.354Z
+ * Generated: 2026-04-16T19:56:39.213Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5416';
-export const BUILD_NUMBER = '5416';
-export const BUILD_HASH = 'ea76c99d8';
+export const BUILD_VERSION = '1.0.5443';
+export const BUILD_NUMBER = '5443';
+export const BUILD_HASH = '9ce132d80';
 export const BUILD_DATE = '2026-04-16';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,117 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5416',
+    version: '1.0.5443',
     date: '2026-04-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix LFO beat sync and anti-click ramps"
+      },
+      {
+        type: 'improvement',
+        "description": "Set stereo defaults to rich mono: PT2 25%, ModPlug 50/200"
+      },
+      {
+        type: 'improvement',
+        "description": "Auto-select DJ knob page based on playing deck"
+      },
+      {
+        type: 'fix',
+        "description": "Fix PT2 stereo slider live update during libopenmpt playback"
+      },
+      {
+        type: 'fix',
+        "description": "Show DJ MIDI knob assignments in status bar + fix EQ MIDI range"
+      },
+      {
+        type: 'fix',
+        "description": "Fix live stereo separation: apply config changes to running module"
+      },
+      {
+        type: 'fix',
+        "description": "Fix master audio chain: stereo downmix and limiter coloring"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DJ pause immediately resuming: pause Auto DJ guard on manual stop"
+      },
+      {
+        type: 'fix',
+        "description": "Fix AdPlug hybrid notes: enable fireHybridNotesForRow in position callback"
+      },
+      {
+        type: 'fix',
+        "description": "Fix pure synth songs not playing after TS sequencer removal"
+      },
+      {
+        type: 'fix',
+        "description": "Remove PitchShift/key lock, fix PTT/Space, fix DJ libopenmpt routing"
+      },
+      {
+        type: 'fix',
+        "description": "Remove AmigaFilter from audio chain entirely"
+      },
+      {
+        type: 'fix',
+        "description": "Fix scratch accumulation: direction-switch cooldown + faster gain transitions"
+      },
+      {
+        type: 'fix',
+        "description": "Clean audio defaults — bypass AmigaFilter, widen stereo, soften limiter"
+      },
+      {
+        type: 'feature',
+        "description": "DJ view polish — EQ knobs, playlist preview/FX, Auto DJ resilience"
+      },
+      {
+        type: 'fix',
+        "description": "Worklet config merge preserves repeatCount=-1 (song looping)"
+      },
+      {
+        type: 'feature',
+        "description": "DJ Complete drumpad preset + fix LFO reschedule BPM sync"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate deferred stop race causing intermittent silent playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add fader cuts to Baby/Tear scratches, convert EQ mute to hold-down"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Transformer/Crab fader (Signal override), tune Chirp/Stab timing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix baby scratch pause: tighter dead zone + steeper zero-crossings"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert \"Double scratch pattern speed — all patterns now 2× faster\""
+      },
+      {
+        type: 'fix',
+        "description": "Fix osl_create_new: set up order list + fix osl_set_order OOB write"
+      },
+      {
+        type: 'improvement',
+        "description": "Double scratch pattern speed — all patterns now 2× faster"
+      },
+      {
+        type: 'improvement',
+        "description": "Beat-sync all scratch patterns to BPM and beat grid"
+      },
+      {
+        type: 'feature',
+        "description": "Add scratch actions to drum pads with hold-to-scratch semantics"
+      },
+      {
+        type: 'fix',
+        "description": "Fix empty song ending immediately: set up order list for fresh XM"
+      },
       {
         type: 'improvement',
         "description": "Improve baby scratch: hold to loop, graceful release"
@@ -124,116 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Stop button actually stops instead of restarting from pos 0"
-      },
-      {
-        type: 'fix',
-        "description": "Fix drum pad grid to fill viewport without scrolling"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DJ vocoder settings panel not opening on click"
-      },
-      {
-        type: 'fix',
-        "description": "Remove test-songs from git, deploy separately via Hetzner scripts"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Pink Trombone note-off: engine passes time, not note"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Pink Trombone TTS: shapeMainTract was overwriting lip/constriction changes"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TMS5220 re-render loop, VLM5030 wrong ROM labels"
-      },
-      {
-        type: 'fix',
-        "description": "Remove broken eSpeak-NG from Pink Trombone — fixes 10s browser freeze"
-      },
-      {
-        type: 'fix',
-        "description": "Fix speech synths: eSpeak-NG freeze, ROM speech first-press, dynamic labels"
-      },
-      {
-        type: 'fix',
-        "description": "Fix speech synth quality: MEA8000 formant range, SP0250 pitch & fade-out"
-      },
-      {
-        type: 'feature',
-        "description": "Add ROM speech presets for Speak & Spell TMS5220"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove tone mode from speech synths, remove TMS5220 hardware UI"
-      },
-      {
-        type: 'improvement',
-        "description": "Drumpad UI improvements: ROM speech presets, pad grid layout"
-      },
-      {
-        type: 'fix',
-        "description": "PadEditor preview button uses mouseDown/Up for hold-to-play"
-      },
-      {
-        type: 'fix',
-        "description": "Drumpad sustain indicator and MIDI note-off routing"
-      },
-      {
-        type: 'fix',
-        "description": "Remove duplicate DUB_SIREN_PRESETS from factory presets"
-      },
-      {
-        type: 'improvement',
-        "description": "PadEditor uses UnifiedInstrumentEditor, wider modal"
-      },
-      {
-        type: 'improvement',
-        "description": "DECtalk pad UI with grouped character presets"
-      },
-      {
-        type: 'improvement',
-        "description": "DubSiren controls use configRef pattern for knob stability"
-      },
-      {
-        type: 'fix',
-        "description": "Speech synth timing and auto-render on trigger"
-      }
-    ]
-  },
-  {
-    version: '2026-04-15',
-    date: '2026-04-15',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Correct sample playback pitch — hardcode 2x rate for octave up"
-      },
-      {
-        type: 'fix',
-        "description": "Tour spotlight covers full tracker editor (matrix + pattern)"
-      },
-      {
-        type: 'fix',
-        "description": "Correct tour narration — sample is 303 acid line, not guitar riff"
-      },
-      {
-        type: 'improvement',
-        "description": "Tour: revert sample playback to direct Web Audio"
-      },
-      {
-        type: 'improvement',
-        "description": "PadEditor: dispose cached synth on config change"
-      },
-      {
-        type: 'improvement',
-        "description": "Update changelog, persistence schema, and project memory"
-      },
-      {
-        type: 'improvement',
-        "description": "KraftwerkHead: update VJ scene"
       }
     ]
   }

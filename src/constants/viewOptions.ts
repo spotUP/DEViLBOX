@@ -25,7 +25,6 @@ export interface ViewOption {
 /** All views available in the app, in display order. */
 export const VIEW_OPTIONS: ViewOption[] = [
   { value: 'tracker',     label: 'Tracker',      shortLabel: 'Tracker',  showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: true },
-  { value: 'mixer',       label: 'Mixer',        shortLabel: 'Mixer',    showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: true },
   { value: 'dj',          label: 'DJ Mixer',     shortLabel: 'DJ',       showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
   { value: 'drumpad',     label: 'Drum Pads',    shortLabel: 'Pads',     showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
   { value: 'vj',          label: 'VJ View',      shortLabel: 'VJ',       showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },

@@ -22,7 +22,6 @@ import { useMIDIStore } from '@/stores/useMIDIStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { useMixerStore } from '@/stores/useMixerStore';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -354,32 +353,6 @@ const DrumPadStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
       <pixiContainer alpha={noteRepeatEnabled ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
         <PixiSep height={10} />
         <pixiBitmapText text={`Repeat: ${noteRepeatRate}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.warning.color} layout={textLayout} />
-      </pixiContainer>
-    </pixiContainer>
-  );
-};
-
-// ─── Mixer Status Content ─────────────────────────────────────────────────────
-
-const MixerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
-  const theme = usePixiTheme();
-  const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
-  const soloChannels = useMixerStore(s => s.channels.filter(c => c.soloed).length);
-  const mutedChannels = useMixerStore(s => s.channels.filter(c => c.muted).length);
-
-  return (
-    <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
-      <pixiBitmapText text="MIXER" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
-      <PixiSep height={10} />
-      <pixiBitmapText text="16 channels" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
-      {/* Always mounted — conditional render causes @pixi/layout BindingError */}
-      <pixiContainer alpha={mutedChannels > 0 ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
-        <PixiSep height={10} />
-        <pixiBitmapText text={`${mutedChannels} muted`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.warning.color} layout={textLayout} />
-      </pixiContainer>
-      <pixiContainer alpha={soloChannels > 0 ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
-        <PixiSep height={10} />
-        <pixiBitmapText text={`${soloChannels} solo`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.success.color} layout={textLayout} />
       </pixiContainer>
     </pixiContainer>
   );
@@ -803,9 +776,6 @@ const MainStatusRow: React.FC<MainRowProps> = ({
         </pixiContainer>
         <pixiContainer alpha={activeView === 'drumpad' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
           <DrumPadStatusContent barHeight={STATUS_BAR_HEIGHT} />
-        </pixiContainer>
-        <pixiContainer alpha={activeView === 'mixer' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
-          <MixerStatusContent barHeight={STATUS_BAR_HEIGHT} />
         </pixiContainer>
         <pixiContainer alpha={activeView === 'studio' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
           <StudioStatusContent barHeight={STATUS_BAR_HEIGHT} />

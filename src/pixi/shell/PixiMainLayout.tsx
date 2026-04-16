@@ -32,7 +32,6 @@ import {
 import { PixiTrackerView } from '../views/PixiTrackerView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiVJView } from '../views/PixiVJView';
-import { PixiMixerView } from '../views/PixiMixerView';
 import { PixiDrumPadManager } from '../dialogs/PixiDrumPadManager';
 import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
 
@@ -102,7 +101,7 @@ class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBound
 
 // ─── View router ─────────────────────────────────────────────────────────────
 
-type MainViewId = 'tracker' | 'dj' | 'vj' | 'mixer' | 'studio' | 'drumpad';
+type MainViewId = 'tracker' | 'dj' | 'vj' | 'studio' | 'drumpad';
 
 // Views that are always mounted (hidden when inactive) to avoid @pixi/layout BindingError.
 // WorkbenchContainer and VJ are excluded — WorkbenchContainer contains its own copies
@@ -114,7 +113,6 @@ type AlwaysMountedViewId = Exclude<MainViewId, 'studio' | 'vj'>;
 const ALWAYS_MOUNTED_VIEWS: Record<AlwaysMountedViewId, React.ComponentType> = {
   tracker: PixiTrackerView,
   dj: PixiDJView,
-  mixer: PixiMixerView,
   drumpad: PixiDrumPadManager,
 };
 
@@ -274,7 +272,6 @@ export const PixiMainLayout: React.FC = () => {
       tracker: 'tracker',
       dj: 'dj',
       vj: 'vj',
-      mixer: 'mixer',
     };
     const winId = viewToWindowId[mainViewId];
     if (winId && store.windows[winId]) {

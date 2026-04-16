@@ -10,7 +10,6 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { useMixerStore } from '@/stores/useMixerStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useShallow } from 'zustand/react/shallow';
 import { KNOB_BANKS } from '@/midi/knobBanks';
@@ -239,35 +238,6 @@ const DrumPadStatusContent: React.FC = () => {
   );
 };
 
-// ─── Mixer Status Bar Content ────────────────────────────────────────────────
-
-const MixerStatusContent: React.FC = () => {
-  const mutedChannels = useMixerStore(s => s.channels.filter(c => c.muted).length);
-  const soloChannels = useMixerStore(s => s.channels.filter(c => c.soloed).length);
-
-  const sep = <div className="w-px h-3 bg-border opacity-50" />;
-
-  return (
-    <div className="flex items-center gap-4">
-      <span className="text-accent-primary font-semibold">MIXER</span>
-      {sep}
-      <span className="text-text-primary">16 channels</span>
-      {mutedChannels > 0 && (
-        <>
-          {sep}
-          <span className="text-accent-warning">{mutedChannels} muted</span>
-        </>
-      )}
-      {soloChannels > 0 && (
-        <>
-          {sep}
-          <span className="text-accent-success">{soloChannels} solo</span>
-        </>
-      )}
-    </div>
-  );
-};
-
 // ─── Studio Status Bar Content ───────────────────────────────────────────────
 
 const StudioStatusContent: React.FC = () => {
@@ -466,7 +436,6 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
             </div>
           )
           : activeView === 'drumpad' ? <DrumPadStatusContent />
-          : activeView === 'mixer' ? <MixerStatusContent />
           : activeView === 'studio' ? <StudioStatusContent />
           : <TrackerStatusContent />}
 

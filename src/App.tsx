@@ -14,7 +14,6 @@ import { useDJStore } from './stores/useDJStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
-import { useMixerStore } from './stores/useMixerStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useMIDIActions } from './hooks/useMIDIActions';
 import { usePadTriggers } from './hooks/usePadTriggers';
@@ -92,8 +91,6 @@ const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBro
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
 const DJ3DOverlay = lazy(() => import('./components/dj/DJ3DOverlay').then(m => ({ default: m.DJ3DOverlay })));
 const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
-const MixerPanel = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerPanel })));
-const MixerView  = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerView })));
 const StudioCanvasView = lazy(() => import('./components/studio/StudioCanvasView').then(m => ({ default: m.StudioCanvasView })));
 
 // Module-level flag — resets on every page load (sessionStorage persists through reloads)
@@ -552,7 +549,7 @@ function App() {
         const state = useUIStore.getState();
         if (state.modalOpen) state.closeModal();
         else if (state.showPatterns) state.togglePatterns();
-        else if (state.activeView === 'vj' || state.activeView === 'drumpad' || state.activeView === 'mixer') state.setActiveView('tracker');
+        else if (state.activeView === 'vj' || state.activeView === 'drumpad') state.setActiveView('tracker');
         return;
       }
 
@@ -623,13 +620,6 @@ function App() {
         e.preventDefault();
         const s = useUIStore.getState();
         if (s.modalOpen === 'instruments') { s.closeModal(); } else { s.openModal('instruments'); }
-        return;
-      }
-
-      // Ctrl+M: Toggle mixer DOM panel
-      if ((e.ctrlKey || e.metaKey) && e.key === 'm' && !e.shiftKey) {
-        e.preventDefault();
-        useMixerStore.getState().toggleDomPanel();
         return;
       }
 
@@ -1243,14 +1233,6 @@ function App() {
               </DJErrorBoundary>
             )}
 
-            {activeView === 'mixer' && (
-              <DJErrorBoundary viewName="Mixer">
-                <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading mixer...</div>}>
-                  <MixerView />
-                </Suspense>
-              </DJErrorBoundary>
-            )}
-
             {activeView === 'drumpad' && (
               <DJErrorBoundary viewName="DrumPad">
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading drum pads...</div>}>
@@ -1505,11 +1487,6 @@ function App() {
           </PopOutWindow>
         </Suspense>
       )}
-
-      {/* Floating DOM Mixer Panel — visibility controlled by useMixerStore.domPanelVisible */}
-      <Suspense fallback={null}>
-        <MixerPanel />
-      </Suspense>
 
       {/* Peer mouse cursor — fixed overlay covering entire UI, visible when in shared collab mode */}
       <PeerMouseCursor />

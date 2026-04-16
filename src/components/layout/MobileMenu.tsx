@@ -32,7 +32,6 @@ interface MobileMenuProps {
 // Icons for mobile menu views (keyed by view value)
 const VIEW_ICONS: Record<string, React.ReactNode> = {
   tracker: <LayoutGrid size={18} />,
-  mixer: <Sliders size={18} />,
   dj: <Radio size={18} />,
   drumpad: <Disc3 size={18} />,
   vj: <Monitor size={18} />,

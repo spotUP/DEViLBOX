@@ -433,7 +433,7 @@ export function setFollowPlayback(params: Record<string, unknown>): Record<strin
 // ─── UI Control ────────────────────────────────────────────────────────────────
 
 export function setActiveView(params: Record<string, unknown>): Record<string, unknown> {
-  useUIStore.getState().setActiveView(params.view as 'tracker' | 'mixer' | 'dj' | 'drumpad' | 'vj' | 'studio');
+  useUIStore.getState().setActiveView(params.view as 'tracker' | 'dj' | 'drumpad' | 'vj' | 'studio');
   return { ok: true };
 }
 

@@ -7,7 +7,7 @@ import type { PanelType } from '@typedefs/project';
 
 interface LayoutPreset {
   panels: PanelType[];
-  view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
+  view: 'tracker' | 'dj' | 'drumpad' | 'vj' | 'studio';
   label: string;
 }
 
@@ -18,7 +18,7 @@ const LAYOUT_PRESETS: Record<number, LayoutPreset> = {
   4: { panels: ['instrument-editor'], view: 'tracker', label: 'Instrument Editor' },
   5: { panels: ['tracker', 'automation'], view: 'tracker', label: 'Pattern + Automation' },
   6: { panels: ['tracker', 'pattern-list', 'oscilloscope', 'instrument-editor'], view: 'tracker', label: 'Full View' },
-  7: { panels: ['tracker', 'pattern-list'], view: 'mixer', label: 'Mixer' },
+  7: { panels: ['tracker', 'pattern-list'], view: 'tracker', label: 'Tracker Compact' },
   8: { panels: ['tracker', 'oscilloscope', 'instrument-editor', 'automation', 'pattern-list'], view: 'tracker', label: 'All Panels' },
 };
 
@@ -125,7 +125,7 @@ const PANEL_LABELS: Partial<Record<string, string>> = {
   'instrument-editor': 'Instrument Editor',
   'oscilloscope': 'Oscilloscope',
   'automation': 'Automation',
-  'mixer': 'Mixer',
+
 };
 
 export function focusNextPanel(): boolean {
