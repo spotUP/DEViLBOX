@@ -158,6 +158,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setVoiceParam':
+        if (this.wasm && typeof this.wasm._hively_set_voice_param === 'function') {
+          this.wasm._hively_set_voice_param(data.channel, data.paramId, data.value);
+        }
+        break;
+
       case 'setMuteMask':
         this.muteMask = data.mask;
         if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
