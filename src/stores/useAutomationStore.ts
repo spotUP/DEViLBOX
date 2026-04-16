@@ -10,6 +10,7 @@ import type {
   AutomationCurve,
   AutomationPreset,
   AutomationParameter,
+  InterpolationType,
 } from '@typedefs/automation';
 import { AUTOMATION_PRESETS, interpolateAutomationValue } from '@typedefs/automation';
 
@@ -99,6 +100,7 @@ interface AutomationStore {
   removePoint: (curveId: string, row: number) => void;
   updatePoint: (curveId: string, row: number, value: number) => void;
   clearPoints: (curveId: string) => void;
+  setPointCurveType: (curveId: string, row: number, curveType: InterpolationType | undefined) => void;
 
   // Preset application
   applyPreset: (curveId: string, preset: AutomationPreset) => void;
@@ -136,6 +138,15 @@ interface AutomationStore {
   copiedCurvePoints: AutomationCurve['points'] | null;
   copyCurve: (curveId: string) => void;
   pasteCurve: (patternId: string, channelIndex: number, parameter: string) => void;
+
+  // Curve transforms
+  flipCurve: (curveId: string) => void;            // Invert values (1-v)
+  reverseCurve: (curveId: string) => void;          // Reverse time order
+  scaleCurve: (curveId: string, min: number, max: number) => void; // Scale to range
+  offsetCurve: (curveId: string, amount: number) => void;  // Shift all values
+  smoothCurve: (curveId: string, passes?: number) => void;  // Gaussian smooth
+  thinCurve: (curveId: string, tolerance?: number) => void;  // Reduce point count
+  humanizeCurve: (curveId: string, amount?: number) => void; // Random variation
 
   // Automation recording
   recordMode: boolean;
@@ -333,6 +344,20 @@ export const useAutomationStore = create<AutomationStore>()(
         if (curve) {
           curve.points = [];
           rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    setPointCurveType: (curveId, row, curveType) => {
+      set((state) => {
+        const curve = state.curves.find((c) => c.id === curveId);
+        if (curve) {
+          const point = curve.points.find((p) => p.row === row);
+          if (point) {
+            point.curveType = curveType;
+            rebuildAutomationIndex(state);
+          }
         }
       });
       syncCurveToTracker(curveId);
@@ -548,6 +573,133 @@ export const useAutomationStore = create<AutomationStore>()(
           rebuildAutomationIndex(s);
         });
       }
+    },
+
+    // ── Curve transforms ──────────────────────────────────────────────────
+
+    flipCurve: (curveId) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve) {
+          curve.points = curve.points.map(p => ({ ...p, value: 1 - p.value }));
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    reverseCurve: (curveId) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve && curve.points.length > 1) {
+          const maxRow = Math.max(...curve.points.map(p => p.row));
+          curve.points = curve.points.map(p => ({ ...p, row: maxRow - p.row }));
+          curve.points.sort((a, b) => a.row - b.row);
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    scaleCurve: (curveId, min, max) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve && curve.points.length > 0) {
+          const range = max - min;
+          curve.points = curve.points.map(p => ({
+            ...p,
+            value: Math.max(0, Math.min(1, min + p.value * range)),
+          }));
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    offsetCurve: (curveId, amount) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve) {
+          curve.points = curve.points.map(p => ({
+            ...p,
+            value: Math.max(0, Math.min(1, p.value + amount)),
+          }));
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    smoothCurve: (curveId, passes = 2) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve && curve.points.length > 2) {
+          let pts = [...curve.points];
+          for (let pass = 0; pass < passes; pass++) {
+            const smoothed = pts.map((p, i) => {
+              if (i === 0 || i === pts.length - 1) return p; // Keep endpoints
+              const prev = pts[i - 1].value;
+              const next = pts[i + 1].value;
+              return { ...p, value: prev * 0.25 + p.value * 0.5 + next * 0.25 };
+            });
+            pts = smoothed;
+          }
+          curve.points = pts;
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    thinCurve: (curveId, tolerance = 0.02) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve && curve.points.length > 2) {
+          // Ramer-Douglas-Peucker algorithm
+          const pts = curve.points;
+          const keep = new Set<number>([0, pts.length - 1]);
+
+          const rdp = (start: number, end: number) => {
+            if (end - start < 2) return;
+            let maxDist = 0;
+            let maxIdx = start;
+            const dx = pts[end].row - pts[start].row;
+            const dy = pts[end].value - pts[start].value;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            for (let i = start + 1; i < end; i++) {
+              const dist = Math.abs(
+                dy * (pts[i].row - pts[start].row) -
+                dx * (pts[i].value - pts[start].value)
+              ) / len;
+              if (dist > maxDist) { maxDist = dist; maxIdx = i; }
+            }
+            if (maxDist > tolerance) {
+              keep.add(maxIdx);
+              rdp(start, maxIdx);
+              rdp(maxIdx, end);
+            }
+          };
+
+          rdp(0, pts.length - 1);
+          curve.points = pts.filter((_, i) => keep.has(i));
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
+    },
+
+    humanizeCurve: (curveId, amount = 0.05) => {
+      set((state) => {
+        const curve = state.curves.find(c => c.id === curveId);
+        if (curve) {
+          curve.points = curve.points.map(p => ({
+            ...p,
+            value: Math.max(0, Math.min(1, p.value + (Math.random() * 2 - 1) * amount)),
+          }));
+          rebuildAutomationIndex(state);
+        }
+      });
+      syncCurveToTracker(curveId);
     },
 
     // Automation recording
