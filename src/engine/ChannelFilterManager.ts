@@ -103,6 +103,20 @@ class ChannelFilterManager {
   }
 
   /**
+   * Set filter position or resonance on ALL active channels at once.
+   * Used by MIDI controller routing for global filter sweeps.
+   */
+  setAll(filterParam: 'position' | 'resonance', value: number): void {
+    for (const channelIndex of this.filters.keys()) {
+      if (filterParam === 'position') {
+        this.setPosition(channelIndex, value);
+      } else {
+        this.setResonance(channelIndex, value);
+      }
+    }
+  }
+
+  /**
    * Dispose all filter nodes for cleanup.
    */
   disposeAll(): void {
