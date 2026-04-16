@@ -116,7 +116,8 @@ function stopPattern(): boolean {
 
   try {
     const deck = getDJEngine().getDeck(deckId);
-    deck.stopPattern();
+    // Finish current cycle gracefully (clean zero-crossing) instead of hard stop
+    deck.finishPatternCycle();
     activePatterns[deckId] = null;
     useDJStore.getState().setDeckPattern(deckId, null);
     useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);

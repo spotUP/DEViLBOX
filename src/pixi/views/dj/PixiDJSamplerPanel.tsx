@@ -28,7 +28,7 @@ import {
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
 } from '@/engine/keyboard/commands/djScratch';
 
-const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
+const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, (start?: boolean) => boolean> = {
   scratch_baby: djScratchBaby,
   scratch_trans: djScratchTrans,
   scratch_flare: djScratchFlare,
@@ -317,9 +317,10 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
     setPadVelocities(prev => ({ ...prev, [pad.id]: velocity }));
 
     if (currentProgram && engineRef.current) {
-      // Fire scratch action if assigned
+      // Fire scratch action if assigned (start on press)
       if (pad.scratchAction) {
-        SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
+        SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(true);
+        heldPadsRef.current.add(pad.id); // track for release
       }
       if (pad.sample) {
         engineRef.current.triggerPad(pad, velocity);
@@ -361,6 +362,11 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
     if (heldPadsRef.current.has(pad.id)) {
       heldPadsRef.current.delete(pad.id);
       noteRepeatRef.current?.stopRepeat(pad.id);
+    }
+
+    // Stop scratch action on release (finish current cycle gracefully)
+    if (pad.scratchAction) {
+      SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
     }
 
     if (engineRef.current && currentProgram && pad.playMode === 'sustain') {
