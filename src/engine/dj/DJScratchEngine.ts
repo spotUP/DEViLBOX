@@ -15,6 +15,8 @@
  *    indefinitely without expiring.
  *  - Beat quantization is available but disabled (quantize: false) for all
  *    patterns to ensure zero-latency response when scratch buttons are pressed.
+ *    Instead, patterns are phase-aligned to the current beat position at start
+ *    time, giving instant response while staying locked to the beat grid.
  */
 
 import * as Tone from 'tone';
@@ -142,21 +144,21 @@ const FLARE: ScratchPattern = {
 const HYDROPLANE: ScratchPattern = {
   name: 'Hydroplane',
   shortName: 'Hydro',
-  durationBeats: null,
-  durationMs: 500,
+  durationBeats: 1,
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   trueReverse: false,  // forward-only — opposing force creates speed modulation
   frames: [
-    { timeMs: 0,   velocity: 1.0,  faderGain: 1 },  // push forward (normal speed)
-    { timeMs: 70,  velocity: 0.15, faderGain: 1 },  // resistance (opposing force)
-    { timeMs: 130, velocity: 1.1,  faderGain: 1 },  // push through resistance
-    { timeMs: 190, velocity: 0.15, faderGain: 1 },  // resistance
-    { timeMs: 250, velocity: 1.0,  faderGain: 1 },  // push through
-    { timeMs: 310, velocity: 0.2,  faderGain: 1 },  // resistance
-    { timeMs: 370, velocity: 1.0,  faderGain: 1 },  // push through
-    { timeMs: 430, velocity: 0.25, faderGain: 1 },  // trailing resistance
+    { timeFraction: 0,    velocity: 1.0,  faderGain: 1 },  // push forward (normal speed)
+    { timeFraction: 0.14, velocity: 0.15, faderGain: 1 },  // resistance (opposing force)
+    { timeFraction: 0.26, velocity: 1.1,  faderGain: 1 },  // push through resistance
+    { timeFraction: 0.38, velocity: 0.15, faderGain: 1 },  // resistance
+    { timeFraction: 0.50, velocity: 1.0,  faderGain: 1 },  // push through
+    { timeFraction: 0.62, velocity: 0.2,  faderGain: 1 },  // resistance
+    { timeFraction: 0.74, velocity: 1.0,  faderGain: 1 },  // push through
+    { timeFraction: 0.86, velocity: 0.25, faderGain: 1 },  // trailing resistance
   ],
 };
 
@@ -251,13 +253,13 @@ const CHIRP: ScratchPattern = {
 const STAB: ScratchPattern = {
   name: 'Stab',
   shortName: 'Stab',
-  durationBeats: null,
-  durationMs: 180,
+  durationBeats: 0.25,       // 1/16th note — tight rhythmic stab
+  durationMs: null,
   loop: true,
   quantize: false,
   frames: [
-    { timeMs: 0,  velocity: 3.0,   faderGain: 1 },  // forward burst, fader open
-    { timeMs: 70, velocity: -1.0,  faderGain: 0 },  // fader closed, rewind to start
+    { timeFraction: 0,    velocity: 3.0,   faderGain: 1 },  // forward burst, fader open
+    { timeFraction: 0.39, velocity: -1.0,  faderGain: 0 },  // fader closed, rewind to start
   ],
 };
 
@@ -270,21 +272,21 @@ const STAB: ScratchPattern = {
 const SCRIBBLE: ScratchPattern = {
   name: 'Scribble',
   shortName: 'Scrbl',
-  durationBeats: null,
-  durationMs: 160,           // faster cycle than baby scratch
+  durationBeats: 0.25,       // 1/16th note — rapid machine-gun stutter per beat subdivision
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   trueReverse: false,  // too rapid for ring-buffer switching — speed modulation only
   frames: [
-    { timeMs: 0,   velocity: 1.5,  faderGain: 1 },
-    { timeMs: 20,  velocity: 0.3,  faderGain: 1 },
-    { timeMs: 40,  velocity: 1.5,  faderGain: 1 },
-    { timeMs: 60,  velocity: 0.3,  faderGain: 1 },
-    { timeMs: 80,  velocity: 1.5,  faderGain: 1 },
-    { timeMs: 100, velocity: 0.3,  faderGain: 1 },
-    { timeMs: 120, velocity: 1.5,  faderGain: 1 },
-    { timeMs: 140, velocity: 0.3,  faderGain: 1 },
+    { timeFraction: 0,    velocity: 1.5,  faderGain: 1 },
+    { timeFraction: 0.125, velocity: 0.3,  faderGain: 1 },
+    { timeFraction: 0.25, velocity: 1.5,  faderGain: 1 },
+    { timeFraction: 0.375, velocity: 0.3,  faderGain: 1 },
+    { timeFraction: 0.50, velocity: 1.5,  faderGain: 1 },
+    { timeFraction: 0.625, velocity: 0.3,  faderGain: 1 },
+    { timeFraction: 0.75, velocity: 1.5,  faderGain: 1 },
+    { timeFraction: 0.875, velocity: 0.3,  faderGain: 1 },
   ],
 };
 
@@ -336,21 +338,21 @@ const TEAR: ScratchPattern = {
 const UZI: ScratchPattern = {
   name: 'Uzi',
   shortName: 'Uzi',
-  durationBeats: null,
-  durationMs: 60,
+  durationBeats: 0.125,      // 1/32nd note — extremely fast buzz per beat subdivision
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   trueReverse: false,
   frames: [
-    { timeMs: 0,   velocity: 1.4, faderGain: 1 },
-    { timeMs: 8,   velocity: 0.6, faderGain: 1 },
-    { timeMs: 15,  velocity: 1.4, faderGain: 1 },
-    { timeMs: 23,  velocity: 0.6, faderGain: 1 },
-    { timeMs: 30,  velocity: 1.4, faderGain: 1 },
-    { timeMs: 38,  velocity: 0.6, faderGain: 1 },
-    { timeMs: 45,  velocity: 1.4, faderGain: 1 },
-    { timeMs: 53,  velocity: 0.6, faderGain: 1 },
+    { timeFraction: 0,     velocity: 1.4, faderGain: 1 },
+    { timeFraction: 0.125, velocity: 0.6, faderGain: 1 },
+    { timeFraction: 0.25,  velocity: 1.4, faderGain: 1 },
+    { timeFraction: 0.375, velocity: 0.6, faderGain: 1 },
+    { timeFraction: 0.50,  velocity: 1.4, faderGain: 1 },
+    { timeFraction: 0.625, velocity: 0.6, faderGain: 1 },
+    { timeFraction: 0.75,  velocity: 1.4, faderGain: 1 },
+    { timeFraction: 0.875, velocity: 0.6, faderGain: 1 },
   ],
 };
 
@@ -468,17 +470,17 @@ const FLARE_3CLICK: ScratchPattern = {
 const LASER: ScratchPattern = {
   name: 'Laser',
   shortName: 'Laser',
-  durationBeats: null,
-  durationMs: 150,
+  durationBeats: 0.25,       // 1/16th note — rhythmic laser hits
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   frames: [
-    { timeMs: 0,   velocity: 5.0,  faderGain: 1 },  // sharp hit — very fast forward
-    { timeMs: 30,  velocity: 2.5,  faderGain: 1 },  // rapid deceleration (descending pitch)
-    { timeMs: 60,  velocity: 0.8,  faderGain: 1 },  // slowing further
-    { timeMs: 90,  velocity: 0.2,  faderGain: 1 },  // nearly stopped
-    { timeMs: 110, velocity: -1.0, faderGain: 0 },  // fader cut, silent rewind
+    { timeFraction: 0,    velocity: 5.0,  faderGain: 1 },  // sharp hit — very fast forward
+    { timeFraction: 0.20, velocity: 2.5,  faderGain: 1 },  // rapid deceleration (descending pitch)
+    { timeFraction: 0.40, velocity: 0.8,  faderGain: 1 },  // slowing further
+    { timeFraction: 0.60, velocity: 0.2,  faderGain: 1 },  // nearly stopped
+    { timeFraction: 0.73, velocity: -1.0, faderGain: 0 },  // fader cut, silent rewind
   ],
 };
 
@@ -494,17 +496,17 @@ const LASER: ScratchPattern = {
 const PHASER_SCRATCH: ScratchPattern = {
   name: 'Phaser',
   shortName: 'Phasr',
-  durationBeats: null,
-  durationMs: 120,
+  durationBeats: 0.25,       // 1/16th note — tight rhythmic zap
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   frames: [
-    { timeMs: 0,   velocity: 5.0,  faderGain: 1 },  // sharp hit forward
-    { timeMs: 20,  velocity: 2.0,  faderGain: 1 },  // rapid decel (opposing hand)
-    { timeMs: 35,  velocity: 0,    faderGain: 1 },  // complete stop (caught by hand)
-    { timeMs: 55,  velocity: 0,    faderGain: 1 },  // held at stop
-    { timeMs: 80,  velocity: -0.8, faderGain: 0 },  // silent reset
+    { timeFraction: 0,    velocity: 5.0,  faderGain: 1 },  // sharp hit forward
+    { timeFraction: 0.17, velocity: 2.0,  faderGain: 1 },  // rapid decel (opposing hand)
+    { timeFraction: 0.29, velocity: 0,    faderGain: 1 },  // complete stop (caught by hand)
+    { timeFraction: 0.46, velocity: 0,    faderGain: 1 },  // held at stop
+    { timeFraction: 0.67, velocity: -0.8, faderGain: 0 },  // silent reset
   ],
 };
 
@@ -577,17 +579,17 @@ const DRAG: ScratchPattern = {
 const VIBRATO: ScratchPattern = {
   name: 'Vibrato',
   shortName: 'Vibr',
-  durationBeats: null,
-  durationMs: 100,
+  durationBeats: 0.25,       // 1/16th note — vibrato oscillation synced to beat subdivisions
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   trueReverse: false,
   frames: [
-    { timeMs: 0,   velocity: 1.25, faderGain: 1 },
-    { timeMs: 25,  velocity: 0.75, faderGain: 1 },
-    { timeMs: 50,  velocity: 1.25, faderGain: 1 },
-    { timeMs: 75,  velocity: 0.75, faderGain: 1 },
+    { timeFraction: 0,    velocity: 1.25, faderGain: 1 },
+    { timeFraction: 0.25, velocity: 0.75, faderGain: 1 },
+    { timeFraction: 0.50, velocity: 1.25, faderGain: 1 },
+    { timeFraction: 0.75, velocity: 0.75, faderGain: 1 },
   ],
 };
 
@@ -712,8 +714,23 @@ export class ScratchPlayback {
 
     const startLoop = () => {
       this.activePattern = pattern;
-      this.patternElapsedMs = 0;
       this.patternLastTick = performance.now();
+
+      // Phase-align: start the pattern at the correct phase within the current
+      // beat so scratch cycles lock to beat boundaries. This gives instant
+      // response (no quantize delay) while keeping the rhythm perfectly synced.
+      if (bpm >= 30) {
+        try {
+          const elapsed = this.getDeck().replayer.getElapsedMs();
+          const posInCycle = elapsed % this.patternDurationMs;
+          this.patternElapsedMs = posInCycle;
+        } catch {
+          this.patternElapsedMs = 0;
+        }
+      } else {
+        this.patternElapsedMs = 0;
+      }
+
       this._startPatternInterval();
     };
 
