@@ -75,6 +75,7 @@ interface MIDIStore {
   // UI State
   showPatternDialog: boolean;
   showKnobBar: boolean;
+  knobValues: Record<string, number>;  // Current values for bank knobs (param → 0-1)
 
   // Actions
   init: () => Promise<boolean>;
@@ -97,6 +98,7 @@ interface MIDIStore {
   openPatternDialog: () => void;
   closePatternDialog: () => void;
   setShowKnobBar: (show: boolean) => void;
+  setKnobValue: (param: string, value: number) => void;
 
   // CC value handlers (set by TB303KnobPanel to receive MIDI CC updates)
   // Note: Using Record instead of Map because immer doesn't handle Map correctly
@@ -149,7 +151,10 @@ interface MIDIStore {
 
 // Helper to update parameters from bank CC — delegates to NKS2 parameter router
 const updateBankParameter = (param: MappableParameter, value: number) => {
-  routeParameterToEngine(param, value / 127);
+  const normalized = value / 127;
+  routeParameterToEngine(param, normalized);
+  // Store the value so UI knobs can reflect it
+  useMIDIStore.getState().setKnobValue(param, normalized);
 };
 
 
@@ -219,6 +224,7 @@ export const useMIDIStore = create<MIDIStore>()(
       djKnobTotalPages: DJ_KNOB_BANKS.length,
       showPatternDialog: false,
       showKnobBar: true, // Always visible — shows parameter assignments
+      knobValues: {},    // Current knob positions (param → 0-1)
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
 
       // Initialize MIDI
@@ -940,6 +946,12 @@ export const useMIDIStore = create<MIDIStore>()(
       setShowKnobBar: (show) => {
         set((state) => {
           state.showKnobBar = show;
+        });
+      },
+
+      setKnobValue: (param, value) => {
+        set((state) => {
+          state.knobValues[param] = value;
         });
       },
 

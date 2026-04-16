@@ -15,7 +15,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { KNOB_BANKS } from '@/midi/knobBanks';
 import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '@/midi/djKnobBanks';
 import type { KnobBankMode } from '@/midi/types';
-import { Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Knob } from '@/components/controls/Knob';
+import { routeParameterToEngine } from '@/midi/performance/parameterRouter';
+import type { KnobAssignment } from '@/midi/knobBanks';
+import { Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 
 interface StatusBarProps {}
 
@@ -316,7 +319,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 
   // MIDI state
-  const { knobBank, setKnobBank, djKnobPage, setDJKnobPage, isInitialized, inputDevices, selectedInputId, showKnobBar, setShowKnobBar } = useMIDIStore();
+  const { knobBank, setKnobBank, djKnobPage, setDJKnobPage, isInitialized, inputDevices, selectedInputId, showKnobBar, setShowKnobBar, knobValues, setKnobValue } = useMIDIStore();
 
   const hasMIDIDevice = isInitialized && inputDevices.length > 0;
   const selectedDevice = hasMIDIDevice ? (inputDevices.find(d => d.id === selectedInputId) || inputDevices[0]) : null;
@@ -405,21 +408,32 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
           </div>
 
           {/* Knob Assignment Grid */}
-          <div className="grid grid-cols-8 gap-2">
-            {currentAssignments.map((assignment: { cc: number; label: string }, index: number) => (
-              <div
-                key={index}
-                className="flex flex-col items-center p-1.5 rounded bg-dark-bgSecondary border border-dark-border relative group overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 w-full h-[2px] bg-accent-primary/20 group-hover:bg-accent-primary/50 transition-colors"></div>
-                <span className="text-[8px] font-mono text-text-muted mb-1 flex items-center gap-1">
-                  <Disc size={8} /> K{index + 1} (CC {assignment.cc})
-                </span>
-                <span className="text-[10px] font-bold text-accent-primary uppercase truncate w-full text-center">
-                  {assignment.label}
-                </span>
-              </div>
-            ))}
+          <div className="grid grid-cols-8 gap-3">
+            {currentAssignments.map((assignment: { cc: number; label: string; param?: string }, index: number) => {
+              const param = (assignment as KnobAssignment).param || '';
+              const currentValue = knobValues[param] ?? 0.5;
+              const isBipolar = param === 'mixer.pan' || param === 'mixer.filterPosition' || param.endsWith('.crossfader');
+              return (
+                <div
+                  key={index}
+                  className="flex flex-col items-center"
+                >
+                  <Knob
+                    value={currentValue}
+                    min={0}
+                    max={1}
+                    size="sm"
+                    label={assignment.label}
+                    bipolar={isBipolar}
+                    hideValue
+                    onChange={(v) => {
+                      setKnobValue(param, v);
+                      if (param) routeParameterToEngine(param, v);
+                    }}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
