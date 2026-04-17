@@ -14,7 +14,7 @@ import type { MenuItemType } from '@/components/common/ContextMenu';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import { SYNTH_QUICK_PRESETS } from './useDJQuickAssignData';
-import { PAD_INSTRUMENT_BASE } from '@/types/drumpad';
+import { PAD_INSTRUMENT_BASE, createDefaultPadFX } from '@/types/drumpad';
 import type { DrumPad, OutputBus, VelocityCurve, ScratchActionId } from '@/types/drumpad';
 import type { DrumMachineType, DrumType } from '@/types/instrument/drums';
 import { getDjFxByCategory, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
@@ -25,6 +25,9 @@ import { SYNTH_CATEGORIES, getSynthInfo } from '@/constants/synthCategories';
 import type { SynthType, InstrumentPreset } from '@/types/instrument';
 import { TB303_PRESETS } from '@/constants/tb303Presets';
 import { DECTALK_PRESETS } from '@/constants/dectalkPresets';
+import { FACTORY_PRESETS } from '@/constants/factoryPresets';
+import { getPresetsForSynthType } from '@/constants/synthPresets/allPresets';
+import { getToneEngine } from '@/engine/ToneEngine';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +91,17 @@ function buildLoadedPadMenu(
       id: 'rename', label: 'Rename...',
       onClick: () => callbacks.onRename!(padId),
     });
+  }
+
+  // ── Synth Presets (if pad has a synth assigned) ──────────────────────────
+  if (pad.synthConfig?.synthType) {
+    const presetSubmenu = buildSynthPresetSubmenu(padId, pad, store);
+    if (presetSubmenu.length > 0) {
+      items.push({
+        id: 'presets', label: `Presets (${pad.synthConfig.synthType})`,
+        submenu: presetSubmenu,
+      });
+    }
   }
   items.push({ type: 'divider' });
 
@@ -368,6 +382,119 @@ function buildOneShotSubmenu(
   return items;
 }
 
+// ── Synth Preset submenu (for pads with a synth assigned) ───────────────────
+
+function buildSynthPresetSubmenu(
+  padId: number,
+  pad: DrumPad,
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): MenuItemType[] {
+  const synthType = pad.synthConfig?.synthType;
+  if (!synthType) return [];
+
+  const items: MenuItemType[] = [];
+
+  // 1. Factory presets (full InstrumentConfig — includes effects, volume, etc.)
+  const factoryPresets = FACTORY_PRESETS.filter(p => p.synthType === synthType);
+
+  // 2. Synth presets (synth-specific config only — lighter, more focused)
+  const synthPresets = getPresetsForSynthType(synthType);
+
+  // 3. DJ One-Shot presets (for DubSiren specifically)
+  const djPresets = getPresetsForSynth(synthType);
+
+  // Group by category for synth presets
+  if (synthPresets.length > 0) {
+    const categories = new Map<string, typeof synthPresets>();
+    for (const p of synthPresets) {
+      const cat = p.category || 'other';
+      if (!categories.has(cat)) categories.set(cat, []);
+      categories.get(cat)!.push(p);
+    }
+
+    for (const [cat, presets] of categories) {
+      for (const preset of presets) {
+        items.push({
+          id: `preset-synth-${preset.id}`,
+          label: preset.name,
+          radio: true,
+          checked: pad.presetName === preset.name,
+          onClick: () => applySynthPresetToPad(padId, pad, preset.name, preset.config, store),
+        });
+      }
+      if (cat !== [...categories.keys()].pop()) {
+        items.push({ type: 'divider' });
+      }
+    }
+  }
+
+  // Add factory presets
+  if (factoryPresets.length > 0) {
+    if (items.length > 0) items.push({ type: 'divider' });
+    for (const preset of factoryPresets) {
+      items.push({
+        id: `preset-factory-${preset.name?.replace(/\s/g, '-').toLowerCase()}`,
+        label: preset.name || 'Unnamed',
+        radio: true,
+        checked: pad.presetName === preset.name,
+        onClick: () => {
+          const padInstId = PAD_INSTRUMENT_BASE + padId;
+          try { getToneEngine().disposeInstrument(padInstId); } catch {}
+          store.updatePad(padId, {
+            presetName: preset.name,
+            synthConfig: {
+              ...preset,
+              id: padInstId,
+              effects: preset.effects?.length ? preset.effects : createDefaultPadFX(),
+            } as any,
+          });
+        },
+      });
+    }
+  }
+
+  // Add DJ one-shot presets for DubSiren
+  if (djPresets && djPresets.length > 0 && synthType === 'DubSiren') {
+    if (items.length > 0) items.push({ type: 'divider' });
+    items.push({ id: 'preset-dj-header', label: '── DJ One-Shots ──', disabled: true });
+    for (const preset of djPresets) {
+      if (preset.synthType !== 'DubSiren') continue;
+      items.push({
+        id: `preset-dj-${preset.name?.replace(/\s/g, '-').toLowerCase()}`,
+        label: preset.name || 'Unnamed',
+        radio: true,
+        checked: pad.presetName === preset.name,
+        onClick: () => assignSynthWithPreset(padId, synthType, preset, store),
+      });
+    }
+  }
+
+  return items;
+}
+
+/** Apply a SynthPreset's config to an existing pad (merges into synthConfig) */
+function applySynthPresetToPad(
+  padId: number,
+  pad: DrumPad,
+  presetName: string,
+  presetConfig: Record<string, unknown>,
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  if (!pad.synthConfig) return;
+  const padInstId = PAD_INSTRUMENT_BASE + padId;
+  // Dispose cached synth so new config takes effect
+  try { getToneEngine().disposeInstrument(padInstId); } catch {}
+  // Merge preset config into existing synthConfig (preserve id, effects, etc.)
+  store.updatePad(padId, {
+    presetName,
+    synthConfig: {
+      ...pad.synthConfig,
+      ...presetConfig,
+      id: padInstId,
+    } as any,
+  });
+}
+
 // ── Quick assign submenu (synth voices) ─────────────────────────────────────
 
 // Helper to get presets for a synth type
@@ -440,14 +567,18 @@ function assignSynthWithPreset(
   preset: InstrumentPreset['config'],
   store: ReturnType<typeof useDrumPadStore.getState>,
 ): void {
-  // Merge preset with pad-specific IDs
+  const padInstId = PAD_INSTRUMENT_BASE + padId;
+  // Dispose cached synth so new preset takes effect
+  try { getToneEngine().disposeInstrument(padInstId); } catch {}
   const presetConfig = {
     ...preset,
-    id: PAD_INSTRUMENT_BASE + padId,
+    id: padInstId,
+    effects: preset.effects?.length ? preset.effects : createDefaultPadFX(),
   };
 
   store.updatePad(padId, {
     name: preset.name || synthType,
+    presetName: preset.name || undefined,
     synthConfig: presetConfig as any,
     instrumentNote: 'C4',
     playMode: 'oneshot',
@@ -497,12 +628,13 @@ function assignGeneralSynth(
   // Default: create basic synth config
   store.updatePad(padId, {
     name: synthName,
+    presetName: undefined,
     synthConfig: {
       id: PAD_INSTRUMENT_BASE + padId,
       name: synthName,
       type: 'synth',
       synthType,
-      effects: [],
+      effects: createDefaultPadFX(),
       volume: 0,
       pan: 0,
     },
