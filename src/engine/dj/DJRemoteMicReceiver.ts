@@ -22,6 +22,11 @@ export class DJRemoteMicReceiver {
   private pc: RTCPeerConnection | null = null;
   private remoteSource: MediaStreamAudioSourceNode | null = null;
   private remoteGain: GainNode | null = null;
+  // Chromium will not deliver samples from an inbound WebRTC audio track to a
+  // MediaStreamAudioSourceNode unless the stream is also consumed by an <audio>
+  // element. Muted sink keeps the track "playing" so Web Audio actually receives PCM.
+  // See crbug.com/933677.
+  private audioSink: HTMLAudioElement | null = null;
   roomCode: string | null = null;
   onStatusChange?: (status: 'waiting' | 'connected' | 'disconnected') => void;
 
@@ -114,6 +119,18 @@ export class DJRemoteMicReceiver {
   /** Route the received audio stream to the DJ mixer */
   private routeRemoteAudio(stream: MediaStream): void {
     const ctx = Tone.getContext().rawContext as AudioContext;
+
+    // Chromium silent-inbound-track workaround (crbug.com/933677): the stream
+    // must be attached to an HTMLAudioElement and playing, otherwise the
+    // MediaStreamAudioSourceNode below produces silence.
+    this.audioSink = new Audio();
+    this.audioSink.srcObject = stream;
+    this.audioSink.muted = true;
+    this.audioSink.autoplay = true;
+    this.audioSink.play().catch((err) => {
+      console.warn('[RemoteMic] audio sink play() rejected (autoplay policy?):', err);
+    });
+
     this.remoteSource = ctx.createMediaStreamSource(stream);
     this.remoteGain = ctx.createGain();
     this.remoteGain.gain.value = 1.0;
@@ -142,6 +159,11 @@ export class DJRemoteMicReceiver {
   private cleanupPeerConnection(): void {
     this.remoteSource?.disconnect();
     this.remoteGain?.disconnect();
+    if (this.audioSink) {
+      this.audioSink.pause();
+      this.audioSink.srcObject = null;
+      this.audioSink = null;
+    }
     this.pc?.close();
     this.remoteSource = null;
     this.remoteGain = null;

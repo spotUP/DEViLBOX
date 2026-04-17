@@ -48,13 +48,14 @@ export const DJVocoderControl: React.FC = () => {
   const gearRef = useRef<HTMLButtonElement>(null);
   const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
 
-  // Close panel on click outside (exclude the gear button itself)
+  // Close panel on click outside (exclude the gear button itself and portaled dropdowns)
   useEffect(() => {
     if (!showPanel) return;
     const handlePointerDown = (e: PointerEvent) => {
-      const target = e.target as Node;
+      const target = e.target as Element | null;
       if (gearRef.current?.contains(target)) return; // gear toggles via its own handler
       if (panelRef.current?.contains(target)) return; // click inside panel
+      if (target?.closest?.('[data-context-menu]')) return; // CustomSelect dropdown (portaled)
       setShowPanel(false);
     };
     document.addEventListener('pointerdown', handlePointerDown);
@@ -127,6 +128,7 @@ export const DJVocoderControl: React.FC = () => {
       setActiveVocoderEngine(engine);
       setMuted(true);
       engine.setMuted(true);
+      engine.setMicActive(false); // mic idle until PTT — prevents ambient bleed into FX
       if (followMelodyEnabledRef.current) {
         followMelodyRef.current = new VocoderAutoTune(engine);
         followMelodyRef.current.start();
@@ -219,6 +221,7 @@ export const DJVocoderControl: React.FC = () => {
       useVocoderStore.getState().setActive(true);
     }
     setMuted(false);
+    engine.setMicActive(true);
     engine.setMuted(false);
     if (duckingEnabled) {
       try { getDJEngineIfActive()?.mixer.duck(); } catch { /* ok */ }
@@ -231,6 +234,9 @@ export const DJVocoderControl: React.FC = () => {
     if (!engineRef.current) return;
     setMuted(true);
     engineRef.current.setMuted(true);
+    // Cut the mic track so the worklet stops being fed by ambient noise —
+    // prevents the FX chain (reverb/delay) from sustaining continuous static.
+    engineRef.current.setMicActive(false);
     if (duckingEnabled) {
       try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
     }
@@ -328,13 +334,11 @@ export const DJVocoderControl: React.FC = () => {
         onPointerLeave={handlePTTUp}
         onPointerCancel={handlePTTUp}
         onContextMenu={(e) => e.preventDefault()}
-        className={`
-          px-2 py-1 rounded text-[10px] font-bold transition-all select-none touch-none
+        className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all select-none touch-none
           ${!muted || globalPTT
-            ? 'bg-green-600 text-white shadow-[0_0_8px_rgba(34,197,94,0.4)]'
-            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
-          }
-        `}
+            ? 'border-green-500 bg-green-600 text-white shadow-[0_0_8px_rgba(34,197,94,0.4)]'
+            : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+          }`}
         title="Hold to talk (or press Space) — release to let echo ring out"
       >
         TALK
@@ -343,18 +347,16 @@ export const DJVocoderControl: React.FC = () => {
       {/* VOCODER toggle — always visible */}
       <button
         onClick={handleToggle}
-        className={`
-          px-2 py-1 rounded text-xs font-bold transition-all relative overflow-hidden
+        className={`relative overflow-hidden px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
           ${isActive
-            ? 'bg-purple-600 hover:bg-purple-700 text-white'
-            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
-          }
-        `}
+            ? 'border-purple-500 bg-purple-600 text-white hover:bg-purple-700'
+            : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+          }`}
         title={isActive ? 'Switch to clean mic' : 'Enable robot voice'}
       >
         {isActive && !muted && (
           <span
-            className="absolute inset-0 bg-purple-400 rounded pointer-events-none"
+            className="absolute inset-0 bg-purple-400 rounded-md pointer-events-none"
             style={{ opacity: amplitude * 0.5 }}
           />
         )}
@@ -375,15 +377,15 @@ export const DJVocoderControl: React.FC = () => {
           }
           setShowPanel(v => !v);
         }}
-        className={`relative flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${
+        className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all ${
           showPanel
-            ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
-            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
+            ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
+            : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
         }`}
-        title="Mic & vocoder settings"
+        title="Voice settings — mic, vocoder, autotune, mic FX"
       >
-        <Settings size={11} />
-        <span>Prefs</span>
+        <Settings size={12} />
+        <span>Voice</span>
         {activeFeatureCount > 0 && (
           <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-accent-primary text-[7px] font-bold text-dark-bg flex items-center justify-center">
             {activeFeatureCount}
