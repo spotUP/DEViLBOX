@@ -283,6 +283,83 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 76, param: 'cz101.dca_rate', label: 'DCA Rat' },
     { cc: 77, param: 'mixer.volume', label: 'Volume' },
   ],
+  // ── Harmonic Synth ────────────────────────────────────────────────────────
+  'Harmonic': [
+    { cc: 70, param: 'harmonic.filterCutoff', label: 'Cutoff' },
+    { cc: 71, param: 'harmonic.filterResonance', label: 'Reso' },
+    { cc: 72, param: 'harmonic.attack', label: 'Attack' },
+    { cc: 73, param: 'harmonic.decay', label: 'Decay' },
+    { cc: 74, param: 'harmonic.sustain', label: 'Sustain' },
+    { cc: 75, param: 'harmonic.release', label: 'Release' },
+    { cc: 76, param: 'harmonic.spectralTilt', label: 'Tilt' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── Wavetable Synth ───────────────────────────────────────────────────────
+  'Wavetable': [
+    { cc: 70, param: 'wavetable.morphPosition', label: 'Morph' },
+    { cc: 71, param: 'wavetable.cutoff', label: 'Cutoff' },
+    { cc: 72, param: 'wavetable.resonance', label: 'Reso' },
+    { cc: 73, param: 'wavetable.attack', label: 'Attack' },
+    { cc: 74, param: 'wavetable.decay', label: 'Decay' },
+    { cc: 75, param: 'wavetable.sustain', label: 'Sustain' },
+    { cc: 76, param: 'wavetable.release', label: 'Release' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── Pink Trombone (vocal tract) ───────────────────────────────────────────
+  'PinkTrombone': [
+    { cc: 70, param: 'pinktrombone.tongueIndex', label: 'Tongue' },
+    { cc: 71, param: 'pinktrombone.tongueDiameter', label: 'TngDia' },
+    { cc: 72, param: 'pinktrombone.lipDiameter', label: 'Lip' },
+    { cc: 73, param: 'pinktrombone.constrictionIndex', label: 'CnstIdx' },
+    { cc: 74, param: 'pinktrombone.constrictionDiameter', label: 'CnstDia' },
+    { cc: 75, param: 'pinktrombone.velum', label: 'Velum' },
+    { cc: 76, param: 'pinktrombone.tenseness', label: 'Tense' },
+    { cc: 77, param: 'pinktrombone.vibratoAmount', label: 'Vibrato' },
+  ],
+  // ── Sfizz (SFZ sampler) ───────────────────────────────────────────────────
+  'Sfizz': [
+    { cc: 70, param: 'sfizz.expression', label: 'Express' },
+    { cc: 71, param: 'sfizz.modWheel', label: 'ModWhl' },
+    { cc: 72, param: 'sfizz.pan', label: 'Pan' },
+    { cc: 73, param: 'sfizz.chorusSend', label: 'Chorus' },
+    { cc: 74, param: 'sfizz.reverbSend', label: 'Reverb' },
+    { cc: 75, param: 'sfizz.transpose', label: 'Trans' },
+    { cc: 76, param: 'sfizz.polyphony', label: 'Poly' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── CEM3394 (analog synth chip) ───────────────────────────────────────────
+  'CEM3394': [
+    { cc: 70, param: 'cem3394.saw', label: 'Saw' },
+    { cc: 71, param: 'cem3394.square', label: 'Square' },
+    { cc: 72, param: 'cem3394.triangle', label: 'Tri' },
+    { cc: 73, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 74, param: 'mixer.filterResonance', label: 'Reso' },
+    { cc: 75, param: 'mixer.pan', label: 'Pan' },
+    { cc: 76, param: 'mixer.volume', label: 'Volume' },
+    { cc: 77, param: 'masterFx.masterVolume', label: 'Master' },
+  ],
+  // ── TR-808 (drum machine) ─────────────────────────────────────────────────
+  'TR808': [
+    { cc: 70, param: 'tr808.kick', label: 'Kick' },
+    { cc: 71, param: 'tr808.snare', label: 'Snare' },
+    { cc: 72, param: 'tr808.closedHat', label: 'CH' },
+    { cc: 73, param: 'tr808.openHat', label: 'OH' },
+    { cc: 74, param: 'tr808.clap', label: 'Clap' },
+    { cc: 75, param: 'tr808.cowbell', label: 'Cowbell' },
+    { cc: 76, param: 'tr808.cymbal', label: 'Cymbal' },
+    { cc: 77, param: 'tr808.clave', label: 'Clave' },
+  ],
+  // ── TR-909 (drum machine) ─────────────────────────────────────────────────
+  'TR909': [
+    { cc: 70, param: 'tr909.kick', label: 'Kick' },
+    { cc: 71, param: 'tr909.snare', label: 'Snare' },
+    { cc: 72, param: 'tr909.closedHat', label: 'CH' },
+    { cc: 73, param: 'tr909.openHat', label: 'OH' },
+    { cc: 74, param: 'tr909.clap', label: 'Clap' },
+    { cc: 75, param: 'tr909.crash', label: 'Crash' },
+    { cc: 76, param: 'tr909.ride', label: 'Ride' },
+    { cc: 77, param: 'tr909.rimshot', label: 'Rim' },
+  ],
 };
 
 /**
@@ -471,6 +548,18 @@ export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
     x: { param: 'cz101.dcw_rate', min: 0, max: 1, curve: 'linear' },
     y: { param: 'cz101.dcw_depth', min: 0, max: 1, curve: 'linear' },
   },
+  'Harmonic': {
+    x: { param: 'harmonic.filterCutoff', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'harmonic.filterResonance', min: 0, max: 1, curve: 'linear' },
+  },
+  'Wavetable': {
+    x: { param: 'wavetable.morphPosition', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'wavetable.cutoff', min: 0, max: 1, curve: 'linear' },
+  },
+  'PinkTrombone': {
+    x: { param: 'pinktrombone.tongueIndex', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'pinktrombone.tongueDiameter', min: 0, max: 1, curve: 'linear' },
+  },
 };
 
 /** Map a SynthType to the appropriate knob bank for auto-switching */
@@ -540,6 +629,35 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
 
   // CZ-101
   if (synthType === 'CZ101') return 'CZ101';
+
+  // Harmonic synth
+  if (synthType === 'HarmonicSynth') return 'Harmonic';
+
+  // Wavetable synth
+  if (synthType === 'Wavetable') return 'Wavetable';
+
+  // Pink Trombone vocal synth
+  if (synthType === 'PinkTrombone') return 'PinkTrombone';
+
+  // Sfizz SFZ sampler
+  if (synthType === 'Sfizz') return 'Sfizz';
+
+  // CEM3394 analog chip
+  if (synthType === 'CEM3394') return 'CEM3394';
+
+  // TR-808 drum machine
+  if (synthType === 'TR808') return 'TR808';
+
+  // TR-909 drum machine
+  if (synthType === 'TR909') return 'TR909';
+
+  // Volume-only synths → Mixer bank (filter sweep, pan, volume, FX sends)
+  if (synthType === 'Buzzmachine' || synthType === 'D50' || synthType === 'FredSynth'
+    || synthType === 'TFMXSynth' || synthType === 'TFMXModuleSynth'
+    || synthType === 'OctaMEDSynth' || synthType === 'SymphonieSynth'
+    || synthType === 'MusicLineSynth' || synthType === 'PreTrackerSynth'
+    || synthType === 'FuturePlayerSynth' || synthType === 'DrumKit'
+    || synthType === 'WAM') return 'Mixer';
 
   return null;
 }
