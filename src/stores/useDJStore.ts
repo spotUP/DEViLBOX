@@ -59,6 +59,7 @@ export interface DeckState {
   eqLowKill: boolean;
   eqMidKill: boolean;
   eqHighKill: boolean;
+  eqPreset: string | null;    // active quick-EQ preset id, null = custom
 
   // Filter
   filterPosition: number;     // -1 (HPF) to 0 (off) to +1 (LPF)
@@ -168,6 +169,7 @@ const defaultDeckState: DeckState = {
   eqLowKill: false,
   eqMidKill: false,
   eqHighKill: false,
+  eqPreset: null,
   filterPosition: 0,
   filterResonance: 1,
   volume: 1,
@@ -493,6 +495,7 @@ export const useDJStore = create<DJStore>()(
       set((state) => {
         const key = `eq${band.charAt(0).toUpperCase() + band.slice(1)}` as 'eqLow' | 'eqMid' | 'eqHigh';
         state.decks[deck][key] = Math.max(-24, Math.min(6, dB));
+        state.decks[deck].eqPreset = null;
       }),
 
     setDeckEQKill: (deck, band, kill) =>

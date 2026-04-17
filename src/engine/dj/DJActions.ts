@@ -13,6 +13,7 @@
 
 import * as Tone from 'tone';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
+import type { DjEqPreset } from '@/constants/djEqPresets';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
@@ -295,6 +296,22 @@ export function setDeckEQ(deckId: DeckId, band: 'low' | 'mid' | 'high', dB: numb
   useDJStore.getState().setDeckEQ(deckId, band, clamped);
   try {
     getDJEngine().getDeck(deckId).setEQ(band, clamped);
+  } catch { /* engine not ready */ }
+}
+
+/** Apply a quick-EQ preset to a deck (all 3 bands atomically). */
+export function applyEqPreset(deckId: DeckId, preset: DjEqPreset): void {
+  useDJStore.getState().setDeckState(deckId, {
+    eqLow: preset.eqLow,
+    eqMid: preset.eqMid,
+    eqHigh: preset.eqHigh,
+    eqPreset: preset.id,
+  });
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    deck.setEQ('low', preset.eqLow);
+    deck.setEQ('mid', preset.eqMid);
+    deck.setEQ('high', preset.eqHigh);
   } catch { /* engine not ready */ }
 }
 
