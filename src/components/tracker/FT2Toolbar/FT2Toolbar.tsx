@@ -24,10 +24,11 @@ import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { Maximize2, Minimize2, X } from 'lucide-react';
+import { Maximize2, Minimize2, X, Menu, FileUp, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { NibblesGame } from '@components/visualization/NibblesGame';
+import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
@@ -509,6 +510,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     if (newLength >= 1 && newLength <= 256) resizePattern(currentPatternIndex, newLength);
   };
 
+  const hamburgerMenuItems: MenuItemType[] = [
+    { id: 'export', label: 'Export', icon: <FileUp size={14} />, shortcut: '⌘⇧E', onClick: () => onShowExport?.() },
+    { id: 'new', label: 'New Song', icon: <FilePlus size={14} />, onClick: () => useUIStore.getState().openNewSongWizard() },
+    { id: 'clear', label: 'Clear All Patterns', icon: <ClearIcon size={14} />, danger: true, onClick: () => setShowClearModal(true) },
+    { type: 'divider' as const },
+    { id: 'ai', label: 'AI Composition', icon: <Wand2 size={14} />, checked: aiOpen, onClick: toggleAI },
+    { type: 'divider' as const },
+    { id: 'info', label: 'Song Info', icon: <InfoIcon size={14} />, onClick: () => { const s = useUIStore.getState(); if (s.modalOpen === 'moduleInfo') { s.closeModal(); } else { s.openModal('moduleInfo'); } } },
+    { type: 'divider' as const },
+    { id: 'help', label: 'Help & Shortcuts', icon: <HelpCircle size={14} />, shortcut: '?', onClick: () => onShowHelp?.() },
+    { id: 'about', label: 'About DEViLBOX', onClick: () => setShowAbout(true) },
+    { id: 'nibbles', label: 'Nibbles', icon: <Gamepad2 size={14} />, onClick: () => setShowNibbles(true) },
+  ];
+
   return (
     <div className="ft2-toolbar">
       <div className="flex flex-1 min-w-0 flex-wrap gap-y-1 items-start overflow-hidden">
@@ -554,18 +569,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           </div>
         </div>
 
-        {/* Hardware ASID button */}
-        <div className="flex items-center gap-2 flex-shrink-0 py-1">
-              <Button
-                variant={asidEnabled ? 'primary' : 'default'}
-                size="sm"
-                onClick={handleToggleASID}
-                title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
-                className={`min-w-[72px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
-              >
-                Hardware
-              </Button>
-        </div>
         </div>
       <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
@@ -604,21 +607,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
-        <Button variant="ghost" size="sm" onClick={onShowExport} title="Export (Ctrl+Shift+E)">Export</Button>
-        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
-        <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
-        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.()} title="Help & keyboard shortcuts (?)">Help</Button>
-        <Button variant={showAbout ? 'primary' : 'ghost'} size="sm" onClick={() => setShowAbout(true)} title="About DEViLBOX">About</Button>
-        <Button variant={showNibbles ? 'primary' : 'ghost'} size="sm" onClick={() => setShowNibbles(true)} title="Play Nibbles">Nibbles</Button>
-
         <Button
-          variant={useUIStore.getState().modalOpen === 'moduleInfo' ? 'primary' : 'ghost'}
+          variant={asidEnabled ? 'primary' : 'default'}
           size="sm"
-          onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'moduleInfo') { s.closeModal(); } else { s.openModal('moduleInfo'); } }}
-          title="Song / module info"
-        >Info</Button>
+          onClick={handleToggleASID}
+          title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
+          className={asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}
+        >Hardware</Button>
         <Button
           variant={isFullscreen ? 'primary' : 'ghost'}
           size="sm"
@@ -627,6 +623,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         >
           {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </Button>
+
+        <DropdownButton items={hamburgerMenuItems} zIndex={200}>
+          <Button variant="ghost" size="sm" className="px-1.5" title="More actions">
+            <Menu size={16} />
+          </Button>
+        </DropdownButton>
       </div>
 
       <ImportModuleDialog
