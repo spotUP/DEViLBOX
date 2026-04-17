@@ -14,7 +14,7 @@ import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
-import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount, getKnobPageForSection } from '../midi/knobBanks';
+import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount, getKnobPageForSection, getKnobPageName } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
 import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation } from '../midi/performance/parameterRouter';
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
@@ -883,9 +883,11 @@ export const useMIDIStore = create<MIDIStore>()(
         if (!nksActiveSynthType || nksKnobTotalPages <= 1) return;
         const nextPage = (nksKnobPage + 1) % nksKnobTotalPages;
         const assignments = getKnobAssignmentsForPage(nksActiveSynthType as import('../types/instrument').SynthType, nextPage);
+        const pageName = getKnobPageName(nksActiveSynthType as import('../types/instrument').SynthType, nextPage);
         set((state) => {
           state.nksKnobAssignments = assignments;
           state.nksKnobPage = nextPage;
+          state.activeEditorSection = pageName;
         });
         const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
         updateNKSDisplay(nksActiveSynthType, nextPage, nksKnobTotalPages, displayParams);
@@ -896,9 +898,11 @@ export const useMIDIStore = create<MIDIStore>()(
         if (!nksActiveSynthType || nksKnobTotalPages <= 1) return;
         const prevPage = (nksKnobPage - 1 + nksKnobTotalPages) % nksKnobTotalPages;
         const assignments = getKnobAssignmentsForPage(nksActiveSynthType as import('../types/instrument').SynthType, prevPage);
+        const pageName = getKnobPageName(nksActiveSynthType as import('../types/instrument').SynthType, prevPage);
         set((state) => {
           state.nksKnobAssignments = assignments;
           state.nksKnobPage = prevPage;
+          state.activeEditorSection = pageName;
         });
         const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
         updateNKSDisplay(nksActiveSynthType, prevPage, nksKnobTotalPages, displayParams);
@@ -908,9 +912,11 @@ export const useMIDIStore = create<MIDIStore>()(
         const { nksActiveSynthType, nksKnobTotalPages } = get();
         if (!nksActiveSynthType || page < 0 || page >= nksKnobTotalPages) return;
         const assignments = getKnobAssignmentsForPage(nksActiveSynthType as import('../types/instrument').SynthType, page);
+        const pageName = getKnobPageName(nksActiveSynthType as import('../types/instrument').SynthType, page);
         set((state) => {
           state.nksKnobAssignments = assignments;
           state.nksKnobPage = page;
+          state.activeEditorSection = pageName;
         });
         const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
         updateNKSDisplay(nksActiveSynthType, page, nksKnobTotalPages, displayParams);

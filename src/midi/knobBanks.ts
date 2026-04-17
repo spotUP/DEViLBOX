@@ -668,7 +668,7 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
 // Falls back to legacy KNOB_BANKS for synths with hardcoded banks.
 // ============================================================================
 
-import { getKnob8Params, getPerformanceParams } from './performance/synthParameterMaps';
+import { getKnob8Params, getPerformanceParams, getNKS2Profile } from './performance/synthParameterMaps';
 
 /** CC numbers for the 8 knobs on Akai MPK Mini MK3 (CC 70-77) */
 const KNOB_CC_START = 70;
@@ -838,13 +838,17 @@ export function getKnobPageForSection(synthType: SynthType, section: string): nu
   const nksSections = EDITOR_TAB_TO_NKS_SECTION[section];
   if (!nksSections) return 0;
 
-  const allParams = getPerformanceParams(synthType);
-  if (allParams.length === 0) return 0;
-
-  for (let i = 0; i < allParams.length; i++) {
-    if (nksSections.includes(allParams[i].section)) {
-      return Math.floor(i / 8);
+  const profile = getNKS2Profile(synthType);
+  const perfSections = profile.navigation.performance;
+  let paramIndex = 0;
+  for (const perfSection of perfSections) {
+    const sectionLower = perfSection.name.toLowerCase();
+    for (const ns of nksSections) {
+      if (sectionLower.includes(ns.toLowerCase())) {
+        return Math.floor(paramIndex / 8);
+      }
     }
+    paramIndex += perfSection.parameters.length;
   }
   return 0;
 }
