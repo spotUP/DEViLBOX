@@ -171,6 +171,15 @@ export function clearSlotBinding(slot: number): void {
   }
 }
 
+/** Wipe every slot binding. Used when the wizard gets muddled. */
+export function clearAllSlotBindings(): void {
+  if (_slotBindings.size === 0) return;
+  _slotBindings.clear();
+  saveSlotBindings();
+  notifySlotBindingListeners();
+  console.log('[MIDI Slots] Cleared all bindings');
+}
+
 /** Read the binding for a slot (for UI display). */
 export function getSlotBinding(slot: number): SlotBinding | undefined {
   return _slotBindings.get(slot);
@@ -185,6 +194,16 @@ export function getLearnSlotTarget(): number | null {
 export function subscribeSlotBindings(listener: () => void): () => void {
   _slotBindingListeners.add(listener);
   return () => _slotBindingListeners.delete(listener);
+}
+
+/** Console debug helper: print current slot bindings. */
+export function dumpSlotBindings(): void {
+  console.log('[MIDI Slots] Current bindings:', Array.from(_slotBindings.entries()));
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).clearAllSlotBindings = clearAllSlotBindings;
+  (window as any).dumpSlotBindings = dumpSlotBindings;
 }
 
 // Get current device's learned notes
@@ -595,12 +614,39 @@ export function useMIDIPadRouting() {
     const handler = (message: MIDIMessage) => {
       const view = useUIStore.getState().activeView;
 
+      // Full diagnostic — every incoming MIDI event with learn/binding state.
+      // Include noteOn so we can see pad presses during wizard and compare
+      // later bindings against actual pad events.
+      if (message.type !== 'noteOff') {
+        console.log('[MPK RX]', message.type,
+          'ch=', message.channel,
+          'note=', message.note,
+          'vel=', message.velocity,
+          'cc=', message.cc,
+          'value=', message.value,
+          'program=', message.program,
+          'learnTarget=', _learnSlotTarget,
+          'bindings=', _slotBindings.size,
+          'view=', view);
+      }
+
       // Slot-binding learn mode: capture the first meaningful MIDI event
       // and bind it to the target slot. Runs before everything else so the
       // captured event doesn't double as a pad trigger.
       if (_learnSlotTarget !== null) {
         const binding = buildBindingFromMessage(message);
         if (binding) {
+          // Reject duplicates: don't let two slots share the same MIDI event,
+          // otherwise only the first matching slot ever fires.
+          for (const [otherSlot, otherBinding] of _slotBindings) {
+            if (otherSlot === _learnSlotTarget) continue;
+            if (otherBinding.type === binding.type
+              && otherBinding.value === binding.value
+              && otherBinding.channel === binding.channel) {
+              console.warn('[MIDI Slots] Duplicate binding ignored — slot', otherSlot, 'already uses', binding);
+              return; // stay in learn mode; wait for a different event
+            }
+          }
           _slotBindings.set(_learnSlotTarget, binding);
           saveSlotBindings();
           const slot = _learnSlotTarget;
@@ -621,6 +667,7 @@ export function useMIDIPadRouting() {
         if (messageMatchesBinding(message, binding)) {
           const id = mpkSlotId(slot);
           const store = useDrumPadStore.getState();
+          console.log('[MPK SLOT]', 'match slot', slot, 'binding=', binding, 'loading', id, store.programs.has(id) ? 'OK' : 'MISSING');
           if (store.programs.has(id)) store.loadProgram(id);
           return;
         }
