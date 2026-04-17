@@ -17,7 +17,9 @@ import { useTransportStore } from '../../stores/useTransportStore';
 import { useDJStore } from '../../stores/useDJStore';
 import { getDJEngine } from '../dj/DJEngine';
 import { filterSweep, filterReset, echoOut, instantEQKill, cancelAllAutomation } from '../dj/DJQuantizedFX';
-import { beatJump } from '../dj/DJBeatJump';
+import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
+import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop } from '../dj/DJActions';
+import { syncBPMToOther } from '../dj/DJAutoSync';
 import type { DeckId } from '../dj/DeckEngine';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -45,12 +47,23 @@ export type DjFxActionId =
   | 'fx_deck_kill_lo' | 'fx_deck_kill_mid' | 'fx_deck_kill_hi'
   | 'fx_deck_brake'
   | 'fx_deck_jump_m16' | 'fx_deck_jump_m4' | 'fx_deck_jump_m1'
-  | 'fx_deck_jump_p1' | 'fx_deck_jump_p4' | 'fx_deck_jump_p16';
+  | 'fx_deck_jump_p1' | 'fx_deck_jump_p4' | 'fx_deck_jump_p16'
+  // Hot Cues (trigger/set on active deck)
+  | 'fx_hotcue_1' | 'fx_hotcue_2' | 'fx_hotcue_3' | 'fx_hotcue_4'
+  | 'fx_hotcue_5' | 'fx_hotcue_6' | 'fx_hotcue_7' | 'fx_hotcue_8'
+  // Loop controls (active deck)
+  | 'fx_loop_toggle' | 'fx_loop_half' | 'fx_loop_double'
+  // Transport (active deck)
+  | 'fx_deck_play' | 'fx_deck_cue'
+  // Sync
+  | 'fx_sync'
+  // Crossfader (momentary cut)
+  | 'fx_xfader_cut_a' | 'fx_xfader_cut_b';
 
 export interface DjFxAction {
   id: DjFxActionId;
   name: string;
-  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck';
+  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck' | 'hotcue' | 'loop' | 'transport' | 'mixer';
   mode: 'momentary' | 'oneshot'; // momentary = hold to engage, oneshot = fire and forget
   engage: () => void;
   disengage: () => void;
@@ -1326,7 +1339,155 @@ function createDeckBeatJump(beats: number): DjFxAction {
   };
 }
 
-// ─── Registry ─────────────────────────────────────────────────────
+// ─── Hot Cue Actions ──────────────────────────────────────────────
+
+function createHotCue(index: number): DjFxAction {
+  return {
+    id: `fx_hotcue_${index}` as DjFxActionId,
+    name: `Hot Cue ${index}`,
+    category: 'hotcue',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      triggerHotCue(deckId, index - 1); // triggerHotCue uses 0-based index
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+// ─── Loop Actions ─────────────────────────────────────────────────
+
+const LOOP_SIZES: (1 | 2 | 4 | 8 | 16 | 32)[] = [1, 2, 4, 8, 16, 32];
+
+function createLoopToggle(): DjFxAction {
+  return {
+    id: 'fx_loop_toggle',
+    name: 'Loop On/Off',
+    category: 'loop',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const state = useDJStore.getState().decks[deckId];
+      if (state.loopActive) {
+        clearDeckLineLoop(deckId);
+        useDJStore.getState().setDeckLoop(deckId, 'off', false);
+      } else {
+        setDeckLineLoop(deckId, state.lineLoopSize);
+        useDJStore.getState().setDeckLoop(deckId, 'line', true);
+      }
+    },
+    disengage() { /* one-shot toggle */ },
+  };
+}
+
+function createLoopHalf(): DjFxAction {
+  return {
+    id: 'fx_loop_half',
+    name: 'Loop ÷2',
+    category: 'loop',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const state = useDJStore.getState().decks[deckId];
+      const idx = LOOP_SIZES.indexOf(state.lineLoopSize);
+      if (idx > 0) {
+        const newSize = LOOP_SIZES[idx - 1];
+        useDJStore.getState().setDeckLoopSize(deckId, newSize);
+        if (state.loopActive) setDeckLineLoop(deckId, newSize);
+      }
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+function createLoopDouble(): DjFxAction {
+  return {
+    id: 'fx_loop_double',
+    name: 'Loop ×2',
+    category: 'loop',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const state = useDJStore.getState().decks[deckId];
+      const idx = LOOP_SIZES.indexOf(state.lineLoopSize);
+      if (idx < LOOP_SIZES.length - 1) {
+        const newSize = LOOP_SIZES[idx + 1];
+        useDJStore.getState().setDeckLoopSize(deckId, newSize);
+        if (state.loopActive) setDeckLineLoop(deckId, newSize);
+      }
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+// ─── Transport Actions ────────────────────────────────────────────
+
+function createDeckPlay(): DjFxAction {
+  return {
+    id: 'fx_deck_play',
+    name: 'Deck Play/Pause',
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      togglePlay(deckId);
+    },
+    disengage() { /* toggle — no release action */ },
+  };
+}
+
+function createDeckCue(): DjFxAction {
+  return {
+    id: 'fx_deck_cue',
+    name: 'Deck Cue',
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const state = useDJStore.getState().decks[deckId];
+      cueDeck(deckId, state.cuePoint);
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+// ─── Sync Action ──────────────────────────────────────────────────
+
+function createSync(): DjFxAction {
+  return {
+    id: 'fx_sync',
+    name: 'Sync BPM',
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const otherDeckId: DeckId = deckId === 'A' ? 'B' : 'A';
+      try {
+        syncBPMToOther(deckId, otherDeckId);
+      } catch { /* engine not ready */ }
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+// ─── Crossfader Cut Actions ───────────────────────────────────────
+
+function createXfaderCut(side: 'a' | 'b'): DjFxAction {
+  let savedPosition = 0.5;
+  return {
+    id: `fx_xfader_cut_${side}` as DjFxActionId,
+    name: side === 'a' ? 'Cut to Deck A' : 'Cut to Deck B',
+    category: 'mixer',
+    mode: 'momentary',
+    engage() {
+      savedPosition = useDJStore.getState().crossfaderPosition;
+      useDJStore.getState().setCrossfader(side === 'a' ? 0 : 1);
+    },
+    disengage() {
+      useDJStore.getState().setCrossfader(savedPosition);
+    },
+  };
+}
 
 const stutterActions = [
   createStutter('1/4'),
@@ -1378,6 +1539,26 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   createDeckBeatJump(1),
   createDeckBeatJump(4),
   createDeckBeatJump(16),
+  // Hot Cues
+  createHotCue(1),
+  createHotCue(2),
+  createHotCue(3),
+  createHotCue(4),
+  createHotCue(5),
+  createHotCue(6),
+  createHotCue(7),
+  createHotCue(8),
+  // Loop controls
+  createLoopToggle(),
+  createLoopHalf(),
+  createLoopDouble(),
+  // Transport
+  createDeckPlay(),
+  createDeckCue(),
+  createSync(),
+  // Crossfader cuts
+  createXfaderCut('a'),
+  createXfaderCut('b'),
 ];
 
 export const DJ_FX_ACTION_MAP: Record<DjFxActionId, DjFxAction> = Object.fromEntries(
