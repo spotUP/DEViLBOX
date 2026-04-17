@@ -207,22 +207,24 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
     ? 'bg-accent-primary/10'
     : isDragging
       ? 'bg-accent-primary/20'
-      : isSelected
-        ? 'bg-accent-primary/15'
-        : isAutoDJCurrent
-          ? 'bg-accent-success/10'
-          : isAutoDJNext
-            ? 'bg-accent-primary/5'
-            : isHovered
-              ? 'bg-dark-bgHover'
-              : '';
+      : isPreviewing
+        ? 'bg-accent-success/10'
+        : isSelected
+          ? 'bg-accent-primary/15'
+          : isAutoDJCurrent
+            ? 'bg-accent-success/10'
+            : isAutoDJNext
+              ? 'bg-accent-primary/5'
+              : isHovered
+                ? 'bg-dark-bgHover'
+                : '';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       data-track-index={index}
-      className={`flex items-center gap-2 px-3 border-b border-dark-border/50 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''}`}
+      className={`flex items-center gap-2 px-3 border-b border-dark-border/50 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
       onClick={(e) => onClick(index, e)}
       onDoubleClick={() => onDoubleClick(track, index)}
       onPointerEnter={() => setIsHovered(true)}
@@ -306,15 +308,21 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         </span>
       )}
 
+      {/* Preview button — always visible when previewing */}
+      <button
+        onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
+        className={`p-1 rounded transition-all shrink-0 ${
+          isPreviewing
+            ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25'
+            : `text-text-muted/30 hover:text-text-primary ${isHovered || isFocused ? 'opacity-100' : 'opacity-0'}`
+        }`}
+        title={isPreviewing ? 'Stop preview' : 'Preview track'}
+      >
+        {isPreviewing ? <Square size={12} /> : <Play size={12} />}
+      </button>
+
       {/* Actions (visible on hover) */}
       <span className={`flex items-center gap-1 shrink-0 transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <button
-          onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
-          className={`p-1 rounded transition-colors ${isPreviewing ? 'text-accent-success hover:text-accent-success/80' : 'text-text-muted/50 hover:text-text-primary'}`}
-          title={isPreviewing ? 'Stop preview' : 'Preview track'}
-        >
-          {isPreviewing ? <Square size={10} /> : <Play size={10} />}
-        </button>
         <select
           value={track.masterFxPreset || ''}
           onClick={(e) => e.stopPropagation()}
