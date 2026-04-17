@@ -26,11 +26,16 @@ class VocoderProcessor extends AudioWorkletProcessor {
 
     // Noise gate — smooth open/close to avoid clicks
     this.gateOpen = 0;          // 0 = closed, 1 = open
-    this.gateThreshold = 0.015; // mic peak must exceed this to open (covers normal
-                                // speech on built-in laptop mics after 2x preamp;
-                                // still above typical room/keyboard/HVAC floor)
-    this.gateAttack = 0.05;     // how fast it opens (per block, 0-1)
-    this.gateRelease = 0.008;   // how fast it closes (per block, 0-1)
+    this.gateThreshold = 0.003; // mic peak must exceed this to open. Very low
+                                // because built-in MacBook mics with echoCancellation
+                                // enabled output extremely low raw signal levels
+                                // (0.003-0.01 even during speech). A separate
+                                // 4x preamp in VocoderEngine boosts headroom,
+                                // but the gate threshold needs to accommodate
+                                // quiet mics out of the box.
+    this.gateAttack = 0.08;     // how fast it opens (per block, 0-1)
+    this.gateRelease = 0.004;   // slower release — keeps gate open through brief
+                                // pauses in speech instead of chopping words
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
     console.log('[Vocoder Worklet] Processor constructed');

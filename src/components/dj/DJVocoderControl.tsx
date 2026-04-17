@@ -43,6 +43,11 @@ export const DJVocoderControl: React.FC = () => {
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const engineRef = useRef<VocoderEngine | null>(null);
+  // Single-flight gate for ensureEngine — without this, rapid overlapping
+  // calls (PTT + panel open + device switch) each race through the null
+  // check and spin up parallel VocoderEngine instances, all competing for
+  // the same mic and producing duplicate worklet output.
+  const enginePendingRef = useRef<Promise<VocoderEngine | null> | null>(null);
   const [showPanel, setShowPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const gearRef = useRef<HTMLButtonElement>(null);
@@ -118,16 +123,23 @@ export const DJVocoderControl: React.FC = () => {
 
   const ensureEngine = useCallback(async (): Promise<VocoderEngine | null> => {
     if (engineRef.current) return engineRef.current;
-    try {
-      setError(null);
-      const djEngine = getDJEngineIfActive();
-      const destination = djEngine?.mixer.samplerInput;
-      const engine = new VocoderEngine(destination);
-      await engine.start(selectedDeviceRef.current || undefined);
-      engineRef.current = engine;
-      setActiveVocoderEngine(engine);
-      setMuted(true);
-      engine.setMuted(true);
+    // Single-flight: if a creation is in flight, await the same promise so
+    // we don't spawn parallel VocoderEngine instances from racing callers
+    // (PTT down + joystick + panel open can all trigger ensureEngine in
+    // quick succession).
+    if (enginePendingRef.current) return enginePendingRef.current;
+
+    const pending = (async () => {
+      try {
+        setError(null);
+        const djEngine = getDJEngineIfActive();
+        const destination = djEngine?.mixer.samplerInput;
+        const engine = new VocoderEngine(destination);
+        await engine.start(selectedDeviceRef.current || undefined);
+        engineRef.current = engine;
+        setActiveVocoderEngine(engine);
+        setMuted(true);
+        engine.setMuted(true);
       // Leave the mic track ENABLED at engine creation. outputGain=0 already
       // silences any audible output, and rapid enable/disable cycling during
       // the first PTT press (engine.start sets enabled=true, then we set
@@ -136,27 +148,32 @@ export const DJVocoderControl: React.FC = () => {
       // until a forced micPreamp reconnect (e.g. manual Vocoder toggle)
       // kicks it back to life. setMicActive(false) is still used on PTT
       // release to stop ambient bleed into FX tails.
-      if (followMelodyEnabledRef.current) {
-        followMelodyRef.current = new VocoderAutoTune(engine);
-        followMelodyRef.current.start();
+        if (followMelodyEnabledRef.current) {
+          followMelodyRef.current = new VocoderAutoTune(engine);
+          followMelodyRef.current.start();
+        }
+        if (realTuneEnabledRef.current) {
+          engine.setRealAutoTuneEnabled(true, {
+            key: tuneKeyRef.current, scale: tuneScaleRef.current, strength: 1.0, speed: 0.7,
+          });
+        }
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = allDevices
+          .filter(d => d.kind === 'audioinput')
+          .map(d => ({ deviceId: d.deviceId, label: d.label || `Mic ${d.deviceId.slice(0, 8)}` }));
+        setDevices(inputs);
+        return engine;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg.includes('Permission') || msg.includes('NotAllowed') ? 'Mic blocked' : 'Failed');
+        console.error('[DJVocoderControl]', err);
+        return null;
+      } finally {
+        enginePendingRef.current = null;
       }
-      if (realTuneEnabledRef.current) {
-        engine.setRealAutoTuneEnabled(true, {
-          key: tuneKeyRef.current, scale: tuneScaleRef.current, strength: 1.0, speed: 0.7,
-        });
-      }
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      const inputs = allDevices
-        .filter(d => d.kind === 'audioinput')
-        .map(d => ({ deviceId: d.deviceId, label: d.label || `Mic ${d.deviceId.slice(0, 8)}` }));
-      setDevices(inputs);
-      return engine;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg.includes('Permission') || msg.includes('NotAllowed') ? 'Mic blocked' : 'Failed');
-      console.error('[DJVocoderControl]', err);
-      return null;
-    }
+    })();
+    enginePendingRef.current = pending;
+    return pending;
   }, []); // Stable — reads refs, not state
 
   const handleToggle = useCallback(async () => {
