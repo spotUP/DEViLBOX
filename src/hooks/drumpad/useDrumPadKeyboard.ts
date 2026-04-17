@@ -20,11 +20,11 @@ const KEY_TO_PAD_INDEX: Record<string, number> = {
 
 /**
  * Get the absolute pad ID for a bank-relative index.
- * Banks A-D each contain 16 pads, starting at (bankOffset * 16) + 1.
+ * Banks A-B each contain 8 pads, starting at (bankOffset * 8) + 1.
  */
 function getPadId(bankRelativeIndex: number, bank: string): number {
-  const bankOffset = ['A', 'B', 'C', 'D'].indexOf(bank);
-  const offset = bankOffset >= 0 ? bankOffset * 16 : 0;
+  const bankOffset = ['A', 'B'].indexOf(bank);
+  const offset = bankOffset >= 0 ? bankOffset * 8 : 0;
   return offset + bankRelativeIndex + 1; // Pads are 1-indexed
 }
 

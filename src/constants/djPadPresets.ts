@@ -83,8 +83,8 @@ function applyScratchPads(program: DrumProgram, startPad: number, count: number)
 export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'djfx-essential',
-    name: 'DJ FX (Bank A)',
-    description: '16 DJ FX pads in Bank A — stutter, delay, filter, reverb, modulation',
+    name: 'DJ FX',
+    description: 'DJ FX pads — stutter, delay, filter, reverb, modulation',
     create: () => {
       const program = createEmptyProgram('D-01', 'DJ FX Essential');
       applyDjFxPads(program, 0, 16);
@@ -93,8 +93,8 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   },
   {
     id: 'oneshots-live',
-    name: 'One-Shots (Bank A)',
-    description: '16 one-shot pads in Bank A — horns, sirens, impacts, risers',
+    name: 'One-Shots',
+    description: 'One-shot pads — horns, sirens, impacts, risers',
     create: () => {
       const program = createEmptyProgram('D-02', 'One-Shots Live');
       applyOneShotPads(program, 0, 16);
@@ -103,8 +103,8 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   },
   {
     id: 'scratch-master',
-    name: 'Scratch (Bank A)',
-    description: '16 scratch pads in Bank A — baby, flare, crab, orbit, and more',
+    name: 'Scratch',
+    description: 'Scratch pads — baby, flare, crab, orbit, and more',
     create: () => {
       const program = createEmptyProgram('D-03', 'Scratch Master');
       applyScratchPads(program, 0, 16);
@@ -113,13 +113,12 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   },
   {
     id: 'dj-complete',
-    name: 'DJ Complete (A+B+C)',
-    description: 'FX in Bank A, one-shots in Bank B, scratch in Bank C',
+    name: 'DJ Complete',
+    description: 'Bank A: FX — Bank B: scratch patterns',
     create: () => {
       const program = createEmptyProgram('D-04', 'DJ Complete Kit');
-      applyDjFxPads(program, 0, 16);
-      applyOneShotPads(program, 16, 16);
-      applyScratchPads(program, 32, 16);
+      applyDjFxPads(program, 0, 8);
+      applyScratchPads(program, 8, 8);
       return program;
     },
   },

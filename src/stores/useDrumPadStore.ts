@@ -101,7 +101,7 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
 };
 
 // Bump this when factory presets or stored schema changes — discards stale data
-const DRUMPAD_SCHEMA_VERSION = 18;
+const DRUMPAD_SCHEMA_VERSION = 19;
 const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 
 // Set when schema migration clears old data — prevents IndexedDB from overwriting factory presets
@@ -109,7 +109,7 @@ let _schemaResetPending = false;
 
 export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   // Controller-detected pad count (default 16 = MPC standard 4×4)
-  controllerPadCount: 16,
+  controllerPadCount: 8,
   setControllerPadCount: (count: number) => set({ controllerPadCount: count }),
 
   // FX tracking
@@ -378,9 +378,9 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     // Atomic bulk clear: one set() + one save cycle instead of 16 back-to-back
     // clearPad() calls. The looped version raced on concurrent saveToIndexedDB
     // transactions, occasionally leaving one pad's sample intact in IndexedDB.
-    const bankIndex = { A: 0, B: 1, C: 2, D: 3 }[bank];
-    const bankStart = bankIndex * 16;
-    const bankEnd = bankStart + 16;
+    const bankIndex = { A: 0, B: 1 }[bank];
+    const bankStart = bankIndex * 8;
+    const bankEnd = bankStart + 8;
     set((state) => {
       const programs = new Map(state.programs);
       const currentProgram = programs.get(state.currentProgramId);

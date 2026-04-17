@@ -514,7 +514,7 @@ export function useMIDIPadRouting() {
       }
 
       const bank = currentBankRef.current;
-      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[bank];
+      const bankOffset = { A: 0, B: 8 }[bank];
       
       const learnedNotes = getCurrentMapping();
       

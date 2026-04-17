@@ -358,8 +358,9 @@ function storedToProgram(
     };
   });
 
-  // Migration: expand 16-pad programs to 64 pads
-  while (pads.length < 64) {
+  // Migration: pad out to 16 pads (2 banks × 8 pads) — older stores had 64
+  if (pads.length > 16) pads.length = 16;
+  while (pads.length < 16) {
     pads.push(createEmptyPad(pads.length + 1));
   }
 
