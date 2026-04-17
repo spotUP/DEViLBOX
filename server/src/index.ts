@@ -24,6 +24,7 @@ import aiRoutes from './routes/ai';
 import analysisRoutes from './routes/analysis';
 import renderRoutes from './routes/render';
 import djsetsRoutes from './routes/djsets';
+import playlistsRoutes from './routes/playlists';
 import ratingsRoutes from './routes/ratings';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
@@ -69,6 +70,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/render', express.raw({ type: 'application/octet-stream', limit: '10mb' }), renderRoutes);
 app.use('/api/djsets', djsetsRoutes);
+app.use('/api/playlists', playlistsRoutes);
 app.use('/api/ratings', ratingsRoutes);
 
 // Health check
