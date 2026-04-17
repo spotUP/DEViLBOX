@@ -2423,7 +2423,7 @@ export class TrackerReplayer {
   stop(preservePosition = true, skipNativeStop = false): void {
     // Sync transport store to the last visually-displayed row before stopping.
     // The pattern editor reads currentRow from the store when stopped (line 1134
-    // of PatternEditorCanvas). Use lastDequeuedState (what was on screen) rather
+    // of PixiPatternEditor). Use lastDequeuedState (what was on screen) rather
     // than pattPos (which is ahead due to look-ahead scheduling).
     // preservePosition=false skips this (used by loadSong — a preparation stop
     // that should not overwrite the position saved by the user's stop action).

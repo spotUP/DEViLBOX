@@ -22,18 +22,6 @@ import ReadOnlyWorkerFactory from '@/workers/readonly-pattern.worker.ts?worker';
 const LINE_NUMBER_WIDTH = 40;
 const CHAR_WIDTH = 10;
 
-/** Lighten a hex color by blending toward white. amount 0-1 */
-function lightenColor(hex: string, amount: number): string {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  const lr = Math.round(r + (255 - r) * amount);
-  const lg = Math.round(g + (255 - g) * amount);
-  const lb = Math.round(b + (255 - b) * amount);
-  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
-}
-
 // Worker message types
 interface ReadOnlyInitMsg {
   type: 'init';
@@ -117,7 +105,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       bg:                  t.colors.trackerRowEven,
       rowNormal:           t.colors.trackerRowOdd,
       rowHighlight:        t.colors.trackerRowHighlight,
-      rowSecondaryHighlight: lightenColor(t.colors.trackerRowHighlight, 0.15),
+      rowSecondaryHighlight: t.colors.accent + '33',
       border:              t.colors.border,
       trackerBorder:       t.colors.trackerBorder,
       textNote:            t.colors.textSecondary,
@@ -127,7 +115,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       textVolume:          t.colors.cellVolume,
       textEffect:          t.colors.cellEffect,
       lineNumber:          t.colors.textMuted,
-      lineNumberHighlight: lightenColor(t.colors.trackerRowHighlight, 0.6),
+      lineNumberHighlight: t.colors.accentSecondary,
       selection:           t.colors.accentGlow,
       bookmark:            t.colors.warning,
     };
