@@ -1017,3 +1017,38 @@ function applyPadFilterParam(padId: number, param: string, value: number): void 
       break;
   }
 }
+
+// ── Vocoder / Mic joystick modulation ──
+
+import { getActiveVocoderEngine } from '../../engine/vocoder/VocoderEngine';
+import { useVocoderStore } from '../../stores/useVocoderStore';
+
+/**
+ * Check if the vocoder mic is actively being used (vocoder on + PTT held).
+ */
+export function isVocoderTalking(): boolean {
+  const store = useVocoderStore.getState();
+  return store.isActive && store.pttActive;
+}
+
+/**
+ * Route joystick XY to the active vocoder engine.
+ * X (pitch bend) → formantShift (0.25–4.0, log)
+ * Y (mod wheel)  → carrierFreq (20–2000 Hz, log)
+ */
+export function routeVocoderModulation(
+  normalizedX: number | null,
+  normalizedY: number | null,
+): void {
+  const engine = getActiveVocoderEngine();
+  if (!engine) return;
+
+  if (normalizedX !== null) {
+    const shift = 0.25 * Math.pow(4.0 / 0.25, normalizedX);
+    engine.setFormantShift(shift);
+  }
+  if (normalizedY !== null) {
+    const freq = 20 * Math.pow(2000 / 20, normalizedY);
+    engine.setCarrierFreq(freq);
+  }
+}
