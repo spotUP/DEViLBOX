@@ -421,6 +421,39 @@ const handleChange = useCallback((key, value) => {
 }, [onChange]);
 ```
 
+### MIDI-Driven Snappiness: `paramKey` imperative fast path
+
+Every knob in the app **MUST** use `@components/controls/Knob`. When the knob's value can be driven by a MIDI CC (via `parameterRouter`), pass the matching `paramKey` prop:
+
+```tsx
+<Knob
+  value={config.filter.cutoff}
+  onChange={(v) => updateFilter('cutoff', v)}
+  paramKey="cutoff"   // ← matches PARAMETER_ROUTES key in parameterRouter.ts
+  ...
+/>
+```
+
+**What it does:** the Knob auto-subscribes to `subscribeToParamLiveValue(paramKey, …)`. On every MIDI CC (~100Hz), the router fires subscribers synchronously and the Knob writes `x1/y1/x2/y2` on the indicator line + `d` on the arc directly to the DOM — **fully bypassing React render**. Mouse drag still works via the normal `value`/`onChange` path because the Knob's drag code uses its own internal state.
+
+**Every knob that takes MIDI must pass `paramKey`.** No exceptions. Mixing imperative DJ knobs with non-imperative synth knobs is why knobs felt inconsistent (2026-04-17 fix).
+
+The param keys match the `PARAMETER_ROUTES` table in `src/midi/performance/parameterRouter.ts`:
+- TB303 main: `cutoff`, `resonance`, `envMod`, `decay`, `accent`, `overdrive`, `slideTime`, `tuning`, `volume`
+- DJ: `dj.crossfader`, `dj.deckA.eqHi`, `dj.deckA.filter`, `dj.masterVolume`, etc.
+- Siren: `siren.osc.frequency`, `siren.lfo.rate`, `siren.delay.time`, etc.
+- Furnace FM: `furnace.algorithm`, `furnace.op1TL`, etc.
+
+### Knob Perf Invariants (do not break)
+
+The `Knob` component is the **only** rotary-knob component in the app:
+- No CSS transitions on the SVG pointer/arc — each render IS the animation frame.
+- No idle drop-shadow filter (active-only) — GPU filter passes are expensive.
+- `React.memo` skips value-prop re-renders when `paramKey` / `imperativeSubscribe` is set.
+- DJ param writes are rAF-batched via `scheduleDJStoreSync` → single `setState` → single immer run → single subscriber broadcast per frame.
+
+If you're tempted to add a transition, a custom knob, or a raw `<input type="range">` — don't. Extend `Knob` or `Fader` (linear sibling, TODO) instead.
+
 ---
 
 ## Furnace Synth Implementation
