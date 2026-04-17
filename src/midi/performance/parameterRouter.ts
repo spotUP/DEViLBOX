@@ -836,6 +836,7 @@ import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
 import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
 import type { DrumPadXYMapping } from '../drumpadXYMap';
+import type { SynthType } from '../../types/instrument/base';
 
 /**
  * Apply joystick XY modulation to held drum pads.
@@ -859,14 +860,31 @@ export function routeDrumPadModulation(
     const pad = program.pads.find(p => p.id === padId);
     if (!pad) continue;
 
-    const synthType = pad.synthConfig?.synthType;
+    // Resolve synthType from synthConfig (pad-owned) or instrumentId (song instrument)
+    let synthType: SynthType | undefined = pad.synthConfig?.synthType;
+    let instId: number = PAD_INSTRUMENT_BASE + padId;
+
+    if (!synthType && pad.instrumentId != null) {
+      const instrument = useInstrumentStore.getState().instruments.find(
+        i => i.id === pad.instrumentId,
+      );
+      if (instrument) {
+        synthType = instrument.synthType;
+        instId = pad.instrumentId;
+      }
+    }
+
     const mapping = getDrumPadXYMapping(synthType);
 
+    if ((globalThis as Record<string, unknown>).MIDI_DEBUG) {
+      console.log(`[DrumPadXY] pad=${padId} synth=${synthType} instId=${instId} X=${normalizedX?.toFixed(2)} Y=${normalizedY?.toFixed(2)} mapping=${mapping.x.param}/${mapping.y.param}`);
+    }
+
     if (normalizedX !== null) {
-      applyDrumPadAxis(mapping.x, normalizedX, padId);
+      applyDrumPadAxis(mapping.x, normalizedX, padId, instId);
     }
     if (normalizedY !== null) {
-      applyDrumPadAxis(mapping.y, normalizedY, padId);
+      applyDrumPadAxis(mapping.y, normalizedY, padId, instId);
     }
   }
 }
@@ -875,6 +893,7 @@ function applyDrumPadAxis(
   axis: DrumPadXYMapping['x'],
   normalized: number,
   padId: number,
+  instId: number,
 ): void {
   // Denormalize value based on curve
   let value: number;
@@ -888,8 +907,7 @@ function applyDrumPadAxis(
     // Modulate the pad's built-in filter via DrumPadEngine voice
     applyPadFilterParam(padId, axis.param, value);
   } else {
-    // Modulate via synth engine (routeParameterToEngine)
-    const instId = PAD_INSTRUMENT_BASE + padId;
+    // Modulate via synth engine — use the correct instrument ID
     routeParameterToEngine(axis.param, normalized, instId);
   }
 }

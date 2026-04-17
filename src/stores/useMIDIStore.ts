@@ -19,7 +19,7 @@ import type { KnobAssignment } from '../midi/knobBanks';
 import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation } from '../midi/performance/parameterRouter';
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
-import { isDJContext, isDrumPadContext } from '../midi/MIDIContextRouter';
+import { isDJContext } from '../midi/MIDIContextRouter';
 import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
 import { getDJControllerMapper } from '../midi/DJControllerMapper';
 import { getHeldDrumPads } from '../hooks/drumpad/useMIDIPadRouting';
@@ -466,11 +466,12 @@ export const useMIDIStore = create<MIDIStore>()(
               if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
                 const normalizedPB = (message.pitchBend + 8192) / 16383;
 
-                // Drumpad context: modulate held pad's synth params
-                if (isDrumPadContext()) {
-                  const heldPads = getHeldDrumPads();
-                  if (heldPads.length > 0) {
-                    routeDrumPadModulation(normalizedPB, null, heldPads);
+                // Drumpad modulation: if ANY pad is held, route joystick to it
+                // (works regardless of active view — pads may be triggered from any context)
+                {
+                  const heldPadsPB = getHeldDrumPads();
+                  if (heldPadsPB.length > 0) {
+                    routeDrumPadModulation(normalizedPB, null, heldPadsPB);
                     return;
                   }
                 }
@@ -496,11 +497,11 @@ export const useMIDIStore = create<MIDIStore>()(
                 if (message.cc === 1) {
                   const normalizedMW = message.value / 127;
 
-                  // Drumpad context: modulate held pad's synth params
-                  if (isDrumPadContext()) {
-                    const heldPads = getHeldDrumPads();
-                    if (heldPads.length > 0) {
-                      routeDrumPadModulation(null, normalizedMW, heldPads);
+                  // Drumpad modulation: if ANY pad is held, route joystick to it
+                  {
+                    const heldPadsMW = getHeldDrumPads();
+                    if (heldPadsMW.length > 0) {
+                      routeDrumPadModulation(null, normalizedMW, heldPadsMW);
                       return;
                     }
                   }
