@@ -10,7 +10,6 @@ import { useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, useUIStore, themes } from '@stores';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
-import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useAIStore } from '@stores/useAIStore';
 import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
@@ -62,9 +61,6 @@ export function useNavBar() {
   const viewExposeActive = useUIStore((s) => s.viewExposeActive);
   const toggleViewExpose = useUIStore((s) => s.toggleViewExpose);
 
-  // ── Workbench store ───────────────────────────────────────────────────────
-  const workbenchExposeActive = useWorkbenchStore((s) => s.exposeActive);
-  const toggleWorkbenchExpose = useWorkbenchStore((s) => s.toggleExpose);
 
   // ── Collaboration store ───────────────────────────────────────────────────
   const collabStatus = useCollaborationStore((s) => s.status);
@@ -86,8 +82,7 @@ export function useNavBar() {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const currentTheme = getCurrentTheme();
-  const isStudio = activeView === 'studio';
-  const exposeActive = isStudio ? workbenchExposeActive : viewExposeActive;
+  const exposeActive = viewExposeActive;
 
   const themeOptions = useMemo<NavBarThemeOption[]>(
     () => themes.map((t) => ({ value: t.id, label: t.name.toUpperCase(), color: t.colors.accent })),
@@ -168,15 +163,13 @@ export function useNavBar() {
   }, []);
 
   const handleExpose = useCallback(() => {
-    if (isStudio) toggleWorkbenchExpose();
-    else toggleViewExpose();
-  }, [isStudio, toggleWorkbenchExpose, toggleViewExpose]);
+    toggleViewExpose();
+  }, [toggleViewExpose]);
 
   const handleSwitchView = useCallback((id: ViewTabId) => {
-    if (workbenchExposeActive) useWorkbenchStore.getState().setExposeActive(false);
     if (viewExposeActive) useUIStore.getState().setViewExposeActive(false);
     setActiveView(id as any);
-  }, [workbenchExposeActive, viewExposeActive, setActiveView]);
+  }, [viewExposeActive, setActiveView]);
 
   // ── Return ────────────────────────────────────────────────────────────────
 
@@ -204,9 +197,7 @@ export function useNavBar() {
     activeView,
     setActiveView,
     viewExposeActive,
-    workbenchExposeActive,
     exposeActive,
-    isStudio,
     // Collab
     collabStatus,
     collabViewMode,

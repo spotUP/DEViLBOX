@@ -84,7 +84,6 @@ const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => (
 const ModuleInfoModal = lazy(() => import('@components/dialogs/ModuleInfoModal').then(m => ({ default: m.ModuleInfoModal })));
 const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog })));
-const StudioCanvasView = lazy(() => import('./components/studio/StudioCanvasView').then(m => ({ default: m.StudioCanvasView })));
 
 // Module-level flag — resets on every page load (sessionStorage persists through reloads)
 let jinglePlayedThisLoad = false;
@@ -1021,12 +1020,6 @@ function App() {
                   <DrumPadManager />
                 </Suspense>
               </DJErrorBoundary>
-            )}
-
-            {activeView === 'studio' && (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading studio...</div>}>
-                <StudioCanvasView />
-              </Suspense>
             )}
 
           </div>
