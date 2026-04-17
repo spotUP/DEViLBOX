@@ -503,10 +503,13 @@ export function useMIDIPadRouting() {
     const manager = getMIDIManager();
 
     const handler = (message: MIDIMessage) => {
-      // Temporary diagnostic: surface every incoming MIDI message type so
-      // we can see whether the MPK is sending Program Change at all.
-      if (message.type === 'programChange' || message.type === 'other') {
-        console.log('[MIDIPadRouting] message:', message.type, 'program=', message.program, 'ch=', message.channel);
+      // Temporary diagnostic: log every non-noteOn message so we can spot
+      // what the MPK is actually sending when the PROG button is pressed.
+      if (message.type !== 'noteOn' && message.type !== 'noteOff') {
+        console.log('[MIDI]', message.type, 'ch=', message.channel,
+          'note=', message.note, 'vel=', message.velocity,
+          'cc=', message.cc, 'value=', message.value,
+          'program=', message.program);
       }
 
       const view = useUIStore.getState().activeView;
