@@ -66,6 +66,10 @@ export interface DJPlaylist {
   masterEffects?: EffectConfig[];
   /** Full DJ environment snapshot — crossfader, volumes, Auto DJ, master FX, drumpads */
   environment?: DJEnvironment;
+  /** Cloud storage ID (set when saved to server) */
+  cloudId?: string;
+  /** Visibility: 'private' (default) or 'public' (visible to community) */
+  visibility?: 'private' | 'public';
 }
 
 interface DJPlaylistState {
@@ -89,6 +93,8 @@ interface DJPlaylistState {
   setActivePlaylist: (playlistId: string | null) => void;
   updatePlaylistDescription: (playlistId: string, description: string) => void;
   clonePlaylist: (playlistId: string) => string;
+  setPlaylistCloudId: (playlistId: string, cloudId: string | undefined) => void;
+  setPlaylistVisibility: (playlistId: string, visibility: 'private' | 'public') => void;
 
   // ── Track CRUD ────────────────────────────────────────────────────────
   addTrack: (playlistId: string, track: Omit<PlaylistTrack, 'id'> & { id?: string }) => void;
@@ -279,6 +285,8 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           clone.name = `${source.name} (Copy)`;
           clone.createdAt = Date.now();
           clone.updatedAt = Date.now();
+          clone.cloudId = undefined;
+          clone.visibility = 'private';
           // Give cloned tracks new IDs
           for (const t of clone.tracks) {
             t.id = generateTrackId();
@@ -288,6 +296,28 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         });
         syncPlaylists();
         return newId;
+      },
+
+      setPlaylistCloudId: (playlistId: string, cloudId: string | undefined) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p) {
+            p.cloudId = cloudId;
+            p.updatedAt = Date.now();
+          }
+        });
+        syncPlaylists();
+      },
+
+      setPlaylistVisibility: (playlistId: string, visibility: 'private' | 'public') => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p) {
+            p.visibility = visibility;
+            p.updatedAt = Date.now();
+          }
+        });
+        syncPlaylists();
       },
 
       // ── Track CRUD ────────────────────────────────────────────────────
