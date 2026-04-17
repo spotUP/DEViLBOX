@@ -505,6 +505,40 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       <div className="flex flex-1 min-w-0 flex-wrap gap-y-1 items-start overflow-hidden">
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="ft2-toolbar-row">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
+                onClick={(e) => {
+                  if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                  else if (isPlaying && (e.altKey || e.metaKey)) {
+                    e.preventDefault();
+                    const replayer = getTrackerReplayer();
+                    replayer.forcePosition(0, 0);
+                    setIsLooping(false);
+                  }
+                  else { handlePlaySong(); }
+                }}
+                onContextMenu={(e) => {
+                  if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                }}
+                title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
+                className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
+                onClick={(e) => {
+                  if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                  else if (isPlaying && (e.altKey || e.metaKey)) {
+                    e.preventDefault();
+                    const replayer = getTrackerReplayer();
+                    replayer.forcePosition(replayer.getSongPos(), 0);
+                    setIsLooping(true);
+                  }
+                  else { handlePlayPattern(); }
+                }}
+                onContextMenu={(e) => {
+                  if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                }}
+                title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
+                className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+            </div>
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
             </div>
@@ -552,38 +586,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             <Menu size={16} />
           </Button>
         </DropdownButton>
-              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => {
-                  if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                  else if (isPlaying && (e.altKey || e.metaKey)) {
-                    e.preventDefault();
-                    const replayer = getTrackerReplayer();
-                    replayer.forcePosition(0, 0);
-                    setIsLooping(false);
-                  }
-                  else { handlePlaySong(); }
-                }}
-                onContextMenu={(e) => {
-                  if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                }}
-                title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
-                className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
-              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
-                onClick={(e) => {
-                  if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                  else if (isPlaying && (e.altKey || e.metaKey)) {
-                    e.preventDefault();
-                    const replayer = getTrackerReplayer();
-                    replayer.forcePosition(replayer.getSongPos(), 0);
-                    setIsLooping(true);
-                  }
-                  else { handlePlayPattern(); }
-                }}
-                onContextMenu={(e) => {
-                  if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
-                }}
-                title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
-                className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
