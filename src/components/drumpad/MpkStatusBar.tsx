@@ -12,11 +12,19 @@
  * live in useMIDIStore (knobBank) + KNOB_BANKS dictionary.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { MPK_SLOT_COUNT, mpkSlotId } from '@/types/drumpad';
 import { KNOB_BANKS } from '@/midi/knobBanks';
+import {
+  startLearnSlotBinding,
+  cancelLearnSlotBinding,
+  clearSlotBinding,
+  getSlotBinding,
+  getLearnSlotTarget,
+  subscribeSlotBindings,
+} from '@/hooks/drumpad/useMIDIPadRouting';
 
 export const MpkStatusBar: React.FC = () => {
   const programs = useDrumPadStore((s) => s.programs);
@@ -27,6 +35,12 @@ export const MpkStatusBar: React.FC = () => {
   const renameProgram = useDrumPadStore((s) => s.renameProgram);
 
   const knobBank = useMIDIStore((s) => s.knobBank);
+
+  // Re-render whenever slot bindings change or learn mode toggles so slot
+  // buttons accurately show tooltip + pulsing learn state.
+  const [, forceBindingsRender] = useState(0);
+  useEffect(() => subscribeSlotBindings(() => forceBindingsRender((n) => n + 1)), []);
+  const learnTarget = getLearnSlotTarget();
 
   // Active program and its slot number (1-8) if it's one of the MPK slots
   const current = programs.get(currentProgramId);
@@ -70,18 +84,42 @@ export const MpkStatusBar: React.FC = () => {
           const n = i + 1;
           const id = mpkSlotId(n);
           const isActive = activeSlot === n;
+          const isLearning = learnTarget === n;
           const prog = programs.get(id);
+          const binding = getSlotBinding(n);
+          const bindingDesc = binding
+            ? ` · MIDI ${binding.type} ${binding.value} ch${binding.channel + 1}`
+            : '';
+          const tip = isLearning
+            ? 'Learning — press any MPK pad/key/button'
+            : `${prog ? prog.name : `Slot ${n}`}${bindingDesc}\nRight-click: Learn / Clear MIDI trigger`;
           return (
             <button
               key={id}
-              onClick={() => loadProgram(id)}
-              title={prog ? prog.name : `Slot ${n}`}
-              className={`min-w-[32px] px-2 py-1 text-[10px] font-mono font-bold rounded border transition-colors
-                ${isActive
-                  ? 'bg-accent-primary text-text-inverse border-accent-primary'
-                  : 'bg-dark-bgTertiary text-text-muted border-dark-border hover:text-text-primary hover:border-accent-primary/50'}`}
+              onClick={() => { if (isLearning) { cancelLearnSlotBinding(); } else { loadProgram(id); } }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (binding) {
+                  // Cycle: bound → clear → (next right-click starts learn)
+                  clearSlotBinding(n);
+                } else if (isLearning) {
+                  cancelLearnSlotBinding();
+                } else {
+                  startLearnSlotBinding(n);
+                }
+              }}
+              title={tip}
+              className={`min-w-[32px] px-2 py-1 text-[10px] font-mono font-bold rounded border transition-colors relative
+                ${isLearning
+                  ? 'bg-accent-warning text-text-inverse border-accent-warning animate-pulse'
+                  : isActive
+                    ? 'bg-accent-primary text-text-inverse border-accent-primary'
+                    : 'bg-dark-bgTertiary text-text-muted border-dark-border hover:text-text-primary hover:border-accent-primary/50'}`}
             >
               {n}
+              {binding && !isLearning && (
+                <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-accent-success" />
+              )}
             </button>
           );
         })}
