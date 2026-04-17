@@ -3,6 +3,7 @@
  */
 
 import type { InstrumentConfig } from './instrument/defaults';
+import type { EffectConfig } from './instrument/effects';
 import type { SynthType, EnvelopeConfig } from './instrument/base';
 import type { DrumType, DrumMachineType } from './instrument/drums';
 import type { DjFxActionId } from '../engine/drumpad/DjFxActions';
@@ -186,6 +187,41 @@ export function createEmptyProgram(id: string, name: string): DrumProgram {
 
 /** Base ID for pad-owned instruments in ToneEngine (50000 + padId) */
 export const PAD_INSTRUMENT_BASE = 50000;
+
+/**
+ * Default instrument FX chain for drumpad synths — Reggae Soundsystem.
+ * Spring reverb + Space Echo + warm EQ — deep, dubby, cavernous.
+ * Returns fresh array with unique IDs each call.
+ */
+export function createDefaultPadFX(): EffectConfig[] {
+  const ts = Date.now();
+  return [
+    {
+      id: `pad-fx-eq-${ts}`,
+      category: 'tonejs',
+      type: 'EQ3',
+      enabled: true,
+      wet: 100,
+      parameters: { low: 2.5, mid: -1, high: -1.5 },
+    },
+    {
+      id: `pad-fx-spring-${ts}`,
+      category: 'wasm',
+      type: 'SpringReverb',
+      enabled: true,
+      wet: 30,
+      parameters: { decay: 0.6, damping: 0.4, tension: 0.45, mix: 0.4, drip: 0.55, diffusion: 0.7 },
+    },
+    {
+      id: `pad-fx-echo-${ts}`,
+      category: 'tonejs',
+      type: 'SpaceEcho',
+      enabled: true,
+      wet: 40,
+      parameters: { mode: 4, rate: 300, intensity: 0.55, echoVolume: 0.75, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
+    },
+  ] as EffectConfig[];
+}
 
 /** Get the bank letter for a pad ID (1-64) */
 export function getPadBank(padId: number): PadBank {
