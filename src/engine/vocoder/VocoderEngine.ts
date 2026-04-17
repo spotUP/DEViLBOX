@@ -454,6 +454,7 @@ export class VocoderEngine {
 
   /** Full cleanup */
   dispose(): void {
+    if (_activeVocoderEngine === this) _activeVocoderEngine = null;
     this.stop();
     if (this._isRecording) {
       this.recorder?.stop();
@@ -465,4 +466,17 @@ export class VocoderEngine {
     this.micPreamp.disconnect();
     this.outputGain.disconnect();
   }
+}
+
+// ── Global vocoder engine accessor (for joystick modulation) ──
+let _activeVocoderEngine: VocoderEngine | null = null;
+
+/** Register the active VocoderEngine instance (called by DJVocoderControl on create). */
+export function setActiveVocoderEngine(engine: VocoderEngine | null): void {
+  _activeVocoderEngine = engine;
+}
+
+/** Get the active VocoderEngine instance, if any. */
+export function getActiveVocoderEngine(): VocoderEngine | null {
+  return _activeVocoderEngine;
 }
