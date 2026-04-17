@@ -143,8 +143,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     reset: s.reset,
   })));
 
-  const { isDirty, setMetadata, metadata, resetProject } = useProjectStore(useShallow((s) => ({
-    isDirty: s.isDirty,
+  const { setMetadata, metadata, resetProject } = useProjectStore(useShallow((s) => ({
     setMetadata: s.setMetadata,
     metadata: s.metadata,
     resetProject: s.resetProject,
@@ -608,7 +607,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
                 className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
-        <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
+        <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
         <MIDIToolbarDropdown />
