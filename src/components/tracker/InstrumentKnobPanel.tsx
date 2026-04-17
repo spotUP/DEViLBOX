@@ -16,6 +16,7 @@ import { ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Plus } from 'luci
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { Knob } from '@components/controls/Knob';
+import { resolveParamKey } from '@components/controls/resolveParamKey';
 import { SynthControlsRouter } from './SynthControlsRouter';
 import type { TB303Config, EffectConfig, InstrumentConfig, SynthType } from '@typedefs/instrument';
 import type { InstrumentEffectsPanelHandle } from '@components/effects/InstrumentEffectsPanel';
@@ -152,7 +153,7 @@ const GenericSynthKnobs: React.FC<{
       label: 'Oscillator', accent: '#22d3ee', bg: '#081420', bgEnd: '#040e18', border: '#0a1e30',
       content: (
         <div className="flex items-end gap-3">
-          <Knob value={osc?.detune ?? 0} min={-100} max={100} onChange={(v) => updateOsc('detune', v)} label="Detune" color="#22d3ee" size="sm" formatValue={(v) => `${Math.round(v)}¢`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'oscillator.detune')} value={osc?.detune ?? 0} min={-100} max={100} onChange={(v) => updateOsc('detune', v)} label="Detune" color="#22d3ee" size="sm" formatValue={(v) => `${Math.round(v)}¢`} />
         </div>
       ),
     },
@@ -161,10 +162,10 @@ const GenericSynthKnobs: React.FC<{
       label: 'Envelope', accent: '#4ade80', bg: '#081a0a', bgEnd: '#041204', border: '#0a2a0e',
       content: (
         <div className="flex items-end gap-3">
-          <Knob value={env?.attack ?? 10} min={0} max={2000} onChange={(v) => updateEnv('attack', v)} label="Attack" color="#4ade80" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
-          <Knob value={env?.decay ?? 100} min={0} max={2000} onChange={(v) => updateEnv('decay', v)} label="Decay" color="#4ade80" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
-          <Knob value={env?.sustain ?? 70} min={0} max={100} onChange={(v) => updateEnv('sustain', v)} label="Sustain" color="#4ade80" size="sm" formatValue={(v) => `${Math.round(v)}%`} />
-          <Knob value={env?.release ?? 200} min={0} max={5000} onChange={(v) => updateEnv('release', v)} label="Release" color="#4ade80" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'envelope.attack')} value={env?.attack ?? 10} min={0} max={2000} onChange={(v) => updateEnv('attack', v)} label="Attack" color="#4ade80" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'envelope.decay')} value={env?.decay ?? 100} min={0} max={2000} onChange={(v) => updateEnv('decay', v)} label="Decay" color="#4ade80" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'envelope.sustain')} value={env?.sustain ?? 70} min={0} max={100} onChange={(v) => updateEnv('sustain', v)} label="Sustain" color="#4ade80" size="sm" formatValue={(v) => `${Math.round(v)}%`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'envelope.release')} value={env?.release ?? 200} min={0} max={5000} onChange={(v) => updateEnv('release', v)} label="Release" color="#4ade80" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
         </div>
       ),
     },
@@ -173,8 +174,8 @@ const GenericSynthKnobs: React.FC<{
       label: 'Filter', accent: '#fb923c', bg: '#201408', bgEnd: '#180e04', border: '#301e0a',
       content: (
         <div className="flex items-end gap-3">
-          <Knob value={filter?.frequency ?? 2000} min={20} max={20000} onChange={(v) => updateFilter('frequency', v)} label="Cutoff" color="#fb923c" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
-          <Knob value={filter?.Q ?? 1} min={0} max={100} onChange={(v) => updateFilter('Q', v)} label="Resonance" color="#fb923c" size="sm" formatValue={(v) => v.toFixed(1)} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'filter.frequency')} value={filter?.frequency ?? 2000} min={20} max={20000} onChange={(v) => updateFilter('frequency', v)} label="Cutoff" color="#fb923c" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'filter.Q')} value={filter?.Q ?? 1} min={0} max={100} onChange={(v) => updateFilter('Q', v)} label="Resonance" color="#fb923c" size="sm" formatValue={(v) => v.toFixed(1)} />
         </div>
       ),
     },
@@ -183,9 +184,9 @@ const GenericSynthKnobs: React.FC<{
       label: 'Filter Env', accent: '#c084fc', bg: '#1a0a22', bgEnd: '#100618', border: '#2a1430',
       content: (
         <div className="flex items-end gap-3">
-          <Knob value={filterEnv?.octaves ?? 2} min={0} max={8} onChange={(v) => updateFilterEnv('octaves', v)} label="Amount" color="#c084fc" size="sm" formatValue={(v) => v.toFixed(1)} />
-          <Knob value={filterEnv?.attack ?? 10} min={0} max={2000} onChange={(v) => updateFilterEnv('attack', v)} label="Attack" color="#c084fc" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
-          <Knob value={filterEnv?.decay ?? 200} min={0} max={2000} onChange={(v) => updateFilterEnv('decay', v)} label="Decay" color="#c084fc" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'filterEnvelope.octaves')} value={filterEnv?.octaves ?? 2} min={0} max={8} onChange={(v) => updateFilterEnv('octaves', v)} label="Amount" color="#c084fc" size="sm" formatValue={(v) => v.toFixed(1)} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'filterEnvelope.attack')} value={filterEnv?.attack ?? 10} min={0} max={2000} onChange={(v) => updateFilterEnv('attack', v)} label="Attack" color="#c084fc" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
+          <Knob paramKey={resolveParamKey(instrument.synthType, 'filterEnvelope.decay')} value={filterEnv?.decay ?? 200} min={0} max={2000} onChange={(v) => updateFilterEnv('decay', v)} label="Decay" color="#c084fc" size="sm" formatValue={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`} />
         </div>
       ),
     },

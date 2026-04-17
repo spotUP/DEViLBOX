@@ -66,11 +66,12 @@ interface ParamKnobProps {
   paramValues: Map<number, number>;
   setParam: (id: number, value: number) => void;
   knobColor: string;
+  paramKey?: string;
 }
 
 const ParamKnob: React.FC<ParamKnobProps> = ({
   name, label, min, max, fmt, logarithmic, bipolar, size,
-  paramByName, paramValues, setParam, knobColor,
+  paramByName, paramValues, setParam, knobColor, paramKey,
 }) => {
   const p = paramByName.get(name);
   if (!p) return null;
@@ -87,6 +88,7 @@ const ParamKnob: React.FC<ParamKnobProps> = ({
       logarithmic={logarithmic}
       bipolar={bipolar}
       formatValue={fmt}
+      paramKey={paramKey}
     />
   );
 };

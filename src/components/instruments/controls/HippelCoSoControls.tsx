@@ -306,6 +306,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
           <Knob
+            paramKey="hippelcoso.vibDelay"
             value={config.vibDelay}
             min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('vibDelay', Math.round(v), 4)}
@@ -313,6 +314,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
+            paramKey="hippelcoso.vibSpeed"
             value={config.vibSpeed}
             min={-128} max={127} step={1}
             onChange={(v) => updS8WithChipRam('vibSpeed', Math.round(v), 2)}
@@ -320,6 +322,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
+            paramKey="hippelcoso.vibDepth"
             value={config.vibDepth}
             min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('vibDepth', Math.round(v), 3)}

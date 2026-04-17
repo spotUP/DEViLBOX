@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { useKnobImperative } from '@components/controls/useKnobImperative';
 
 interface FalconHardwareProps {
   parameters: Record<string, number>;
@@ -16,8 +17,10 @@ const FKnob: React.FC<{
   value: number;
   color?: string;
   onChange: (value: number) => void;
-}> = ({ label, value, color = '#3366ff', onChange }) => {
+  paramKey?: string;
+}> = ({ label, value, color = '#3366ff', onChange, paramKey }) => {
   const angle = -135 + value * 270;
+  const indicatorRef = useKnobImperative<HTMLDivElement>({ paramKey, transformOrigin: 'bottom center' });
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -46,6 +49,7 @@ const FKnob: React.FC<{
         title={`${label}: ${Math.round(value * 100)}%`}
       >
         <div
+          ref={indicatorRef}
           className="absolute w-0.5 h-3 rounded-full"
           style={{ background: color, top: '2px', left: '50%', transform: `translateX(-50%) rotate(${angle}deg)`, transformOrigin: 'bottom center' }}
         />

@@ -639,6 +639,7 @@ export const GeonkickControls: React.FC<GeonkickControlsProps> = ({ config, onCh
                 }`}
               >
                 <Knob
+                  paramKey="geonkick.filterCutoff"
                   value={readPresetNumber(preset, 'kick.filter.cutoff', 800)}
                   min={20}
                   max={20000}
@@ -651,6 +652,7 @@ export const GeonkickControls: React.FC<GeonkickControlsProps> = ({ config, onCh
                   formatValue={(v) => `${Math.round(v)}Hz`}
                 />
                 <Knob
+                  paramKey="geonkick.filterQ"
                   value={readPresetNumber(preset, 'kick.filter.factor', 10)}
                   min={0.1}
                   max={20}
@@ -715,6 +717,7 @@ export const GeonkickControls: React.FC<GeonkickControlsProps> = ({ config, onCh
                 }`}
               >
                 <Knob
+                  paramKey="geonkick.distDrive"
                   value={readPresetNumber(preset, 'kick.distortion.drive', 1)}
                   min={0}
                   max={10}
