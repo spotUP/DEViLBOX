@@ -193,9 +193,15 @@ export class VocoderEngine {
       VocoderEngine.cachedStream?.getTracks().forEach(t => t.stop());
       const constraints: MediaStreamConstraints = {
         audio: {
-          echoCancellation: true,
+          // echoCancellation: true was aggressively suppressing the built-in
+          // MacBook mic — signal stayed at ~0.005 peak even during speech,
+          // unable to reach a usable level for the vocoder. Disabled.
+          echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false,
+          // autoGainControl boosts quiet mics to a usable level. Without it,
+          // some mics produce signal so low that no downstream preamp can
+          // compensate without clipping loud passages.
+          autoGainControl: true,
           ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
         },
       };
