@@ -196,6 +196,13 @@ export function createEmptyProgram(id: string, name: string): DrumProgram {
 /** Base ID for pad-owned instruments in ToneEngine (50000 + padId) */
 export const PAD_INSTRUMENT_BASE = 50000;
 
+/** How many named slots map 1:1 to an Akai MPK Mini's 8 programs. */
+export const MPK_SLOT_COUNT = 8;
+/** Canonical id for MPK slot N (1-based). */
+export const mpkSlotId = (n: number): string => `mpk-${n}`;
+/** Default display name for MPK slot N. */
+export const mpkSlotName = (n: number): string => `Program ${n}`;
+
 /**
  * Default instrument FX chain for drumpad synths — Reggae Soundsystem.
  * Spring reverb + Space Echo + warm EQ — deep, dubby, but with tail values

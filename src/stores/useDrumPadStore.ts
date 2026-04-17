@@ -12,7 +12,17 @@ import type {
   SampleData,
   PadBank,
 } from '../types/drumpad';
-import { createEmptyProgram, createEmptyPad, create808Program, create909Program, createDJFXProgram, createDJCompleteProgram, getBankPads } from '../types/drumpad';
+import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName } from '../types/drumpad';
+
+/** Build the 8 default MPK-linked program slots. */
+function buildMpkSlots(): Map<string, ReturnType<typeof createEmptyProgram>> {
+  const programs = new Map<string, ReturnType<typeof createEmptyProgram>>();
+  for (let n = 1; n <= MPK_SLOT_COUNT; n++) {
+    const id = mpkSlotId(n);
+    programs.set(id, createEmptyProgram(id, mpkSlotName(n)));
+  }
+  return programs;
+}
 import {
   saveAllPrograms,
   loadAllPrograms,
@@ -53,6 +63,7 @@ interface DrumPadStore extends DrumPadState {
   loadProgram: (id: string) => void;
   saveProgram: (program: DrumProgram) => void;
   createProgram: (id: string, name: string) => void;
+  renameProgram: (id: string, name: string) => void;
   deleteProgram: (id: string) => void;
   copyProgram: (fromId: string, toId: string) => void;
 
@@ -121,14 +132,10 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     set({ activeFxPads: next });
   },
 
-  // Initial state
-  programs: new Map([
-    ['A-01', create808Program()],
-    ['B-01', create909Program()],
-    ['C-01', createDJFXProgram()],
-    ['D-01', createDJCompleteProgram()],
-  ]),
-  currentProgramId: 'A-01',
+  // Initial state — 8 empty slots mapped to Akai MPK Mini programs 1-8.
+  // Extra user programs can live alongside these beyond the slot 8 index.
+  programs: buildMpkSlots(),
+  currentProgramId: mpkSlotId(1),
   midiMappings: {},
   preferences: DEFAULT_PREFERENCES,
   busLevels: {} as Record<string, number>,
@@ -245,6 +252,18 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     get().saveToStorage();
   },
 
+  renameProgram: (id: string, name: string) => {
+    set((state) => {
+      const programs = new Map(state.programs);
+      const program = programs.get(id);
+      if (!program) return { programs };
+      programs.set(id, { ...program, name });
+      return { programs };
+    });
+    get().saveToStorage();
+    get().saveToIndexedDB();
+  },
+
   deleteProgram: (id: string) => {
     set((state) => {
       const programs = new Map(state.programs);
@@ -254,12 +273,13 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       let newCurrentId = state.currentProgramId;
       if (id === state.currentProgramId) {
         const firstId = Array.from(programs.keys())[0];
-        newCurrentId = firstId || 'A-01';
+        newCurrentId = firstId || mpkSlotId(1);
 
-        // Create default program if none exist
+        // Create default MPK slot 1 if nothing remains
         if (!programs.has(newCurrentId)) {
-          programs.set('A-01', create808Program());
-          newCurrentId = 'A-01';
+          const defaultId = mpkSlotId(1);
+          programs.set(defaultId, createEmptyProgram(defaultId, mpkSlotName(1)));
+          newCurrentId = defaultId;
         }
       }
 
@@ -591,16 +611,23 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       return;
     }
     try {
-      const programs = await loadAllPrograms(audioContext);
-      if (programs && programs.size > 0) {
+      const loaded = await loadAllPrograms(audioContext);
+      if (loaded && loaded.size > 0) {
+        // Ensure the 8 MPK-linked slots always exist. Any user data from
+        // previous sessions wins; missing slots get freshly created.
+        for (let n = 1; n <= MPK_SLOT_COUNT; n++) {
+          const id = mpkSlotId(n);
+          if (!loaded.has(id)) {
+            loaded.set(id, createEmptyProgram(id, mpkSlotName(n)));
+          }
+        }
         const state = get();
-        // Merge: keep current program ID if it exists in loaded data
-        const currentId = programs.has(state.currentProgramId)
+        const currentId = loaded.has(state.currentProgramId)
           ? state.currentProgramId
-          : Array.from(programs.keys())[0] || 'A-01';
-        set({ programs, currentProgramId: currentId });
+          : mpkSlotId(1);
+        set({ programs: loaded, currentProgramId: currentId });
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[DrumPadStore] Loaded ${programs.size} programs from IndexedDB`);
+          console.log(`[DrumPadStore] Loaded ${loaded.size} programs from IndexedDB`);
         }
       }
     } catch (error) {
