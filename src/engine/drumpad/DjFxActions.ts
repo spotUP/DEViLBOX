@@ -18,7 +18,7 @@ import { useDJStore } from '../../stores/useDJStore';
 import { getDJEngine } from '../dj/DJEngine';
 import { filterSweep, filterReset, echoOut, instantEQKill, cancelAllAutomation, getQuantizeMode, setQuantizeMode, type QuantizeMode } from '../dj/DJQuantizedFX';
 import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
-import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock } from '../dj/DJActions';
+import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, getDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock } from '../dj/DJActions';
 import { syncBPMToOther } from '../dj/DJAutoSync';
 import type { DeckId } from '../dj/DeckEngine';
 
@@ -1502,8 +1502,12 @@ function createXfaderCut(side: 'a' | 'b'): DjFxAction {
 
 // ─── Channel Mute Toggle Actions ──────────────────────────────────
 
-const channelMuteState = new Map<DeckId, number>(); // track per-deck mute masks
-
+/* TrackerReplayer.setChannelMuteMask convention: bit N = 1 → channel N is
+ * audible; bit N = 0 → channel N is muted. Read the mask straight from the
+ * deck's replayer on every press — no local cache — so reloading a song
+ * or switching decks never leaves stale mute bits for channels the new
+ * content doesn't have. The replayer defaults to 0xFFFF (16 channels on)
+ * on construction and is reset by loadSong for each new deck content. */
 function createChannelMuteToggle(channel: number): DjFxAction {
   return {
     id: `fx_ch_mute_${channel}` as DjFxActionId,
@@ -1512,10 +1516,9 @@ function createChannelMuteToggle(channel: number): DjFxAction {
     mode: 'oneshot',
     engage() {
       const deckId = getActiveDeckId();
-      const current = channelMuteState.get(deckId) || 0;
+      const current = getDeckChannelMuteMask(deckId);
       const bit = 1 << (channel - 1);
-      const newMask = current ^ bit; // toggle bit
-      channelMuteState.set(deckId, newMask);
+      const newMask = (current ^ bit) >>> 0; // toggle bit, keep as uint32
       setDeckChannelMuteMask(deckId, newMask);
     },
     disengage() { /* toggle — no release action */ },
