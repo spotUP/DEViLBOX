@@ -64,6 +64,7 @@ import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
+import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -548,6 +549,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       {/* Main Content Area with Pattern Editor and Instrument Panel - Flexbox Layout */}
       <div className="flex-1 min-h-0 min-w-0 relative z-10 flex overflow-hidden">
+
+        {/* Pattern Order Sidebar - Renoise-style (tracker view only, hidden in fullscreen) */}
+        {!editorFullscreen && viewMode === 'tracker' && (
+          <PatternOrderSidebar />
+        )}
 
         {/* Pattern Editor / Grid Sequencer - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden" data-tracker-editor="true">
