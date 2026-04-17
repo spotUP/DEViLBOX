@@ -71,14 +71,14 @@ const CLUB_HOUSE: DJScenarioPreset = {
   ],
   
   knobMappings: [
-    { channel: 0, cc: 70, param: 'dj.deckA.eqHi' },
-    { channel: 0, cc: 71, param: 'dj.deckA.eqMid' },
-    { channel: 0, cc: 72, param: 'dj.deckA.eqLow' },
-    { channel: 0, cc: 73, param: 'dj.deckA.filter' },
-    { channel: 0, cc: 74, param: 'dj.deckB.eqHi' },
-    { channel: 0, cc: 75, param: 'dj.deckB.eqMid' },
-    { channel: 0, cc: 76, param: 'dj.deckB.eqLow' },
-    { channel: 0, cc: 77, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 70, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 71, param: 'dj.deckA.eqHi' },
+    { channel: 0, cc: 72, param: 'dj.deckA.eqMid' },
+    { channel: 0, cc: 73, param: 'dj.deckA.eqLow' },
+    { channel: 0, cc: 74, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 75, param: 'dj.deckB.eqHi' },
+    { channel: 0, cc: 76, param: 'dj.deckB.eqMid' },
+    { channel: 0, cc: 77, param: 'dj.deckB.eqLow' },
   ],
   
   padMappings: [
@@ -576,14 +576,14 @@ const OPEN_FORMAT: DJScenarioPreset = {
   ],
   
   knobMappings: [
-    { channel: 0, cc: 70, param: 'dj.deckA.eqHi' },
-    { channel: 0, cc: 71, param: 'dj.deckA.eqMid' },
-    { channel: 0, cc: 72, param: 'dj.deckA.eqLow' },
-    { channel: 0, cc: 73, param: 'dj.deckA.filter' },
-    { channel: 0, cc: 74, param: 'dj.deckB.eqHi' },
-    { channel: 0, cc: 75, param: 'dj.deckB.eqMid' },
-    { channel: 0, cc: 76, param: 'dj.deckB.eqLow' },
-    { channel: 0, cc: 77, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 70, param: 'dj.deckA.filter' },
+    { channel: 0, cc: 71, param: 'dj.deckA.eqHi' },
+    { channel: 0, cc: 72, param: 'dj.deckA.eqMid' },
+    { channel: 0, cc: 73, param: 'dj.deckA.eqLow' },
+    { channel: 0, cc: 74, param: 'dj.deckB.filter' },
+    { channel: 0, cc: 75, param: 'dj.deckB.eqHi' },
+    { channel: 0, cc: 76, param: 'dj.deckB.eqMid' },
+    { channel: 0, cc: 77, param: 'dj.deckB.eqLow' },
   ],
   
   padMappings: [
