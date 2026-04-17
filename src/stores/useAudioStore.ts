@@ -27,6 +27,7 @@ interface AudioStore {
 
   // Master Effects Chain
   masterEffects: EffectConfig[];
+  presetGainCompensationDb: number;
 
   // Actions
   setInitialized: (initialized: boolean) => void;
@@ -47,7 +48,7 @@ interface AudioStore {
   removeMasterEffect: (effectId: string) => void;
   updateMasterEffect: (effectId: string, updates: Partial<EffectConfig>) => void;
   reorderMasterEffects: (fromIndex: number, toIndex: number) => void;
-  setMasterEffects: (effects: EffectConfig[]) => void;
+  setMasterEffects: (effects: EffectConfig[], presetGainCompensationDb?: number) => void;
 }
 
 export const useAudioStore = create<AudioStore>()(
@@ -64,6 +65,7 @@ export const useAudioStore = create<AudioStore>()(
     fftNode: null,
     toneEngineInstance: null,
     masterEffects: [],
+    presetGainCompensationDb: 0,
 
     // Actions
     setInitialized: (initialized) =>
@@ -252,8 +254,11 @@ export const useAudioStore = create<AudioStore>()(
         // Engine rebuild handled by usePatternPlayback's useEffect on masterEffectsKey
       }),
 
-    setMasterEffects: (effects) =>
+    setMasterEffects: (effects, presetGainCompensationDb) =>
       set((state) => {
+        // Store preset-level gain compensation (0 = no compensation)
+        state.presetGainCompensationDb = presetGainCompensationDb ?? 0;
+
         // Migrate old effects without category field (backward compatibility)
         const migratedEffects = effects.map(effect => {
           const withCategory = {

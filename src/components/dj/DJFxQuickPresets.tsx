@@ -147,8 +147,8 @@ export const DJFxQuickPresets: React.FC = () => {
   // The DJMixerEngine handles crossfading internally (equal-power, ~2 beats).
   // Just apply the new effects — the engine does the rest.
   const applyPreset = useCallback(
-    (newEffects: EffectConfig[], presetName: string) => {
-      setMasterEffects(newEffects);
+    (newEffects: EffectConfig[], presetName: string, gainCompensationDb?: number) => {
+      setMasterEffects(newEffects, gainCompensationDb);
       setActivePresetName(presetName);
       setIsOpen(false);
     },
@@ -161,7 +161,7 @@ export const DJFxQuickPresets: React.FC = () => {
         ...fx,
         id: `master-fx-${Date.now()}-${i}`,
       }));
-      applyPreset(effects, preset.name);
+      applyPreset(effects, preset.name, preset.gainCompensationDb);
     },
     [applyPreset],
   );
@@ -172,7 +172,7 @@ export const DJFxQuickPresets: React.FC = () => {
         ...fx,
         id: `master-fx-${Date.now()}-${i}`,
       }));
-      applyPreset(effects, preset.name);
+      applyPreset(effects, preset.name, 0); // user presets have no measured compensation
     },
     [applyPreset],
   );
@@ -191,7 +191,7 @@ export const DJFxQuickPresets: React.FC = () => {
   );
 
   const clearPresets = useCallback(() => {
-    setMasterEffects([]);
+    setMasterEffects([], 0);
     setActivePresetName(null);
     setIsOpen(false);
   }, [setMasterEffects]);

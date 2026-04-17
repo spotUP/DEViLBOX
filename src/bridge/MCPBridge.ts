@@ -125,6 +125,7 @@ import {
   updateMasterEffect,
   removeMasterEffect,
   toggleMasterEffect,
+  setMasterEffects,
   setSampleBusGain,
   setSynthBusGain,
   loadFile,
@@ -330,6 +331,7 @@ const handlers: Record<string, Handler> = {
   update_master_effect: updateMasterEffect,
   remove_master_effect: removeMasterEffect,
   toggle_master_effect: toggleMasterEffect,
+  set_master_effects: setMasterEffects,
 
   // ─── Write: Bus Gains ─────────────────────────────────────────────────────
   set_sample_bus_gain: setSampleBusGain,

@@ -307,7 +307,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects);
+    setMasterEffects(effects, preset.gainCompensationDb);
     setActivePresetName(preset.name);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
@@ -318,14 +318,14 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects);
+    setMasterEffects(effects, 0);
     setActivePresetName(preset.name);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
   // Clear all effects
   const handleClearEffects = useCallback(() => {
-    setMasterEffects([]);
+    setMasterEffects([], 0);
     setActivePresetName(null);
     setShowPresetMenu(false);
   }, [setMasterEffects]);

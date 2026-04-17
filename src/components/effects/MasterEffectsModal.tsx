@@ -145,7 +145,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects);
+    setMasterEffects(effects, preset.gainCompensationDb);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
@@ -155,7 +155,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects);
+    setMasterEffects(effects, 0);
     setShowPresetMenu(false);
   }, [setMasterEffects]);
 
