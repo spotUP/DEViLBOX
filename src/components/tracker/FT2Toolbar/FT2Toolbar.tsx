@@ -630,14 +630,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={displayPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
             </div>
-            <div className="ft2-section ft2-col-2">
-              <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
+            <div className="ft2-section ft2-col-3">
+              <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
             </div>
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
             </div>
-            <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
+            <div className="ft2-section ft2-col-2">
+              <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
             </div>
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput
