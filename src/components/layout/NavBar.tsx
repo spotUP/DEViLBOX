@@ -121,6 +121,18 @@ const NavBarComponent: React.FC = () => {
           >
             1.0.{BUILD_NUMBER}
           </span>
+          {!isElectron() && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowDownloadModal(true)}
+              icon={<Download size={14} />}
+              iconPosition="left"
+              title="Download Desktop App"
+            >
+              <span className="hidden sm:inline uppercase whitespace-nowrap">Desktop App</span>
+            </Button>
+          )}
           <button
             onClick={() => openModal('tips', { initialTab: 'tips' })}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent-warning/10 text-accent-warning hover:bg-accent-warning/20 transition-colors"
@@ -228,20 +240,6 @@ const NavBarComponent: React.FC = () => {
           >
             <span className="hidden sm:inline">Settings</span>
           </Button>
-
-          {/* Download Button (Web only) */}
-          {!isElectron() && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setShowDownloadModal(true)}
-              icon={<Download size={14} />}
-              iconPosition="left"
-              title="Download Desktop App"
-            >
-              <span className="hidden sm:inline uppercase whitespace-nowrap">Desktop App</span>
-            </Button>
-          )}
 
           {/* Info button moved to FT2 toolbar */}
 
