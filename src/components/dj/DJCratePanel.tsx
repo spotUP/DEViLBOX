@@ -8,9 +8,9 @@
 import React, { useState, useCallback } from 'react';
 import { HardDrive, ListMusic, Globe, Disc3, X, type LucideIcon } from 'lucide-react';
 import { DJFileBrowser } from './DJFileBrowser';
-import { DJPlaylistPanel } from './DJPlaylistPanel';
 import { DJModlandBrowser } from './DJModlandBrowser';
 import { DJSeratoBrowser } from './DJSeratoBrowser';
+import { DJPlaylistModal } from './DJPlaylistModal';
 import type { SeratoTrack } from '@/lib/serato';
 
 type CrateTab = 'browser' | 'playlists' | 'online' | 'serato';
@@ -29,48 +29,57 @@ interface DJCratePanelProps {
 
 export const DJCratePanel: React.FC<DJCratePanelProps> = ({ onClose, onLoadSeratoTrack }) => {
   const [activeTab, setActiveTab] = useState<CrateTab>('playlists');
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   const handleTabClick = useCallback((tab: CrateTab) => {
+    if (tab === 'playlists') {
+      setShowPlaylistModal(true);
+      return;
+    }
     setActiveTab(tab);
   }, []);
 
   return (
-    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg flex flex-col max-h-[50vh]">
-      {/* Tab bar */}
-      <div className="flex items-center border-b border-dark-border shrink-0">
-        {TABS.map(({ id, label, icon: Icon }) => (
+    <>
+      <div className="bg-dark-bgSecondary border border-dark-border rounded-lg flex flex-col max-h-[50vh]">
+        {/* Tab bar */}
+        <div className="flex items-center border-b border-dark-border shrink-0">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => handleTabClick(id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-colors border-b-2 ${
+                activeTab === id && id !== 'playlists'
+                  ? 'border-accent-primary text-accent-primary bg-dark-bg/50'
+                  : 'border-transparent text-text-muted hover:text-text-secondary hover:bg-dark-bg/30'
+              }`}
+            >
+              <Icon size={12} strokeWidth={1.5} />
+              {label}
+            </button>
+          ))}
+          <div className="flex-1" />
           <button
-            key={id}
-            onClick={() => handleTabClick(id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-colors border-b-2 ${
-              activeTab === id
-                ? 'border-accent-primary text-accent-primary bg-dark-bg/50'
-                : 'border-transparent text-text-muted hover:text-text-secondary hover:bg-dark-bg/30'
-            }`}
+            onClick={onClose}
+            className="p-1.5 text-text-muted hover:text-text-primary transition-colors mr-1"
+            title="Close crate"
           >
-            <Icon size={12} strokeWidth={1.5} />
-            {label}
+            <X size={14} />
           </button>
-        ))}
-        <div className="flex-1" />
-        <button
-          onClick={onClose}
-          className="p-1.5 text-text-muted hover:text-text-primary transition-colors mr-1"
-          title="Close crate"
-        >
-          <X size={14} />
-        </button>
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 min-h-0">
+          {activeTab === 'browser' && <DJFileBrowser />}
+          {activeTab === 'online' && <DJModlandBrowser />}
+          {activeTab === 'serato' && (
+            <DJSeratoBrowser onLoadTrackToDevice={onLoadSeratoTrack} />
+          )}
+        </div>
       </div>
 
-      {/* Tab content */}
-      <div className="flex-1 min-h-0">
-        {activeTab === 'browser' && <DJFileBrowser />}
-        {activeTab === 'playlists' && <DJPlaylistPanel />}
-        {activeTab === 'online' && <DJModlandBrowser />}
-        {activeTab === 'serato' && (
-          <DJSeratoBrowser onLoadTrackToDevice={onLoadSeratoTrack} />
-        )}
-      </div>
-    </div>
+      {/* Playlist modal */}
+      <DJPlaylistModal isOpen={showPlaylistModal} onClose={() => setShowPlaylistModal(false)} />
+    </>
   );
 };
