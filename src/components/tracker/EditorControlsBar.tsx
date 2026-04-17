@@ -27,7 +27,6 @@ import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
-  Eye, EyeOff,
   Activity, Cpu, Zap, Trash2,
 } from 'lucide-react';
 
@@ -258,23 +257,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           </>
         )}
 
-        {/* Ghost Patterns Toggle (tracker view) */}
-        {viewMode === 'tracker' && (
-          <button
-            onClick={c.handleToggleGhosts}
-            className={`
-              flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors
-              ${c.showGhostPatterns
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-              }
-            `}
-            title={c.showGhostPatterns ? 'Hide ghost patterns' : 'Show ghost patterns'}
-          >
-            {c.showGhostPatterns ? <Eye size={12} /> : <EyeOff size={12} />}
-            <span>Ghosts</span>
-          </button>
-        )}
 
         {/* Advanced Edit Toggle (tracker view only) */}
         {viewMode === 'tracker' && onToggleAdvancedEdit && (

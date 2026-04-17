@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { X, Maximize2, Keyboard, Usb } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { themes, THEME_TOKEN_GROUPS } from '@stores/useThemeStore';
 import { type SIDEngineType } from '@stores/useSettingsStore';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
@@ -193,6 +194,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <label className="text-ft2-text text-xs font-mono">Fullscreen:</label>
                     </div>
                     <Toggle label="" value={s.isFullscreen} onChange={s.toggleFullscreen} size="sm" />
+                  </div>
+
+                  {/* Ghost Patterns */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Ghost Patterns:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Show adjacent patterns dimmed behind current</span>
+                    </div>
+                    <Toggle label="" value={useEditorStore.getState().showGhostPatterns} onChange={(v) => useEditorStore.getState().setShowGhostPatterns(v)} size="sm" />
                   </div>
                 </div>
               </section>
