@@ -361,7 +361,7 @@ export const DJVocoderControl: React.FC = () => {
         <span className="relative">Vocoder</span>
       </button>
 
-      {/* Settings gear — opens dropdown with all vocoder settings */}
+      {/* Settings button — opens dropdown with all vocoder settings */}
       <button
         ref={gearRef}
         onClick={(e) => {
@@ -375,16 +375,17 @@ export const DJVocoderControl: React.FC = () => {
           }
           setShowPanel(v => !v);
         }}
-        className={`p-1 rounded transition-all ${
+        className={`relative flex items-center gap-1 px-2 py-1 rounded transition-all text-[10px] font-medium ${
           showPanel
             ? 'text-accent-primary bg-accent-primary/10'
-            : 'text-text-muted hover:text-text-primary'
+            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
         }`}
         title="Mic & vocoder settings"
       >
-        <Settings size={12} />
+        <Settings size={11} />
+        <span>Prefs</span>
         {activeFeatureCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent-primary text-[7px] font-bold text-dark-bg flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-accent-primary text-[7px] font-bold text-dark-bg flex items-center justify-center">
             {activeFeatureCount}
           </span>
         )}
