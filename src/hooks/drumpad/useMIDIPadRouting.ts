@@ -635,7 +635,9 @@ export function useMIDIPadRouting() {
         const slot = (message.program % MPK_SLOT_COUNT) + 1;
         const id = mpkSlotId(slot);
         const store = useDrumPadStore.getState();
-        if (store.programs.has(id)) {
+        const hit = store.programs.has(id);
+        console.log('[MPK PC] ch=', message.channel, 'program=', message.program, '→ slot', slot, '(', id, hit ? 'loaded' : 'MISSING', ')');
+        if (hit) {
           store.loadProgram(id);
         }
         return;
