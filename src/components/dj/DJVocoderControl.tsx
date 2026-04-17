@@ -174,15 +174,33 @@ export const DJVocoderControl: React.FC = () => {
   const handleDeviceChange = useCallback(async (deviceId: string) => {
     setSelectedDeviceId(deviceId);
     if (!engineRef.current?.isActive) return;
+
+    // Snapshot state from the old engine so the new one inherits it.
+    // Without this, engine.start() leaves the new engine UNMUTED and with
+    // the mic track ENABLED — so if the user is not holding PTT, the fresh
+    // engine pipes amplified mic noise + FX tail straight to the output.
     const oldEngine = engineRef.current;
+    const wasBypassed = oldEngine.isBypassed;
+    const pttIsActive = useVocoderStore.getState().pttActive;
+
     engineRef.current = null; // Prevent stale use during switch
     setActiveVocoderEngine(null);
-    oldEngine.stop();
+    oldEngine.dispose();
     try {
       const djEngine = getDJEngineIfActive();
       const destination = djEngine?.mixer.samplerInput;
       const engine = new VocoderEngine(destination);
       await engine.start(deviceId || undefined);
+      engine.setVocoderBypass(wasBypassed);
+      // Match PTT state — if user is not holding PTT, mute + disable mic so
+      // there's no accidental noise bleed while they're not talking.
+      if (pttIsActive) {
+        engine.setMicActive(true);
+        engine.setMuted(false);
+      } else {
+        engine.setMuted(true);
+        engine.setMicActive(false);
+      }
       engineRef.current = engine;
       setActiveVocoderEngine(engine);
     } catch (err) {
