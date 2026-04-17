@@ -499,6 +499,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const [searchQuery, setSearchQuery] = useState('');
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
   const [editTrack, setEditTrack] = useState<{ index: number; track: PlaylistTrack } | null>(null);
+  const clipboardRef = useRef<{ tracks: PlaylistTrack[]; isCut: boolean }>({ tracks: [], isCut: false });
   const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
 
@@ -1223,37 +1224,63 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!activePlaylist || !activePlaylistId) return;
     const trackCount = filteredTracks.length;
-    if (trackCount === 0) return;
+    if (trackCount === 0 && e.key !== 'v') return;
 
     const isMeta = e.metaKey || e.ctrlKey;
 
     switch (e.key) {
       case 'ArrowDown': {
         e.preventDefault();
-        const next = Math.min(focusedTrackIndex + 1, trackCount - 1);
-        const realNext = getRealIndex(next);
-        if (e.shiftKey) {
-          selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, realNext);
+        if (isMeta && !isFiltered && selectedTrackIndices.length > 0) {
+          // Ctrl/Cmd+Down: move selected tracks down
+          const sorted = [...selectedTrackIndices].sort((a, b) => b - a);
+          if (sorted[0] < activePlaylist.tracks.length - 1) {
+            for (const idx of sorted) {
+              reorderTrack(activePlaylistId, idx, idx + 1);
+            }
+            const newFocus = Math.min(focusedTrackIndex + 1, trackCount - 1);
+            setFocusedTrack(newFocus);
+            virtualizer.scrollToIndex(newFocus, { align: 'auto' });
+          }
         } else {
-          selectTrack(realNext);
-          lastClickedRef.current = realNext;
+          const next = Math.min(focusedTrackIndex + 1, trackCount - 1);
+          const realNext = getRealIndex(next);
+          if (e.shiftKey) {
+            selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, realNext);
+          } else {
+            selectTrack(realNext);
+            lastClickedRef.current = realNext;
+          }
+          setFocusedTrack(next);
+          virtualizer.scrollToIndex(next, { align: 'auto' });
         }
-        setFocusedTrack(next);
-        virtualizer.scrollToIndex(next, { align: 'auto' });
         break;
       }
       case 'ArrowUp': {
         e.preventDefault();
-        const prev = Math.max(focusedTrackIndex - 1, 0);
-        const realPrev = getRealIndex(prev);
-        if (e.shiftKey) {
-          selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, realPrev);
+        if (isMeta && !isFiltered && selectedTrackIndices.length > 0) {
+          // Ctrl/Cmd+Up: move selected tracks up
+          const sorted = [...selectedTrackIndices].sort((a, b) => a - b);
+          if (sorted[0] > 0) {
+            for (const idx of sorted) {
+              reorderTrack(activePlaylistId, idx, idx - 1);
+            }
+            const newFocus = Math.max(focusedTrackIndex - 1, 0);
+            setFocusedTrack(newFocus);
+            virtualizer.scrollToIndex(newFocus, { align: 'auto' });
+          }
         } else {
-          selectTrack(realPrev);
-          lastClickedRef.current = realPrev;
+          const prev = Math.max(focusedTrackIndex - 1, 0);
+          const realPrev = getRealIndex(prev);
+          if (e.shiftKey) {
+            selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, realPrev);
+          } else {
+            selectTrack(realPrev);
+            lastClickedRef.current = realPrev;
+          }
+          setFocusedTrack(prev);
+          virtualizer.scrollToIndex(prev, { align: 'auto' });
         }
-        setFocusedTrack(prev);
-        virtualizer.scrollToIndex(prev, { align: 'auto' });
         break;
       }
       case 'Enter': {
@@ -1284,6 +1311,66 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
         }
         break;
       }
+      case 'x': {
+        if (isMeta && selectedTrackIndices.length > 0) {
+          e.preventDefault();
+          // Cut: copy selected tracks to clipboard, then remove
+          const sorted = [...selectedTrackIndices].sort((a, b) => a - b);
+          clipboardRef.current = {
+            tracks: sorted.map(i => ({ ...activePlaylist.tracks[i] })),
+            isCut: true,
+          };
+          removeSelectedTracks(activePlaylistId);
+          import('@/stores/useNotificationStore').then(({ notify }) => {
+            notify.success(`Cut ${sorted.length} track${sorted.length > 1 ? 's' : ''}`);
+          });
+        }
+        break;
+      }
+      case 'c': {
+        if (isMeta && selectedTrackIndices.length > 0) {
+          e.preventDefault();
+          // Copy: store selected tracks in clipboard
+          const sorted = [...selectedTrackIndices].sort((a, b) => a - b);
+          clipboardRef.current = {
+            tracks: sorted.map(i => ({ ...activePlaylist.tracks[i] })),
+            isCut: false,
+          };
+          import('@/stores/useNotificationStore').then(({ notify }) => {
+            notify.success(`Copied ${sorted.length} track${sorted.length > 1 ? 's' : ''}`);
+          });
+        }
+        break;
+      }
+      case 'v': {
+        if (isMeta && clipboardRef.current.tracks.length > 0) {
+          e.preventDefault();
+          // Paste: insert clipboard tracks after focused position
+          const insertAt = Math.max(0, focusedTrackIndex + 1);
+          const newTracks = [...activePlaylist.tracks];
+          const pastedTracks = clipboardRef.current.tracks.map(t => ({
+            ...t,
+            id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          }));
+          newTracks.splice(insertAt, 0, ...pastedTracks);
+          sortTracksAction(activePlaylistId, newTracks);
+          // Select the pasted tracks
+          const pastedIndices = pastedTracks.map((_, i) => insertAt + i);
+          clearSelection();
+          for (const idx of pastedIndices) {
+            toggleTrackSelection(idx);
+          }
+          setFocusedTrack(insertAt);
+          import('@/stores/useNotificationStore').then(({ notify }) => {
+            notify.success(`Pasted ${pastedTracks.length} track${pastedTracks.length > 1 ? 's' : ''}`);
+          });
+          // If it was a cut, clear clipboard after paste
+          if (clipboardRef.current.isCut) {
+            clipboardRef.current = { tracks: [], isCut: false };
+          }
+        }
+        break;
+      }
       case 'a': {
         if (isMeta) {
           e.preventDefault();
@@ -1307,7 +1394,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
         break;
       }
     }
-  }, [activePlaylist, activePlaylistId, filteredTracks, focusedTrackIndex, selectedTrackIndices, getRealIndex, selectTrack, selectTrackRange, setFocusedTrack, selectAllTracks, clearSelection, removeSelectedTracks, loadTrackWithProgress, pickFreeDeck, canUndo, canRedo, undo, redo, virtualizer]);
+  }, [activePlaylist, activePlaylistId, filteredTracks, isFiltered, focusedTrackIndex, selectedTrackIndices, getRealIndex, selectTrack, selectTrackRange, toggleTrackSelection, setFocusedTrack, selectAllTracks, clearSelection, removeSelectedTracks, reorderTrack, sortTracksAction, loadTrackWithProgress, pickFreeDeck, canUndo, canRedo, undo, redo, virtualizer]);
 
   // ── Computed stats ────────────────────────────────────────────────────────
 
@@ -1345,7 +1432,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
         {/* Header */}
         <ModalHeader
           title="Playlist Manager"
-          subtitle="Double-click to play · Drag to reorder · Right-click for more"
+          subtitle="⌘↑↓ move · ⌘XCV cut/copy/paste · Drag to reorder · Double-click to play"
           icon={<ListMusic size={18} />}
           onClose={onClose}
         />
