@@ -69,6 +69,12 @@ export default {
         'lg': '8px',
         'xl': '12px',
       },
+      borderColor: {
+        DEFAULT: 'var(--color-border)',
+      },
+      divideColor: {
+        DEFAULT: 'var(--color-border)',
+      },
       boxShadow: {
         'glow': '0 0 20px var(--color-accent-glow)',
         'glow-sm': '0 0 10px var(--color-accent-glow)',
