@@ -292,6 +292,10 @@ function buildDjFxSubmenu(
 
   // Grouped by category
   const categoryLabels: Record<string, string> = {
+    hotcue: 'Hot Cues',
+    loop: 'Loop',
+    transport: 'Transport',
+    mixer: 'Mixer',
     deck: 'Deck FX',
     stutter: 'Stutter / Glitch',
     delay: 'Delay / Echo',
@@ -303,20 +307,35 @@ function buildDjFxSubmenu(
     oneshot: 'Sound FX',
   };
 
+  // Auto-color by category for quick visual identification
+  const categoryColors: Record<string, string> = {
+    hotcue: '#E91E63',   // pink/red — matches standard hot cue palette
+    loop: '#2196F3',     // blue
+    transport: '#4CAF50', // green
+    mixer: '#FF9800',    // orange
+  };
+
+  // Hot cue pads use individual colors matching the DJ standard
+  const hotCueColors = ['#E91E63', '#FF9800', '#2196F3', '#4CAF50', '#9C27B0', '#00BCD4', '#FFEB3B', '#F44336'];
+
   for (const [cat, actions] of Object.entries(byCategory)) {
     items.push({
       id: `djfx-cat-${cat}`, label: categoryLabels[cat] || cat,
-      submenu: actions.map((a) => ({
-        id: `djfx-${a.id}`,
-        label: a.name,
-        radio: true,
-        checked: currentAction === a.id,
-        onClick: () => store.updatePad(padId, {
-          djFxAction: a.id,
-          name: a.name,
-          playMode: a.mode === 'momentary' ? 'sustain' : 'oneshot',
-        }),
-      })),
+      submenu: actions.map((a, i) => {
+        const color = cat === 'hotcue' ? hotCueColors[i % hotCueColors.length] : categoryColors[cat];
+        return {
+          id: `djfx-${a.id}`,
+          label: a.name,
+          radio: true,
+          checked: currentAction === a.id,
+          onClick: () => store.updatePad(padId, {
+            djFxAction: a.id,
+            name: a.name,
+            playMode: a.mode === 'momentary' ? 'sustain' : 'oneshot',
+            ...(color ? { color } : {}),
+          }),
+        };
+      }),
     });
   }
 
