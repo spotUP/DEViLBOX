@@ -49,6 +49,7 @@ export class DJMixerEngine {
   // When no FX: masterGain → chainGain → duckGain
   private chainGain: Tone.Gain;
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
+  private bassLockNodes: AudioNode[] = []; // raw Web Audio crossover filters
   private masterEffectsRebuildVersion = 0;
   private crossfadeCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -315,14 +316,56 @@ export class DJMixerEngine {
     }
 
     // Build new chain: newChainGain → [FX nodes] → duckGain
+    // When delay/reverb effects are present, adds bass-lock crossover:
+    //   chainGain → LP(150Hz) → duckGain  (dry bass, always clean)
+    //   chainGain → HP(150Hz) → [FX] → duckGain  (FX'd mids/highs only)
+    const BASS_LOCK_TYPES = new Set([
+      'Delay', 'FeedbackDelay', 'PingPongDelay',
+      'Reverb', 'JCReverb', 'Freeverb', 'MVerb', 'SpringReverb',
+      'RETapeEcho', 'SpaceEcho',
+    ]);
+    const needsBassLock = nodes.length > 0 &&
+      enabled.some((fx) => BASS_LOCK_TYPES.has(fx.type));
+
     const newChainGain = new Tone.Gain(0); // starts silent
+    const extraDisposables: AudioNode[] = []; // raw Web Audio nodes for cleanup
     try {
       if (nodes.length > 0) {
-        newChainGain.connect(nodes[0]);
-        for (let i = 0; i < nodes.length - 1; i++) {
-          nodes[i].connect(nodes[i + 1]);
+        if (needsBassLock) {
+          // Bass-lock crossover: split at 150Hz
+          const ctx = Tone.getContext().rawContext;
+          const bassLP = ctx.createBiquadFilter();
+          bassLP.type = 'lowpass';
+          bassLP.frequency.value = 150;
+          bassLP.Q.value = 0.707; // Butterworth
+
+          const bassHP = ctx.createBiquadFilter();
+          bassHP.type = 'highpass';
+          bassHP.frequency.value = 150;
+          bassHP.Q.value = 0.707;
+
+          // chainGain → LP → duckGain (clean bass bypass)
+          Tone.connect(newChainGain, bassLP);
+          Tone.connect(bassLP, this.duckGain);
+
+          // chainGain → HP → FX chain → duckGain
+          Tone.connect(newChainGain, bassHP);
+          Tone.connect(bassHP, nodes[0]);
+          for (let i = 0; i < nodes.length - 1; i++) {
+            nodes[i].connect(nodes[i + 1]);
+          }
+          nodes[nodes.length - 1].connect(this.duckGain);
+
+          extraDisposables.push(bassLP, bassHP);
+          console.log('[DJMixer] Bass-lock enabled (crossover at 150Hz)');
+        } else {
+          // Standard chain — full spectrum through effects
+          newChainGain.connect(nodes[0]);
+          for (let i = 0; i < nodes.length - 1; i++) {
+            nodes[i].connect(nodes[i + 1]);
+          }
+          nodes[nodes.length - 1].connect(this.duckGain);
         }
-        nodes[nodes.length - 1].connect(this.duckGain);
       } else {
         newChainGain.connect(this.duckGain);
       }
@@ -331,13 +374,16 @@ export class DJMixerEngine {
     } catch (err) {
       console.error('[DJMixerEngine] FX chain connection failed, keeping old chain:', err);
       nodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+      extraDisposables.forEach(n => { try { n.disconnect(); } catch { /* */ } });
       try { newChainGain.disconnect(); newChainGain.dispose(); } catch { /* */ }
       return;
     }
 
     // Update state to point to new chain
+    const oldBassLockNodes = [...this.bassLockNodes];
     this.chainGain = newChainGain;
     this.masterEffectsNodes = nodes;
+    this.bassLockNodes = extraDisposables;
 
     // Compute crossfade duration from BPM (~2 beats)
     let fadeSec = 1.0; // fallback at 120 BPM = 2 beats
@@ -381,6 +427,9 @@ export class DJMixerEngine {
       for (const node of oldNodes) {
         try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
       }
+      for (const node of oldBassLockNodes) {
+        try { node.disconnect(); } catch { /* already disconnected */ }
+      }
       try { oldChainGain.disconnect(); oldChainGain.dispose(); } catch { /* */ }
     }, (fadeSec + 0.1) * 1000); // small buffer after fade completes
   }
@@ -408,6 +457,10 @@ export class DJMixerEngine {
       try { node.disconnect(); node.dispose(); } catch { /* */ }
     }
     this.masterEffectsNodes = [];
+    for (const node of this.bassLockNodes) {
+      try { node.disconnect(); } catch { /* */ }
+    }
+    this.bassLockNodes = [];
 
     this.inputA.dispose();
     this.inputB.dispose();
