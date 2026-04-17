@@ -213,12 +213,6 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       },
 
       setActivePlaylist: (playlistId: string | null) => {
-        // Save environment to the current active playlist before switching
-        const currentId = _get().activePlaylistId;
-        if (currentId) {
-          _get().saveEnvironmentToPlaylist(currentId);
-        }
-
         set((state) => {
           state.activePlaylistId = playlistId;
           state.selectedTrackIndices = [];
@@ -246,21 +240,8 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           }
         });
 
-        // Restore environment from the newly activated playlist
-        if (playlistId) {
-          const playlist = _get().playlists.find((p: DJPlaylist) => p.id === playlistId);
-          if (playlist?.environment) {
-            import('@/lib/dj/djEnvironment').then(({ restoreDJEnvironment }) => {
-              restoreDJEnvironment(playlist.environment!);
-              console.log(`[DJPlaylist] Restored DJ environment from "${playlist.name}"`);
-            });
-          } else if (playlist?.masterEffects) {
-            // Backward compat: restore just master effects from old format
-            import('@/stores/useAudioStore').then(({ useAudioStore }) => {
-              useAudioStore.getState().setMasterEffects(playlist.masterEffects!);
-            });
-          }
-        }
+        // Environment save/restore is explicit only (cloud save, "Save DJ Set" button).
+        // Auto-restoring on every playlist switch causes phantom FX and unwanted state changes.
       },
 
       updatePlaylistDescription: (playlistId: string, description: string) => {
@@ -734,6 +715,10 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
               // Migrate: ensure all tracks have IDs
               if (!t.id) t.id = generateTrackId();
             }
+            // Clear auto-saved environment/masterEffects that cause phantom FX.
+            // Environment is now only saved explicitly (cloud save / "Save DJ Set").
+            pl.environment = undefined;
+            pl.masterEffects = undefined;
           }
           // Async migration: resolve SID tracks missing hvsc: prefix
           repairSIDTracks(state.playlists);
