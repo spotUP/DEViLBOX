@@ -21,6 +21,7 @@ import { getDjFxByCategory, type DjFxActionId } from '@/engine/drumpad/DjFxActio
 import { DEFAULT_SCRATCH_PADS } from '@/constants/djPadModeDefaults';
 import { DJ_ONE_SHOT_PRESETS } from '@/constants/djOneShotPresets';
 import { ONE_SHOT_PRESETS_BY_CATEGORY } from '@/constants/djOneShotPresetsByCategory';
+import { SAMPLE_FX_PRESETS, type SampleFxPreset } from '@/constants/sampleFxPresets';
 import { SYNTH_CATEGORIES, getSynthInfo } from '@/constants/synthCategories';
 import type { SynthType, InstrumentPreset } from '@/types/instrument';
 import { TB303_PRESETS } from '@/constants/tb303Presets';
@@ -100,6 +101,17 @@ function buildLoadedPadMenu(
       items.push({
         id: 'presets', label: `Presets (${pad.synthConfig.synthType})`,
         submenu: presetSubmenu,
+      });
+    }
+  }
+
+  // ── FX Presets (for any pad — sample or synth) ──────────────────────────
+  {
+    const fxSubmenu = buildSampleFxPresetSubmenu(padId, pad, store);
+    if (fxSubmenu.length > 0) {
+      items.push({
+        id: 'fx-presets', label: 'FX Presets',
+        submenu: fxSubmenu,
       });
     }
   }
@@ -493,6 +505,86 @@ function applySynthPresetToPad(
       id: padInstId,
     } as any,
   });
+}
+
+// ── Sample FX Presets submenu ─────────────────────────────────────────────────
+
+function buildSampleFxPresetSubmenu(
+  padId: number,
+  pad: DrumPad,
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): MenuItemType[] {
+  const items: MenuItemType[] = [];
+  const currentPresetName = pad.presetName;
+
+  // "No FX" option
+  items.push({
+    id: 'fx-none',
+    label: 'No FX',
+    radio: true,
+    checked: !pad.effects || pad.effects.length === 0,
+    onClick: () => {
+      store.updatePad(padId, { effects: undefined, presetName: undefined });
+      // Also update effects chain in engine
+      updatePadEngineEffects(padId, store);
+    },
+  });
+  items.push({ type: 'divider' });
+
+  // Group presets by category
+  const categories = new Map<string, SampleFxPreset[]>();
+  for (const preset of SAMPLE_FX_PRESETS) {
+    if (!categories.has(preset.category)) categories.set(preset.category, []);
+    categories.get(preset.category)!.push(preset);
+  }
+
+  const catKeys = [...categories.keys()];
+  for (const [cat, presets] of categories) {
+    items.push({ id: `fx-cat-${cat}`, label: `── ${cat} ──`, disabled: true });
+    for (const preset of presets) {
+      // Stamp unique IDs per application
+      const stampedEffects = preset.effects.map(e => ({
+        ...e,
+        id: `${e.id}-${padId}-${Date.now()}`,
+      }));
+      items.push({
+        id: `fx-${preset.name.replace(/\s/g, '-').toLowerCase()}`,
+        label: preset.name,
+        radio: true,
+        checked: currentPresetName === preset.name,
+        onClick: () => {
+          store.updatePad(padId, {
+            effects: stampedEffects,
+            presetName: preset.name,
+          });
+          updatePadEngineEffects(padId, store);
+        },
+      });
+    }
+    if (cat !== catKeys[catKeys.length - 1]) {
+      items.push({ type: 'divider' });
+    }
+  }
+
+  return items;
+}
+
+/** Trigger effects chain rebuild in DrumPadEngine after FX preset change */
+function updatePadEngineEffects(
+  padId: number,
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  // Import getDrumPadEngine lazily to avoid circular dependency
+  import('./useMIDIPadRouting').then(({ getDrumPadEngine }) => {
+    const engine = getDrumPadEngine();
+    if (!engine) return;
+    const program = store.programs.get(store.currentProgramId);
+    if (!program) return;
+    const pad = program.pads.find(p => p.id === padId);
+    if (pad) {
+      engine.updatePadEffects([pad]);
+    }
+  }).catch(() => {});
 }
 
 // ── Quick assign submenu (synth voices) ─────────────────────────────────────
