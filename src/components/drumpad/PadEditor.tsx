@@ -12,9 +12,14 @@ import React, { useCallback, useMemo, useState, Suspense, lazy } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import type { DrumPad, OutputBus, VelocityCurve, SampleData } from '@/types/drumpad';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
+import type { EffectConfig } from '@typedefs/instrument';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
-import { X } from 'lucide-react';
+import { VisualEffectEditorWrapper } from '../effects/VisualEffectEditors';
+import { AVAILABLE_EFFECTS } from '@constants/unifiedEffects';
+import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { SAMPLE_FX_PRESETS } from '@constants/sampleFxPresets';
+import { X, Trash2 } from 'lucide-react';
 
 const UnifiedInstrumentEditor = lazy(() => import('../instruments/editors/UnifiedInstrumentEditor'));
 
@@ -273,6 +278,15 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
         )}
       </div>
 
+      {/* Effects chain — reverb, delay, saturation, etc. wired per pad. */}
+      {kind !== 'empty' && (
+        <PadEffectsSection
+          pad={pad}
+          onEffectsChange={(effects) => updatePad(pad.id, { effects, presetName: undefined })}
+          onLoadPreset={(name, effects) => updatePad(pad.id, { effects, presetName: name })}
+        />
+      )}
+
       {/* Danger zone */}
       <div className="flex justify-end px-4 py-2 border-t border-dark-border bg-dark-bg shrink-0">
         <button
@@ -281,6 +295,143 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
         >
           Clear pad
         </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Effects section ───────────────────────────────────────────────────────
+
+interface PadEffectsSectionProps {
+  pad: DrumPad;
+  onEffectsChange: (effects: EffectConfig[]) => void;
+  onLoadPreset: (name: string, effects: EffectConfig[]) => void;
+}
+
+const PadEffectsSection: React.FC<PadEffectsSectionProps> = ({ pad, onEffectsChange, onLoadPreset }) => {
+  const effects = pad.effects ?? [];
+
+  const addEffect = useCallback((effectId: string) => {
+    const avail = AVAILABLE_EFFECTS.find((e) => (e.type ?? `neural-${e.neuralModelIndex}`) === effectId);
+    if (!avail) return;
+    const type = avail.type ?? `NeuralEffect${avail.neuralModelIndex}`;
+    const params = getDefaultEffectParameters(type);
+    const next: EffectConfig = {
+      id: `pad-fx-${pad.id}-${Date.now()}`,
+      category: avail.category,
+      type: type as EffectConfig['type'],
+      enabled: true,
+      wet: 100,
+      parameters: params,
+      ...(avail.neuralModelIndex !== undefined ? { neuralModelIndex: avail.neuralModelIndex } : {}),
+    };
+    onEffectsChange([...effects, next]);
+  }, [effects, pad.id, onEffectsChange]);
+
+  const removeEffect = useCallback((idx: number) => {
+    onEffectsChange(effects.filter((_, i) => i !== idx));
+  }, [effects, onEffectsChange]);
+
+  const updateEffect = useCallback((idx: number, patch: Partial<EffectConfig>) => {
+    onEffectsChange(effects.map((fx, i) => (i === idx ? { ...fx, ...patch } : fx)));
+  }, [effects, onEffectsChange]);
+
+  const updateParameter = useCallback((idx: number, key: string, value: number | string) => {
+    onEffectsChange(effects.map((fx, i) => (i === idx ? { ...fx, parameters: { ...fx.parameters, [key]: value } } : fx)));
+  }, [effects, onEffectsChange]);
+
+  const updateParameters = useCallback((idx: number, params: Record<string, number | string>) => {
+    onEffectsChange(effects.map((fx, i) => (i === idx ? { ...fx, parameters: { ...fx.parameters, ...params } } : fx)));
+  }, [effects, onEffectsChange]);
+
+  const effectOptions = useMemo(() => (
+    AVAILABLE_EFFECTS.map((e) => ({
+      value: e.type ?? `neural-${e.neuralModelIndex}`,
+      label: `${e.group} · ${e.label}`,
+    }))
+  ), []);
+
+  const presetOptions = useMemo(() => ([
+    { value: '', label: '— Load FX preset —' },
+    ...SAMPLE_FX_PRESETS.map((p) => ({ value: p.name, label: p.name })),
+  ]), []);
+
+  const handlePresetChange = useCallback((name: string) => {
+    const preset = SAMPLE_FX_PRESETS.find((p) => p.name === name);
+    if (!preset) return;
+    const stamped = preset.effects.map((e, i) => ({ ...e, id: `pad-fx-${pad.id}-${Date.now()}-${i}` }));
+    onLoadPreset(preset.name, stamped);
+  }, [pad.id, onLoadPreset]);
+
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3 border-t border-dark-border bg-dark-bg">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted shrink-0">
+          Effects ({effects.length})
+        </span>
+        <CustomSelect
+          value=""
+          onChange={handlePresetChange}
+          options={presetOptions}
+          className="flex-1 px-2 py-1 text-xs font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
+        />
+        <CustomSelect
+          value=""
+          onChange={(v) => { if (v) addEffect(v); }}
+          options={[{ value: '', label: '＋ Add effect' }, ...effectOptions]}
+          className="flex-1 px-2 py-1 text-xs font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
+        />
+        {effects.length > 0 && (
+          <button
+            onClick={() => onEffectsChange([])}
+            className="px-2 py-1 text-[10px] font-mono rounded border border-accent-error/50 text-accent-error hover:bg-accent-error/10"
+            title="Clear effects chain"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {pad.presetName && (
+        <div className="text-[10px] font-mono text-text-muted">
+          Preset: <span className="text-accent-highlight">{pad.presetName}</span>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {effects.map((fx, idx) => (
+          <div key={fx.id} className="border border-dark-borderLight rounded bg-dark-bgTertiary">
+            <div className="flex items-center justify-between px-2 py-1 border-b border-dark-border">
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1 text-[10px] font-mono text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={fx.enabled}
+                    onChange={(e) => updateEffect(idx, { enabled: e.target.checked })}
+                  />
+                  {fx.type}
+                </label>
+              </div>
+              <button
+                onClick={() => removeEffect(idx)}
+                className="p-1 text-text-muted hover:text-accent-error"
+                title="Remove effect"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+            {fx.enabled && (
+              <div className="p-2">
+                <VisualEffectEditorWrapper
+                  effect={fx}
+                  onUpdateParameter={(k, v) => updateParameter(idx, k, v)}
+                  onUpdateParameters={(params) => updateParameters(idx, params)}
+                  onUpdateWet={(w) => updateEffect(idx, { wet: w })}
+                />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
