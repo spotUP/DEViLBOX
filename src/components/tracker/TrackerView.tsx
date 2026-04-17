@@ -387,7 +387,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onShowExport={onShowExport}
           onShowHelp={onShowHelp}
           onShowMasterFX={onShowMasterFX}
-          onShowInstruments={onShowInstruments}
           showMasterFX={showMasterFX}
         />
         {/* Dialogs still need to render */}
@@ -514,7 +513,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           <FT2Toolbar
             onShowExport={onShowExport}
             onShowHelp={onShowHelp}
-            onShowInstruments={onShowInstruments}
           />
         </div>
       )}
