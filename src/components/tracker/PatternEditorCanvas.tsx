@@ -1542,7 +1542,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       textVolume:          theme.colors.cellVolume,
       textEffect:          theme.colors.cellEffect,
       lineNumber:          theme.colors.textMuted,
-      lineNumberHighlight: theme.colors.accentSecondary,
+      lineNumberHighlight: lightenColor(theme.colors.trackerRowHighlight, 0.6),
       selection:           theme.colors.accentGlow,
       bookmark:            theme.colors.warning,
     };
