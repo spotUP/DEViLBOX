@@ -634,12 +634,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               <FT2NumericInput label="Pattern" value={patternOrder[displayPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
             </div>
             <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
-            </div>
-            <div className="ft2-section ft2-col-2">
-              <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
-            </div>
-            <div className="ft2-section ft2-col-3">
               <FT2NumericInput
                 label="Length"
                 value={patternLength}
@@ -658,11 +652,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 ]}
               />
             </div>
-            <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
-            </div>
             <div className="ft2-section ft2-col-4">
               <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
+            </div>
+            <div className="ft2-section ft2-col-3">
+              <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
+            </div>
+            <div className="ft2-section ft2-col-2">
+              <FT2NumericInput label="BPM" value={bpm} onChange={setBPM} min={32} max={255} throttleMs={50} />
+            </div>
+            <div className="ft2-section ft2-col-3">
+              <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
             </div>
           </div>
         </div>
