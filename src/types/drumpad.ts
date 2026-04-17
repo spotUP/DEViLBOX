@@ -54,6 +54,7 @@ export interface DrumPad {
   sample: SampleData | null;
   name: string;
   color?: string;          // Custom pad color (CSS hex, e.g. '#ff6b35')
+  presetName?: string;     // Currently active synth preset name (shown on pad)
 
   // Instrument / synth assignment (optional — triggers via ToneEngine)
   instrumentId?: number;   // Legacy: reference to song instrument in useInstrumentStore

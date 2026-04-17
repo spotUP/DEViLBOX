@@ -265,7 +265,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       </div>
 
       {/* Pad name */}
-      <div className="absolute inset-0 flex items-center justify-center px-2">
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-2">
         <span 
           className="text-[28px] font-bold text-center truncate leading-tight"
           style={{ 
@@ -275,6 +275,11 @@ export const PadButton: React.FC<PadButtonProps> = ({
           {/* Show actual pad name, or "Empty" if no data */}
           {hasActualData ? pad.name : 'Empty'}
         </span>
+        {pad.presetName && (
+          <span className="text-[9px] font-mono text-white/50 truncate max-w-full leading-none mt-0.5">
+            {pad.presetName}
+          </span>
+        )}
       </div>
 
       {/* DJ FX active glow */}
