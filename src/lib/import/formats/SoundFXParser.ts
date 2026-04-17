@@ -310,7 +310,29 @@ export async function parseSoundFXFile(
 
   for (let i = 1; i < numSampleSlots; i++) {
     const sample = samples[i];
-    if (!sample || sample.length === 0) continue;
+    if (!sample || sample.length === 0) {
+      /* Empty slot — expose as a WASM-synth placeholder so the SoundFx
+       * instrument editor can reach it. The chip-RAM header still exists
+       * in the module file at sampleTableBase + (i-1)*30. */
+      const emptyChipRam: UADEChipRamInfo = {
+        moduleBase: 0,
+        moduleSize: buffer.byteLength,
+        instrBase: sampleTableBase + (i - 1) * 30,
+        instrSize: 30,
+        sections: { sampleTable: sampleTableBase },
+      };
+      instruments.push({
+        id: i,
+        name: sample?.name || `Sample ${i}`,
+        type: 'synth' as const,
+        synthType: 'SoundFxWasmSynth' as const,
+        effects: [],
+        volume: 0,
+        pan: 0,
+        uadeChipRam: emptyChipRam,
+      } as unknown as InstrumentConfig);
+      continue;
+    }
 
     const pcmStart = sampleDataStart + sample.pointer;
     const pcmEnd = pcmStart + sample.length;

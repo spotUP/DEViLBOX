@@ -25,6 +25,7 @@ if(EMSCRIPTEN)
         "_octamed_create_player"
         "_octamed_destroy_player"
         "_octamed_player_set_instrument"
+        "_octamed_player_set_instrument_param"
         "_octamed_player_note_on"
         "_octamed_player_note_off"
         "_octamed_player_render"

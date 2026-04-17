@@ -354,6 +354,38 @@ KEEPALIVE int octamed_player_set_instrument(int handle, const uint8_t *data, int
   return 1;
 }
 
+/**
+ * Live-edit a scalar instrument parameter. Matches the string-keyed
+ * set_instrument_param convention used by Symphonie/SoundMon so the TS
+ * engine layer can forward OctaMEDControls edits without reloading the
+ * full instrument blob.
+ */
+KEEPALIVE void octamed_player_set_instrument_param(int handle, const char *param, float value) {
+  if (handle < 0 || handle >= MAX_PLAYERS) return;
+  if (!g_players[handle].allocated) return;
+  if (!param) return;
+  OctaMEDPlayer *p = &g_players[handle];
+
+  if (strcmp(param, "volume") == 0) {
+    /* Config "volume" maps to the instrument-level defaultVolume (0-64). */
+    int v = (int)value;
+    if (v < 0) v = 0;
+    if (v > 64) v = 64;
+    p->defaultVolume = (uint8_t)v;
+  } else if (strcmp(param, "voltblSpeed") == 0) {
+    p->voltblSpeed = (uint8_t)value;
+    p->volStepSamples = compute_step_samples(p->voltblSpeed, p->sampleRate);
+  } else if (strcmp(param, "wfSpeed") == 0) {
+    p->wfSpeed = (uint8_t)value;
+    p->wfStepSamples = compute_step_samples(p->wfSpeed, p->sampleRate);
+  } else if (strcmp(param, "vibratoSpeed") == 0) {
+    p->vibratoSpeed = (uint8_t)value;
+  }
+  /* loopStart / loopLen live in chip-RAM only; they do not affect the
+   * OctaMED synth engine's waveform oscillator and are applied by the
+   * UADE chip-RAM write-back in OctaMEDControls. */
+}
+
 KEEPALIVE void octamed_player_note_on(int handle, int midi_note, int velocity) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
   if (!g_players[handle].allocated) return;
