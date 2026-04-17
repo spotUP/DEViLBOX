@@ -166,7 +166,7 @@ const NavBarComponent: React.FC = () => {
           {/* Collab */}
           <button
             onClick={() => useUIStore.getState().openModal('collab')}
-            className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded transition-colors ${
               n.collabStatus === 'connected'
                 ? 'bg-accent-primary/20 text-accent-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgHover'
@@ -187,11 +187,11 @@ const NavBarComponent: React.FC = () => {
                 <>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+                    className="flex items-center gap-2 px-2 py-1 rounded text-[10px] text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
                     title={`Logged in as ${n.authUser.username}`}
                   >
-                    <User size={16} className="text-accent-success" />
-                    <span className="text-sm hidden sm:inline">{n.authUser.username}</span>
+                    <User size={14} className="text-accent-success" />
+                    <span className="hidden sm:inline">{n.authUser.username}</span>
                   </button>
                   {showUserMenu && (
                     <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-[99990] min-w-[160px]">
