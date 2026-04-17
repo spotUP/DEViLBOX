@@ -796,7 +796,10 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     count: filteredTracks.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => TRACK_ROW_HEIGHT,
-    overscan: 8,
+    // Large overscan — fast wheel/trackpad flicks outpace React render and
+    // leave a blank runway if the pre-rendered buffer is too small. 20 rows
+    // ≈ 500px of cushion above + below, enough to cover a quick flick.
+    overscan: 20,
   });
 
   // ── @dnd-kit ──────────────────────────────────────────────────────────────
