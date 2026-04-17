@@ -28,11 +28,10 @@ import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
-  Activity, Cpu, Zap, Trash2, Users,
+  Activity, Cpu, Zap, Trash2,
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
-import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 
 export interface EditorControlsBarProps {
@@ -76,8 +75,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
 
-  // Collab + Volume
-  const collabStatus = useCollaborationStore(s => s.status);
+  // Volume
   const masterVolume = useAudioStore(s => s.masterVolume);
   const setMasterVolume = useAudioStore(s => s.setMasterVolume);
 
@@ -412,25 +410,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         )}
       </div>
 
-      {/* Right section: Collab, Volume, FPS */}
+      {/* Right section: Volume, FPS */}
       <div className="flex-shrink-0 flex items-center gap-2">
-        {/* Collab */}
-        <button
-          onClick={() => useUIStore.getState().openModal('collab')}
-          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
-            collabStatus === 'connected'
-              ? 'bg-accent-primary/20 text-accent-primary'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-          }`}
-          title={collabStatus === 'connected' ? 'Collaboration active' : 'Start live collaboration'}
-        >
-          <Users size={12} />
-          Collab
-          {collabStatus === 'connected' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
-          )}
-        </button>
-
         {/* Master Volume */}
         <input
           type="range"

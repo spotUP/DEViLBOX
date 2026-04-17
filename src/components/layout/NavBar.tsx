@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Download, LogOut, User, Settings, Lightbulb, Play } from 'lucide-react';
+import { Plus, X, Download, LogOut, User, Users, Settings, Lightbulb, Play } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -168,6 +168,23 @@ const NavBarComponent: React.FC = () => {
 
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />
+
+          {/* Collab */}
+          <button
+            onClick={() => useUIStore.getState().openModal('collab')}
+            className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+              n.collabStatus === 'connected'
+                ? 'bg-accent-primary/20 text-accent-primary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgHover'
+            }`}
+            title={n.collabStatus === 'connected' ? 'Collaboration active' : 'Start live collaboration'}
+          >
+            <Users size={14} />
+            <span className="hidden sm:inline">Collab</span>
+            {n.collabStatus === 'connected' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
+            )}
+          </button>
 
           {/* Sign In / User Menu (far right, Web only) */}
           {!isElectron() && n.isServerAvailable && (
