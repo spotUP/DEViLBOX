@@ -6,7 +6,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, laz
 import type { DrumPad, FilterType, OutputBus, ScratchActionId, VelocityCurve, SampleData } from '../../types/drumpad';
 import type { DjFxActionId } from '../../engine/drumpad/DjFxActions';
 import { DJ_FX_ACTIONS } from '../../engine/drumpad/DjFxActions';
-import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
+import { PAD_INSTRUMENT_BASE, createDefaultPadFX } from '../../types/drumpad';
 import type { InstrumentConfig } from '../../types/instrument/defaults';
 import { DEFAULT_DECTALK } from '../../types/instrument/defaults';
 import { DEFAULT_SAM } from '../../types/instrument/defaults';
@@ -392,7 +392,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialTab
                         name: newName,
                         type: 'synth',
                         synthType,
-                        effects: [],
+                        effects: createDefaultPadFX(),
                         volume: 0,
                         pan: 0,
                       };
