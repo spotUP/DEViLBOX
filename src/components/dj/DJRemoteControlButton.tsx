@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { DJRemoteMicReceiver } from '@/engine/dj/DJRemoteMicReceiver';
 import { QRCode } from './QRCode';
 
@@ -17,6 +18,9 @@ export const DJRemoteControlButton: React.FC = () => {
   const [localIP, setLocalIP] = useState<string>('');
   const [micStatus, setMicStatus] = useState<string>('');
   const receiverRef = useRef<DJRemoteMicReceiver | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
 
   const handleToggle = useCallback(async () => {
     if (showPanel) {
@@ -27,6 +31,14 @@ export const DJRemoteControlButton: React.FC = () => {
       setRoomCode(null);
       setMicStatus('');
       return;
+    }
+
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPanelPos({
+        top: rect.bottom + 4,
+        right: Math.max(0, window.innerWidth - rect.right),
+      });
     }
 
     setShowPanel(true);
@@ -55,6 +67,19 @@ export const DJRemoteControlButton: React.FC = () => {
     return () => { receiverRef.current?.disconnect(); };
   }, []);
 
+  // Close panel on click outside (exclude the toggle button and the portaled panel)
+  useEffect(() => {
+    if (!showPanel) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      handleToggle();
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [showPanel, handleToggle]);
+
   const controllerURL = localIP && roomCode
     ? `http://${localIP}:5173/controller.html?host=${localIP}&room=${roomCode}`
     : '';
@@ -62,27 +87,23 @@ export const DJRemoteControlButton: React.FC = () => {
   return (
     <div style={{ position: 'relative' }}>
       <button
+        ref={buttonRef}
         onClick={handleToggle}
-        className={`
-          px-2 py-1 rounded text-xs font-bold transition-all
+        className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
           ${showPanel
-            ? 'bg-blue-600 text-white'
-            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
-          }
-        `}
+            ? 'border-blue-500 bg-blue-600 text-white'
+            : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+          }`}
         title="Connect iPhone controller"
       >
         REMOTE
       </button>
 
-      {/* Click-outside overlay to close */}
-      {showPanel && (
-        <div className="fixed inset-0 z-40" onClick={handleToggle} />
-      )}
-
-      {showPanel && (
+      {showPanel && createPortal(
         <div
-          className="absolute top-full right-0 mt-1 w-72 bg-dark-bgSecondary border border-dark-borderLight rounded-lg p-4 shadow-xl z-50"
+          ref={panelRef}
+          style={{ position: 'fixed', top: panelPos.top, right: panelPos.right }}
+          className="z-[99991] w-72 bg-dark-bgSecondary border border-dark-borderLight rounded-lg p-4 shadow-xl"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-text-primary">iPhone Controller</span>
@@ -129,7 +150,8 @@ export const DJRemoteControlButton: React.FC = () => {
           ) : (
             <div className="text-[10px] text-text-muted">Setting up...</div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
