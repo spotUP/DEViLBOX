@@ -907,6 +907,13 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
       setLoadingTrackIndex(index);
       setLoadingDeckId(deckId);
       try {
+        // Stop the target deck before loading a new track
+        const engine = getDJEngine();
+        try {
+          engine.getDeck(deckId).stop();
+          useDJStore.getState().setDeckPlaying(deckId, false);
+        } catch { /* deck may not be initialized yet */ }
+
         await loadTrackToDeck(track, deckId);
         if (track.masterFxPreset) {
           const preset = DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset);
@@ -937,7 +944,17 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
   // ── Preview ──────────────────────────────────────────────────────────────
 
+  const previewDeckRef = useRef<'A' | 'B' | null>(null);
+
   const stopPreview = useCallback(() => {
+    // Stop the deck that was used for previewing
+    if (previewDeckRef.current) {
+      try {
+        getDJEngine().getDeck(previewDeckRef.current).stop();
+        useDJStore.getState().setDeckPlaying(previewDeckRef.current, false);
+      } catch { /* deck not initialized */ }
+      previewDeckRef.current = null;
+    }
     if (previewPlayerRef.current) {
       try { previewPlayerRef.current.stop(); } catch { /* already stopped */ }
       previewPlayerRef.current = null;
@@ -951,16 +968,22 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
   const handlePreview = useCallback(async (track: PlaylistTrack, index: number) => {
     stopPreview();
-    const store = useDJStore.getState();
-    const idleDeck: 'A' | 'B' = store.decks.A.isPlaying ? 'B' : 'A';
+    const deckId: 'A' | 'B' = 'A';
+    previewDeckRef.current = deckId;
     setPreviewingIndex(index);
     try {
-      await loadTrackToDeck(track, idleDeck);
+      // Stop the deck first, then load and play
       try {
-        getDJEngine().getDeck(idleDeck).play();
-        useDJStore.getState().setDeckPlaying(idleDeck, true);
+        getDJEngine().getDeck(deckId).stop();
+        useDJStore.getState().setDeckPlaying(deckId, false);
+      } catch { /* */ }
+      await loadTrackToDeck(track, deckId);
+      try {
+        getDJEngine().getDeck(deckId).play();
+        useDJStore.getState().setDeckPlaying(deckId, true);
       } catch { /* engine not ready */ }
     } catch {
+      previewDeckRef.current = null;
       setPreviewingIndex(null);
     }
   }, [loadTrackToDeck, stopPreview]);
@@ -1057,16 +1080,30 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     lastClickedRef.current = realIndex;
   }, [getRealIndex, toggleTrackSelection, selectTrackRange, selectTrack]);
 
-  const handleTrackDoubleClick = useCallback(async (_track: PlaylistTrack, displayIndex: number) => {
+  const handleTrackDoubleClick = useCallback(async (track: PlaylistTrack, displayIndex: number) => {
     const realIndex = getRealIndex(displayIndex);
     if (!activePlaylistId) return;
-    const { getAutoDJ } = await import('@/engine/dj/DJAutoDJ');
-    const autoDJ = getAutoDJ();
-    const error = await autoDJ.enable(realIndex);
-    if (error) {
-      console.error('[DJPlaylistModal] Auto DJ start failed:', error);
+
+    // Stop all playing decks first
+    const engine = getDJEngine();
+    const decks = useDJStore.getState().decks;
+    for (const id of ['A', 'B', 'C'] as const) {
+      if (decks[id].isPlaying) {
+        try {
+          engine.getDeck(id).stop();
+          useDJStore.getState().setDeckPlaying(id, false);
+        } catch { /* deck not initialized */ }
+      }
     }
-  }, [getRealIndex, activePlaylistId]);
+
+    // Load and play on a free deck
+    const deckId = pickFreeDeck();
+    await loadTrackWithProgress(track, deckId, realIndex);
+    try {
+      engine.getDeck(deckId).play();
+      useDJStore.getState().setDeckPlaying(deckId, true);
+    } catch { /* engine not ready */ }
+  }, [getRealIndex, activePlaylistId, pickFreeDeck, loadTrackWithProgress]);
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
@@ -1288,7 +1325,20 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
         if (focusedTrackIndex >= 0 && focusedTrackIndex < trackCount) {
           const realIdx = getRealIndex(focusedTrackIndex);
           const track = activePlaylist.tracks[realIdx];
-          if (track) loadTrackWithProgress(track, pickFreeDeck(), realIdx);
+          if (track) {
+            // Stop all playing decks, then load to a free one
+            const eng = getDJEngine();
+            const dks = useDJStore.getState().decks;
+            for (const id of ['A', 'B', 'C'] as const) {
+              if (dks[id].isPlaying) {
+                try { eng.getDeck(id).stop(); useDJStore.getState().setDeckPlaying(id, false); } catch { /* */ }
+              }
+            }
+            const dk = pickFreeDeck();
+            loadTrackWithProgress(track, dk, realIdx).then(() => {
+              try { eng.getDeck(dk).play(); useDJStore.getState().setDeckPlaying(dk, true); } catch { /* */ }
+            });
+          }
         }
         break;
       }
