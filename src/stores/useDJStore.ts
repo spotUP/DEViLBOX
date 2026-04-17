@@ -485,7 +485,8 @@ export const useDJStore = create<DJStore>()(
 
     setDeckPitch: (deck, offset) =>
       set((state) => {
-        const clamped = Math.max(-16, Math.min(16, offset));
+        const safe = Number.isFinite(offset) ? offset : 0;
+        const clamped = Math.max(-16, Math.min(16, safe));
         state.decks[deck].pitchOffset = clamped;
         const baseBPM = state.decks[deck].detectedBPM || 120;
         state.decks[deck].effectiveBPM = Math.round(baseBPM * Math.pow(2, clamped / 12) * 100) / 100;

@@ -1485,6 +1485,11 @@ export class TrackerReplayer {
     }).catch(() => {});
   }
 
+  /** Current channel-mute mask. Bit N = 1 → channel N audible; 0 → muted. */
+  getChannelMuteMask(): number {
+    return this.channelMuteMask;
+  }
+
   // ==========================================================================
   // STEREO SEPARATION
   // ==========================================================================
@@ -1606,6 +1611,10 @@ export class TrackerReplayer {
     this._hasPlayedOnce = false;
     this._replacedInstruments.clear();
     this._activeWasmEngine = null;
+    /* Restore channel mute mask to "all audible" for the new content so
+     * stale mute bits from a previous song (DJ view drumpad channel-mute
+     * pads, manual mutes) don't leave channels silent in the new song. */
+    this.channelMuteMask = 0xFFFF;
     // Reset format compat flag so the warning fires again for the new song
     import('@/lib/formatCompatibility').then(({ resetFormatViolations }) => {
       resetFormatViolations();

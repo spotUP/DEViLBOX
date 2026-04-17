@@ -487,6 +487,12 @@ export class DeckEngine {
 
   /** Set pitch offset in semitones. Updates per-deck tempo and sample playback rates. */
   setPitch(semitones: number): void {
+    /* Clamp defensively so direct DSP callers (MIDI mapper, parameter router,
+     * drumpad FX actions) cannot push the playback rate into aliased ranges
+     * that produce buzzing / random noise. Matches useDJStore.setDeckPitch. */
+    if (!Number.isFinite(semitones)) semitones = 0;
+    if (semitones > 16) semitones = 16;
+    else if (semitones < -16) semitones = -16;
     const multiplier = Math.pow(2, semitones / 12);
     this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
     this._currentPitchSemitones = semitones;
