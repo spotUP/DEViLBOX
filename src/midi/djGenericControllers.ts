@@ -25,6 +25,7 @@ export const GENERIC_8x8: DJControllerPreset = {
   name: 'Generic 8-Knob + 8-Pad',
   manufacturer: 'Generic',
   description: 'Standard 8-knob (CC 70-77) + 8-pad (36-43) layout',
+  detectPatterns: ['mpk mini', 'mpkmini', 'lpd8', 'launch control', 'beatstep'],
   
   ccMappings: [
     // Knobs 1-4: Deck A
@@ -74,6 +75,7 @@ export const GENERIC_4x16: DJControllerPreset = {
   name: 'Generic 4-Knob + 16-Pad',
   manufacturer: 'Generic',
   description: 'Pad-heavy layout: 4 knobs + 16 pads (36-51)',
+  detectPatterns: ['mpd218', 'mpd226', 'mpd232', 'launchpad', 'maschine mikro'],
   
   ccMappings: [
     // 4 essential knobs
@@ -123,6 +125,7 @@ export const GENERIC_MIXER: DJControllerPreset = {
   name: 'Generic 2-Channel Mixer',
   manufacturer: 'Generic',
   description: 'Simple mixer: faders, EQ, crossfader only',
+  detectPatterns: ['cmd micro', 'mixtour'],
   
   ccMappings: [
     // Channel faders
@@ -172,6 +175,7 @@ export const GENERIC_4DECK: DJControllerPreset = {
   name: 'Generic 4-Deck Controller',
   manufacturer: 'Generic',
   description: 'Full 4-deck layout (A+B mapped, C+D reserved)',
+  detectPatterns: ['mcx8000', 'traktor s4', 'traktor kontrol s4'],
   
   ccMappings: [
     // Deck A (Channel 0)
@@ -231,6 +235,7 @@ export const GENERIC_TWISTER: DJControllerPreset = {
   name: 'Generic Rotation Controller',
   manufacturer: 'Generic',
   description: '16-encoder layout (e.g., MIDI Fighter Twister)',
+  detectPatterns: ['midi fighter', 'twister'],
   
   ccMappings: [
     // Bank 1: Deck A (knobs 1-8)

@@ -39,6 +39,8 @@ export interface DJControllerPreset {
   name: string;
   manufacturer: string;
   description: string;
+  /** Device name patterns for auto-detection (case insensitive substring match) */
+  detectPatterns?: string[];
   ccMappings: DJControllerCCMapping[];
   noteMappings: DJControllerNoteMapping[];
   jogMapping?: {
@@ -99,6 +101,7 @@ const PIONEER_DDJ_SB3: DJControllerPreset = {
   name: 'DDJ-SB3',
   manufacturer: 'Pioneer DJ',
   description: '2-channel Serato DJ controller',
+  detectPatterns: ['ddj-sb3', 'ddj sb3', 'ddjsb3'],
   ccMappings: [
     // Crossfader
     { channel: 0, cc: 63, param: 'dj.crossfader' },
@@ -159,6 +162,7 @@ const PIONEER_DDJ_FLX4: DJControllerPreset = {
   name: 'DDJ-FLX4',
   manufacturer: 'Pioneer DJ',
   description: '2-channel DJ controller (Serato/rekordbox)',
+  detectPatterns: ['ddj-flx4', 'ddj flx4', 'ddjflx4'],
   ccMappings: [
     { channel: 0, cc: 31, param: 'dj.crossfader' },
     { channel: 0, cc: 19, param: 'dj.deckA.volume' },
@@ -206,6 +210,7 @@ const PIONEER_DDJ_1000: DJControllerPreset = {
   name: 'DDJ-1000',
   manufacturer: 'Pioneer DJ',
   description: '4-channel professional DJ controller',
+  detectPatterns: ['ddj-1000', 'ddj 1000', 'ddj1000'],
   ccMappings: [
     { channel: 0, cc: 63, param: 'dj.crossfader' },
     { channel: 0, cc: 19, param: 'dj.deckA.volume' },
@@ -265,6 +270,7 @@ const NUMARK_MIXTRACK_PRO_FX: DJControllerPreset = {
   name: 'Mixtrack Pro FX',
   manufacturer: 'Numark',
   description: '2-channel Serato DJ controller',
+  detectPatterns: ['mixtrack pro', 'mixtrack platinum', 'numark mixtrack'],
   ccMappings: [
     { channel: 0, cc: 26, param: 'dj.crossfader' },
     { channel: 0, cc: 23, param: 'dj.deckA.volume' },
@@ -312,6 +318,7 @@ const NUMARK_DJ2GO2: DJControllerPreset = {
   name: 'DJ2GO2 Touch',
   manufacturer: 'Numark',
   description: 'Portable 2-channel Serato DJ controller',
+  detectPatterns: ['dj2go2', 'dj2go', 'numark dj2'],
   ccMappings: [
     { channel: 0, cc: 8, param: 'dj.crossfader' },
     { channel: 0, cc: 9, param: 'dj.deckA.pitch', invert: true },
@@ -342,6 +349,7 @@ const ROLAND_DJ_202: DJControllerPreset = {
   name: 'DJ-202',
   manufacturer: 'Roland',
   description: '2-channel Serato DJ controller with TR drum machine',
+  detectPatterns: ['dj-202', 'dj 202', 'roland dj'],
   ccMappings: [
     { channel: 0, cc: 63, param: 'dj.crossfader' },
     { channel: 0, cc: 19, param: 'dj.deckA.volume' },
@@ -404,4 +412,28 @@ export function getPresetsByManufacturer(): Record<string, DJControllerPreset[]>
     grouped[preset.manufacturer].push(preset);
   }
   return grouped;
+}
+
+/**
+ * Auto-detect the best DJ controller preset from a MIDI device name.
+ * Returns the first matching preset, or the Generic 8x8 as fallback
+ * for any unrecognized device (every MIDI controller can use 8-knob mapping).
+ */
+export function detectDJPreset(deviceName: string): DJControllerPreset | null {
+  if (!deviceName) return null;
+  const lower = deviceName.toLowerCase();
+
+  // Try exact preset matches first (hardware presets have priority)
+  for (const preset of DJ_CONTROLLER_PRESETS) {
+    if (!preset.detectPatterns) continue;
+    for (const pattern of preset.detectPatterns) {
+      if (lower.includes(pattern.toLowerCase())) {
+        return preset;
+      }
+    }
+  }
+
+  // Fallback: any connected MIDI device gets the Generic 8x8 preset
+  // (every controller with knobs sends CC messages that the generic layout can use)
+  return DJ_CONTROLLER_PRESETS.find(p => p.id === 'generic-8x8') ?? null;
 }

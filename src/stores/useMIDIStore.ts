@@ -14,7 +14,7 @@ import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
-import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount } from '../midi/knobBanks';
+import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount, getKnobPageForSection } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
 import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation } from '../midi/performance/parameterRouter';
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
@@ -60,6 +60,7 @@ interface MIDIStore {
   nksKnobPage: number;                    // Current page (0-indexed)
   nksKnobTotalPages: number;              // Total pages for current synth
   nksActiveSynthType: string | null;       // Synth type currently driving knobs
+  activeEditorSection: string | null;      // Currently focused editor tab/section
 
   // NKS2 Navigation & Light Guide
   nks2Mode: 'performance' | 'edit';       // Current NKS2 display mode
@@ -118,6 +119,7 @@ interface MIDIStore {
   nextKnobPage: () => void;
   prevKnobPage: () => void;
   setKnobPage: (page: number) => void;
+  setActiveEditorSection: (section: string) => void;
 
   // NKS2 Navigation actions
   setNKS2Mode: (mode: 'performance' | 'edit') => void;
@@ -216,6 +218,7 @@ export const useMIDIStore = create<MIDIStore>()(
             nksKnobPage: 0,
             nksKnobTotalPages: 0,
             nksActiveSynthType: null,
+            activeEditorSection: null,
             nks2Mode: 'performance' as const,
             nks2EditGroupIndex: 0,
             nks2ScrollOffset: 0,
@@ -911,6 +914,19 @@ export const useMIDIStore = create<MIDIStore>()(
         });
         const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
         updateNKSDisplay(nksActiveSynthType, page, nksKnobTotalPages, displayParams);
+      },
+
+      setActiveEditorSection: (section) => {
+        const { nksActiveSynthType } = get();
+        set((state) => { state.activeEditorSection = section; });
+        if (!nksActiveSynthType) return;
+        const page = getKnobPageForSection(
+          nksActiveSynthType as import('../types/instrument').SynthType,
+          section
+        );
+        if (page >= 0) {
+          get().setKnobPage(page);
+        }
       },
 
       // NKS2 Navigation Actions
