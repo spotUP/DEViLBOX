@@ -21,7 +21,8 @@ export function isDJContext(): boolean {
   return useUIStore.getState().activeView === 'dj';
 }
 
-/** Check if drumpad view is active for MIDI routing */
+/** Check if a pad-capable view is active (drumpad, dj, vj) */
 export function isDrumPadContext(): boolean {
-  return useUIStore.getState().activeView === 'drumpad';
+  const view = useUIStore.getState().activeView;
+  return view === 'drumpad' || view === 'dj' || view === 'vj';
 }

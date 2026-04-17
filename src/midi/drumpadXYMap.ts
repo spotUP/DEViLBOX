@@ -87,7 +87,7 @@ const EXPLICIT_MAP: Partial<Record<SynthType, DrumPadXYMapping>> = {
   Geonkick:      synthXY('geonkick.filterCutoff', 'Cutoff', 20, 20000, 'geonkick.distortion', 'Dist', 0, 100, 'log'),
 
   // ─── Effects / Weird ───
-  DubSiren:    synthXY('siren.osc.frequency', 'Freq', 60, 1500, 'siren.lfo.rate', 'LFO Rate', 0.1, 20),
+  DubSiren:    synthXY('frequency', 'Freq', 0, 1, 'lfoRate', 'LFO Rate', 0, 1),
   SpaceLaser:  synthXY('spacelaser.fmAmount', 'FM Amt', 0, 100, 'spacelaser.filterCutoff', 'Cutoff', 20, 20000, 'linear', 'log'),
   NoiseSynth:  synthXY('filter.frequency', 'Cutoff', 20, 20000, 'filter.Q', 'Reso', 0, 100, 'log'),
   PluckSynth:  synthXY('resonance', 'Bright', 0, 7000, 'attackNoise', 'Noise', 0, 5),

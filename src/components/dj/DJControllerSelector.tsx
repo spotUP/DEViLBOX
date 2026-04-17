@@ -7,8 +7,9 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { DJ_CONTROLLER_PRESETS, getPresetById } from '@/midi/djControllerPresets';
+import { DJ_CONTROLLER_PRESETS, getPresetById, detectDJPreset } from '@/midi/djControllerPresets';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
+import { getMIDIManager } from '@/midi/MIDIManager';
 import { CustomSelect } from '@components/common/CustomSelect';
 
 const STORAGE_KEY = 'devilbox-dj-controller-preset';
@@ -18,11 +19,25 @@ export const DJControllerSelector: React.FC = () => {
     return localStorage.getItem(STORAGE_KEY) || '';
   });
 
-  // Restore preset on mount
+  // Restore saved preset OR auto-detect from connected MIDI device
   useEffect(() => {
     if (selectedId) {
       const preset = getPresetById(selectedId);
       getDJControllerMapper().setPreset(preset);
+      return;
+    }
+
+    // No saved preset — try auto-detecting from connected MIDI device
+    const manager = getMIDIManager();
+    const input = manager.getSelectedInput();
+    if (input?.name) {
+      const detected = detectDJPreset(input.name);
+      if (detected) {
+        console.log(`[DJ] Auto-detected controller: ${input.name} → ${detected.name}`);
+        setSelectedId(detected.id);
+        getDJControllerMapper().setPreset(detected);
+        localStorage.setItem(STORAGE_KEY, detected.id);
+      }
     }
   }, []);
 
