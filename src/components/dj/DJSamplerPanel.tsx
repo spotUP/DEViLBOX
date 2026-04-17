@@ -107,6 +107,16 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     };
   }, []);
 
+  // ── DJ panic: silence local engine when ESC panic fires ──
+  useEffect(() => {
+    const onPanic = () => {
+      noteRepeatRef.current?.stopAll();
+      engineRef.current?.stopAll();
+    };
+    window.addEventListener('dj-panic', onPanic);
+    return () => window.removeEventListener('dj-panic', onPanic);
+  }, []);
+
   // Sync master level
   useEffect(() => {
     if (engineRef.current && currentProgram) {
