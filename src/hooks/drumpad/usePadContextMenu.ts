@@ -296,6 +296,7 @@ function buildDjFxSubmenu(
     loop: 'Loop',
     transport: 'Transport',
     mixer: 'Mixer',
+    channel: 'Channel Mute',
     deck: 'Deck FX',
     stutter: 'Stutter / Glitch',
     delay: 'Delay / Echo',
@@ -313,6 +314,7 @@ function buildDjFxSubmenu(
     loop: '#2196F3',     // blue
     transport: '#4CAF50', // green
     mixer: '#FF9800',    // orange
+    channel: '#9C27B0',  // purple
   };
 
   // Hot cue pads use individual colors matching the DJ standard
