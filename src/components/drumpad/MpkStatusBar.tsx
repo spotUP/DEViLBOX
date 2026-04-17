@@ -52,14 +52,19 @@ export const MpkStatusBar: React.FC = () => {
       if (wizardSlot === null) return;
       if (getSlotBinding(wizardSlot)) {
         const next = wizardSlot + 1;
-        if (next > MPK_SLOT_COUNT) {
-          setWizardSlot(null);
-          cancelLearnSlotBinding();
-          notify.success(`MPK setup complete — ${MPK_SLOT_COUNT} slots bound`, 3000);
-        } else {
-          setWizardSlot(next);
-          startLearnSlotBinding(next);
-        }
+        // Defer to a microtask so startLearnSlotBinding doesn't re-enter
+        // the listener chain we're currently running inside, which would
+        // otherwise recurse and flood the console.
+        queueMicrotask(() => {
+          if (next > MPK_SLOT_COUNT) {
+            setWizardSlot(null);
+            cancelLearnSlotBinding();
+            notify.success(`MPK setup complete — ${MPK_SLOT_COUNT} slots bound`, 3000);
+          } else {
+            setWizardSlot(next);
+            startLearnSlotBinding(next);
+          }
+        });
       }
     });
   }, [wizardSlot]);
