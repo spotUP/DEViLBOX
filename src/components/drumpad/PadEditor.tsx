@@ -298,13 +298,20 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
         />
       )}
 
-      {/* Danger zone */}
-      <div className="flex justify-end px-4 py-2 border-t border-dark-border bg-dark-bg shrink-0">
+      {/* Footer — clear on the left (destructive), confirm on the right. */}
+      <div className="flex items-center justify-between px-4 py-2 border-t border-dark-border bg-dark-bg shrink-0">
         <button
           onClick={() => { clearPad(pad.id); onClose?.(); }}
           className="px-3 py-1 text-[10px] font-mono font-bold rounded border border-accent-error/50 text-accent-error hover:bg-accent-error/10"
         >
           Clear pad
+        </button>
+        <button
+          onClick={() => onClose?.()}
+          className="px-4 py-1.5 text-xs font-mono font-bold rounded border border-accent-primary bg-accent-primary text-text-inverse hover:bg-accent-primary/90"
+          autoFocus
+        >
+          Done
         </button>
       </div>
     </div>
