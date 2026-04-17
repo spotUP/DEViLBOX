@@ -140,6 +140,149 @@ export const KNOB_BANKS: Record<KnobBankMode, KnobAssignment[]> = {
     { cc: 76, param: 'masterFx.slot2.wet', label: 'FX3 Wet' },
     { cc: 77, param: 'masterFx.masterVolume', label: 'Master' },
   ],
+  // ── Hively / AHX ──────────────────────────────────────────────────────────
+  'Hively': [
+    { cc: 70, param: 'hively.filterSpeed', label: 'Flt Spd' },
+    { cc: 71, param: 'hively.filterLower', label: 'Flt Low' },
+    { cc: 72, param: 'hively.filterUpper', label: 'Flt Hi' },
+    { cc: 73, param: 'hively.vibratoSpeed', label: 'Vib Spd' },
+    { cc: 74, param: 'hively.vibratoDepth', label: 'Vib Dep' },
+    { cc: 75, param: 'hively.squareSpeed', label: 'Sq Spd' },
+    { cc: 76, param: 'mixer.pan', label: 'Pan' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── Klystrack ─────────────────────────────────────────────────────────────
+  'Klystrack': [
+    { cc: 70, param: 'klystrack.cutoff', label: 'Cutoff' },
+    { cc: 71, param: 'klystrack.resonance', label: 'Reso' },
+    { cc: 72, param: 'klystrack.attack', label: 'Attack' },
+    { cc: 73, param: 'klystrack.decay', label: 'Decay' },
+    { cc: 74, param: 'klystrack.sustain', label: 'Sustain' },
+    { cc: 75, param: 'klystrack.release', label: 'Release' },
+    { cc: 76, param: 'klystrack.pulseWidth', label: 'PW' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── DX7 / FM ──────────────────────────────────────────────────────────────
+  'DX7': [
+    { cc: 70, param: 'dx7.algorithm', label: 'Algo' },
+    { cc: 71, param: 'dx7.feedback', label: 'Feedbk' },
+    { cc: 72, param: 'dx7.op1Level', label: 'Op1 Lvl' },
+    { cc: 73, param: 'dx7.op2Level', label: 'Op2 Lvl' },
+    { cc: 74, param: 'dx7.op3Level', label: 'Op3 Lvl' },
+    { cc: 75, param: 'dx7.lfoSpeed', label: 'LFO Spd' },
+    { cc: 76, param: 'dx7.transpose', label: 'Trans' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── SidMon (C64) ──────────────────────────────────────────────────────────
+  'SidMon': [
+    { cc: 70, param: 'sidmon.filterCutoff', label: 'Cutoff' },
+    { cc: 71, param: 'sidmon.filterResonance', label: 'Reso' },
+    { cc: 72, param: 'sidmon.arpSpeed', label: 'Arp Spd' },
+    { cc: 73, param: 'sidmon.vibSpeed', label: 'Vib Spd' },
+    { cc: 74, param: 'sidmon.vibDepth', label: 'Vib Dep' },
+    { cc: 75, param: 'sidmon.vibDelay', label: 'Vib Dly' },
+    { cc: 76, param: 'mixer.pan', label: 'Pan' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── SidMon 1.0 ────────────────────────────────────────────────────────────
+  'SidMon1': [
+    { cc: 70, param: 'sidmon1.attackSpeed', label: 'Atk Spd' },
+    { cc: 71, param: 'sidmon1.attackMax', label: 'Atk Max' },
+    { cc: 72, param: 'sidmon1.decaySpeed', label: 'Dcy Spd' },
+    { cc: 73, param: 'sidmon1.decayMin', label: 'Dcy Min' },
+    { cc: 74, param: 'sidmon1.sustain', label: 'Sustain' },
+    { cc: 75, param: 'sidmon1.releaseSpeed', label: 'Rel Spd' },
+    { cc: 76, param: 'sidmon1.releaseMin', label: 'Rel Min' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── Sonic Arranger ────────────────────────────────────────────────────────
+  'SonicArranger': [
+    { cc: 70, param: 'sonicarranger.vibratoSpeed', label: 'Vib Spd' },
+    { cc: 71, param: 'sonicarranger.vibratoLevel', label: 'Vib Lvl' },
+    { cc: 72, param: 'sonicarranger.vibratoDelay', label: 'Vib Dly' },
+    { cc: 73, param: 'sonicarranger.portamentoSpeed', label: 'Porta' },
+    { cc: 74, param: 'sonicarranger.fineTuning', label: 'Tune' },
+    { cc: 75, param: 'sonicarranger.effect', label: 'Effect' },
+    { cc: 76, param: 'sonicarranger.effectArg1', label: 'Fx Arg' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── SoundMon (Brian Postma) ───────────────────────────────────────────────
+  'SoundMon': [
+    { cc: 70, param: 'soundmon.adsrControl', label: 'ADSR' },
+    { cc: 71, param: 'soundmon.adsrSpeed', label: 'ADSR Spd' },
+    { cc: 72, param: 'soundmon.egControl', label: 'EG Ctrl' },
+    { cc: 73, param: 'soundmon.lfoSpeed', label: 'LFO Spd' },
+    { cc: 74, param: 'soundmon.lfoDepth', label: 'LFO Dep' },
+    { cc: 75, param: 'soundmon.lfoDelay', label: 'LFO Dly' },
+    { cc: 76, param: 'soundmon.waveTable', label: 'WaveTbl' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── Hippel CoSo ───────────────────────────────────────────────────────────
+  'HippelCoSo': [
+    { cc: 70, param: 'hippelcoso.vibSpeed', label: 'Vib Spd' },
+    { cc: 71, param: 'hippelcoso.vibDepth', label: 'Vib Dep' },
+    { cc: 72, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 73, param: 'mixer.filterResonance', label: 'Reso' },
+    { cc: 74, param: 'mixer.pan', label: 'Pan' },
+    { cc: 75, param: 'mixer.volume', label: 'Volume' },
+    { cc: 76, param: 'masterFx.masterVolume', label: 'Master' },
+    { cc: 77, param: 'masterFx.masterVolume', label: '-' },
+  ],
+  // ── Future Composer ───────────────────────────────────────────────────────
+  'FC': [
+    { cc: 70, param: 'fc.synthSpeed', label: 'Synth' },
+    { cc: 71, param: 'fc.vibSpeed', label: 'Vib Spd' },
+    { cc: 72, param: 'fc.vibDepth', label: 'Vib Dep' },
+    { cc: 73, param: 'fc.vibDelay', label: 'Vib Dly' },
+    { cc: 74, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 75, param: 'mixer.pan', label: 'Pan' },
+    { cc: 76, param: 'mixer.volume', label: 'Volume' },
+    { cc: 77, param: 'masterFx.masterVolume', label: 'Master' },
+  ],
+  // ── Rob Hubbard ───────────────────────────────────────────────────────────
+  'RobHubbard': [
+    { cc: 70, param: 'robhubbard.divider', label: 'Divider' },
+    { cc: 71, param: 'robhubbard.portaSpeed', label: 'Porta' },
+    { cc: 72, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 73, param: 'mixer.filterResonance', label: 'Reso' },
+    { cc: 74, param: 'mixer.pan', label: 'Pan' },
+    { cc: 75, param: 'mixer.volume', label: 'Volume' },
+    { cc: 76, param: 'masterFx.masterVolume', label: 'Master' },
+    { cc: 77, param: 'masterFx.masterVolume', label: '-' },
+  ],
+  // ── GTUltra (Game Boy) ────────────────────────────────────────────────────
+  'GTUltra': [
+    { cc: 70, param: 'gtultra.attack', label: 'Attack' },
+    { cc: 71, param: 'gtultra.decay', label: 'Decay' },
+    { cc: 72, param: 'gtultra.sustain', label: 'Sustain' },
+    { cc: 73, param: 'gtultra.release', label: 'Release' },
+    { cc: 74, param: 'gtultra.firstwave', label: '1stWave' },
+    { cc: 75, param: 'gtultra.gatetimer', label: 'Gate' },
+    { cc: 76, param: 'gtultra.vibdelay', label: 'Vib Dly' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── Geonkick ──────────────────────────────────────────────────────────────
+  'Geonkick': [
+    { cc: 70, param: 'geonkick.osc0Freq', label: 'Osc0 Hz' },
+    { cc: 71, param: 'geonkick.osc0Amp', label: 'Osc0 Amp' },
+    { cc: 72, param: 'geonkick.osc1Freq', label: 'Osc1 Hz' },
+    { cc: 73, param: 'geonkick.osc1Amp', label: 'Osc1 Amp' },
+    { cc: 74, param: 'geonkick.filterCutoff', label: 'Cutoff' },
+    { cc: 75, param: 'geonkick.filterQ', label: 'Q' },
+    { cc: 76, param: 'geonkick.distDrive', label: 'Drive' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
+  // ── CZ-101 (Casio) ───────────────────────────────────────────────────────
+  'CZ101': [
+    { cc: 70, param: 'cz101.waveform1', label: 'Wave1' },
+    { cc: 71, param: 'cz101.waveform2', label: 'Wave2' },
+    { cc: 72, param: 'cz101.dco_rate', label: 'DCO Rat' },
+    { cc: 73, param: 'cz101.dco_depth', label: 'DCO Dep' },
+    { cc: 74, param: 'cz101.dcw_rate', label: 'DCW Rat' },
+    { cc: 75, param: 'cz101.dcw_depth', label: 'DCW Dep' },
+    { cc: 76, param: 'cz101.dca_rate', label: 'DCA Rat' },
+    { cc: 77, param: 'mixer.volume', label: 'Volume' },
+  ],
 };
 
 /**
@@ -226,6 +369,46 @@ const KNOB_303_PAGES: KnobAssignment[][] = [
 /** 303 tab names for LCD display (indexed by page number) */
 const KNOB_303_PAGE_NAMES = ['303 Main', 'MOJO', 'DevilFish', 'Korg', 'LFO', 'FX', 'Oscillator'];
 
+/**
+ * Multi-page banks for Klystrack: 2 pages
+ * Page 0 = Filter & Envelope (main sound shaping)
+ * Page 1 = Modulation (vibrato, PWM, FM)
+ */
+const KNOB_KLYSTRACK_PAGES: KnobAssignment[][] = [
+  KNOB_BANKS['Klystrack'],
+  [
+    { cc: 70, param: 'klystrack.cutoff', label: 'Cutoff' },
+    { cc: 71, param: 'klystrack.resonance', label: 'Reso' },
+    { cc: 72, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 73, param: 'mixer.filterResonance', label: 'Reso' },
+    { cc: 74, param: 'mixer.pan', label: 'Pan' },
+    { cc: 75, param: 'mixer.volume', label: 'Volume' },
+    { cc: 76, param: 'masterFx.masterVolume', label: 'Master' },
+    { cc: 77, param: 'masterFx.masterVolume', label: '-' },
+  ],
+];
+const KNOB_KLYSTRACK_PAGE_NAMES = ['Synth', 'Mixer'];
+
+/**
+ * Multi-page banks for DX7: 2 pages
+ * Page 0 = Main (algorithm, feedback, operators 1-3, LFO)
+ * Page 1 = Operators 4-6 + mixer
+ */
+const KNOB_DX7_PAGES: KnobAssignment[][] = [
+  KNOB_BANKS['DX7'],
+  [
+    { cc: 70, param: 'dx7.op1Level', label: 'Op1 Lvl' },
+    { cc: 71, param: 'dx7.op2Level', label: 'Op2 Lvl' },
+    { cc: 72, param: 'dx7.op3Level', label: 'Op3 Lvl' },
+    { cc: 73, param: 'mixer.filterPosition', label: 'Filter' },
+    { cc: 74, param: 'mixer.filterResonance', label: 'Reso' },
+    { cc: 75, param: 'mixer.pan', label: 'Pan' },
+    { cc: 76, param: 'mixer.volume', label: 'Volume' },
+    { cc: 77, param: 'masterFx.masterVolume', label: 'Master' },
+  ],
+];
+const KNOB_DX7_PAGE_NAMES = ['FM Main', 'Ops & Mix'];
+
 /** Joystick axis mappings per bank (X = pitch bend, Y = CC1 mod wheel) */
 export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
   '303': {
@@ -295,6 +478,45 @@ export function getKnobBankForSynth(synthType: SynthType): KnobBankMode | null {
   // VSTBridge: Melodica
   if (synthType === 'Melodica') return 'Melodica';
 
+  // Hively / AHX
+  if (synthType === 'HivelySynth') return 'Hively';
+
+  // Klystrack
+  if (synthType === 'KlysSynth') return 'Klystrack';
+
+  // DX7 / FM
+  if (synthType === 'DX7') return 'DX7';
+
+  // SidMon
+  if (synthType === 'SidMonSynth') return 'SidMon';
+
+  // SidMon 1.0
+  if (synthType === 'SidMon1Synth') return 'SidMon1';
+
+  // Sonic Arranger
+  if (synthType === 'SonicArrangerSynth') return 'SonicArranger';
+
+  // SoundMon
+  if (synthType === 'SoundMonSynth') return 'SoundMon';
+
+  // Hippel CoSo
+  if (synthType === 'HippelCoSoSynth') return 'HippelCoSo';
+
+  // Future Composer
+  if (synthType === 'FCSynth' || synthType === 'FutureComposerWasmSynth') return 'FC';
+
+  // Rob Hubbard
+  if (synthType === 'RobHubbardSynth') return 'RobHubbard';
+
+  // GTUltra (Game Boy)
+  if (synthType === 'GTUltraSynth') return 'GTUltra';
+
+  // Geonkick drum synth
+  if (synthType === 'Geonkick') return 'Geonkick';
+
+  // CZ-101
+  if (synthType === 'CZ101') return 'CZ101';
+
   return null;
 }
 
@@ -350,28 +572,44 @@ export function getKnobAssignmentsForSynth(synthType: SynthType): KnobAssignment
  */
 export function getKnobPageName(synthType: SynthType, page?: number): string {
   const legacyBank = getKnobBankForSynth(synthType);
-  if (legacyBank === '303' && page !== undefined && page < KNOB_303_PAGE_NAMES.length) {
-    return KNOB_303_PAGE_NAMES[page];
+  if (legacyBank && page !== undefined) {
+    const multi = getMultiPageBank(legacyBank);
+    if (multi && page < multi.names.length) {
+      return multi.names[page];
+    }
   }
   if (legacyBank) return legacyBank;
   return synthType;
 }
 
 /**
+ * Multi-page resolution helper — maps bank mode to its page array + names.
+ */
+function getMultiPageBank(legacyBank: KnobBankMode): { pages: KnobAssignment[][], names: string[] } | null {
+  switch (legacyBank) {
+    case '303': return { pages: KNOB_303_PAGES, names: KNOB_303_PAGE_NAMES };
+    case 'Klystrack': return { pages: KNOB_KLYSTRACK_PAGES, names: KNOB_KLYSTRACK_PAGE_NAMES };
+    case 'DX7': return { pages: KNOB_DX7_PAGES, names: KNOB_DX7_PAGE_NAMES };
+    default: return null;
+  }
+}
+
+/**
  * Get knob assignments for a specific page of an NKS2 profile.
  * page 0 = params [0..7], page 1 = params [8..15].
  * Falls back to legacy KNOB_BANKS (1 page only) or Mixer as last resort.
- * Special case: 303 has 6 sub-pages (Main, MOJO, DevilFish, Korg, LFO, FX).
+ * Multi-page synths (303, Klystrack, DX7) have dedicated page arrays.
  */
 export function getKnobAssignmentsForPage(synthType: SynthType, page: number): KnobAssignment[] {
-  // 303: multi-page (one per UI tab)
   const legacyBank = getKnobBankForSynth(synthType);
-  if (legacyBank === '303') {
-    return page >= 0 && page < KNOB_303_PAGES.length ? KNOB_303_PAGES[page] : [];
-  }
 
-  // Other legacy synths: always 1 page
+  // Multi-page legacy banks
   if (legacyBank) {
+    const multi = getMultiPageBank(legacyBank);
+    if (multi) {
+      return page >= 0 && page < multi.pages.length ? multi.pages[page] : [];
+    }
+    // Single-page legacy bank
     return page === 0 ? KNOB_BANKS[legacyBank] : [];
   }
 
@@ -392,12 +630,14 @@ export function getKnobAssignmentsForPage(synthType: SynthType, page: number): K
 
 /**
  * Get total page count for a synth's NKS2 profile.
- * Legacy synths = 1 page (except 303 = 6 pages). NKS2 synths = ceil(performanceParams / 8).
+ * Legacy synths = 1 page (except multi-page banks). NKS2 synths = ceil(performanceParams / 8).
  */
 export function getKnobPageCount(synthType: SynthType): number {
   const legacyBank = getKnobBankForSynth(synthType);
-  if (legacyBank === '303') return KNOB_303_PAGES.length;
-  if (legacyBank) return 1;
+  if (legacyBank) {
+    const multi = getMultiPageBank(legacyBank);
+    return multi ? multi.pages.length : 1;
+  }
 
   const allParams = getPerformanceParams(synthType);
   if (allParams.length === 0) return 1; // Mixer fallback = 1 page
