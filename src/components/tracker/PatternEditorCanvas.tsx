@@ -52,6 +52,15 @@ import { TrackerVisualBackground } from './TrackerVisualBackground';
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+
+/** Add a flat amount to each RGB channel of a hex color */
+function lightenHex(hex: string, add: number): string {
+  const h = hex.replace('#', '');
+  const r = Math.min(255, parseInt(h.substring(0, 2), 16) + add);
+  const g = Math.min(255, parseInt(h.substring(2, 4), 16) + add);
+  const b = Math.min(255, parseInt(h.substring(4, 6), 16) + add);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
 const AUTOMATION_LANE_W = AUTOMATION_LANE_WIDTH; // Re-export alias for readability
 // Mobile-scaled layout constants (must match TrackerCanvas2DRenderer MOBILE_SCALE)
 const MOBILE_SCALE = 1.6;
@@ -1520,7 +1529,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       bg:                  theme.colors.trackerRowEven,
       rowNormal:           theme.colors.trackerRowOdd,
       rowHighlight:        theme.colors.trackerRowHighlight,
-      rowSecondaryHighlight: theme.colors.accent + '33',
+      rowSecondaryHighlight: lightenHex(theme.colors.trackerRowHighlight, 20),
       border:              theme.colors.border,
       trackerBorder:       theme.colors.trackerBorder,
       textNote:            theme.colors.textSecondary,
