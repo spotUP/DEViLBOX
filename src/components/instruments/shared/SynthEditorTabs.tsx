@@ -3,7 +3,8 @@
  * Part of the no-scroll tracker UI implementation
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { useMIDIStore } from '../../../stores/useMIDIStore';
 
 export type SynthEditorTab = 'oscillator' | 'envelope' | 'filter' | 'modulation' | 'output' | 'special';
 
@@ -37,14 +38,20 @@ export const SynthEditorTabs: React.FC<SynthEditorTabsProps> = ({
   hiddenTabs = [],
   showFullLabels = false,
 }) => {
+  const setActiveEditorSection = useMIDIStore(s => s.setActiveEditorSection);
   const visibleTabs = SYNTH_TABS.filter(tab => !hiddenTabs.includes(tab.id));
+
+  const handleTabChange = useCallback((tab: SynthEditorTab) => {
+    onTabChange(tab);
+    setActiveEditorSection(tab);
+  }, [onTabChange, setActiveEditorSection]);
 
   return (
     <div className="synth-editor-tabs">
       {visibleTabs.map((tab) => (
         <button
           key={tab.id}
-          onClick={() => onTabChange(tab.id)}
+          onClick={() => handleTabChange(tab.id)}
           className={`synth-editor-tab ${activeTab === tab.id ? 'active' : ''}`}
           title={tab.label}
         >
@@ -74,12 +81,19 @@ export const TB303Tabs: React.FC<TB303TabsProps> = ({
   onTabChange,
   devilFishEnabled = false,
 }) => {
+  const setActiveEditorSection = useMIDIStore(s => s.setActiveEditorSection);
+
+  const handleTabChange = useCallback((tab: TB303Tab) => {
+    onTabChange(tab);
+    setActiveEditorSection(tab);
+  }, [onTabChange, setActiveEditorSection]);
+
   return (
     <div className="synth-editor-tabs">
       {TB303_TABS.map((tab) => (
         <button
           key={tab.id}
-          onClick={() => onTabChange(tab.id)}
+          onClick={() => handleTabChange(tab.id)}
           className={`synth-editor-tab ${activeTab === tab.id ? 'active' : ''} ${
             tab.id === 'devilfish' && devilFishEnabled ? 'devil-fish-active' : ''
           }`}
