@@ -259,7 +259,6 @@ export const DJVocoderControl: React.FC = () => {
       useVocoderStore.getState().setActive(true);
     }
     setMuted(false);
-    engine.setMicActive(true);
     engine.setMuted(false);
     if (duckingEnabled) {
       try { getDJEngineIfActive()?.mixer.duck(); } catch { /* ok */ }
@@ -272,9 +271,13 @@ export const DJVocoderControl: React.FC = () => {
     if (!engineRef.current) return;
     setMuted(true);
     engineRef.current.setMuted(true);
-    // Cut the mic track so the worklet stops being fed by ambient noise —
-    // prevents the FX chain (reverb/delay) from sustaining continuous static.
-    engineRef.current.setMicActive(false);
+    // Don't cut the mic track on release — that's a binary step (no ramp)
+    // that clicks the mic signal mid-sample. The click gets amplified by
+    // the 4x preamp and injected into the reverb/delay, which then echoes
+    // it for seconds. outputGain=0 (applied above) already silences the
+    // downstream path; leaving the mic track enabled means the only thing
+    // flowing through the FX on release is the pre-existing tail, which
+    // decays cleanly.
     if (duckingEnabled) {
       try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
     }
