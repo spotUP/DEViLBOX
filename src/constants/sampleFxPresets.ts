@@ -65,6 +65,17 @@ const LEE_PERRY_BLACK_ARK: SampleFxPreset = {
   ],
 };
 
+const REGGAE_SOUNDSYSTEM: SampleFxPreset = {
+  name: 'Reggae Soundsystem',
+  category: 'Dub Classics',
+  effects: [
+    { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: -2, high: -2 } },
+    { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 1400 } },
+    { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 28, parameters: { decay: 0.45, damping: 0.4, tension: 0.5, mix: 0.3, drip: 0.55, diffusion: 0.7 } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 32, parameters: { mode: 4, rate: 300, intensity: 0.18, echoVolume: 0.3, reverbVolume: 0.12, bpmSync: 1, syncDivision: '1/4' } },
+  ],
+};
+
 // =============================================================================
 // ECHO CHAMBER — Delay-heavy presets
 // =============================================================================
@@ -245,6 +256,7 @@ const REWIND_MADNESS: SampleFxPreset = {
 
 export const SAMPLE_FX_PRESETS: SampleFxPreset[] = [
   // Dub Classics
+  REGGAE_SOUNDSYSTEM,
   DUB_PLATE_SPECIAL,
   KING_TUBBYS,
   SCIENTIST_DUB,
