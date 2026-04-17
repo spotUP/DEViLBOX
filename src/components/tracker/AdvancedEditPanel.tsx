@@ -49,7 +49,7 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
     <div className="p-4 bg-dark-bgSecondary border border-dark-border rounded space-y-4 max-h-[600px] overflow-y-auto">
       <h3 className="text-text-primary font-bold mb-2 flex items-center gap-2">
         <Sliders size={16} />
-        FT2 Advanced Edit
+        Advanced Edit
       </h3>
 
       {/* Volume Operations */}

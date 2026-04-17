@@ -160,8 +160,6 @@ const NavBarComponent: React.FC = () => {
             <span className="hidden sm:inline">Settings</span>
           </Button>
 
-          {/* Info button moved to FT2 toolbar */}
-
           {/* DJ Sets — only shown in DJ and VJ views */}
           {(n.activeView === 'dj' || n.activeView === 'vj') && <DJSetBrowser />}
 
@@ -289,7 +287,7 @@ const NavBarComponent: React.FC = () => {
         {/* Add Tab Button */}
         <button
           onClick={handleAddTab}
-          className="flex-shrink-0 p-1.5 ml-1 rounded hover:bg-dark-border/50 text-text-muted hover:text-text-primary transition-colors"
+          className="flex-shrink-0 p-1.5 rounded hover:bg-dark-border/50 text-text-muted hover:text-text-primary transition-colors"
           title="New project tab"
         >
           <Plus size={16} />
