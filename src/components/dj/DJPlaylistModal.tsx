@@ -242,7 +242,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       ref={setNodeRef}
       style={style}
       data-track-index={index}
-      className={`flex items-center gap-2 px-3 border-b border-dark-border/50 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
+      className={`flex items-center gap-2 px-3 border-b border-dark-border/30 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
       onClick={(e) => onClick(index, e)}
       onDoubleClick={() => onDoubleClick(track, index)}
       onPointerEnter={() => setIsHovered(true)}
@@ -1863,7 +1863,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                       </div>
                     ))
                   )}
-                  <div className="px-3 py-1 border-t border-dark-border/50">
+                  <div className="px-3 py-1 border-t border-dark-border/30">
                     <button
                       onClick={loadCommunityPlaylists}
                       className="text-[9px] font-mono text-accent-primary/60 hover:text-accent-primary transition-colors"
@@ -1934,7 +1934,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   </div>
 
                   {/* Divider */}
-                  <div className="w-px h-5 bg-dark-border/50" />
+                  <div className="w-px h-5 bg-dark-border/30" />
 
                   {/* Undo / Redo */}
                   <button onClick={undo} disabled={!canUndo} className="p-1 text-text-muted/40 hover:text-text-primary disabled:opacity-20 transition-colors" title="Undo (⌘Z)">
@@ -1945,7 +1945,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   </button>
 
                   {/* Divider */}
-                  <div className="w-px h-5 bg-dark-border/50" />
+                  <div className="w-px h-5 bg-dark-border/30" />
 
                   {/* Sort */}
                   <div ref={sortMenuRef} className="relative">
@@ -1964,7 +1964,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                           className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-accent-primary hover:bg-dark-bgHover transition-colors">
                           ✨ Smart Mix
                         </button>
-                        <div className="border-t border-dark-border/30 my-0.5" />
+                        <div className="border-t border-dark-border/20 my-0.5" />
                         {(['bpm', 'bpm-desc', 'key', 'energy', 'name'] as const).map((mode) => (
                           <button key={mode} onClick={() => handleSort(mode)}
                             className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
@@ -1992,7 +1992,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   )}
 
                   {/* Divider */}
-                  <div className="w-px h-5 bg-dark-border/50" />
+                  <div className="w-px h-5 bg-dark-border/30" />
 
                   {/* Add files */}
                   <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoadingFile} icon={<Plus size={12} />} title="Add files (drag & drop also works)">
