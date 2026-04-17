@@ -19,6 +19,7 @@ import {
   setCrossfader,
   killAllDecks,
   setDeckSlipEnabled,
+  djPanic,
 } from '@/engine/dj/DJActions';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 import { beatJump, triggerHotCue, activateSeratoLoop } from '@/engine/dj/DJBeatJump';
@@ -92,6 +93,15 @@ export function useDJKeyboardHandler(): void {
     }
 
     switch (e.key.toLowerCase()) {
+      // ================================================================
+      // PANIC — silence FX/drumpads/mic, keep songs playing
+      // Modals intercept ESC first via stopPropagation; this only fires
+      // when nothing else consumed the key.
+      // ================================================================
+      case 'escape':
+        djPanic();
+        break;
+
       // ================================================================
       // DECK A (left hand)
       // ================================================================

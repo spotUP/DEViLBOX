@@ -15,9 +15,12 @@ import * as Tone from 'tone';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
 import type { DjEqPreset } from '@/constants/djEqPresets';
 import { useDJSetStore } from '@/stores/useDJSetStore';
+import { useAudioStore } from '@/stores/useAudioStore';
+import { useVocoderStore } from '@/stores/useVocoderStore';
+import { getDrumPadEngine, getNoteRepeatEngine } from '@/hooks/drumpad/useMIDIPadRouting';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
-import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition, quantizeAction } from './DJQuantizedFX';
+import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
 import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
 import { getAutoDJ } from './DJAutoDJ';
@@ -593,6 +596,48 @@ export function killAllDecks(): void {
 }
 
 // ============================================================================
+// PANIC
+// ============================================================================
+
+/**
+ * DJ panic — silence all effects, drumpads, mic/vocoder, and reset all
+ * stuck-able per-deck state (EQ kills, filter, loops, slip, pitch, scratch,
+ * channel mutes). Decks keep playing.
+ *
+ * Bound to the ESC key in DJKeyboardHandler when no modal intercepts.
+ */
+export function djPanic(): void {
+  const state = useDJStore.getState();
+  const decks: DeckId[] = state.thirdDeckActive ? ['A', 'B', 'C'] : ['A', 'B'];
+
+  useAudioStore.getState().setMasterEffects([]);
+
+  getDrumPadEngine()?.stopAll();
+  getNoteRepeatEngine()?.stopAll();
+  window.dispatchEvent(new CustomEvent('dj-panic'));
+
+  cancelAllAutomation();
+
+  for (const d of decks) {
+    stopDeckFaderLFO(d);
+    setDeckEQKill(d, 'low', false);
+    setDeckEQKill(d, 'mid', false);
+    setDeckEQKill(d, 'high', false);
+    setDeckFilter(d, 0);
+    clearDeckLineLoop(d);
+    setDeckChannelMuteMask(d, 0);
+    setDeckSlipEnabled(d, false);
+    setDeckPitch(d, 0);
+    stopScratch(d, 50);
+  }
+
+  if (useDJSetStore.getState().micEnabled) {
+    void toggleMic();
+  }
+  useVocoderStore.getState().setPTT(false);
+}
+
+// ============================================================================
 // PITCH
 // ============================================================================
 
@@ -601,9 +646,11 @@ export function killAllDecks(): void {
  * Updates the store and propagates to the engine.
  */
 export function setDeckPitch(deckId: DeckId, semitones: number): void {
-  useDJStore.getState().setDeckPitch(deckId, semitones);
+  const safe = Number.isFinite(semitones) ? semitones : 0;
+  const clamped = Math.max(-16, Math.min(16, safe));
+  useDJStore.getState().setDeckPitch(deckId, clamped);
   try {
-    getDJEngine().getDeck(deckId).setPitch(semitones);
+    getDJEngine().getDeck(deckId).setPitch(clamped);
   } catch { /* engine not ready */ }
 }
 
@@ -618,6 +665,19 @@ export function setDeckChannelMuteMask(deckId: DeckId, mask: number): void {
   try {
     getDJEngine().getDeck(deckId).replayer.setChannelMuteMask(mask);
   } catch { /* engine not ready */ }
+}
+
+/**
+ * Read the current channel mute mask from a deck's replayer. Bit N = 1
+ * means channel N is audible. Returns 0xFFFFFFFF (all audible) if the
+ * engine is not yet ready so callers default to the safe "all on" state.
+ */
+export function getDeckChannelMuteMask(deckId: DeckId): number {
+  try {
+    return getDJEngine().getDeck(deckId).replayer.getChannelMuteMask() >>> 0;
+  } catch {
+    return 0xFFFFFFFF;
+  }
 }
 
 // ============================================================================
