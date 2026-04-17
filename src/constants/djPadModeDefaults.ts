@@ -100,30 +100,26 @@ export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
 // ─── Default One-Shot Pads (16) ──────────────────────────────────────────────
 
 export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
-  // Horns x2
+  // Row 1: Horns (4) — instant recognition, DJ staples
   osPad('Air Horn',      'Horns',       DJ_ONESHOT,     0),   // DJ_AIR_HORN
   osPad('Reggae Horn',   'Horns',       DJ_ONESHOT,     1),   // REGGAETON_HORN
-  // Sirens x2
-  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  21),  // DUB_SIREN (was 20, corrected to 21)
-  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  22),  // RAVE_SIREN (was 21, corrected to 22)
-  // Impacts x2
+  osPad('Dub Horn',      'Horns',       DJ_ONESHOT,     5),   // DUB_HORN
+  osPad('Foghorn',       'Horns',       DJ_ONESHOT,     2),   // FOGHORN
+  // Row 2: Sirens (4) — hold-and-modulate with joystick
+  osPad('Dub Siren',     'Sirens',      DJ_DISTORTION,  21),  // DUB_SIREN
+  osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  22),  // RAVE_SIREN
+  osPad('Wobble',        'Sirens',      DJ_DISTORTION,  25),  // WOBBLE_SIREN
+  osPad('Nuclear',       'Sirens',      DJ_DISTORTION,  24),  // NUCLEAR_ALARM
+  // Row 3: Impacts & FX (4) — punctuation and transitions
   osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),  // SUB_DROP
   osPad('Boom',          'Impacts',     DJ_MODULATION,  12),  // BOOM
-  // Transitions x2
-  osPad('Rewind',        'Transitions', DJ_TAPE,        31),  // REWIND
-  osPad('Tape Stop',     'Transitions', DJ_TAPE,        32),  // TAPE_STOP
-  // Risers x4
-  osPad('Noise Riser',   'Risers',      DJ_FILTER,      6),   // WHITE_NOISE_RISER
-  osPad('Freq Sweep',    'Risers',      DJ_FILTER,      8),   // FREQUENCY_SWEEP
-  osPad('Dark Riser',    'Risers',      DJ_FILTER,      9),   // DARK_RISER
-  osPad('Euphoria',      'Risers',      DJ_FILTER,      10),  // EUPHORIA_RISER
-  // Lasers x2
+  osPad('Earthquake',    'Impacts',     DJ_MODULATION,  14),  // EARTHQUAKE
+  osPad('Dub Echo',      'Transitions', DJ_TAPE,        30),  // ECHO_WASHOUT (Dub Echo)
+  // Row 4: Lasers & Noise (4) — sci-fi and texture
   osPad('DJ Laser',      'Lasers',      DJ_SCRATCH,     17),  // DJ_LASER
   osPad('Glitch Zap',    'Lasers',      DJ_SCRATCH,     18),  // GLITCH_ZAP
-  // Noise x1
-  osPad('Vinyl Scratch', 'Noise',       DJ_DELAY,       26),  // VINYL_SCRATCH
-  // Transitions x1
-  osPad('Echo Washout',  'Transitions', DJ_TAPE,        30),  // ECHO_WASHOUT
+  osPad('Pew Pew',       'Lasers',      DJ_SCRATCH,     19),  // PEW_PEW
+  osPad('Acid Sweep',    'Transitions', DJ_FILTER,      31),  // REWIND (Acid Sweep)
 ];
 
 // ─── Default Scratch Pads (16) ───────────────────────────────────────────────

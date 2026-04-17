@@ -23,12 +23,15 @@ const DJ_AIR_HORN: InstrumentPreset['config'] = {
     ...DEFAULT_DUB_SIREN,
     oscillator: { type: 'sawtooth', frequency: 150 },
     lfo: { enabled: true, type: 'sawtooth', rate: 15, depth: 20 },
-    delay: { enabled: true, time: 0.15, feedback: 0.2, wet: 0.2 },
+    delay: { enabled: true, time: 0.15, feedback: 0.25, wet: 0.25 },
     filter: { enabled: true, type: 'lowpass', frequency: 1200, rolloff: -12 },
-    reverb: { enabled: false, decay: 1, wet: 0 },
+    reverb: { enabled: true, decay: 1.2, wet: 0.15 },
   },
-  effects: [],
-  volume: -6,
+  effects: [
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 30, frequency: 2000 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.001, release: 0.05 } },
+  ],
+  volume: -4,
   pan: 0,
 };
 
@@ -59,14 +62,16 @@ const FOGHORN: InstrumentPreset['config'] = {
     ...DEFAULT_DUB_SIREN,
     oscillator: { type: 'sawtooth', frequency: 65 },
     lfo: { enabled: true, type: 'sine', rate: 0.5, depth: 10 },
-    delay: { enabled: false, time: 0.1, feedback: 0, wet: 0 },
+    delay: { enabled: true, time: 0.4, feedback: 0.3, wet: 0.2 },
     filter: { enabled: true, type: 'lowpass', frequency: 400, rolloff: -24 },
-    reverb: { enabled: false, decay: 1, wet: 0 },
+    reverb: { enabled: true, decay: 3, wet: 0.3 },
   },
   effects: [
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 40, parameters: { damping: 0.5, density: 0.6, bandwidth: 0.7, decay: 0.5, predelay: 0.02, size: 0.7, gain: 1.0, mix: 0.45, earlyMix: 0.5 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 500 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -15, ratio: 8, attack: 0.005, release: 0.1 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 45, parameters: { damping: 0.4, density: 0.7, bandwidth: 0.6, decay: 0.6, predelay: 0.03, size: 0.85, gain: 1.0, mix: 0.5, earlyMix: 0.4 } },
   ],
-  volume: -8,
+  volume: -4,
   pan: 0,
 };
 
@@ -126,77 +131,81 @@ const DUB_HORN: InstrumentPreset['config'] = {
 
 const WHITE_NOISE_RISER: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'White Noise Riser',
+  name: 'Noise Riser',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 2000, decay: 100, sustain: 0, release: 200 },
-  filter: { type: 'lowpass', frequency: 200, Q: 5, rolloff: -24 },
+  envelope: { attack: 800, decay: 100, sustain: 0, release: 150 },
+  filter: { type: 'lowpass', frequency: 300, Q: 8, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 0.15, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 30, parameters: { damping: 0.4, density: 0.6, bandwidth: 0.7, decay: 0.5, predelay: 0.01, size: 0.6, gain: 1.0, mix: 0.4, earlyMix: 0.4 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 90, parameters: { frequency: 0.25, baseFrequency: 200, octaves: 7, type: 'sawtooth', depth: 1 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 40, frequency: 4000 } },
+    { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.4, diffusion: 0.7 } },
   ],
-  volume: -14,
+  volume: -10,
   pan: 0,
 };
 
 const TENSION_BUILDER: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Tension Builder',
-  synthType: 'NoiseSynth',
-  oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 3000, decay: 200, sustain: 0.1, release: 300 },
-  filter: { type: 'bandpass', frequency: 800, Q: 4, rolloff: -24 },
+  name: 'Tension Swell',
+  synthType: 'MonoSynth',
+  oscillator: { type: 'sawtooth', detune: 12, octave: 0 },
+  envelope: { attack: 1200, decay: 200, sustain: 0.3, release: 200 },
+  filter: { type: 'lowpass', frequency: 400, Q: 10, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'Phaser', enabled: true, wet: 60, parameters: { frequency: 0.2, octaves: 4, baseFrequency: 400, Q: 8 } },
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 35, parameters: { damping: 0.3, density: 0.7, bandwidth: 0.6, decay: 0.6, predelay: 0.03, size: 0.8, gain: 1.0, mix: 0.45, earlyMix: 0.3 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 0.15, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 30, parameters: { distortion: 0.4, oversample: 2 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 40, parameters: { damping: 0.3, density: 0.8, bandwidth: 0.7, decay: 0.6, predelay: 0.02, size: 0.8, gain: 1.0, mix: 0.45, earlyMix: 0.3 } },
   ],
-  volume: -16,
+  volume: -12,
   pan: 0,
 };
 
 const FREQUENCY_SWEEP: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Frequency Sweep',
+  name: 'Filter Sweep',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
-  envelope: { attack: 1500, decay: 500, sustain: 0, release: 200 },
-  filter: { type: 'lowpass', frequency: 300, Q: 6, rolloff: -24 },
+  envelope: { attack: 600, decay: 400, sustain: 0.2, release: 200 },
+  filter: { type: 'lowpass', frequency: 200, Q: 12, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 70, parameters: { frequency: 0.1, baseFrequency: 150, octaves: 7, type: 'sawtooth', depth: 1 } },
-    { category: 'tonejs', type: 'Chorus', enabled: true, wet: 40, parameters: { frequency: 2.5, delayTime: 3.5, depth: 0.7, spread: 180 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 0.2, baseFrequency: 100, octaves: 8, type: 'sawtooth', depth: 1 } },
+    { category: 'tonejs', type: 'Chorus', enabled: true, wet: 50, parameters: { frequency: 3, delayTime: 4, depth: 0.8, spread: 180 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 30, frequency: 3000 } },
   ],
-  volume: -14,
+  volume: -10,
   pan: 0,
 };
 
 const DARK_RISER: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Dark Riser',
-  synthType: 'NoiseSynth',
-  oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 2500, decay: 300, sustain: 0, release: 200 },
-  filter: { type: 'lowpass', frequency: 500, Q: 3, rolloff: -24 },
+  name: 'Dark Growl',
+  synthType: 'FMSynth',
+  oscillator: { type: 'sine', detune: 0, octave: -1 },
+  envelope: { attack: 800, decay: 400, sustain: 0.2, release: 200 },
+  filter: { type: 'lowpass', frequency: 600, Q: 6, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 50, parameters: { bits: 6 } },
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 35, parameters: { damping: 0.6, density: 0.5, bandwidth: 0.5, decay: 0.4, predelay: 0.02, size: 0.5, gain: 1.0, mix: 0.4, earlyMix: 0.5 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 50, parameters: { distortion: 0.7, oversample: 2 } },
+    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 35, parameters: { bits: 6 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 40, parameters: { damping: 0.5, density: 0.6, bandwidth: 0.5, decay: 0.5, predelay: 0.02, size: 0.6, gain: 1.0, mix: 0.45, earlyMix: 0.5 } },
   ],
-  volume: -14,
+  volume: -10,
   pan: 0,
 };
 
 const EUPHORIA_RISER: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Euphoria Riser',
-  synthType: 'NoiseSynth',
-  oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 3000, decay: 200, sustain: 0, release: 400 },
-  filter: { type: 'highpass', frequency: 400, Q: 2, rolloff: -12 },
+  name: 'Shimmer Rise',
+  synthType: 'MonoSynth',
+  oscillator: { type: 'sawtooth', detune: 7, octave: 1 },
+  envelope: { attack: 1000, decay: 300, sustain: 0.1, release: 400 },
+  filter: { type: 'highpass', frequency: 800, Q: 4, rolloff: -12 },
   effects: [
-    { category: 'tonejs', type: 'Chorus', enabled: true, wet: 55, parameters: { frequency: 3, delayTime: 4, depth: 0.8, spread: 180 } },
-    { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 70, parameters: { width: 0.8 } },
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 45, parameters: { damping: 0.2, density: 0.8, bandwidth: 0.8, decay: 0.7, predelay: 0.02, size: 0.9, gain: 1.0, mix: 0.5, earlyMix: 0.3 } },
+    { category: 'tonejs', type: 'Chorus', enabled: true, wet: 60, parameters: { frequency: 4, delayTime: 5, depth: 0.9, spread: 180 } },
+    { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 80, parameters: { width: 0.9 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 50, parameters: { damping: 0.2, density: 0.9, bandwidth: 0.9, decay: 0.8, predelay: 0.02, size: 0.95, gain: 1.0, mix: 0.55, earlyMix: 0.25 } },
   ],
-  volume: -16,
+  volume: -12,
   pan: 0,
 };
 
@@ -209,11 +218,13 @@ const SUB_DROP: InstrumentPreset['config'] = {
   name: 'Sub Drop',
   synthType: 'MembraneSynth',
   oscillator: { type: 'sine', detune: 0, octave: -1 },
-  envelope: { attack: 1, decay: 800, sustain: 0, release: 200 },
+  envelope: { attack: 1, decay: 1000, sustain: 0, release: 200 },
   effects: [
-    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.001, release: 0.05 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 30, parameters: { drive: 25, frequency: 400 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 8, attack: 0.001, release: 0.05 } },
+    { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 15, parameters: { decay: 0.3, damping: 0.6, tension: 0.3, mix: 0.2, drip: 0.3, diffusion: 0.5 } },
   ],
-  volume: -6,
+  volume: -4,
   pan: 0,
 };
 
@@ -222,26 +233,28 @@ const BOOM: InstrumentPreset['config'] = {
   name: 'Boom',
   synthType: 'MembraneSynth',
   oscillator: { type: 'sine', detune: 0, octave: -1 },
-  envelope: { attack: 1, decay: 600, sustain: 0, release: 300 },
+  envelope: { attack: 1, decay: 700, sustain: 0, release: 300 },
   effects: [
-    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 55, parameters: { drive: 50, frequency: 800 } },
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 30, parameters: { damping: 0.6, density: 0.5, bandwidth: 0.6, decay: 0.35, predelay: 0.01, size: 0.45, gain: 1.0, mix: 0.4, earlyMix: 0.6 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 60, parameters: { drive: 55, frequency: 600 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 25, parameters: { distortion: 0.3, oversample: 2 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 35, parameters: { damping: 0.5, density: 0.6, bandwidth: 0.6, decay: 0.4, predelay: 0.01, size: 0.5, gain: 1.0, mix: 0.4, earlyMix: 0.6 } },
   ],
-  volume: -8,
+  volume: -6,
   pan: 0,
 };
 
 const CINEMATIC_HIT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Cinematic Hit',
+  name: 'Metal Hit',
   synthType: 'MetalSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 1000, sustain: 0, release: 500 },
+  envelope: { attack: 1, decay: 1200, sustain: 0, release: 500 },
   effects: [
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 50, parameters: { damping: 0.3, density: 0.8, bandwidth: 0.7, decay: 0.7, predelay: 0.03, size: 0.9, gain: 1.0, mix: 0.5, earlyMix: 0.3 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 2000 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 55, parameters: { damping: 0.2, density: 0.9, bandwidth: 0.8, decay: 0.75, predelay: 0.03, size: 0.95, gain: 1.0, mix: 0.55, earlyMix: 0.25 } },
     { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 80, parameters: { width: 0.9 } },
   ],
-  volume: -10,
+  volume: -8,
   pan: 0,
 };
 
@@ -250,40 +263,44 @@ const EARTHQUAKE: InstrumentPreset['config'] = {
   name: 'Earthquake',
   synthType: 'MembraneSynth',
   oscillator: { type: 'sine', detune: 0, octave: -2 },
-  envelope: { attack: 1, decay: 1200, sustain: 0, release: 400 },
+  envelope: { attack: 1, decay: 1500, sustain: 0, release: 400 },
   effects: [
-    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 40, parameters: { distortion: 0.6, oversample: 2 } },
-    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -15, ratio: 8, attack: 0.001, release: 0.08 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 45, parameters: { distortion: 0.7, oversample: 2 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 50, frequency: 300 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -15, ratio: 10, attack: 0.001, release: 0.08 } },
   ],
-  volume: -8,
+  volume: -6,
   pan: 0,
 };
 
 const CRASH_IMPACT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Crash Impact',
+  name: 'Crash Hit',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 400, sustain: 0, release: 200 },
-  filter: { type: 'lowpass', frequency: 4000, Q: 1, rolloff: -12 },
+  envelope: { attack: 1, decay: 500, sustain: 0, release: 200 },
+  filter: { type: 'lowpass', frequency: 6000, Q: 2, rolloff: -12 },
   effects: [
-    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.001, release: 0.05 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 3000 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.05 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 30, parameters: { damping: 0.4, density: 0.7, bandwidth: 0.8, decay: 0.4, predelay: 0.01, size: 0.5, gain: 1.0, mix: 0.4, earlyMix: 0.5 } },
   ],
-  volume: -8,
+  volume: -6,
   pan: 0,
 };
 
 const REVERSE_HIT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Reverse Hit',
+  name: 'Echo Burst',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 300, decay: 100, sustain: 0, release: 50 },
-  filter: { type: 'bandpass', frequency: 1500, Q: 3, rolloff: -12 },
+  envelope: { attack: 150, decay: 200, sustain: 0, release: 100 },
+  filter: { type: 'bandpass', frequency: 2000, Q: 5, rolloff: -24 },
   effects: [
-    { category: 'wasm', type: 'RETapeEcho', enabled: true, wet: 55, parameters: { time: 0.25, feedback: 0.5, tone: 0.6, flutter: 0.3, wow: 0.2, saturation: 0.4, mix: 0.5 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 55, parameters: { mode: 4, rate: 250, intensity: 0.65, echoVolume: 0.8, reverbVolume: 0.25, bpmSync: 0 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 30, frequency: 3000 } },
   ],
-  volume: -10,
+  volume: -8,
   pan: 0,
 };
 
@@ -303,9 +320,10 @@ const DJ_LASER: InstrumentPreset['config'] = {
     filter: { type: 'bandpass', cutoff: 2500, resonance: 40 },
   },
   effects: [
-    { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 30, parameters: { delayTime: 0.15, feedback: 0.4 } },
+    { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 35, parameters: { delayTime: 0.15, feedback: 0.45 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 30, parameters: { drive: 25, frequency: 4000 } },
   ],
-  volume: -10,
+  volume: -8,
   pan: 0,
 };
 
@@ -321,10 +339,11 @@ const GLITCH_ZAP: InstrumentPreset['config'] = {
     filter: { type: 'highpass', cutoff: 1000, resonance: 50 },
   },
   effects: [
-    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 55, parameters: { bits: 4 } },
-    { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 25, parameters: { delayTime: 0.1, feedback: 0.35 } },
+    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 60, parameters: { bits: 3 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 35, parameters: { distortion: 0.6, oversample: 2 } },
+    { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 30, parameters: { delayTime: 0.08, feedback: 0.4 } },
   ],
-  volume: -12,
+  volume: -8,
   pan: 0,
 };
 
@@ -333,12 +352,14 @@ const PEW_PEW: InstrumentPreset['config'] = {
   name: 'Pew Pew',
   synthType: 'FMSynth',
   oscillator: { type: 'sine', detune: 0, octave: 1 },
-  envelope: { attack: 1, decay: 150, sustain: 0, release: 80 },
-  filter: { type: 'bandpass', frequency: 3000, Q: 8, rolloff: -24 },
+  envelope: { attack: 1, decay: 120, sustain: 0, release: 60 },
+  filter: { type: 'bandpass', frequency: 3000, Q: 10, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 30, parameters: { delayTime: 0.12, feedback: 0.3 } },
+    { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 35, parameters: { delayTime: 0.1, feedback: 0.35 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 30, parameters: { drive: 30, frequency: 5000 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.04 } },
   ],
-  volume: -10,
+  volume: -6,
   pan: 0,
 };
 
@@ -349,17 +370,18 @@ const COSMIC_RAY: InstrumentPreset['config'] = {
   spaceLaser: {
     ...DEFAULT_SPACE_LASER,
     laser: { startFreq: 6000, endFreq: 300, sweepTime: 250, sweepCurve: 'exponential' },
-    fm: { amount: 45, ratio: 3.5 },
+    fm: { amount: 55, ratio: 3.5 },
     noise: { amount: 12, type: 'pink' },
-    filter: { type: 'bandpass', cutoff: 2000, resonance: 35 },
-    delay: { enabled: true, time: 0.3, feedback: 0.5, wet: 0.4 },
-    reverb: { enabled: true, decay: 3.0, wet: 0.3 },
+    filter: { type: 'bandpass', cutoff: 2000, resonance: 45 },
+    delay: { enabled: true, time: 0.3, feedback: 0.55, wet: 0.45 },
+    reverb: { enabled: true, decay: 3.5, wet: 0.35 },
   },
   effects: [
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 40, parameters: { damping: 0.3, density: 0.7, bandwidth: 0.7, decay: 0.6, predelay: 0.02, size: 0.8, gain: 1.0, mix: 0.45, earlyMix: 0.3 } },
-    { category: 'tonejs', type: 'Chorus', enabled: true, wet: 35, parameters: { frequency: 2, delayTime: 3.5, depth: 0.6, spread: 180 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 45, parameters: { damping: 0.2, density: 0.8, bandwidth: 0.8, decay: 0.65, predelay: 0.02, size: 0.85, gain: 1.0, mix: 0.5, earlyMix: 0.3 } },
+    { category: 'tonejs', type: 'Chorus', enabled: true, wet: 40, parameters: { frequency: 3, delayTime: 4, depth: 0.8, spread: 180 } },
+    { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 70, parameters: { width: 0.85 } },
   ],
-  volume: -12,
+  volume: -8,
   pan: 0,
 };
 
@@ -414,12 +436,15 @@ const AMBULANCE: InstrumentPreset['config'] = {
     ...DEFAULT_DUB_SIREN,
     oscillator: { type: 'square', frequency: 700 },
     lfo: { enabled: true, type: 'square', rate: 3, depth: 150 },
-    delay: { enabled: false, time: 0.1, feedback: 0, wet: 0 },
+    delay: { enabled: true, time: 0.25, feedback: 0.3, wet: 0.2 },
     filter: { enabled: true, type: 'lowpass', frequency: 4000, rolloff: -12 },
-    reverb: { enabled: false, decay: 1, wet: 0 },
+    reverb: { enabled: true, decay: 1.5, wet: 0.15 },
   },
-  effects: [],
-  volume: -10,
+  effects: [
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.001, release: 0.05 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 25, parameters: { drive: 20, frequency: 3000 } },
+  ],
+  volume: -8,
   pan: 0,
 };
 
@@ -468,60 +493,66 @@ const WOBBLE_SIREN: InstrumentPreset['config'] = {
 
 const VINYL_SCRATCH: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Vinyl Scratch',
+  name: 'Filter Scratch',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 120, sustain: 0, release: 50 },
-  filter: { type: 'bandpass', frequency: 2000, Q: 6, rolloff: -24 },
+  envelope: { attack: 1, decay: 80, sustain: 0, release: 30 },
+  filter: { type: 'bandpass', frequency: 3000, Q: 12, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 8, baseFrequency: 800, octaves: 4, type: 'sawtooth', depth: 1 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 90, parameters: { frequency: 12, baseFrequency: 500, octaves: 5, type: 'sawtooth', depth: 1 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 4000 } },
+    { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -8, ratio: 10, attack: 0.001, release: 0.03 } },
   ],
-  volume: -10,
+  volume: -6,
   pan: 0,
 };
 
 const STATIC_BURST: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Static Burst',
+  name: 'Glitch Burst',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 200, sustain: 0, release: 80 },
-  filter: { type: 'highpass', frequency: 1000, Q: 2, rolloff: -12 },
+  envelope: { attack: 1, decay: 120, sustain: 0, release: 40 },
+  filter: { type: 'bandpass', frequency: 2500, Q: 6, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 65, parameters: { bits: 3 } },
-    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 40, parameters: { distortion: 0.5, oversample: 2 } },
+    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 75, parameters: { bits: 3 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 55, parameters: { distortion: 0.8, oversample: 2 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 3, rate: 120, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.15, bpmSync: 0 } },
   ],
-  volume: -12,
+  volume: -8,
   pan: 0,
 };
 
 const WIND_GUST: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Wind Gust',
+  name: 'Storm Wash',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 200, decay: 800, sustain: 0.2, release: 600 },
-  filter: { type: 'bandpass', frequency: 600, Q: 2, rolloff: -12 },
+  envelope: { attack: 50, decay: 600, sustain: 0.4, release: 400 },
+  filter: { type: 'bandpass', frequency: 800, Q: 4, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 75, parameters: { frequency: 0.3, baseFrequency: 300, octaves: 5, type: 'sine', depth: 1 } },
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 40, parameters: { damping: 0.3, density: 0.7, bandwidth: 0.7, decay: 0.6, predelay: 0.03, size: 0.8, gain: 1.0, mix: 0.45, earlyMix: 0.3 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 0.5, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
+    { category: 'tonejs', type: 'Phaser', enabled: true, wet: 45, parameters: { frequency: 0.3, octaves: 4, baseFrequency: 300, Q: 6 } },
+    { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 40, parameters: { decay: 0.7, damping: 0.25, tension: 0.4, mix: 0.4, drip: 0.6, diffusion: 0.8 } },
   ],
-  volume: -14,
+  volume: -8,
   pan: 0,
 };
 
 const RADIO_TUNE: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Radio Tune',
+  name: 'Radio Static',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 50, decay: 300, sustain: 0.3, release: 200 },
-  filter: { type: 'bandpass', frequency: 1200, Q: 8, rolloff: -24 },
+  envelope: { attack: 1, decay: 250, sustain: 0.5, release: 150 },
+  filter: { type: 'bandpass', frequency: 1500, Q: 14, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 2, baseFrequency: 600, octaves: 3, type: 'sine', depth: 1 } },
-    { category: 'tonejs', type: 'Tremolo', enabled: true, wet: 50, parameters: { frequency: 12, depth: 0.6, type: 'sine', spread: 0 } },
+    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 40, parameters: { bits: 4 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 4, baseFrequency: 400, octaves: 4, type: 'square', depth: 1 } },
+    { category: 'tonejs', type: 'Tremolo', enabled: true, wet: 60, parameters: { frequency: 18, depth: 0.8, type: 'square', spread: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 25, parameters: { mode: 2, rate: 180, intensity: 0.45, echoVolume: 0.5, reverbVolume: 0.2, bpmSync: 0 } },
   ],
-  volume: -12,
+  volume: -8,
   pan: 0,
 };
 
@@ -531,58 +562,64 @@ const RADIO_TUNE: InstrumentPreset['config'] = {
 
 const ECHO_WASHOUT: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Echo Washout',
+  name: 'Dub Echo',
   synthType: 'MonoSynth',
-  oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
-  envelope: { attack: 10, decay: 300, sustain: 0.3, release: 200 },
-  filter: { type: 'lowpass', frequency: 2000, Q: 3, rolloff: -12 },
+  oscillator: { type: 'sawtooth', detune: 5, octave: 0 },
+  envelope: { attack: 5, decay: 250, sustain: 0.2, release: 150 },
+  filter: { type: 'lowpass', frequency: 1500, Q: 6, rolloff: -24 },
   effects: [
-    { category: 'wasm', type: 'RETapeEcho', enabled: true, wet: 65, parameters: { time: 0.35, feedback: 0.7, tone: 0.5, flutter: 0.4, wow: 0.3, saturation: 0.5, mix: 0.6 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 70, parameters: { mode: 4, rate: 300, intensity: 0.7, echoVolume: 0.85, reverbVolume: 0.3, bpmSync: 1 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 2000 } },
+    { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.35, tension: 0.45, mix: 0.3, drip: 0.5, diffusion: 0.6 } },
   ],
-  volume: -12,
+  volume: -8,
   pan: 0,
 };
 
 const REWIND: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Rewind',
+  name: 'Acid Sweep',
   synthType: 'MonoSynth',
-  oscillator: { type: 'sawtooth', detune: 0, octave: 1 },
-  envelope: { attack: 10, decay: 600, sustain: 0, release: 100 },
-  filter: { type: 'lowpass', frequency: 4000, Q: 4, rolloff: -24 },
+  oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
+  envelope: { attack: 5, decay: 400, sustain: 0.1, release: 100 },
+  filter: { type: 'lowpass', frequency: 600, Q: 16, rolloff: -24 },
   effects: [
-    { category: 'tonejs', type: 'Phaser', enabled: true, wet: 55, parameters: { frequency: 6, octaves: 3, baseFrequency: 500, Q: 10 } },
+    { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 90, parameters: { frequency: 0.4, baseFrequency: 200, octaves: 7, type: 'sawtooth', depth: 1 } },
+    { category: 'tonejs', type: 'Distortion', enabled: true, wet: 35, parameters: { distortion: 0.5, oversample: 2 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 2, rate: 200, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.2, bpmSync: 0 } },
   ],
-  volume: -12,
+  volume: -8,
   pan: 0,
 };
 
 const TAPE_STOP: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Tape Stop',
-  synthType: 'NoiseSynth',
-  oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 500, sustain: 0, release: 200 },
-  filter: { type: 'lowpass', frequency: 1500, Q: 2, rolloff: -24 },
+  name: 'Lo-Fi Stab',
+  synthType: 'MonoSynth',
+  oscillator: { type: 'square', detune: 0, octave: 0 },
+  envelope: { attack: 1, decay: 300, sustain: 0, release: 100 },
+  filter: { type: 'lowpass', frequency: 1200, Q: 8, rolloff: -24 },
   effects: [
-    { category: 'wasm', type: 'TapeSimulator', enabled: true, wet: 70, parameters: { flutter: 0.8, wow: 0.9, saturation: 0.5, hiss: 0.2, toneHigh: 0.4, toneLow: 0.6, speed: 0.3, mix: 0.7 } },
+    { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 40, parameters: { bits: 6 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 55, parameters: { drive: 50, frequency: 2000 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 3, rate: 250, intensity: 0.55, echoVolume: 0.7, reverbVolume: 0.25, bpmSync: 0 } },
   ],
-  volume: -10,
+  volume: -8,
   pan: 0,
 };
 
 const SPLASH: InstrumentPreset['config'] = {
   type: 'synth',
-  name: 'Splash',
-  synthType: 'NoiseSynth',
-  oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 300, sustain: 0, release: 400 },
-  filter: { type: 'highpass', frequency: 600, Q: 1, rolloff: -12 },
+  name: 'Cymbal Wash',
+  synthType: 'MetalSynth',
+  oscillator: { type: 'sine', detune: 0, octave: 2 },
+  envelope: { attack: 1, decay: 600, sustain: 0, release: 500 },
   effects: [
-    { category: 'wasm', type: 'MVerb', enabled: true, wet: 55, parameters: { damping: 0.2, density: 0.8, bandwidth: 0.8, decay: 0.7, predelay: 0.01, size: 0.9, gain: 1.0, mix: 0.55, earlyMix: 0.4 } },
+    { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 30, parameters: { drive: 20, frequency: 5000 } },
     { category: 'tonejs', type: 'StereoWidener', enabled: true, wet: 80, parameters: { width: 0.9 } },
+    { category: 'wasm', type: 'MVerb', enabled: true, wet: 55, parameters: { damping: 0.2, density: 0.9, bandwidth: 0.9, decay: 0.7, predelay: 0.01, size: 0.9, gain: 1.0, mix: 0.55, earlyMix: 0.35 } },
   ],
-  volume: -10,
+  volume: -8,
   pan: 0,
 };
 
