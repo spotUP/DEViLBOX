@@ -83,7 +83,17 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
 
   const handleSynthChange = useCallback((updates: Partial<InstrumentConfig>) => {
     if (!pad?.synthConfig) return;
-    updatePad(pad.id, { synthConfig: { ...pad.synthConfig, ...updates } });
+    const patch: Partial<DrumPad> = {
+      synthConfig: { ...pad.synthConfig, ...updates },
+    };
+    // When the embedded synth editor loads a preset, its PresetDropdown
+    // includes the preset name in the updates. Mirror that onto the pad
+    // itself so the grid tile + status bar label reflect the new sound.
+    if (typeof updates.name === 'string' && updates.name !== pad.synthConfig.name) {
+      patch.name = updates.name;
+      patch.presetName = updates.name;
+    }
+    updatePad(pad.id, patch);
   }, [pad, updatePad]);
 
   const handleSampleLoaded = useCallback(async (sample: SampleData) => {
