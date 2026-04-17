@@ -11,7 +11,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
-import { useAudioStore } from '@stores/useAudioStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorControls } from '@hooks/views/useEditorControls';
 import { BG_MODES, getBgModeLabel } from './TrackerVisualBackground';
@@ -74,10 +73,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
-
-  // Volume
-  const masterVolume = useAudioStore(s => s.masterVolume);
-  const setMasterVolume = useAudioStore(s => s.setMasterVolume);
 
   // DOM-only: UI store for view-mode switching and groove dialog command
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -410,19 +405,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         )}
       </div>
 
-      {/* Right section: Volume, FPS */}
+      {/* Right section: FPS */}
       <div className="flex-shrink-0 flex items-center gap-2">
-        {/* Master Volume */}
-        <input
-          type="range"
-          value={masterVolume}
-          onChange={(e) => setMasterVolume(Number(e.target.value))}
-          min="-60"
-          max="0"
-          step="1"
-          className="w-20"
-          title={`Volume: ${masterVolume} dB`}
-        />
 
         {/* FPS / Quality Indicator - Compact */}
       <div

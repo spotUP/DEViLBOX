@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
 import { Plus, X, Download, LogOut, User, Users, Settings, Lightbulb, Play } from 'lucide-react';
-import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
@@ -166,9 +165,6 @@ const NavBarComponent: React.FC = () => {
           {/* DJ Sets — only shown in DJ and VJ views */}
           {(n.activeView === 'dj' || n.activeView === 'vj') && <DJSetBrowser />}
 
-          {/* MIDI Settings */}
-          <MIDIToolbarDropdown />
-
           {/* Collab */}
           <button
             onClick={() => useUIStore.getState().openModal('collab')}
@@ -238,7 +234,7 @@ const NavBarComponent: React.FC = () => {
       {/* Tab Bar — hidden in DJ/VJ views and editor fullscreen */}
       {n.activeView !== 'dj' && n.activeView !== 'vj' && !editorFullscreen && <div className="flex items-center px-2 py-1 border-b border-dark-border bg-dark-bgTertiary">
         {/* Tabs */}
-        <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
           {n.tabs.map((tab) => (
             <button
               key={tab.id}
