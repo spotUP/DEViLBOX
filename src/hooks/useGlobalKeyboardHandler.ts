@@ -1931,6 +1931,14 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         }
       }
 
+      // DJ/VJ view: reserve Escape for the view-level panic handler
+      // (DJKeyboardHandler). Skipping the scheme lookup here prevents tracker
+      // schemes that bind Escape (e.g. protracker → show_main_screen) from
+      // stealing the key and switching back to tracker view.
+      if (_isDJVJ && e.key === 'Escape') {
+        return;
+      }
+
       // Normalize the event
       const normalized = KeyboardNormalizer.normalize(e);
       const platform = getPlatform();
