@@ -360,9 +360,42 @@ export class VocoderEngine {
     this.outputGain.gain.value = Math.max(0, Math.min(2, gain));
   }
 
-  /** Mute/unmute the vocoder output (keeps processing so unmute is instant) */
+  /** Mute/unmute the vocoder output (keeps processing so unmute is instant).
+   *  Uses a short ramp to avoid clicks on press/release.
+   *
+   *  Also ramps fxTail to zero on mute. outputGain=0 stops feeding the FX
+   *  chain, but reverb/delay nodes still play out their internal buffer —
+   *  with long-tailed presets (reggae-soundsystem: 3.5s reverb, 0.45 feedback
+   *  at 750ms) that ring for 6+ seconds after release. fxTail caps the tail
+   *  so PTT release produces audible silence within a bounded time. */
   setMuted(muted: boolean): void {
-    this.outputGain.gain.value = muted ? 0 : 1;
+    const now = this.audioContext.currentTime;
+    const g = this.outputGain.gain;
+    try { g.cancelScheduledValues(now); } catch { /* ok */ }
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(muted ? 0 : 1, now + (muted ? 0.03 : 0.015));
+
+    if (this.fxTail) {
+      const fxG = this.fxTail.gain as unknown as AudioParam;
+      try { fxG.cancelScheduledValues(now); } catch { /* ok */ }
+      fxG.setValueAtTime(fxG.value ?? 1, now);
+      if (muted) {
+        // Allow a brief natural tail, then force silence.
+        fxG.linearRampToValueAtTime(1, now + 0.5);
+        fxG.linearRampToValueAtTime(0, now + 2.5);
+      } else {
+        // Restore instantly so the next phrase's FX is heard.
+        fxG.linearRampToValueAtTime(1, now + 0.015);
+      }
+    }
+  }
+
+  /** Enable/disable the mic AudioTrack. When disabled, the vocoder worklet
+   *  receives silence — its noise gate fully closes, the carrier stops
+   *  bleeding through, and the FX tails decay cleanly. Call this on PTT
+   *  release to prevent ambient mic noise from sustaining the FX chain. */
+  setMicActive(active: boolean): void {
+    this.stream?.getAudioTracks().forEach((t) => { t.enabled = active; });
   }
 
   /** Connect output to a different destination */
