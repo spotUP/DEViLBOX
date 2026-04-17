@@ -78,7 +78,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   }, []);
 
   // A pad is "loaded" if it has actual sound source assigned
-  const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
+  const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction || pad.pttAction);
   const isLoaded = hasActualData;
 
   const isFxActive = pad.djFxAction && activeFxPads.has(pad.id);
@@ -139,7 +139,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       const { pad, onTrigger, calculateVelocity, flashTrigger } = touchHandlersRef.current;
 
       // Check if pad is empty (same check as line 90 hasActualData)
-      const isEmpty = !pad.sample && !pad.synthConfig && pad.instrumentId == null && !pad.djFxAction && !pad.scratchAction;
+      const isEmpty = !pad.sample && !pad.synthConfig && pad.instrumentId == null && !pad.djFxAction && !pad.scratchAction && !pad.pttAction;
       if (isEmpty) {
         // Empty pads: do nothing on touch (use context menu to set up)
         return;
