@@ -49,6 +49,7 @@ async function ensureFallbackEngine(): Promise<VocoderEngine | null> {
     fallbackEngine = new VocoderEngine(dest as AudioNode);
     await fallbackEngine.start();
     fallbackEngine.setMuted(true);
+    fallbackEngine.setMicActive(false);
     fallbackEngine.setVocoderBypass(false);
     return fallbackEngine;
   } catch (err) {
@@ -73,6 +74,7 @@ export function useGlobalPTT(): void {
         (async () => {
           const engine = await ensureFallbackEngine();
           if (!engine) return;
+          engine.setMicActive(true);
           engine.setMuted(false);
           useVocoderStore.getState().setActive(true);
           try { getDJEngineIfActive()?.mixer.duck(); } catch { /* ok */ }
@@ -84,6 +86,7 @@ export function useGlobalPTT(): void {
         registeredPTTUp();
       } else if (fallbackEngine) {
         fallbackEngine.setMuted(true);
+        fallbackEngine.setMicActive(false);
         useVocoderStore.getState().setActive(false);
         try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
       }
