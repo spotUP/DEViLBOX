@@ -53,8 +53,6 @@ interface FT2ToolbarProps {
   onShowHelp?: (tab?: string) => void;
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
-  onShowFindReplace?: () => void;
-  showFindReplace?: boolean;
   showPatterns?: boolean;
   showInstrumentFX?: boolean;
   compact?: boolean;
@@ -64,8 +62,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   onShowExport,
   onShowHelp,
   onShowInstruments,
-  onShowFindReplace,
-  showFindReplace,
 }) => {
   const {
     patterns,
@@ -611,7 +607,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={onShowExport} title="Export (Ctrl+Shift+E)">Export</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
-        <Button variant={showFindReplace ? 'primary' : 'ghost'} size="sm" onClick={onShowFindReplace} title="Find & replace (Ctrl+F)">Find</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.()} title="Help & keyboard shortcuts (?)">Help</Button>

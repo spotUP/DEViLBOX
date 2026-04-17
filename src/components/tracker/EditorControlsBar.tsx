@@ -47,6 +47,9 @@ export interface EditorControlsBarProps {
   onShowDrumpads?: () => void;
   /** When provided, renders a "Cleanup" button in the toolbar */
   onShowCleanup?: () => void;
+  /** Find & Replace toggle */
+  showFindReplace?: boolean;
+  onShowFindReplace?: () => void;
 }
 
 export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
@@ -59,6 +62,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   onShowAutomation,
   onShowDrumpads: onShowDrumpadsProp,
   onShowCleanup,
+  showFindReplace,
+  onShowFindReplace,
 }) => {
   // ── Shared hook ───────────────────────────────────────────────────────────
   const c = useEditorControls({
@@ -297,6 +302,21 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           >
             <Trash2 size={12} />
             <span>Cleanup</span>
+          </button>
+        )}
+
+        {/* Find & Replace */}
+        {onShowFindReplace && (
+          <button
+            onClick={onShowFindReplace}
+            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+              showFindReplace
+                ? 'bg-accent-primary/20 text-accent-primary'
+                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+            }`}
+            title="Find & replace (Ctrl+F)"
+          >
+            Find
           </button>
         )}
 

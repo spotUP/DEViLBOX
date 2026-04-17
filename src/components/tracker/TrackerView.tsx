@@ -515,8 +515,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             onShowExport={onShowExport}
             onShowHelp={onShowHelp}
             onShowInstruments={onShowInstruments}
-            onShowFindReplace={() => setShowFindReplace(v => !v)}
-            showFindReplace={showFindReplace}
           />
         </div>
       )}
@@ -545,6 +543,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         onShowAutomation={() => setShowAutomation(true)}
         onShowDrumpads={onShowDrumpads}
         onShowCleanup={() => setShowCleanup(true)}
+        showFindReplace={showFindReplace}
+        onShowFindReplace={() => setShowFindReplace(v => !v)}
       />
       )}
 
