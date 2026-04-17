@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Download, LogIn, LogOut, Cloud, Users, Settings, Lightbulb, Play } from 'lucide-react';
+import { Plus, X, Download, LogOut, User, Settings, Lightbulb, Play } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
@@ -26,6 +26,8 @@ const NavBarComponent: React.FC = () => {
 
   const editorFullscreen = useUIStore((state) => state.editorFullscreen);
   const openModal = useUIStore((state) => state.openModal);
+  const modalOpen = useUIStore((state) => state.modalOpen);
+  const closeModal = useUIStore((state) => state.closeModal);
   const tourActive = useTourStore((s) => s.isActive);
 
   const handleStartTour = useCallback(async () => {
@@ -36,15 +38,14 @@ const NavBarComponent: React.FC = () => {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showCollabModal, setShowCollabModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Auto-close collab modal when connection succeeds (DOM-local modal state)
+  // Auto-close collab modal when connection succeeds
   useEffect(() => {
-    if (n.collabStatus === 'connected') {
-      setShowCollabModal(false);
+    if (n.collabStatus === 'connected' && modalOpen === 'collab') {
+      closeModal();
     }
-  }, [n.collabStatus]);
+  }, [n.collabStatus, modalOpen, closeModal]);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -58,21 +59,6 @@ const NavBarComponent: React.FC = () => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showUserMenu]);
-
-  const handleCollabClick = () => {
-    if (n.collabStatus === 'connected' && n.collabViewMode === 'split') {
-      return;
-    }
-    if (n.collabStatus === 'connected') {
-      n.handleOpenCollab();
-    } else {
-      setShowCollabModal(true);
-    }
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    n.setMasterVolume(parseInt(e.target.value, 10));
-  };
 
   const handleAddTab = () => {
     n.addTab();
@@ -153,74 +139,8 @@ const NavBarComponent: React.FC = () => {
           )}
         </div>
 
-        {/* Right: MIDI, Theme Switcher and Master Volume */}
+        {/* Right: View Switcher, Settings, MIDI */}
         <div className="flex items-center gap-4">
-          {/* Cloud Login/User Button (Web only) */}
-          {!isElectron() && n.isServerAvailable && (
-            <div className="relative" data-user-menu>
-              {n.authUser ? (
-                // Logged in - show user dropdown
-                <>
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
-                    title={`Logged in as ${n.authUser.username}`}
-                  >
-                    <Cloud size={16} className="text-accent-success" />
-                    <span className="text-sm hidden sm:inline">{n.authUser.username}</span>
-                  </button>
-                  {showUserMenu && (
-                    <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-[99990] min-w-[160px]">
-                      <div className="px-3 py-2 border-b border-dark-border">
-                        <p className="text-xs text-text-muted">Signed in as</p>
-                        <p className="text-sm font-medium text-text-primary truncate">{n.authUser.username}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          n.logout();
-                          setShowUserMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex items-center gap-2"
-                      >
-                        <LogOut size={14} />
-                        Sign Out
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                // Not logged in - show login button
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAuthModal(true)}
-                  icon={<LogIn size={14} />}
-                  iconPosition="left"
-                  title="Sign in to save files to the cloud"
-                >
-                  <span className="hidden sm:inline whitespace-nowrap">Sign In</span>
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Collab Button */}
-          <Button
-            variant={n.collabStatus === 'connected' ? 'primary' : 'ghost'}
-            size="sm"
-            onClick={handleCollabClick}
-            icon={<Users size={14} />}
-            iconPosition="left"
-            title={n.collabStatus === 'connected' ? 'Collaboration active' : 'Start live collaboration'}
-          >
-            <span className="hidden sm:inline">
-              {n.collabStatus === 'connected' ? 'Collab' : 'Collab'}
-            </span>
-            {n.collabStatus === 'connected' && (
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse ml-1" />
-            )}
-          </Button>
-
           {/* View Switcher */}
           <CustomSelect
             value={n.activeView}
@@ -249,17 +169,52 @@ const NavBarComponent: React.FC = () => {
           {/* MIDI Settings */}
           <MIDIToolbarDropdown />
 
-          {/* Master Volume */}
-          <input
-            type="range"
-            value={n.masterVolume}
-            onChange={handleVolumeChange}
-            min="-60"
-            max="0"
-            step="1"
-            className="w-24"
-            title={`Volume: ${n.masterVolume} dB`}
-          />
+          {/* Sign In / User Menu (far right, Web only) */}
+          {!isElectron() && n.isServerAvailable && (
+            <div className="relative" data-user-menu>
+              {n.authUser ? (
+                <>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+                    title={`Logged in as ${n.authUser.username}`}
+                  >
+                    <User size={16} className="text-accent-success" />
+                    <span className="text-sm hidden sm:inline">{n.authUser.username}</span>
+                  </button>
+                  {showUserMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-[99990] min-w-[160px]">
+                      <div className="px-3 py-2 border-b border-dark-border">
+                        <p className="text-xs text-text-muted">Signed in as</p>
+                        <p className="text-sm font-medium text-text-primary truncate">{n.authUser.username}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          n.logout();
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex items-center gap-2"
+                      >
+                        <LogOut size={14} />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAuthModal(true)}
+                  icon={<User size={14} />}
+                  iconPosition="left"
+                  title="Sign in to save files to the cloud"
+                >
+                  <span className="hidden sm:inline whitespace-nowrap">Sign In</span>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </nav>
 
@@ -341,10 +296,10 @@ const NavBarComponent: React.FC = () => {
       />
 
       {/* Collaboration Modal */}
-      {showCollabModal && (
+      {modalOpen === 'collab' && (
         <CollaborationModal
-          isOpen={showCollabModal}
-          onClose={() => setShowCollabModal(false)}
+          isOpen={true}
+          onClose={() => closeModal()}
         />
       )}
 
