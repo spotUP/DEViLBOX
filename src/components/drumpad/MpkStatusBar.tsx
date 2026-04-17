@@ -42,6 +42,36 @@ export const MpkStatusBar: React.FC = () => {
   useEffect(() => subscribeSlotBindings(() => forceBindingsRender((n) => n + 1)), []);
   const learnTarget = getLearnSlotTarget();
 
+  // Wizard: auto-advance through all 8 slots. User presses any MPK
+  // button/pad → slot N binds → wizard advances to slot N+1 until done.
+  const [wizardSlot, setWizardSlot] = useState<number | null>(null);
+  useEffect(() => {
+    if (wizardSlot === null) return;
+    return subscribeSlotBindings(() => {
+      if (wizardSlot === null) return;
+      if (getSlotBinding(wizardSlot)) {
+        const next = wizardSlot + 1;
+        if (next > MPK_SLOT_COUNT) {
+          setWizardSlot(null);
+          cancelLearnSlotBinding();
+        } else {
+          setWizardSlot(next);
+          startLearnSlotBinding(next);
+        }
+      }
+    });
+  }, [wizardSlot]);
+
+  const startWizard = useCallback(() => {
+    setWizardSlot(1);
+    startLearnSlotBinding(1);
+  }, []);
+
+  const cancelWizard = useCallback(() => {
+    setWizardSlot(null);
+    cancelLearnSlotBinding();
+  }, []);
+
   // Active program and its slot number (1-8) if it's one of the MPK slots
   const current = programs.get(currentProgramId);
   const activeSlot = useMemo(() => {
@@ -77,6 +107,23 @@ export const MpkStatusBar: React.FC = () => {
   const knobPageLabel = knobBank;
 
   return (
+    <div className="flex flex-col shrink-0">
+      {/* Wizard banner — only visible during setup. Full-width so it's impossible to miss. */}
+      {wizardSlot !== null && (
+        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-accent-warning/20 border-b border-accent-warning text-text-primary animate-pulse">
+          <span className="text-xs font-mono font-bold">
+            SETUP WIZARD — press any MPK button/pad you want for <span className="text-accent-warning">slot {wizardSlot}</span>
+            <span className="ml-2 text-text-muted">({wizardSlot - 1}/{MPK_SLOT_COUNT} done)</span>
+          </span>
+          <button
+            onClick={cancelWizard}
+            className="px-3 py-1 text-[10px] font-mono font-bold rounded bg-dark-bgTertiary border border-dark-border text-text-primary hover:bg-dark-bgHover"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
     <div className="flex items-stretch gap-2 px-3 py-2 border-b border-dark-border bg-dark-bgSecondary shrink-0">
       {/* Slots 1-8: program switcher that mirrors the MPK PROG button. */}
       <div className="flex items-center gap-1">
@@ -192,6 +239,21 @@ export const MpkStatusBar: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Setup MPK wizard launcher — teaches the 8 slots in one sweep. */}
+      <div className="flex items-center px-3 border-l border-dark-border shrink-0">
+        <button
+          onClick={wizardSlot !== null ? cancelWizard : startWizard}
+          title="Run the 8-step wizard to bind MPK buttons to each slot"
+          className={`px-3 py-1.5 text-[10px] font-mono font-bold rounded border transition-colors
+            ${wizardSlot !== null
+              ? 'bg-accent-warning text-text-inverse border-accent-warning'
+              : 'bg-dark-bgTertiary text-accent-warning border-accent-warning/50 hover:bg-accent-warning/10'}`}
+        >
+          {wizardSlot !== null ? `Learning ${wizardSlot}/${MPK_SLOT_COUNT}` : 'SETUP MPK'}
+        </button>
+      </div>
+    </div>
     </div>
   );
 };
