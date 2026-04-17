@@ -128,7 +128,14 @@ export const DJVocoderControl: React.FC = () => {
       setActiveVocoderEngine(engine);
       setMuted(true);
       engine.setMuted(true);
-      engine.setMicActive(false); // mic idle until PTT — prevents ambient bleed into FX
+      // Leave the mic track ENABLED at engine creation. outputGain=0 already
+      // silences any audible output, and rapid enable/disable cycling during
+      // the first PTT press (engine.start sets enabled=true, then we set
+      // false, then handlePTTDown sets true again within the same async tick)
+      // can leave the macOS getUserMedia pipeline stuck producing silence
+      // until a forced micPreamp reconnect (e.g. manual Vocoder toggle)
+      // kicks it back to life. setMicActive(false) is still used on PTT
+      // release to stop ambient bleed into FX tails.
       if (followMelodyEnabledRef.current) {
         followMelodyRef.current = new VocoderAutoTune(engine);
         followMelodyRef.current.start();
@@ -192,15 +199,11 @@ export const DJVocoderControl: React.FC = () => {
       const engine = new VocoderEngine(destination);
       await engine.start(deviceId || undefined);
       engine.setVocoderBypass(wasBypassed);
-      // Match PTT state — if user is not holding PTT, mute + disable mic so
-      // there's no accidental noise bleed while they're not talking.
-      if (pttIsActive) {
-        engine.setMicActive(true);
-        engine.setMuted(false);
-      } else {
-        engine.setMuted(true);
-        engine.setMicActive(false);
-      }
+      // Match PTT state. Leave the mic track enabled (from engine.start) and
+      // let outputGain gate audibility — disabling + re-enabling the track
+      // in the same async tick as a follow-up PTT press can leave the macOS
+      // mic pipeline returning silence.
+      engine.setMuted(!pttIsActive);
       engineRef.current = engine;
       setActiveVocoderEngine(engine);
     } catch (err) {

@@ -49,7 +49,9 @@ async function ensureFallbackEngine(): Promise<VocoderEngine | null> {
     fallbackEngine = new VocoderEngine(dest as AudioNode);
     await fallbackEngine.start();
     fallbackEngine.setMuted(true);
-    fallbackEngine.setMicActive(false);
+    // Track stays enabled; outputGain=0 silences the path. Disabling the
+    // track at creation + re-enabling on PTT down in the same async tick
+    // can leave the mic returning silence on macOS until a forced reconnect.
     fallbackEngine.setVocoderBypass(false);
     return fallbackEngine;
   } catch (err) {
