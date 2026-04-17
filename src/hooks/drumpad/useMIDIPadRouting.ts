@@ -32,6 +32,7 @@ import type { ScratchActionId } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
 import { resetDrumPadModulation } from '../../midi/performance/parameterRouter';
+import { useVocoderStore } from '../../stores/useVocoderStore';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -297,6 +298,9 @@ export function useMIDIPadRouting() {
             DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
             setFxPadActive(padId, false);
           }
+          if (pad.pttAction) {
+            useVocoderStore.getState().setPTT(false);
+          }
           if (pad.playMode === 'sustain') {
             _engine.stopPad(padId, pad.release / 1000);
           }
@@ -339,6 +343,11 @@ export function useMIDIPadRouting() {
     // Scratch actions (start on note-on, stop on note-off via releasePad)
     if (pad.scratchAction) {
       SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(true);
+    }
+
+    // Vocoder PTT (push-to-talk via pad hold)
+    if (pad.pttAction) {
+      useVocoderStore.getState().setPTT(true);
     }
 
     // DJ FX with quantization
@@ -437,6 +446,11 @@ export function useMIDIPadRouting() {
     // Stop scratch action on release (finish current cycle gracefully)
     if (pad.scratchAction) {
       SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
+    }
+
+    // Release vocoder PTT
+    if (pad.pttAction) {
+      useVocoderStore.getState().setPTT(false);
     }
 
     // Stop sample playback — only for sustain-mode pads.
