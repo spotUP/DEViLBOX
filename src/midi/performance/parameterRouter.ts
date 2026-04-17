@@ -494,6 +494,10 @@ export function routeParameterToEngine(
   normalizedValue: number,
   instrumentId?: number,
 ): void {
+  // Push to live subscribers first so DOM knobs can update on every CC
+  // without waiting for React re-render. Harmless if no subscriber.
+  fireParamLiveSubscribers(param, normalizedValue);
+
   // Master FX parameters are routed separately (not per-instrument)
   if (param.startsWith('masterFx.')) {
     routeMasterFXParameter(param, normalizedValue);
@@ -750,21 +754,294 @@ function getDJRoutes(): Record<string, DJRouteHandler> {
 /**
  * Route a DJ parameter change to the DJ engine.
  *
+ * Uses relative-delta tracking: each CC is treated as a DELTA from the
+ * previous MIDI value and added to the current software position. No jump
+ * on first touch, 1:1 responsiveness, full 0-1 range reachable. First CC
+ * after a preset change / reset establishes baseline without moving SW.
+ *
  * @param param - DJ parameter path (e.g., 'dj.crossfader')
  * @param normalizedValue - 0-1 normalized value from MIDI CC
  */
 export function routeDJParameter(param: string, normalizedValue: number): void {
+  const tracked = djRelativeTrack(param, normalizedValue);
+
   const routes = getDJRoutes();
   const handler = routes[param];
   if (handler) {
     try {
-      handler(normalizedValue);
+      handler(tracked);
     } catch {
       // DJ engine not initialized — ignore silently
     }
   }
-  // Sync to store so UI knobs reflect the change
-  syncDJParamToStore(param, normalizedValue);
+  // Fire imperative subscribers (DOM-ref knob updates) synchronously on
+  // every CC. setAttribute on SVG x/y/d is cheap (no layout) and the
+  // browser coalesces paints to the next vsync, so this minimizes the
+  // delay between CC arrival and pixels on screen.
+  fireParamLiveSubscribers(param, tracked);
+  // UI store sync is still batched to 60fps via rAF — immer+broadcast is
+  // expensive, and DOM knobs handled imperatively above don't need it.
+  scheduleDJStoreSync(param, tracked);
+}
+
+// ── rAF-batched store sync (60fps UI) ──────────────────────────────────────
+const _pendingDJStoreUpdates = new Map<string, number>();
+let _djStoreSyncScheduled = false;
+
+function flushDJStoreSync(): void {
+  _djStoreSyncScheduled = false;
+  if (_pendingDJStoreUpdates.size > 0) {
+    // Single consolidated setState — one immer run, one subscriber broadcast,
+    // one React render pass regardless of how many DJ params updated this frame.
+    useDJStore.setState((state) => {
+      for (const [param, value] of _pendingDJStoreUpdates) {
+        applyDJMutation(state as unknown as DJMutableState, param, value);
+      }
+    });
+    _pendingDJStoreUpdates.clear();
+  }
+  // Drop live values so the next frame's first CC re-seeds from the store
+  // (lets DOM-knob changes between MIDI bursts be respected).
+  _djLiveValues.clear();
+}
+
+// ── Direct state mutation (inside a single setState for minimal overhead) ──
+interface DJMutableState {
+  crossfaderPosition: number;
+  masterVolume: number;
+  decks: Record<'A' | 'B' | 'C', {
+    volume: number;
+    eqLow: number;
+    eqMid: number;
+    eqHigh: number;
+    eqPreset: string | null;
+    filterPosition: number;
+    filterResonance: number;
+    pitchOffset: number;
+    effectiveBPM: number;
+    detectedBPM: number;
+    scratchVelocity: number;
+  }>;
+}
+
+function applyDJMutation(state: DJMutableState, param: string, value: number): void {
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  switch (param) {
+    case 'dj.crossfader':
+      state.crossfaderPosition = clamp(value, 0, 1);
+      break;
+    case 'dj.masterVolume':
+      state.masterVolume = clamp(value * 1.5, 0, 1.5);
+      break;
+    case 'dj.deckA.volume':
+      state.decks.A.volume = clamp(value * 1.5, 0, 1.5);
+      break;
+    case 'dj.deckB.volume':
+      state.decks.B.volume = clamp(value * 1.5, 0, 1.5);
+      break;
+    case 'dj.deckA.eqHi':
+      state.decks.A.eqHigh = clamp(-12 + value * 24, -12, 12);
+      state.decks.A.eqPreset = null;
+      break;
+    case 'dj.deckA.eqMid':
+      state.decks.A.eqMid = clamp(-12 + value * 24, -12, 12);
+      state.decks.A.eqPreset = null;
+      break;
+    case 'dj.deckA.eqLow':
+      state.decks.A.eqLow = clamp(-12 + value * 24, -12, 12);
+      state.decks.A.eqPreset = null;
+      break;
+    case 'dj.deckB.eqHi':
+      state.decks.B.eqHigh = clamp(-12 + value * 24, -12, 12);
+      state.decks.B.eqPreset = null;
+      break;
+    case 'dj.deckB.eqMid':
+      state.decks.B.eqMid = clamp(-12 + value * 24, -12, 12);
+      state.decks.B.eqPreset = null;
+      break;
+    case 'dj.deckB.eqLow':
+      state.decks.B.eqLow = clamp(-12 + value * 24, -12, 12);
+      state.decks.B.eqPreset = null;
+      break;
+    case 'dj.deckA.filter':
+      state.decks.A.filterPosition = clamp(-1 + value * 2, -1, 1);
+      break;
+    case 'dj.deckB.filter':
+      state.decks.B.filterPosition = clamp(-1 + value * 2, -1, 1);
+      break;
+    case 'dj.deckA.filterQ':
+      state.decks.A.filterResonance = clamp(0.5 + value * 14.5, 0.5, 15);
+      break;
+    case 'dj.deckB.filterQ':
+      state.decks.B.filterResonance = clamp(0.5 + value * 14.5, 0.5, 15);
+      break;
+    case 'dj.deckA.pitch': {
+      const c = clamp(-6 + value * 12, -16, 16);
+      state.decks.A.pitchOffset = c;
+      const base = state.decks.A.detectedBPM || 120;
+      state.decks.A.effectiveBPM = Math.round(base * Math.pow(2, c / 12) * 100) / 100;
+      break;
+    }
+    case 'dj.deckB.pitch': {
+      const c = clamp(-6 + value * 12, -16, 16);
+      state.decks.B.pitchOffset = c;
+      const base = state.decks.B.detectedBPM || 120;
+      state.decks.B.effectiveBPM = Math.round(base * Math.pow(2, c / 12) * 100) / 100;
+      break;
+    }
+    case 'dj.deckA.scratchVelocity':
+      state.decks.A.scratchVelocity = clamp(-4 + value * 8, -8, 8);
+      break;
+    case 'dj.deckB.scratchVelocity':
+      state.decks.B.scratchVelocity = clamp(-4 + value * 8, -8, 8);
+      break;
+  }
+}
+
+// ── Imperative live-value subscribers (bypass React render entirely) ──────
+// Knob components can subscribe via subscribeToParamLiveValue to push updates
+// directly to the DOM (line x/y, arc d attribute) on each CC, skipping the
+// React store → selector → render cycle. Works for any param — DJ, TB303,
+// Siren, Furnace, effect chains — as long as its router calls
+// fireParamLiveSubscribers() after resolving the normalized value.
+type LiveValueCallback = (normalized: number) => void;
+const _paramLiveSubscribers = new Map<string, Set<LiveValueCallback>>();
+
+/** Subscribe to live pre-store values of ANY param (MIDI-routed). Fires
+ *  synchronously on each CC with a normalized 0-1 value. Returns an
+ *  unsubscribe fn. */
+export function subscribeToParamLiveValue(param: string, cb: LiveValueCallback): () => void {
+  let set = _paramLiveSubscribers.get(param);
+  if (!set) {
+    set = new Set();
+    _paramLiveSubscribers.set(param, set);
+  }
+  set.add(cb);
+  return () => {
+    set!.delete(cb);
+    if (set!.size === 0) _paramLiveSubscribers.delete(param);
+  };
+}
+
+/** Backward-compatible alias — DJ callers use the generic subscriber. */
+export const subscribeToDJLiveValue = subscribeToParamLiveValue;
+
+/** Fire all live-value subscribers for a param with a normalized 0-1 value.
+ *  Called by both routeDJParameter and routeParameterToEngine so any knob
+ *  in the app can bypass React. */
+function fireParamLiveSubscribers(param: string, normalized: number): void {
+  const subs = _paramLiveSubscribers.get(param);
+  if (subs && subs.size > 0) {
+    for (const cb of subs) cb(normalized);
+  }
+}
+
+function scheduleDJStoreSync(param: string, normalized: number): void {
+  _pendingDJStoreUpdates.set(param, normalized); // last value wins per param
+  if (!_djStoreSyncScheduled) {
+    _djStoreSyncScheduled = true;
+    requestAnimationFrame(flushDJStoreSync);
+  }
+}
+
+// ── Relative-delta tracking state ──────────────────────────────────────────
+// Keyed by DJ param path. Stores the last MIDI value we saw; the next CC's
+// delta (midiValue - lastMidi) is added to the current SW value. First CC
+// for a param sets the baseline but doesn't move SW (no jump on first touch).
+// _djLiveValues holds the running SW value so multiple CCs within a single
+// rAF frame accumulate correctly (readDJParamNormalized would otherwise be
+// stale until the rAF flush writes to the store).
+const _djLastMidi = new Map<string, number>();
+const _djLiveValues = new Map<string, number>();
+
+/** Returns the current software (store) value for a DJ param in 0-1 space. */
+function readDJParamNormalized(param: string): number | null {
+  const store = useDJStore.getState();
+  switch (param) {
+    case 'dj.crossfader':      return store.crossfaderPosition;
+    case 'dj.deckA.volume':    return Math.max(0, Math.min(1, store.decks.A.volume / 1.5));
+    case 'dj.deckB.volume':    return Math.max(0, Math.min(1, store.decks.B.volume / 1.5));
+    case 'dj.masterVolume':    return Math.max(0, Math.min(1, store.masterVolume / 1.5));
+    case 'dj.deckA.eqHi':      return (store.decks.A.eqHigh + 12) / 24;
+    case 'dj.deckA.eqMid':     return (store.decks.A.eqMid   + 12) / 24;
+    case 'dj.deckA.eqLow':     return (store.decks.A.eqLow   + 12) / 24;
+    case 'dj.deckB.eqHi':      return (store.decks.B.eqHigh + 12) / 24;
+    case 'dj.deckB.eqMid':     return (store.decks.B.eqMid   + 12) / 24;
+    case 'dj.deckB.eqLow':     return (store.decks.B.eqLow   + 12) / 24;
+    case 'dj.deckA.filter':    return (store.decks.A.filterPosition + 1) / 2;
+    case 'dj.deckB.filter':    return (store.decks.B.filterPosition + 1) / 2;
+    case 'dj.deckA.filterQ':   return (store.decks.A.filterResonance - 0.5) / 14.5;
+    case 'dj.deckB.filterQ':   return (store.decks.B.filterResonance - 0.5) / 14.5;
+    case 'dj.deckA.pitch':     return (store.decks.A.pitchOffset + 6) / 12;
+    case 'dj.deckB.pitch':     return (store.decks.B.pitchOffset + 6) / 12;
+    default:                   return null; // no SW reference — pass through unchanged
+  }
+}
+
+function djRelativeTrack(param: string, midiValue: number): number {
+  // Use live value if available (accumulated within current rAF frame),
+  // otherwise seed from the store (start of a new frame / first ever touch).
+  let sw = _djLiveValues.get(param);
+  if (sw === undefined) {
+    const stored = readDJParamNormalized(param);
+    if (stored === null) return midiValue; // no SW reference — pass through
+    sw = stored;
+  }
+
+  const lastMidi = _djLastMidi.get(param);
+  _djLastMidi.set(param, midiValue);
+  const debug = (globalThis as Record<string, unknown>).DJ_PICKUP_DEBUG;
+
+  // First CC for this param — establish baseline without moving SW
+  if (lastMidi === undefined) {
+    _djLiveValues.set(param, sw);
+    if (debug) console.log(`[DJRelative] ${param} BASELINE midi=${midiValue.toFixed(3)} sw=${sw.toFixed(3)}`);
+    return sw;
+  }
+
+  const delta = midiValue - lastMidi;
+
+  // Adaptive scaling: each CC moves SW proportionally so the two converge
+  // at the matching extreme. speed = (SW range left toward target) / (physical
+  // range left toward target). Produces 1:1 when SW and physical are in sync,
+  // accelerates when SW is behind, decelerates when SW is ahead, and hits
+  // 0 / 1 exactly when the physical knob reaches its stop. No discontinuous
+  // snaps — reversing direction re-computes the ratio cleanly.
+  let next: number;
+  if (delta === 0) {
+    next = sw;
+  } else if (delta > 0) {
+    const remainingPhysical = 1 - lastMidi;
+    if (remainingPhysical <= 0) {
+      next = 1;
+    } else {
+      const remainingSW = 1 - sw;
+      next = sw + delta * (remainingSW / remainingPhysical);
+    }
+  } else {
+    // delta < 0
+    if (lastMidi <= 0) {
+      next = 0;
+    } else {
+      next = sw + delta * (sw / lastMidi); // delta is negative → SW decreases
+    }
+  }
+  next = Math.max(0, Math.min(1, next));
+  _djLiveValues.set(param, next);
+
+  if (debug) {
+    console.log(
+      `[DJAdaptive] ${param} midi=${midiValue.toFixed(3)} last=${lastMidi.toFixed(3)} ` +
+      `Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(3)} sw=${sw.toFixed(3)} → ${next.toFixed(3)}`,
+    );
+  }
+  return next;
+}
+
+/** Reset relative-track baselines — call when the DJ controller preset changes. */
+export function resetDJSoftTakeover(): void {
+  _djLastMidi.clear();
+  _djLiveValues.clear();
 }
 
 /**
