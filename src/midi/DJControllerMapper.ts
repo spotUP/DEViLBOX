@@ -12,7 +12,7 @@
 
 import { getMIDIManager } from './MIDIManager';
 import { isDJContext } from './MIDIContextRouter';
-import { routeDJParameter } from './performance/parameterRouter';
+import { routeDJParameter, resetDJSoftTakeover } from './performance/parameterRouter';
 import { getDJEngine } from '../engine/dj/DJEngine';
 import { useDJStore } from '../stores/useDJStore';
 import { DJBeatSync } from '../engine/dj/DJBeatSync';
@@ -62,6 +62,7 @@ class DJControllerMapper {
     this.noteLookup.clear();
     this.jogCCs.clear();
     this.jogTouchNotes.clear();
+    resetDJSoftTakeover();
 
     if (preset) {
       // Build CC lookup: "channel:cc" → mapping
