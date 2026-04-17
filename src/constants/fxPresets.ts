@@ -324,10 +324,6 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 0.5, baseFrequency: 200, octaves: 4, type: 'sine', depth: 0.8 } },
     ] },
-  { name: 'Tape Stop', description: 'Pitch shift down — tape-stop effect', tags: ['DJ', 'Creative'], gainCompensationDb: 4.1,
-    effects: [
-      { category: 'tonejs', type: 'PitchShift', enabled: true, wet: 100, parameters: { pitch: -2, windowSize: 0.1, delayTime: 0 } },
-    ] },
   { name: 'Phaser Wash', description: 'Deep phaser sweep — psychedelic movement', tags: ['DJ', 'Modulation'], gainCompensationDb: 2,
     effects: [
       { category: 'tonejs', type: 'Phaser', enabled: true, wet: 60, parameters: { frequency: 0.3, octaves: 3, stages: 10, Q: 6, baseFrequency: 350 } },
