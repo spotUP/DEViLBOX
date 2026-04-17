@@ -60,6 +60,7 @@ interface DrumPadStore extends DrumPadState {
   updatePad: (padId: number, updates: Partial<DrumPad>) => void;
   loadSampleToPad: (padId: number, sample: SampleData) => Promise<void>;
   clearPad: (padId: number) => void;
+  clearBankPads: (bank: PadBank) => void;
 
   // Layer management
   addLayerToPad: (padId: number, sample: SampleData, velocityRange: [number, number]) => void;
@@ -365,6 +366,27 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       if (!currentProgram) return { programs };
       const updatedPads = currentProgram.pads.map((pad) =>
         pad.id === padId ? createEmptyPad(padId) : pad,
+      );
+      programs.set(state.currentProgramId, { ...currentProgram, pads: updatedPads });
+      return { programs };
+    });
+    get().saveToStorage();
+    get().saveToIndexedDB();
+  },
+
+  clearBankPads: (bank) => {
+    // Atomic bulk clear: one set() + one save cycle instead of 16 back-to-back
+    // clearPad() calls. The looped version raced on concurrent saveToIndexedDB
+    // transactions, occasionally leaving one pad's sample intact in IndexedDB.
+    const bankIndex = { A: 0, B: 1, C: 2, D: 3 }[bank];
+    const bankStart = bankIndex * 16;
+    const bankEnd = bankStart + 16;
+    set((state) => {
+      const programs = new Map(state.programs);
+      const currentProgram = programs.get(state.currentProgramId);
+      if (!currentProgram) return { programs };
+      const updatedPads = currentProgram.pads.map((pad, idx) =>
+        idx >= bankStart && idx < bankEnd ? createEmptyPad(pad.id) : pad,
       );
       programs.set(state.currentProgramId, { ...currentProgram, pads: updatedPads });
       return { programs };

@@ -205,11 +205,7 @@ function buildLoadedPadMenu(
   const currentBank = store.currentBank;
   items.push({
     id: 'clear-bank', label: `Clear All Pads in Bank ${currentBank}`, danger: true,
-    onClick: () => {
-      // Get all pad IDs in current bank and clear them
-      const bankPads = store.getCurrentBankPads();
-      bankPads.forEach(pad => store.clearPad(pad.id));
-    },
+    onClick: () => store.clearBankPads(currentBank),
   });
 
   return items;
