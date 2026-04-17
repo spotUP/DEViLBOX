@@ -414,12 +414,10 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
     const unsub = useDJStore.subscribe(
       (s) => ({ a: s.decks.A.isPlaying, b: s.decks.B.isPlaying }),
       ({ a, b }, prev) => {
-        // Deck A just started playing (and B isn't) → switch to Deck A page
-        if (a && !prev.a && !b) setDJKnobPage(1);
-        // Deck B just started playing (and A isn't) → switch to Deck B page
-        else if (b && !prev.b && !a) setDJKnobPage(2);
-        // Both playing → switch to Mixer page
-        else if (a && b && (!prev.a || !prev.b)) setDJKnobPage(0);
+        // Any deck started → switch to EQ page (has both decks)
+        if ((a && !prev.a) || (b && !prev.b)) setDJKnobPage(0);
+        // Both playing → switch to Mixer page (crossfader/volumes)
+        if (a && b && (!prev.a || !prev.b)) setDJKnobPage(1);
       },
       { equalityFn: (a, b) => a.a === b.a && a.b === b.b },
     );
