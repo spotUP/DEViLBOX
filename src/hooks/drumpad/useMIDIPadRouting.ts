@@ -595,18 +595,6 @@ export function useMIDIPadRouting() {
     const handler = (message: MIDIMessage) => {
       const view = useUIStore.getState().activeView;
 
-      // Diagnostic: every non-note MIDI message arriving here.
-      if (message.type !== 'noteOn' && message.type !== 'noteOff') {
-        console.log('[MIDI]', message.type,
-          'ch=', message.channel,
-          'note=', message.note,
-          'cc=', message.cc,
-          'value=', message.value,
-          'program=', message.program,
-          'learnTarget=', _learnSlotTarget,
-          'bindings=', _slotBindings.size);
-      }
-
       // Slot-binding learn mode: capture the first meaningful MIDI event
       // and bind it to the target slot. Runs before everything else so the
       // captured event doesn't double as a pad trigger.
