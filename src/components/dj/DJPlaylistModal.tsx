@@ -61,8 +61,11 @@ import {
   type PlaylistTrack,
   type DJPlaylist,
 } from '@/stores/useDJPlaylistStore';
-import { useDJStore } from '@/stores/useDJStore';
+import { useDJStore, type DeckId } from '@/stores/useDJStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { seekDeckAudio } from '@/engine/dj/DJActions';
+import { markSeek } from './seekGuard';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
@@ -164,6 +167,92 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 
 const TRACK_ROW_HEIGHT = 44;
 
+// ── Playing-deck lookup + inline scrubber ────────────────────────────────────
+
+interface PlayingDeckInfo {
+  deckId: DeckId;
+  audioPosition: number;
+  durationMs: number;
+}
+
+/**
+ * Returns the deck currently playing this track in audio mode, or null.
+ * Custom equality so rows whose track isn't playing never re-render on deck state.
+ */
+function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
+  return useDJStore(
+    useShallow((s) => {
+      for (const id of ['A', 'B', 'C'] as const) {
+        const d = s.decks[id];
+        if (
+          d.fileName === fileName &&
+          d.isPlaying &&
+          d.playbackMode === 'audio' &&
+          d.durationMs > 0
+        ) {
+          return { deckId: id, audioPosition: d.audioPosition, durationMs: d.durationMs };
+        }
+      }
+      return null;
+    })
+  );
+}
+
+const DECK_COLOR: Record<DeckId, string> = {
+  A: 'bg-accent-primary',
+  B: 'bg-accent-error',
+  C: 'bg-accent-success',
+};
+
+const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, audioPosition, durationMs }) => {
+  const barRef = useRef<HTMLDivElement>(null);
+  const durationSec = durationMs / 1000;
+  const progress = durationSec > 0 ? Math.min(1, Math.max(0, audioPosition / durationSec)) : 0;
+
+  const seekFromEvent = useCallback((clientX: number) => {
+    const bar = barRef.current;
+    if (!bar || durationSec <= 0) return;
+    const rect = bar.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const t = (x / rect.width) * durationSec;
+    markSeek(deckId);
+    seekDeckAudio(deckId, t);
+  }, [deckId, durationSec]);
+
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    seekFromEvent(e.clientX);
+  }, [seekFromEvent]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.buttons === 0) return;
+    e.stopPropagation();
+    seekFromEvent(e.clientX);
+  }, [seekFromEvent]);
+
+  const color = DECK_COLOR[deckId];
+
+  return (
+    <div
+      ref={barRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/60 cursor-ew-resize group/scrub hover:h-1.5 transition-[height]"
+      title={`Deck ${deckId} · drag to scrub`}
+    >
+      <div className={`h-full ${color}`} style={{ width: `${progress * 100}%` }} />
+      <div
+        className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full ${color} opacity-0 group-hover/scrub:opacity-100 transition-opacity pointer-events-none`}
+        style={{ left: `calc(${progress * 100}% - 5px)` }}
+      />
+    </div>
+  );
+});
+TrackScrubber.displayName = 'TrackScrubber';
+
 // ── Sortable Track Row (enhanced for modal) ──────────────────────────────────
 
 interface ModalTrackRowProps {
@@ -222,6 +311,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
   };
 
   const [isHovered, setIsHovered] = useState(false);
+  const playingDeck = usePlayingDeckForTrack(track.fileName);
 
   const bgClass = isLoading
     ? 'bg-accent-primary/10'
@@ -231,20 +321,22 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         ? 'bg-accent-success/10'
         : isSelected
           ? 'bg-accent-primary/15'
-          : isAutoDJCurrent
+          : playingDeck
             ? 'bg-accent-success/10'
-            : isAutoDJNext
-              ? 'bg-accent-primary/5'
-              : isHovered
-                ? 'bg-dark-bgHover'
-                : '';
+            : isAutoDJCurrent
+              ? 'bg-accent-success/10'
+              : isAutoDJNext
+                ? 'bg-accent-primary/5'
+                : isHovered
+                  ? 'bg-dark-bgHover'
+                  : '';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       data-track-index={index}
-      className={`flex items-center gap-2 px-3 border-b border-dark-border/30 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
+      className={`relative flex items-center gap-2 px-3 border-b border-dark-border/30 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
       onClick={(e) => onClick(index, e)}
       onDoubleClick={() => onDoubleClick(track, index)}
       onPointerEnter={() => setIsHovered(true)}
@@ -268,6 +360,14 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
           </span>
         ) : track.isBad ? (
           <span className="text-accent-error text-[10px]" title={`Bad: ${track.badReason}`}>✗</span>
+        ) : playingDeck ? (
+          <span
+            className="text-[10px] font-bold"
+            style={{ color: playingDeck.deckId === 'A' ? '#00d4ff' : playingDeck.deckId === 'B' ? '#ef4444' : '#22c55e' }}
+            title={`Playing on deck ${playingDeck.deckId}`}
+          >
+            {playingDeck.deckId}
+          </span>
         ) : track.played ? (
           <span className="text-accent-success/50 text-[10px]" title="Played">✓</span>
         ) : isAutoDJCurrent ? (
@@ -377,6 +477,9 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
           <X size={10} />
         </button>
       </span>
+
+      {/* Scrub bar — pinned to bottom, only while this track is playing on a deck in audio mode */}
+      {playingDeck && <TrackScrubber {...playingDeck} />}
     </div>
   );
 });
@@ -423,19 +526,24 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
   const totalDuration = playlist.tracks.reduce((s, t) => s + (t.duration || 0), 0);
   const badCount = playlist.tracks.filter(t => t.isBad).length;
 
-  if (isEditing) {
+  // Only render inline edit UI when editing a non-active playlist — the header title
+  // owns the edit UI for the active one (prevents two autoFocus inputs fighting for focus).
+  if (isEditing && !isActive) {
     return (
       <div className="flex items-center gap-1 px-2 py-1.5">
         <input
           autoFocus
           value={editName}
           onChange={(e) => onEditName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') onFinishEdit(); if (e.key === 'Escape') onCancelEdit(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onFinishEdit();
+            if (e.key === 'Escape') onCancelEdit();
+          }}
           onBlur={onFinishEdit}
           className="flex-1 px-2 py-0.5 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary min-w-0"
         />
-        <button onClick={onFinishEdit} className="p-0.5 text-accent-success hover:text-accent-success/80"><Check size={12} /></button>
-        <button onClick={onCancelEdit} className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={onFinishEdit} className="p-0.5 text-accent-success hover:text-accent-success/80"><Check size={12} /></button>
+        <button onMouseDown={(e) => e.preventDefault()} onClick={onCancelEdit} className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
       </div>
     );
   }
@@ -812,7 +920,10 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   }, [newName, createPlaylist]);
 
   const handleRename = useCallback((id: string) => {
-    if (!editName.trim()) return;
+    if (!editName.trim()) {
+      setEditingPlaylistId(null);
+      return;
+    }
     renamePlaylist(id, editName.trim());
     setEditingPlaylistId(null);
   }, [editName, renamePlaylist]);
@@ -1350,6 +1461,13 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
     const otherPlaylists = playlists.filter((p) => p.id !== activePlaylistId);
     const selCount = selectedTrackIndices.length;
+    console.warn('[ctxmenu] built', {
+      activePlaylistId,
+      total: playlists.length,
+      otherCount: otherPlaylists.length,
+      allNames: playlists.map(p => `${p.name}#${p.id.slice(-4)}`),
+      otherNames: otherPlaylists.map(p => `${p.name}#${p.id.slice(-4)}`),
+    });
 
     const items: MenuItemType[] = [
       { id: 'play-from-here', label: 'Play from here (Auto DJ)', onClick: async () => {
@@ -2068,19 +2186,44 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                 <div className="px-3 py-2 border-b border-dark-border flex items-center gap-2">
                   {/* Playlist title + actions menu */}
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-[13px] font-mono font-bold text-text-primary truncate">
-                      {activePlaylist.name}
-                    </span>
-                    <DropdownButton
-                      items={headerMenuItems}
-                      className="p-1 text-text-muted/50 hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors shrink-0"
-                    >
-                      <MoreHorizontal size={14} />
-                    </DropdownButton>
-                    <span className="text-[10px] font-mono text-text-muted/50 ml-1 truncate">
-                      {activePlaylist.tracks.length} tracks
-                      {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
-                    </span>
+                    {editingPlaylistId && editingPlaylistId === activePlaylistId ? (
+                      <input
+                        autoFocus
+                        value={editName}
+                        onChange={(e) => { console.warn('[rename-hdr] onChange', e.target.value); setEditName(e.target.value); }}
+                        onKeyDown={(e) => {
+                          console.warn('[rename-hdr] onKeyDown', e.key);
+                          if (e.key === 'Enter') handleRename(editingPlaylistId);
+                          if (e.key === 'Escape') setEditingPlaylistId(null);
+                        }}
+                        onBlur={(e) => { console.warn('[rename-hdr] onBlur — relatedTarget:', (e.relatedTarget as HTMLElement | null)?.tagName, (e.relatedTarget as HTMLElement | null)?.className); handleRename(editingPlaylistId); }}
+                        onFocus={() => console.warn('[rename-hdr] onFocus')}
+                        className="flex-1 min-w-0 px-2 py-0.5 text-[13px] font-mono font-bold bg-dark-bgTertiary border border-accent-primary/60 rounded text-text-primary"
+                      />
+                    ) : (
+                      <>
+                        <span
+                          onClick={() => {
+                            setEditingPlaylistId(activePlaylistId);
+                            setEditName(activePlaylist.name);
+                          }}
+                          className="text-[13px] font-mono font-bold text-text-primary truncate cursor-text hover:text-accent-primary transition-colors"
+                          title="Click to rename"
+                        >
+                          {activePlaylist.name}
+                        </span>
+                        <DropdownButton
+                          items={headerMenuItems}
+                          className="p-1 text-text-muted/50 hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors shrink-0"
+                        >
+                          <MoreHorizontal size={14} />
+                        </DropdownButton>
+                        <span className="text-[10px] font-mono text-text-muted/50 ml-1 truncate">
+                          {activePlaylist.tracks.length} tracks
+                          {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* Search */}
