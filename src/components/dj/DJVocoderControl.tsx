@@ -375,10 +375,10 @@ export const DJVocoderControl: React.FC = () => {
           }
           setShowPanel(v => !v);
         }}
-        className={`relative flex items-center gap-1 px-2 py-1 rounded transition-all text-[10px] font-medium ${
+        className={`relative flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${
           showPanel
-            ? 'text-accent-primary bg-accent-primary/10'
-            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
+            ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
+            : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-border text-text-muted'
         }`}
         title="Mic & vocoder settings"
       >
