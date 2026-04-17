@@ -28,7 +28,6 @@ export const VIEW_OPTIONS: ViewOption[] = [
   { value: 'dj',          label: 'DJ Mixer',     shortLabel: 'DJ',       showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
   { value: 'drumpad',     label: 'Drum Pads',    shortLabel: 'Pads',     showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
   { value: 'vj',          label: 'VJ View',      shortLabel: 'VJ',       showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
-  { value: 'studio',      label: 'Studio',       shortLabel: 'Studio',   showInNavBar: true,  showInMobileMenu: true,  showInMobileTabBar: false },
 ];
 
 /** Filtered subsets for each context */

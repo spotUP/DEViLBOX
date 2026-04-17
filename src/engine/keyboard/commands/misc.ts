@@ -6,7 +6,6 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
-import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -58,12 +57,6 @@ export function toggleHexMode(): boolean {
 }
 
 export function zoomIn(): boolean {
-  if (useUIStore.getState().activeView === 'studio') {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    useWorkbenchStore.getState().zoomCamera(0.15, vw / 2, vh / 2);
-    return true;
-  }
   const { trackerZoom, setTrackerZoom } = useUIStore.getState();
   setTrackerZoom(trackerZoom + 10);
   useUIStore.getState().setStatusMessage(`Zoom ${useUIStore.getState().trackerZoom}%`, false, 800);
@@ -71,12 +64,6 @@ export function zoomIn(): boolean {
 }
 
 export function zoomOut(): boolean {
-  if (useUIStore.getState().activeView === 'studio') {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    useWorkbenchStore.getState().zoomCamera(-0.15, vw / 2, vh / 2);
-    return true;
-  }
   const { trackerZoom, setTrackerZoom } = useUIStore.getState();
   setTrackerZoom(trackerZoom - 10);
   useUIStore.getState().setStatusMessage(`Zoom ${useUIStore.getState().trackerZoom}%`, false, 800);
@@ -84,39 +71,12 @@ export function zoomOut(): boolean {
 }
 
 export function resetZoom(): boolean {
-  if (useUIStore.getState().activeView === 'studio') {
-    useWorkbenchStore.getState().setCamera({ x: 0, y: 0, scale: 1 });
-    return true;
-  }
   useUIStore.getState().setTrackerZoom(100);
   useUIStore.getState().setStatusMessage('Zoom 100%', false, 800);
   return true;
 }
 
 export function fitToWindow(): boolean {
-  if (useUIStore.getState().activeView === 'studio') {
-    // Fit all visible windows: compute bounding box and set camera to fit
-    const wins = useWorkbenchStore.getState().windows;
-    const screenW = window.innerWidth;
-    const screenH = window.innerHeight - 130; // Subtract chrome height
-    const visibleWins = Object.values(wins).filter(w => w.visible && !w.minimized);
-    if (visibleWins.length === 0) return true;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const w of visibleWins) {
-      minX = Math.min(minX, w.x);
-      minY = Math.min(minY, w.y);
-      maxX = Math.max(maxX, w.x + w.width);
-      maxY = Math.max(maxY, w.y + w.height);
-    }
-    const bw = maxX - minX;
-    const bh = maxY - minY;
-    const padding = 0.05;
-    const scale = Math.min(2, screenW * (1 - padding * 2) / bw, screenH * (1 - padding * 2) / bh);
-    const cx = (screenW - bw * scale) / 2 - minX * scale;
-    const cy = (screenH - bh * scale) / 2 - minY * scale;
-    useWorkbenchStore.getState().setCamera({ x: cx, y: cy, scale });
-    return true;
-  }
   useUIStore.getState().setTrackerZoom(100);
   useUIStore.getState().setStatusMessage('Fit to window', false, 800);
   return true;

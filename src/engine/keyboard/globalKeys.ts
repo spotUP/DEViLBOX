@@ -8,7 +8,7 @@ import type { NormalizedKeyEvent } from './types';
 /**
  * View type matching useUIStore.activeView
  */
-export type ViewType = 'tracker' | 'dj' | 'drumpad' | 'vj' | 'studio';
+export type ViewType = 'tracker' | 'dj' | 'drumpad' | 'vj';
 
 /**
  * Keys that should work globally across all views.

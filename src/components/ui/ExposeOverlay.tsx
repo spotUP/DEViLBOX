@@ -12,7 +12,6 @@ const EXPOSE_VIEWS = [
   { id: 'tracker',     label: 'Tracker',  icon: '♫', color: '#60a5fa' },
   { id: 'dj',          label: 'DJ',       icon: '◎', color: '#fb923c' },
   { id: 'vj',          label: 'VJ',       icon: '◈', color: '#f472b6' },
-  { id: 'studio',      label: 'Studio',   icon: '⊞', color: '#fbbf24' },
   { id: 'split',       label: 'Split',    icon: '⊟', color: '#94a3b8' },
 ] as const;
 
