@@ -14,6 +14,11 @@
 }
 
 @layer base {
+  /* Override Tailwind's default border-color (gray-200) with our design token */
+  *, ::before, ::after {
+    border-color: var(--color-border);
+  }
+
   :root {
     font-family: var(--theme-font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif);
     line-height: 1.5;
