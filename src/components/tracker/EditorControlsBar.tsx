@@ -5,11 +5,11 @@
  * channel selector, ghost/edit/auto toggles, REC, mute, scrolling mode,
  * groove, FPS, and status message.
  *
- * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
+ * Extracted from TrackerView.tsx.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -74,6 +74,13 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   // Volume
   const masterVolume = useAudioStore(s => s.masterVolume);
@@ -239,6 +246,21 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <AVPSubsongSelector />
         <ModuleInfoButton />
 
+        {/* Fullscreen toggle */}
+        <button
+          onClick={async () => {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+            } else {
+              await document.exitFullscreen();
+            }
+          }}
+          className="px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+          title="Toggle Fullscreen (F11)"
+        >
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+
         {/* Sub-mode toggle (Tracker / Grid) */}
         <CustomSelect
           value={viewMode}
@@ -366,21 +388,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           title={c.masterMuted ? 'Unmute master output' : 'Mute master output'}
         >
           {c.masterMuted ? 'Unmute' : 'Mute'}
-        </button>
-
-        {/* Stepped/Smooth Scrolling Toggle */}
-        <button
-          onClick={c.handleToggleSmooth}
-          className={`
-            px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors
-            ${c.smoothScrolling
-              ? 'bg-accent-primary/20 text-accent-primary'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-            }
-          `}
-          title={c.smoothScrolling ? 'Switch to stepped scrolling' : 'Switch to smooth scrolling'}
-        >
-          {c.smoothScrolling ? 'Smooth' : 'Stepped'}
         </button>
 
         {/* Groove Settings Button */}

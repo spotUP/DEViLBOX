@@ -1,10 +1,8 @@
 /**
- * TrackerCanvas2DRenderer — Canvas2D fallback for environments where
- * OffscreenCanvas WebGL2 is unavailable (e.g. Safari < 17.4, Chrome with
- * hardware acceleration disabled).
+ * TrackerCanvas2DRenderer — Canvas2D pattern editor renderer.
  *
- * Implements the same render() / resize() interface as TrackerGLRenderer
- * so the worker can swap between them transparently.
+ * Runs in a Web Worker on an OffscreenCanvas. Receives state snapshots
+ * and renders the pattern grid, cursor, selection, and playback position.
  */
 
 import type {

@@ -52,6 +52,18 @@ import { TrackerVisualBackground } from './TrackerVisualBackground';
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
+
+/** Lighten a hex color by blending toward white. amount 0-1 */
+function lightenColor(hex: string, amount: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+}
 const AUTOMATION_LANE_W = AUTOMATION_LANE_WIDTH; // Re-export alias for readability
 // Mobile-scaled layout constants (must match TrackerCanvas2DRenderer MOBILE_SCALE)
 const MOBILE_SCALE = 1.6;
@@ -67,7 +79,7 @@ const KEY_TO_SEMITONE: Record<string, number> = {
   'i': 24, '9': 25, 'o': 26, '0': 27, 'p': 28,
 };
 
-// NOTE_NAMES, noteToString and hexByte moved to TrackerGLRenderer (WebGL worker)
+// NOTE_NAMES, noteToString and hexByte are in the Canvas2D renderer worker
 
 interface ChannelTrigger {
   level: number;
@@ -185,7 +197,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const scrollAccumulatorRef = useRef(0);
 
   // Set to true if worker reports WebGL2 is unsupported (iOS Safari)
-  const [webglUnsupported, setWebglUnsupported] = useState(false);
+  const [offscreenUnsupported, setOffscreenUnsupported] = useState(false);
   // Main-thread Canvas2D renderer ref (iOS fallback)
   const mainThreadRendererRef = useRef<TrackerCanvas2DRenderer | null>(null);
   const mainThreadRafRef = useRef<number>(0);
@@ -291,7 +303,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }));
 
   // Use larger sizes on mobile iOS (Canvas2D main-thread path) for finger-friendly targets
-  const mobileCanvas = webglUnsupported && isMobile;
+  const mobileCanvas = offscreenUnsupported && isMobile;
   const CW = mobileCanvas ? M_CHAR_WIDTH : CHAR_WIDTH;
   const LNW = mobileCanvas ? M_LINE_NUMBER_WIDTH : LINE_NUMBER_WIDTH;
 
@@ -1520,7 +1532,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       bg:                  theme.colors.trackerRowEven,
       rowNormal:           theme.colors.trackerRowOdd,
       rowHighlight:        theme.colors.trackerRowHighlight,
-      rowSecondaryHighlight: theme.colors.accent + '33',
+      rowSecondaryHighlight: lightenColor(theme.colors.trackerRowHighlight, 0.15),
       border:              theme.colors.border,
       trackerBorder:       theme.colors.trackerBorder,
       textNote:            theme.colors.textSecondary,
@@ -1530,7 +1542,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       textVolume:          theme.colors.cellVolume,
       textEffect:          theme.colors.cellEffect,
       lineNumber:          theme.colors.textMuted,
-      lineNumberHighlight: theme.colors.accentSecondary,
+      lineNumberHighlight: lightenColor(theme.colors.trackerRowHighlight, 0.6),
       selection:           theme.colors.accentGlow,
       bookmark:            theme.colors.warning,
     };
@@ -1895,7 +1907,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       console.warn('[PatternEditorCanvas] OffscreenCanvas worker skipped (iOS or unsupported)');
       // Clear any stale children before React renders fallback table
       while (container.firstChild) container.removeChild(container.firstChild);
-      setWebglUnsupported(true);
+      setOffscreenUnsupported(true);
       return;
     }
 
@@ -1926,10 +1938,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
       },
       onMessage: (msg) => {
-        if (msg.type === 'webgl-unsupported') {
-          clearTimeout(readyTimeoutId);
-          setWebglUnsupported(true);
-        } else if (msg.type === 'error') {
+        if (msg.type === 'error') {
           clearTimeout(readyTimeoutId);
           reportSynthError(
             'Tracker Worker',
@@ -2102,7 +2111,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // When WebGL2+OffscreenCanvas worker is unavailable, create a Canvas2D renderer
   // directly on the main thread. Reads stores in a RAF loop (same data as worker).
   useEffect(() => {
-    if (!webglUnsupported) return;
+    if (!offscreenUnsupported) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -2353,7 +2362,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       canvasRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webglUnsupported]);
+  }, [offscreenUnsupported]);
 
   // Native contextmenu listener — reliably prevents browser native menu on all elements
   // including imperatively-created canvas elements that React synthetic events may miss
@@ -2877,7 +2886,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
   }, []);
 
-  // NOTE: webglUnsupported (iOS) no longer short-circuits here.
+  // NOTE: offscreenUnsupported (iOS) no longer short-circuits here.
   // The main-thread Canvas2D renderer effect above creates a canvas in containerRef
   // and runs a RAF loop — the component falls through to the normal render path below.
 
