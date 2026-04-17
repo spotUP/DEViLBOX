@@ -16,7 +16,6 @@ import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useMIDIActions } from './hooks/useMIDIActions';
-import { usePadTriggers } from './hooks/usePadTriggers';
 import { useMIDIPadRouting } from './hooks/drumpad/useMIDIPadRouting';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
@@ -70,7 +69,6 @@ const MasterEffectsModal = lazy(() => import('@components/effects').then(m => ({
 const InstrumentEffectsModal = lazy(() => import('@components/effects').then(m => ({ default: m.InstrumentEffectsModal })));
 const EffectParameterEditor = lazy(() => import('@components/effects').then(m => ({ default: m.EffectParameterEditor })));
 const TD3PatternDialog = lazy(() => import('@components/midi/TD3PatternDialog').then(m => ({ default: m.TD3PatternDialog })));
-const DrumpadEditorModal = lazy(() => import('@components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal })));
 const DrumPadManager = lazy(() => import('@components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager })));
 const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
 const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
@@ -367,9 +365,6 @@ function App() {
 
   // Register MIDI CC mappings for TB-303 parameters and tracker actions
   useMIDIActions();
-
-  // Register MIDI Pad triggers
-  usePadTriggers();
 
   // Route MIDI pad notes (36-43) to drum pads in DJ / VJ views
   useMIDIPadRouting();
@@ -1043,7 +1038,6 @@ function App() {
         {modalOpen === 'instrumentFx' && <InstrumentEffectsModal isOpen={true} onClose={closeModal} />}
         {showTD3Pattern && <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />}
         {modalOpen === 'drumpads' && <DrumPadManager onClose={closeModal} />}
-        {modalOpen === 'midi-pads' && <DrumpadEditorModal isOpen={true} onClose={closeModal} />}
         {modalOpen === 'revisions' && <RevisionBrowserDialog isOpen={true} onClose={closeModal} />}
         {showFileBrowser && (
           <FileBrowser

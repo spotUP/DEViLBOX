@@ -13,7 +13,7 @@ import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import type { SampleData } from '../../types/drumpad';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useDJStore } from '../../stores/useDJStore';
-import { X, Piano, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
@@ -265,16 +265,6 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               {performanceMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               {performanceMode ? 'EXIT' : 'PERFORM'}
             </button>
-            {!performanceMode && (
-              <button
-                onClick={() => useUIStore.getState().openModal('midi-pads')}
-                className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-text-primary bg-dark-bgTertiary border border-dark-border rounded transition-colors flex items-center gap-1.5"
-                title="Open MIDI Pad Mapper"
-              >
-                <Piano className="w-3.5 h-3.5" />
-                MIDI Map
-              </button>
-            )}
             {onClose && !performanceMode && (
               <button
                 onClick={onClose}
