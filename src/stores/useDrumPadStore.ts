@@ -354,15 +354,22 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   },
 
   clearPad: (padId: number) => {
-    get().updatePad(padId, {
-      sample: null,
-      instrumentId: undefined,
-      instrumentNote: undefined,
-      synthConfig: undefined,
-      color: undefined,
-      velocityCurve: undefined,
-      name: `Pad ${padId}`,
+    // Replace the pad entirely with a fresh empty one so every field — layers,
+    // scratchAction, djFxAction, pttAction, effects, color, etc. — is reset.
+    // The previous `updatePad({ sample: null, ... })` only nulled the named
+    // fields, leaving velocity layers and action assignments playable after
+    // "Clear Pad" / "Clear Bank".
+    set((state) => {
+      const programs = new Map(state.programs);
+      const currentProgram = programs.get(state.currentProgramId);
+      if (!currentProgram) return { programs };
+      const updatedPads = currentProgram.pads.map((pad) =>
+        pad.id === padId ? createEmptyPad(padId) : pad,
+      );
+      programs.set(state.currentProgramId, { ...currentProgram, pads: updatedPads });
+      return { programs };
     });
+    get().saveToStorage();
     get().saveToIndexedDB();
   },
 
