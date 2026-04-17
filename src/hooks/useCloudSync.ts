@@ -73,7 +73,6 @@ function applySettings(bundle: SettingsBundle): void {
 interface MIDIBundle {
   midiSettings?: unknown;   // midi-settings
   ccMappings?: unknown;     // cc-mappings-v1
-  padMappings?: unknown;    // pad-mappings-v1
   buttonMappings?: unknown; // button-mappings-v1
 }
 
@@ -81,7 +80,6 @@ function gatherMIDI(): MIDIBundle {
   return {
     midiSettings: readLS('midi-settings'),
     ccMappings: readLS('cc-mappings-v1'),
-    padMappings: readLS('pad-mappings-v1'),
     buttonMappings: readLS('button-mappings-v1'),
   };
 }
@@ -89,7 +87,6 @@ function gatherMIDI(): MIDIBundle {
 function applyMIDI(bundle: MIDIBundle): void {
   if (bundle.midiSettings) writeLS('midi-settings', bundle.midiSettings);
   if (bundle.ccMappings) writeLS('cc-mappings-v1', bundle.ccMappings);
-  if (bundle.padMappings) writeLS('pad-mappings-v1', bundle.padMappings);
   if (bundle.buttonMappings) writeLS('button-mappings-v1', bundle.buttonMappings);
 }
 

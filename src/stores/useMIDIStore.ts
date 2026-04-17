@@ -9,7 +9,6 @@ import type { MIDIDeviceInfo, CCMapping, TB303Parameter, KnobBankMode, MappableP
 import { getMIDIManager } from '../midi/MIDIManager';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { getButtonMapManager } from '../midi/ButtonMapManager';
-import { getPadMappingManager } from '../midi/PadMappingManager';
 import { midiToTrackerNote } from '../midi/types';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useInstrumentStore } from './useInstrumentStore';
@@ -20,7 +19,7 @@ import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation, isVoc
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
 import { isDJContext } from '../midi/MIDIContextRouter';
-import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
+import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '../midi/djKnobBanks';
 import { getDJControllerMapper } from '../midi/DJControllerMapper';
 import { getHeldDrumPads } from '../hooks/drumpad/useMIDIPadRouting';
 import { midiToXMNote } from '../lib/xmConversions';
@@ -192,6 +191,26 @@ const DEFAULT_CC_MAPPINGS: CCMapping[] = [
 // CC handlers stored outside Zustand state (Map doesn't work well with immer)
 const ccHandlersMap = new Map<TB303Parameter, (value: number) => void>();
 
+/** Push DJ knob-bank labels to the Akai MPK Mini LCD for the given page. */
+function pushDJLabelsToController(page: number): void {
+  const assignments = DJ_KNOB_BANKS[page];
+  if (!assignments) return;
+  const pageName = DJ_KNOB_PAGE_NAMES[page] ?? `DJ ${page + 1}`;
+  const params = assignments.map((a) => ({ id: a.param, name: a.label }) as NKSParameter);
+  try {
+    updateNKSDisplay(pageName, page, DJ_KNOB_BANKS.length, params);
+  } catch (err) {
+    console.warn('[MIDI] Failed to push DJ labels to controller:', err);
+  }
+}
+
+/** Refresh the controller LCD with the current DJ knob-bank labels.
+ *  Call from DJView on mount so switching into DJ mode updates the hardware. */
+export function refreshDJKnobLabels(): void {
+  const state = useMIDIStore.getState();
+  pushDJLabelsToController(state.djKnobPage);
+}
+
 // Track active MIDI notes for proper release
 const activeMidiNotes = new Map<number, string>();
 
@@ -285,14 +304,6 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note On messages
               if (message.type === 'noteOn' && message.note !== undefined && message.velocity !== undefined) {
-                // EXCLUSIVE: Check if this note is handled by the PadMappingManager
-                // If it is, skip global "chromatic" keyboard handling to avoid double-triggering
-                const padManager = getPadMappingManager();
-                if (padManager.getMapping(message.channel, message.note)) {
-                  // console.log(`[useMIDIStore] Skipping global handling for mapped pad: ${message.note}`);
-                  return;
-                }
-
                 // In DrumPad / DJ / VJ views, ALL notes trigger drum pads (not tracker)
                 const activeView = useUIStore.getState().activeView;
                 if (activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') {
@@ -430,12 +441,6 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Note Off messages
               if (message.type === 'noteOff' && message.note !== undefined) {
-                // EXCLUSIVE: Check if this note is handled by the PadMappingManager
-                const padManager = getPadMappingManager();
-                if (padManager.getMapping(message.channel, message.note)) {
-                  return;
-                }
-
                 // In DrumPad / DJ / VJ views, notes 36-43 are routed to drum pads
                 const activeView = useUIStore.getState().activeView;
                 if ((activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') && message.note >= 36 && message.note <= 43) {
@@ -982,6 +987,7 @@ export const useMIDIStore = create<MIDIStore>()(
         set((state) => {
           state.djKnobPage = page;
         });
+        pushDJLabelsToController(page);
       },
 
       nextDJKnobPage: () => {
@@ -990,6 +996,7 @@ export const useMIDIStore = create<MIDIStore>()(
         set((state) => {
           state.djKnobPage = nextPage;
         });
+        pushDJLabelsToController(nextPage);
       },
 
       prevDJKnobPage: () => {
@@ -998,6 +1005,7 @@ export const useMIDIStore = create<MIDIStore>()(
         set((state) => {
           state.djKnobPage = prevPage;
         });
+        pushDJLabelsToController(prevPage);
       },
 
       setShowKnobBar: (show) => {

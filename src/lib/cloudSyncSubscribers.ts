@@ -67,7 +67,6 @@ export function setupCloudSyncSubscribers(): void {
     debouncedPush(SYNC_KEYS.MIDI_CONFIG, {
       midiSettings: readLS('midi-settings'),
       ccMappings: readLS('cc-mappings-v1'),
-      padMappings: readLS('pad-mappings-v1'),
       buttonMappings: readLS('button-mappings-v1'),
     });
   });
