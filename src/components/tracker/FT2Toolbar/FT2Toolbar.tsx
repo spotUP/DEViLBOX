@@ -569,6 +569,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
         </div>
       <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
+        <DropdownButton items={hamburgerMenuItems} zIndex={200}>
+          <Button variant="ghost" size="sm" className="px-1.5" title="Menu">
+            <Menu size={16} />
+          </Button>
+        </DropdownButton>
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
                 onClick={(e) => {
                   if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
@@ -620,12 +625,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         >
           {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </Button>
-
-        <DropdownButton items={hamburgerMenuItems} zIndex={200}>
-          <Button variant="ghost" size="sm" className="px-1.5" title="More actions">
-            <Menu size={16} />
-          </Button>
-        </DropdownButton>
       </div>
 
       <ImportModuleDialog
