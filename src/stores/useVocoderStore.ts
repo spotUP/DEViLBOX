@@ -87,7 +87,7 @@ export const DEFAULT_VOCODER_PARAMS: VocoderParams = { ...VOCODER_PRESETS[0].par
 
 // ── Effects ─────────────────────────────────────────────────────────────────
 
-export type VocoderFXPreset = 'none' | 'space-echo' | 'dub-delay' | 'hall-reverb' | 'plate-reverb' | 'radio';
+export type VocoderFXPreset = 'none' | 'space-echo' | 'dub-delay' | 'hall-reverb' | 'plate-reverb' | 'radio' | 'reggae-soundsystem';
 
 export interface VocoderFXParams {
   enabled: boolean;
@@ -106,6 +106,7 @@ export const VOCODER_FX_PRESETS: Record<VocoderFXPreset, Omit<VocoderFXParams, '
   'hall-reverb':  { reverbDecay: 5.0, reverbWet: 0.5, delayTime: 0, delayFeedback: 0, delayWet: 0 },
   'plate-reverb': { reverbDecay: 2.5, reverbWet: 0.4, delayTime: 0, delayFeedback: 0, delayWet: 0 },
   'radio':        { reverbDecay: 0.5, reverbWet: 0.12, delayTime: 0.6, delayFeedback: 0.25, delayWet: 0.2 },
+  'reggae-soundsystem': { reverbDecay: 3.5, reverbWet: 0.35, delayTime: 0.75, delayFeedback: 0.45, delayWet: 0.3 },
 };
 
 export const DEFAULT_FX: VocoderFXParams = {
