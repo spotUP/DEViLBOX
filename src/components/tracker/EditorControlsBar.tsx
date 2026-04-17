@@ -228,18 +228,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           ]}
         />
 
-        {/* Pattern Order */}
-        <button
-          onClick={() => useUIStore.getState().openModal('patternOrder')}
-          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
-            modalOpen === 'patternOrder'
-              ? 'bg-accent-primary/20 text-accent-primary'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-          }`}
-          title="Pattern order list"
-        >
-          Order
-        </button>
+
 
         {/* Master FX */}
         <button
