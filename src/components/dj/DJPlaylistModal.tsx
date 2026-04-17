@@ -532,14 +532,18 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
     return (
       <div className="flex items-center gap-1 px-2 py-1.5">
         <input
-          autoFocus
+          ref={(el) => {
+            if (el && document.activeElement !== el) {
+              el.focus();
+              el.select();
+            }
+          }}
           value={editName}
           onChange={(e) => onEditName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') onFinishEdit();
             if (e.key === 'Escape') onCancelEdit();
           }}
-          onBlur={onFinishEdit}
           className="flex-1 px-2 py-0.5 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary min-w-0"
         />
         <button onMouseDown={(e) => e.preventDefault()} onClick={onFinishEdit} className="p-0.5 text-accent-success hover:text-accent-success/80"><Check size={12} /></button>
@@ -796,10 +800,12 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     count: filteredTracks.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => TRACK_ROW_HEIGHT,
-    // Large overscan — fast wheel/trackpad flicks outpace React render and
-    // leave a blank runway if the pre-rendered buffer is too small. 20 rows
-    // ≈ 500px of cushion above + below, enough to cover a quick flick.
-    overscan: 20,
+    // Each row mounts @dnd-kit's useSortable which is heavy enough that
+    // React can't reconcile a full screen of rows in one frame during fast
+    // wheel/trackpad flicks — the virtualizer's scrollTop outpaces React
+    // and reveals blank runway. 60 rows ≈ 2600px cushion in each direction,
+    // enough for several frames of catch-up on aggressive flicks.
+    overscan: 60,
   });
 
   // ── @dnd-kit ──────────────────────────────────────────────────────────────
@@ -1464,13 +1470,6 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
     const otherPlaylists = playlists.filter((p) => p.id !== activePlaylistId);
     const selCount = selectedTrackIndices.length;
-    console.warn('[ctxmenu] built', {
-      activePlaylistId,
-      total: playlists.length,
-      otherCount: otherPlaylists.length,
-      allNames: playlists.map(p => `${p.name}#${p.id.slice(-4)}`),
-      otherNames: otherPlaylists.map(p => `${p.name}#${p.id.slice(-4)}`),
-    });
 
     const items: MenuItemType[] = [
       { id: 'play-from-here', label: 'Play from here (Auto DJ)', onClick: async () => {
@@ -2190,19 +2189,25 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   {/* Playlist title + actions menu */}
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     {editingPlaylistId && editingPlaylistId === activePlaylistId ? (
-                      <input
-                        autoFocus
-                        value={editName}
-                        onChange={(e) => { console.warn('[rename-hdr] onChange', e.target.value); setEditName(e.target.value); }}
-                        onKeyDown={(e) => {
-                          console.warn('[rename-hdr] onKeyDown', e.key);
-                          if (e.key === 'Enter') handleRename(editingPlaylistId);
-                          if (e.key === 'Escape') setEditingPlaylistId(null);
-                        }}
-                        onBlur={(e) => { console.warn('[rename-hdr] onBlur — relatedTarget:', (e.relatedTarget as HTMLElement | null)?.tagName, (e.relatedTarget as HTMLElement | null)?.className); handleRename(editingPlaylistId); }}
-                        onFocus={() => console.warn('[rename-hdr] onFocus')}
-                        className="flex-1 min-w-0 px-2 py-0.5 text-[13px] font-mono font-bold bg-dark-bgTertiary border border-accent-primary/60 rounded text-text-primary"
-                      />
+                      <>
+                        <input
+                          ref={(el) => {
+                            if (el && document.activeElement !== el) {
+                              el.focus();
+                              el.select();
+                            }
+                          }}
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRename(editingPlaylistId);
+                            if (e.key === 'Escape') setEditingPlaylistId(null);
+                          }}
+                          className="flex-1 min-w-0 px-2 py-0.5 text-[13px] font-mono font-bold bg-dark-bgTertiary border border-accent-primary/60 rounded text-text-primary"
+                        />
+                        <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleRename(editingPlaylistId)} className="p-1 text-accent-success hover:text-accent-success/80 shrink-0" title="Save (Enter)"><Check size={14} /></button>
+                        <button onMouseDown={(e) => e.preventDefault()} onClick={() => setEditingPlaylistId(null)} className="p-1 text-text-muted hover:text-text-primary shrink-0" title="Cancel (Esc)"><X size={14} /></button>
+                      </>
                     ) : (
                       <>
                         <span
@@ -2475,6 +2480,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                                   width: '100%',
                                   height: virtualRow.size,
                                   transform: `translateY(${virtualRow.start}px)`,
+                                  willChange: 'transform',
                                 }}
                               >
                                 <ModalTrackRow
