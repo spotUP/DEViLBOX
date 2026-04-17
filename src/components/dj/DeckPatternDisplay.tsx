@@ -176,9 +176,9 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
           numChannels={numChannels}
           isPlaying={isPlaying}
         />
-      ) : (
+      ) : fileName ? (
         <DJOscilloscope />
-      )}
+      ) : null}
     </div>
   );
 };
