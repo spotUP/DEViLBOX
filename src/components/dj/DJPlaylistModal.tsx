@@ -48,6 +48,11 @@ import {
   AlertTriangle,
   BarChart3,
   ArrowUpDown,
+  Cloud,
+  Globe,
+  Lock,
+  Users,
+  RefreshCw,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
@@ -73,6 +78,14 @@ import { showConfirm } from '@/stores/useConfirmStore';
 import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
 import { Button } from '@/components/ui/Button';
+import { useAuthStore } from '@/stores/useAuthStore';
+import {
+  savePlaylistToCloud,
+  listCloudPlaylists,
+  getCloudPlaylist,
+  setPlaylistVisibility as apiSetVisibility,
+  type CloudPlaylistSummary,
+} from '@/lib/playlistCloudApi';
 import { DJ_FX_PRESETS } from './DJPlaylistPanel';
 import { DJTrackEditModal } from './DJTrackEditModal';
 
@@ -378,6 +391,8 @@ interface PlaylistSidebarItemProps {
   isActive: boolean;
   isEditing: boolean;
   editName: string;
+  isAuthenticated: boolean;
+  isSaving: boolean;
   onSelect: () => void;
   onStartEdit: () => void;
   onEditName: (name: string) => void;
@@ -385,6 +400,8 @@ interface PlaylistSidebarItemProps {
   onCancelEdit: () => void;
   onDelete: () => void;
   onClone: () => void;
+  onCloudSave: () => void;
+  onToggleVisibility: () => void;
 }
 
 const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
@@ -392,6 +409,8 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
   isActive,
   isEditing,
   editName,
+  isAuthenticated: authed,
+  isSaving,
   onSelect,
   onStartEdit,
   onEditName,
@@ -399,6 +418,8 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
   onCancelEdit,
   onDelete,
   onClone,
+  onCloudSave,
+  onToggleVisibility,
 }) => {
   const totalDuration = playlist.tracks.reduce((s, t) => s + (t.duration || 0), 0);
   const badCount = playlist.tracks.filter(t => t.isBad).length;
@@ -432,7 +453,16 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
     >
       <Music size={12} className={isActive ? 'text-accent-primary' : 'text-text-muted/40'} />
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-mono truncate">{playlist.name}</div>
+        <div className="text-[11px] font-mono truncate flex items-center gap-1">
+          {playlist.name}
+          {playlist.cloudId && (
+            <span title={playlist.visibility === 'public' ? 'Public' : 'Private'}>
+              {playlist.visibility === 'public'
+                ? <Globe size={9} className="text-accent-success/60 shrink-0" />
+                : <Lock size={9} className="text-text-muted/40 shrink-0" />}
+            </span>
+          )}
+        </div>
         <div className="text-[9px] font-mono text-text-muted/50">
           {playlist.tracks.length} tracks
           {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
@@ -440,6 +470,27 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
         </div>
       </div>
       <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {authed && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); onCloudSave(); }}
+              className={`p-0.5 transition-colors ${isSaving ? 'animate-spin text-accent-primary' : playlist.cloudId ? 'text-accent-success/60 hover:text-accent-success' : 'text-text-muted/40 hover:text-accent-primary'}`}
+              title={playlist.cloudId ? 'Update in cloud' : 'Save to cloud'}
+              disabled={isSaving}
+            >
+              {isSaving ? <RefreshCw size={10} /> : playlist.cloudId ? <Cloud size={10} /> : <Upload size={10} />}
+            </button>
+            {playlist.cloudId && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
+                className="p-0.5 text-text-muted/40 hover:text-text-primary transition-colors"
+                title={playlist.visibility === 'public' ? 'Make private' : 'Make public'}
+              >
+                {playlist.visibility === 'public' ? <Globe size={10} /> : <Lock size={10} />}
+              </button>
+            )}
+          </>
+        )}
         <button onClick={(e) => { e.stopPropagation(); onStartEdit(); }} className="p-0.5 text-text-muted/40 hover:text-text-primary" title="Rename">
           <Edit3 size={10} />
         </button>
@@ -499,6 +550,10 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const autoDJNextIdx = useDJStore((s) => s.autoDJNextTrackIndex);
   const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
 
+  const isLoggedIn = useAuthStore((s) => !!s.token && !!s.user);
+  const setPlaylistCloudId = useDJPlaylistStore((s) => s.setPlaylistCloudId);
+  const setPlaylistVisibilityStore = useDJPlaylistStore((s) => s.setPlaylistVisibility);
+
   // ── Local state ──────────────────────────────────────────────────────────
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -515,6 +570,11 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const [columnSort, setColumnSort] = useState<{ column: string; dir: 'asc' | 'desc' } | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [savingPlaylistId, setSavingPlaylistId] = useState<string | null>(null);
+  const [communityPlaylists, setCommunityPlaylists] = useState<CloudPlaylistSummary[]>([]);
+  const [showCommunity, setShowCommunity] = useState(false);
+  const [loadingCommunity, setLoadingCommunity] = useState(false);
+  const [importingCloudId, setImportingCloudId] = useState<string | null>(null);
   const clipboardRef = useRef<{ tracks: PlaylistTrack[]; isCut: boolean }>({ tracks: [], isCut: false });
   const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
@@ -760,6 +820,69 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     });
     if (confirmed) deletePlaylist(playlist.id);
   }, [deletePlaylist]);
+
+  // ── Cloud save/visibility handlers ────────────────────────────────────
+
+  const handleCloudSave = useCallback(async (playlist: DJPlaylist) => {
+    if (savingPlaylistId) return;
+    setSavingPlaylistId(playlist.id);
+    try {
+      const totalDur = playlist.tracks.reduce((s, t) => s + (t.duration || 0), 0);
+      const result = await savePlaylistToCloud({
+        playlistId: playlist.id,
+        name: playlist.name,
+        description: playlist.description,
+        visibility: playlist.visibility || 'private',
+        tracks: playlist.tracks,
+        totalDuration: totalDur,
+      });
+      setPlaylistCloudId(playlist.id, result.id);
+    } catch (err) {
+      console.error('Failed to save playlist to cloud:', err);
+    } finally {
+      setSavingPlaylistId(null);
+    }
+  }, [savingPlaylistId, setPlaylistCloudId]);
+
+  const handleToggleVisibility = useCallback(async (playlist: DJPlaylist) => {
+    if (!playlist.cloudId) return;
+    const newVis = playlist.visibility === 'public' ? 'private' : 'public';
+    try {
+      await apiSetVisibility(playlist.cloudId, newVis);
+      setPlaylistVisibilityStore(playlist.id, newVis);
+    } catch (err) {
+      console.error('Failed to toggle visibility:', err);
+    }
+  }, [setPlaylistVisibilityStore]);
+
+  const loadCommunityPlaylists = useCallback(async () => {
+    setLoadingCommunity(true);
+    try {
+      const result = await listCloudPlaylists({ limit: 50 });
+      setCommunityPlaylists(result.playlists);
+    } catch (err) {
+      console.error('Failed to load community playlists:', err);
+    } finally {
+      setLoadingCommunity(false);
+    }
+  }, []);
+
+  const handleImportCommunityPlaylist = useCallback(async (cloudId: string) => {
+    setImportingCloudId(cloudId);
+    try {
+      const full = await getCloudPlaylist(cloudId);
+      const newId = createPlaylist(full.name);
+      const tracks = (full.tracks as PlaylistTrack[]).map(t => ({
+        ...t,
+        id: undefined,
+      }));
+      addTracks(newId, tracks);
+    } catch (err) {
+      console.error('Failed to import community playlist:', err);
+    } finally {
+      setImportingCloudId(null);
+    }
+  }, [createPlaylist, addTracks]);
 
   // ── Add files to playlist ────────────────────────────────────────────────
 
@@ -1641,6 +1764,8 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   isActive={pl.id === activePlaylistId}
                   isEditing={editingPlaylistId === pl.id}
                   editName={editName}
+                  isAuthenticated={isLoggedIn}
+                  isSaving={savingPlaylistId === pl.id}
                   onSelect={() => setActivePlaylist(pl.id)}
                   onStartEdit={() => { setEditingPlaylistId(pl.id); setEditName(pl.name); }}
                   onEditName={setEditName}
@@ -1648,6 +1773,8 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   onCancelEdit={() => setEditingPlaylistId(null)}
                   onDelete={() => handleDeletePlaylist(pl)}
                   onClone={() => clonePlaylist(pl.id)}
+                  onCloudSave={() => handleCloudSave(pl)}
+                  onToggleVisibility={() => handleToggleVisibility(pl)}
                 />
               ))}
 
@@ -1657,6 +1784,70 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   <Button variant="ghost" size="sm" onClick={() => { setIsCreating(true); setNewName(''); }}>
                     Create one
                   </Button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Community Playlists Section ──────────────────────── */}
+            <div className="border-t border-dark-border">
+              <button
+                onClick={() => {
+                  setShowCommunity(!showCommunity);
+                  if (!showCommunity && communityPlaylists.length === 0) loadCommunityPlaylists();
+                }}
+                className="w-full px-3 py-2 flex items-center justify-between text-[10px] font-mono text-text-muted uppercase tracking-wider hover:bg-dark-bgHover transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Users size={10} />
+                  Community
+                </span>
+                {showCommunity ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
+
+              {showCommunity && (
+                <div className="max-h-48 overflow-y-auto">
+                  {loadingCommunity ? (
+                    <div className="px-3 py-3 text-center">
+                      <RefreshCw size={12} className="animate-spin text-text-muted/40 mx-auto" />
+                      <p className="text-[9px] font-mono text-text-muted/40 mt-1">Loading…</p>
+                    </div>
+                  ) : communityPlaylists.length === 0 ? (
+                    <div className="px-3 py-3 text-center">
+                      <p className="text-[9px] font-mono text-text-muted/40">No public playlists yet</p>
+                    </div>
+                  ) : (
+                    communityPlaylists.map((cp) => (
+                      <div
+                        key={cp.id}
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-dark-bgHover transition-colors group"
+                      >
+                        <Globe size={10} className="text-accent-primary/40 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-mono text-text-secondary truncate">{cp.name}</div>
+                          <div className="text-[9px] font-mono text-text-muted/40">
+                            {cp.trackCount} tracks · by {cp.authorName}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleImportCommunityPlaylist(cp.id)}
+                          disabled={importingCloudId === cp.id}
+                          className="p-0.5 text-text-muted/40 hover:text-accent-primary transition-colors opacity-0 group-hover:opacity-100"
+                          title="Import to my playlists"
+                        >
+                          {importingCloudId === cp.id ? <RefreshCw size={10} className="animate-spin" /> : <Download size={10} />}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                  <div className="px-3 py-1 border-t border-dark-border/50">
+                    <button
+                      onClick={loadCommunityPlaylists}
+                      className="text-[9px] font-mono text-accent-primary/60 hover:text-accent-primary transition-colors"
+                      disabled={loadingCommunity}
+                    >
+                      ↻ Refresh
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1806,6 +1997,22 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                       </div>
                     )}
                   </div>
+
+                  {/* Cloud save */}
+                  {isLoggedIn && activePlaylist && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCloudSave(activePlaylist)}
+                      disabled={savingPlaylistId === activePlaylist.id}
+                      icon={savingPlaylistId === activePlaylist.id
+                        ? <RefreshCw size={12} className="animate-spin" />
+                        : activePlaylist.cloudId ? <Cloud size={12} /> : <Upload size={12} />}
+                      title={activePlaylist.cloudId ? 'Update in cloud' : 'Save to cloud'}
+                    >
+                      {activePlaylist.cloudId ? 'Synced' : 'Save'}
+                    </Button>
+                  )}
                 </div>
 
                 {/* Selection bar */}

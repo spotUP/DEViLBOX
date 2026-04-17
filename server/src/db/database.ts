@@ -187,6 +187,26 @@ export function initDatabase() {
       analysis_version INTEGER DEFAULT 1,
       created_at INTEGER NOT NULL
     );
+
+    -- Shared playlists (cloud-saved DJ playlists with public/private visibility)
+    CREATE TABLE IF NOT EXISTS shared_playlists (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      playlist_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      visibility TEXT NOT NULL DEFAULT 'private',
+      track_count INTEGER DEFAULT 0,
+      total_duration INTEGER DEFAULT 0,
+      data TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_shared_playlists_user ON shared_playlists(user_id);
+    CREATE INDEX IF NOT EXISTS idx_shared_playlists_visibility ON shared_playlists(visibility);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_playlists_user_playlist ON shared_playlists(user_id, playlist_id);
   `);
 
   // Migration: add type column to files table
