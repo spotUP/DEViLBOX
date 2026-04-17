@@ -108,7 +108,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.15 } },
       { category: 'tonejs', type: 'Distortion', enabled: true, wet: 10, parameters: { distortion: 0.1 } },
     ] },
-  { name: 'Big Muff Wall', description: 'Big Muff Pi fuzz — thick wall of sustain', tags: ['Loud', 'Grit'], gainCompensationDb: 10.9,
+  { name: 'Big Muff Wall', description: 'Big Muff Pi fuzz — thick wall of sustain', tags: ['Loud', 'Grit'], gainCompensationDb: 8.5,
     effects: [
       { category: 'wam', type: 'WAMBigMuff', enabled: true, wet: 50, parameters: {} },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -12, ratio: 6, attack: 0.005, release: 0.15 } },
@@ -347,7 +347,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'wam', type: 'WAMStonePhaser', enabled: true, wet: 60, parameters: {} },
     ] },
-  { name: 'Vox Amp Crunch', description: 'Vox amplifier — British crunch for mix character', tags: ['DJ', 'Grit'], gainCompensationDb: 6.3,
+  { name: 'Vox Amp Crunch', description: 'Vox amplifier — British crunch for mix character', tags: ['DJ', 'Grit'], gainCompensationDb: -1.4,
     effects: [
       { category: 'wam', type: 'WAMVoxAmp', enabled: true, wet: 40, parameters: {} },
     ] },
