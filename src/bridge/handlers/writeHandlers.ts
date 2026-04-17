@@ -1080,17 +1080,29 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
   const masterGain = Math.pow(10, level / 20);
 
   if (mode === 'rich') {
-    // Multi-oscillator full-spectrum signal
+    // Full-spectrum test signal covering 30 Hz to 16 kHz + white noise.
+    // Designed to exercise every FX frequency band audibly.
     const mix = new Tone.Gain(masterGain);
     mix.connect(engine.masterEffectsInput);
     _richToneNodes.push(mix);
 
     const layers: { type: OscillatorType; frequency: number; gain: number }[] = [
-      { type: 'sawtooth',  frequency: 55,   gain: 0.25 },  // sub bass
-      { type: 'sawtooth',  frequency: 110,  gain: 0.22 },  // bass
-      { type: 'square',    frequency: 440,  gain: 0.18 },  // mid
-      { type: 'triangle',  frequency: 1760, gain: 0.12 },  // upper mid
-      { type: 'sawtooth',  frequency: 3520, gain: 0.08 },  // presence
+      // Sub bass
+      { type: 'sawtooth',  frequency: 40,    gain: 0.20 },
+      // Bass
+      { type: 'sawtooth',  frequency: 100,   gain: 0.18 },
+      // Low-mid
+      { type: 'square',    frequency: 250,   gain: 0.15 },
+      // Mid
+      { type: 'sawtooth',  frequency: 600,   gain: 0.14 },
+      // Upper mid (presence)
+      { type: 'square',    frequency: 1500,  gain: 0.12 },
+      // Presence / brilliance
+      { type: 'sawtooth',  frequency: 3500,  gain: 0.10 },
+      // High (sizzle/air)
+      { type: 'sawtooth',  frequency: 7000,  gain: 0.08 },
+      // Very high
+      { type: 'square',    frequency: 12000, gain: 0.06 },
     ];
 
     for (const l of layers) {
@@ -1102,8 +1114,8 @@ export function testTone(params: Record<string, unknown>): Record<string, unknow
       _richToneNodes.push(o, g);
     }
 
-    // White noise for transients / air
-    const noiseGain = new Tone.Gain(0.06);
+    // White noise — clearly audible for transients, filters, gates
+    const noiseGain = new Tone.Gain(0.12);
     const noise = new Tone.Noise('white');
     noise.connect(noiseGain);
     noiseGain.connect(mix);
@@ -1137,7 +1149,7 @@ export function setMasterEffects(params: Record<string, unknown>): Record<string
     parameters: (fx.parameters as Record<string, unknown>) ?? {},
   }));
 
-  useAudioStore.getState().setMasterEffects(configs as never);
+  useAudioStore.getState().setMasterEffects(configs as never, (params.gainCompensationDb as number) ?? undefined);
   return { ok: true, count: configs.length };
 }
 

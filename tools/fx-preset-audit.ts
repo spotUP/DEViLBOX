@@ -56,6 +56,7 @@ const ALL_EFFECTS = [
 
 interface PresetDef {
   name: string;
+  gainCompensationDb?: number;
   effects: Array<{
     category: string;
     type: string;
@@ -89,6 +90,10 @@ function loadPresets(): PresetDef[] {
     m = /^\{\s*name:\s*'([^']+)'/.exec(seg);
     if (!m) continue;
     const name = m[1];
+
+    // Extract gainCompensationDb if present
+    const compMatch = seg.match(/gainCompensationDb:\s*(-?\d+(?:\.\d+)?)/);
+    const gainCompensationDb = compMatch ? parseFloat(compMatch[1]) : undefined;
 
     // Extract effects array
     const effectsMatch = seg.match(/effects:\s*\[([\s\S]*?)\]\s*\}/);
@@ -127,7 +132,7 @@ function loadPresets(): PresetDef[] {
     }
 
     if (effects.length > 0) {
-      presets.push({ name, effects });
+      presets.push({ name, gainCompensationDb, effects });
     }
   }
 
@@ -138,10 +143,10 @@ function loadPresets(): PresetDef[] {
 
 let ws: WebSocket;
 
-function mcpCall(method: string, params: Record<string, unknown> = {}): Promise<any> {
+function mcpCall(method: string, params: Record<string, unknown> = {}, timeoutMs = 20000): Promise<any> {
   return new Promise((resolve, reject) => {
     const id = `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const timeout = setTimeout(() => reject(new Error('timeout: ' + method)), 20000);
+    const timeout = setTimeout(() => reject(new Error('timeout: ' + method)), timeoutMs);
     const handler = (data: WebSocket.Data) => {
       try {
         const msg = JSON.parse(data.toString());
@@ -172,7 +177,7 @@ async function clearFx() {
 }
 
 async function startRichTone() {
-  await mcpCall('test_tone', { action: 'start', mode: 'rich', level: -12 });
+  await mcpCall('test_tone', { action: 'start', mode: 'rich', level: -6 });
   await sleep(2000); // let signal stabilize
 }
 
@@ -246,7 +251,9 @@ async function auditPresets(baseRms: number, only?: string): Promise<PresetResul
   const results: PresetResult[] = [];
   const baseDb = toDb(baseRms);
 
-  const toTest = only ? presets.filter(p => p.name === only) : presets;
+  const toTest = only
+    ? presets.filter(p => p.name === only)
+    : presets;
 
   console.log(`\n═══ PHASE 2: FX Presets (${toTest.length} presets, rich tone) ═══\n`);
   console.log(`Baseline: ${baseDb.toFixed(1)} dBFS\n`);
@@ -255,9 +262,15 @@ async function auditPresets(baseRms: number, only?: string): Promise<PresetResul
     process.stdout.write(`  [${preset.name}] `);
 
     try {
-      // Set all effects at once
-      await mcpCall('set_master_effects', { effects: preset.effects });
-      await sleep(5000); // full chain init
+      const hasNeural = preset.effects.some(e => e.type === 'Neural');
+      const initWait = hasNeural ? 10000 : 5000; // Neural needs longer to load model
+
+      // Set all effects WITH compensation — verify compensated volume
+      await mcpCall('set_master_effects', {
+        effects: preset.effects,
+        gainCompensationDb: preset.gainCompensationDb ?? 0,
+      });
+      await sleep(initWait);
 
       const lvl = await measure(3000);
       const rmsDb = toDb(lvl.rmsAvg);
@@ -291,6 +304,27 @@ async function auditPresets(baseRms: number, only?: string): Promise<PresetResul
         effectTypes: preset.effects.map(e => e.type),
         status: 'error',
       });
+
+      // If WS died, try to reconnect
+      if (ws.readyState !== WebSocket.OPEN) {
+        console.log('  ⚠️  Reconnecting WebSocket...');
+        try {
+          ws = new WebSocket(WS_URL);
+          await new Promise<void>((resolve, reject) => {
+            ws.on('open', resolve);
+            ws.on('error', (e) => reject(e));
+            setTimeout(() => reject(new Error('reconnect timeout')), 10000);
+          });
+          await sleep(2000);
+          // Re-start the test tone after reconnect
+          await startRichTone();
+          await sleep(2000);
+          console.log('  ✓ Reconnected, resuming...');
+        } catch (reconErr: any) {
+          console.error(`  ✗ Reconnect failed: ${reconErr.message} — aborting`);
+          break;
+        }
+      }
     }
 
     // Clean up between presets
