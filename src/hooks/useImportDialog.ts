@@ -8,7 +8,7 @@
  * - Import handling
  * - Companion file management
  *
- * Both ImportModuleDialog (DOM) and PixiImportModuleDialog (GL) use this hook.
+ * Used by ImportModuleDialog.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';

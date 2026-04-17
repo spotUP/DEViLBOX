@@ -1,9 +1,8 @@
 // src/hooks/views/usePatternEditor.ts
 /**
- * usePatternEditor — Shared logic hook for PatternEditorCanvas (DOM/WebGL) and
- * PixiPatternEditor (Pixi/WebGL).
+ * usePatternEditor — Shared logic hook for PatternEditorCanvas.
  *
- * Both views call this hook and keep only their renderer-specific markup.
+ * The view calls this hook and keeps only renderer-specific markup.
  *
  * Shared:
  *  - TrackerStore slice (pattern, patterns, actions)
@@ -37,7 +36,7 @@ import { useCollaborationStore, getCollabClient } from '@stores/useCollaboration
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 
-// ─── Layout constants (must match PatternEditorCanvas + PixiPatternEditor) ───
+// ─── Layout constants (must match PatternEditorCanvas) ───
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 export const AUTOMATION_LANE_WIDTH = 56; // base width for a single automation lane
