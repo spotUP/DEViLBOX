@@ -97,127 +97,10 @@ function saveLearning() {
   }
 }
 
-// ── Slot MIDI bindings (user-taught shortcut → slot-switch) ──────────────────
-// Replaces dependency on the Akai editor: user right-clicks a slot in the
-// drumpad status bar, presses any MIDI event, and that event becomes the
-// trigger for switching to that slot. Works for Note On, CC, and PC.
-
-type SlotBindingType = 'note' | 'cc' | 'programChange';
-interface SlotBinding { type: SlotBindingType; value: number; channel: number; }
-const _slotBindings = new Map<number, SlotBinding>();   // slot# (1..8) → binding
-let _learnSlotTarget: number | null = null;              // which slot is waiting to be learned
-const SLOT_BINDINGS_STORAGE_KEY = 'devilbox_mpk_slot_bindings';
-const _slotBindingListeners = new Set<() => void>();
-
-function notifySlotBindingListeners() {
-  _slotBindingListeners.forEach((l) => { try { l(); } catch { /* ignore */ } });
-}
-
-try {
-  const raw = localStorage.getItem(SLOT_BINDINGS_STORAGE_KEY);
-  if (raw) {
-    const obj = JSON.parse(raw) as Record<string, SlotBinding>;
-    for (const [slot, binding] of Object.entries(obj)) {
-      _slotBindings.set(Number(slot), binding);
-    }
-  }
-} catch (e) {
-  console.warn('[MIDI Slots] Failed to load slot bindings:', e);
-}
-
-function saveSlotBindings() {
-  try {
-    const obj: Record<number, SlotBinding> = {};
-    _slotBindings.forEach((binding, slot) => { obj[slot] = binding; });
-    localStorage.setItem(SLOT_BINDINGS_STORAGE_KEY, JSON.stringify(obj));
-  } catch (e) {
-    console.warn('[MIDI Slots] Failed to save slot bindings:', e);
-  }
-}
-
-function messageMatchesBinding(msg: MIDIMessage, b: SlotBinding): boolean {
-  if (msg.channel !== b.channel) return false;
-  if (b.type === 'note' && msg.type === 'noteOn' && msg.note === b.value) return msg.velocity !== undefined && msg.velocity > 0;
-  if (b.type === 'cc' && msg.type === 'cc' && msg.cc === b.value) return msg.value !== undefined && msg.value > 63;
-  if (b.type === 'programChange' && msg.type === 'programChange' && msg.program === b.value) return true;
-  return false;
-}
-
-function buildBindingFromMessage(msg: MIDIMessage): SlotBinding | null {
-  if (msg.type === 'noteOn' && msg.note !== undefined) return { type: 'note', value: msg.note, channel: msg.channel };
-  if (msg.type === 'cc' && msg.cc !== undefined && msg.value !== undefined && msg.value > 63) return { type: 'cc', value: msg.cc, channel: msg.channel };
-  if (msg.type === 'programChange' && msg.program !== undefined) return { type: 'programChange', value: msg.program, channel: msg.channel };
-  return null;
-}
-
-/** Start listening for the next MIDI event to bind to the given slot (1..8). */
-export function startLearnSlotBinding(slot: number): void {
-  _learnSlotTarget = slot;
-  notifySlotBindingListeners();
-  console.log('[MIDI Slots] Learning slot', slot, '— press any MIDI pad/key/button');
-}
-
-/** Cancel a pending learn. */
-export function cancelLearnSlotBinding(): void {
-  _learnSlotTarget = null;
-  notifySlotBindingListeners();
-}
-
-/** Forget the MIDI binding for a slot. */
-export function clearSlotBinding(slot: number): void {
-  if (_slotBindings.delete(slot)) {
-    saveSlotBindings();
-    notifySlotBindingListeners();
-  }
-}
-
-/** Wipe every slot binding. Used when the wizard gets muddled. */
-export function clearAllSlotBindings(): void {
-  if (_slotBindings.size === 0) return;
-  _slotBindings.clear();
-  saveSlotBindings();
-  notifySlotBindingListeners();
-  console.log('[MIDI Slots] Cleared all bindings');
-}
-
-/** Read the binding for a slot (for UI display). */
-export function getSlotBinding(slot: number): SlotBinding | undefined {
-  return _slotBindings.get(slot);
-}
-
-/** Which slot (if any) is currently waiting for a MIDI event. */
-export function getLearnSlotTarget(): number | null {
-  return _learnSlotTarget;
-}
-
-/** Subscribe to binding / learn-target changes (for React UI). */
-export function subscribeSlotBindings(listener: () => void): () => void {
-  _slotBindingListeners.add(listener);
-  return () => _slotBindingListeners.delete(listener);
-}
-
-/** Console debug helper: print current slot bindings in readable form. */
-export function dumpSlotBindings(): void {
-  if (_slotBindings.size === 0) {
-    console.log('[MIDI Slots] No bindings.');
-    return;
-  }
-  const rows = Array.from(_slotBindings.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([slot, b]) => ({
-      slot,
-      type: b.type,
-      value: b.value,
-      channel: b.channel,
-      displayChannel: b.channel + 1,
-    }));
-  console.table(rows);
-}
-
-if (typeof window !== 'undefined') {
-  (window as any).clearAllSlotBindings = clearAllSlotBindings;
-  (window as any).dumpSlotBindings = dumpSlotBindings;
-}
+// Wipe any stale MIDI-learn bindings from the deprecated slot-binding
+// feature so old localStorage entries don't silently redirect pad notes
+// after an upgrade. MPK slot switching is Program-Change-only now.
+try { localStorage.removeItem('devilbox_mpk_slot_bindings'); } catch { /* ignore */ }
 
 // Get current device's learned notes
 function getCurrentMapping(): number[] {
@@ -627,79 +510,14 @@ export function useMIDIPadRouting() {
     const handler = (message: MIDIMessage) => {
       const view = useUIStore.getState().activeView;
 
-      // Full diagnostic — every incoming MIDI event with learn/binding state.
-      // Include noteOn so we can see pad presses during wizard and compare
-      // later bindings against actual pad events.
-      if (message.type !== 'noteOff') {
-        console.log('[MPK RX]', message.type,
-          'ch=', message.channel,
-          'note=', message.note,
-          'vel=', message.velocity,
-          'cc=', message.cc,
-          'value=', message.value,
-          'program=', message.program,
-          'learnTarget=', _learnSlotTarget,
-          'bindings=', _slotBindings.size,
-          'view=', view);
-      }
-
-      // Slot-binding learn mode: capture the first meaningful MIDI event
-      // and bind it to the target slot. Runs before everything else so the
-      // captured event doesn't double as a pad trigger.
-      if (_learnSlotTarget !== null) {
-        const binding = buildBindingFromMessage(message);
-        if (binding) {
-          // Reject duplicates: don't let two slots share the same MIDI event,
-          // otherwise only the first matching slot ever fires.
-          for (const [otherSlot, otherBinding] of _slotBindings) {
-            if (otherSlot === _learnSlotTarget) continue;
-            if (otherBinding.type === binding.type
-              && otherBinding.value === binding.value
-              && otherBinding.channel === binding.channel) {
-              console.warn('[MIDI Slots] Duplicate binding ignored — slot', otherSlot, 'already uses', binding);
-              return; // stay in learn mode; wait for a different event
-            }
-          }
-          _slotBindings.set(_learnSlotTarget, binding);
-          saveSlotBindings();
-          const slot = _learnSlotTarget;
-          _learnSlotTarget = null;
-          notifySlotBindingListeners();
-          const id = mpkSlotId(slot);
-          const store = useDrumPadStore.getState();
-          if (store.programs.has(id)) store.loadProgram(id);
-          console.log('[MIDI Slots] Bound slot', slot, '→', binding);
-          return;
-        }
-      }
-
-      // Check any learned slot bindings first — user-taught shortcuts
-      // always take priority over pad/PC routing so a pad re-used for
-      // slot switching doesn't also fire as a drum hit.
-      for (const [slot, binding] of _slotBindings) {
-        if (messageMatchesBinding(message, binding)) {
-          const id = mpkSlotId(slot);
-          const store = useDrumPadStore.getState();
-          console.log('[MPK SLOT]', 'match slot', slot, 'binding=', binding, 'loading', id, store.programs.has(id) ? 'OK' : 'MISSING');
-          if (store.programs.has(id)) store.loadProgram(id);
-          return;
-        }
-      }
-
-      // Program Change — Akai MPK Mini has 8 programs (PROG button cycles
-      // through 1-8). Map MIDI PC value 0-7 to DEViLBOX MPK slot 1-8.
-      // Check BEFORE the PAD_VIEWS guard so a program switch sent while the
-      // user is in (say) tracker view still swaps the slot — they'd want
-      // the right kit loaded before they switch back.
+      // Program Change — the MPK Mini sends these from PROG SELECT + pad.
+      // PC value 0-7 loads DEViLBOX slot 1-8. Checked before the PAD_VIEWS
+      // guard so slot swaps happen even from tracker/mixer views.
       if (message.type === 'programChange' && message.program !== undefined) {
         const slot = (message.program % MPK_SLOT_COUNT) + 1;
         const id = mpkSlotId(slot);
         const store = useDrumPadStore.getState();
-        const hit = store.programs.has(id);
-        console.log('[MPK PC] ch=', message.channel, 'program=', message.program, '→ slot', slot, '(', id, hit ? 'loaded' : 'MISSING', ')');
-        if (hit) {
-          store.loadProgram(id);
-        }
+        if (store.programs.has(id)) store.loadProgram(id);
         return;
       }
 
