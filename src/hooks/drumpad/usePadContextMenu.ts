@@ -57,7 +57,7 @@ export function usePadContextMenu(
     if (!pad) return [];
 
     const store = useDrumPadStore.getState();
-    const isLoaded = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction);
+    const isLoaded = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction || pad.pttAction);
     const hasClipboard = clipboardPad !== null;
 
     if (isLoaded) {
@@ -142,6 +142,15 @@ function buildLoadedPadMenu(
   items.push({
     id: 'assign-scratch', label: 'Assign Scratch',
     submenu: buildScratchSubmenu(padId, pad.scratchAction, store),
+  });
+  items.push({
+    id: 'assign-ptt', label: 'Vocoder PTT',
+    radio: true, checked: !!pad.pttAction,
+    onClick: () => store.updatePad(padId, {
+      pttAction: !pad.pttAction,
+      name: !pad.pttAction ? 'Vocoder PTT' : pad.name,
+      color: !pad.pttAction ? '#22c55e' : undefined,
+    }),
   });
   items.push({
     id: 'assign-oneshot', label: 'Assign One Shot',
@@ -241,6 +250,15 @@ function buildEmptyPadMenu(
   items.push({
     id: 'assign-scratch', label: 'Assign Scratch',
     submenu: buildScratchSubmenu(padId, undefined, store),
+  });
+  items.push({
+    id: 'assign-ptt', label: 'Vocoder PTT',
+    radio: true, checked: false,
+    onClick: () => store.updatePad(padId, {
+      pttAction: true,
+      name: 'Vocoder PTT',
+      color: '#22c55e',
+    }),
   });
   items.push({
     id: 'assign-oneshot', label: 'Assign One Shot',
