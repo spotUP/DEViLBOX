@@ -223,7 +223,7 @@ export function createDefaultPadFX(): EffectConfig[] {
       type: 'SpaceEcho',
       enabled: true,
       wet: 40,
-      parameters: { mode: 4, rate: 300, intensity: 0.55, echoVolume: 0.75, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
+      parameters: { mode: 4, rate: 300, intensity: 0.25, echoVolume: 0.4, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
     },
   ] as EffectConfig[];
 }
