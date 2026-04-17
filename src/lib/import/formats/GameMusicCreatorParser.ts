@@ -335,8 +335,8 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
       instruments.push({
         id,
         name,
-        type: 'sample' as const,
-        synthType: 'Sampler' as const,
+        type: 'synth' as const,
+        synthType: 'GmcWasmSynth' as const,
         effects: [],
         volume: 0,
         pan: 0,
