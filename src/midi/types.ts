@@ -35,7 +35,8 @@ export type TB303Parameter =
   | 'filterTracking'
   | 'filterFM';
 
-export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Furnace' | 'V2' | 'Synare' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX' | 'Mixer';
+export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Furnace' | 'V2' | 'Synare' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX' | 'Mixer'
+  | 'Hively' | 'Klystrack' | 'DX7' | 'SidMon' | 'SidMon1' | 'SonicArranger' | 'SoundMon' | 'HippelCoSo' | 'FC' | 'RobHubbard' | 'GTUltra' | 'Geonkick' | 'CZ101';
 
 export type MappableParameter =
   | TB303Parameter
@@ -189,6 +190,95 @@ export type MappableParameter =
   | 'melodica.portamento'
   | 'melodica.attack'
   | 'melodica.volume'
+  // Hively / AHX
+  | 'hively.filterSpeed'
+  | 'hively.filterLower'
+  | 'hively.filterUpper'
+  | 'hively.vibratoSpeed'
+  | 'hively.vibratoDepth'
+  | 'hively.squareSpeed'
+  // Klystrack
+  | 'klystrack.cutoff'
+  | 'klystrack.resonance'
+  | 'klystrack.attack'
+  | 'klystrack.decay'
+  | 'klystrack.sustain'
+  | 'klystrack.release'
+  | 'klystrack.pulseWidth'
+  // DX7
+  | 'dx7.algorithm'
+  | 'dx7.feedback'
+  | 'dx7.op1Level'
+  | 'dx7.op2Level'
+  | 'dx7.op3Level'
+  | 'dx7.lfoSpeed'
+  | 'dx7.transpose'
+  // SidMon
+  | 'sidmon.filterCutoff'
+  | 'sidmon.filterResonance'
+  | 'sidmon.arpSpeed'
+  | 'sidmon.vibSpeed'
+  | 'sidmon.vibDepth'
+  | 'sidmon.vibDelay'
+  // SidMon1
+  | 'sidmon1.attackSpeed'
+  | 'sidmon1.attackMax'
+  | 'sidmon1.decaySpeed'
+  | 'sidmon1.decayMin'
+  | 'sidmon1.sustain'
+  | 'sidmon1.releaseSpeed'
+  | 'sidmon1.releaseMin'
+  // SonicArranger
+  | 'sonicarranger.vibratoSpeed'
+  | 'sonicarranger.vibratoLevel'
+  | 'sonicarranger.vibratoDelay'
+  | 'sonicarranger.portamentoSpeed'
+  | 'sonicarranger.fineTuning'
+  | 'sonicarranger.effect'
+  | 'sonicarranger.effectArg1'
+  // SoundMon
+  | 'soundmon.adsrControl'
+  | 'soundmon.adsrSpeed'
+  | 'soundmon.egControl'
+  | 'soundmon.lfoSpeed'
+  | 'soundmon.lfoDepth'
+  | 'soundmon.lfoDelay'
+  | 'soundmon.waveTable'
+  // HippelCoSo
+  | 'hippelcoso.vibSpeed'
+  | 'hippelcoso.vibDepth'
+  // Future Composer
+  | 'fc.synthSpeed'
+  | 'fc.vibSpeed'
+  | 'fc.vibDepth'
+  | 'fc.vibDelay'
+  // Rob Hubbard
+  | 'robhubbard.divider'
+  | 'robhubbard.portaSpeed'
+  // GTUltra
+  | 'gtultra.attack'
+  | 'gtultra.decay'
+  | 'gtultra.sustain'
+  | 'gtultra.release'
+  | 'gtultra.firstwave'
+  | 'gtultra.gatetimer'
+  | 'gtultra.vibdelay'
+  // Geonkick
+  | 'geonkick.osc0Freq'
+  | 'geonkick.osc0Amp'
+  | 'geonkick.osc1Freq'
+  | 'geonkick.osc1Amp'
+  | 'geonkick.filterCutoff'
+  | 'geonkick.filterQ'
+  | 'geonkick.distDrive'
+  // CZ-101
+  | 'cz101.waveform1'
+  | 'cz101.waveform2'
+  | 'cz101.dco_rate'
+  | 'cz101.dco_depth'
+  | 'cz101.dcw_rate'
+  | 'cz101.dcw_depth'
+  | 'cz101.dca_rate'
   // Master FX
   | 'masterFx.slot0.wet'
   | 'masterFx.slot0.param0'

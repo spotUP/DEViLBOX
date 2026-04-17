@@ -382,15 +382,18 @@ export function useMIDIPadRouting() {
 
         engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
 
-        // Auto-release as safety net (e.g. MIDI controllers without noteOff)
-        const releaseDelayMs = Math.max(pad.decay, 100);
-        const existing = _pendingReleases.get(instId);
-        if (existing) clearTimeout(existing);
-        const timer = setTimeout(() => {
-          try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
-          _pendingReleases.delete(instId);
-        }, releaseDelayMs);
-        _pendingReleases.set(instId, timer);
+        // For sample-only pads (no sustained synth), auto-release after decay.
+        // Synth pads sustain while held — releasePad handles note-off.
+        if (!pad.synthConfig) {
+          const releaseDelayMs = Math.max(pad.decay, 100);
+          const existing = _pendingReleases.get(instId);
+          if (existing) clearTimeout(existing);
+          const timer = setTimeout(() => {
+            try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
+            _pendingReleases.delete(instId);
+          }, releaseDelayMs);
+          _pendingReleases.set(instId, timer);
+        }
       } catch { /* ignore synth errors */ }
     }
 
