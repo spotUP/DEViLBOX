@@ -159,8 +159,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const masterVolume = useAudioStore(s => s.masterVolume);
-  const setMasterVolume = useAudioStore(s => s.setMasterVolume);
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     curves: s.curves,
     reset: s.reset,
@@ -613,16 +611,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
-        <input
-          type="range"
-          value={masterVolume}
-          onChange={(e) => setMasterVolume(Number(e.target.value))}
-          min="-60"
-          max="0"
-          step="1"
-          className="w-20"
-          title={`Volume: ${masterVolume} dB`}
-        />
         <MIDIToolbarDropdown />
         <Button
           variant={asidEnabled ? 'primary' : 'default'}
