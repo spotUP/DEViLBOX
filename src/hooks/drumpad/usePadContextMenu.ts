@@ -28,6 +28,7 @@ import { TB303_PRESETS } from '@/constants/tb303Presets';
 import { DECTALK_PRESETS } from '@/constants/dectalkPresets';
 import { FACTORY_PRESETS } from '@/constants/factoryPresets';
 import { getPresetsForSynthType } from '@/constants/synthPresets/allPresets';
+import type { SynthPreset } from '@/constants/synthPresets/types';
 import { getToneEngine } from '@/engine/ToneEngine';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -647,10 +648,52 @@ function buildQuickAssignSubmenu(
   // Build categorized menu from SYNTH_CATEGORIES
   for (const category of SYNTH_CATEGORIES) {
     const synthItems = category.synths.map((synthInfo) => {
-      const presets = getPresetsForSynth(synthInfo.type);
-      
-      // If synth has presets, show them in a submenu
-      if (presets && presets.length > 0) {
+      // Prefer the broad SynthPreset library (22+ synth types, grouped by
+      // sound category). Fall back to legacy InstrumentPreset-style presets
+      // (TB-303 patches, DECtalk voices, DJ one-shots) for synths that
+      // predate the new format.
+      const synthPresets = getPresetsForSynthType(synthInfo.type);
+      const legacyPresets = getPresetsForSynth(synthInfo.type);
+
+      if (synthPresets.length > 0) {
+        // Group presets by sound category (bass / lead / pad / …) so the
+        // submenu isn't a flat wall of 20+ names.
+        const byCategory = new Map<string, SynthPreset[]>();
+        for (const p of synthPresets) {
+          const cat = p.category || 'other';
+          if (!byCategory.has(cat)) byCategory.set(cat, []);
+          byCategory.get(cat)!.push(p);
+        }
+
+        const submenu: MenuItemType[] = [
+          {
+            id: `qa-${synthInfo.type.toLowerCase()}-default`,
+            label: 'Default',
+            onClick: () => assignGeneralSynth(padId, synthInfo.type, store),
+          },
+        ];
+
+        const catKeys = [...byCategory.keys()].sort();
+        for (const cat of catKeys) {
+          submenu.push({ type: 'divider' });
+          submenu.push({ id: `qa-${synthInfo.type}-cat-${cat}`, label: `── ${cat} ──`, disabled: true });
+          for (const preset of byCategory.get(cat)!) {
+            submenu.push({
+              id: `qa-${synthInfo.type.toLowerCase()}-${preset.id}`,
+              label: preset.name,
+              onClick: () => assignSynthWithSynthPreset(padId, synthInfo.type, preset, store),
+            });
+          }
+        }
+
+        return {
+          id: `qa-${synthInfo.type.toLowerCase()}`,
+          label: synthInfo.name,
+          submenu,
+        };
+      }
+
+      if (legacyPresets && legacyPresets.length > 0) {
         return {
           id: `qa-${synthInfo.type.toLowerCase()}`,
           label: synthInfo.name,
@@ -660,8 +703,8 @@ function buildQuickAssignSubmenu(
               label: 'Default',
               onClick: () => assignGeneralSynth(padId, synthInfo.type, store),
             },
-            { id: `qa-${synthInfo.type.toLowerCase()}-div`, label: '─────', disabled: true },
-            ...presets.map((preset, idx) => ({
+            { type: 'divider' as const },
+            ...legacyPresets.map((preset, idx) => ({
               id: `qa-${synthInfo.type.toLowerCase()}-preset-${idx}`,
               label: preset.name || `Preset ${idx + 1}`,
               onClick: () => assignSynthWithPreset(padId, synthInfo.type, preset, store),
@@ -669,8 +712,8 @@ function buildQuickAssignSubmenu(
           ],
         };
       }
-      
-      // No presets - direct assignment
+
+      // No presets — direct assignment
       return {
         id: `qa-${synthInfo.type.toLowerCase()}`,
         label: synthInfo.name,
@@ -686,6 +729,39 @@ function buildQuickAssignSubmenu(
   }
 
   return items;
+}
+
+/** Assign the synth's default config and overlay a SynthPreset's synth-specific
+ *  params (envelope / filter / oscillator / etc.) on top. Used by the empty-pad
+ *  context menu so picking "MonoSynth → Acid Bass" creates the pad in one
+ *  click with the right character. */
+function assignSynthWithSynthPreset(
+  padId: number,
+  synthType: SynthType,
+  preset: SynthPreset,
+  store: ReturnType<typeof useDrumPadStore.getState>,
+): void {
+  // 1. Assign the base synth (creates default config via assignGeneralSynth)
+  assignGeneralSynth(padId, synthType, store);
+
+  // 2. Merge the SynthPreset's config into the freshly-assigned synthConfig.
+  //    Zustand's set() is synchronous so this read sees the write from step 1.
+  const program = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
+  const pad = program?.pads.find((p) => p.id === padId);
+  if (!pad?.synthConfig) return;
+
+  const padInstId = PAD_INSTRUMENT_BASE + padId;
+  try { getToneEngine().disposeInstrument(padInstId); } catch { /* ok */ }
+
+  store.updatePad(padId, {
+    name: preset.name,
+    presetName: preset.name,
+    synthConfig: {
+      ...pad.synthConfig,
+      ...preset.config,
+      id: padInstId,
+    } as any,
+  });
 }
 
 function assignSynthWithPreset(
