@@ -503,20 +503,31 @@ export function useMIDIPadRouting() {
     const manager = getMIDIManager();
 
     const handler = (message: MIDIMessage) => {
+      // Temporary diagnostic: surface every incoming MIDI message type so
+      // we can see whether the MPK is sending Program Change at all.
+      if (message.type === 'programChange' || message.type === 'other') {
+        console.log('[MIDIPadRouting] message:', message.type, 'program=', message.program, 'ch=', message.channel);
+      }
+
       const view = useUIStore.getState().activeView;
-      if (!PAD_VIEWS.has(view)) return;
 
       // Program Change — Akai MPK Mini has 8 programs (PROG button cycles
       // through 1-8). Map MIDI PC value 0-7 to DEViLBOX MPK slot 1-8.
+      // Check BEFORE the PAD_VIEWS guard so a program switch sent while the
+      // user is in (say) tracker view still swaps the slot — they'd want
+      // the right kit loaded before they switch back.
       if (message.type === 'programChange' && message.program !== undefined) {
         const slot = (message.program % MPK_SLOT_COUNT) + 1;
         const id = mpkSlotId(slot);
         const store = useDrumPadStore.getState();
+        console.log('[MIDIPadRouting] PC', message.program, '→ slot', slot, '(' + id + ')', 'exists=', store.programs.has(id));
         if (store.programs.has(id)) {
           store.loadProgram(id);
         }
         return;
       }
+
+      if (!PAD_VIEWS.has(view)) return;
 
       if (message.note === undefined || message.note < MIDI_PAD_LO || message.note > MIDI_PAD_HI) return;
 
