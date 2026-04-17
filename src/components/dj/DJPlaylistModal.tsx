@@ -69,6 +69,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
 import { Button } from '@/components/ui/Button';
 import { DJ_FX_PRESETS } from './DJPlaylistPanel';
+import { DJTrackEditModal } from './DJTrackEditModal';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ function downloadFile(content: string, filename: string, mimeType: string): void
   URL.revokeObjectURL(url);
 }
 
-const TRACK_ROW_HEIGHT = 40;
+const TRACK_ROW_HEIGHT = 44;
 
 // ── Sortable Track Row (enhanced for modal) ──────────────────────────────────
 
@@ -253,46 +254,50 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       ) : null}
 
       {/* Track name */}
-      <span className={`flex-1 text-[13px] font-mono truncate min-w-0 ${
+      <span className={`flex-1 text-sm font-mono truncate min-w-0 ${
         isLoading ? 'text-accent-primary' : track.isBad ? 'text-accent-error/80' : track.played ? 'text-text-muted/40' : 'text-text-primary'
       }`}>
         {track.trackName}
       </span>
 
       {/* Format badge */}
-      <span className="text-[9px] font-mono text-text-muted/30 shrink-0 px-1 bg-dark-bgTertiary rounded">
+      <span className="text-[9px] font-mono text-text-muted/30 shrink-0 w-12 text-center px-1 bg-dark-bgTertiary rounded">
         {track.format}
       </span>
 
       {/* BPM */}
-      {track.bpm > 0 && (
-        <span className="text-[11px] font-mono text-text-muted/50 shrink-0 w-8 text-right">{track.bpm}</span>
-      )}
+      <span className="text-[11px] font-mono text-text-muted/50 shrink-0 w-8 text-right">
+        {track.bpm > 0 ? track.bpm : ''}
+      </span>
 
       {/* Musical key (Camelot) */}
-      {track.musicalKey && (
-        <span
-          className="text-[10px] font-mono font-bold shrink-0 px-1.5 py-0.5 rounded"
-          style={{ color: camelotColor(track.musicalKey), backgroundColor: `${camelotColor(track.musicalKey)}15` }}
-        >
-          {camelotDisplay(track.musicalKey)}
-        </span>
-      )}
+      <span className="shrink-0 w-10 text-center">
+        {track.musicalKey ? (
+          <span
+            className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
+            style={{ color: camelotColor(track.musicalKey), backgroundColor: `${camelotColor(track.musicalKey)}15` }}
+          >
+            {camelotDisplay(track.musicalKey)}
+          </span>
+        ) : null}
+      </span>
 
       {/* Energy bar */}
-      {track.energy != null && track.energy > 0 && (
-        <div className="w-10 h-1.5 bg-dark-bgTertiary rounded-full shrink-0 overflow-hidden" title={`Energy: ${Math.round(track.energy * 100)}%`}>
-          <div
-            className="h-full rounded-full bg-accent-warning"
-            style={{ width: `${track.energy * 100}%` }}
-          />
-        </div>
-      )}
+      <span className="shrink-0 w-10">
+        {track.energy != null && track.energy > 0 ? (
+          <div className="w-full h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden" title={`Energy: ${Math.round(track.energy * 100)}%`}>
+            <div
+              className="h-full rounded-full bg-accent-warning"
+              style={{ width: `${track.energy * 100}%` }}
+            />
+          </div>
+        ) : null}
+      </span>
 
       {/* Duration */}
-      {track.duration > 0 && (
-        <span className="text-[11px] font-mono text-text-muted/40 shrink-0 w-10 text-right">{formatDuration(track.duration)}</span>
-      )}
+      <span className="text-[11px] font-mono text-text-muted/40 shrink-0 w-10 text-right">
+        {track.duration > 0 ? formatDuration(track.duration) : ''}
+      </span>
 
       {/* Per-song FX preset indicator */}
       {track.masterFxPreset && (
@@ -490,8 +495,10 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
+  const [editTrack, setEditTrack] = useState<{ index: number; track: PlaylistTrack } | null>(null);
   const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
 
@@ -499,10 +506,27 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const importInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastClickedRef = useRef<number>(-1);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Context menu
   const contextMenu = useContextMenu();
   const [contextMenuTrackIndex, setContextMenuTrackIndex] = useState<number>(-1);
+
+  // Close sort/export menus on outside click
+  useEffect(() => {
+    if (!showSortMenu && !showExportMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (showSortMenu && sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSortMenu, showExportMenu]);
 
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
   const selectedSet = useMemo(() => new Set(selectedTrackIndices), [selectedTrackIndices]);
@@ -1119,6 +1143,12 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     }
 
     items.push({
+      id: 'edit-info',
+      label: 'Edit Track Info',
+      onClick: () => setEditTrack({ index: contextMenuTrackIndex, track }),
+    });
+
+    items.push({
       id: 'copy-info',
       label: 'Copy Track Info',
       onClick: () => {
@@ -1287,6 +1317,16 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const analyzedCount = activePlaylist
     ? activePlaylist.tracks.filter(t => t.bpm > 0 || t.musicalKey).length
     : 0;
+  const playedCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.played).length
+    : 0;
+
+  const handleClearPlayed = useCallback(() => {
+    if (!activePlaylistId || !activePlaylist) return;
+    activePlaylist.tracks.forEach((_, i) => {
+      updateTrackMeta(activePlaylistId, i, { played: undefined });
+    });
+  }, [activePlaylistId, activePlaylist, updateTrackMeta]);
 
   // ── Hidden file inputs ────────────────────────────────────────────────────
 
@@ -1300,18 +1340,19 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl" closeOnEscape closeOnBackdropClick>
-      <div className="flex flex-col h-[80vh]">
+    <Modal isOpen={isOpen} onClose={onClose} size="fullscreen" closeOnEscape closeOnBackdropClick={false}>
+      <div className="flex flex-col h-full">
         {/* Header */}
         <ModalHeader
           title="Playlist Manager"
+          subtitle="Double-click to play · Drag to reorder · Right-click for more"
           icon={<ListMusic size={18} />}
           onClose={onClose}
         />
 
         <div className="flex flex-1 min-h-0">
           {/* ── Left sidebar: Playlist list ──────────────────────────── */}
-          <div className="w-52 shrink-0 border-r border-dark-border bg-dark-bg flex flex-col">
+          <div className="w-60 shrink-0 border-r border-dark-border bg-dark-bg flex flex-col">
             <div className="px-3 py-2 border-b border-dark-border flex items-center justify-between">
               <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Playlists</span>
               <div className="flex items-center gap-1">
@@ -1403,7 +1444,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Filter tracks..."
-                      className="w-32 bg-transparent text-[11px] font-mono text-text-primary placeholder:text-text-muted/30 outline-none"
+                      className="w-48 bg-transparent text-[11px] font-mono text-text-primary placeholder:text-text-muted/30 outline-none"
                     />
                     {searchQuery && (
                       <>
@@ -1422,7 +1463,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   </button>
 
                   {/* Sort */}
-                  <div className="relative">
+                  <div ref={sortMenuRef} className="relative">
                     <button
                       onClick={() => setShowSortMenu(v => !v)}
                       className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
@@ -1454,20 +1495,26 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   </Button>
 
                   {/* Export */}
-                  <div className="relative group">
-                    <button className="p-1 text-text-muted/40 hover:text-text-primary transition-colors" title="Export">
+                  <div ref={exportMenuRef} className="relative">
+                    <button
+                      onClick={() => setShowExportMenu(v => !v)}
+                      className={`p-1 transition-colors ${showExportMenu ? 'text-accent-primary' : 'text-text-muted/40 hover:text-text-primary'}`}
+                      title="Export"
+                    >
                       <Download size={13} />
                     </button>
-                    <div className="hidden group-hover:flex absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded-lg shadow-xl min-w-[130px] py-1 flex-col">
-                      <button onClick={handleExportJSON}
-                        className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
-                        Export JSON
-                      </button>
-                      <button onClick={handleExportM3U}
-                        className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
-                        Export M3U
-                      </button>
-                    </div>
+                    {showExportMenu && (
+                      <div className="absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded-lg shadow-xl min-w-[130px] py-1">
+                        <button onClick={() => { handleExportJSON(); setShowExportMenu(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
+                          Export JSON
+                        </button>
+                        <button onClick={() => { handleExportM3U(); setShowExportMenu(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
+                          Export M3U
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1479,18 +1526,41 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   </div>
                 )}
 
+                {/* Column headers */}
+                {filteredTracks.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1 border-b border-dark-border bg-dark-bg/50 text-[9px] font-mono text-text-muted/40 uppercase tracking-wider select-none shrink-0">
+                    <span className="w-6 shrink-0" />
+                    <span className="w-6 text-right shrink-0">#</span>
+                    <span className="w-4 shrink-0" />
+                    <span className="flex-1 min-w-0">Title</span>
+                    <span className="shrink-0 w-12 text-center">Format</span>
+                    <span className="shrink-0 w-8 text-right">BPM</span>
+                    <span className="shrink-0 w-10 text-center">Key</span>
+                    <span className="shrink-0 w-10 text-center">Energy</span>
+                    <span className="shrink-0 w-10 text-right">Time</span>
+                    <span className="shrink-0 w-6" />
+                    <span className="shrink-0 w-36" />
+                  </div>
+                )}
+
                 {/* Track list */}
                 {filteredTracks.length === 0 ? (
                   <div
-                    className="flex-1 flex items-center justify-center"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleDropOnPlaylist}
+                    className="flex-1 flex items-center justify-center border-2 border-dashed border-dark-border/30 m-4 rounded-xl"
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent-primary/50', 'bg-accent-primary/5'); }}
+                    onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent-primary/50', 'bg-accent-primary/5'); }}
+                    onDrop={(e) => { e.currentTarget.classList.remove('border-accent-primary/50', 'bg-accent-primary/5'); handleDropOnPlaylist(e); }}
                   >
                     <div className="text-center">
-                      <Music size={32} className="text-text-muted/20 mx-auto mb-2" />
-                      <p className="text-[11px] font-mono text-text-muted/40">
-                        {isFiltered ? 'No tracks match your search' : 'Drop files here or click + to add tracks'}
+                      <Music size={48} className="text-text-muted/15 mx-auto mb-3" />
+                      <p className="text-[13px] font-mono text-text-muted/40 mb-1">
+                        {isFiltered ? 'No tracks match your search' : 'Drop files here to add tracks'}
                       </p>
+                      {!isFiltered && (
+                        <p className="text-[11px] font-mono text-text-muted/25">
+                          or click <span className="text-accent-primary/50">+ Add</span> in the toolbar
+                        </p>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1579,7 +1649,18 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                     {activePlaylist.tracks.length} tracks
                     {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
                     {analyzedCount > 0 && ` · ${analyzedCount} analyzed`}
+                    {playedCount > 0 && ` · ${playedCount} played`}
                   </span>
+
+                  {playedCount > 0 && (
+                    <button
+                      onClick={handleClearPlayed}
+                      className="text-text-muted/40 hover:text-text-primary transition-colors"
+                      title="Clear played marks"
+                    >
+                      Clear played
+                    </button>
+                  )}
 
                   <div className="flex-1" />
 
@@ -1633,9 +1714,12 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <ListMusic size={40} className="text-text-muted/15 mx-auto mb-3" />
-                  <p className="text-[12px] font-mono text-text-muted/40 mb-3">
-                    {playlists.length > 0 ? 'Select a playlist' : 'Create a playlist to get started'}
+                  <ListMusic size={56} className="text-text-muted/10 mx-auto mb-4" />
+                  <p className="text-[14px] font-mono text-text-muted/30 mb-1">
+                    {playlists.length > 0 ? 'Select a playlist' : 'No playlists yet'}
+                  </p>
+                  <p className="text-[11px] font-mono text-text-muted/20 mb-4">
+                    {playlists.length > 0 ? 'Choose from the sidebar to start curating' : 'Create your first playlist to get started'}
                   </p>
                   {playlists.length === 0 && (
                     <Button variant="primary" size="sm" onClick={() => { setIsCreating(true); setNewName(''); }}>
@@ -1653,6 +1737,17 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
       </div>
 
       {hiddenInputs}
+
+      {/* Track edit modal */}
+      {editTrack && activePlaylistId && (
+        <DJTrackEditModal
+          isOpen={!!editTrack}
+          onClose={() => setEditTrack(null)}
+          playlistId={activePlaylistId}
+          trackIndex={editTrack.index}
+          track={editTrack.track}
+        />
+      )}
     </Modal>
   );
 };
