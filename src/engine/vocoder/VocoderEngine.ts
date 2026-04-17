@@ -76,9 +76,11 @@ export class VocoderEngine {
     this.audioContext = Tone.getContext().rawContext as AudioContext;
     this.destination = destination || this.audioContext.destination;
 
-    // Mic preamp — built-in laptop mics are often very quiet
+    // Mic preamp — built-in laptop mics with echoCancellation output
+    // surprisingly low raw signal (0.003-0.01 peak even during speech).
+    // Boost further so the vocoder has enough headroom to track formants.
     this.micPreamp = this.audioContext.createGain();
-    this.micPreamp.gain.value = 2.0;
+    this.micPreamp.gain.value = 4.0;
 
     this.autoTuneInsert = this.audioContext.createGain();
     this.autoTuneInsert.gain.value = 1.0;
