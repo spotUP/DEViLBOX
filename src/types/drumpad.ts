@@ -12,7 +12,7 @@ export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
 export type PlayMode = 'oneshot' | 'sustain';
 export type DecayMode = 'start' | 'end';  // Decay from note-on or sample-end
-export type PadBank = 'A' | 'B' | 'C' | 'D';
+export type PadBank = 'A' | 'B';
 
 export interface MpcResampleConfig {
   enabled: boolean;
@@ -50,7 +50,7 @@ export type ScratchActionId =
 export type VelocityCurve = 'linear' | 'exponential' | 'logarithmic' | 'scurve' | 'fixed';
 
 export interface DrumPad {
-  id: number;              // 1-64
+  id: number;              // 1-16
   sample: SampleData | null;
   name: string;
   color?: string;          // Custom pad color (CSS hex, e.g. '#ff6b35')
@@ -119,7 +119,7 @@ export interface DrumPad {
 export interface DrumProgram {
   id: string;              // 'A-01' to 'Z-99'
   name: string;
-  pads: DrumPad[];         // 64 pads (4 banks of 16)
+  pads: DrumPad[];         // 16 pads (2 banks of 8) — matches Akai MPK mini's 8 physical pads × 2 banks per program
   masterLevel: number;     // 0-127
   masterTune: number;      // -12 to +12 semitones
   mpcResample?: MpcResampleConfig;
@@ -187,7 +187,7 @@ export function createEmptyProgram(id: string, name: string): DrumProgram {
   return {
     id,
     name,
-    pads: Array.from({ length: 64 }, (_, i) => createEmptyPad(i + 1)),
+    pads: Array.from({ length: 16 }, (_, i) => createEmptyPad(i + 1)),
     masterLevel: 100,
     masterTune: 0,
   };
@@ -232,12 +232,9 @@ export function createDefaultPadFX(): EffectConfig[] {
   ] as EffectConfig[];
 }
 
-/** Get the bank letter for a pad ID (1-64) */
+/** Get the bank letter for a pad ID (1-16) */
 export function getPadBank(padId: number): PadBank {
-  if (padId <= 16) return 'A';
-  if (padId <= 32) return 'B';
-  if (padId <= 48) return 'C';
-  return 'D';
+  return padId <= 8 ? 'A' : 'B';
 }
 
 /** Apply velocity curve transformation (input: 0-127, output: 0-127) */
@@ -266,10 +263,10 @@ export function applyVelocityCurve(velocity: number, curve: VelocityCurve = 'lin
   return Math.max(1, Math.min(127, Math.round(result * 127)));
 }
 
-/** Get the 16 pads for a given bank */
+/** Get the 8 pads for a given bank */
 export function getBankPads(pads: DrumPad[], bank: PadBank): DrumPad[] {
-  const bankIndex = { A: 0, B: 1, C: 2, D: 3 }[bank];
-  return pads.slice(bankIndex * 16, (bankIndex + 1) * 16);
+  const bankIndex = { A: 0, B: 1 }[bank];
+  return pads.slice(bankIndex * 8, (bankIndex + 1) * 8);
 }
 
 /** Create a pad-owned synth-based InstrumentConfig (used when user picks a synth type in PadEditor) */
@@ -478,98 +475,51 @@ export function createDJFXProgram(): DrumProgram {
 }
 
 /**
- * Factory preset: DJ Complete — All scratch patterns, fader LFO, deck FX, and beat jumps.
- * Bank A: 16 scratch patterns (Baby through Phaser)
- * Bank B: 3 remaining scratches + stop + 5 fader LFO + 7 deck FX
- * Bank C: EQ kills + filter reset + beat jumps + performance FX
+ * Factory preset: DJ Complete — top 8 scratch patterns + deck FX, sized for
+ * 8 physical pads × 2 banks = 16 total.
+ * Bank A (pads 1–8): 8 essential scratch patterns
+ * Bank B (pads 9–16): 4 deck FX + 4 performance FX
  */
 export function createDJCompleteProgram(): DrumProgram {
   const program = createEmptyProgram('D-01', 'DJ Complete');
 
-  // ── Bank A (pads 1–16): Scratch patterns ──────────────────────────
+  // ── Bank A (pads 1–8): essential scratch patterns ─────────────────
   const scratchPads: { name: string; color: string; action: ScratchActionId }[] = [
-    { name: 'Baby',     color: '#3b82f6', action: 'scratch_baby' },
-    { name: 'Trans',    color: '#ef4444', action: 'scratch_trans' },
-    { name: 'Flare',    color: '#f97316', action: 'scratch_flare' },
-    { name: 'Hydro',    color: '#22c55e', action: 'scratch_hydro' },
-    { name: 'Crab',     color: '#8b5cf6', action: 'scratch_crab' },
-    { name: 'Orbit',    color: '#06b6d4', action: 'scratch_orbit' },
-    { name: 'Chirp',    color: '#eab308', action: 'scratch_chirp' },
-    { name: 'Stab',     color: '#ec4899', action: 'scratch_stab' },
-    { name: 'Scribble', color: '#a3e635', action: 'scratch_scribble' },
-    { name: 'Tear',     color: '#f43f5e', action: 'scratch_tear' },
-    { name: 'Uzi',      color: '#fb923c', action: 'scratch_uzi' },
-    { name: 'Twiddle',  color: '#a855f7', action: 'scratch_twiddle' },
-    { name: '8-Crab',   color: '#d946ef', action: 'scratch_8crab' },
-    { name: '3-Flare',  color: '#14b8a6', action: 'scratch_3flare' },
-    { name: 'Laser',    color: '#fbbf24', action: 'scratch_laser' },
-    { name: 'Phaser',   color: '#6366f1', action: 'scratch_phaser' },
+    { name: 'Baby',   color: '#3b82f6', action: 'scratch_baby' },
+    { name: 'Trans',  color: '#ef4444', action: 'scratch_trans' },
+    { name: 'Flare',  color: '#f97316', action: 'scratch_flare' },
+    { name: 'Crab',   color: '#8b5cf6', action: 'scratch_crab' },
+    { name: 'Chirp',  color: '#eab308', action: 'scratch_chirp' },
+    { name: 'Stab',   color: '#ec4899', action: 'scratch_stab' },
+    { name: 'Tear',   color: '#f43f5e', action: 'scratch_tear' },
+    { name: 'STOP',   color: '#991b1b', action: 'scratch_stop' },
   ];
 
   scratchPads.forEach((sp, i) => {
-    const pad = program.pads[i]; // pads 1–16
+    const pad = program.pads[i]; // pads 1–8 (bank A)
     pad.name = sp.name;
     pad.color = sp.color;
     pad.scratchAction = sp.action;
     pad.playMode = 'sustain'; // Hold to scratch
   });
 
-  // ── Bank B (pads 17–32): Remaining scratches + LFO + Deck FX ─────
-  const bankBPads: { name: string; color: string; scratch?: ScratchActionId; fx?: DjFxActionId }[] = [
-    { name: 'Tweak',      color: '#84cc16', scratch: 'scratch_tweak' },
-    { name: 'Drag',       color: '#78716c', scratch: 'scratch_drag' },
-    { name: 'Vibrato',    color: '#c084fc', scratch: 'scratch_vibrato' },
-    { name: 'STOP',       color: '#991b1b', scratch: 'scratch_stop' },
-    // Fader LFO divisions (toggle — press again to stop)
-    { name: 'LFO 1/4',   color: '#ef4444', scratch: 'fader_lfo_1_4' },
-    { name: 'LFO 1/8',   color: '#f97316', scratch: 'fader_lfo_1_8' },
-    { name: 'LFO 1/16',  color: '#eab308', scratch: 'fader_lfo_1_16' },
-    { name: 'LFO 1/32',  color: '#a3e635', scratch: 'fader_lfo_1_32' },
-    // Deck FX (real DJ engine effects)
-    { name: 'HPF Sweep',  color: '#8b5cf6', fx: 'fx_deck_hpf_sweep' },
-    { name: 'LPF Sweep',  color: '#3b82f6', fx: 'fx_deck_lpf_sweep' },
-    { name: 'Echo Out',   color: '#22c55e', fx: 'fx_deck_echo_out' },
-    { name: 'Brake',      color: '#ef4444', fx: 'fx_deck_brake' },
+  // ── Bank B (pads 9–16): deck FX + performance FX ──────────────────
+  const bankBPads: { name: string; color: string; fx: DjFxActionId }[] = [
+    { name: 'HPF Sweep',   color: '#8b5cf6', fx: 'fx_deck_hpf_sweep' },
+    { name: 'LPF Sweep',   color: '#3b82f6', fx: 'fx_deck_lpf_sweep' },
+    { name: 'Echo Out',    color: '#22c55e', fx: 'fx_deck_echo_out' },
+    { name: 'Brake',       color: '#ef4444', fx: 'fx_deck_brake' },
     { name: 'Stutter 1/8', color: '#f43f5e', fx: 'fx_stutter_8' },
-    { name: 'Dub Siren',  color: '#fb923c', fx: 'fx_dub_siren' },
-    { name: 'Air Horn',   color: '#fbbf24', fx: 'fx_air_horn' },
+    { name: 'Dub Siren',   color: '#fb923c', fx: 'fx_dub_siren' },
+    { name: 'Air Horn',    color: '#fbbf24', fx: 'fx_air_horn' },
     { name: 'Noise Riser', color: '#06b6d4', fx: 'fx_noise_riser' },
   ];
 
   bankBPads.forEach((bp, i) => {
-    const pad = program.pads[16 + i]; // pads 17–32
+    const pad = program.pads[8 + i]; // pads 9–16 (bank B)
     pad.name = bp.name;
     pad.color = bp.color;
-    if (bp.scratch) pad.scratchAction = bp.scratch;
-    if (bp.fx) pad.djFxAction = bp.fx;
-    pad.playMode = 'sustain';
-  });
-
-  // ── Bank C (pads 33–48): EQ kills + filter + beat jumps + extra FX ─
-  const bankCPads: { name: string; color: string; fx: DjFxActionId }[] = [
-    { name: 'Kill Lo',    color: '#f97316', fx: 'fx_deck_kill_lo' },
-    { name: 'Kill Mid',   color: '#eab308', fx: 'fx_deck_kill_mid' },
-    { name: 'Kill Hi',    color: '#06b6d4', fx: 'fx_deck_kill_hi' },
-    { name: 'Filt Reset', color: '#14b8a6', fx: 'fx_deck_filter_reset' },
-    { name: 'Jump -16',   color: '#8b5cf6', fx: 'fx_deck_jump_m16' },
-    { name: 'Jump -4',    color: '#a855f7', fx: 'fx_deck_jump_m4' },
-    { name: 'Jump -1',    color: '#c084fc', fx: 'fx_deck_jump_m1' },
-    { name: 'Jump +1',    color: '#c084fc', fx: 'fx_deck_jump_p1' },
-    { name: 'Jump +4',    color: '#d946ef', fx: 'fx_deck_jump_p4' },
-    { name: 'Jump +16',   color: '#ec4899', fx: 'fx_deck_jump_p16' },
-    { name: 'Stutter 1/4', color: '#f43f5e', fx: 'fx_stutter_4' },
-    { name: 'Stutter 1/16', color: '#fb7185', fx: 'fx_stutter_16' },
-    { name: 'Tape Stop',  color: '#78716c', fx: 'fx_tape_stop' },
-    { name: 'Half Speed', color: '#a8a29e', fx: 'fx_half_speed' },
-    { name: 'Bitcrush',   color: '#84cc16', fx: 'fx_bitcrush' },
-    { name: 'Ring Mod',   color: '#22d3ee', fx: 'fx_ring_mod' },
-  ];
-
-  bankCPads.forEach((cp, i) => {
-    const pad = program.pads[32 + i]; // pads 33–48
-    pad.name = cp.name;
-    pad.color = cp.color;
-    pad.djFxAction = cp.fx;
+    pad.djFxAction = bp.fx;
     pad.playMode = 'sustain';
   });
 

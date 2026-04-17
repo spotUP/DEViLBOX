@@ -52,14 +52,14 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const { programs, currentProgramId } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
   const controllerPadCount = useDrumPadStore(s => s.controllerPadCount);
-  const visiblePads = Math.min(controllerPadCount, 16);
+  const visiblePads = Math.min(controllerPadCount, 8);
 
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Reset focused pad and clear visual state when bank changes
   useEffect(() => {
-    const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+    const bankOffset = { A: 0, B: 8 }[currentBank];
     setFocusedPadId(bankOffset + 1);
     setPadVelocities({});
     releaseAllHeld();
@@ -122,7 +122,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
         return;
       }
 
-      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+      const bankOffset = { A: 0, B: 8 }[currentBank];
       const bankStart = bankOffset + 1;
       const bankEnd = bankOffset + visiblePads;
 
@@ -252,7 +252,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 
-  const bankButtons: PadBank[] = ['A', 'B', 'C', 'D'];
+  const bankButtons: PadBank[] = ['A', 'B'];
   const bankLoadedCount = bankPads.slice(0, visiblePads).filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
   const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null || p.synthConfig || p.instrumentId != null).length;
 
@@ -311,7 +311,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
             Import
           </button>
           <div className="text-xs text-text-muted" title={`${totalLoadedCount} samples across all banks`}>
-            {bankLoadedCount}/{visiblePads} ({totalLoadedCount}/64)
+            {bankLoadedCount}/{visiblePads} ({totalLoadedCount}/16)
           </div>
         </div>
       </div>
@@ -335,11 +335,11 @@ export const PadGrid: React.FC<PadGridProps> = ({
         ))}
       </div>
 
-      {/* Responsive Pad Grid (4x4 landscape, 2x8 portrait) — fills remaining height */}
+      {/* Responsive Pad Grid — 8 pads (4x2 landscape, 2x4 portrait) */}
       <div
         ref={gridRef}
         className={`grid flex-1 min-h-0 ${performanceMode ? 'gap-3' : 'gap-1.5'} ${gridCols === 2 ? 'grid-cols-2' : 'grid-cols-4'}`}
-        style={{ gridTemplateRows: `repeat(${gridCols === 2 ? 8 : 4}, 1fr)` }}
+        style={{ gridTemplateRows: `repeat(${gridCols === 2 ? 4 : 2}, 1fr)` }}
         role="grid"
         aria-label="Drum pad grid"
       >
