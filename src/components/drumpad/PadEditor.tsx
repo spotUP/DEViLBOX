@@ -49,8 +49,9 @@ const OUTPUT_OPTIONS: { value: OutputBus; label: string }[] = [
 ];
 
 const PLAY_MODE_OPTIONS: { value: DrumPad['playMode']; label: string }[] = [
-  { value: 'oneshot', label: 'One-shot' },
-  { value: 'sustain', label: 'Sustain (hold)' },
+  { value: 'oneshot', label: 'One-shot (fires once)' },
+  { value: 'sustain', label: 'Sustain (hold to engage)' },
+  { value: 'toggle',  label: 'Toggle (click on / click off)' },
 ];
 
 const VELOCITY_CURVE_OPTIONS: { value: VelocityCurve; label: string }[] = [
