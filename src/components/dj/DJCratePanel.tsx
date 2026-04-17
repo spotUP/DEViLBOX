@@ -28,7 +28,7 @@ interface DJCratePanelProps {
 }
 
 export const DJCratePanel: React.FC<DJCratePanelProps> = ({ onClose, onLoadSeratoTrack }) => {
-  const [activeTab, setActiveTab] = useState<CrateTab>('playlists');
+  const [activeTab, setActiveTab] = useState<CrateTab>('browser');
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   const handleTabClick = useCallback((tab: CrateTab) => {
