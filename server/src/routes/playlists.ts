@@ -18,7 +18,7 @@ const router = Router();
 router.post('/', authenticateToken as any, (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { playlistId, name, description, visibility, tracks, totalDuration } = req.body;
+    const { playlistId, name, description, visibility, tracks, environment, totalDuration } = req.body;
 
     if (!playlistId || !name || !tracks) {
       return res.status(400).json({ error: 'playlistId, name, and tracks are required' });
@@ -29,6 +29,9 @@ router.post('/', authenticateToken as any, (req: AuthRequest, res: Response) => 
     const trackCount = Array.isArray(tracks) ? tracks.length : 0;
     const dur = totalDuration || 0;
     const desc = description || '';
+
+    // Store full payload: tracks + environment (crossfader, volumes, master FX, drumpads, Auto DJ)
+    const payload = JSON.stringify({ tracks, environment: environment || null });
 
     // Upsert: check if this user already saved this playlist
     const existing = db.prepare(
@@ -42,14 +45,14 @@ router.post('/', authenticateToken as any, (req: AuthRequest, res: Response) => 
         UPDATE shared_playlists
         SET name = ?, description = ?, visibility = ?, track_count = ?, total_duration = ?, data = ?, updated_at = ?
         WHERE id = ?
-      `).run(name, desc, vis, trackCount, dur, JSON.stringify(tracks), now, existing.id);
+      `).run(name, desc, vis, trackCount, dur, payload, now, existing.id);
       cloudId = existing.id;
     } else {
       cloudId = randomBytes(16).toString('hex');
       db.prepare(`
         INSERT INTO shared_playlists (id, user_id, playlist_id, name, description, visibility, track_count, total_duration, data, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(cloudId, userId, playlistId, name, desc, vis, trackCount, dur, JSON.stringify(tracks), now, now);
+      `).run(cloudId, userId, playlistId, name, desc, vis, trackCount, dur, payload, now, now);
     }
 
     // Get username for response
@@ -143,6 +146,11 @@ router.get('/:id', optionalAuth as any, (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Playlist not found' });
     }
 
+    // Parse stored data — may be { tracks, environment } (new) or raw tracks array (legacy)
+    const parsed = JSON.parse(row.data);
+    const tracks = Array.isArray(parsed) ? parsed : (parsed.tracks || []);
+    const environment = Array.isArray(parsed) ? null : (parsed.environment || null);
+
     res.json({
       id: row.id,
       playlistId: row.playlist_id,
@@ -151,7 +159,8 @@ router.get('/:id', optionalAuth as any, (req: AuthRequest, res: Response) => {
       visibility: row.visibility,
       trackCount: row.track_count,
       totalDuration: row.total_duration,
-      tracks: JSON.parse(row.data),
+      tracks,
+      environment,
       authorName: row.author_name,
       authorId: row.user_id,
       createdAt: row.created_at,

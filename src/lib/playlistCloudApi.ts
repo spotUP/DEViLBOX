@@ -40,6 +40,7 @@ export interface CloudPlaylistSummary {
 
 export interface CloudPlaylistFull extends CloudPlaylistSummary {
   tracks: unknown[];
+  environment: unknown | null;
 }
 
 export interface SavePlaylistResult {
@@ -60,6 +61,7 @@ export async function savePlaylistToCloud(params: {
   description?: string;
   visibility?: 'private' | 'public';
   tracks: unknown[];
+  environment?: unknown;
   totalDuration?: number;
 }): Promise<SavePlaylistResult> {
   if (!isAuthenticated()) throw new Error('Not authenticated');
