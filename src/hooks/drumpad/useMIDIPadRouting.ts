@@ -360,8 +360,21 @@ export function useMIDIPadRouting() {
       useVocoderStore.getState().setPTT(true);
     }
 
-    // DJ FX with quantization
+    // DJ FX — behavior depends on pad.playMode:
+    //   'sustain'  = hold to engage, disengage on release   (filter sweeps, EQ kills)
+    //   'toggle'   = click to engage, click again to disengage  (echo out, brake)
+    //   'oneshot'  = fire + let the action run its own timeline  (beat jumps, air horn)
     if (pad.djFxAction) {
+      const fxMode = pad.playMode ?? 'sustain';
+
+      // Toggle OFF: second press on an already-active toggle pad disengages.
+      if (fxMode === 'toggle' && _heldPads.has(padId)) {
+        DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+        setFxPadActive(padId, false);
+        _heldPads.delete(padId);
+        return;
+      }
+
       const shouldQuantize =
         pad.djFxAction.startsWith('fx_stutter') ||
         pad.djFxAction.startsWith('fx_dub_echo') ||
@@ -374,7 +387,10 @@ export function useMIDIPadRouting() {
         if (!pad.djFxAction) return;
         DJ_FX_ACTION_MAP[pad.djFxAction]?.engage();
         setFxPadActive(padId, true);
-        _heldPads.add(padId);
+        // Only 'sustain' and 'toggle' need held-state tracking so releasePad
+        // can disengage (sustain) or the next press can disengage (toggle).
+        // 'oneshot' fires and forgets — no disengage path.
+        if (fxMode !== 'oneshot') _heldPads.add(padId);
       };
 
       if (shouldQuantize && getQuantizeMode() !== 'off') {
@@ -437,6 +453,17 @@ export function useMIDIPadRouting() {
   // ── Full-featured pad release ──
   const releasePad = useCallback((padId: number) => {
     if (!_heldPads.has(padId)) return;
+
+    if (!currentProgram || !_engine) return;
+    const pad = currentProgram.pads.find(p => p.id === padId);
+    if (!pad) return;
+
+    // Toggle-mode djFxAction pads: note-off is a no-op — the pad stays
+    // 'held' so the next press can disengage it.
+    if (pad.djFxAction && pad.playMode === 'toggle') {
+      return;
+    }
+
     _heldPads.delete(padId);
 
     // Restore joystick-modulated synth params to pre-modulation values
@@ -444,13 +471,13 @@ export function useMIDIPadRouting() {
 
     _noteRepeat?.stopRepeat(padId);
 
-    if (!currentProgram || !_engine) return;
-    const pad = currentProgram.pads.find(p => p.id === padId);
-    if (!pad) return;
-
     if (pad.djFxAction) {
-      DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
-      setFxPadActive(padId, false);
+      // Only sustain mode disengages on release. Oneshot actions run their
+      // own timeline; toggle was handled above.
+      if (pad.playMode === 'sustain') {
+        DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
+        setFxPadActive(padId, false);
+      }
     }
 
     // Stop scratch action on release (finish current cycle gracefully)

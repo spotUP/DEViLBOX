@@ -10,7 +10,7 @@ import type { DjFxActionId } from '../engine/drumpad/DjFxActions';
 
 export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
-export type PlayMode = 'oneshot' | 'sustain';
+export type PlayMode = 'oneshot' | 'sustain' | 'toggle';
 export type DecayMode = 'start' | 'end';  // Decay from note-on or sample-end
 export type PadBank = 'A' | 'B';
 
@@ -447,27 +447,29 @@ export function create909Program(): DrumProgram {
 export function createDJFXProgram(): DrumProgram {
   const program = createEmptyProgram('C-01', 'DJ FX');
 
-  const fxPads: { name: string; color: string; action: DjFxActionId }[] = [
-    // Row 1: Deck filter & echo (real DJ engine effects)
-    { name: 'HPF Sweep',    color: '#3b82f6', action: 'fx_deck_hpf_sweep' },
-    { name: 'LPF Sweep',    color: '#6366f1', action: 'fx_deck_lpf_sweep' },
-    { name: 'Echo Out',     color: '#22c55e', action: 'fx_deck_echo_out' },
-    { name: 'Brake',        color: '#ef4444', action: 'fx_deck_brake' },
-    // Row 2: EQ kills & filter reset (real DJ engine effects)
-    { name: 'Kill Lo',      color: '#f97316', action: 'fx_deck_kill_lo' },
-    { name: 'Kill Mid',     color: '#eab308', action: 'fx_deck_kill_mid' },
-    { name: 'Kill Hi',      color: '#a3e635', action: 'fx_deck_kill_hi' },
-    { name: 'Filt Reset',   color: '#14b8a6', action: 'fx_deck_filter_reset' },
-    // Row 3: Beat jumps (real DJ engine effects)
-    { name: 'Jump −16',     color: '#8b5cf6', action: 'fx_deck_jump_m16' },
-    { name: 'Jump −4',      color: '#a855f7', action: 'fx_deck_jump_m4' },
-    { name: 'Jump +4',      color: '#d946ef', action: 'fx_deck_jump_p4' },
-    { name: 'Jump +16',     color: '#ec4899', action: 'fx_deck_jump_p16' },
-    // Row 4: Performance FX & sounds (master bus)
-    { name: 'Stutter 1/8',  color: '#f43f5e', action: 'fx_stutter_8' },
-    { name: 'Dub Siren',    color: '#fb923c', action: 'fx_dub_siren' },
-    { name: 'Air Horn',     color: '#fbbf24', action: 'fx_air_horn' },
-    { name: 'Noise Riser',  color: '#06b6d4', action: 'fx_noise_riser' },
+  // mode per pad: sustain = hold to engage, toggle = click on / click off,
+  // oneshot = fire once and let the effect run its own timeline.
+  const fxPads: { name: string; color: string; action: DjFxActionId; mode: PlayMode }[] = [
+    // Row 1: Deck filter & echo
+    { name: 'HPF Sweep',    color: '#3b82f6', action: 'fx_deck_hpf_sweep',    mode: 'sustain' },
+    { name: 'LPF Sweep',    color: '#6366f1', action: 'fx_deck_lpf_sweep',    mode: 'sustain' },
+    { name: 'Echo Out',     color: '#22c55e', action: 'fx_deck_echo_out',     mode: 'toggle'  },
+    { name: 'Brake',        color: '#ef4444', action: 'fx_deck_brake',        mode: 'toggle'  },
+    // Row 2: EQ kills (hold) + filter reset (oneshot)
+    { name: 'Kill Lo',      color: '#f97316', action: 'fx_deck_kill_lo',      mode: 'sustain' },
+    { name: 'Kill Mid',     color: '#eab308', action: 'fx_deck_kill_mid',     mode: 'sustain' },
+    { name: 'Kill Hi',      color: '#a3e635', action: 'fx_deck_kill_hi',      mode: 'sustain' },
+    { name: 'Filt Reset',   color: '#14b8a6', action: 'fx_deck_filter_reset', mode: 'oneshot' },
+    // Row 3: Beat jumps — instant
+    { name: 'Jump −16',     color: '#8b5cf6', action: 'fx_deck_jump_m16',     mode: 'oneshot' },
+    { name: 'Jump −4',      color: '#a855f7', action: 'fx_deck_jump_m4',      mode: 'oneshot' },
+    { name: 'Jump +4',      color: '#d946ef', action: 'fx_deck_jump_p4',      mode: 'oneshot' },
+    { name: 'Jump +16',     color: '#ec4899', action: 'fx_deck_jump_p16',     mode: 'oneshot' },
+    // Row 4: Performance FX — hold for stutter, toggle for sounds that should cut
+    { name: 'Stutter 1/8',  color: '#f43f5e', action: 'fx_stutter_8',         mode: 'sustain' },
+    { name: 'Dub Siren',    color: '#fb923c', action: 'fx_dub_siren',         mode: 'toggle'  },
+    { name: 'Air Horn',     color: '#fbbf24', action: 'fx_air_horn',          mode: 'oneshot' },
+    { name: 'Noise Riser',  color: '#06b6d4', action: 'fx_noise_riser',       mode: 'toggle'  },
   ];
 
   fxPads.forEach((fx, i) => {
@@ -475,7 +477,7 @@ export function createDJFXProgram(): DrumProgram {
     pad.name = fx.name;
     pad.color = fx.color;
     pad.djFxAction = fx.action;
-    pad.playMode = 'sustain'; // Hold to engage
+    pad.playMode = fx.mode;
   });
 
   return program;
