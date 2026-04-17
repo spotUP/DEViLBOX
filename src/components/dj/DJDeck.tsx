@@ -28,6 +28,7 @@ import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
 import { DeckScratch } from './DeckScratch';
 import { DeckFXPads } from './DeckFXPads';
+import { DeckQuickEQ } from './DeckQuickEQ';
 import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
 // DeckAudioWaveform moved to full-width strip in DJView
@@ -306,6 +307,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         <DeckNudge deckId={deckId} />
         <DeckLoopControls deckId={deckId} />
       </div>
+
+      {/* Quick EQ presets */}
+      <DeckQuickEQ deckId={deckId} />
 
       {/* Performance FX Pads */}
       <DeckFXPads deckId={deckId} />
