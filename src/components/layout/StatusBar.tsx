@@ -427,7 +427,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
   return (
     <div className="flex flex-col">
       {/* MIDI Knob Controls - Expanded (hidden when nothing to control) */}
-      {activeView !== 'vj' && showKnobBar && contextKnobs.length > 0 && (
+      {activeView !== 'vj' && activeView !== 'dj' && showKnobBar && contextKnobs.length > 0 && (
         <div className="bg-dark-bgTertiary border-t border-dark-border px-4 py-2 flex items-center gap-2">
           {/* Page nav left */}
           {showPageNav && (
@@ -504,7 +504,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
         {/* Right: MIDI Device, Audio State & Tips */}
         <div className="flex items-center gap-4">
           {/* Knob Bar Toggle — only show when there are knobs to control */}
-          {activeView !== 'vj' && (contextKnobs.length > 0 || hasMIDIDevice) && (
+          {activeView !== 'vj' && activeView !== 'dj' && (contextKnobs.length > 0 || hasMIDIDevice) && (
             <>
               <button
                 onClick={() => setShowKnobBar(!showKnobBar)}
