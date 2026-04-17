@@ -20,6 +20,7 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { DJDeck } from './DJDeck';
 import { DJMixer } from './DJMixer';
 import { DJCratePanel } from './DJCratePanel';
+import { DJPlaylistModal } from './DJPlaylistModal';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
 import { DJAutoDJPanel } from './DJAutoDJPanel';
@@ -63,6 +64,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
   const [showCrate, setShowCrate] = useState(false);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
   const autoDJBtnRef = useRef<HTMLButtonElement>(null);
   const [autoDJDropdownPos, setAutoDJDropdownPos] = useState({ top: 0, left: 0 });
@@ -402,6 +404,14 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             >
               Crate
             </button>
+            <button
+              onClick={() => setShowPlaylistModal(true)}
+              className="px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
+                border-accent-primary bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+              title="Open playlist manager"
+            >
+              Playlist
+            </button>
           </div>
         </div>
         {/* Portal: renders outside DOM hierarchy so overflow:hidden can't clip it */}
@@ -432,6 +442,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           </div>
         </div>
       )}
+
+      {/* ================================================================== */}
+      {/* PLAYLIST MANAGER (modal — accessible from header)                 */}
+      {/* ================================================================== */}
+      <DJPlaylistModal isOpen={showPlaylistModal} onClose={() => setShowPlaylistModal(false)} />
 
       {/* ================================================================== */}
       {/* AUTO DJ PANEL                                                     */}
