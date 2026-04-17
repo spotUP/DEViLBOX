@@ -827,6 +827,13 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     if (savingPlaylistId) return;
     setSavingPlaylistId(playlist.id);
     try {
+      // Snapshot current DJ environment (crossfader, volumes, master FX, drumpads, Auto DJ)
+      const { snapshotDJEnvironment } = await import('@/lib/dj/djEnvironment');
+      const environment = snapshotDJEnvironment();
+
+      // Also save environment to the local playlist
+      useDJPlaylistStore.getState().saveEnvironmentToPlaylist(playlist.id);
+
       const totalDur = playlist.tracks.reduce((s, t) => s + (t.duration || 0), 0);
       const result = await savePlaylistToCloud({
         playlistId: playlist.id,
@@ -834,6 +841,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
         description: playlist.description,
         visibility: playlist.visibility || 'private',
         tracks: playlist.tracks,
+        environment,
         totalDuration: totalDur,
       });
       setPlaylistCloudId(playlist.id, result.id);
@@ -877,6 +885,22 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
         id: undefined,
       }));
       addTracks(newId, tracks);
+
+      // Restore the DJ environment snapshot if present
+      if (full.environment) {
+        const store = useDJPlaylistStore.getState();
+        // Save environment to the new local playlist
+        const playlist = store.playlists.find(p => p.id === newId);
+        if (playlist) {
+          useDJPlaylistStore.setState((state) => {
+            const p = state.playlists.find(pl => pl.id === newId);
+            if (p) p.environment = full.environment as any;
+          });
+          // Restore live DJ state from the environment
+          const { restoreDJEnvironment } = await import('@/lib/dj/djEnvironment');
+          restoreDJEnvironment(full.environment as any);
+        }
+      }
     } catch (err) {
       console.error('Failed to import community playlist:', err);
     } finally {
