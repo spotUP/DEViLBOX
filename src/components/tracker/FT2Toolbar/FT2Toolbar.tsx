@@ -554,8 +554,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           </div>
         </div>
 
-        {/* Playback buttons — separate block so they wrap below inputs on narrow windows */}
+        {/* Hardware ASID button */}
         <div className="flex items-center gap-2 flex-shrink-0 py-1">
+              <Button
+                variant={asidEnabled ? 'primary' : 'default'}
+                size="sm"
+                onClick={handleToggleASID}
+                title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
+                className={`min-w-[72px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
+              >
+                Hardware
+              </Button>
+        </div>
+        </div>
+      <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
                 onClick={(e) => {
                   if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
@@ -588,18 +600,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 }}
                 title={isPlayingPattern ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Pattern'}
                 className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
-              <Button
-                variant={asidEnabled ? 'primary' : 'default'}
-                size="sm"
-                onClick={handleToggleASID}
-                title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
-                className={`min-w-[72px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
-              >
-                Hardware
-              </Button>
-        </div>
-        </div>
-      <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
