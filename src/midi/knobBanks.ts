@@ -447,6 +447,30 @@ export const JOYSTICK_MAP: Partial<Record<KnobBankMode, JoystickMapping>> = {
     x: { param: 'melodica.vibratoRate', min: 0, max: 10, curve: 'linear' },
     y: { param: 'melodica.brightness', min: 0, max: 1, curve: 'linear' },
   },
+  'Hively': {
+    x: { param: 'hively.filterSpeed', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'hively.filterUpper', min: 0, max: 1, curve: 'linear' },
+  },
+  'Klystrack': {
+    x: { param: 'klystrack.cutoff', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'klystrack.resonance', min: 0, max: 1, curve: 'linear' },
+  },
+  'DX7': {
+    x: { param: 'dx7.algorithm', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'dx7.feedback', min: 0, max: 1, curve: 'linear' },
+  },
+  'SidMon': {
+    x: { param: 'sidmon.filterCutoff', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'sidmon.filterResonance', min: 0, max: 1, curve: 'linear' },
+  },
+  'Geonkick': {
+    x: { param: 'geonkick.osc0Freq', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'geonkick.filterCutoff', min: 0, max: 1, curve: 'linear' },
+  },
+  'CZ101': {
+    x: { param: 'cz101.dcw_rate', min: 0, max: 1, curve: 'linear' },
+    y: { param: 'cz101.dcw_depth', min: 0, max: 1, curve: 'linear' },
+  },
 };
 
 /** Map a SynthType to the appropriate knob bank for auto-switching */
