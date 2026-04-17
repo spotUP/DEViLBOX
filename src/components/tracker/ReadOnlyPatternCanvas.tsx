@@ -127,7 +127,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       textVolume:          t.colors.cellVolume,
       textEffect:          t.colors.cellEffect,
       lineNumber:          t.colors.textMuted,
-      lineNumberHighlight: lightenColor(t.colors.trackerRowHighlight, 0.6),
+      lineNumberHighlight: t.colors.accentSecondary,
       selection:           t.colors.accentGlow,
       bookmark:            t.colors.warning,
     };
