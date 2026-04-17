@@ -1879,9 +1879,9 @@
 .ft2-section {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 10px;
-  padding-right: 10px;
+  gap: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
   height: 32px;
   white-space: nowrap;
   min-width: 0;
