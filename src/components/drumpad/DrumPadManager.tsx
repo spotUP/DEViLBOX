@@ -6,6 +6,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useDrumPadKeyboard } from '@/hooks/drumpad/useDrumPadKeyboard';
 import { PadGrid } from './PadGrid';
 import { PadEditor } from './PadEditor';
+import { MpkStatusBar } from './MpkStatusBar';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -247,7 +248,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </span>
             {!performanceMode && (
               <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
-                MPC-style 64-pad drum machine
+                8 MPK slots · 2 banks · 8 pads each
               </span>
             )}
             {performanceMode && <PerformanceStatus />}
@@ -275,6 +276,9 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             )}
           </div>
         </div>
+
+        {/* MPK-aligned status bar (slots 1-8, program name, bank A/B, knob labels) */}
+        {!performanceMode && <MpkStatusBar />}
 
         {/* Preset strip */}
         <div className="flex items-center gap-1 px-4 py-1.5 border-b border-dark-border bg-dark-bg shrink-0">
