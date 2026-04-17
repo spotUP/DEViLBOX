@@ -304,10 +304,10 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
                 height: 40,
                 transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
                 transform: pressed ? 'scale(0.92)' : 'scale(1)',
-                backgroundColor: active ? colors.bg : 'var(--color-dark-bgTertiary)',
-                color: active ? colors.text : 'var(--color-text-muted)',
-                border: `1px solid ${active ? colors.border : 'var(--color-dark-border)'}`,
-                boxShadow: active ? `0 0 12px ${colors.glow}, inset 0 0 8px ${colors.glow}` : 'none',
+                backgroundColor: active ? colors.bg : 'var(--color-dark-bgHover)',
+                color: active ? colors.text : 'var(--color-text-secondary)',
+                border: `1px solid ${active ? colors.border : 'var(--color-dark-borderLight)'}`,
+                boxShadow: active ? `0 0 12px ${colors.glow}, inset 0 0 8px ${colors.glow}` : 'inset 0 1px 0 rgba(255,255,255,0.04)',
               }}
               title={`${pad.label} ${pad.sublabel ?? ''} (${pad.mode})`}
             >

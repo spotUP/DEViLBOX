@@ -116,6 +116,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
     engineRef.current = getDJEngine();
     setDJModeActive(true);
 
+    // Push DJ knob labels to the MIDI controller's LCD (Akai MPK Mini etc.)
+    import('@/stores/useMIDIStore').then(({ refreshDJKnobLabels }) => {
+      refreshDJKnobLabels();
+    });
+
     return () => {
       // Keep DJ audio alive when navigating to companion views (drumpad/vj)
       // or when auto DJ is actively running (must never be interrupted)

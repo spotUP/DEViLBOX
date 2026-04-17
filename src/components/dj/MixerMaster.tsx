@@ -97,6 +97,7 @@ export const MixerMaster: React.FC = () => {
         formatValue={formatMaster}
         hideValue
         title="Master volume — controls overall output level"
+        paramKey="dj.masterVolume"
       />
 
       {/* Stereo VU meter (compact) */}
