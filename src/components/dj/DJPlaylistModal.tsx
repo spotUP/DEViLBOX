@@ -54,6 +54,7 @@ import {
   Users,
   RefreshCw,
   Save,
+  MoreHorizontal,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
@@ -74,7 +75,7 @@ import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
 import { precachePlaylist, type PrecacheProgress } from '@/engine/dj/DJPlaylistPrecache';
 import { getCachedFilenames } from '@/engine/dj/DJAudioCache';
-import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { ContextMenu, useContextMenu, DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 import { showConfirm } from '@/stores/useConfirmStore';
 import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
@@ -1749,6 +1750,134 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
     });
   }, [activePlaylistId, activePlaylist, updateTrackMeta]);
 
+  // ── Header dropdown menu (playlist-level actions) ─────────────────────────
+
+  const headerMenuItems = useMemo((): MenuItemType[] => {
+    if (!activePlaylist || !activePlaylistId) return [];
+    const cloud = !!activePlaylist.cloudId;
+    const items: MenuItemType[] = [
+      {
+        id: 'rename',
+        label: 'Rename…',
+        icon: <Edit3 size={12} />,
+        onClick: () => {
+          setEditingPlaylistId(activePlaylistId);
+          setEditName(activePlaylist.name);
+        },
+      },
+      {
+        id: 'duplicate',
+        label: 'Duplicate',
+        icon: <Copy size={12} />,
+        onClick: () => { clonePlaylist(activePlaylistId); },
+      },
+      { type: 'divider' },
+      {
+        id: 'export-json',
+        label: 'Export as JSON',
+        icon: <Download size={12} />,
+        onClick: handleExportJSON,
+      },
+      {
+        id: 'export-m3u',
+        label: 'Export as M3U',
+        icon: <Download size={12} />,
+        onClick: handleExportM3U,
+      },
+    ];
+
+    if (isLoggedIn) {
+      items.push({ type: 'divider' });
+      items.push({
+        id: 'cloud-save',
+        label: cloud ? 'Update in cloud' : 'Save to cloud',
+        icon: cloud ? <Cloud size={12} /> : <Upload size={12} />,
+        onClick: () => { handleCloudSave(activePlaylist); },
+        disabled: savingPlaylistId === activePlaylistId,
+      });
+      if (cloud) {
+        items.push({
+          id: 'toggle-visibility',
+          label: activePlaylist.visibility === 'public' ? 'Make private' : 'Make public',
+          icon: activePlaylist.visibility === 'public' ? <Lock size={12} /> : <Globe size={12} />,
+          onClick: () => { handleToggleVisibility(activePlaylist); },
+        });
+      }
+    }
+
+    const maintenanceItems: MenuItemType[] = [];
+    if (needsAnalysis) {
+      maintenanceItems.push({
+        id: 'analyze',
+        label: 'Analyze unscanned',
+        icon: <BarChart3 size={12} />,
+        onClick: handleAnalyzeAll,
+        disabled: !!analysisProgress,
+      });
+    }
+    if (uncachedCount > 0 && !precacheProgress) {
+      maintenanceItems.push({
+        id: 'precache',
+        label: `Cache ${uncachedCount} online track${uncachedCount === 1 ? '' : 's'}`,
+        icon: <Download size={12} />,
+        onClick: handlePrecache,
+      });
+    }
+    if (badTrackCount > 0) {
+      maintenanceItems.push({
+        id: 'retest',
+        label: retestingBad ? 'Testing bad tracks…' : `Re-test ${badTrackCount} bad track${badTrackCount === 1 ? '' : 's'}`,
+        icon: <RefreshCw size={12} />,
+        onClick: handleRetestBadTracks,
+        disabled: retestingBad,
+      });
+    }
+    if (maintenanceItems.length > 0) {
+      items.push({ type: 'divider' });
+      items.push(...maintenanceItems);
+    }
+
+    const clearItems: MenuItemType[] = [];
+    if (playedCount > 0) {
+      clearItems.push({
+        id: 'clear-played',
+        label: `Clear ${playedCount} played mark${playedCount === 1 ? '' : 's'}`,
+        icon: <Check size={12} />,
+        onClick: handleClearPlayed,
+      });
+    }
+    if (badTrackCount > 0) {
+      clearItems.push({
+        id: 'clear-bad',
+        label: `Clear ${badTrackCount} bad flag${badTrackCount === 1 ? '' : 's'}`,
+        icon: <AlertTriangle size={12} />,
+        onClick: () => { useDJPlaylistStore.getState().clearAllBadFlags(activePlaylistId); },
+      });
+    }
+    if (clearItems.length > 0) {
+      items.push({ type: 'divider' });
+      items.push(...clearItems);
+    }
+
+    items.push({ type: 'divider' });
+    items.push({
+      id: 'delete',
+      label: 'Delete playlist…',
+      icon: <Trash2 size={12} />,
+      danger: true,
+      onClick: () => { handleDeletePlaylist(activePlaylist); },
+    });
+
+    return items;
+  }, [
+    activePlaylist, activePlaylistId, isLoggedIn, savingPlaylistId,
+    needsAnalysis, analysisProgress, uncachedCount, precacheProgress,
+    badTrackCount, retestingBad, playedCount,
+    clonePlaylist, handleExportJSON, handleExportM3U, handleCloudSave,
+    handleToggleVisibility, handleAnalyzeAll, handlePrecache,
+    handleRetestBadTracks, handleClearPlayed, handleDeletePlaylist,
+  ]);
+
   // ── Hidden file inputs ────────────────────────────────────────────────────
 
   const hiddenInputs = (
@@ -1937,12 +2066,18 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
               <>
                 {/* Toolbar */}
                 <div className="px-3 py-2 border-b border-dark-border flex items-center gap-2">
-                  {/* Playlist title */}
-                  <div className="flex-1 min-w-0">
+                  {/* Playlist title + actions menu */}
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     <span className="text-[13px] font-mono font-bold text-text-primary truncate">
                       {activePlaylist.name}
                     </span>
-                    <span className="text-[10px] font-mono text-text-muted/50 ml-2">
+                    <DropdownButton
+                      items={headerMenuItems}
+                      className="p-1 text-text-muted/50 hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors shrink-0"
+                    >
+                      <MoreHorizontal size={14} />
+                    </DropdownButton>
+                    <span className="text-[10px] font-mono text-text-muted/50 ml-1 truncate">
                       {activePlaylist.tracks.length} tracks
                       {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
                     </span>
