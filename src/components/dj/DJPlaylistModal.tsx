@@ -53,6 +53,7 @@ import {
   Lock,
   Users,
   RefreshCw,
+  Save,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
@@ -249,8 +250,8 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       onPointerLeave={() => setIsHovered(false)}
     >
       {/* Drag handle */}
-      <div {...attributes} {...listeners} className="cursor-grab touch-none p-1 -ml-1">
-        <GripVertical size={14} className="text-text-muted/30 hover:text-text-muted/60 shrink-0" />
+      <div {...attributes} {...listeners} className="cursor-grab touch-none w-5 shrink-0 flex items-center justify-center">
+        <GripVertical size={14} className="text-text-muted/30 hover:text-text-muted/60" />
       </div>
 
       {/* Track number */}
@@ -259,22 +260,24 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Status indicator */}
-      {isLoading ? (
-        <span className="text-accent-primary text-[10px] shrink-0 animate-pulse font-bold" title={`Loading to deck ${loadingDeckId}`}>
-          {loadingDeckId}
-        </span>
-      ) : track.isBad ? (
-        <span className="text-accent-error text-[10px] shrink-0" title={`Bad: ${track.badReason}`}>✗</span>
-      ) : track.played ? (
-        <span className="text-accent-success/50 text-[10px] shrink-0" title="Played">✓</span>
-      ) : isAutoDJCurrent ? (
-        <span className="text-accent-success text-[10px] shrink-0" title="Now playing">▶</span>
-      ) : isAutoDJNext ? (
-        <span className="text-accent-primary text-[10px] shrink-0" title="Up next">▸</span>
-      ) : null}
+      <span className="w-4 shrink-0 text-center">
+        {isLoading ? (
+          <span className="text-accent-primary text-[10px] animate-pulse font-bold" title={`Loading to deck ${loadingDeckId}`}>
+            {loadingDeckId}
+          </span>
+        ) : track.isBad ? (
+          <span className="text-accent-error text-[10px]" title={`Bad: ${track.badReason}`}>✗</span>
+        ) : track.played ? (
+          <span className="text-accent-success/50 text-[10px]" title="Played">✓</span>
+        ) : isAutoDJCurrent ? (
+          <span className="text-accent-success text-[10px]" title="Now playing">▶</span>
+        ) : isAutoDJNext ? (
+          <span className="text-accent-primary text-[10px]" title="Up next">▸</span>
+        ) : null}
+      </span>
 
       {/* Track name */}
-      <span className={`flex-1 text-sm font-mono truncate min-w-0 ${
+      <span className={`flex-1 text-[11px] font-mono truncate min-w-0 ${
         isLoading ? 'text-accent-primary' : track.isBad ? 'text-accent-error/80' : track.played ? 'text-text-muted/40' : 'text-text-primary'
       }`}>
         {track.trackName}
@@ -319,28 +322,23 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         {track.duration > 0 ? formatDuration(track.duration) : ''}
       </span>
 
-      {/* Per-song FX preset indicator */}
-      {track.masterFxPreset && (
-        <span className="text-[9px] font-mono text-accent-highlight shrink-0 px-1 bg-accent-highlight/10 rounded" title={`FX: ${DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset)?.label ?? track.masterFxPreset}`}>
-          FX
-        </span>
-      )}
-
-      {/* Preview button — always visible when previewing */}
-      <button
-        onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
-        className={`p-1 rounded transition-all shrink-0 ${
-          isPreviewing
-            ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25'
-            : `text-text-muted/30 hover:text-text-primary ${isHovered || isFocused ? 'opacity-100' : 'opacity-0'}`
-        }`}
-        title={isPreviewing ? 'Stop preview' : 'Preview track'}
-      >
-        {isPreviewing ? <Square size={12} /> : <Play size={12} />}
-      </button>
+      {/* Preview button */}
+      <span className="shrink-0 w-6 flex items-center justify-center">
+        <button
+          onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
+          className={`p-1 rounded transition-all ${
+            isPreviewing
+              ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25'
+              : `text-text-muted/30 hover:text-text-primary ${isHovered || isFocused ? 'opacity-100' : 'opacity-0'}`
+          }`}
+          title={isPreviewing ? 'Stop preview' : 'Preview track'}
+        >
+          {isPreviewing ? <Square size={12} /> : <Play size={12} />}
+        </button>
+      </span>
 
       {/* Actions (visible on hover) */}
-      <span className={`flex items-center gap-1 shrink-0 transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <span className={`flex items-center gap-1 shrink-0 w-36 justify-end transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <select
           value={track.masterFxPreset || ''}
           onClick={(e) => e.stopPropagation()}
@@ -575,6 +573,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const [showCommunity, setShowCommunity] = useState(false);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [importingCloudId, setImportingCloudId] = useState<string | null>(null);
+  const [sidebarSearch, setSidebarSearch] = useState('');
   const clipboardRef = useRef<{ tracks: PlaylistTrack[]; isCut: boolean }>({ tracks: [], isCut: false });
   const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
@@ -608,6 +607,12 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
 
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
   const selectedSet = useMemo(() => new Set(selectedTrackIndices), [selectedTrackIndices]);
+
+  const filteredPlaylists = useMemo(() => {
+    if (!sidebarSearch.trim()) return playlists;
+    const q = sidebarSearch.toLowerCase();
+    return playlists.filter(p => p.name.toLowerCase().includes(q));
+  }, [playlists, sidebarSearch]);
 
   // ── Search/filter ─────────────────────────────────────────────────────────
 
@@ -862,6 +867,15 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
       console.error('Failed to toggle visibility:', err);
     }
   }, [setPlaylistVisibilityStore]);
+
+  const handleSaveAs = useCallback(() => {
+    if (!activePlaylist) return;
+    const newId = clonePlaylist(activePlaylist.id);
+    // Immediately open rename for the new playlist
+    const newName = `${activePlaylist.name} (Copy)`;
+    setEditingPlaylistId(newId);
+    setEditName(newName);
+  }, [activePlaylist, clonePlaylist]);
 
   const loadCommunityPlaylists = useCallback(async () => {
     setLoadingCommunity(true);
@@ -1780,8 +1794,26 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
               </div>
             </div>
 
+            {/* Sidebar search */}
+            {playlists.length > 3 && (
+              <div className="px-2 py-1.5 border-b border-dark-border/30">
+                <div className="flex items-center gap-1 bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-0.5">
+                  <Search size={10} className="text-text-muted/30 shrink-0" />
+                  <input
+                    value={sidebarSearch}
+                    onChange={(e) => setSidebarSearch(e.target.value)}
+                    placeholder="Filter playlists…"
+                    className="flex-1 bg-transparent text-[10px] font-mono text-text-primary placeholder:text-text-muted/25 outline-none min-w-0"
+                  />
+                  {sidebarSearch && (
+                    <button onClick={() => setSidebarSearch('')} className="p-0.5 text-text-muted/30 hover:text-text-primary"><X size={9} /></button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
-              {playlists.map((pl) => (
+              {filteredPlaylists.map((pl) => (
                 <PlaylistSidebarItem
                   key={pl.id}
                   playlist={pl}
@@ -1802,12 +1834,16 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                 />
               ))}
 
-              {playlists.length === 0 && !isCreating && (
+              {filteredPlaylists.length === 0 && !isCreating && (
                 <div className="p-4 text-center">
-                  <p className="text-[10px] font-mono text-text-muted/40 mb-2">No playlists yet</p>
-                  <Button variant="ghost" size="sm" onClick={() => { setIsCreating(true); setNewName(''); }}>
-                    Create one
-                  </Button>
+                  <p className="text-[10px] font-mono text-text-muted/40 mb-2">
+                    {sidebarSearch ? 'No matches' : 'No playlists yet'}
+                  </p>
+                  {!sidebarSearch && (
+                    <Button variant="ghost" size="sm" onClick={() => { setIsCreating(true); setNewName(''); }}>
+                      Create one
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -2022,6 +2058,15 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                     )}
                   </div>
 
+                  {/* Save As */}
+                  <button
+                    onClick={handleSaveAs}
+                    className="p-1 text-text-muted/40 hover:text-text-primary transition-colors"
+                    title="Save As… (duplicate playlist)"
+                  >
+                    <Save size={13} />
+                  </button>
+
                   {/* Cloud save */}
                   {isLoggedIn && activePlaylist && (
                     <Button
@@ -2077,7 +2122,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                 {/* Column headers (sortable) */}
                 {filteredTracks.length > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1 border-b border-dark-border bg-dark-bg/50 text-[9px] font-mono text-text-muted/40 uppercase tracking-wider select-none shrink-0">
-                    <span className="w-6 shrink-0" />
+                    <span className="w-5 shrink-0" />
                     <span className="w-6 text-right shrink-0">#</span>
                     <span className="w-4 shrink-0" />
                     <span className="flex-1 min-w-0 cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('name')}>
