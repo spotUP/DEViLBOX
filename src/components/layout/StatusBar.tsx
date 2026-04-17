@@ -10,7 +10,6 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { KnobAssignment } from '@/midi/knobBanks';
 import { getKnobBankForSynth, getKnobPageName } from '@/midi/knobBanks';
@@ -236,25 +235,6 @@ const DrumPadStatusContent: React.FC = () => {
           <span className="text-accent-warning">Repeat: {noteRepeatRate}</span>
         </>
       )}
-    </div>
-  );
-};
-
-// ─── Studio Status Bar Content ───────────────────────────────────────────────
-
-const StudioStatusContent: React.FC = () => {
-  const windowCount = useWorkbenchStore(s => Object.keys(s.windows).length);
-  const zoom = useWorkbenchStore(s => s.camera.scale);
-
-  const sep = <div className="w-px h-3 bg-border opacity-50" />;
-
-  return (
-    <div className="flex items-center gap-4">
-      <span className="text-accent-primary font-semibold">STUDIO</span>
-      {sep}
-      <span className="text-text-primary">{windowCount} window{windowCount !== 1 ? 's' : ''}</span>
-      {sep}
-      <span className="text-text-muted tabular-nums">Zoom: {Math.round(zoom * 100)}%</span>
     </div>
   );
 };
@@ -521,7 +501,6 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(() => {
             </div>
           )
           : activeView === 'drumpad' ? <DrumPadStatusContent />
-          : activeView === 'studio' ? <StudioStatusContent />
           : <TrackerStatusContent />}
 
         {/* Right: MIDI Device, Audio State & Tips */}
