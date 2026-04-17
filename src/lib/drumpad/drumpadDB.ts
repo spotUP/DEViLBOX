@@ -11,6 +11,7 @@
 
 import type { DrumProgram, DrumPad, SampleData, SampleLayer, MpcResampleConfig } from '../../types/drumpad';
 import type { InstrumentConfig } from '../../types/instrument/defaults';
+import type { EffectConfig } from '../../types/instrument/effects';
 import { createEmptyPad } from '../../types/drumpad';
 
 const DB_NAME = 'devilbox-drumpad';
@@ -237,6 +238,10 @@ interface StoredPad {
   layers?: StoredLayer[];
   // Pad-owned synth config (JSON-safe, no AudioBuffer)
   synthConfig?: InstrumentConfig;
+  // Effects chain for sample playback
+  effects?: EffectConfig[];
+  // Active preset name
+  presetName?: string;
 }
 
 function programToStored(program: DrumProgram): StoredProgram {
@@ -288,6 +293,8 @@ function programToStored(program: DrumProgram): StoredProgram {
           }))
         : undefined,
       synthConfig: pad.synthConfig,
+      effects: pad.effects,
+      presetName: pad.presetName,
     })),
   };
 }
@@ -346,6 +353,8 @@ function storedToProgram(
       veloToStart: sp.veloToStart ?? 0,
       veloToFilter: sp.veloToFilter ?? 0,
       veloToPitch: sp.veloToPitch ?? 0,
+      effects: sp.effects,
+      presetName: sp.presetName,
     };
   });
 

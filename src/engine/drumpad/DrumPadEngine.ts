@@ -1,9 +1,13 @@
 /**
  * DrumPadEngine - Audio playback engine for drum pads
- * Handles sample triggering with velocity, ADSR, filtering, and routing
+ * Handles sample triggering with velocity, ADSR, filtering, and routing.
+ * Supports per-pad effects chains (SpringReverb, SpaceEcho, TapeSaturation, etc.)
+ * using Tone.js effect nodes connected inline with Web Audio routing.
  */
 
+import * as Tone from 'tone';
 import type { DrumPad } from '../../types/drumpad';
+import { createEffectChain } from '../factories/EffectFactory';
 
 interface VoiceState {
   source: AudioBufferSourceNode | null;
@@ -13,6 +17,13 @@ interface VoiceState {
   startTime: number;
   noteOffTime: number | null;
   velocity: number;
+}
+
+interface PadEffectsChain {
+  inputGain: GainNode;
+  effects: { disconnect(): void; dispose(): void }[];
+  outputGain: GainNode;
+  configHash: string; // detect when effects config changes
 }
 
 export class DrumPadEngine {
@@ -25,6 +36,7 @@ export class DrumPadEngine {
   private muteGroups: Map<number, number> = new Map(); // padId -> muteGroup
   private reversedBufferCache: WeakMap<AudioBuffer, AudioBuffer> = new WeakMap();
   private pendingCleanupTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
+  private padEffects: Map<number, PadEffectsChain> = new Map();
   private _disposed = false;
 
   constructor(context: AudioContext, outputDestination?: AudioNode) {
@@ -62,6 +74,83 @@ export class DrumPadEngine {
         this.muteGroups.set(pad.id, pad.muteGroup);
       }
     }
+  }
+
+  /**
+   * Build or update the per-pad effects chain.
+   * Called lazily on trigger — caches by config hash to avoid rebuilding every hit.
+   */
+  private async ensurePadEffectsChain(pad: DrumPad): Promise<PadEffectsChain | null> {
+    if (!pad.effects || pad.effects.length === 0) {
+      // No effects — dispose any existing chain
+      this.disposePadEffectsChain(pad.id);
+      return null;
+    }
+
+    const hash = JSON.stringify(pad.effects.map(e => ({ t: e.type, e: e.enabled, w: e.wet, p: e.parameters })));
+    const existing = this.padEffects.get(pad.id);
+    if (existing && existing.configHash === hash) return existing;
+
+    // Dispose old chain
+    this.disposePadEffectsChain(pad.id);
+
+    const outputBus = this.outputs.get(pad.output) || this.masterGain;
+
+    // Create input/output gains for the chain
+    const inputGain = this.context.createGain();
+    const outputGain = this.context.createGain();
+    outputGain.connect(outputBus);
+
+    try {
+      const effectNodes = await createEffectChain(pad.effects);
+
+      if (effectNodes.length === 0) {
+        inputGain.connect(outputGain);
+      } else {
+        // Connect: inputGain → first effect
+        const first = effectNodes[0] as Tone.ToneAudioNode;
+        Tone.connect(inputGain, first);
+
+        // Chain effects together
+        for (let i = 0; i < effectNodes.length - 1; i++) {
+          const a = effectNodes[i] as Tone.ToneAudioNode;
+          const b = effectNodes[i + 1] as Tone.ToneAudioNode;
+          a.connect(b);
+        }
+
+        // Last effect → outputGain
+        const last = effectNodes[effectNodes.length - 1] as Tone.ToneAudioNode;
+        Tone.connect(last, outputGain);
+      }
+
+      const chain: PadEffectsChain = { inputGain, effects: effectNodes as any[], outputGain, configHash: hash };
+      this.padEffects.set(pad.id, chain);
+      return chain;
+    } catch (err) {
+      console.warn('[DrumPadEngine] Failed to create effects chain for pad', pad.id, err);
+      inputGain.connect(outputGain);
+      const chain: PadEffectsChain = { inputGain, effects: [], outputGain, configHash: hash };
+      this.padEffects.set(pad.id, chain);
+      return chain;
+    }
+  }
+
+  /**
+   * Dispose and remove a pad's effects chain.
+   */
+  private disposePadEffectsChain(padId: number): void {
+    const chain = this.padEffects.get(padId);
+    if (!chain) return;
+
+    for (const fx of chain.effects) {
+      try {
+        (fx as Tone.ToneAudioNode).disconnect();
+        fx.dispose();
+      } catch { /* already disposed */ }
+    }
+    try { chain.inputGain.disconnect(); } catch { /* */ }
+    try { chain.outputGain.disconnect(); } catch { /* */ }
+    this.padEffects.delete(padId);
   }
 
   /**
@@ -211,7 +300,8 @@ export class DrumPadEngine {
     }
     gainNode.gain.linearRampToValueAtTime(sustainLevel, now + attackTime + decayTime);
 
-    // Connect nodes — minimal chain when filter is off
+    // Connect nodes — route through effects chain if pad has effects
+    const effectsChain = this.padEffects.get(pad.id);
     const outputBus = this.outputs.get(pad.output) || this.masterGain;
     if (filterNode) {
       source.connect(filterNode);
@@ -220,7 +310,16 @@ export class DrumPadEngine {
       source.connect(panNode);
     }
     panNode.connect(gainNode);
-    gainNode.connect(outputBus);
+    if (effectsChain) {
+      gainNode.connect(effectsChain.inputGain);
+    } else {
+      gainNode.connect(outputBus);
+    }
+
+    // Lazily build effects chain for next trigger if pad has effects but no chain yet
+    if (pad.effects && pad.effects.length > 0 && !effectsChain) {
+      this.ensurePadEffectsChain(pad).catch(() => {});
+    }
 
     // Calculate sample start/end offsets
     const veloStartMod = (pad.veloToStart / 100) * inverseVeloFactor;
@@ -365,6 +464,10 @@ export class DrumPadEngine {
     // Cancel all pending async cleanup timers
     this.pendingCleanupTimers.forEach(t => clearTimeout(t));
     this.pendingCleanupTimers.clear();
+    // Dispose all pad effects chains
+    for (const padId of this.padEffects.keys()) {
+      this.disposePadEffectsChain(padId);
+    }
     // Synchronously disconnect all voices
     for (const [, voice] of this.voices) {
       try {
@@ -379,6 +482,20 @@ export class DrumPadEngine {
     this.masterGain.disconnect();
     this.outputs.forEach(output => output.disconnect());
     this.outputs.clear();
+  }
+
+  /**
+   * Pre-build effects chains for all pads that have effects.
+   * Call after pad config changes (e.g., applying FX preset from context menu).
+   */
+  async updatePadEffects(pads: DrumPad[]): Promise<void> {
+    for (const pad of pads) {
+      if (pad.effects && pad.effects.length > 0) {
+        await this.ensurePadEffectsChain(pad);
+      } else {
+        this.disposePadEffectsChain(pad.id);
+      }
+    }
   }
 
   /**

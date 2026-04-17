@@ -107,6 +107,10 @@ export interface DrumPad {
 
   // DJ FX action (optional — momentary effect triggered on pad press/release)
   djFxAction?: DjFxActionId;
+
+  // Effects chain for sample playback (separate from synthConfig.effects)
+  // Applied by DrumPadEngine as send effects (reverb, delay, saturation, etc.)
+  effects?: EffectConfig[];
 }
 
 export interface DrumProgram {

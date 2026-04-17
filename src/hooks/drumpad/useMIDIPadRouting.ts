@@ -259,6 +259,11 @@ export function useMIDIPadRouting() {
   useEffect(() => {
     if (_engine && currentProgram) {
       _engine.setMuteGroups(currentProgram.pads);
+      // Pre-build effects chains for pads that have FX presets assigned
+      const padsWithEffects = currentProgram.pads.filter(p => p.effects && p.effects.length > 0);
+      if (padsWithEffects.length > 0) {
+        _engine.updatePadEffects(padsWithEffects);
+      }
     }
   }, [currentProgram]);
 

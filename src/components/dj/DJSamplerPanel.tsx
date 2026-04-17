@@ -114,10 +114,14 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     }
   }, [currentProgram?.masterLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync mute groups
+  // Sync mute groups + pre-build effects chains
   useEffect(() => {
     if (engineRef.current && currentProgram) {
       engineRef.current.setMuteGroups(currentProgram.pads);
+      const padsWithEffects = currentProgram.pads.filter(p => p.effects && p.effects.length > 0);
+      if (padsWithEffects.length > 0) {
+        engineRef.current.updatePadEffects(padsWithEffects);
+      }
     }
   }, [currentProgram]);
 
