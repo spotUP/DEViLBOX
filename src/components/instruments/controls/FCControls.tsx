@@ -229,15 +229,15 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
-          <Knob value={config.vibDelay} min={0} max={255} step={1}
+          <Knob paramKey="fc.vibDelay" value={config.vibDelay} min={0} max={255} step={1}
             onChange={(v) => updWithChipRam('vibDelay', Math.round(v), 4)}
             label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibSpeed} min={0} max={63} step={1}
+          <Knob paramKey="fc.vibSpeed" value={config.vibSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), 2)}
             label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibDepth} min={0} max={63} step={1}
+          <Knob paramKey="fc.vibDepth" value={config.vibDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibDepth', Math.round(v), 3)}
             label="Depth" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
@@ -269,7 +269,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Synth Macro Sequencer" />
         <div className="flex items-center gap-4 mb-3">
-          <Knob value={config.synthSpeed} min={0} max={15} step={1}
+          <Knob paramKey="fc.synthSpeed" value={config.synthSpeed} min={0} max={15} step={1}
             onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
             label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />

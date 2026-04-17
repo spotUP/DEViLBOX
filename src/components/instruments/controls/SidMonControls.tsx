@@ -229,13 +229,13 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4">
-          <Knob value={config.vibDelay} min={0} max={255} step={1}
+          <Knob paramKey="sidmon.vibDelay" value={config.vibDelay} min={0} max={255} step={1}
             onChange={(v) => updWithChipRam('vibDelay', Math.round(v), async (ed, base) => { await ed.writeU8(base + 11, Math.round(v)); })}
             label="Delay" color={knob} formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibSpeed} min={0} max={63} step={1}
+          <Knob paramKey="sidmon.vibSpeed" value={config.vibSpeed} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), async (ed, base) => { await ed.writeU8(base + 10, Math.round(v)); })}
             label="Speed" color={knob} formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibDepth} min={0} max={63} step={1}
+          <Knob paramKey="sidmon.vibDepth" value={config.vibDepth} min={0} max={63} step={1}
             onChange={(v) => updWithChipRam('vibDepth', Math.round(v), async (ed, base) => { await ed.writeU8(base + 9, Math.round(v)); })}
             label="Depth" color={knob} formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -263,10 +263,10 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
           ))}
         </div>
         <div className="flex gap-4">
-          <Knob value={config.filterCutoff} min={0} max={255} step={1}
+          <Knob paramKey="sidmon.filterCutoff" value={config.filterCutoff} min={0} max={255} step={1}
             onChange={(v) => upd('filterCutoff', Math.round(v))}
             label="Cutoff" color={knob} size="md" formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.filterResonance} min={0} max={15} step={1}
+          <Knob paramKey="sidmon.filterResonance" value={config.filterResonance} min={0} max={15} step={1}
             onChange={(v) => upd('filterResonance', Math.round(v))}
             label="Resonance" color={knob} size="md" formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -289,7 +289,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg} flex flex-col`} style={{ ...panelStyle, flex: 1, minHeight: 0 }}>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel color={accent} label="Arpeggio Speed" />
-          <Knob value={config.arpSpeed} min={0} max={15} step={1}
+          <Knob paramKey="sidmon.arpSpeed" value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => updWithChipRam('arpSpeed', Math.round(v), async (ed, base) => {
               await ed.writeU8(base + 6, Math.round(v) * 16);
             })}

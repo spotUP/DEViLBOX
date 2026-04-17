@@ -95,7 +95,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         </div>
         <div className="flex items-center gap-6">
           {renderWaveSelector(config.oscillator.type, (t) => updateOsc({ type: t }), "Waveform")}
-          <Knob value={config.oscillator.frequency} min={60} max={1000} onChange={(v) => updateOsc({ frequency: v })} label="Freq" color={knobColor} formatValue={(v) => `${Math.round(v)}Hz`} />
+          <Knob paramKey="siren.osc.frequency" value={config.oscillator.frequency} min={60} max={1000} onChange={(v) => updateOsc({ frequency: v })} label="Freq" color={knobColor} formatValue={(v) => `${Math.round(v)}Hz`} />
         </div>
       </div>
 
@@ -114,8 +114,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
         </div>
         <div className={`flex items-center gap-6 transition-opacity ${config.lfo.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           {renderWaveSelector(config.lfo.type, (t) => updateLFO({ type: t }), "Shape")}
-          <Knob value={config.lfo.rate} min={0.1} max={20} onChange={(v) => updateLFO({ rate: v })} label="Rate" color={knobColor} formatValue={(v) => `${v.toFixed(1)}Hz`} />
-          <Knob value={config.lfo.depth} min={0} max={500} onChange={(v) => updateLFO({ depth: v })} label="Depth" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
+          <Knob paramKey="siren.lfo.rate" value={config.lfo.rate} min={0.1} max={20} onChange={(v) => updateLFO({ rate: v })} label="Rate" color={knobColor} formatValue={(v) => `${v.toFixed(1)}Hz`} />
+          <Knob paramKey="siren.lfo.depth" value={config.lfo.depth} min={0} max={500} onChange={(v) => updateLFO({ depth: v })} label="Depth" color={knobColor} formatValue={(v) => `${Math.round(v)}`} />
         </div>
       </div>
 
@@ -133,9 +133,9 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           </label>
         </div>
         <div className={`flex items-center gap-6 transition-opacity ${config.delay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-          <Knob value={config.delay.time} min={0.01} max={1.0} onChange={(v) => updateDelay({ time: v })} label="Time" color={knobColor} formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
-          <Knob value={config.delay.feedback} min={0} max={0.95} onChange={(v) => updateDelay({ feedback: v })} label="Fdbk" color={knobColor} formatValue={(v) => `${Math.round(v * 100)}%`} />
-          <Knob value={config.delay.wet} min={0} max={1} onChange={(v) => updateDelay({ wet: v })} label="Mix" color={knobColor} formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob paramKey="siren.delay.time" value={config.delay.time} min={0.01} max={1.0} onChange={(v) => updateDelay({ time: v })} label="Time" color={knobColor} formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
+          <Knob paramKey="siren.delay.feedback" value={config.delay.feedback} min={0} max={0.95} onChange={(v) => updateDelay({ feedback: v })} label="Fdbk" color={knobColor} formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob paramKey="siren.delay.wet" value={config.delay.wet} min={0} max={1} onChange={(v) => updateDelay({ wet: v })} label="Mix" color={knobColor} formatValue={(v) => `${Math.round(v * 100)}%`} />
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] font-bold text-text-muted uppercase">Throw</span>
             <button
@@ -183,7 +183,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
               ))}
             </div>
             <div className="flex items-center gap-4">
-              <Knob value={config.filter.frequency} min={20} max={10000} onChange={(v) => updateFilter({ frequency: v })} label="Cutoff" color={knobColor} formatValue={(v) => `${Math.round(v)}Hz`} />
+              <Knob paramKey="siren.filter.frequency" value={config.filter.frequency} min={20} max={10000} onChange={(v) => updateFilter({ frequency: v })} label="Cutoff" color={knobColor} formatValue={(v) => `${Math.round(v)}Hz`} />
               <FilterFrequencyResponse filterType={config.filter.type as FilterType} cutoff={Math.log10(Math.max(config.filter.frequency, 20) / 20) / 3} resonance={0} poles={2} color={knobColor} width={180} height={50} />
             </div>
           </div>
@@ -204,7 +204,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           </div>
           <div className={`flex items-center gap-6 transition-opacity ${config.reverb.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <Knob value={config.reverb.decay} min={0.1} max={10.0} onChange={(v) => updateReverb({ decay: v })} label="Decay" color={knobColor} formatValue={(v) => `${v.toFixed(1)}s`} />
-            <Knob value={config.reverb.wet} min={0} max={1} onChange={(v) => updateReverb({ wet: v })} label="Mix" color={knobColor} formatValue={(v) => `${Math.round(v * 100)}%`} />
+            <Knob paramKey="siren.reverb.wet" value={config.reverb.wet} min={0} max={1} onChange={(v) => updateReverb({ wet: v })} label="Mix" color={knobColor} formatValue={(v) => `${Math.round(v * 100)}%`} />
           </div>
         </div>
       </div>

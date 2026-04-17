@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { useKnobImperative } from '@components/controls/useKnobImperative';
 
 interface TunefishHardwareProps {
   parameters: Record<string, number>;
@@ -17,8 +18,10 @@ const TFKnob: React.FC<{
   value: number;
   color?: string;
   onChange: (value: number) => void;
-}> = ({ label, value, color = '#ff9933', onChange }) => {
+  paramKey?: string;
+}> = ({ label, value, color = '#ff9933', onChange, paramKey }) => {
   const angle = -135 + value * 270;
+  const indicatorRef = useKnobImperative<HTMLDivElement>({ paramKey });
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -49,6 +52,7 @@ const TFKnob: React.FC<{
         title={`${label}: ${Math.round(value * 100)}%`}
       >
         <div
+          ref={indicatorRef}
           className="absolute w-0.5 h-2.5 rounded-full"
           style={{ background: color, top: '2px', left: '50%', transform: `translateX(-50%) rotate(${angle}deg)`, transformOrigin: 'bottom center' }}
         />

@@ -2,7 +2,8 @@
  * MAMESharedKnob — shared knob and section label components for MAME hardware UIs.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { subscribeToParamLiveValue } from '@/midi/performance/parameterRouter';
 
 interface HWKnobProps {
   label: string;
@@ -14,6 +15,7 @@ interface HWKnobProps {
   color?: string;
   formatDisplay?: (v: number) => string;
   onChange: (value: number) => void;
+  paramKey?: string;
 }
 
 /**
@@ -30,10 +32,32 @@ export const HWKnob: React.FC<HWKnobProps> = ({
   color = '#88ccff',
   formatDisplay,
   onChange,
+  paramKey,
 }) => {
   const dragRef = useRef<{ startY: number; startVal: number } | null>(null);
+  const percentRef = useRef<HTMLDivElement>(null);
+  const displayRef = useRef<HTMLDivElement>(null);
   const knobSize = size === 'sm' ? 24 : size === 'lg' ? 40 : 32;
   const containerWidth = size === 'sm' ? 48 : size === 'lg' ? 64 : 56;
+
+  // Imperative MIDI path: push text updates directly to DOM on each CC.
+  // HWKnob has no rotating indicator — the percent text and display are
+  // what changes. Bypasses React re-render for high-rate param flow.
+  useEffect(() => {
+    if (!paramKey) return;
+    return subscribeToParamLiveValue(paramKey, (norm01) => {
+      const safe = Math.max(0, Math.min(1, isNaN(norm01) ? 0 : norm01));
+      const rawValue = min + safe * (max - min);
+      if (percentRef.current) {
+        percentRef.current.textContent = String(Math.round(safe * 100));
+      }
+      if (displayRef.current) {
+        displayRef.current.textContent = formatDisplay
+          ? formatDisplay(rawValue)
+          : rawValue.toFixed(2);
+      }
+    });
+  }, [paramKey, min, max, formatDisplay]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -69,12 +93,12 @@ export const HWKnob: React.FC<HWKnobProps> = ({
         className="rounded-full border-2 flex items-center justify-center text-[9px]"
         style={{ borderColor: color, color, width: knobSize, height: knobSize }}
       >
-        {Math.round(((value - min) / (max - min)) * 100)}
+        <div ref={percentRef}>{Math.round(((value - min) / (max - min)) * 100)}</div>
       </div>
       <div className="text-[8px] text-text-muted text-center leading-tight truncate w-full">
         {label}
       </div>
-      <div className="text-[7px] text-text-muted text-center">
+      <div ref={displayRef} className="text-[7px] text-text-muted text-center">
         {displayVal}
       </div>
     </div>

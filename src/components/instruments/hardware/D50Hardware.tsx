@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import { useKnobImperative } from '@components/controls/useKnobImperative';
 
 interface D50HardwareProps {
   parameters: Record<string, number>;
@@ -21,7 +22,9 @@ const D50Knob: React.FC<{
   value: number;
   onChange: (value: number) => void;
   size?: 'small' | 'medium';
-}> = ({ label, value, onChange, size = 'medium' }) => {
+  paramKey?: string;
+}> = ({ label, value, onChange, size = 'medium', paramKey }) => {
+  const indicatorRef = useKnobImperative<HTMLDivElement>({ paramKey });
 
   const sizeMap = {
     small: 'w-10 h-10',
@@ -70,6 +73,7 @@ const D50Knob: React.FC<{
 
         {/* Indicator */}
         <div
+          ref={indicatorRef}
           className="absolute top-1 left-1/2 w-1 h-2 bg-white rounded-full -translate-x-1/2 shadow-md"
           style={{
             transform: `translateX(-50%) rotate(${rotation}deg)`,

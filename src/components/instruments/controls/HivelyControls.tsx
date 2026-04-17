@@ -203,11 +203,11 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             onChange={(v) => updateParam('vibratoDelay', Math.round(v))}
             label="Delay" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibratoDepth} min={0} max={15} step={1}
+          <Knob paramKey="hively.vibratoDepth" value={config.vibratoDepth} min={0} max={15} step={1}
             onChange={(v) => updateParam('vibratoDepth', Math.round(v))}
             label="Depth" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibratoSpeed} min={0} max={63} step={1}
+          <Knob paramKey="hively.vibratoSpeed" value={config.vibratoSpeed} min={0} max={63} step={1}
             onChange={(v) => updateParam('vibratoSpeed', Math.round(v))}
             label="Speed" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
@@ -226,7 +226,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             onChange={(v) => updateParam('squareUpperLimit', Math.round(v))}
             label="Upper" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.squareSpeed} min={0} max={63} step={1}
+          <Knob paramKey="hively.squareSpeed" value={config.squareSpeed} min={0} max={63} step={1}
             onChange={(v) => updateParam('squareSpeed', Math.round(v))}
             label="Speed" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
@@ -241,11 +241,11 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             onChange={(v) => updateParam('filterLowerLimit', Math.round(v))}
             label="Lower" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.filterUpperLimit} min={0} max={63} step={1}
+          <Knob paramKey="hively.filterUpper" value={config.filterUpperLimit} min={0} max={63} step={1}
             onChange={(v) => updateParam('filterUpperLimit', Math.round(v))}
             label="Upper" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.filterSpeed} min={0} max={63} step={1}
+          <Knob paramKey="hively.filterSpeed" value={config.filterSpeed} min={0} max={63} step={1}
             onChange={(v) => updateParam('filterSpeed', Math.round(v))}
             label="Speed" color={knobColor}
             formatValue={(v) => Math.round(v).toString()} />

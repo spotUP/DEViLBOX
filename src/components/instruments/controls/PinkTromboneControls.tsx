@@ -158,6 +158,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
           </div>
           <div className="flex gap-3 justify-center">
             <Knob
+              paramKey="pinktrombone.tenseness"
               value={config.tenseness}
               min={0} max={1} step={0.01}
               onChange={(v) => updateParam('tenseness', v)}
@@ -166,6 +167,7 @@ export const PinkTromboneControls: React.FC<PinkTromboneControlsProps> = ({
               color={knobColor}
             />
             <Knob
+              paramKey="pinktrombone.vibratoAmount"
               value={config.vibratoAmount}
               min={0} max={1} step={0.01}
               onChange={(v) => updateParam('vibratoAmount', v)}
