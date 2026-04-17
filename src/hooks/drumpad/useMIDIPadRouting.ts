@@ -27,7 +27,7 @@ import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
 import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
-import { applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
+import { applyVelocityCurve, PAD_INSTRUMENT_BASE, MPK_SLOT_COUNT, mpkSlotId } from '../../types/drumpad';
 import type { ScratchActionId } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
@@ -505,6 +505,19 @@ export function useMIDIPadRouting() {
     const handler = (message: MIDIMessage) => {
       const view = useUIStore.getState().activeView;
       if (!PAD_VIEWS.has(view)) return;
+
+      // Program Change — Akai MPK Mini has 8 programs (PROG button cycles
+      // through 1-8). Map MIDI PC value 0-7 to DEViLBOX MPK slot 1-8.
+      if (message.type === 'programChange' && message.program !== undefined) {
+        const slot = (message.program % MPK_SLOT_COUNT) + 1;
+        const id = mpkSlotId(slot);
+        const store = useDrumPadStore.getState();
+        if (store.programs.has(id)) {
+          store.loadProgram(id);
+        }
+        return;
+      }
+
       if (message.note === undefined || message.note < MIDI_PAD_LO || message.note > MIDI_PAD_HI) return;
 
       // Track current MIDI device (use channel as proxy for device ID)
@@ -513,9 +526,6 @@ export function useMIDIPadRouting() {
         _currentDeviceId = deviceKey;
       }
 
-      const bank = currentBankRef.current;
-      const bankOffset = { A: 0, B: 8 }[bank];
-      
       const learnedNotes = getCurrentMapping();
       
       // Learning mode: collect notes
@@ -549,20 +559,20 @@ export function useMIDIPadRouting() {
         return;
       }
       
-      // Map note to pad index (0-15)
-      // Standard GM drum mapping: note 36 = pad 0 (kick), 37 = pad 1, ...
+      // Map note to pad index (0-15) — MPK's PAD BANK A/B toggle sends
+      // different note ranges (36-43 vs 44-51) so DEViLBOX banks A/B are
+      // driven directly by the incoming note. No currentBank offset applied.
       let padIndex: number;
       if (learnedNotes.length > 0) {
         padIndex = learnedNotes.indexOf(message.note);
         if (padIndex === -1) {
-          // Note not in learned set — fall back to GM drum mapping
           padIndex = ((message.note - 36) % 16 + 16) % 16;
         }
       } else {
         padIndex = ((message.note - 36) % 16 + 16) % 16;
       }
-      
-      const padId = bankOffset + padIndex + 1;
+
+      const padId = padIndex + 1;
 
       if (message.type === 'noteOn' && message.velocity) {
         triggerRef.current(padId, message.velocity);
