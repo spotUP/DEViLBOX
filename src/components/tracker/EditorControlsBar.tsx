@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
+import { useAudioStore } from '@stores/useAudioStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorControls } from '@hooks/views/useEditorControls';
 import { BG_MODES, getBgModeLabel } from './TrackerVisualBackground';
@@ -27,10 +28,11 @@ import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
-  Activity, Cpu, Zap, Trash2,
+  Activity, Cpu, Zap, Trash2, Users,
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
+import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 
 export interface EditorControlsBarProps {
@@ -73,6 +75,11 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
+
+  // Collab + Volume
+  const collabStatus = useCollaborationStore(s => s.status);
+  const masterVolume = useAudioStore(s => s.masterVolume);
+  const setMasterVolume = useAudioStore(s => s.setMasterVolume);
 
   // DOM-only: UI store for view-mode switching and groove dialog command
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -405,7 +412,38 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         )}
       </div>
 
-      {/* FPS / Quality Indicator - Compact */}
+      {/* Right section: Collab, Volume, FPS */}
+      <div className="flex-shrink-0 flex items-center gap-2">
+        {/* Collab */}
+        <button
+          onClick={() => useUIStore.getState().openModal('collab')}
+          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+            collabStatus === 'connected'
+              ? 'bg-accent-primary/20 text-accent-primary'
+              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+          }`}
+          title={collabStatus === 'connected' ? 'Collaboration active' : 'Start live collaboration'}
+        >
+          <Users size={12} />
+          Collab
+          {collabStatus === 'connected' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
+          )}
+        </button>
+
+        {/* Master Volume */}
+        <input
+          type="range"
+          value={masterVolume}
+          onChange={(e) => setMasterVolume(Number(e.target.value))}
+          min="-60"
+          max="0"
+          step="1"
+          className="w-20"
+          title={`Volume: ${masterVolume} dB`}
+        />
+
+        {/* FPS / Quality Indicator - Compact */}
       <div
         className={`
           flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold font-mono rounded border
@@ -425,6 +463,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           quality === 'medium' ? 'bg-orange-400' :
           'bg-green-400'
         } animate-pulse`} />
+      </div>
       </div>
     </div>
   );
