@@ -285,9 +285,15 @@ function flushSynthUpdates(): void {
         found = true;
         const synthObj = instrument as unknown as Record<string, unknown>;
         if (typeof synthObj.set === 'function') {
-          const setFn = synthObj.set as (p: string, v: number) => void;
           for (const [param, value] of params) {
-            setFn(param, value);
+            try {
+              // Call set() as a method on the object to preserve `this` binding.
+              // Also handle Tone.js native synths which expect set({key: value}).
+              (synthObj as any).set(param, value);
+            } catch {
+              // Tone.js synths: set() expects an object, not (string, number)
+              try { (synthObj as any).set({ [param]: value }); } catch { /* ignore */ }
+            }
           }
         }
       });
