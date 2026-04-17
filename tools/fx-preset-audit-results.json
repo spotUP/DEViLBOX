@@ -3,9 +3,9 @@
   "presetResults": [
     {
       "name": "Clean Master",
-      "rmsDb": -28.499015636333777,
-      "diffDb": -2.230847365563829,
-      "compensationDb": 2.2,
+      "rmsDb": -20.9797616239139,
+      "diffDb": -2.348228815692437,
+      "compensationDb": 2.3,
       "effectTypes": [
         "EQ3",
         "Compressor"
@@ -14,8 +14,8 @@
     },
     {
       "name": "Transparent",
-      "rmsDb": -28.621188607674064,
-      "diffDb": -2.353020336904116,
+      "rmsDb": -20.9958194857575,
+      "diffDb": -2.364286677536036,
       "compensationDb": 2.4,
       "effectTypes": [
         "Compressor"
@@ -24,9 +24,9 @@
     },
     {
       "name": "Balanced",
-      "rmsDb": -32.70860490060768,
-      "diffDb": -6.440436629837734,
-      "compensationDb": 6.4,
+      "rmsDb": -25.129647921834895,
+      "diffDb": -6.49811511361343,
+      "compensationDb": 6.5,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -36,9 +36,9 @@
     },
     {
       "name": "Analog Warmth",
-      "rmsDb": -28.645830777429005,
-      "diffDb": -2.377662506659057,
-      "compensationDb": 2.4,
+      "rmsDb": -22.412691258954354,
+      "diffDb": -3.781158450732889,
+      "compensationDb": 3.8,
       "effectTypes": [
         "TapeSaturation",
         "Compressor",
@@ -48,9 +48,9 @@
     },
     {
       "name": "Tape Machine",
-      "rmsDb": -26.811184362593643,
-      "diffDb": -0.543016091823695,
-      "compensationDb": 0.5,
+      "rmsDb": -19.909273642973545,
+      "diffDb": -1.2777408347520804,
+      "compensationDb": 1.3,
       "effectTypes": [
         "TapeSimulator",
         "Compressor"
@@ -59,9 +59,9 @@
     },
     {
       "name": "Tube Console",
-      "rmsDb": -26.799585554641546,
-      "diffDb": -0.5314172838715976,
-      "compensationDb": 0.5,
+      "rmsDb": -19.266384318676838,
+      "diffDb": -0.6348515104553734,
+      "compensationDb": 0.6,
       "effectTypes": [
         "Chebyshev",
         "EQ3",
@@ -71,20 +71,20 @@
     },
     {
       "name": "Warm Bass",
-      "rmsDb": -23.62519188225832,
-      "diffDb": 2.6429763885116273,
-      "compensationDb": -2.6,
+      "rmsDb": -18.521529238447588,
+      "diffDb": 0.11000356977387682,
+      "compensationDb": -0.1,
       "effectTypes": [
         "TapeSaturation",
         "Compressor"
       ],
-      "status": "hot"
+      "status": "ok"
     },
     {
       "name": "Warm Overdrive",
-      "rmsDb": -19.530012369039756,
-      "diffDb": 6.738155901730192,
-      "compensationDb": -6.7,
+      "rmsDb": -15.256517419893056,
+      "diffDb": 3.375015388328409,
+      "compensationDb": -3.4,
       "effectTypes": [
         "TapeSaturation",
         "Filter"
@@ -93,9 +93,9 @@
     },
     {
       "name": "Tube Screamer Glow",
-      "rmsDb": -31.030202169778285,
-      "diffDb": -4.762033899008337,
-      "compensationDb": 4.8,
+      "rmsDb": -24.613635312568185,
+      "diffDb": -5.98210250434672,
+      "compensationDb": 6,
       "effectTypes": [
         "WAMTS9",
         "EQ3"
@@ -104,9 +104,9 @@
     },
     {
       "name": "Rotary Warmth",
-      "rmsDb": -30.106335588576396,
-      "diffDb": -3.838167317806448,
-      "compensationDb": 3.8,
+      "rmsDb": -23.33425220062056,
+      "diffDb": -4.702719392399096,
+      "compensationDb": 4.7,
       "effectTypes": [
         "Leslie",
         "TapeSaturation"
@@ -115,9 +115,9 @@
     },
     {
       "name": "Club Ready",
-      "rmsDb": -29.84396162560872,
-      "diffDb": -3.5757933548387726,
-      "compensationDb": 3.6,
+      "rmsDb": -23.174312603698194,
+      "diffDb": -4.542779795476729,
+      "compensationDb": 4.5,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -127,9 +127,9 @@
     },
     {
       "name": "Brick Wall",
-      "rmsDb": -28.917488369739747,
-      "diffDb": -2.649320098969799,
-      "compensationDb": 2.6,
+      "rmsDb": -21.296205160438426,
+      "diffDb": -2.664672352216961,
+      "compensationDb": 2.7,
       "effectTypes": [
         "EQ3",
         "Compressor"
@@ -138,9 +138,9 @@
     },
     {
       "name": "Pumping",
-      "rmsDb": -30.170805014803417,
-      "diffDb": -3.902636744033469,
-      "compensationDb": 3.9,
+      "rmsDb": -23.56632386838784,
+      "diffDb": -4.934791060166376,
+      "compensationDb": 4.9,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -150,9 +150,9 @@
     },
     {
       "name": "Big Muff Wall",
-      "rmsDb": -34.6923215008765,
-      "diffDb": -8.424153230106555,
-      "compensationDb": 8.4,
+      "rmsDb": -27.08723239510903,
+      "diffDb": -8.455699586887565,
+      "compensationDb": 8.5,
       "effectTypes": [
         "WAMBigMuff",
         "Compressor"
@@ -161,9 +161,9 @@
     },
     {
       "name": "Swedish Chainsaw",
-      "rmsDb": -17.808631532562003,
-      "diffDb": 8.459536738207944,
-      "compensationDb": -8.5,
+      "rmsDb": -16.434277424448652,
+      "diffDb": 2.197255383772813,
+      "compensationDb": -2.2,
       "effectTypes": [
         "SwedishChainsaw",
         "Compressor"
@@ -172,9 +172,9 @@
     },
     {
       "name": "Stereo Wide",
-      "rmsDb": -35.71478266444917,
-      "diffDb": -9.44661439367922,
-      "compensationDb": 9.4,
+      "rmsDb": -28.08214284116103,
+      "diffDb": -9.450610032939565,
+      "compensationDb": 9.5,
       "effectTypes": [
         "StereoWidener",
         "Compressor"
@@ -183,9 +183,9 @@
     },
     {
       "name": "Room Glue",
-      "rmsDb": -30.109116586146996,
-      "diffDb": -3.840948315377048,
-      "compensationDb": 3.8,
+      "rmsDb": -22.965418221426226,
+      "diffDb": -4.3338854132047615,
+      "compensationDb": 4.3,
       "effectTypes": [
         "MVerb",
         "Compressor"
@@ -194,9 +194,9 @@
     },
     {
       "name": "Immersive",
-      "rmsDb": -30.757133263416048,
-      "diffDb": -4.4889649926461,
-      "compensationDb": 4.5,
+      "rmsDb": -22.815312078190036,
+      "diffDb": -4.183779269968571,
+      "compensationDb": 4.2,
       "effectTypes": [
         "Chorus",
         "MVerb",
@@ -207,9 +207,9 @@
     },
     {
       "name": "Leslie Cabinet",
-      "rmsDb": -31.295220228078705,
-      "diffDb": -5.027051957308757,
-      "compensationDb": 5,
+      "rmsDb": -24.130199097426935,
+      "diffDb": -5.49866628920547,
+      "compensationDb": 5.5,
       "effectTypes": [
         "Leslie"
       ],
@@ -217,9 +217,9 @@
     },
     {
       "name": "Hall Reverb",
-      "rmsDb": -29.805199688592353,
-      "diffDb": -3.537031417822405,
-      "compensationDb": 3.5,
+      "rmsDb": -21.849193200376643,
+      "diffDb": -3.217660392155178,
+      "compensationDb": 3.2,
       "effectTypes": [
         "Reverb"
       ],
@@ -227,9 +227,9 @@
     },
     {
       "name": "Vinyl Press",
-      "rmsDb": -28.245107400940135,
-      "diffDb": -1.9769391301701873,
-      "compensationDb": 2,
+      "rmsDb": -20.481901825286066,
+      "diffDb": -1.850369017064601,
+      "compensationDb": 1.9,
       "effectTypes": [
         "ToneArm",
         "Compressor"
@@ -238,9 +238,9 @@
     },
     {
       "name": "Dusty Grooves",
-      "rmsDb": -30.814563327102903,
-      "diffDb": -4.546395056332955,
-      "compensationDb": 4.5,
+      "rmsDb": -24.03804135875028,
+      "diffDb": -5.406508550528816,
+      "compensationDb": 5.4,
       "effectTypes": [
         "VinylNoise",
         "TapeSaturation",
@@ -250,9 +250,9 @@
     },
     {
       "name": "Lo-Fi Master",
-      "rmsDb": -26.112283942431326,
-      "diffDb": 0.15588432833862242,
-      "compensationDb": -0.2,
+      "rmsDb": -19.196184168578668,
+      "diffDb": -0.5646513603572032,
+      "compensationDb": 0.6,
       "effectTypes": [
         "TapeSimulator",
         "ToneArm",
@@ -263,9 +263,9 @@
     },
     {
       "name": "VHS Tape",
-      "rmsDb": -26.531287198534773,
-      "diffDb": -0.26311892776482537,
-      "compensationDb": 0.3,
+      "rmsDb": -19.433537405300353,
+      "diffDb": -0.8020045970788878,
+      "compensationDb": 0.8,
       "effectTypes": [
         "BitCrusher",
         "Vibrato",
@@ -275,8 +275,8 @@
     },
     {
       "name": "Vinyl Record",
-      "rmsDb": -27.266431548549587,
-      "diffDb": -0.998263277779639,
+      "rmsDb": -19.641145308723495,
+      "diffDb": -1.0096125005020298,
       "compensationDb": 1,
       "effectTypes": [
         "VinylNoise"
@@ -285,21 +285,21 @@
     },
     {
       "name": "Broken Sampler",
-      "rmsDb": -23.309805692200687,
-      "diffDb": 2.958362578569261,
-      "compensationDb": -3,
+      "rmsDb": -18.04382119585492,
+      "diffDb": 0.5877116123665438,
+      "compensationDb": -0.6,
       "effectTypes": [
         "BitCrusher",
         "Distortion",
         "Filter"
       ],
-      "status": "hot"
+      "status": "ok"
     },
     {
       "name": "Cassette Dub",
-      "rmsDb": -26.198737752301877,
-      "diffDb": 0.0694305184680708,
-      "compensationDb": -0.1,
+      "rmsDb": -19.402183301374908,
+      "diffDb": -0.7706504931534433,
+      "compensationDb": 0.8,
       "effectTypes": [
         "TapeSimulator",
         "FeedbackDelay"
@@ -308,9 +308,9 @@
     },
     {
       "name": "Cassette Deck",
-      "rmsDb": -25.684444279728194,
-      "diffDb": 0.5837239910417544,
-      "compensationDb": -0.6,
+      "rmsDb": -19.609034159334197,
+      "diffDb": -0.977501351112732,
+      "compensationDb": 1,
       "effectTypes": [
         "BitCrusher",
         "Vibrato",
@@ -320,8 +320,8 @@
     },
     {
       "name": "Lo-Fi Radio",
-      "rmsDb": -27.13450051577798,
-      "diffDb": -0.8663322450080315,
+      "rmsDb": -19.514885309472902,
+      "diffDb": -0.8833525012514372,
       "compensationDb": 0.9,
       "effectTypes": [
         "BitCrusher",
@@ -331,20 +331,20 @@
     },
     {
       "name": "Lo-Fi Drums",
-      "rmsDb": -26.813658243125555,
-      "diffDb": -0.5454899723556075,
-      "compensationDb": 0.5,
+      "rmsDb": -20.74153802681065,
+      "diffDb": -2.110005218589187,
+      "compensationDb": 2.1,
       "effectTypes": [
         "BitCrusher",
         "TapeDegradation"
       ],
-      "status": "ok"
+      "status": "quiet"
     },
     {
       "name": "Lo-Fi Tape",
-      "rmsDb": -18.09047571609808,
-      "diffDb": 8.177692554671868,
-      "compensationDb": -8.2,
+      "rmsDb": -13.377084512558355,
+      "diffDb": 5.25444829566311,
+      "compensationDb": -5.3,
       "effectTypes": [
         "TapeDegradation"
       ],
@@ -352,9 +352,9 @@
     },
     {
       "name": "Turntable",
-      "rmsDb": -25.989386860428162,
-      "diffDb": 0.27878141034178583,
-      "compensationDb": -0.3,
+      "rmsDb": -17.683464538404987,
+      "diffDb": 0.9480682698164777,
+      "compensationDb": -0.9,
       "effectTypes": [
         "ToneArm"
       ],
@@ -362,9 +362,9 @@
     },
     {
       "name": "Techno",
-      "rmsDb": -30.633348835204494,
-      "diffDb": -4.365180564434546,
-      "compensationDb": 4.4,
+      "rmsDb": -24.046202904308146,
+      "diffDb": -5.414670096086681,
+      "compensationDb": 5.4,
       "effectTypes": [
         "EQ3",
         "TapeSaturation",
@@ -374,9 +374,9 @@
     },
     {
       "name": "House",
-      "rmsDb": -31.50693999169489,
-      "diffDb": -5.238771720924941,
-      "compensationDb": 5.2,
+      "rmsDb": -23.94986177390843,
+      "diffDb": -5.318328965686966,
+      "compensationDb": 5.3,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -386,9 +386,9 @@
     },
     {
       "name": "Drum & Bass",
-      "rmsDb": -28.89714329519903,
-      "diffDb": -2.6289750244290815,
-      "compensationDb": 2.6,
+      "rmsDb": -21.293281348294908,
+      "diffDb": -2.661748540073443,
+      "compensationDb": 2.7,
       "effectTypes": [
         "EQ3",
         "Compressor"
@@ -397,115 +397,8 @@
     },
     {
       "name": "Hip Hop",
-      "rmsDb": -30.280747316043858,
-      "diffDb": -4.01257904527391,
-      "compensationDb": 4,
-      "effectTypes": [
-        "EQ3",
-        "TapeSaturation",
-        "Compressor"
-      ],
-      "status": "quiet"
-    },
-    {
-      "name": "Dub / Reggae",
-      "rmsDb": -31.24784224170126,
-      "diffDb": -4.979673970931312,
-      "compensationDb": 5,
-      "effectTypes": [
-        "EQ3",
-        "SpringReverb",
-        "Compressor"
-      ],
-      "status": "quiet"
-    },
-    {
-      "name": "Ambient",
-      "rmsDb": -35.196006494216824,
-      "diffDb": -8.927838223446876,
-      "compensationDb": 8.9,
-      "effectTypes": [
-        "MVerb",
-        "StereoWidener",
-        "Compressor"
-      ],
-      "status": "quiet"
-    },
-    {
-      "name": "Hardstyle",
-      "rmsDb": -29.366335143135945,
-      "diffDb": -3.098166872365997,
-      "compensationDb": 3.1,
-      "effectTypes": [
-        "EQ3",
-        "TapeSaturation",
-        "Compressor"
-      ],
-      "status": "quiet"
-    },
-    {
-      "name": "Psychedelic",
-      "rmsDb": -34.91387335337429,
-      "diffDb": -8.645705082604344,
-      "compensationDb": 8.6,
-      "effectTypes": [
-        "Leslie",
-        "Phaser",
-        "Reverb"
-      ],
-      "status": "quiet"
-    },
-    {
-      "name": "Synthwave",
-      "rmsDb": -25.608402845725532,
-      "diffDb": 0.6597654250444158,
-      "compensationDb": -0.7,
-      "effectTypes": [
-        "Chorus",
-        "Delay",
-        "Compressor"
-      ],
-      "status": "ok"
-    },
-    {
-      "name": "Shoegaze",
-      "rmsDb": -26.843208922840805,
-      "diffDb": -0.5750406520708573,
-      "compensationDb": 0.6,
-      "effectTypes": [
-        "Chorus",
-        "TapeSaturation",
-        "Reverb"
-      ],
-      "status": "ok"
-    },
-    {
-      "name": "Acid House",
-      "rmsDb": -22.111684765847613,
-      "diffDb": 4.156483504922335,
-      "compensationDb": -4.2,
-      "effectTypes": [
-        "AutoFilter",
-        "Distortion"
-      ],
-      "status": "hot"
-    },
-    {
-      "name": "Garage / 2-Step",
-      "rmsDb": -29.72685998084326,
-      "diffDb": -3.4586917100733103,
-      "compensationDb": 3.5,
-      "effectTypes": [
-        "Compressor",
-        "PingPongDelay",
-        "EQ3"
-      ],
-      "status": "quiet"
-    },
-    {
-      "name": "DJ Booth",
-      "rmsDb": -31.168610747273533,
-      "diffDb": -4.900442476503585,
+      "rmsDb": -23.51969739879499,
+      "diffDb": -4.888164590573524,
       "compensationDb": 4.9,
       "effectTypes": [
         "EQ3",
@@ -515,9 +408,116 @@
       "status": "quiet"
     },
     {
+      "name": "Dub / Reggae",
+      "rmsDb": -23.136715346593814,
+      "diffDb": -4.505182538372349,
+      "compensationDb": 4.5,
+      "effectTypes": [
+        "EQ3",
+        "SpringReverb",
+        "Compressor"
+      ],
+      "status": "quiet"
+    },
+    {
+      "name": "Ambient",
+      "rmsDb": -27.992305387550246,
+      "diffDb": -9.360772579328781,
+      "compensationDb": 9.4,
+      "effectTypes": [
+        "MVerb",
+        "StereoWidener",
+        "Compressor"
+      ],
+      "status": "quiet"
+    },
+    {
+      "name": "Hardstyle",
+      "rmsDb": -23.414053224179185,
+      "diffDb": -4.78252041595772,
+      "compensationDb": 4.8,
+      "effectTypes": [
+        "EQ3",
+        "TapeSaturation",
+        "Compressor"
+      ],
+      "status": "quiet"
+    },
+    {
+      "name": "Psychedelic",
+      "rmsDb": -28.57957331608512,
+      "diffDb": -9.948040507863656,
+      "compensationDb": 9.9,
+      "effectTypes": [
+        "Leslie",
+        "Phaser",
+        "Reverb"
+      ],
+      "status": "quiet"
+    },
+    {
+      "name": "Synthwave",
+      "rmsDb": -17.64675367740097,
+      "diffDb": 0.9847791308204954,
+      "compensationDb": -1,
+      "effectTypes": [
+        "Chorus",
+        "Delay",
+        "Compressor"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Shoegaze",
+      "rmsDb": -22.263758060835507,
+      "diffDb": -3.6322252526140417,
+      "compensationDb": 3.6,
+      "effectTypes": [
+        "Chorus",
+        "TapeSaturation",
+        "Reverb"
+      ],
+      "status": "quiet"
+    },
+    {
+      "name": "Acid House",
+      "rmsDb": -16.977876200976493,
+      "diffDb": 1.6536566072449723,
+      "compensationDb": -1.7,
+      "effectTypes": [
+        "AutoFilter",
+        "Distortion"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Garage / 2-Step",
+      "rmsDb": -21.879983188574364,
+      "diffDb": -3.2484503803528995,
+      "compensationDb": 3.2,
+      "effectTypes": [
+        "Compressor",
+        "PingPongDelay",
+        "EQ3"
+      ],
+      "status": "quiet"
+    },
+    {
+      "name": "DJ Booth",
+      "rmsDb": -24.206552888983023,
+      "diffDb": -5.575020080761558,
+      "compensationDb": 5.6,
+      "effectTypes": [
+        "EQ3",
+        "TapeSaturation",
+        "Compressor"
+      ],
+      "status": "quiet"
+    },
+    {
       "name": "Big Room",
-      "rmsDb": -35.810772107400254,
-      "diffDb": -9.542603836630306,
+      "rmsDb": -28.126526861095023,
+      "diffDb": -9.494994052873558,
       "compensationDb": 9.5,
       "effectTypes": [
         "MVerb",
@@ -529,9 +529,9 @@
     },
     {
       "name": "Vinyl DJ",
-      "rmsDb": -31.188429703272597,
-      "diffDb": -4.920261432502649,
-      "compensationDb": 4.9,
+      "rmsDb": -24.051602037366674,
+      "diffDb": -5.420069229145209,
+      "compensationDb": 5.4,
       "effectTypes": [
         "ToneArm",
         "TapeSaturation",
@@ -541,72 +541,62 @@
     },
     {
       "name": "Echo Out",
-      "rmsDb": -26.532024180877286,
-      "diffDb": -0.26385591010733833,
-      "compensationDb": 0.3,
+      "rmsDb": -16.01027196384235,
+      "diffDb": 2.6212608443791154,
+      "compensationDb": -2.6,
       "effectTypes": [
         "RETapeEcho",
         "Compressor"
       ],
-      "status": "ok"
+      "status": "hot"
     },
     {
       "name": "Warehouse Rave",
-      "rmsDb": -28.09404464313122,
-      "diffDb": -1.8258763723612716,
-      "compensationDb": 1.8,
+      "rmsDb": -20.98355444024365,
+      "diffDb": -2.3520216320221863,
+      "compensationDb": 2.4,
       "effectTypes": [
         "TapeSimulator",
         "EQ3",
         "Compressor"
       ],
-      "status": "ok"
+      "status": "quiet"
     },
     {
       "name": "Dub Echo",
-      "rmsDb": -24.500468726579196,
-      "diffDb": 1.7676995441907515,
-      "compensationDb": -1.8,
+      "rmsDb": -15.18831619777822,
+      "diffDb": 3.443216610443244,
+      "compensationDb": -3.4,
       "effectTypes": [
         "PingPongDelay",
         "JCReverb"
       ],
-      "status": "ok"
-    },
-    {
-      "name": "Filter Sweep",
-      "rmsDb": -23.785674163295802,
-      "diffDb": 2.482494107474146,
-      "compensationDb": -2.5,
-      "effectTypes": [
-        "AutoFilter"
-      ],
       "status": "hot"
     },
     {
-      "name": "Tape Stop",
-      "rmsDb": -30.39152438801179,
-      "diffDb": -4.1233561172418405,
-      "compensationDb": 4.1,
+      "name": "Filter Sweep",
+      "rmsDb": -16.66630728249831,
+      "diffDb": 1.965225525723156,
+      "compensationDb": -2,
       "effectTypes": [
-        "PitchShift"
+        "AutoFilter"
+      ],
+      "status": "ok"
+    },
+    {
+      "name": "Phaser Wash",
+      "rmsDb": -20.897602748224312,
+      "diffDb": -2.266069940002847,
+      "compensationDb": 2.3,
+      "effectTypes": [
+        "Phaser"
       ],
       "status": "quiet"
     },
     {
-      "name": "Phaser Wash",
-      "rmsDb": -28.228067886622014,
-      "diffDb": -1.9598996158520663,
-      "compensationDb": 2,
-      "effectTypes": [
-        "Phaser"
-      ],
-      "status": "ok"
-    },
-    {
       "name": "Auto-Pan",
-      "rmsDb": -27.25220699741576,
-      "diffDb": -0.9840387266458137,
+      "rmsDb": -19.63389745172586,
+      "diffDb": -1.0023646435043965,
       "compensationDb": 1,
       "effectTypes": [
         "AutoPanner"
@@ -615,9 +605,9 @@
     },
     {
       "name": "Vibrato Wobble",
-      "rmsDb": -27.685627065798045,
-      "diffDb": -1.4174587950280966,
-      "compensationDb": 1.4,
+      "rmsDb": -19.967056173079236,
+      "diffDb": -1.335523364857771,
+      "compensationDb": 1.3,
       "effectTypes": [
         "Vibrato"
       ],
@@ -625,8 +615,8 @@
     },
     {
       "name": "Frequency Shift",
-      "rmsDb": -29.270346261456,
-      "diffDb": -3.0021779906860537,
+      "rmsDb": -21.655668319913577,
+      "diffDb": -3.024135511692112,
       "compensationDb": 3,
       "effectTypes": [
         "FrequencyShifter"
@@ -635,39 +625,39 @@
     },
     {
       "name": "Feedback Loop",
-      "rmsDb": -27.13904391342482,
-      "diffDb": -0.8708756426548732,
-      "compensationDb": 0.9,
+      "rmsDb": -16.19487919432611,
+      "diffDb": 2.4366536138953556,
+      "compensationDb": -2.4,
       "effectTypes": [
         "FeedbackDelay"
+      ],
+      "status": "hot"
+    },
+    {
+      "name": "Stone Phaser",
+      "rmsDb": -19.228232530998767,
+      "diffDb": -0.5966997227773021,
+      "compensationDb": 0.6,
+      "effectTypes": [
+        "WAMStonePhaser"
       ],
       "status": "ok"
     },
     {
-      "name": "Stone Phaser",
-      "rmsDb": -34.726331988856145,
-      "diffDb": -8.458163718086197,
-      "compensationDb": 8.5,
-      "effectTypes": [
-        "WAMStonePhaser"
-      ],
-      "status": "quiet"
-    },
-    {
       "name": "Vox Amp Crunch",
-      "rmsDb": -32.70597900810603,
-      "diffDb": -6.437810737336079,
-      "compensationDb": 6.4,
+      "rmsDb": -14.003667587738217,
+      "diffDb": 4.6278652204832476,
+      "compensationDb": -4.6,
       "effectTypes": [
         "WAMVoxAmp"
       ],
-      "status": "quiet"
+      "status": "hot"
     },
     {
       "name": "Small Room",
-      "rmsDb": -29.401901117436328,
-      "diffDb": -3.13373284666638,
-      "compensationDb": 3.1,
+      "rmsDb": -22.519878106817504,
+      "diffDb": -3.8883452985960396,
+      "compensationDb": 3.9,
       "effectTypes": [
         "MVerb"
       ],
@@ -675,9 +665,9 @@
     },
     {
       "name": "Plate Shimmer",
-      "rmsDb": -30.68134384515062,
-      "diffDb": -4.4131755743806735,
-      "compensationDb": 4.4,
+      "rmsDb": -23.34369269260104,
+      "diffDb": -4.712159884379574,
+      "compensationDb": 4.7,
       "effectTypes": [
         "MVerb"
       ],
@@ -685,19 +675,19 @@
     },
     {
       "name": "Cathedral",
-      "rmsDb": -30.160446504716635,
-      "diffDb": -3.892278233946687,
-      "compensationDb": 3.9,
+      "rmsDb": -19.67789406486913,
+      "diffDb": -1.046361256647664,
+      "compensationDb": 1,
       "effectTypes": [
         "JCReverb",
         "Delay"
       ],
-      "status": "quiet"
+      "status": "ok"
     },
     {
       "name": "Spring Tank",
-      "rmsDb": -27.207879931724218,
-      "diffDb": -0.93971166095427,
+      "rmsDb": -19.504213572711468,
+      "diffDb": -0.8726807644900028,
       "compensationDb": 0.9,
       "effectTypes": [
         "SpringReverb"
@@ -706,9 +696,9 @@
     },
     {
       "name": "Ping Pong Hall",
-      "rmsDb": -30.226447956108444,
-      "diffDb": -3.9582796853384963,
-      "compensationDb": 4,
+      "rmsDb": -21.226804048409086,
+      "diffDb": -2.5952712401876212,
+      "compensationDb": 2.6,
       "effectTypes": [
         "PingPongDelay",
         "Reverb"
@@ -717,9 +707,9 @@
     },
     {
       "name": "Shimmer Wash",
-      "rmsDb": -35.72221058347328,
-      "diffDb": -9.45404231270333,
-      "compensationDb": 9.5,
+      "rmsDb": -27.83782692698146,
+      "diffDb": -9.206294118759995,
+      "compensationDb": 9.2,
       "effectTypes": [
         "ShimmerReverb"
       ],
@@ -727,9 +717,9 @@
     },
     {
       "name": "Dark Plate",
-      "rmsDb": -31.725959744377732,
-      "diffDb": -5.457791473607784,
-      "compensationDb": 5.5,
+      "rmsDb": -23.940286173299828,
+      "diffDb": -5.308753365078363,
+      "compensationDb": 5.3,
       "effectTypes": [
         "MVerb"
       ],
@@ -737,9 +727,9 @@
     },
     {
       "name": "Tight Room",
-      "rmsDb": -29.217975964109183,
-      "diffDb": -2.9498076933392348,
-      "compensationDb": 2.9,
+      "rmsDb": -22.18107794899183,
+      "diffDb": -3.549545140770366,
+      "compensationDb": 3.5,
       "effectTypes": [
         "MVerb"
       ],
@@ -747,8 +737,8 @@
     },
     {
       "name": "Spacey Delay",
-      "rmsDb": -24.52427110037613,
-      "diffDb": 1.7438971703938186,
+      "rmsDb": -16.91060756295317,
+      "diffDb": 1.720925245268294,
       "compensationDb": -1.7,
       "effectTypes": [
         "SpaceyDelayer",
@@ -758,9 +748,9 @@
     },
     {
       "name": "Dub Siren Echo",
-      "rmsDb": -5.0711772747630315,
-      "diffDb": 21.196990996006917,
-      "compensationDb": -21.2,
+      "rmsDb": -12.536093878034825,
+      "diffDb": 6.09543893018664,
+      "compensationDb": -6.1,
       "effectTypes": [
         "SpaceEcho",
         "SpringReverb"
@@ -769,9 +759,9 @@
     },
     {
       "name": "King Tubby Filter",
-      "rmsDb": -23.059040378029504,
-      "diffDb": 3.209127892740444,
-      "compensationDb": -3.2,
+      "rmsDb": -14.564236252950982,
+      "diffDb": 4.067296555270483,
+      "compensationDb": -4.1,
       "effectTypes": [
         "DubFilter",
         "SpaceEcho"
@@ -780,9 +770,9 @@
     },
     {
       "name": "Phaser Dub",
-      "rmsDb": -26.258343107912587,
-      "diffDb": 0.00982516285736068,
-      "compensationDb": 0,
+      "rmsDb": -18.8707457466556,
+      "diffDb": -0.23921293843413594,
+      "compensationDb": 0.2,
       "effectTypes": [
         "BiPhase",
         "SpaceEcho"
@@ -791,19 +781,19 @@
     },
     {
       "name": "Tape Echo Wash",
-      "rmsDb": -24.969029412386465,
-      "diffDb": 1.2991388583834826,
-      "compensationDb": -1.3,
+      "rmsDb": -13.646253190276333,
+      "diffDb": 4.985279617945132,
+      "compensationDb": -5,
       "effectTypes": [
         "RETapeEcho"
       ],
-      "status": "ok"
+      "status": "hot"
     },
     {
       "name": "Dub Chamber",
-      "rmsDb": -31.672849172517324,
-      "diffDb": -5.404680901747376,
-      "compensationDb": 5.4,
+      "rmsDb": -20.985208237604848,
+      "diffDb": -2.353675429383383,
+      "compensationDb": 2.4,
       "effectTypes": [
         "SpringReverb",
         "SpaceEcho"
@@ -812,9 +802,9 @@
     },
     {
       "name": "Aelapse Dub",
-      "rmsDb": -27.77211977319417,
-      "diffDb": -1.503951502424222,
-      "compensationDb": 1.5,
+      "rmsDb": -19.80231751530258,
+      "diffDb": -1.1707847070811148,
+      "compensationDb": 1.2,
       "effectTypes": [
         "Aelapse"
       ],
@@ -822,9 +812,9 @@
     },
     {
       "name": "Acid Bass",
-      "rmsDb": -21.671131598575396,
-      "diffDb": 4.597036672194552,
-      "compensationDb": -4.6,
+      "rmsDb": -16.442289467313316,
+      "diffDb": 2.189243340908149,
+      "compensationDb": -2.2,
       "effectTypes": [
         "Filter",
         "Distortion"
@@ -833,9 +823,9 @@
     },
     {
       "name": "Sub Bass",
-      "rmsDb": -28.95978394479339,
-      "diffDb": -2.691615674023442,
-      "compensationDb": 2.7,
+      "rmsDb": -22.022316510957765,
+      "diffDb": -3.3907837027363,
+      "compensationDb": 3.4,
       "effectTypes": [
         "Filter",
         "Compressor"
@@ -844,9 +834,9 @@
     },
     {
       "name": "Moog Acid",
-      "rmsDb": -30.589438193021017,
-      "diffDb": -4.321269922251069,
-      "compensationDb": 4.3,
+      "rmsDb": -24.2313999855906,
+      "diffDb": -5.599867177369134,
+      "compensationDb": 5.6,
       "effectTypes": [
         "MoogFilter",
         "Leslie"
@@ -855,9 +845,9 @@
     },
     {
       "name": "Acid Screamer",
-      "rmsDb": -24.454509222728106,
-      "diffDb": 1.813659048041842,
-      "compensationDb": -1.8,
+      "rmsDb": -19.23069657935853,
+      "diffDb": -0.5991637711370643,
+      "compensationDb": 0.6,
       "effectTypes": [
         "MoogFilter",
         "Distortion"
@@ -866,9 +856,9 @@
     },
     {
       "name": "Punchy Drums",
-      "rmsDb": -26.533498333183783,
-      "diffDb": -0.2653300624138346,
-      "compensationDb": 0.3,
+      "rmsDb": -19.85033608257004,
+      "diffDb": -1.2188032743485735,
+      "compensationDb": 1.2,
       "effectTypes": [
         "Compressor",
         "EQ3"
@@ -877,20 +867,20 @@
     },
     {
       "name": "Gated Snare",
-      "rmsDb": -27.883129218838217,
-      "diffDb": -1.6149609480682692,
-      "compensationDb": 1.6,
+      "rmsDb": -22.478646807580617,
+      "diffDb": -3.847113999359152,
+      "compensationDb": 3.8,
       "effectTypes": [
         "Reverb",
         "Compressor"
       ],
-      "status": "ok"
+      "status": "quiet"
     },
     {
       "name": "Chorus Lead",
-      "rmsDb": -30.4208822509093,
-      "diffDb": -4.152713980139353,
-      "compensationDb": 4.2,
+      "rmsDb": -23.035848055710872,
+      "diffDb": -4.404315247489407,
+      "compensationDb": 4.4,
       "effectTypes": [
         "Chorus",
         "StereoWidener"
@@ -899,9 +889,9 @@
     },
     {
       "name": "Phaser Lead",
-      "rmsDb": -27.01602976621714,
-      "diffDb": -0.7478614954471929,
-      "compensationDb": 0.7,
+      "rmsDb": -19.692469535755443,
+      "diffDb": -1.0609367275339778,
+      "compensationDb": 1.1,
       "effectTypes": [
         "Phaser"
       ],
@@ -909,20 +899,20 @@
     },
     {
       "name": "Shimmer Pad",
-      "rmsDb": -24.065183920441857,
-      "diffDb": 2.202984350328091,
-      "compensationDb": -2.2,
+      "rmsDb": -17.04585532439181,
+      "diffDb": 1.585677483829656,
+      "compensationDb": -1.6,
       "effectTypes": [
         "TapeSaturation",
         "Chorus"
       ],
-      "status": "hot"
+      "status": "ok"
     },
     {
       "name": "Dark Pad",
-      "rmsDb": -25.39808839864832,
-      "diffDb": 0.8700798721216287,
-      "compensationDb": -0.9,
+      "rmsDb": -19.320834958897642,
+      "diffDb": -0.689302150676177,
+      "compensationDb": 0.7,
       "effectTypes": [
         "Filter",
         "TapeDegradation"
@@ -931,9 +921,9 @@
     },
     {
       "name": "Clean Vocal",
-      "rmsDb": -28.530267788255003,
-      "diffDb": -2.262099517485055,
-      "compensationDb": 2.3,
+      "rmsDb": -21.075672300816617,
+      "diffDb": -2.444139492595152,
+      "compensationDb": 2.4,
       "effectTypes": [
         "Compressor",
         "EQ3"
@@ -942,20 +932,20 @@
     },
     {
       "name": "Crystal Castles Vocal",
-      "rmsDb": -27.894545693526464,
-      "diffDb": -1.6263774227565158,
-      "compensationDb": 1.6,
+      "rmsDb": -20.941149845234058,
+      "diffDb": -2.3096170370125932,
+      "compensationDb": 2.3,
       "effectTypes": [
         "BitCrusher",
         "TapeDegradation"
       ],
-      "status": "ok"
+      "status": "quiet"
     },
     {
       "name": "Thick Chorus",
-      "rmsDb": -27.55489037837686,
-      "diffDb": -1.2867221076069129,
-      "compensationDb": 1.3,
+      "rmsDb": -20.174414972938802,
+      "diffDb": -1.5428821647173372,
+      "compensationDb": 1.5,
       "effectTypes": [
         "Chorus",
         "StereoWidener"
@@ -964,9 +954,9 @@
     },
     {
       "name": "Phaser Jet",
-      "rmsDb": -28.13472182853088,
-      "diffDb": -1.8665535577609305,
-      "compensationDb": 1.9,
+      "rmsDb": -20.59110976469465,
+      "diffDb": -1.9595769564731853,
+      "compensationDb": 2,
       "effectTypes": [
         "BiPhase"
       ],
@@ -974,8 +964,8 @@
     },
     {
       "name": "Tremolo Gate",
-      "rmsDb": -28.056191815975215,
-      "diffDb": -1.7880235452052666,
+      "rmsDb": -20.46685734879277,
+      "diffDb": -1.8353245405713068,
       "compensationDb": 1.8,
       "effectTypes": [
         "Tremolo",
@@ -985,9 +975,9 @@
     },
     {
       "name": "Wah Sweep",
-      "rmsDb": -27.815798066107057,
-      "diffDb": -1.5476297953371088,
-      "compensationDb": 1.5,
+      "rmsDb": -20.313865304988656,
+      "diffDb": -1.6823324967671915,
+      "compensationDb": 1.7,
       "effectTypes": [
         "AutoWah",
         "Phaser"
@@ -996,9 +986,9 @@
     },
     {
       "name": "Ambient Space",
-      "rmsDb": -32.82455697014532,
-      "diffDb": -6.5563886993753755,
-      "compensationDb": 6.6,
+      "rmsDb": -23.251893210607754,
+      "diffDb": -4.620360402386289,
+      "compensationDb": 4.6,
       "effectTypes": [
         "Reverb",
         "PingPongDelay"
@@ -1007,9 +997,9 @@
     },
     {
       "name": "Dreamy Haze",
-      "rmsDb": -26.474726521526012,
-      "diffDb": -0.20655825075606415,
-      "compensationDb": 0.2,
+      "rmsDb": -18.77155362598151,
+      "diffDb": -0.14002081776004616,
+      "compensationDb": 0.1,
       "effectTypes": [
         "Chorus",
         "Reverb",
@@ -1019,9 +1009,9 @@
     },
     {
       "name": "Underwater",
-      "rmsDb": -26.553978056968685,
-      "diffDb": -0.28580978619873676,
-      "compensationDb": 0.3,
+      "rmsDb": -18.53025203577745,
+      "diffDb": 0.10128077244401368,
+      "compensationDb": -0.1,
       "effectTypes": [
         "Filter",
         "Chorus",
@@ -1031,9 +1021,9 @@
     },
     {
       "name": "Frozen",
-      "rmsDb": -35.402781026900186,
-      "diffDb": -9.134612756130238,
-      "compensationDb": 9.1,
+      "rmsDb": -27.970534046599806,
+      "diffDb": -9.33900123837834,
+      "compensationDb": 9.3,
       "effectTypes": [
         "PitchShift",
         "MVerb",
@@ -1043,8 +1033,8 @@
     },
     {
       "name": "*Wave Landscape",
-      "rmsDb": -31.719596086926742,
-      "diffDb": -5.451427816156794,
+      "rmsDb": -24.08531860244784,
+      "diffDb": -5.453785794226373,
       "compensationDb": 5.5,
       "effectTypes": [
         "ShimmerReverb",
@@ -1054,9 +1044,9 @@
     },
     {
       "name": "Crystal Castles Void",
-      "rmsDb": -35.29246155195526,
-      "diffDb": -9.024293281185315,
-      "compensationDb": 9,
+      "rmsDb": -27.524266885165204,
+      "diffDb": -8.89273407694374,
+      "compensationDb": 8.9,
       "effectTypes": [
         "ShimmerReverb",
         "TapeDegradation"
@@ -1065,9 +1055,9 @@
     },
     {
       "name": "Radiowave",
-      "rmsDb": -37.59971495843865,
-      "diffDb": -11.331546687668705,
-      "compensationDb": 11.3,
+      "rmsDb": -31.19441573528824,
+      "diffDb": -12.562882927066774,
+      "compensationDb": 12.6,
       "effectTypes": [
         "Filter",
         "BitCrusher",
@@ -1077,9 +1067,9 @@
     },
     {
       "name": "Haunted",
-      "rmsDb": -30.463657157389967,
-      "diffDb": -4.195488886620019,
-      "compensationDb": 4.2,
+      "rmsDb": -24.964413350468394,
+      "diffDb": -6.332880542246929,
+      "compensationDb": 6.3,
       "effectTypes": [
         "PitchShift",
         "SpringReverb",
@@ -1089,9 +1079,9 @@
     },
     {
       "name": "Cosmic",
-      "rmsDb": -34.98720932176803,
-      "diffDb": -8.71904105099808,
-      "compensationDb": 8.7,
+      "rmsDb": -25.616690118215732,
+      "diffDb": -6.985157309994268,
+      "compensationDb": 7,
       "effectTypes": [
         "FrequencyShifter",
         "PingPongDelay",
@@ -1101,9 +1091,9 @@
     },
     {
       "name": "Rain Ambience",
-      "rmsDb": -26.26602365077887,
-      "diffDb": 0.0021446199910784003,
-      "compensationDb": 0,
+      "rmsDb": -18.7106155832895,
+      "diffDb": -0.0790827750680343,
+      "compensationDb": 0.1,
       "effectTypes": [
         "Tumult"
       ],
@@ -1111,9 +1101,9 @@
     },
     {
       "name": "Industrial",
-      "rmsDb": -25.196063274002157,
-      "diffDb": 1.0721049967677914,
-      "compensationDb": -1.1,
+      "rmsDb": -20.409760912949263,
+      "diffDb": -1.7782281047277984,
+      "compensationDb": 1.8,
       "effectTypes": [
         "Distortion",
         "Compressor",
@@ -1123,21 +1113,21 @@
     },
     {
       "name": "Fuzz Box",
-      "rmsDb": -22.573212378002783,
-      "diffDb": 3.6949558927671653,
-      "compensationDb": -3.7,
+      "rmsDb": -18.15288688147016,
+      "diffDb": 0.47864592675130524,
+      "compensationDb": -0.5,
       "effectTypes": [
         "TapeSaturation",
         "Filter",
         "Compressor"
       ],
-      "status": "hot"
+      "status": "ok"
     },
     {
       "name": "Frozen Texture",
-      "rmsDb": -26.267453338601875,
-      "diffDb": 0.0007149321680728349,
-      "compensationDb": 0,
+      "rmsDb": -18.70807015793346,
+      "diffDb": -0.07653734971199455,
+      "compensationDb": 0.1,
       "effectTypes": [
         "GranularFreeze"
       ],
@@ -1145,9 +1135,9 @@
     },
     {
       "name": "Granular Cloud",
-      "rmsDb": -26.268347013007,
-      "diffDb": -0.00017874223705049985,
-      "compensationDb": 0,
+      "rmsDb": -18.69542895360925,
+      "diffDb": -0.06389614538778687,
+      "compensationDb": 0.1,
       "effectTypes": [
         "GranularFreeze"
       ],
@@ -1155,8 +1145,8 @@
     },
     {
       "name": "Tape Delay Machine",
-      "rmsDb": -22.254069518859847,
-      "diffDb": 4.014098751910101,
+      "rmsDb": -14.672637450420483,
+      "diffDb": 3.958895357800982,
       "compensationDb": -4,
       "effectTypes": [
         "TapeDelay"
@@ -1165,19 +1155,19 @@
     },
     {
       "name": "Parallel Crush",
-      "rmsDb": -22.65607325049206,
-      "diffDb": 3.612095020277888,
-      "compensationDb": -3.6,
+      "rmsDb": -18.147622003787074,
+      "diffDb": 0.48391080443439094,
+      "compensationDb": -0.5,
       "effectTypes": [
         "Compressor"
       ],
-      "status": "hot"
+      "status": "ok"
     },
     {
       "name": "Glue Bus",
-      "rmsDb": -27.670909847970048,
-      "diffDb": -1.4027415772001,
-      "compensationDb": 1.4,
+      "rmsDb": -20.34589378962226,
+      "diffDb": -1.7143609814007945,
+      "compensationDb": 1.7,
       "effectTypes": [
         "Compressor"
       ],
@@ -1185,9 +1175,9 @@
     },
     {
       "name": "Ambient Echo",
-      "rmsDb": -25.67676001652697,
-      "diffDb": 0.5914082542429782,
-      "compensationDb": -0.6,
+      "rmsDb": -17.692916286763626,
+      "diffDb": 0.9386165214578384,
+      "compensationDb": -0.9,
       "effectTypes": [
         "AmbientDelay"
       ],
@@ -1195,19 +1185,19 @@
     },
     {
       "name": "Tape Echo",
-      "rmsDb": -25.86700962985331,
-      "diffDb": 0.40115864091663767,
-      "compensationDb": -0.4,
+      "rmsDb": -13.878150453492584,
+      "diffDb": 4.753382354728881,
+      "compensationDb": -4.8,
       "effectTypes": [
         "RETapeEcho"
       ],
-      "status": "ok"
+      "status": "hot"
     },
     {
       "name": "Stereo Ping Pong",
-      "rmsDb": -27.286706696793335,
-      "diffDb": -1.0185384260233867,
-      "compensationDb": 1,
+      "rmsDb": -17.685460529904702,
+      "diffDb": 0.9460722783167625,
+      "compensationDb": -0.9,
       "effectTypes": [
         "PingPongDelay"
       ],
@@ -1215,9 +1205,9 @@
     },
     {
       "name": "Space Echo",
-      "rmsDb": -30.631576325238868,
-      "diffDb": -4.36340805446892,
-      "compensationDb": 4.4,
+      "rmsDb": -25.23120707604069,
+      "diffDb": -6.599674267819225,
+      "compensationDb": 6.6,
       "effectTypes": [
         "SpaceEcho"
       ],
@@ -1225,9 +1215,9 @@
     },
     {
       "name": "Princeton Glow",
-      "rmsDb": -25.333486237840116,
-      "diffDb": 0.9346820329298318,
-      "compensationDb": -0.9,
+      "rmsDb": -19.1406972090293,
+      "diffDb": -0.5091644008078369,
+      "compensationDb": 0.5,
       "effectTypes": [
         "Neural",
         "Compressor"
@@ -1236,9 +1226,9 @@
     },
     {
       "name": "Blackstar Clean",
-      "rmsDb": -25.857457197238286,
-      "diffDb": 0.4107110735316617,
-      "compensationDb": -0.4,
+      "rmsDb": -19.544506423680122,
+      "diffDb": -0.9129736154586574,
+      "compensationDb": 0.9,
       "effectTypes": [
         "Neural",
         "EQ3",
@@ -1248,9 +1238,9 @@
     },
     {
       "name": "Tube Screamer Glue",
-      "rmsDb": -25.33589414686375,
-      "diffDb": 0.9322741239061969,
-      "compensationDb": -0.9,
+      "rmsDb": -19.134248069378433,
+      "diffDb": -0.5027152611569683,
+      "compensationDb": 0.5,
       "effectTypes": [
         "Neural",
         "Compressor"
@@ -1259,9 +1249,9 @@
     },
     {
       "name": "Sovtek Warmth",
-      "rmsDb": -24.909822546840932,
-      "diffDb": 1.3583457239290162,
-      "compensationDb": -1.4,
+      "rmsDb": -18.92552718523256,
+      "diffDb": -0.29399437701109576,
+      "compensationDb": 0.3,
       "effectTypes": [
         "Neural",
         "TapeSimulator",
@@ -1271,9 +1261,9 @@
     },
     {
       "name": "Filmosound Master",
-      "rmsDb": -25.86035593250694,
-      "diffDb": 0.4078123382630068,
-      "compensationDb": -0.4,
+      "rmsDb": -19.54401190976624,
+      "diffDb": -0.9124791015447755,
+      "compensationDb": 0.9,
       "effectTypes": [
         "Neural",
         "EQ3",
@@ -1284,8 +1274,8 @@
     {
       "name": "Clean Fender",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "SpringReverb"
@@ -1295,8 +1285,8 @@
     {
       "name": "Crunch Marshall",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "EQ3"
@@ -1306,8 +1296,8 @@
     {
       "name": "High Gain Mesa",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Compressor"
@@ -1317,8 +1307,8 @@
     {
       "name": "Dumble Lead",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "FeedbackDelay",
@@ -1329,8 +1319,8 @@
     {
       "name": "Sovtek Doom",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "EQ3"
@@ -1340,8 +1330,8 @@
     {
       "name": "BadCat Jazz",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Chorus",
@@ -1352,8 +1342,8 @@
     {
       "name": "El Coyote Blues",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Tremolo",
@@ -1364,8 +1354,8 @@
     {
       "name": "ENGL Metal",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Compressor",
@@ -1376,8 +1366,8 @@
     {
       "name": "TS9 + Spring",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "SpringReverb"
@@ -1387,8 +1377,8 @@
     {
       "name": "Big Muff Doom",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "EQ3",
@@ -1399,8 +1389,8 @@
     {
       "name": "RAT + Delay",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "FeedbackDelay"
@@ -1410,8 +1400,8 @@
     {
       "name": "Revv G3 Chug",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Compressor"
@@ -1421,8 +1411,8 @@
     {
       "name": "Goat + Leslie",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Leslie"
@@ -1432,8 +1422,8 @@
     {
       "name": "Aguilar Bass Grit",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Compressor",
@@ -1444,8 +1434,8 @@
     {
       "name": "Paula Punchline",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "TapeSaturation",
@@ -1456,8 +1446,8 @@
     {
       "name": "Amiga Bass Cannon",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "BassEnhancer",
         "TapeSaturation",
@@ -1469,8 +1459,8 @@
     {
       "name": "Tracker Dance Floor",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "Exciter",
@@ -1482,8 +1472,8 @@
     {
       "name": "Amiga Tape Warmth",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "TapeSimulator",
         "EQ3",
@@ -1494,8 +1484,8 @@
     {
       "name": "Paula Dub Sirens",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -1507,8 +1497,8 @@
     {
       "name": "Amiga Multiband",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "MultibandComp",
         "TapeSaturation"
@@ -1518,8 +1508,8 @@
     {
       "name": "Chipgold",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "BassEnhancer",
         "EQ3",
@@ -1532,8 +1522,8 @@
     {
       "name": "Paula Sings",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "BassEnhancer",
         "Exciter",
@@ -1546,8 +1536,8 @@
     {
       "name": "Retro Arcade",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "TransientDesigner",
@@ -1559,8 +1549,8 @@
     {
       "name": "Exotic Shimmer",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "Chorus",
@@ -1572,8 +1562,8 @@
     {
       "name": "SID Shredder",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "Compressor",
@@ -1585,8 +1575,8 @@
     {
       "name": "SID Stadium",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -1598,8 +1588,8 @@
     {
       "name": "SID Bass Machine",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "BassEnhancer",
         "TapeSaturation",
@@ -1611,8 +1601,8 @@
     {
       "name": "SID Acid Trip",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "BiPhase",
         "SpaceEcho",
@@ -1624,8 +1614,8 @@
     {
       "name": "SID Raw Power",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "EQ3",
         "Compressor",
@@ -1636,8 +1626,8 @@
     {
       "name": "SID Crunch Box",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Neural",
         "EQ3",
@@ -1648,8 +1638,8 @@
     {
       "name": "SID Neon Nights",
       "rmsDb": -100,
-      "diffDb": -73.73183172923005,
-      "compensationDb": 73.7,
+      "diffDb": -81.36846719177854,
+      "compensationDb": 81.4,
       "effectTypes": [
         "Chorus",
         "Chebyshev",
