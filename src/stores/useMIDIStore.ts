@@ -72,8 +72,8 @@ interface MIDIStore {
   midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
 
   // DJ Knob Paging (context-aware routing for DJ mode)
-  djKnobPage: number;           // 0 = Mixer, 1 = Deck A, 2 = Deck B, 3 = FX
-  djKnobTotalPages: number;     // Always 4
+  djKnobPage: number;           // 0 = EQ, 1 = Mixer, 2 = FX
+  djKnobTotalPages: number;
 
   // UI State
   showPatternDialog: boolean;
