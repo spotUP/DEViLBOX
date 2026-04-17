@@ -76,11 +76,14 @@ export class VocoderEngine {
     this.audioContext = Tone.getContext().rawContext as AudioContext;
     this.destination = destination || this.audioContext.destination;
 
-    // Mic preamp — built-in laptop mics with echoCancellation output
-    // surprisingly low raw signal (0.003-0.01 peak even during speech).
-    // Boost further so the vocoder has enough headroom to track formants.
+    // Mic preamp — 2x is the sweet spot. 4x (previous) pushed the
+    // vocoder worklet's modulator into saturation during speech, causing
+    // crackling when the filterbank output got multiplied by
+    // MAKEUP_GAIN(50) and clipped via tanh. With 2x + the worklet's very
+    // low gate threshold (0.003), quiet built-in mics can still open
+    // the gate during speech without driving the vocoder into distortion.
     this.micPreamp = this.audioContext.createGain();
-    this.micPreamp.gain.value = 4.0;
+    this.micPreamp.gain.value = 2.0;
 
     this.autoTuneInsert = this.audioContext.createGain();
     this.autoTuneInsert.gain.value = 1.0;
