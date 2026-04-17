@@ -44,6 +44,7 @@ export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
       formatValue={formatFilter}
       hideValue
       title={`Deck ${deckNum} Filter — left: high-pass, center: off, right: low-pass`}
+      paramKey={`dj.deck${deckId}.filter`}
     />
   );
 };
@@ -77,6 +78,9 @@ export const MixerEQBandKnob: React.FC<{
     return `${val > 0 ? '+' : ''}${val.toFixed(0)}`;
   }, []);
 
+  const bandKey = band === 'high' ? 'eqHi' : band === 'mid' ? 'eqMid' : 'eqLow';
+  const paramKey = `dj.deck${deckId}.${bandKey}`;
+
   const deckNum = deckId === 'A' ? '1' : '2';
   const bandDesc = band === 'high' ? 'treble' : band === 'low' ? 'bass' : 'mid';
 
@@ -88,11 +92,11 @@ export const MixerEQBandKnob: React.FC<{
       className={`
         w-4 h-4 rounded-sm text-[7px] font-black leading-none
         flex items-center justify-center flex-shrink-0
-        transition-all duration-75
+        border transition-all duration-75
         ${
           killActive
-            ? 'bg-red-600 text-text-primary shadow-[0_0_6px_rgba(220,38,38,0.5)]'
-            : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover border border-dark-border'
+            ? 'bg-red-600 border-red-500 text-text-primary shadow-[0_0_6px_rgba(220,38,38,0.5)]'
+            : 'bg-dark-bgHover border-dark-borderLight text-text-secondary hover:bg-dark-bgActive hover:text-text-primary'
         }
       `}
       title={`Hold to kill ${label}`}
@@ -117,6 +121,7 @@ export const MixerEQBandKnob: React.FC<{
         formatValue={formatEQ}
         hideValue
         title={`Deck ${deckNum} EQ ${label} — ${bandDesc} (-12 to +12 dB)`}
+        paramKey={paramKey}
       />
       {side === 'right' && killButton}
     </div>
