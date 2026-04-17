@@ -276,7 +276,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
           {hasActualData ? pad.name : 'Empty'}
         </span>
         {pad.presetName && (
-          <span className="text-[9px] font-mono text-white/50 truncate max-w-full leading-none mt-0.5">
+          <span className="text-[27px] font-mono text-white/50 truncate max-w-full leading-none mt-0.5">
             {pad.presetName}
           </span>
         )}
