@@ -1038,50 +1038,107 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
 
 let _testToneOsc: Tone.Oscillator | null = null;
 let _testToneGain: Tone.Gain | null = null;
+let _richToneNodes: Tone.ToneAudioNode[] = [];
 
-/** Start/stop a steady test tone routed through the master effects chain */
+function stopAllTestTones() {
+  if (_testToneOsc) {
+    _testToneOsc.stop(); _testToneOsc.dispose(); _testToneOsc = null;
+  }
+  if (_testToneGain) {
+    _testToneGain.dispose(); _testToneGain = null;
+  }
+  for (const n of _richToneNodes) {
+    try { n.dispose(); } catch { /* */ }
+  }
+  _richToneNodes = [];
+}
+
+/**
+ * Start/stop a test tone routed through the master effects chain.
+ * mode='sine' (default): single sine wave
+ * mode='rich': full-spectrum signal — sub bass (saw 55Hz), bass (saw 110Hz),
+ *   mid (square 440Hz), upper-mid (triangle 1760Hz), presence (saw 3520Hz),
+ *   plus white noise for transient/air content. Exercises EQ, compressors,
+ *   distortion, filters, and time-based effects properly.
+ */
 export function testTone(params: Record<string, unknown>): Record<string, unknown> {
   const action = (params.action as string) ?? 'start';
   const freq = (params.frequency as number) ?? 440;
   const level = (params.level as number) ?? -12; // dBFS
+  const mode = (params.mode as string) ?? 'sine';
 
   if (action === 'stop') {
-    if (_testToneOsc) {
-      _testToneOsc.stop();
-      _testToneOsc.dispose();
-      _testToneOsc = null;
-    }
-    if (_testToneGain) {
-      _testToneGain.dispose();
-      _testToneGain = null;
-    }
+    stopAllTestTones();
     return { status: 'stopped' };
   }
 
-  // Stop existing tone if any
-  if (_testToneOsc) {
-    _testToneOsc.stop();
-    _testToneOsc.dispose();
-    _testToneOsc = null;
-  }
-  if (_testToneGain) {
-    _testToneGain.dispose();
-    _testToneGain = null;
-  }
+  stopAllTestTones();
 
   const engine = getToneEngine();
-  if (!engine) {
-    return { error: 'ToneEngine not initialized' };
+  if (!engine) return { error: 'ToneEngine not initialized' };
+
+  const masterGain = Math.pow(10, level / 20);
+
+  if (mode === 'rich') {
+    // Multi-oscillator full-spectrum signal
+    const mix = new Tone.Gain(masterGain);
+    mix.connect(engine.masterEffectsInput);
+    _richToneNodes.push(mix);
+
+    const layers: { type: OscillatorType; frequency: number; gain: number }[] = [
+      { type: 'sawtooth',  frequency: 55,   gain: 0.25 },  // sub bass
+      { type: 'sawtooth',  frequency: 110,  gain: 0.22 },  // bass
+      { type: 'square',    frequency: 440,  gain: 0.18 },  // mid
+      { type: 'triangle',  frequency: 1760, gain: 0.12 },  // upper mid
+      { type: 'sawtooth',  frequency: 3520, gain: 0.08 },  // presence
+    ];
+
+    for (const l of layers) {
+      const g = new Tone.Gain(l.gain);
+      const o = new Tone.Oscillator({ frequency: l.frequency, type: l.type });
+      o.connect(g);
+      g.connect(mix);
+      o.start();
+      _richToneNodes.push(o, g);
+    }
+
+    // White noise for transients / air
+    const noiseGain = new Tone.Gain(0.06);
+    const noise = new Tone.Noise('white');
+    noise.connect(noiseGain);
+    noiseGain.connect(mix);
+    noise.start();
+    _richToneNodes.push(noise, noiseGain);
+
+    return { status: 'playing', mode: 'rich', levelDb: level, layers: layers.length + 1 };
   }
 
-  // Create oscillator → gain → masterEffectsInput
-  _testToneGain = new Tone.Gain(Math.pow(10, level / 20));
+  // Simple sine mode
+  _testToneGain = new Tone.Gain(masterGain);
   _testToneOsc = new Tone.Oscillator({ frequency: freq, type: 'sine' });
   _testToneOsc.connect(_testToneGain);
   _testToneGain.connect(engine.masterEffectsInput);
   _testToneOsc.start();
 
-  return { status: 'playing', frequency: freq, levelDb: level };
+  return { status: 'playing', mode: 'sine', frequency: freq, levelDb: level };
+}
+
+/** Replace all master effects at once (for preset auditing) */
+export function setMasterEffects(params: Record<string, unknown>): Record<string, unknown> {
+  const effects = params.effects as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(effects)) return { error: 'effects must be an array' };
+
+  const configs = effects.map((fx, i) => ({
+    id: `audit-fx-${Date.now()}-${i}`,
+    category: (fx.category as string) ?? 'tonejs',
+    type: fx.type as string,
+    enabled: fx.enabled !== false,
+    wet: (fx.wet as number) ?? 50,
+    parameters: (fx.parameters as Record<string, unknown>) ?? {},
+  }));
+
+  useAudioStore.getState().setMasterEffects(configs as never);
+  return { ok: true, count: configs.length };
 }
 
 // ─── Audio Measurement ─────────────────────────────────────────────────────────

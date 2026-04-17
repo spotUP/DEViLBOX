@@ -250,7 +250,7 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
   }
 
   // Store nodes and configs, interleaving compensation gains for level normalization
-  // Chain: masterEffectsInput → [effect → compGain?] → [effect → compGain?] → blepInput
+  // Chain: masterEffectsInput → [effect → compGain?] → [effect → compGain?] → [presetCompGain?] → blepInput
   const chainNodes: Tone.ToneAudioNode[] = [];
   successNodes.forEach((node, index) => {
     const config = successConfigs[index];
@@ -271,6 +271,18 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
       chainNodes.push(compGain);
     }
   });
+
+  // Preset-level gain compensation (measured with full-spectrum test tone).
+  // This corrects the combined volume of the entire preset chain, on top of
+  // the per-effect compensations above.
+  const { useAudioStore: getAudioStore } = await import('../../stores/useAudioStore');
+  const presetCompDb = getAudioStore.getState().presetGainCompensationDb;
+  if (presetCompDb !== 0) {
+    const presetCompLinear = Math.pow(10, presetCompDb / 20);
+    const presetCompGain = new Tone.Gain(presetCompLinear);
+    ctx.masterEffectsNodes.push(presetCompGain);
+    chainNodes.push(presetCompGain);
+  }
 
   // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
   // Most effects are Tone.ToneAudioNodes and use Tone's .connect() directly.
