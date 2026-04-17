@@ -201,6 +201,11 @@ export function getDrumPadEngine(): DrumPadEngine | null {
   return _engine;
 }
 
+/** Returns the singleton NoteRepeatEngine instance (for panic / shared access). */
+export function getNoteRepeatEngine(): NoteRepeatEngine | null {
+  return _noteRepeat;
+}
+
 function getOrCreateEngine(): DrumPadEngine {
   if (!_engine) {
     const ctx = getAudioContext();
