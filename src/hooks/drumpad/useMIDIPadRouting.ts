@@ -297,7 +297,9 @@ export function useMIDIPadRouting() {
             DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
             setFxPadActive(padId, false);
           }
-          _engine.stopPad(padId, pad.release / 1000);
+          if (pad.playMode === 'sustain') {
+            _engine.stopPad(padId, pad.release / 1000);
+          }
           if (pad.synthConfig || pad.instrumentId != null) {
             try {
               let instId: number;
@@ -437,8 +439,11 @@ export function useMIDIPadRouting() {
       SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
     }
 
-    // Stop sample playback
-    _engine.stopPad(padId, pad.release / 1000);
+    // Stop sample playback — only for sustain-mode pads.
+    // Oneshot pads play to completion regardless of when you release.
+    if (pad.playMode === 'sustain') {
+      _engine.stopPad(padId, pad.release / 1000);
+    }
 
     // Release synth note and cancel any pending auto-release
     if (pad.synthConfig || pad.instrumentId != null) {
