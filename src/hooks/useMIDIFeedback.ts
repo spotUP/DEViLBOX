@@ -13,6 +13,8 @@ import { getMPKMiniDisplay } from '../midi/MPKMiniDisplay';
 import { useTransportStore } from '../stores/useTransportStore';
 import { useMIDIStore } from '../stores/useMIDIStore';
 import { useInstrumentStore } from '../stores/useInstrumentStore';
+import { useDrumPadStore } from '../stores/useDrumPadStore';
+import { useUIStore } from '../stores/useUIStore';
 
 export function useMIDIFeedback(): void {
   const isConnectedRef = useRef(false);
@@ -23,6 +25,9 @@ export function useMIDIFeedback(): void {
   const isInitialized = useMIDIStore(s => s.isInitialized);
   const currentInstrumentId = useInstrumentStore(s => s.currentInstrumentId);
   const instruments = useInstrumentStore(s => s.instruments);
+  const activeView = useUIStore(s => s.activeView);
+  const drumProgramId = useDrumPadStore(s => s.currentProgramId);
+  const drumPrograms = useDrumPadStore(s => s.programs);
 
   // Check connection on mount and when MIDI initializes
   useEffect(() => {
@@ -41,16 +46,23 @@ export function useMIDIFeedback(): void {
     };
   }, [isInitialized]);
 
-  // Update OLED display when BPM, knob bank, or instrument changes
+  // Update OLED display when BPM, knob bank, instrument, or drumpad program changes.
+  // In drumpad/dj/vj views the MPK program name (slot label) takes precedence so
+  // the controller's OLED mirrors the DEViLBOX status bar.
   useEffect(() => {
     if (!isConnectedRef.current) return;
 
     const display = getMPKMiniDisplay();
-    const currentInstrument = instruments.find(i => i.id === currentInstrumentId);
-    const instrumentName = currentInstrument?.name;
+    let label: string | undefined;
 
-    display.updateStatusDisplay(bpm, knobBank, instrumentName);
-  }, [bpm, knobBank, currentInstrumentId, instruments]);
+    if (activeView === 'drumpad' || activeView === 'dj' || activeView === 'vj') {
+      label = drumPrograms.get(drumProgramId)?.name;
+    } else {
+      label = instruments.find(i => i.id === currentInstrumentId)?.name;
+    }
+
+    display.updateStatusDisplay(bpm, knobBank, label);
+  }, [bpm, knobBank, currentInstrumentId, instruments, activeView, drumProgramId, drumPrograms]);
 
   // Flash pad LEDs based on transport playback position (beat indicator)
   useEffect(() => {
