@@ -279,8 +279,10 @@ function flushSynthUpdates(): void {
   try {
     const engine = getToneEngine();
     for (const [instrumentId, params] of _pendingSynthUpdates) {
+      let found = false;
       engine.instruments.forEach((instrument, key) => {
         if ((key >>> 16) !== instrumentId) return;
+        found = true;
         const synthObj = instrument as unknown as Record<string, unknown>;
         if (typeof synthObj.set === 'function') {
           const setFn = synthObj.set as (p: string, v: number) => void;
@@ -289,6 +291,9 @@ function flushSynthUpdates(): void {
           }
         }
       });
+      if (!found && (globalThis as Record<string, unknown>).MIDI_DEBUG) {
+        console.warn(`[SynthFlush] NO MATCH for instId=${instrumentId} — engine has ${engine.instruments.size} instruments`);
+      }
     }
   } catch (e) {
     console.warn('[KnobRoute] flush error:', e);
@@ -877,7 +882,7 @@ export function routeDrumPadModulation(
     const mapping = getDrumPadXYMapping(synthType);
 
     if ((globalThis as Record<string, unknown>).MIDI_DEBUG) {
-      console.log(`[DrumPadXY] pad=${padId} synth=${synthType} instId=${instId} X=${normalizedX?.toFixed(2)} Y=${normalizedY?.toFixed(2)} mapping=${mapping.x.param}/${mapping.y.param}`);
+      console.log(`[DrumPadXY] pad=${padId} synth=${synthType} instId=${instId} X=${normalizedX?.toFixed(2)} Y=${normalizedY?.toFixed(2)} target=${mapping.x.target}/${mapping.y.target} mapping=${mapping.x.param}/${mapping.y.param}`);
     }
 
     if (normalizedX !== null) {
@@ -903,12 +908,20 @@ function applyDrumPadAxis(
     value = axis.min + normalized * (axis.max - axis.min);
   }
 
+  if ((globalThis as Record<string, unknown>).MIDI_DEBUG) {
+    console.log(`[DrumPadAxis] param=${axis.param} target=${axis.target} norm=${normalized.toFixed(2)} value=${value.toFixed(2)} padId=${padId} instId=${instId}`);
+  }
+
   if (axis.target === 'pad') {
     // Modulate the pad's built-in filter via DrumPadEngine voice
     applyPadFilterParam(padId, axis.param, value);
   } else {
-    // Modulate via synth engine — use the correct instrument ID
-    routeParameterToEngine(axis.param, normalized, instId);
+    // Send directly to the synth engine, bypassing PARAMETER_ROUTES.
+    // PARAMETER_ROUTES maps generic param names (e.g. 'lfoRate') to specific
+    // synth configs (e.g. TB303's 'tb303.lfo.rate') which breaks when the
+    // target is a different synth type like DubSiren. Pad synths also aren't
+    // in the instrument store, so the route lookup fails silently.
+    sendDirectToSynth(instId, axis.param, normalized);
   }
 }
 
