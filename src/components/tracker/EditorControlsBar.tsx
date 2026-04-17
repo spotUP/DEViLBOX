@@ -336,9 +336,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           REC
         </button>
 
-        {/* Separator */}
-        <div className="w-px h-4 bg-border opacity-50 mx-1" />
-
         {/* Mute Button */}
         <button
           onClick={c.handleToggleMute}
@@ -353,9 +350,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         >
           {c.masterMuted ? 'Unmute' : 'Mute'}
         </button>
-
-        {/* Separator */}
-        <div className="w-px h-4 bg-border opacity-50 mx-1" />
 
         {/* Stepped/Smooth Scrolling Toggle */}
         <button
@@ -373,20 +367,18 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         </button>
 
         {/* Groove Settings Button */}
-        <div className="flex items-center gap-1 ml-1 pl-2 border-l border-dark-border">
-          <button
-            onClick={() => setShowGrooveSettings(true)}
-            className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
-              c.grooveActive
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-            }`}
-            title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === c.grooveTemplateId)?.name || 'None'})`}
-          >
-            Groove
-          </button>
-          {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
-        </div>
+        <button
+          onClick={() => setShowGrooveSettings(true)}
+          className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
+            c.grooveActive
+              ? 'bg-accent-primary/20 text-accent-primary'
+              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+          }`}
+          title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === c.grooveTemplateId)?.name || 'None'})`}
+        >
+          Groove
+        </button>
+        {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
 
         {/* Genre Analysis Badge */}
         <GenreAnalysisBadge />
