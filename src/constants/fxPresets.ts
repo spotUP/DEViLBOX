@@ -287,12 +287,6 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 15, parameters: { drive: 30, tone: 11000 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -14, ratio: 3.5, attack: 0.005, release: 0.12 } },
     ] },
-  { name: 'Dub Sirens Live', description: 'Space Echo + spring reverb — live dub FX', tags: ['DJ', 'Dub'],
-    effects: [
-      { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.55, echoVolume: 0.75, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' } },
-      { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 20, parameters: { decay: 0.5, damping: 0.4, tension: 0.45, mix: 0.3, drip: 0.5, diffusion: 0.6 } },
-      { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -0.5, high: 0.0 } },
-    ] },
   { name: 'Big Room', description: 'Plate reverb + wide stereo + comp — festival main stage', tags: ['DJ', 'Wide'],
     effects: [
       { category: 'wasm', type: 'MVerb', enabled: true, wet: 12, parameters: { damping: 0.5, density: 0.6, bandwidth: 0.7, decay: 0.35, predelay: 0.0, size: 0.5, gain: 1.0, mix: 0.35, earlyMix: 0.7 } },
@@ -357,10 +351,6 @@ export const FX_PRESETS: FxPreset[] = [
   { name: 'Vox Amp Crunch', description: 'Vox amplifier — British crunch for mix character', tags: ['DJ', 'Grit'],
     effects: [
       { category: 'wam', type: 'WAMVoxAmp', enabled: true, wet: 40, parameters: {} },
-    ] },
-  { name: 'Pitch Up +3', description: 'WAM pitch shifter +3 semi — build-ups', tags: ['DJ', 'Creative'],
-    effects: [
-      { category: 'wam', type: 'WAMPitchShifter', enabled: true, wet: 100, parameters: {} },
     ] },
 
   // ═══ SPACE ═══
