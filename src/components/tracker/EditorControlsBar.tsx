@@ -217,7 +217,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           min="-60"
           max="0"
           step="1"
-          className="w-20"
+          className="w-14"
           title={`Volume: ${masterVolume} dB`}
         />
 

@@ -97,9 +97,10 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`
-            flex items-center gap-2 px-2 py-1 rounded text-sm font-medium
+            flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium
+            border border-transparent
             transition-all duration-150
-            ${isOpen ? 'bg-dark-bgActive text-text-primary' : 'hover:bg-dark-bgHover'}
+            ${isOpen ? 'bg-dark-bgActive text-text-primary border-dark-border' : 'hover:bg-dark-bgHover'}
             ${getStatusColor()}
           `}
           title={
@@ -113,7 +114,7 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
           }
         >
           <div className="relative">
-            <Cable size={16} />
+            <Cable size={14} />
             {showActivity && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-primary rounded-full animate-ping" />
             )}
