@@ -93,7 +93,7 @@ const CHORD_STAB: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 35, frequency: 2000 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 280, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.25, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 280, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.25, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.3, tension: 0.45, mix: 0.35, drip: 0.5, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -110,7 +110,7 @@ const BRASS_STAB: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 2500 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.001, release: 0.06 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.2, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.35, tension: 0.5, mix: 0.3, drip: 0.45, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -131,7 +131,7 @@ const DUB_HORN: InstrumentPreset['config'] = {
   },
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 1800 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 330, intensity: 0.65, echoVolume: 0.8, reverbVolume: 0.3, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 330, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.3, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.6, damping: 0.3, tension: 0.4, mix: 0.35, drip: 0.65, diffusion: 0.75 } },
   ],
   volume: -4,
@@ -169,7 +169,7 @@ const TENSION_BUILDER: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 0.15, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 2000 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 350, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.25, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 350, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.25, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.6, damping: 0.3, tension: 0.4, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
   ],
   volume: -6,
@@ -186,7 +186,7 @@ const FREQUENCY_SWEEP: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 0.2, baseFrequency: 100, octaves: 8, type: 'sawtooth', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 2500 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 3, rate: 280, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.2, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 3, rate: 280, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.5, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.7 } },
   ],
   volume: -6,
@@ -220,7 +220,7 @@ const EUPHORIA_RISER: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'Chorus', enabled: true, wet: 55, parameters: { frequency: 4, delayTime: 5, depth: 0.9, spread: 180 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 3000 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 320, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.3, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 320, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.3, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.6, damping: 0.2, tension: 0.4, mix: 0.35, drip: 0.55, diffusion: 0.8 } },
   ],
   volume: -6,
@@ -240,7 +240,7 @@ const SUB_DROP: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 350 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -8, ratio: 10, attack: 0.001, release: 0.05 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 20, parameters: { mode: 4, rate: 400, intensity: 0.45, echoVolume: 0.5, reverbVolume: 0.15, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 20, parameters: { mode: 4, rate: 400, intensity: 0.2, echoVolume: 0.3, reverbVolume: 0.15, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 20, parameters: { decay: 0.4, damping: 0.5, tension: 0.3, mix: 0.25, drip: 0.4, diffusion: 0.5 } },
   ],
   volume: -4,
@@ -256,7 +256,7 @@ const BOOM: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 60, parameters: { drive: 60, frequency: 500 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.06 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 25, parameters: { mode: 4, rate: 350, intensity: 0.5, echoVolume: 0.55, reverbVolume: 0.2, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 25, parameters: { mode: 4, rate: 350, intensity: 0.25, echoVolume: 0.3, reverbVolume: 0.2, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.4, tension: 0.35, mix: 0.3, drip: 0.5, diffusion: 0.6 } },
   ],
   volume: -4,
@@ -272,7 +272,7 @@ const CINEMATIC_HIT: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 1500 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.06 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.25, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.25, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.25, tension: 0.4, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -305,7 +305,7 @@ const CRASH_IMPACT: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 2500 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -8, ratio: 10, attack: 0.001, release: 0.04 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 4, rate: 250, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 4, rate: 250, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.5, damping: 0.3, tension: 0.45, mix: 0.35, drip: 0.5, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -321,7 +321,7 @@ const REVERSE_HIT: InstrumentPreset['config'] = {
   filter: { type: 'bandpass', frequency: 2000, Q: 6, rolloff: -24 },
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 2500 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 4, rate: 220, intensity: 0.7, echoVolume: 0.85, reverbVolume: 0.3, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 4, rate: 220, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.3, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.25, tension: 0.4, mix: 0.35, drip: 0.6, diffusion: 0.75 } },
   ],
   volume: -4,
@@ -345,7 +345,7 @@ const DJ_LASER: InstrumentPreset['config'] = {
   },
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 3000 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 180, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.25, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 180, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.25, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -366,7 +366,7 @@ const GLITCH_ZAP: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 50, parameters: { bits: 4 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 45, frequency: 2000 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 3, rate: 120, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 3, rate: 120, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.45, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.45, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -383,7 +383,7 @@ const PEW_PEW: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 4000 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -8, ratio: 8, attack: 0.001, release: 0.03 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 150, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 150, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.45, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -430,7 +430,7 @@ const DUB_SIREN: InstrumentPreset['config'] = {
   },
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 1800 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 45, parameters: { mode: 4, rate: 300, intensity: 0.65, echoVolume: 0.8, reverbVolume: 0.3, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 45, parameters: { mode: 4, rate: 300, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.3, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.65, damping: 0.25, tension: 0.45, mix: 0.35, drip: 0.6, diffusion: 0.75 } },
   ],
   volume: -4,
@@ -452,7 +452,7 @@ const RAVE_SIREN: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 50, frequency: 2500 } },
     { category: 'tonejs', type: 'Distortion', enabled: true, wet: 25, parameters: { distortion: 0.3, oversample: 2 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 200, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 200, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -474,7 +474,7 @@ const AMBULANCE: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 2500 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.001, release: 0.05 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 4, rate: 250, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 4, rate: 250, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.3, tension: 0.45, mix: 0.3, drip: 0.5, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -496,7 +496,7 @@ const NUCLEAR_ALARM: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 50, frequency: 1500 } },
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 30, parameters: { bits: 6 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 350, intensity: 0.6, echoVolume: 0.75, reverbVolume: 0.25, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 350, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.25, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.6, damping: 0.3, tension: 0.4, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -518,7 +518,7 @@ const WOBBLE_SIREN: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 2000 } },
     { category: 'tonejs', type: 'Tremolo', enabled: true, wet: 55, parameters: { frequency: 5, depth: 0.7, type: 'sine', spread: 0 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 280, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.2, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 280, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.25, tension: 0.45, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -556,7 +556,7 @@ const STATIC_BURST: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 60, parameters: { bits: 4 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 50, frequency: 2000 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 3, rate: 120, intensity: 0.55, echoVolume: 0.65, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 3, rate: 120, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.45, damping: 0.3, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.65 } },
   ],
   volume: -4,
@@ -573,7 +573,7 @@ const WIND_GUST: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 0.5, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 1500 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 400, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.3, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 400, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.3, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.7, damping: 0.2, tension: 0.35, mix: 0.4, drip: 0.65, diffusion: 0.8 } },
   ],
   volume: -6,
@@ -591,7 +591,7 @@ const RADIO_TUNE: InstrumentPreset['config'] = {
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 35, parameters: { bits: 5 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 1800 } },
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 4, baseFrequency: 400, octaves: 4, type: 'square', depth: 1 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 4, rate: 200, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.2, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 4, rate: 200, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.2, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.3, tension: 0.45, mix: 0.3, drip: 0.5, diffusion: 0.65 } },
   ],
   volume: -6,
@@ -612,7 +612,7 @@ const ECHO_WASHOUT: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 1800 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.06 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 70, parameters: { mode: 4, rate: 300, intensity: 0.75, echoVolume: 0.9, reverbVolume: 0.35, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 70, parameters: { mode: 4, rate: 300, intensity: 0.35, echoVolume: 0.3, reverbVolume: 0.35, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.65, damping: 0.25, tension: 0.4, mix: 0.35, drip: 0.6, diffusion: 0.75 } },
   ],
   volume: -4,
@@ -629,7 +629,7 @@ const REWIND: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 90, parameters: { frequency: 0.4, baseFrequency: 150, octaves: 7, type: 'sawtooth', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 50, frequency: 1500 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 250, intensity: 0.6, echoVolume: 0.7, reverbVolume: 0.25, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 250, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.25, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.3, tension: 0.45, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -647,7 +647,7 @@ const TAPE_STOP: InstrumentPreset['config'] = {
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 30, parameters: { bits: 6 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 55, parameters: { drive: 55, frequency: 1500 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.05 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 45, parameters: { mode: 4, rate: 280, intensity: 0.6, echoVolume: 0.75, reverbVolume: 0.25, bpmSync: 1 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 45, parameters: { mode: 4, rate: 280, intensity: 0.3, echoVolume: 0.4, reverbVolume: 0.25, bpmSync: 1 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.3, tension: 0.4, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
   ],
   volume: -4,
@@ -663,7 +663,7 @@ const SPLASH: InstrumentPreset['config'] = {
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 30, frequency: 3000 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.001, release: 0.05 } },
-    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 250, intensity: 0.5, echoVolume: 0.6, reverbVolume: 0.25, bpmSync: 0 } },
+    { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 250, intensity: 0.25, echoVolume: 0.35, reverbVolume: 0.25, bpmSync: 0 } },
     { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.6, damping: 0.2, tension: 0.4, mix: 0.35, drip: 0.6, diffusion: 0.8 } },
   ],
   volume: -4,

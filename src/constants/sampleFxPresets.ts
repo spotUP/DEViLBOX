@@ -27,7 +27,7 @@ const DUB_PLATE_SPECIAL: SampleFxPreset = {
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: -2, high: -1.5 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 1600 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.35, tension: 0.45, mix: 0.35, drip: 0.6, diffusion: 0.7 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.5, echoVolume: 0.7, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.25, echoVolume: 0.4, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/4' } },
   ],
 };
 
@@ -38,7 +38,7 @@ const KING_TUBBYS: SampleFxPreset = {
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: -3, high: -2 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 1200 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 40, parameters: { decay: 0.7, damping: 0.3, tension: 0.4, mix: 0.45, drip: 0.65, diffusion: 0.8 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 45, parameters: { mode: 4, rate: 350, intensity: 0.6, echoVolume: 0.8, reverbVolume: 0.25, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 45, parameters: { mode: 4, rate: 350, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.25, bpmSync: 1, syncDivision: '1/4' } },
   ],
 };
 
@@ -49,7 +49,7 @@ const SCIENTIST_DUB: SampleFxPreset = {
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3.5, mid: -1.5, high: -1 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 30, frequency: 2000 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.65, damping: 0.25, tension: 0.5, mix: 0.4, drip: 0.55, diffusion: 0.75 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 3, rate: 250, intensity: 0.55, echoVolume: 0.75, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/8' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 3, rate: 250, intensity: 0.25, echoVolume: 0.4, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/8' } },
     { id: 'sfx-comp', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.003, release: 0.05 } },
   ],
 };
@@ -61,7 +61,7 @@ const LEE_PERRY_BLACK_ARK: SampleFxPreset = {
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 5, mid: -4, high: -3 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 60, parameters: { drive: 55, frequency: 1000 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 45, parameters: { decay: 0.8, damping: 0.2, tension: 0.35, mix: 0.5, drip: 0.7, diffusion: 0.85 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 400, intensity: 0.7, echoVolume: 0.85, reverbVolume: 0.3, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 400, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.3, bpmSync: 1, syncDivision: '1/4' } },
   ],
 };
 
@@ -74,7 +74,7 @@ const TAPE_ECHO_DUB: SampleFxPreset = {
   category: 'Echo Chamber',
   effects: [
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 1400 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 55, parameters: { mode: 4, rate: 280, intensity: 0.65, echoVolume: 0.85, reverbVolume: 0.1, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 55, parameters: { mode: 4, rate: 280, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.1, bpmSync: 1, syncDivision: '1/4' } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 20, parameters: { decay: 0.4, damping: 0.4, tension: 0.5, mix: 0.25, drip: 0.45, diffusion: 0.6 } },
   ],
 };
@@ -84,7 +84,7 @@ const STEPPERS_DELAY: SampleFxPreset = {
   category: 'Echo Chamber',
   effects: [
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0, high: -1 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 3, rate: 200, intensity: 0.7, echoVolume: 0.8, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/8' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 3, rate: 200, intensity: 0.3, echoVolume: 0.45, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/8' } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 35, parameters: { drive: 30, frequency: 1800 } },
   ],
 };
@@ -94,7 +94,7 @@ const DUB_SIREN_ECHO: SampleFxPreset = {
   category: 'Echo Chamber',
   effects: [
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 50, frequency: 1600 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 4, rate: 350, intensity: 0.75, echoVolume: 0.9, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 4, rate: 350, intensity: 0.35, echoVolume: 0.3, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.6, damping: 0.3, tension: 0.45, mix: 0.35, drip: 0.6, diffusion: 0.7 } },
   ],
 };
@@ -103,7 +103,7 @@ const INFINITE_ECHO: SampleFxPreset = {
   name: 'Infinite Echo',
   category: 'Echo Chamber',
   effects: [
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 65, parameters: { mode: 4, rate: 400, intensity: 0.85, echoVolume: 0.95, reverbVolume: 0.3, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 65, parameters: { mode: 4, rate: 400, intensity: 0.35, echoVolume: 0.3, reverbVolume: 0.3, bpmSync: 1, syncDivision: '1/4' } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.75, damping: 0.2, tension: 0.4, mix: 0.4, drip: 0.5, diffusion: 0.8 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 1200 } },
   ],
@@ -120,7 +120,7 @@ const VINYL_DUB: SampleFxPreset = {
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: -1, high: -4 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 60, parameters: { drive: 55, frequency: 800 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.45, tension: 0.5, mix: 0.3, drip: 0.4, diffusion: 0.6 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 3, rate: 300, intensity: 0.45, echoVolume: 0.6, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 30, parameters: { mode: 3, rate: 300, intensity: 0.2, echoVolume: 0.35, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/4' } },
   ],
 };
 
@@ -142,7 +142,7 @@ const DANCEHALL_CRUNCH: SampleFxPreset = {
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 3, mid: 1, high: -1 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 65, parameters: { drive: 60, frequency: 2200 } },
     { id: 'sfx-comp', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -8, ratio: 10, attack: 0.001, release: 0.04 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 25, parameters: { mode: 3, rate: 200, intensity: 0.4, echoVolume: 0.6, reverbVolume: 0.1, bpmSync: 1, syncDivision: '1/8' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 25, parameters: { mode: 3, rate: 200, intensity: 0.2, echoVolume: 0.35, reverbVolume: 0.1, bpmSync: 1, syncDivision: '1/8' } },
   ],
 };
 
@@ -202,7 +202,7 @@ const SOUND_CLASH: SampleFxPreset = {
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 70, parameters: { drive: 65, frequency: 1400 } },
     { id: 'sfx-comp', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -6, ratio: 12, attack: 0.001, release: 0.03 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 40, parameters: { decay: 0.7, damping: 0.2, tension: 0.35, mix: 0.45, drip: 0.7, diffusion: 0.8 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 350, intensity: 0.75, echoVolume: 0.9, reverbVolume: 0.25, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 350, intensity: 0.35, echoVolume: 0.3, reverbVolume: 0.25, bpmSync: 1, syncDivision: '1/4' } },
   ],
 };
 
@@ -223,7 +223,7 @@ const DUB_DESTROYER: SampleFxPreset = {
   effects: [
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 80, parameters: { drive: 75, frequency: 1000 } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 50, parameters: { decay: 0.85, damping: 0.15, tension: 0.3, mix: 0.55, drip: 0.75, diffusion: 0.9 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 4, rate: 450, intensity: 0.85, echoVolume: 0.95, reverbVolume: 0.35, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 4, rate: 450, intensity: 0.35, echoVolume: 0.3, reverbVolume: 0.35, bpmSync: 1, syncDivision: '1/4' } },
     { id: 'sfx-comp', category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -6, ratio: 10, attack: 0.001, release: 0.04 } },
   ],
 };
@@ -234,7 +234,7 @@ const REWIND_MADNESS: SampleFxPreset = {
   effects: [
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: -1, high: 2 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 55, parameters: { drive: 50, frequency: 1800 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 55, parameters: { mode: 3, rate: 150, intensity: 0.8, echoVolume: 0.9, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/8' } },
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 55, parameters: { mode: 3, rate: 150, intensity: 0.35, echoVolume: 0.3, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/8' } },
     { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 35, parameters: { decay: 0.55, damping: 0.3, tension: 0.45, mix: 0.4, drip: 0.6, diffusion: 0.7 } },
   ],
 };
