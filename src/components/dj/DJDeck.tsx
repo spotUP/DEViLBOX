@@ -43,6 +43,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   const [vizResetKey, setVizResetKey] = useState(0);
   const dragCountRef = useRef(0);
   const deckViewMode = useDJStore((s) => s.deckViewMode);
+  const hasFileLoaded = useDJStore((s) => !!s.decks[deckId].fileName);
   const hasPatternData = useDJStore((s) => s.decks[deckId].totalPositions > 0);
   const hasAudioWaveform = useDJStore((s) => {
     const peaks = s.decks[deckId].waveformPeaks;
@@ -278,12 +279,12 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center relative">
           {deckViewMode === 'vinyl' ? (
             <DeckCssTurntable deckId={deckId} />
-          ) : (hasPatternData || hasAudioWaveform) ? (
+          ) : hasFileLoaded && (hasPatternData || hasAudioWaveform) ? (
             <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
           ) : null}
 
           {/* Pattern overlay (tracker modules) or oscilloscope (audio-only tracks) */}
-          {deckViewMode !== 'visualizer' && (hasPatternData || hasAudioWaveform) && (
+          {deckViewMode !== 'visualizer' && hasFileLoaded && (hasPatternData || hasAudioWaveform) && (
             <div className="absolute inset-0 pointer-events-none" style={{ opacity: hasPatternData ? 0.55 : 0.7 }}>
               <DeckPatternDisplay deckId={deckId} />
             </div>
