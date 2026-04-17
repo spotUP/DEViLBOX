@@ -198,7 +198,8 @@ export const PAD_INSTRUMENT_BASE = 50000;
 
 /**
  * Default instrument FX chain for drumpad synths — Reggae Soundsystem.
- * Spring reverb + Space Echo + warm EQ — deep, dubby, cavernous.
+ * Spring reverb + Space Echo + warm EQ — deep, dubby, but with tail values
+ * that decay cleanly between hits rather than stacking into permanent wash.
  * Returns fresh array with unique IDs each call.
  */
 export function createDefaultPadFX(): EffectConfig[] {
@@ -217,16 +218,16 @@ export function createDefaultPadFX(): EffectConfig[] {
       category: 'wasm',
       type: 'SpringReverb',
       enabled: true,
-      wet: 30,
-      parameters: { decay: 0.6, damping: 0.4, tension: 0.45, mix: 0.4, drip: 0.55, diffusion: 0.7 },
+      wet: 25,
+      parameters: { decay: 0.45, damping: 0.45, tension: 0.5, mix: 0.3, drip: 0.55, diffusion: 0.7 },
     },
     {
       id: `pad-fx-echo-${ts}`,
       category: 'tonejs',
       type: 'SpaceEcho',
       enabled: true,
-      wet: 40,
-      parameters: { mode: 4, rate: 300, intensity: 0.25, echoVolume: 0.4, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
+      wet: 32,
+      parameters: { mode: 4, rate: 300, intensity: 0.18, echoVolume: 0.3, reverbVolume: 0.12, bpmSync: 1, syncDivision: '1/4' },
     },
   ] as EffectConfig[];
 }
