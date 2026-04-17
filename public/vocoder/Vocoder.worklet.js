@@ -26,7 +26,9 @@ class VocoderProcessor extends AudioWorkletProcessor {
 
     // Noise gate — smooth open/close to avoid clicks
     this.gateOpen = 0;          // 0 = closed, 1 = open
-    this.gateThreshold = 0.06;  // mic peak must exceed this to open (above keyboard/ambient)
+    this.gateThreshold = 0.015; // mic peak must exceed this to open (covers normal
+                                // speech on built-in laptop mics after 2x preamp;
+                                // still above typical room/keyboard/HVAC floor)
     this.gateAttack = 0.05;     // how fast it opens (per block, 0-1)
     this.gateRelease = 0.008;   // how fast it closes (per block, 0-1)
 
