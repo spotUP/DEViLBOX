@@ -168,7 +168,11 @@ function toDb(rms: number): number { return rms > 0 ? 20 * Math.log10(rms) : -10
 
 async function measure(durationMs = 2500) {
   const r = await mcpCall('get_audio_level', { durationMs });
-  return { rmsAvg: r?.rmsAvg ?? 0, peakMax: r?.peakMax ?? 0, silent: r?.silent ?? true };
+  const rmsAvg = r?.rmsAvg ?? 0;
+  const peakMax = r?.peakMax ?? 0;
+  // Fallback: if rmsAvg is 0 but peakMax isn't, estimate RMS from peak
+  const effectiveRms = rmsAvg > 0 ? rmsAvg : peakMax * 0.5;
+  return { rmsAvg: effectiveRms, peakMax, silent: effectiveRms < 0.001 };
 }
 
 async function clearFx() {

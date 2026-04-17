@@ -1176,9 +1176,12 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
       const tick = () => {
         const frame = bus.update();
         framesAnalyzed++;
-        rmsSum += frame.rms;
-        if (frame.rms > rmsMax) rmsMax = frame.rms;
-        if (frame.peak > peakMax) peakMax = frame.peak;
+        // Guard against NaN from smoothing — NaN poisons rmsSum permanently
+        const rms = Number.isFinite(frame.rms) ? frame.rms : 0;
+        const peak = Number.isFinite(frame.peak) ? frame.peak : 0;
+        rmsSum += rms;
+        if (rms > rmsMax) rmsMax = rms;
+        if (peak > peakMax) peakMax = peak;
 
         if (performance.now() - startTime >= durationMs) {
           channel.port1.onmessage = null;

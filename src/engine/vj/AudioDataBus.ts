@@ -253,10 +253,14 @@ export class AudioDataBus {
     mid = Math.min(1, mid * boost);
     high = Math.min(1, high * boost);
 
-    // Smooth all values
+    // Smooth all values (guard NaN — once NaN enters smoothRms it poisons forever)
     const s = SMOOTHING;
-    this.smoothRms = this.smoothRms * (1 - s) + rawRms * s;
-    this.smoothPeak = this.smoothPeak * (1 - s) + rawPeak * s;
+    this.smoothRms = Number.isFinite(rawRms)
+      ? this.smoothRms * (1 - s) + rawRms * s
+      : (Number.isFinite(this.smoothRms) ? this.smoothRms * (1 - s) : 0);
+    this.smoothPeak = Number.isFinite(rawPeak)
+      ? this.smoothPeak * (1 - s) + rawPeak * s
+      : (Number.isFinite(this.smoothPeak) ? this.smoothPeak * (1 - s) : 0);
     this.smoothSub = this.smoothSub * (1 - s) + sub * s;
     this.smoothBass = this.smoothBass * (1 - s) + bass * s;
     this.smoothMid = this.smoothMid * (1 - s) + mid * s;
