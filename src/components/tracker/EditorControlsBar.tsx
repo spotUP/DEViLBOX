@@ -28,7 +28,7 @@ import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
   Eye, EyeOff,
-  Activity, Cpu, SlidersHorizontal, Zap, Trash2,
+  Activity, Cpu, Zap, Trash2,
 } from 'lucide-react';
 
 import { type TrackerViewMode } from '@stores/useUIStore';
@@ -329,30 +329,21 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           </button>
         )}
 
-        {/* Rec Button (with settings access) */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={c.handleToggleRecord}
-            className={`
-              px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors flex items-center gap-1
-              ${c.recordMode
-                ? 'bg-accent-error text-text-primary animate-pulse'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-              }
-            `}
-            title="Toggle Recording Mode (Space)"
-          >
-            <div className={`w-2 h-2 rounded-full ${c.recordMode ? 'bg-white' : 'bg-accent-error'}`} />
-            REC
-          </button>
-          <button
-            onClick={c.handleRecSettings}
-            className="p-1 rounded bg-dark-bgSecondary text-text-secondary hover:text-text-primary transition-colors"
-            title="Recording Settings (Quantize, Edit Step...)"
-          >
-            <SlidersHorizontal size={12} />
-          </button>
-        </div>
+        {/* Rec Button */}
+        <button
+          onClick={c.handleToggleRecord}
+          className={`
+            px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors flex items-center gap-1
+            ${c.recordMode
+              ? 'bg-accent-error text-text-primary animate-pulse'
+              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+            }
+          `}
+          title="Toggle Recording Mode (Space)"
+        >
+          <div className={`w-2 h-2 rounded-full ${c.recordMode ? 'bg-white' : 'bg-accent-error'}`} />
+          REC
+        </button>
 
         {/* Separator */}
         <div className="w-px h-4 bg-border opacity-50 mx-1" />
