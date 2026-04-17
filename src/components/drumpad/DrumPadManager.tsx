@@ -8,7 +8,6 @@ import { PadGrid } from './PadGrid';
 import { PadEditor } from './PadEditor';
 import { MpkStatusBar } from './MpkStatusBar';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
-import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import type { SampleData } from '../../types/drumpad';
@@ -51,93 +50,13 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
   const [showSampleBrowser, setShowSampleBrowser] = useState(false);
   const [showPadEditor, setShowPadEditor] = useState(false);
   const [padEditorShowSamples, setPadEditorShowSamples] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-  });
 
   // Performance mode: fullscreen pads with minimal UI
   const [performanceMode, setPerformanceMode] = useState(false);
 
   // DJ presets — action-only select (no persistent selection)
 
-  const {
-    programs,
-    currentProgramId,
-    loadProgram,
-    createProgram,
-    deleteProgram,
-    copyProgram,
-    loadSampleToPad,
-  } = useDrumPadStore();
-
-  const handleProgramChange = useCallback((programId: string) => {
-    loadProgram(programId);
-    setSelectedPadId(null); // Clear selection when changing programs
-  }, [loadProgram]);
-
-  const handleNewProgram = useCallback(() => {
-    // Find next available ID
-    const existingIds = Array.from(programs.keys());
-    let letter = 'A';
-    let number = 1;
-
-    // Simple algorithm: try A-01, A-02, ... B-01, etc.
-    while (existingIds.includes(`${letter}-${String(number).padStart(2, '0')}`)) {
-      number++;
-      if (number > 99) {
-        number = 1;
-        letter = String.fromCharCode(letter.charCodeAt(0) + 1);
-      }
-    }
-
-    const newId = `${letter}-${String(number).padStart(2, '0')}`;
-    createProgram(newId, `New Kit ${letter}${number}`);
-  }, [programs, createProgram]);
-
-  const handleCopyProgram = useCallback(() => {
-    const existingIds = Array.from(programs.keys());
-    let letter = 'A';
-    let number = 1;
-    while (existingIds.includes(`${letter}-${String(number).padStart(2, '0')}`)) {
-      number++;
-      if (number > 99) {
-        number = 1;
-        letter = String.fromCharCode(letter.charCodeAt(0) + 1);
-      }
-    }
-    const newId = `${letter}-${String(number).padStart(2, '0')}`;
-    copyProgram(currentProgramId, newId);
-    loadProgram(newId);
-  }, [programs, currentProgramId, copyProgram, loadProgram]);
-
-  const handleDeleteProgram = useCallback(() => {
-    if (programs.size <= 1) {
-      setConfirmDialog({
-        isOpen: true,
-        title: 'Cannot Delete',
-        message: 'Cannot delete the last program. At least one program must exist.',
-        onConfirm: () => {},
-      });
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Delete Program',
-      message: `Are you sure you want to delete program ${currentProgramId}? This action cannot be undone.`,
-      onConfirm: () => {
-        deleteProgram(currentProgramId);
-      },
-    });
-  }, [programs.size, currentProgramId, deleteProgram]);
+  const { loadProgram, loadSampleToPad } = useDrumPadStore();
 
 
 
@@ -307,34 +226,6 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </div>
           ) : (
           <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-            <div className="flex flex-col gap-2 px-4 pt-3 pb-1 shrink-0">
-              {/* Compact program bar */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-text-muted shrink-0">PGM</span>
-                <CustomSelect
-                  value={currentProgramId}
-                  onChange={(v) => handleProgramChange(v)}
-                  options={Array.from(programs.entries()).map(([id, program]) => ({
-                    value: id,
-                    label: `${id} - ${program.name}`,
-                  }))}
-                  className="flex-1 bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary font-mono focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                />
-                <button onClick={handleNewProgram}
-                  className="px-2 py-1 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-[10px] font-bold rounded transition-colors shrink-0">
-                  + New
-                </button>
-                <button onClick={handleCopyProgram}
-                  className="px-2 py-1 bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary text-[10px] font-bold rounded transition-colors shrink-0">
-                  Copy
-                </button>
-                <button onClick={handleDeleteProgram}
-                  className="px-2 py-1 bg-accent-error hover:bg-accent-error/80 text-text-primary text-[10px] font-bold rounded transition-colors shrink-0"
-                  disabled={programs.size <= 1}>
-                  Del
-                </button>
-              </div>
-            </div>
             {/* Pad grid — fills remaining height */}
             <div className="flex-1 min-h-0 px-4 pb-3">
               <div className="bg-dark-bg border border-dark-border rounded-lg h-full">
@@ -383,17 +274,6 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             </div>
           </div>
         )}
-
-        {/* Confirm Dialog */}
-        <ConfirmDialog
-          isOpen={confirmDialog.isOpen}
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          variant={programs.size <= 1 ? 'warning' : 'danger'}
-          confirmLabel={programs.size <= 1 ? 'OK' : 'Delete'}
-          onConfirm={confirmDialog.onConfirm}
-          onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-        />
       </div>
     </div>
   );
