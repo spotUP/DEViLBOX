@@ -196,9 +196,22 @@ export function subscribeSlotBindings(listener: () => void): () => void {
   return () => _slotBindingListeners.delete(listener);
 }
 
-/** Console debug helper: print current slot bindings. */
+/** Console debug helper: print current slot bindings in readable form. */
 export function dumpSlotBindings(): void {
-  console.log('[MIDI Slots] Current bindings:', Array.from(_slotBindings.entries()));
+  if (_slotBindings.size === 0) {
+    console.log('[MIDI Slots] No bindings.');
+    return;
+  }
+  const rows = Array.from(_slotBindings.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([slot, b]) => ({
+      slot,
+      type: b.type,
+      value: b.value,
+      channel: b.channel,
+      displayChannel: b.channel + 1,
+    }));
+  console.table(rows);
 }
 
 if (typeof window !== 'undefined') {
