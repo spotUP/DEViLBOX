@@ -22,6 +22,15 @@ import ReadOnlyWorkerFactory from '@/workers/readonly-pattern.worker.ts?worker';
 const LINE_NUMBER_WIDTH = 40;
 const CHAR_WIDTH = 10;
 
+/** Add a flat amount to each RGB channel of a hex color */
+function lightenHex(hex: string, add: number): string {
+  const h = hex.replace('#', '');
+  const r = Math.min(255, parseInt(h.substring(0, 2), 16) + add);
+  const g = Math.min(255, parseInt(h.substring(2, 4), 16) + add);
+  const b = Math.min(255, parseInt(h.substring(4, 6), 16) + add);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
 // Worker message types
 interface ReadOnlyInitMsg {
   type: 'init';
@@ -105,7 +114,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       bg:                  t.colors.trackerRowEven,
       rowNormal:           t.colors.trackerRowOdd,
       rowHighlight:        t.colors.trackerRowHighlight,
-      rowSecondaryHighlight: t.colors.accent + '33',
+      rowSecondaryHighlight: lightenHex(t.colors.trackerRowHighlight, 20),
       border:              t.colors.border,
       trackerBorder:       t.colors.trackerBorder,
       textNote:            t.colors.textSecondary,
