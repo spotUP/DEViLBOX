@@ -32,10 +32,9 @@ import { NibblesGame } from '@components/visualization/NibblesGame';
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
-import { importSong, exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
-import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
+import { exportSong, getOriginalModuleDataForExport } from '@lib/export/exporters';
+import { type ModuleInfo } from '@lib/import/ModuleLoader';
 import { useModuleImport } from '@hooks/tracker/useModuleImport';
-import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { clearSavedProject, clearExplicitlySaved, saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
@@ -47,8 +46,6 @@ import type { Pattern } from '@typedefs';
 
 import { CURRENT_VERSION } from '@generated/changelog';
 
-// Build accept string for file input
-const ACCEPTED_FORMATS = ['.json', '.dbx', '.xml', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
 
 interface FT2ToolbarProps {
   onShowPatterns?: () => void;
@@ -180,8 +177,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const isGT = editorMode === 'goattracker';
 
   const engine = getToneEngine();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
   const [showNibbles, setShowNibbles] = useState(false);
@@ -337,110 +332,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    if (isSupportedModule(file.name)) {
-      setPendingFile(file);
-      setShowImportDialog(true);
-      return;
-    }
-    // Loading an external file — prevent auto-save from overwriting user's saved project
-    clearExplicitlySaved();
-    if (isPlaying) {
-      stop();
-      engine.releaseAll();
-    }
-    setIsLoading(true);
-    try {
-      // DB303 XML pattern?
-      if (file.name.toLowerCase().endsWith('.xml')) {
-        const xmlString = await file.text();
-        const patternName = file.name.replace('.xml', '') || 'Imported Pattern';
-        const { pattern: importedPattern } = parseDb303Pattern(xmlString, patternName);
-        const newPatterns = [...patterns, importedPattern];
-        loadPatterns(newPatterns);
-        setCurrentPattern(newPatterns.length - 1);
-        notify.success(`Loaded DB303 pattern: ${importedPattern.name}`);
-        setIsLoading(false);
-        return;
-      }
-
-      if (isMIDIFile(file.name)) {
-        const midiResult = await importMIDIFile(file, {
-          quantize: 1, velocityToVolume: true, defaultPatternLength: 64,
-        });
-        resetAutomation();
-        resetTransport();
-        resetInstruments();
-        engine.disposeAllInstruments();
-        const midiSongPositions = midiResult.patterns.map((_: Pattern, i: number) => i);
-        loadPatterns(midiResult.patterns);
-        if (midiResult.instruments.length > 0) {
-          loadInstruments(midiResult.instruments);
-        }
-        setPatternOrder(midiSongPositions);
-        setCurrentPattern(0);
-        setMetadata({
-          name: midiResult.metadata.name,
-          author: '',
-          description: `Imported from ${file.name} (${midiResult.metadata.tracks} tracks)`,
-        });
-        setBPM(midiResult.bpm);
-        setSpeed(6);
-        notify.success(
-          `Imported: ${midiResult.metadata.name} — ${midiResult.instruments.length} instrument(s), BPM: ${midiResult.bpm}`
-        );
-      } else {
-        const songData = await importSong(file);
-        if (!songData) {
-          notify.error('Failed to import song');
-          return;
-        }
-        const { needsMigration, migrateProject } = await import('@/lib/migration');
-        let patterns = songData.patterns;
-        let instruments = songData.instruments;
-        if (needsMigration(patterns, instruments)) {
-          const migrated = migrateProject(patterns, instruments);
-          patterns = migrated.patterns;
-          instruments = migrated.instruments;
-        }
-        loadPatterns(patterns);
-        if (songData.sequence && Array.isArray(songData.sequence)) {
-          const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
-          const order = songData.sequence
-            .map((patternId: string) => patternIdToIndex.get(patternId))
-            .filter((index: number | undefined): index is number => index !== undefined);
-          if (order.length > 0) setPatternOrder(order);
-        }
-        if (instruments) loadInstruments(instruments);
-        if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
-        setBPM(songData.bpm);
-        setMetadata(songData.metadata);
-        setGrooveTemplate(songData.grooveTemplateId || 'straight');
-        notify.success(`Loaded: ${songData.metadata?.name || file.name}`);
-      }
-    } catch (error) {
-      console.error('Failed to load file:', error);
-      notify.error(`Failed to load ${file.name}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleFolderLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    e.target.value = '';
-    if (files.length === 0) return;
-    const mainFile = files.find(f => isSupportedModule(f.name));
-    if (!mainFile) return;
-    const companions = files.filter(f => f !== mainFile);
-    setPendingCompanions(companions);
-    setPendingFile(mainFile);
-    setShowImportDialog(true);
   };
 
   const pattern = patterns[currentPatternIndex];
@@ -713,14 +604,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         </div>
         </div>
       <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
-        <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
-        <input
-          ref={folderInputRef}
-          type="file"
-          {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
-          onChange={handleFolderLoad}
-          className="hidden"
-        />
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
@@ -728,7 +611,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={onShowExport} title="Export (Ctrl+Shift+E)">Export</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} title="New song">New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)} title="Clear all patterns">Clear</Button>
-        <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} title="Import module file">Import</Button>
         <Button variant={showFindReplace ? 'primary' : 'ghost'} size="sm" onClick={onShowFindReplace} title="Find & replace (Ctrl+F)">Find</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI} title="AI composition tools">AI</Button>
