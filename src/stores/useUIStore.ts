@@ -112,7 +112,7 @@ interface UIStore {
   pendingAudioFile: File | null;   // Audio sample file pending import (adds sampler instrument)
   pendingTD3File: File | null;     // TD-3 pattern file pending import (.sqs/.seq)
   pendingSunVoxFile: File | null;  // SunVox file pending import (.sunsynth / .sunvox)
-  jingleActive: boolean;           // Startup jingle is playing
+  jingleActive: boolean;           // Startup jingle is playing (drives PixiVisualizer jingle mode)
   postJingleActive: boolean;       // Jingle just ended — switch visualizer to logo mode
 
   // Layout presets (1-4)

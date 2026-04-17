@@ -24,7 +24,7 @@ import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/FormatPlaybackState';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { X, Menu, FileUp, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
+import { Maximize2, Minimize2, X, Menu, FileUp, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { NibblesGame } from '@components/visualization/NibblesGame';
@@ -216,16 +216,38 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const aiOpen = useAIStore((s) => s.isOpen);
   const toggleAI = useAIStore((s) => s.toggle);
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
+
+  // Handle fullscreen changes from keyboard (F11) or other sources
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Register db303 export function for console access
   React.useEffect(() => {
     // Reference the function to prevent tree-shaking
     void exportCurrentPatternToDb303;
   }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error('Failed to toggle fullscreen:', err);
+    }
+  };
   
   const fxPresetsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -596,6 +618,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
           className={asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}
         >Hardware</Button>
+        <Button
+          variant={isFullscreen ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Enter Fullscreen (F11)'}
+        >
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </Button>
       </div>
 
       <ImportModuleDialog

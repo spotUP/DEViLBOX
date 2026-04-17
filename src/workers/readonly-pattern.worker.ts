@@ -1,5 +1,5 @@
 /**
- * ReadOnly Pattern Render Worker — OffscreenCanvas rendering for DJ decks
+ * ReadOnly Pattern Render Worker — OffscreenCanvas WebGL2 rendering for DJ decks
  *
  * Simplified version of tracker-render.worker.ts:
  *   - No cursor, no selection, no editing
@@ -7,7 +7,7 @@
  *   - Accepts pattern and playback state only
  */
 
-import { TrackerCanvas2DRenderer } from '../engine/renderer/TrackerCanvas2DRenderer';
+import { TrackerGLRenderer } from '../engine/renderer/TrackerGLRenderer';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -54,7 +54,7 @@ type WorkerMsg = InitMsg | PatternMsg | PlaybackMsg | ResizeMsg;
 
 // ─── Worker state ─────────────────────────────────────────────────────────────
 
-let renderer: TrackerCanvas2DRenderer | null = null;
+let renderer: TrackerGLRenderer | null = null;
 
 let pattern: PatternSnapshot | null = null;
 let currentRow = 0;
@@ -100,10 +100,10 @@ self.onmessage = (e: MessageEvent<WorkerMsg>) => {
       isPlaying  = msg.isPlaying;
       layout     = msg.layout;
       try {
-        renderer = new TrackerCanvas2DRenderer(msg.canvas);
+        renderer = new TrackerGLRenderer(msg.canvas);
         renderer.resize(msg.width, msg.height, msg.dpr);
       } catch (err) {
-        console.error('[ReadOnlyPatternWorker] Canvas2D init failed:', err);
+        console.error('[ReadOnlyPatternWorker] WebGL2 init failed:', err);
         return;
       }
       startRAF();
