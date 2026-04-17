@@ -45,7 +45,8 @@ export function playStopToggle(): boolean {
 }
 
 /**
- * Play pattern from row 0.
+ * Play pattern from row 0, looped.
+ * If already playing, restarts the current pattern from row 0 (never stops).
  */
 export function playPattern(): boolean {
   const replayer = getTrackerReplayer();
@@ -55,14 +56,10 @@ export function playPattern(): boolean {
   const playing = replayer.isPlaying() || store.isPlaying;
 
   if (playing) {
-    if (replayer.isSuppressNotes) {
-      replayer.stop();
-      store.stop();
-      getToneEngine().stop();
-    } else {
-      replayer.forcePosition(startPos, 0);
-      return true;
-    }
+    // Already playing — restart current pattern from row 0 with looping
+    store.setIsLooping(true);
+    replayer.forcePosition(startPos, 0);
+    return true;
   }
   unlockIOSAudio();
   Tone.start();
