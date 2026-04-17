@@ -16,9 +16,9 @@ import { bpmToMs, type SyncDivision } from '../bpmSync';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useDJStore } from '../../stores/useDJStore';
 import { getDJEngine } from '../dj/DJEngine';
-import { filterSweep, filterReset, echoOut, instantEQKill, cancelAllAutomation } from '../dj/DJQuantizedFX';
+import { filterSweep, filterReset, echoOut, instantEQKill, cancelAllAutomation, getQuantizeMode, setQuantizeMode, type QuantizeMode } from '../dj/DJQuantizedFX';
 import { beatJump, triggerHotCue } from '../dj/DJBeatJump';
-import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop } from '../dj/DJActions';
+import { togglePlay, cueDeck, setDeckLineLoop, clearDeckLineLoop, setDeckPitch, setDeckChannelMuteMask, setDeckSlipEnabled, setDeckKeyLock } from '../dj/DJActions';
 import { syncBPMToOther } from '../dj/DJAutoSync';
 import type { DeckId } from '../dj/DeckEngine';
 
@@ -58,12 +58,23 @@ export type DjFxActionId =
   // Sync
   | 'fx_sync'
   // Crossfader (momentary cut)
-  | 'fx_xfader_cut_a' | 'fx_xfader_cut_b';
+  | 'fx_xfader_cut_a' | 'fx_xfader_cut_b'
+  // Channel mute toggles (active deck, channels 1-8)
+  | 'fx_ch_mute_1' | 'fx_ch_mute_2' | 'fx_ch_mute_3' | 'fx_ch_mute_4'
+  | 'fx_ch_mute_5' | 'fx_ch_mute_6' | 'fx_ch_mute_7' | 'fx_ch_mute_8'
+  // Key shift (active deck)
+  | 'fx_key_up' | 'fx_key_down' | 'fx_key_reset'
+  // Quantize cycle
+  | 'fx_quantize_cycle'
+  // Slip mode toggle
+  | 'fx_slip_toggle'
+  // Key lock toggle
+  | 'fx_keylock_toggle';
 
 export interface DjFxAction {
   id: DjFxActionId;
   name: string;
-  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck' | 'hotcue' | 'loop' | 'transport' | 'mixer';
+  category: 'stutter' | 'delay' | 'filter' | 'reverb' | 'modulation' | 'distortion' | 'tape' | 'oneshot' | 'deck' | 'hotcue' | 'loop' | 'transport' | 'mixer' | 'channel';
   mode: 'momentary' | 'oneshot'; // momentary = hold to engage, oneshot = fire and forget
   engage: () => void;
   disengage: () => void;
@@ -1489,6 +1500,105 @@ function createXfaderCut(side: 'a' | 'b'): DjFxAction {
   };
 }
 
+// ─── Channel Mute Toggle Actions ──────────────────────────────────
+
+const channelMuteState = new Map<DeckId, number>(); // track per-deck mute masks
+
+function createChannelMuteToggle(channel: number): DjFxAction {
+  return {
+    id: `fx_ch_mute_${channel}` as DjFxActionId,
+    name: `Mute Ch ${channel}`,
+    category: 'channel',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const current = channelMuteState.get(deckId) || 0;
+      const bit = 1 << (channel - 1);
+      const newMask = current ^ bit; // toggle bit
+      channelMuteState.set(deckId, newMask);
+      setDeckChannelMuteMask(deckId, newMask);
+    },
+    disengage() { /* toggle — no release action */ },
+  };
+}
+
+// ─── Key Shift Actions ────────────────────────────────────────────
+
+function createKeyShift(direction: 'up' | 'down' | 'reset'): DjFxAction {
+  const labels = { up: 'Key +1', down: 'Key −1', reset: 'Key Reset' };
+  return {
+    id: `fx_key_${direction}` as DjFxActionId,
+    name: labels[direction],
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      if (direction === 'reset') {
+        setDeckPitch(deckId, 0);
+      } else {
+        const current = useDJStore.getState().decks[deckId].pitchOffset || 0;
+        setDeckPitch(deckId, current + (direction === 'up' ? 1 : -1));
+      }
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+// ─── Quantize Cycle Action ────────────────────────────────────────
+
+function createQuantizeCycle(): DjFxAction {
+  const cycle: QuantizeMode[] = ['off', 'beat', 'bar'];
+  return {
+    id: 'fx_quantize_cycle',
+    name: 'Quantize Cycle',
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const current = getQuantizeMode();
+      const idx = cycle.indexOf(current);
+      const next = cycle[(idx + 1) % cycle.length];
+      setQuantizeMode(next);
+    },
+    disengage() { /* one-shot */ },
+  };
+}
+
+// ─── Slip Mode Toggle Action ─────────────────────────────────────
+
+function createSlipToggle(): DjFxAction {
+  return {
+    id: 'fx_slip_toggle',
+    name: 'Slip Mode',
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const state = useDJStore.getState().decks[deckId];
+      const newEnabled = !state.slipEnabled;
+      useDJStore.getState().setDeckSlip(deckId, newEnabled);
+      setDeckSlipEnabled(deckId, newEnabled);
+    },
+    disengage() { /* toggle */ },
+  };
+}
+
+// ─── Key Lock Toggle Action ──────────────────────────────────────
+
+function createKeyLockToggle(): DjFxAction {
+  return {
+    id: 'fx_keylock_toggle',
+    name: 'Key Lock',
+    category: 'transport',
+    mode: 'oneshot',
+    engage() {
+      const deckId = getActiveDeckId();
+      const state = useDJStore.getState().decks[deckId];
+      setDeckKeyLock(deckId, !state.keyLockEnabled);
+    },
+    disengage() { /* toggle */ },
+  };
+}
+
 const stutterActions = [
   createStutter('1/4'),
   createStutter('1/8'),
@@ -1559,6 +1669,23 @@ export const DJ_FX_ACTIONS: DjFxAction[] = [
   // Crossfader cuts
   createXfaderCut('a'),
   createXfaderCut('b'),
+  // Channel mute toggles
+  createChannelMuteToggle(1),
+  createChannelMuteToggle(2),
+  createChannelMuteToggle(3),
+  createChannelMuteToggle(4),
+  createChannelMuteToggle(5),
+  createChannelMuteToggle(6),
+  createChannelMuteToggle(7),
+  createChannelMuteToggle(8),
+  // Key shift
+  createKeyShift('up'),
+  createKeyShift('down'),
+  createKeyShift('reset'),
+  // Quantize, Slip, Key Lock
+  createQuantizeCycle(),
+  createSlipToggle(),
+  createKeyLockToggle(),
 ];
 
 export const DJ_FX_ACTION_MAP: Record<DjFxActionId, DjFxAction> = Object.fromEntries(
