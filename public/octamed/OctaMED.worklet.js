@@ -61,6 +61,16 @@ class OctaMEDProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'setInstrumentParam': {
+        if (!this.wasm) break;
+        const paramBytes = new TextEncoder().encode(data.param + '\0');
+        const ptr = this.wasm._malloc(paramBytes.length);
+        new Uint8Array(this.wasm.HEAPU8.buffer, ptr, paramBytes.length).set(paramBytes);
+        this.wasm._octamed_player_set_instrument_param(data.instrument, ptr, data.value);
+        this.wasm._free(ptr);
+        break;
+      }
+
       case 'noteOn':
         if (this.wasm) {
           this.wasm._octamed_player_note_on(data.handle, data.note, data.velocity || 127);
