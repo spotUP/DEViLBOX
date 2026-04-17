@@ -36,7 +36,8 @@ export type TB303Parameter =
   | 'filterFM';
 
 export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Furnace' | 'V2' | 'Synare' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX' | 'Mixer'
-  | 'Hively' | 'Klystrack' | 'DX7' | 'SidMon' | 'SidMon1' | 'SonicArranger' | 'SoundMon' | 'HippelCoSo' | 'FC' | 'RobHubbard' | 'GTUltra' | 'Geonkick' | 'CZ101';
+  | 'Hively' | 'Klystrack' | 'DX7' | 'SidMon' | 'SidMon1' | 'SonicArranger' | 'SoundMon' | 'HippelCoSo' | 'FC' | 'RobHubbard' | 'GTUltra' | 'Geonkick' | 'CZ101'
+  | 'Harmonic' | 'Wavetable' | 'PinkTrombone' | 'Sfizz' | 'CEM3394' | 'TR808' | 'TR909';
 
 export type MappableParameter =
   | TB303Parameter
@@ -279,6 +280,61 @@ export type MappableParameter =
   | 'cz101.dcw_rate'
   | 'cz101.dcw_depth'
   | 'cz101.dca_rate'
+  // Harmonic synth
+  | 'harmonic.filterCutoff'
+  | 'harmonic.filterResonance'
+  | 'harmonic.attack'
+  | 'harmonic.decay'
+  | 'harmonic.sustain'
+  | 'harmonic.release'
+  | 'harmonic.spectralTilt'
+  // Wavetable synth
+  | 'wavetable.morphPosition'
+  | 'wavetable.cutoff'
+  | 'wavetable.resonance'
+  | 'wavetable.attack'
+  | 'wavetable.decay'
+  | 'wavetable.sustain'
+  | 'wavetable.release'
+  // PinkTrombone vocal synth
+  | 'pinktrombone.tongueIndex'
+  | 'pinktrombone.tongueDiameter'
+  | 'pinktrombone.lipDiameter'
+  | 'pinktrombone.constrictionIndex'
+  | 'pinktrombone.constrictionDiameter'
+  | 'pinktrombone.velum'
+  | 'pinktrombone.tenseness'
+  | 'pinktrombone.vibratoAmount'
+  // Sfizz SFZ sampler
+  | 'sfizz.expression'
+  | 'sfizz.pan'
+  | 'sfizz.chorusSend'
+  | 'sfizz.reverbSend'
+  | 'sfizz.transpose'
+  | 'sfizz.modWheel'
+  | 'sfizz.polyphony'
+  // CEM3394 analog
+  | 'cem3394.saw'
+  | 'cem3394.square'
+  | 'cem3394.triangle'
+  // TR-808 drum levels
+  | 'tr808.kick'
+  | 'tr808.snare'
+  | 'tr808.closedHat'
+  | 'tr808.openHat'
+  | 'tr808.clap'
+  | 'tr808.cowbell'
+  | 'tr808.cymbal'
+  | 'tr808.clave'
+  // TR-909 drum levels
+  | 'tr909.kick'
+  | 'tr909.snare'
+  | 'tr909.closedHat'
+  | 'tr909.openHat'
+  | 'tr909.clap'
+  | 'tr909.crash'
+  | 'tr909.ride'
+  | 'tr909.rimshot'
   // Master FX
   | 'masterFx.slot0.wet'
   | 'masterFx.slot0.param0'
