@@ -190,12 +190,30 @@ export const DJVocoderControl: React.FC = () => {
     }
   }, []);
 
+  const pttInProgressRef = useRef(false);
+
   const handlePTTDown = useCallback(async () => {
+    if (pttInProgressRef.current) return; // Already active — prevent double-fire
+    pttInProgressRef.current = true;
+
+    // Set store PTT immediately (sync) so isVocoderTalking() works for joystick routing
+    useVocoderStore.getState().setPTT(true);
+
     let engine = engineRef.current;
     if (!engine) {
       engine = await ensureEngine();
-      if (!engine) return;
+      if (!engine) {
+        pttInProgressRef.current = false;
+        useVocoderStore.getState().setPTT(false);
+        return;
+      }
     }
+    // Guard: if PTT was released during async engine init, don't unmute
+    if (!useVocoderStore.getState().pttActive) {
+      pttInProgressRef.current = false;
+      return;
+    }
+
     if (!isActive || engine.isBypassed) {
       engine.setVocoderBypass(false);
       useVocoderStore.getState().setActive(true);
@@ -208,6 +226,8 @@ export const DJVocoderControl: React.FC = () => {
   }, [ensureEngine, isActive, duckingEnabled]);
 
   const handlePTTUp = useCallback(() => {
+    pttInProgressRef.current = false;
+    useVocoderStore.getState().setPTT(false);
     if (!engineRef.current) return;
     setMuted(true);
     engineRef.current.setMuted(true);
@@ -219,6 +239,17 @@ export const DJVocoderControl: React.FC = () => {
   useEffect(() => {
     registerPTTHandlers(handlePTTDown, handlePTTUp);
   }, [handlePTTDown, handlePTTUp]);
+
+  // Safety: release PTT on window blur (alt-tab while holding)
+  useEffect(() => {
+    const handleBlur = () => {
+      if (useVocoderStore.getState().pttActive) {
+        handlePTTUp();
+      }
+    };
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [handlePTTUp]);
 
   const handleFormantShift = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const shift = parseFloat(e.target.value);
@@ -295,6 +326,8 @@ export const DJVocoderControl: React.FC = () => {
         onPointerDown={handlePTTDown}
         onPointerUp={handlePTTUp}
         onPointerLeave={handlePTTUp}
+        onPointerCancel={handlePTTUp}
+        onContextMenu={(e) => e.preventDefault()}
         className={`
           px-2 py-1 rounded text-[10px] font-bold transition-all select-none touch-none
           ${!muted || globalPTT
