@@ -16,7 +16,7 @@ import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
 import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount, getKnobPageForSection, getKnobPageName } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
-import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation } from '../midi/performance/parameterRouter';
+import { routeParameterToEngine, routeDJParameter, routeDrumPadModulation, isVocoderTalking, routeVocoderModulation } from '../midi/performance/parameterRouter';
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
 import { isDJContext } from '../midi/MIDIContextRouter';
@@ -466,6 +466,12 @@ export const useMIDIStore = create<MIDIStore>()(
               if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
                 const normalizedPB = (message.pitchBend + 8192) / 16383;
 
+                // Vocoder modulation: if actively talking (PTT held), route joystick to vocoder
+                if (isVocoderTalking()) {
+                  routeVocoderModulation(normalizedPB, null);
+                  return;
+                }
+
                 // Drumpad modulation: if ANY pad is held, route joystick to it
                 // (works regardless of active view — pads may be triggered from any context)
                 {
@@ -496,6 +502,12 @@ export const useMIDIStore = create<MIDIStore>()(
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
                   const normalizedMW = message.value / 127;
+
+                  // Vocoder modulation: if actively talking (PTT held), route joystick to vocoder
+                  if (isVocoderTalking()) {
+                    routeVocoderModulation(null, normalizedMW);
+                    return;
+                  }
 
                   // Drumpad modulation: if ANY pad is held, route joystick to it
                   {
