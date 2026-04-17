@@ -9,7 +9,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Settings } from 'lucide-react';
 import { useVocoderStore, VOCODER_PRESETS, VOCODER_FX_PRESETS, type VocoderFXPreset } from '@/stores/useVocoderStore';
-import { VocoderEngine } from '@/engine/vocoder/VocoderEngine';
+import { VocoderEngine, setActiveVocoderEngine } from '@/engine/vocoder/VocoderEngine';
 import { VocoderAutoTune } from '@/engine/vocoder/VocoderAutoTune';
 import type { AutoTuneScale } from '@/engine/effects/AutoTuneEffect';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
@@ -99,6 +99,7 @@ export const DJVocoderControl: React.FC = () => {
     return () => {
       engineRef.current?.dispose();
       engineRef.current = null;
+      setActiveVocoderEngine(null);
     };
   }, []);
 
@@ -123,6 +124,7 @@ export const DJVocoderControl: React.FC = () => {
       const engine = new VocoderEngine(destination);
       await engine.start(selectedDeviceRef.current || undefined);
       engineRef.current = engine;
+      setActiveVocoderEngine(engine);
       setMuted(true);
       engine.setMuted(true);
       if (followMelodyEnabledRef.current) {
@@ -172,6 +174,7 @@ export const DJVocoderControl: React.FC = () => {
     if (!engineRef.current?.isActive) return;
     const oldEngine = engineRef.current;
     engineRef.current = null; // Prevent stale use during switch
+    setActiveVocoderEngine(null);
     oldEngine.stop();
     try {
       const djEngine = getDJEngineIfActive();
@@ -179,6 +182,7 @@ export const DJVocoderControl: React.FC = () => {
       const engine = new VocoderEngine(destination);
       await engine.start(deviceId || undefined);
       engineRef.current = engine;
+      setActiveVocoderEngine(engine);
     } catch (err) {
       console.error('[DJVocoderControl] Device switch failed:', err);
       setError('Switch failed');
@@ -321,7 +325,7 @@ export const DJVocoderControl: React.FC = () => {
             style={{ opacity: amplitude * 0.5 }}
           />
         )}
-        <span className="relative">VOC</span>
+        <span className="relative">Vocoder</span>
       </button>
 
       {/* Settings gear — opens dropdown with all vocoder settings */}
@@ -372,6 +376,7 @@ export const DJVocoderControl: React.FC = () => {
                 options={devices.map(d => ({ value: d.deviceId, label: d.label }))}
                 className="w-full px-2 py-1 text-xs rounded border border-dark-border bg-dark-bg text-text-primary"
                 title="Select microphone input"
+                zIndex={99992}
               />
             </div>
           )}
@@ -445,6 +450,7 @@ export const DJVocoderControl: React.FC = () => {
                   label: name === 'none' ? 'Dry' : name.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
                 }))}
                 className="flex-1 px-1.5 py-1 text-xs rounded border border-dark-border bg-dark-bg text-cyan-400"
+                zIndex={99992}
               />
             </div>
           )}
@@ -462,6 +468,7 @@ export const DJVocoderControl: React.FC = () => {
                 ]}
                 className="w-full px-2 py-1 text-xs rounded border border-dark-border bg-dark-bg text-text-primary"
                 title="Vocoder voice preset"
+                zIndex={99992}
               />
               <div className="flex items-center gap-2">
                 <span className="text-[9px] text-text-muted w-14">Formant</span>
