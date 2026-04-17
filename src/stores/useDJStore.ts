@@ -495,7 +495,7 @@ export const useDJStore = create<DJStore>()(
     setDeckEQ: (deck, band, dB) =>
       set((state) => {
         const key = `eq${band.charAt(0).toUpperCase() + band.slice(1)}` as 'eqLow' | 'eqMid' | 'eqHigh';
-        state.decks[deck][key] = Math.max(-24, Math.min(6, dB));
+        state.decks[deck][key] = Math.max(-12, Math.min(12, dB));
         state.decks[deck].eqPreset = null;
       }),
 
