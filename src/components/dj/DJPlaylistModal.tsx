@@ -1,0 +1,1658 @@
+/**
+ * DJPlaylistModal — Full-screen modal for playlist curation.
+ *
+ * Two-pane layout: playlist sidebar (left) + track list with toolbar (right).
+ * Replaces the cramped inline DJPlaylistPanel for serious playlist editing.
+ *
+ * Uses design system tokens throughout — no raw Tailwind colors.
+ */
+
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  Plus,
+  Trash2,
+  Edit3,
+  Check,
+  X,
+  GripVertical,
+  Search,
+  Copy,
+  Download,
+  Upload,
+  ListMusic,
+  Play,
+  Square,
+  ChevronDown,
+  Undo2,
+  Redo2,
+  Music,
+  AlertTriangle,
+} from 'lucide-react';
+import {
+  useDJPlaylistStore,
+  type PlaylistTrack,
+  type DJPlaylist,
+} from '@/stores/useDJPlaylistStore';
+import { useDJStore } from '@/stores/useDJStore';
+import { getDJEngine } from '@/engine/dj/DJEngine';
+import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
+import { cacheSong } from '@/engine/dj/DJSongCache';
+import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
+import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
+import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { isAudioFile } from '@/lib/audioFileUtils';
+import { isUADEFormat } from '@/lib/import/formats/UADEParser';
+import { loadUADEToDeck } from '@/engine/dj/DJUADEPrerender';
+import { precachePlaylist, type PrecacheProgress } from '@/engine/dj/DJPlaylistPrecache';
+import { getCachedFilenames } from '@/engine/dj/DJAudioCache';
+import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
+import { showConfirm } from '@/stores/useConfirmStore';
+import { Modal } from '@/components/ui/Modal';
+import { ModalHeader } from '@/components/ui/ModalHeader';
+import { Button } from '@/components/ui/Button';
+import { DJ_FX_PRESETS } from './DJPlaylistPanel';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatTotalDuration(seconds: number): string {
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+  const m = Math.floor(seconds / 60);
+  return `${m}m`;
+}
+
+function exportToM3U(playlist: DJPlaylist): string {
+  const lines = ['#EXTM3U', `#PLAYLIST:${playlist.name}`];
+  for (const t of playlist.tracks) {
+    const dur = Math.round(t.duration || -1);
+    lines.push(`#EXTINF:${dur},${t.trackName}`);
+    lines.push(t.fileName);
+  }
+  return lines.join('\n');
+}
+
+function exportToJSON(playlist: DJPlaylist): string {
+  return JSON.stringify(playlist, null, 2);
+}
+
+function parseM3U(content: string): Array<Omit<PlaylistTrack, 'id'>> {
+  const lines = content.split(/\r?\n/).filter((l) => l.trim());
+  const tracks: Array<Omit<PlaylistTrack, 'id'>> = [];
+  let pendingName = '';
+  let pendingDuration = 0;
+  for (const line of lines) {
+    if (line.startsWith('#EXTINF:')) {
+      const match = line.match(/#EXTINF:(-?\d+),(.+)/);
+      if (match) {
+        pendingDuration = Math.max(0, parseInt(match[1], 10));
+        pendingName = match[2].trim();
+      }
+    } else if (!line.startsWith('#')) {
+      const fileName = line.trim();
+      tracks.push({
+        fileName,
+        trackName: pendingName || fileName.replace(/\.[^.]+$/, ''),
+        format: (fileName.split('.').pop() || 'MOD').toUpperCase(),
+        bpm: 0,
+        duration: pendingDuration,
+        addedAt: Date.now(),
+      });
+      pendingName = '';
+      pendingDuration = 0;
+    }
+  }
+  return tracks;
+}
+
+function downloadFile(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const TRACK_ROW_HEIGHT = 40;
+
+// ── Sortable Track Row (enhanced for modal) ──────────────────────────────────
+
+interface ModalTrackRowProps {
+  track: PlaylistTrack;
+  index: number;
+  isSelected: boolean;
+  isFocused: boolean;
+  isLoading: boolean;
+  loadingDeckId: string | null;
+  isAutoDJCurrent: boolean;
+  isAutoDJNext: boolean;
+  thirdDeckActive: boolean;
+  isPreviewing: boolean;
+  onLoadToDeck: (track: PlaylistTrack, deckId: 'A' | 'B' | 'C', index: number) => void;
+  onRemove: (index: number) => void;
+  onClick: (index: number, e: React.MouseEvent) => void;
+  onDoubleClick: (track: PlaylistTrack, index: number) => void;
+  onPreview: (track: PlaylistTrack, index: number) => void;
+  onStopPreview: () => void;
+  onSetFxPreset: (index: number, preset: string | undefined) => void;
+}
+
+const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
+  track,
+  index,
+  isSelected,
+  isFocused,
+  isLoading,
+  loadingDeckId,
+  isAutoDJCurrent,
+  isAutoDJNext,
+  thirdDeckActive,
+  isPreviewing,
+  onLoadToDeck,
+  onRemove,
+  onClick,
+  onDoubleClick,
+  onPreview,
+  onStopPreview,
+  onSetFxPreset,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: track.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    height: TRACK_ROW_HEIGHT,
+  };
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  const bgClass = isLoading
+    ? 'bg-accent-primary/10'
+    : isDragging
+      ? 'bg-accent-primary/20'
+      : isSelected
+        ? 'bg-accent-primary/15'
+        : isAutoDJCurrent
+          ? 'bg-accent-success/10'
+          : isAutoDJNext
+            ? 'bg-accent-primary/5'
+            : isHovered
+              ? 'bg-dark-bgHover'
+              : '';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-track-index={index}
+      className={`flex items-center gap-2 px-3 border-b border-dark-border/50 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''}`}
+      onClick={(e) => onClick(index, e)}
+      onDoubleClick={() => onDoubleClick(track, index)}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
+    >
+      {/* Drag handle */}
+      <div {...attributes} {...listeners} className="cursor-grab touch-none p-1 -ml-1">
+        <GripVertical size={14} className="text-text-muted/30 hover:text-text-muted/60 shrink-0" />
+      </div>
+
+      {/* Track number */}
+      <span className="text-[10px] font-mono text-text-muted/40 w-6 text-right shrink-0">
+        {index + 1}
+      </span>
+
+      {/* Status indicator */}
+      {isLoading ? (
+        <span className="text-accent-primary text-[10px] shrink-0 animate-pulse font-bold" title={`Loading to deck ${loadingDeckId}`}>
+          {loadingDeckId}
+        </span>
+      ) : track.isBad ? (
+        <span className="text-accent-error text-[10px] shrink-0" title={`Bad: ${track.badReason}`}>✗</span>
+      ) : track.played ? (
+        <span className="text-accent-success/50 text-[10px] shrink-0" title="Played">✓</span>
+      ) : isAutoDJCurrent ? (
+        <span className="text-accent-success text-[10px] shrink-0" title="Now playing">▶</span>
+      ) : isAutoDJNext ? (
+        <span className="text-accent-primary text-[10px] shrink-0" title="Up next">▸</span>
+      ) : null}
+
+      {/* Track name */}
+      <span className={`flex-1 text-[13px] font-mono truncate min-w-0 ${
+        isLoading ? 'text-accent-primary' : track.isBad ? 'text-accent-error/80' : track.played ? 'text-text-muted/40' : 'text-text-primary'
+      }`}>
+        {track.trackName}
+      </span>
+
+      {/* Format badge */}
+      <span className="text-[9px] font-mono text-text-muted/30 shrink-0 px-1 bg-dark-bgTertiary rounded">
+        {track.format}
+      </span>
+
+      {/* BPM */}
+      {track.bpm > 0 && (
+        <span className="text-[11px] font-mono text-text-muted/50 shrink-0 w-8 text-right">{track.bpm}</span>
+      )}
+
+      {/* Musical key (Camelot) */}
+      {track.musicalKey && (
+        <span
+          className="text-[10px] font-mono font-bold shrink-0 px-1.5 py-0.5 rounded"
+          style={{ color: camelotColor(track.musicalKey), backgroundColor: `${camelotColor(track.musicalKey)}15` }}
+        >
+          {camelotDisplay(track.musicalKey)}
+        </span>
+      )}
+
+      {/* Energy bar */}
+      {track.energy != null && track.energy > 0 && (
+        <div className="w-10 h-1.5 bg-dark-bgTertiary rounded-full shrink-0 overflow-hidden" title={`Energy: ${Math.round(track.energy * 100)}%`}>
+          <div
+            className="h-full rounded-full bg-accent-warning"
+            style={{ width: `${track.energy * 100}%` }}
+          />
+        </div>
+      )}
+
+      {/* Duration */}
+      {track.duration > 0 && (
+        <span className="text-[11px] font-mono text-text-muted/40 shrink-0 w-10 text-right">{formatDuration(track.duration)}</span>
+      )}
+
+      {/* Per-song FX preset indicator */}
+      {track.masterFxPreset && (
+        <span className="text-[9px] font-mono text-accent-highlight shrink-0 px-1 bg-accent-highlight/10 rounded" title={`FX: ${DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset)?.label ?? track.masterFxPreset}`}>
+          FX
+        </span>
+      )}
+
+      {/* Actions (visible on hover) */}
+      <span className={`flex items-center gap-1 shrink-0 transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <button
+          onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
+          className={`p-1 rounded transition-colors ${isPreviewing ? 'text-accent-success hover:text-accent-success/80' : 'text-text-muted/50 hover:text-text-primary'}`}
+          title={isPreviewing ? 'Stop preview' : 'Preview track'}
+        >
+          {isPreviewing ? <Square size={10} /> : <Play size={10} />}
+        </button>
+        <select
+          value={track.masterFxPreset || ''}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => { e.stopPropagation(); onSetFxPreset(index, e.target.value || undefined); }}
+          className="text-[9px] bg-transparent border border-dark-border/50 rounded text-text-muted/50 hover:text-text-muted px-1 max-w-[48px] cursor-pointer"
+          title="Per-song master FX preset"
+        >
+          <option value="">FX</option>
+          {DJ_FX_PRESETS.map(p => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+        </select>
+        <button
+          onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'A', index); }}
+          className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-accent-primary hover:text-accent-primary/80 transition-colors rounded hover:bg-dark-bgHover"
+          title="Load to Deck 1"
+        >1</button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'B', index); }}
+          className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-accent-error hover:text-accent-error/80 transition-colors rounded hover:bg-dark-bgHover"
+          title="Load to Deck 2"
+        >2</button>
+        {thirdDeckActive && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'C', index); }}
+            className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-accent-success hover:text-accent-success/80 transition-colors rounded hover:bg-dark-bgHover"
+            title="Load to Deck 3"
+          >3</button>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(index); }}
+          title="Remove from playlist"
+          className="p-1 text-accent-error/60 hover:text-accent-error transition-colors rounded hover:bg-dark-bgHover"
+        >
+          <X size={10} />
+        </button>
+      </span>
+    </div>
+  );
+});
+
+ModalTrackRow.displayName = 'ModalTrackRow';
+
+// ── Playlist Sidebar Item ────────────────────────────────────────────────────
+
+interface PlaylistSidebarItemProps {
+  playlist: DJPlaylist;
+  isActive: boolean;
+  isEditing: boolean;
+  editName: string;
+  onSelect: () => void;
+  onStartEdit: () => void;
+  onEditName: (name: string) => void;
+  onFinishEdit: () => void;
+  onCancelEdit: () => void;
+  onDelete: () => void;
+  onClone: () => void;
+}
+
+const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
+  playlist,
+  isActive,
+  isEditing,
+  editName,
+  onSelect,
+  onStartEdit,
+  onEditName,
+  onFinishEdit,
+  onCancelEdit,
+  onDelete,
+  onClone,
+}) => {
+  const totalDuration = playlist.tracks.reduce((s, t) => s + (t.duration || 0), 0);
+  const badCount = playlist.tracks.filter(t => t.isBad).length;
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 px-2 py-1.5">
+        <input
+          autoFocus
+          value={editName}
+          onChange={(e) => onEditName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') onFinishEdit(); if (e.key === 'Escape') onCancelEdit(); }}
+          onBlur={onFinishEdit}
+          className="flex-1 px-2 py-0.5 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary min-w-0"
+        />
+        <button onClick={onFinishEdit} className="p-0.5 text-accent-success hover:text-accent-success/80"><Check size={12} /></button>
+        <button onClick={onCancelEdit} className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={onStartEdit}
+      className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-l-2 ${
+        isActive
+          ? 'border-accent-primary bg-accent-primary/10 text-text-primary'
+          : 'border-transparent text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+      }`}
+    >
+      <Music size={12} className={isActive ? 'text-accent-primary' : 'text-text-muted/40'} />
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-mono truncate">{playlist.name}</div>
+        <div className="text-[9px] font-mono text-text-muted/50">
+          {playlist.tracks.length} tracks
+          {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
+          {badCount > 0 && <span className="text-accent-error ml-1">· {badCount} bad</span>}
+        </div>
+      </div>
+      <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={(e) => { e.stopPropagation(); onStartEdit(); }} className="p-0.5 text-text-muted/40 hover:text-text-primary" title="Rename">
+          <Edit3 size={10} />
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); onClone(); }} className="p-0.5 text-text-muted/40 hover:text-text-primary" title="Duplicate">
+          <Copy size={10} />
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-0.5 text-text-muted/40 hover:text-accent-error" title="Delete">
+          <Trash2 size={10} />
+        </button>
+      </span>
+    </div>
+  );
+});
+
+PlaylistSidebarItem.displayName = 'PlaylistSidebarItem';
+
+// ── Main Modal Component ─────────────────────────────────────────────────────
+
+interface DJPlaylistModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClose }) => {
+  // ── Store bindings ──────────────────────────────────────────────────────
+  const playlists = useDJPlaylistStore((s) => s.playlists);
+  const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
+  const createPlaylist = useDJPlaylistStore((s) => s.createPlaylist);
+  const deletePlaylist = useDJPlaylistStore((s) => s.deletePlaylist);
+  const renamePlaylist = useDJPlaylistStore((s) => s.renamePlaylist);
+  const setActivePlaylist = useDJPlaylistStore((s) => s.setActivePlaylist);
+  const addTrack = useDJPlaylistStore((s) => s.addTrack);
+  const addTracks = useDJPlaylistStore((s) => s.addTracks);
+  const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
+  const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
+  const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
+  const clonePlaylist = useDJPlaylistStore((s) => s.clonePlaylist);
+  const selectedTrackIndices = useDJPlaylistStore((s) => s.selectedTrackIndices);
+  const focusedTrackIndex = useDJPlaylistStore((s) => s.focusedTrackIndex);
+  const selectTrack = useDJPlaylistStore((s) => s.selectTrack);
+  const selectTrackRange = useDJPlaylistStore((s) => s.selectTrackRange);
+  const toggleTrackSelection = useDJPlaylistStore((s) => s.toggleTrackSelection);
+  const selectAllTracks = useDJPlaylistStore((s) => s.selectAllTracks);
+  const clearSelection = useDJPlaylistStore((s) => s.clearSelection);
+  const setFocusedTrack = useDJPlaylistStore((s) => s.setFocusedTrack);
+  const removeSelectedTracks = useDJPlaylistStore((s) => s.removeSelectedTracks);
+  const moveSelectedTracks = useDJPlaylistStore((s) => s.moveSelectedTracks);
+  const copySelectedTracks = useDJPlaylistStore((s) => s.copySelectedTracks);
+  const canUndo = useDJPlaylistStore((s) => s.canUndo);
+  const canRedo = useDJPlaylistStore((s) => s.canRedo);
+  const undo = useDJPlaylistStore((s) => s.undo);
+  const redo = useDJPlaylistStore((s) => s.redo);
+  const updateTrackMeta = useDJPlaylistStore((s) => s.updateTrackMeta);
+
+  const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
+  const autoDJCurrentIdx = useDJStore((s) => s.autoDJCurrentTrackIndex);
+  const autoDJNextIdx = useDJStore((s) => s.autoDJNextTrackIndex);
+  const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
+
+  // ── Local state ──────────────────────────────────────────────────────────
+  const [isCreating, setIsCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [loadingTrackIndex, setLoadingTrackIndex] = useState<number | null>(null);
+  const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
+  const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
+  const previewGainRef = useRef<GainNode | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastClickedRef = useRef<number>(-1);
+
+  // Context menu
+  const contextMenu = useContextMenu();
+  const [contextMenuTrackIndex, setContextMenuTrackIndex] = useState<number>(-1);
+
+  const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
+  const selectedSet = useMemo(() => new Set(selectedTrackIndices), [selectedTrackIndices]);
+
+  // ── Search/filter ─────────────────────────────────────────────────────────
+
+  const filteredTracks = useMemo(() => {
+    if (!activePlaylist || !searchQuery.trim()) return activePlaylist?.tracks ?? [];
+    const q = searchQuery.toLowerCase();
+    return activePlaylist.tracks.filter((t) =>
+      t.trackName.toLowerCase().includes(q) ||
+      t.fileName.toLowerCase().includes(q) ||
+      t.format.toLowerCase().includes(q) ||
+      (t.musicalKey && t.musicalKey.toLowerCase().includes(q))
+    );
+  }, [activePlaylist, searchQuery]);
+
+  const isFiltered = searchQuery.trim().length > 0;
+
+  const filteredIndexMap = useMemo(() => {
+    if (!isFiltered || !activePlaylist) return null;
+    const map = new Map<number, number>();
+    let fi = 0;
+    for (let i = 0; i < activePlaylist.tracks.length; i++) {
+      if (filteredTracks.includes(activePlaylist.tracks[i])) {
+        map.set(fi, i);
+        fi++;
+      }
+    }
+    return map;
+  }, [isFiltered, activePlaylist, filteredTracks]);
+
+  const getRealIndex = useCallback((displayIndex: number): number => {
+    if (!filteredIndexMap) return displayIndex;
+    return filteredIndexMap.get(displayIndex) ?? displayIndex;
+  }, [filteredIndexMap]);
+
+  // ── Native contextmenu listener ─────────────────────────────────────────
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const trackRow = target.closest('[data-track-index]');
+      if (trackRow) {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(trackRow.getAttribute('data-track-index') || '-1', 10);
+        if (index >= 0) {
+          const realIndex = getRealIndex(index);
+          setContextMenuTrackIndex(realIndex);
+          if (!selectedSet.has(realIndex)) {
+            selectTrack(realIndex);
+          }
+          const fakeEvent = {
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            clientX: e.clientX,
+            clientY: e.clientY,
+          } as React.MouseEvent;
+          contextMenu.open(fakeEvent);
+        }
+      }
+    };
+
+    container.addEventListener('contextmenu', handler, true);
+    return () => container.removeEventListener('contextmenu', handler, true);
+  }, [getRealIndex, selectedSet, selectTrack, contextMenu]);
+
+  // ── Virtual scrolling ─────────────────────────────────────────────────────
+
+  const virtualizer = useVirtualizer({
+    count: filteredTracks.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => TRACK_ROW_HEIGHT,
+    overscan: 8,
+  });
+
+  // ── @dnd-kit ──────────────────────────────────────────────────────────────
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const sortableIds = useMemo(() =>
+    filteredTracks.map((t) => t.id),
+    [filteredTracks]
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    if (!activePlaylistId || isFiltered) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = filteredTracks.findIndex((t) => t.id === active.id);
+    const newIndex = filteredTracks.findIndex((t) => t.id === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      reorderTrack(activePlaylistId, oldIndex, newIndex);
+    }
+  }, [activePlaylistId, isFiltered, filteredTracks, reorderTrack]);
+
+  // ── Pre-cache ─────────────────────────────────────────────────────────────
+
+  const [precacheProgress, setPrecacheProgress] = useState<PrecacheProgress | null>(null);
+  const precachingRef = useRef(false);
+  const [cachedCount, setCachedCount] = useState(0);
+
+  const [retestingBad, setRetestingBad] = useState(false);
+
+  const badTrackCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.isBad).length
+    : 0;
+
+  const handleRetestBadTracks = useCallback(async () => {
+    if (!activePlaylist || !activePlaylistId || retestingBad) return;
+
+    const badTracks = activePlaylist.tracks
+      .map((t, idx) => ({ track: t, index: idx }))
+      .filter(({ track }) => track.isBad);
+
+    if (badTracks.length === 0) return;
+
+    setRetestingBad(true);
+    const { loadPlaylistTrackToDeck } = await import('@/engine/dj/DJTrackLoader');
+    const { clearTrackBadFlag } = useDJPlaylistStore.getState();
+
+    let successCount = 0;
+    for (const { track, index } of badTracks) {
+      clearTrackBadFlag(activePlaylistId, index);
+      const success = await loadPlaylistTrackToDeck(track, 'A');
+      if (success) successCount++;
+    }
+
+    setRetestingBad(false);
+    console.log(`[DJPlaylistModal] Re-test: ${successCount}/${badTracks.length} now working`);
+  }, [activePlaylist, activePlaylistId, retestingBad]);
+
+  useEffect(() => {
+    if (!activePlaylist) { setCachedCount(0); return; }
+    getCachedFilenames().then(names => {
+      let count = 0;
+      for (const t of activePlaylist.tracks) {
+        if (!t.fileName.startsWith('modland:') && !t.fileName.startsWith('hvsc:')) continue;
+        const prefix = t.fileName.startsWith('hvsc:') ? 'hvsc:' : 'modland:';
+        const fn = t.fileName.slice(prefix.length).split('/').pop() || '';
+        if (names.has(fn)) count++;
+      }
+      setCachedCount(count);
+    });
+  }, [activePlaylist, precacheProgress]);
+
+  const onlineCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.fileName.startsWith('modland:') || t.fileName.startsWith('hvsc:')).length
+    : 0;
+  const uncachedCount = onlineCount - cachedCount;
+
+  const handlePrecache = useCallback(async () => {
+    if (!activePlaylistId || precachingRef.current) return;
+    precachingRef.current = true;
+    setPrecacheProgress({ current: 0, total: 1, cached: 0, failed: 0, skipped: 0, trackName: 'Starting...', status: 'checking' });
+    try {
+      await precachePlaylist(activePlaylistId, (p) => setPrecacheProgress({ ...p }));
+    } finally {
+      precachingRef.current = false;
+      setPrecacheProgress(null);
+    }
+  }, [activePlaylistId]);
+
+  // ── Playlist CRUD ────────────────────────────────────────────────────────
+
+  const handleCreate = useCallback(() => {
+    if (!newName.trim()) return;
+    createPlaylist(newName.trim());
+    setNewName('');
+    setIsCreating(false);
+  }, [newName, createPlaylist]);
+
+  const handleRename = useCallback((id: string) => {
+    if (!editName.trim()) return;
+    renamePlaylist(id, editName.trim());
+    setEditingPlaylistId(null);
+  }, [editName, renamePlaylist]);
+
+  const handleDeletePlaylist = useCallback(async (playlist: DJPlaylist) => {
+    const confirmed = await showConfirm({
+      title: 'Delete Playlist',
+      message: `Delete "${playlist.name}" and all ${playlist.tracks.length} tracks?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (confirmed) deletePlaylist(playlist.id);
+  }, [deletePlaylist]);
+
+  // ── Add files to playlist ────────────────────────────────────────────────
+
+  const handleAddFiles = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!activePlaylistId || !e.target.files) return;
+      setIsLoadingFile(true);
+
+      for (const file of Array.from(e.target.files)) {
+        try {
+          const isAudio = isAudioFile(file.name);
+          const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
+
+          if (isAudio) {
+            addTrack(activePlaylistId, {
+              fileName: file.name,
+              trackName: file.name.replace(/\.[^.]+$/, ''),
+              format: fileExt,
+              bpm: 0,
+              duration: 0,
+              addedAt: Date.now(),
+            });
+          } else {
+            const song = await parseModuleToSong(file);
+            cacheSong(file.name, song);
+            const bpmResult = detectBPM(song);
+            const duration = estimateSongDuration(song);
+
+            addTrack(activePlaylistId, {
+              fileName: file.name,
+              trackName: song.name || file.name,
+              format: fileExt,
+              bpm: bpmResult.bpm,
+              duration,
+              addedAt: Date.now(),
+            });
+          }
+        } catch (err) {
+          console.error(`[DJPlaylistModal] Failed to process ${file.name}:`, err);
+        }
+      }
+
+      setIsLoadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+    [activePlaylistId, addTrack],
+  );
+
+  // ── Import playlist ───────────────────────────────────────────────────────
+
+  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    const text = await file.text();
+
+    if (file.name.endsWith('.json')) {
+      try {
+        const data = JSON.parse(text) as DJPlaylist;
+        if (data.tracks && Array.isArray(data.tracks)) {
+          const id = createPlaylist(data.name || 'Imported');
+          addTracks(id, data.tracks);
+        }
+      } catch {
+        console.error('[DJPlaylistModal] Invalid JSON playlist file');
+      }
+    } else {
+      const tracks = parseM3U(text);
+      if (tracks.length > 0) {
+        const name = file.name.replace(/\.[^.]+$/, '');
+        const id = createPlaylist(name);
+        addTracks(id, tracks);
+      }
+    }
+
+    if (importInputRef.current) importInputRef.current.value = '';
+  }, [createPlaylist, addTracks]);
+
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  const handleExportM3U = useCallback(() => {
+    if (!activePlaylist) return;
+    downloadFile(exportToM3U(activePlaylist), `${activePlaylist.name}.m3u8`, 'audio/mpegurl');
+  }, [activePlaylist]);
+
+  const handleExportJSON = useCallback(() => {
+    if (!activePlaylist) return;
+    downloadFile(exportToJSON(activePlaylist), `${activePlaylist.name}.json`, 'application/json');
+  }, [activePlaylist]);
+
+  // ── Load track to deck ────────────────────────────────────────────────────
+
+  const pickFreeDeck = useCallback((): 'A' | 'B' => {
+    const decks = useDJStore.getState().decks;
+    if (!decks.A.isPlaying) return 'A';
+    if (!decks.B.isPlaying) return 'B';
+    return 'A';
+  }, []);
+
+  const loadSongToDeck = useCallback(
+    async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C', rawBuffer?: ArrayBuffer) => {
+      const engine = getDJEngine();
+      const bpmResult = detectBPM(song);
+
+      if (rawBuffer) {
+        useDJStore.getState().setDeckState(deckId, {
+          fileName,
+          trackName: song.name || fileName,
+          detectedBPM: bpmResult.bpm,
+          effectiveBPM: bpmResult.bpm,
+          analysisState: 'rendering',
+          isPlaying: false,
+        });
+
+        try {
+          const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm, song);
+          useDJStore.getState().setDeckViewMode('visualizer');
+        } catch (err) {
+          console.error(`[DJPlaylistModal] Pipeline failed for ${fileName}:`, err);
+        }
+      }
+    },
+    [],
+  );
+
+  const loadTrackToDeck = useCallback(
+    async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C') => {
+      const engine = getDJEngine();
+
+      if (track.fileName.startsWith('modland:')) {
+        const modlandPath = track.fileName.slice('modland:'.length);
+        try {
+          const { downloadModlandFile } = await import('@/lib/modlandApi');
+          const buffer = await downloadModlandFile(modlandPath);
+          const filename = modlandPath.split('/').pop() || 'download.mod';
+
+          if (isAudioFile(filename)) {
+            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+            useDJStore.getState().setDeckViewMode('vinyl');
+          } else if (isUADEFormat(filename)) {
+            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName);
+            useDJStore.getState().setDeckViewMode('visualizer');
+          } else {
+            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+            const song = await parseModuleToSong(blob);
+            cacheSong(track.fileName, song);
+            await loadSongToDeck(song, track.fileName, deckId, buffer);
+          }
+          return;
+        } catch (err) {
+          console.error(`[DJPlaylistModal] Modland re-download failed:`, err);
+        }
+      }
+
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '*/*';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const rawBuffer = await file.arrayBuffer();
+          if (isAudioFile(file.name)) {
+            await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
+            useDJStore.getState().setDeckViewMode('vinyl');
+          } else {
+            const song = await parseModuleToSong(file);
+            cacheSong(file.name, song);
+            await loadSongToDeck(song, file.name, deckId, rawBuffer);
+          }
+        } catch (err) {
+          console.error(`[DJPlaylistModal] Failed to load track:`, err);
+        }
+      };
+      input.click();
+    },
+    [loadSongToDeck],
+  );
+
+  const loadTrackWithProgress = useCallback(
+    async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C', index: number) => {
+      setLoadingTrackIndex(index);
+      setLoadingDeckId(deckId);
+      try {
+        await loadTrackToDeck(track, deckId);
+        if (track.masterFxPreset) {
+          const preset = DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset);
+          if (preset) {
+            try {
+              const { useAudioStore } = await import('@/stores/useAudioStore');
+              const effectConfigs = preset.effects.map((fx, i) => ({
+                id: `persong-${preset.key}-${i}`,
+                category: 'tonejs' as const,
+                type: fx.type,
+                enabled: true,
+                wet: fx.wet,
+                parameters: fx.params as Record<string, number | string>,
+              }));
+              useAudioStore.getState().setMasterEffects(effectConfigs);
+            } catch (err) {
+              console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
+            }
+          }
+        }
+      } finally {
+        setLoadingTrackIndex(null);
+        setLoadingDeckId(null);
+      }
+    },
+    [loadTrackToDeck],
+  );
+
+  // ── Preview ──────────────────────────────────────────────────────────────
+
+  const stopPreview = useCallback(() => {
+    if (previewPlayerRef.current) {
+      try { previewPlayerRef.current.stop(); } catch { /* already stopped */ }
+      previewPlayerRef.current = null;
+    }
+    if (previewGainRef.current) {
+      previewGainRef.current.disconnect();
+      previewGainRef.current = null;
+    }
+    setPreviewingIndex(null);
+  }, []);
+
+  const handlePreview = useCallback(async (track: PlaylistTrack, index: number) => {
+    stopPreview();
+    const store = useDJStore.getState();
+    const idleDeck: 'A' | 'B' = store.decks.A.isPlaying ? 'B' : 'A';
+    setPreviewingIndex(index);
+    try {
+      await loadTrackToDeck(track, idleDeck);
+      try {
+        getDJEngine().getDeck(idleDeck).play();
+        useDJStore.getState().setDeckPlaying(idleDeck, true);
+      } catch { /* engine not ready */ }
+    } catch {
+      setPreviewingIndex(null);
+    }
+  }, [loadTrackToDeck, stopPreview]);
+
+  useEffect(() => stopPreview, [stopPreview]);
+
+  // ── Per-song FX ──────────────────────────────────────────────────────────
+
+  const handleSetFxPreset = useCallback((index: number, preset: string | undefined) => {
+    if (!activePlaylistId) return;
+    updateTrackMeta(activePlaylistId, index, { masterFxPreset: preset });
+  }, [activePlaylistId, updateTrackMeta]);
+
+  // ── Drop files onto playlist ──────────────────────────────────────────────
+
+  const handleDropOnPlaylist = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!activePlaylistId) return;
+
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      if (droppedFiles.length === 0) return;
+
+      setIsLoadingFile(true);
+      for (const file of droppedFiles) {
+        try {
+          const isAudio = isAudioFile(file.name);
+          const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
+
+          if (isAudio) {
+            addTrack(activePlaylistId, {
+              fileName: file.name,
+              trackName: file.name.replace(/\.[^.]+$/, ''),
+              format: fileExt,
+              bpm: 0,
+              duration: 0,
+              addedAt: Date.now(),
+            });
+          } else {
+            const song = await parseModuleToSong(file);
+            cacheSong(file.name, song);
+            const bpmResult = detectBPM(song);
+            const duration = estimateSongDuration(song);
+
+            addTrack(activePlaylistId, {
+              fileName: file.name,
+              trackName: song.name || file.name,
+              format: fileExt,
+              bpm: bpmResult.bpm,
+              duration,
+              addedAt: Date.now(),
+            });
+          }
+        } catch (err) {
+          console.error(`[DJPlaylistModal] Drop process error:`, err);
+        }
+      }
+      setIsLoadingFile(false);
+    },
+    [activePlaylistId, addTrack],
+  );
+
+  // ── Sort handlers ────────────────────────────────────────────────────────
+
+  const handleSort = useCallback((mode: 'smart' | 'bpm' | 'bpm-desc' | 'key' | 'energy' | 'name') => {
+    if (!activePlaylist) return;
+    const tracks = [...activePlaylist.tracks];
+    let sorted: PlaylistTrack[];
+    switch (mode) {
+      case 'smart': sorted = smartSort(tracks); break;
+      case 'bpm': sorted = sortByBPM(tracks); break;
+      case 'bpm-desc': sorted = sortByBPM(tracks, true); break;
+      case 'key': sorted = sortByKey(tracks); break;
+      case 'energy': sorted = sortByEnergy(tracks); break;
+      case 'name': sorted = sortByName(tracks); break;
+      default: sorted = tracks;
+    }
+    sortTracksAction(activePlaylist.id, sorted);
+    setShowSortMenu(false);
+  }, [activePlaylist, sortTracksAction]);
+
+  // ── Multi-select click handler ────────────────────────────────────────────
+
+  const handleTrackClick = useCallback((displayIndex: number, e: React.MouseEvent) => {
+    const realIndex = getRealIndex(displayIndex);
+    if (e.metaKey || e.ctrlKey) {
+      toggleTrackSelection(realIndex);
+    } else if (e.shiftKey && lastClickedRef.current >= 0) {
+      selectTrackRange(lastClickedRef.current, realIndex);
+    } else {
+      selectTrack(realIndex);
+    }
+    lastClickedRef.current = realIndex;
+  }, [getRealIndex, toggleTrackSelection, selectTrackRange, selectTrack]);
+
+  const handleTrackDoubleClick = useCallback(async (_track: PlaylistTrack, displayIndex: number) => {
+    const realIndex = getRealIndex(displayIndex);
+    if (!activePlaylistId) return;
+    const { getAutoDJ } = await import('@/engine/dj/DJAutoDJ');
+    const autoDJ = getAutoDJ();
+    const error = await autoDJ.enable(realIndex);
+    if (error) {
+      console.error('[DJPlaylistModal] Auto DJ start failed:', error);
+    }
+  }, [getRealIndex, activePlaylistId]);
+
+  // ── Context menu ──────────────────────────────────────────────────────────
+
+  const contextMenuItems = useMemo((): MenuItemType[] => {
+    if (!activePlaylist || contextMenuTrackIndex < 0) return [];
+    const track = activePlaylist.tracks[contextMenuTrackIndex];
+    if (!track) return [];
+
+    const otherPlaylists = playlists.filter((p) => p.id !== activePlaylistId);
+    const selCount = selectedTrackIndices.length;
+
+    const items: MenuItemType[] = [
+      { id: 'play-from-here', label: 'Play from here (Auto DJ)', onClick: async () => {
+        if (!activePlaylistId) return;
+        const { getAutoDJ } = await import('@/engine/dj/DJAutoDJ');
+        const autoDJ = getAutoDJ();
+        const error = await autoDJ.enable(contextMenuTrackIndex);
+        if (error) console.error('[DJPlaylistModal] Auto DJ start failed:', error);
+      }},
+      { type: 'divider' },
+      { id: 'load-1', label: 'Load to Deck 1', onClick: () => loadTrackWithProgress(track, 'A', contextMenuTrackIndex) },
+      { id: 'load-2', label: 'Load to Deck 2', onClick: () => loadTrackWithProgress(track, 'B', contextMenuTrackIndex) },
+    ];
+
+    if (thirdDeckActive) {
+      items.push({ id: 'load-3', label: 'Load to Deck 3', onClick: () => loadTrackWithProgress(track, 'C', contextMenuTrackIndex) });
+    }
+
+    items.push({ type: 'divider' });
+
+    if (selCount <= 1) {
+      items.push({
+        id: 'move-up',
+        label: 'Move Up',
+        disabled: contextMenuTrackIndex === 0,
+        onClick: () => {
+          if (activePlaylistId && contextMenuTrackIndex > 0) {
+            reorderTrack(activePlaylistId, contextMenuTrackIndex, contextMenuTrackIndex - 1);
+          }
+        },
+      });
+      items.push({
+        id: 'move-down',
+        label: 'Move Down',
+        disabled: contextMenuTrackIndex === activePlaylist.tracks.length - 1,
+        onClick: () => {
+          if (activePlaylistId && contextMenuTrackIndex < activePlaylist.tracks.length - 1) {
+            reorderTrack(activePlaylistId, contextMenuTrackIndex, contextMenuTrackIndex + 1);
+          }
+        },
+      });
+      items.push({ type: 'divider' });
+    }
+
+    if (otherPlaylists.length > 0) {
+      items.push({
+        id: 'move-to',
+        label: selCount > 1 ? `Move ${selCount} to...` : 'Move to...',
+        submenu: otherPlaylists.map((pl) => ({
+          id: `move-${pl.id}`,
+          label: pl.name,
+          onClick: () => { if (activePlaylistId) moveSelectedTracks(activePlaylistId, pl.id); },
+        })),
+      });
+      items.push({
+        id: 'copy-to',
+        label: selCount > 1 ? `Copy ${selCount} to...` : 'Copy to...',
+        submenu: otherPlaylists.map((pl) => ({
+          id: `copy-${pl.id}`,
+          label: pl.name,
+          onClick: () => { if (activePlaylistId) copySelectedTracks(activePlaylistId, pl.id); },
+        })),
+      });
+      items.push({ type: 'divider' });
+    }
+
+    items.push({
+      id: 'copy-info',
+      label: 'Copy Track Info',
+      onClick: () => {
+        const info = [
+          `Name: ${track.trackName}`,
+          `File: ${track.fileName}`,
+          track.format && `Format: ${track.format}`,
+          track.bpm > 0 && `BPM: ${track.bpm}`,
+          track.musicalKey && `Key: ${track.musicalKey}`,
+          track.duration > 0 && `Duration: ${formatDuration(track.duration)}`,
+        ].filter(Boolean).join('\n');
+        navigator.clipboard.writeText(info);
+      },
+    });
+
+    items.push({ type: 'divider' });
+
+    if (track.isBad) {
+      items.push({
+        id: 'clear-bad',
+        label: 'Clear Bad Flag',
+        onClick: () => {
+          if (activePlaylistId) {
+            useDJPlaylistStore.getState().clearTrackBadFlag(activePlaylistId, contextMenuTrackIndex);
+          }
+        },
+      });
+    } else {
+      items.push({
+        id: 'mark-bad',
+        label: 'Mark as Bad',
+        onClick: () => {
+          if (activePlaylistId) {
+            useDJPlaylistStore.getState().markTrackBad(activePlaylistId, contextMenuTrackIndex, 'Manually marked');
+          }
+        },
+      });
+    }
+
+    items.push({ type: 'divider' });
+
+    if (selCount > 1) {
+      items.push({
+        id: 'remove-selected',
+        label: `Remove ${selCount} tracks`,
+        danger: true,
+        onClick: async () => {
+          if (!activePlaylistId) return;
+          const confirmed = await showConfirm({
+            title: 'Remove Tracks',
+            message: `Remove ${selCount} selected tracks from this playlist?`,
+            confirmLabel: 'Remove',
+            danger: true,
+          });
+          if (confirmed) removeSelectedTracks(activePlaylistId);
+        },
+      });
+    } else {
+      items.push({
+        id: 'remove',
+        label: 'Remove from playlist',
+        danger: true,
+        onClick: () => { if (activePlaylistId) removeTrack(activePlaylistId, contextMenuTrackIndex); },
+      });
+    }
+
+    return items;
+  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack]);
+
+  // ── Keyboard navigation ─────────────────────────────────────────────────
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!activePlaylist || !activePlaylistId) return;
+    const trackCount = filteredTracks.length;
+    if (trackCount === 0) return;
+
+    const isMeta = e.metaKey || e.ctrlKey;
+
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault();
+        const next = Math.min(focusedTrackIndex + 1, trackCount - 1);
+        const realNext = getRealIndex(next);
+        if (e.shiftKey) {
+          selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, realNext);
+        } else {
+          selectTrack(realNext);
+          lastClickedRef.current = realNext;
+        }
+        setFocusedTrack(next);
+        virtualizer.scrollToIndex(next, { align: 'auto' });
+        break;
+      }
+      case 'ArrowUp': {
+        e.preventDefault();
+        const prev = Math.max(focusedTrackIndex - 1, 0);
+        const realPrev = getRealIndex(prev);
+        if (e.shiftKey) {
+          selectTrackRange(lastClickedRef.current >= 0 ? lastClickedRef.current : 0, realPrev);
+        } else {
+          selectTrack(realPrev);
+          lastClickedRef.current = realPrev;
+        }
+        setFocusedTrack(prev);
+        virtualizer.scrollToIndex(prev, { align: 'auto' });
+        break;
+      }
+      case 'Enter': {
+        e.preventDefault();
+        if (focusedTrackIndex >= 0 && focusedTrackIndex < trackCount) {
+          const realIdx = getRealIndex(focusedTrackIndex);
+          const track = activePlaylist.tracks[realIdx];
+          if (track) loadTrackWithProgress(track, pickFreeDeck(), realIdx);
+        }
+        break;
+      }
+      case 'Delete':
+      case 'Backspace': {
+        if (selectedTrackIndices.length > 0) {
+          e.preventDefault();
+          if (selectedTrackIndices.length > 3) {
+            showConfirm({
+              title: 'Remove Tracks',
+              message: `Remove ${selectedTrackIndices.length} selected tracks?`,
+              confirmLabel: 'Remove',
+              danger: true,
+            }).then((confirmed) => {
+              if (confirmed) removeSelectedTracks(activePlaylistId);
+            });
+          } else {
+            removeSelectedTracks(activePlaylistId);
+          }
+        }
+        break;
+      }
+      case 'a': {
+        if (isMeta) {
+          e.preventDefault();
+          selectAllTracks();
+        }
+        break;
+      }
+      case 'z': {
+        if (isMeta) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (canRedo) redo();
+          } else {
+            if (canUndo) undo();
+          }
+        }
+        break;
+      }
+      case 'Escape': {
+        clearSelection();
+        break;
+      }
+    }
+  }, [activePlaylist, activePlaylistId, filteredTracks, focusedTrackIndex, selectedTrackIndices, getRealIndex, selectTrack, selectTrackRange, setFocusedTrack, selectAllTracks, clearSelection, removeSelectedTracks, loadTrackWithProgress, pickFreeDeck, canUndo, canRedo, undo, redo, virtualizer]);
+
+  // ── Computed stats ────────────────────────────────────────────────────────
+
+  const totalDuration = activePlaylist
+    ? activePlaylist.tracks.reduce((s, t) => s + (t.duration || 0), 0)
+    : 0;
+  const analyzedCount = activePlaylist
+    ? activePlaylist.tracks.filter(t => t.bpm > 0 || t.musicalKey).length
+    : 0;
+
+  // ── Hidden file inputs ────────────────────────────────────────────────────
+
+  const hiddenInputs = (
+    <>
+      <input ref={fileInputRef} type="file" multiple accept="*/*" onChange={handleAddFiles} className="hidden" />
+      <input ref={importInputRef} type="file" accept=".m3u,.m3u8,.json" onChange={handleImport} className="hidden" />
+    </>
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="xl" closeOnEscape closeOnBackdropClick>
+      <div className="flex flex-col h-[80vh]">
+        {/* Header */}
+        <ModalHeader
+          title="Playlist Manager"
+          icon={<ListMusic size={18} />}
+          onClose={onClose}
+        />
+
+        <div className="flex flex-1 min-h-0">
+          {/* ── Left sidebar: Playlist list ──────────────────────────── */}
+          <div className="w-52 shrink-0 border-r border-dark-border bg-dark-bg flex flex-col">
+            <div className="px-3 py-2 border-b border-dark-border flex items-center justify-between">
+              <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Playlists</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  className="p-1 text-text-muted/50 hover:text-text-primary transition-colors"
+                  title="Import playlist (M3U/JSON)"
+                >
+                  <Upload size={11} />
+                </button>
+                <button
+                  onClick={() => { setIsCreating(true); setNewName(''); }}
+                  className="p-1 text-text-muted/50 hover:text-accent-primary transition-colors"
+                  title="New playlist"
+                >
+                  <Plus size={12} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {playlists.map((pl) => (
+                <PlaylistSidebarItem
+                  key={pl.id}
+                  playlist={pl}
+                  isActive={pl.id === activePlaylistId}
+                  isEditing={editingPlaylistId === pl.id}
+                  editName={editName}
+                  onSelect={() => setActivePlaylist(pl.id)}
+                  onStartEdit={() => { setEditingPlaylistId(pl.id); setEditName(pl.name); }}
+                  onEditName={setEditName}
+                  onFinishEdit={() => handleRename(pl.id)}
+                  onCancelEdit={() => setEditingPlaylistId(null)}
+                  onDelete={() => handleDeletePlaylist(pl)}
+                  onClone={() => clonePlaylist(pl.id)}
+                />
+              ))}
+
+              {playlists.length === 0 && !isCreating && (
+                <div className="p-4 text-center">
+                  <p className="text-[10px] font-mono text-text-muted/40 mb-2">No playlists yet</p>
+                  <Button variant="ghost" size="sm" onClick={() => { setIsCreating(true); setNewName(''); }}>
+                    Create one
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* New playlist input */}
+            {isCreating && (
+              <div className="px-2 py-2 border-t border-dark-border">
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsCreating(false); }}
+                  placeholder="Playlist name..."
+                  className="w-full px-2 py-1 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary placeholder:text-text-muted/30"
+                />
+                <div className="flex justify-end gap-1 mt-1">
+                  <Button variant="ghost" size="sm" onClick={() => setIsCreating(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={handleCreate} disabled={!newName.trim()}>Create</Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Right pane: Track list ────────────────────────────── */}
+          <div className="flex-1 flex flex-col min-w-0 bg-dark-bgSecondary">
+            {activePlaylist ? (
+              <>
+                {/* Toolbar */}
+                <div className="px-3 py-2 border-b border-dark-border flex items-center gap-2">
+                  {/* Playlist title */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-mono font-bold text-text-primary truncate">
+                      {activePlaylist.name}
+                    </span>
+                    <span className="text-[10px] font-mono text-text-muted/50 ml-2">
+                      {activePlaylist.tracks.length} tracks
+                      {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
+                    </span>
+                  </div>
+
+                  {/* Search */}
+                  <div className="flex items-center gap-1 bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-0.5">
+                    <Search size={11} className="text-text-muted/40 shrink-0" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Filter tracks..."
+                      className="w-32 bg-transparent text-[11px] font-mono text-text-primary placeholder:text-text-muted/30 outline-none"
+                    />
+                    {searchQuery && (
+                      <>
+                        <span className="text-[9px] font-mono text-text-muted/40 shrink-0">{filteredTracks.length}/{activePlaylist.tracks.length}</span>
+                        <button onClick={() => setSearchQuery('')} className="p-0.5 text-text-muted/40 hover:text-text-primary"><X size={10} /></button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Undo / Redo */}
+                  <button onClick={undo} disabled={!canUndo} className="p-1 text-text-muted/40 hover:text-text-primary disabled:opacity-20 transition-colors" title="Undo (Ctrl+Z)">
+                    <Undo2 size={13} />
+                  </button>
+                  <button onClick={redo} disabled={!canRedo} className="p-1 text-text-muted/40 hover:text-text-primary disabled:opacity-20 transition-colors" title="Redo (Ctrl+Shift+Z)">
+                    <Redo2 size={13} />
+                  </button>
+
+                  {/* Sort */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowSortMenu(v => !v)}
+                      className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
+                        showSortMenu ? 'border-accent-primary text-accent-primary bg-accent-primary/10' : 'border-dark-borderLight text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                      }`}
+                    >
+                      Sort <ChevronDown size={10} />
+                    </button>
+                    {showSortMenu && (
+                      <div className="absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded-lg shadow-xl min-w-[160px] py-1">
+                        <button onClick={() => handleSort('smart')}
+                          className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-accent-primary hover:bg-dark-bgHover transition-colors">
+                          ✨ Smart Mix
+                        </button>
+                        <div className="border-t border-dark-border/30 my-0.5" />
+                        {(['bpm', 'bpm-desc', 'key', 'energy', 'name'] as const).map((mode) => (
+                          <button key={mode} onClick={() => handleSort(mode)}
+                            className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
+                            {{ bpm: 'BPM (low → high)', 'bpm-desc': 'BPM (high → low)', key: 'Key (Camelot)', energy: 'Energy', name: 'Name (A→Z)' }[mode]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add files */}
+                  <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoadingFile} icon={<Plus size={12} />}>
+                    Add
+                  </Button>
+
+                  {/* Export */}
+                  <div className="relative group">
+                    <button className="p-1 text-text-muted/40 hover:text-text-primary transition-colors" title="Export">
+                      <Download size={13} />
+                    </button>
+                    <div className="hidden group-hover:flex absolute top-full right-0 mt-1 z-50 bg-dark-bg border border-dark-border rounded-lg shadow-xl min-w-[130px] py-1 flex-col">
+                      <button onClick={handleExportJSON}
+                        className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
+                        Export JSON
+                      </button>
+                      <button onClick={handleExportM3U}
+                        className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-dark-bgHover transition-colors">
+                        Export M3U
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selection bar */}
+                {selectedTrackIndices.length > 1 && (
+                  <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-mono text-accent-primary/70 bg-accent-primary/5 border-b border-dark-border">
+                    <span>{selectedTrackIndices.length} selected</span>
+                    <button onClick={clearSelection} className="text-text-muted hover:text-text-primary">clear</button>
+                  </div>
+                )}
+
+                {/* Track list */}
+                {filteredTracks.length === 0 ? (
+                  <div
+                    className="flex-1 flex items-center justify-center"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDropOnPlaylist}
+                  >
+                    <div className="text-center">
+                      <Music size={32} className="text-text-muted/20 mx-auto mb-2" />
+                      <p className="text-[11px] font-mono text-text-muted/40">
+                        {isFiltered ? 'No tracks match your search' : 'Drop files here or click + to add tracks'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    ref={scrollContainerRef}
+                    className="flex-1 overflow-y-auto min-h-0"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDropOnPlaylist}
+                    tabIndex={0}
+                    onKeyDown={handleKeyDown}
+                  >
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+                          {virtualizer.getVirtualItems().map((virtualRow) => {
+                            const track = filteredTracks[virtualRow.index];
+                            const realIndex = getRealIndex(virtualRow.index);
+                            return (
+                              <div
+                                key={track.id}
+                                data-track-index={virtualRow.index}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: virtualRow.size,
+                                  transform: `translateY(${virtualRow.start}px)`,
+                                }}
+                              >
+                                <ModalTrackRow
+                                  track={track}
+                                  index={virtualRow.index}
+                                  isSelected={selectedSet.has(realIndex)}
+                                  isFocused={focusedTrackIndex === virtualRow.index}
+                                  isLoading={loadingTrackIndex === realIndex}
+                                  loadingDeckId={loadingDeckId}
+                                  isAutoDJCurrent={autoDJEnabled && realIndex === autoDJCurrentIdx}
+                                  isAutoDJNext={autoDJEnabled && realIndex === autoDJNextIdx}
+                                  thirdDeckActive={thirdDeckActive}
+                                  isPreviewing={previewingIndex === realIndex}
+                                  onLoadToDeck={(t, d, _i) => loadTrackWithProgress(t, d, realIndex)}
+                                  onRemove={(i) => removeTrack(activePlaylist.id, getRealIndex(i))}
+                                  onClick={handleTrackClick}
+                                  onDoubleClick={handleTrackDoubleClick}
+                                  onPreview={handlePreview}
+                                  onStopPreview={stopPreview}
+                                  onSetFxPreset={handleSetFxPreset}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                )}
+
+                {/* Preview strip */}
+                {previewingIndex != null && activePlaylist.tracks[previewingIndex] && (
+                  <div className="px-3 py-1.5 border-t border-dark-border bg-dark-bg flex items-center gap-2">
+                    <button onClick={stopPreview} className="p-1 text-accent-success hover:text-accent-success/80 transition-colors" title="Stop preview">
+                      <Square size={12} />
+                    </button>
+                    <span className="text-[11px] font-mono text-accent-success">▶ Preview:</span>
+                    <span className="text-[11px] font-mono text-text-primary truncate flex-1 min-w-0">
+                      {activePlaylist.tracks[previewingIndex].trackName}
+                    </span>
+                    {activePlaylist.tracks[previewingIndex].bpm > 0 && (
+                      <span className="text-[10px] font-mono text-text-muted/50">{activePlaylist.tracks[previewingIndex].bpm} BPM</span>
+                    )}
+                    {activePlaylist.tracks[previewingIndex].musicalKey && (
+                      <span
+                        className="text-[10px] font-mono font-bold px-1 rounded"
+                        style={{ color: camelotColor(activePlaylist.tracks[previewingIndex].musicalKey!) }}
+                      >
+                        {camelotDisplay(activePlaylist.tracks[previewingIndex].musicalKey!)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Status bar */}
+                <div className="px-3 py-2 border-t border-dark-border bg-dark-bg flex items-center gap-3 text-[10px] font-mono">
+                  <span className="text-text-muted/50">
+                    {activePlaylist.tracks.length} tracks
+                    {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
+                    {analyzedCount > 0 && ` · ${analyzedCount} analyzed`}
+                  </span>
+
+                  <div className="flex-1" />
+
+                  {/* Precache progress */}
+                  {precacheProgress && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden">
+                        <div className="h-full bg-accent-warning transition-all duration-300"
+                          style={{ width: `${(precacheProgress.current / precacheProgress.total) * 100}%` }} />
+                      </div>
+                      <span className="text-accent-warning">{precacheProgress.current}/{precacheProgress.total}</span>
+                    </div>
+                  )}
+
+                  {/* Cache button */}
+                  {!precacheProgress && uncachedCount > 0 && (
+                    <Button variant="ghost" size="sm" onClick={handlePrecache}>
+                      Cache ({uncachedCount})
+                    </Button>
+                  )}
+
+                  {/* Bad tracks */}
+                  {badTrackCount > 0 && (
+                    <>
+                      <span className="text-accent-error">
+                        <AlertTriangle size={10} className="inline mr-0.5" />
+                        {badTrackCount} bad
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={handleRetestBadTracks} disabled={retestingBad}>
+                        {retestingBad ? 'Testing...' : 'Re-test'}
+                      </Button>
+                      <button
+                        onClick={() => activePlaylistId && useDJPlaylistStore.getState().clearAllBadFlags(activePlaylistId)}
+                        className="text-text-muted/40 hover:text-text-primary transition-colors"
+                        title="Clear all bad marks"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+
+                  {/* Online cache status */}
+                  {onlineCount > 0 && !precacheProgress && (
+                    <span className="text-accent-success/50">
+                      {cachedCount}/{onlineCount} cached
+                      {uncachedCount === 0 && ' ✓'}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <ListMusic size={40} className="text-text-muted/15 mx-auto mb-3" />
+                  <p className="text-[12px] font-mono text-text-muted/40 mb-3">
+                    {playlists.length > 0 ? 'Select a playlist' : 'Create a playlist to get started'}
+                  </p>
+                  {playlists.length === 0 && (
+                    <Button variant="primary" size="sm" onClick={() => { setIsCreating(true); setNewName(''); }}>
+                      New Playlist
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Context menu */}
+        <ContextMenu items={contextMenuItems} position={contextMenu.position} onClose={contextMenu.close} />
+      </div>
+
+      {hiddenInputs}
+    </Modal>
+  );
+};
