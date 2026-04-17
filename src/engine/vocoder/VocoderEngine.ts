@@ -252,9 +252,13 @@ export class VocoderEngine {
     // Disable mic tracks (don't stop — keep stream alive for glitch-free re-enable)
     this.stream?.getAudioTracks().forEach(t => { t.enabled = false; });
 
-    // Clean up effects
+    // Clean up effects — dispose the FX bridges too (not just reverb/delay),
+    // otherwise dangling Tone.Gain nodes stay connected to destination and
+    // accumulate across device-switch cycles.
     this.reverb?.dispose(); this.reverb = null;
     this.delay?.dispose(); this.delay = null;
+    this.fxBridge?.dispose(); this.fxBridge = null;
+    this.fxTail?.dispose(); this.fxTail = null;
 
     this.sourceNode = null;
     this.core = null;
