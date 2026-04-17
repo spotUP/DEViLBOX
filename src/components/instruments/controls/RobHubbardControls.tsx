@@ -93,7 +93,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-4 items-center">
-          <Knob value={config.divider} min={0} max={255} step={1}
+          <Knob paramKey="robhubbard.divider" value={config.divider} min={0} max={255} step={1}
             onChange={(v) => upd('divider', Math.round(v))}
             label="Depth Divisor" color={knob}
             formatValue={(v) => Math.round(v).toString()} />

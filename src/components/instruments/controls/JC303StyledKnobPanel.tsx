@@ -474,25 +474,25 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* --- ROW 1: CLASSIC Controls (Always Visible) --- */}
-        <div style={style(40, 145, 65, 80)}><Knob value={config.tuning ?? 0.5} min={0} max={1} defaultValue={0.5} bipolar onChange={updateTuning} label="Tone" size="md" color="#ffcc00" formatValue={v => (v - 0.5 > 0 ? '+' : '') + Math.round((v - 0.5) * 100) + 'c'} /></div>
+        <div style={style(40, 145, 65, 80)}><Knob paramKey="tuning" value={config.tuning ?? 0.5} min={0} max={1} defaultValue={0.5} bipolar onChange={updateTuning} label="Tone" size="md" color="#ffcc00" formatValue={v => (v - 0.5 > 0 ? '+' : '') + Math.round((v - 0.5) * 100) + 'c'} /></div>
         <div style={style(145, 140, 65, 100)}>
-          <Knob value={config.filter.cutoff} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilter('cutoff', v)} label="Cutoff" size="md" color="#ffcc00" formatValue={v => Math.round(CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, v)) + ' Hz'} />
+          <Knob paramKey="cutoff" value={config.filter.cutoff} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilter('cutoff', v)} label="Cutoff" size="md" color="#ffcc00" formatValue={v => Math.round(CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, v)) + ' Hz'} />
           <label className="flex items-center gap-1 justify-center mt-1 cursor-pointer">
             <input type="checkbox" checked={config.devilFish?.extendedCutoff || false} onChange={(e) => updateDevilFish('extendedCutoff', e.target.checked)} className="w-3 h-3 accent-yellow-500 rounded" />
             <span className="text-[8px] text-text-secondary uppercase">Wide</span>
           </label>
         </div>
-        <div style={style(250, 145, 65, 80)}><Knob value={config.filter.resonance} min={0} max={1} defaultValue={0} onChange={(v) => updateFilter('resonance', v)} label="Reso" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        <div style={style(250, 145, 65, 80)}><Knob paramKey="resonance" value={config.filter.resonance} min={0} max={1} defaultValue={0} onChange={(v) => updateFilter('resonance', v)} label="Reso" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
         <div style={style(355, 140, 65, 100)}>
-          <Knob value={config.filterEnvelope.envMod} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilterEnvelope('envMod', v)} label="EnvMod" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} />
+          <Knob paramKey="envMod" value={config.filterEnvelope.envMod} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilterEnvelope('envMod', v)} label="EnvMod" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} />
           <label className="flex items-center gap-1 justify-center mt-1 cursor-pointer">
             <input type="checkbox" checked={config.devilFish?.extendedEnvMod || false} onChange={(e) => updateDevilFish('extendedEnvMod', e.target.checked)} className="w-3 h-3 accent-yellow-500 rounded" />
             <span className="text-[8px] text-text-secondary uppercase">Wide</span>
           </label>
         </div>
-        <div style={style(460, 145, 65, 80)}><Knob value={config.filterEnvelope.decay} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilterEnvelope('decay', v)} label="Decay" size="md" color="#ffcc00" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
-        <div style={style(565, 145, 65, 80)}><Knob value={config.accent.amount} min={0} max={1} defaultValue={0.5} onChange={(v) => updateAccent('amount', v)} label="Accent" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
-        <div style={style(670, 145, 65, 80)}><Knob value={config.volume ?? 0.75} min={0} max={1} defaultValue={0.75} onChange={(v) => onChange({ volume: v })} label="Level" size="md" color="#00ffff" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        <div style={style(460, 145, 65, 80)}><Knob paramKey="decay" value={config.filterEnvelope.decay} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilterEnvelope('decay', v)} label="Decay" size="md" color="#ffcc00" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
+        <div style={style(565, 145, 65, 80)}><Knob paramKey="accent" value={config.accent.amount} min={0} max={1} defaultValue={0.5} onChange={(v) => updateAccent('amount', v)} label="Accent" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
+        <div style={style(670, 145, 65, 80)}><Knob paramKey="volume" value={config.volume ?? 0.75} min={0} max={1} defaultValue={0.75} onChange={(v) => onChange({ volume: v })} label="Level" size="md" color="#00ffff" formatValue={v => Math.round(v * 100) + '%'} /></div>
 
         {/* --- TAB BAR --- */}
         <div style={{ position: 'absolute', left: 20, right: 20, top: 290, height: 30 }} className="flex items-center gap-1.5">
@@ -531,11 +531,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           {/* OSC Tab — Oscillator controls */}
           {effectiveTab === 'osc' && (
             <div className="flex items-center gap-3 h-full px-6">
-              <div style={{ width: '65px' }}><Knob value={config.oscillator.waveformBlend ?? (config.oscillator.type === 'square' ? 1 : 0)} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('waveformBlend', v)} label="Waveform" size="md" color="#06b6d4" formatValue={v => v < 0.05 ? 'SAW' : v > 0.95 ? 'SQR' : Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.oscillator.pulseWidth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('pulseWidth', v)} label="Pulse W" size="md" color="#06b6d4" formatValue={v => Math.round(50 + v * 49) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.oscillator.pitchToPw ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('pitchToPw', v)} label="P→PW" size="md" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.oscillator.subOscGain ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('subOscGain', v)} label="Sub Osc" size="md" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.oscillator.subOscBlend ?? 1} min={0} max={1} defaultValue={1} onChange={(v) => updateOscillatorParam('subOscBlend', v)} label="Sub Wave" size="md" color="#06b6d4" formatValue={v => v < 0.5 ? '-2 Oct' : '-1 Oct'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="waveform" value={config.oscillator.waveformBlend ?? (config.oscillator.type === 'square' ? 1 : 0)} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('waveformBlend', v)} label="Waveform" size="md" color="#06b6d4" formatValue={v => v < 0.05 ? 'SAW' : v > 0.95 ? 'SQR' : Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="pulseWidth" value={config.oscillator.pulseWidth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('pulseWidth', v)} label="Pulse W" size="md" color="#06b6d4" formatValue={v => Math.round(50 + v * 49) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="pitchToPw" value={config.oscillator.pitchToPw ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('pitchToPw', v)} label="P→PW" size="md" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="subOscGain" value={config.oscillator.subOscGain ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateOscillatorParam('subOscGain', v)} label="Sub Osc" size="md" color="#06b6d4" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="subOscBlend" value={config.oscillator.subOscBlend ?? 1} min={0} max={1} defaultValue={1} onChange={(v) => updateOscillatorParam('subOscBlend', v)} label="Sub Wave" size="md" color="#06b6d4" formatValue={v => v < 0.5 ? '-2 Oct' : '-1 Oct'} /></div>
             </div>
           )}
 
@@ -543,14 +543,14 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           {effectiveTab === 'mojo' && (
             <div className="flex flex-col gap-2 h-full overflow-y-auto px-6 py-2">
               <div className="flex items-center gap-3">
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.passbandCompensation ?? 0.9} min={0} max={1} defaultValue={0.9} onChange={(v) => updateDevilFish('passbandCompensation', v)} label="Bass" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.resTracking ?? 0.7} min={0} max={1} defaultValue={0.7} onChange={(v) => updateDevilFish('resTracking', v)} label="Rez" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterInputDrive ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterInputDrive', v)} label="Satur" size="md" color="#ff9900" formatValue={v => (v * 10).toFixed(1)} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="passbandCompensation" value={config.devilFish?.passbandCompensation ?? 0.9} min={0} max={1} defaultValue={0.9} onChange={(v) => updateDevilFish('passbandCompensation', v)} label="Bass" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="resTracking" value={config.devilFish?.resTracking ?? 0.7} min={0} max={1} defaultValue={0.7} onChange={(v) => updateDevilFish('resTracking', v)} label="Rez" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="filterInputDrive" value={config.devilFish?.filterInputDrive ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterInputDrive', v)} label="Satur" size="md" color="#ff9900" formatValue={v => (v * 10).toFixed(1)} /></div>
                 <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.diodeCharacter ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('diodeCharacter', v)} label="Bite" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.duffingAmount ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateDevilFish('duffingAmount', v)} label="Tension" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.lpBpMix ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('lpBpMix', v)} label="LP/BP" size="md" color="#ff9900" formatValue={v => v < 0.05 ? 'LP' : v > 0.95 ? 'BP' : 'Mix'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.stageNLAmount ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('stageNLAmount', v)} label="StgNL" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="diodeCharacter" value={config.devilFish?.diodeCharacter ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('diodeCharacter', v)} label="Bite" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="duffingAmount" value={config.devilFish?.duffingAmount ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateDevilFish('duffingAmount', v)} label="Tension" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="lpBpMix" value={config.devilFish?.lpBpMix ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('lpBpMix', v)} label="LP/BP" size="md" color="#ff9900" formatValue={v => v < 0.05 ? 'LP' : v > 0.95 ? 'BP' : 'Mix'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="stageNLAmount" value={config.devilFish?.stageNLAmount ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('stageNLAmount', v)} label="StgNL" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
                 <div className="w-px h-14 bg-white/5 flex-shrink-0" />
                 <div className="flex flex-col gap-1">
                   <label className="text-[8px] font-bold text-orange-500/70">FILTER</label>
@@ -564,11 +564,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               {config.devilFish?.korgEnabled && (
                 <div className="flex items-center gap-3">
                   <span className="text-[8px] font-bold text-orange-400/40 tracking-wider flex-shrink-0">KORG</span>
-                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgBite ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgBite', v)} label="Bite" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgClip ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgClip', v)} label="Clip" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgCrossmod ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgCrossmod', v)} label="Xmod" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgQSag ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgQSag', v)} label="Q-Sag" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                  <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgSharpness ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgSharpness', v)} label="Sharp" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob paramKey="korgBite" value={config.devilFish?.korgBite ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgBite', v)} label="Bite" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob paramKey="korgClip" value={config.devilFish?.korgClip ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgClip', v)} label="Clip" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob paramKey="korgCrossmod" value={config.devilFish?.korgCrossmod ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgCrossmod', v)} label="Xmod" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob paramKey="korgQSag" value={config.devilFish?.korgQSag ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgQSag', v)} label="Q-Sag" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                  <div style={{ width: '60px' }}><Knob paramKey="korgSharpness" value={config.devilFish?.korgSharpness ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgSharpness', v)} label="Sharp" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
                   <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgStiffness ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgStiffness', v)} label="Stiff" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
                   <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgWarmth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgWarmth', v)} label="Warm" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
                   <div style={{ width: '60px' }}><Knob value={config.devilFish?.korgFilterFm ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('korgFilterFm', v)} label="FiltFM" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
@@ -598,12 +598,12 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 </div>
               </div>
               <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.rate ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, rate: v })} label="Rate" size="md" color="#a855f7" formatValue={v => { const r = LFO_RATE_MIN * Math.pow(LFO_RATE_MAX/LFO_RATE_MIN, v); return r >= 10 ? r.toFixed(1) + 'Hz' : r.toFixed(2) + 'Hz'; }} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.contour ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateLfo({ enabled: true, contour: v })} label="Contour" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.pwmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pwmDepth: v })} label="PWM Mod" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.pitchDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pitchDepth: v })} label="Pitch" size="md" color="#a855f7" formatValue={v => '+' + Math.round(v * 12) + ' semi'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.filterDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, filterDepth: v })} label="Filter" size="md" color="#a855f7" formatValue={v => '+' + (v * 2).toFixed(1) + ' oct'} /></div>
-              <div style={{ width: '65px' }}><Knob value={config.lfo?.stiffDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, stiffDepth: v })} label="Tension" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="lfoRate" value={config.lfo?.rate ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, rate: v })} label="Rate" size="md" color="#a855f7" formatValue={v => { const r = LFO_RATE_MIN * Math.pow(LFO_RATE_MAX/LFO_RATE_MIN, v); return r >= 10 ? r.toFixed(1) + 'Hz' : r.toFixed(2) + 'Hz'; }} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="lfoContour" value={config.lfo?.contour ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateLfo({ enabled: true, contour: v })} label="Contour" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="lfoPwmDepth" value={config.lfo?.pwmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pwmDepth: v })} label="PWM Mod" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="lfoPitchDepth" value={config.lfo?.pitchDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pitchDepth: v })} label="Pitch" size="md" color="#a855f7" formatValue={v => '+' + Math.round(v * 12) + ' semi'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="lfoFilterDepth" value={config.lfo?.filterDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, filterDepth: v })} label="Filter" size="md" color="#a855f7" formatValue={v => '+' + (v * 2).toFixed(1) + ' oct'} /></div>
+              <div style={{ width: '65px' }}><Knob paramKey="lfoStiffDepth" value={config.lfo?.stiffDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, stiffDepth: v })} label="Tension" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
             </div>
           )}
 
@@ -617,9 +617,9 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   <input type="checkbox" checked={config.devilFish?.enabled ?? true} onChange={(e) => updateDevilFish('enabled', e.target.checked)} className="w-4 h-4 accent-red-500 rounded" />
                 </label>
                 <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterFmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterFmDepth', v)} label="Filt FM" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterTracking ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterTracking', v)} label="Filt Trk" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.slide?.time ?? 0.17} min={0} max={1} defaultValue={0.17} onChange={updateSlide} label="Slide" size="md" color="#ff3333" formatValue={v => Math.round(SLIDE_MIN * Math.pow(SLIDE_MAX / SLIDE_MIN, v)) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="filterFmDepth" value={config.devilFish?.filterFmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterFmDepth', v)} label="Filt FM" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="filterTracking" value={config.devilFish?.filterTracking ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterTracking', v)} label="Filt Trk" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="slideTime" value={config.slide?.time ?? 0.17} min={0} max={1} defaultValue={0.17} onChange={updateSlide} label="Slide" size="md" color="#ff3333" formatValue={v => Math.round(SLIDE_MIN * Math.pow(SLIDE_MAX / SLIDE_MIN, v)) + ' ms'} /></div>
                 <div className="flex flex-col items-center gap-1 flex-shrink-0">
                   <span className="text-[8px] font-bold text-red-400/60">SLIDE</span>
                   <div className="flex gap-1">
@@ -634,17 +634,17 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   </div>
                 </div>
                 <div className="w-px h-14 bg-white/5 flex-shrink-0" />
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.softAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('softAttack', v)} label="S.Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="softAttack" value={config.devilFish?.softAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('softAttack', v)} label="S.Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
                 <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('accentAttack', v)} label="Acc Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.normalDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('normalDecay', v)} label="N.Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentDecay', v)} label="Acc Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentSoftAttack ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentSoftAttack', v)} label="Acc Soft" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="normalDecay" value={config.devilFish?.normalDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('normalDecay', v)} label="N.Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="accentDecay" value={config.devilFish?.accentDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentDecay', v)} label="Acc Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="accentSoftAttack" value={config.devilFish?.accentSoftAttack ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentSoftAttack', v)} label="Acc Soft" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
               </div>
               {/* Row 2: VEG, Ensemble, Controls */}
               <div className="flex items-center gap-3 flex-shrink-0">
                 <div style={{ width: '65px' }}><Knob value={config.devilFish?.vegDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('vegDecay', v)} label="VEG Dec" size="md" color="#ff3333" formatValue={v => Math.round(16 + v * 2984) + ' ms'} /></div>
                 <div style={{ width: '65px' }}><Knob value={config.devilFish?.vegSustain ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('vegSustain', v)} label="VEG Sus" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
-                <div style={{ width: '65px' }}><Knob value={config.devilFish?.ensembleAmount ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('ensembleAmount', v)} label="Ensem" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
+                <div style={{ width: '65px' }}><Knob paramKey="ensembleAmount" value={config.devilFish?.ensembleAmount ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('ensembleAmount', v)} label="Ensem" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
                 <div className="w-px h-14 bg-white/5 flex-shrink-0" />
                 {/* Compact toggles/selects */}
                 <div className="flex flex-col gap-1.5 flex-shrink-0">

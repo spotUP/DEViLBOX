@@ -63,6 +63,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
         <div className="flex justify-around items-end">
           <div className={synced ? 'opacity-40 pointer-events-none' : ''}>
             <Knob
+              paramKey="biphase.rateA"
               value={rateA}
               min={0.1}
               max={10}
@@ -110,6 +111,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
       <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <div className="flex justify-around items-end">
           <Knob
+            paramKey="biphase.feedback"
             value={feedback}
             min={0}
             max={0.95}

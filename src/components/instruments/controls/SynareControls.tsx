@@ -102,6 +102,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             </div>
           </div>
           <Knob
+            paramKey="synare.tune"
             value={config.oscillator.tune}
             min={40}
             max={1000}
@@ -122,6 +123,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             formatValue={(v) => `${Math.round(v)}c`}
           />
           <Knob
+            paramKey="synare.osc2Mix"
             value={config.oscillator2.enabled ? config.oscillator2.mix : 0}
             min={0}
             max={1}
@@ -244,6 +246,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
 
         <div className={`flex flex-wrap gap-3 transition-opacity ${config.sweep.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
           <Knob
+            paramKey="synare.sweepAmount"
             value={config.sweep.amount}
             min={0}
             max={48}
@@ -253,6 +256,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             formatValue={(v) => `${Math.round(v)}st`}
           />
           <Knob
+            paramKey="synare.sweepTime"
             value={config.sweep.time}
             min={10}
             max={1000}
@@ -277,6 +281,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
         
         <div className="flex flex-wrap gap-3 items-end">
           <Knob
+            paramKey="synare.filterCutoff"
             value={config.filter.cutoff}
             min={20}
             max={10000}
@@ -286,6 +291,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             formatValue={(v) => `${Math.round(v)}Hz`}
           />
           <Knob
+            paramKey="synare.filterReso"
             value={config.filter.resonance}
             min={0}
             max={100}
@@ -295,6 +301,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             formatValue={(v) => `${Math.round(v)}%`}
           />
           <Knob
+            paramKey="synare.filterEnvMod"
             value={config.filter.envMod}
             min={0}
             max={100}
@@ -304,6 +311,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
             formatValue={(v) => `${Math.round(v)}%`}
           />
           <Knob
+            paramKey="synare.filterDecay"
             value={config.filter.decay}
             min={10}
             max={2000}

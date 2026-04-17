@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import { useKnobImperative } from '@components/controls/useKnobImperative';
 
 interface TB303HardwareProps {
   parameters: Record<string, number>;
@@ -22,7 +23,9 @@ const TB303Knob: React.FC<{
   onChange: (value: number) => void;
   size?: 'small' | 'medium' | 'large';
   color?: 'silver' | 'orange';
-}> = ({ label, value, onChange, size = 'medium', color = 'silver' }) => {
+  paramKey?: string;
+}> = ({ label, value, onChange, size = 'medium', color = 'silver', paramKey }) => {
+  const indicatorRef = useKnobImperative<HTMLDivElement>({ paramKey });
 
   const sizeMap = {
     small: 'w-10 h-10',
@@ -76,6 +79,7 @@ const TB303Knob: React.FC<{
 
         {/* Indicator line */}
         <div
+          ref={indicatorRef}
           className="absolute top-1 left-1/2 w-0.5 h-3 bg-black rounded-full -translate-x-1/2"
           style={{
             transform: `translateX(-50%) rotate(${rotation}deg)`,
@@ -159,6 +163,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('cutoff', value)}
               size="large"
               color="silver"
+              paramKey="cutoff"
             />
             <TB303Knob
               label="Resonance"
@@ -166,6 +171,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('resonance', value)}
               size="large"
               color="silver"
+              paramKey="resonance"
             />
             <TB303Knob
               label="Env Mod"
@@ -173,6 +179,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('envMod', value)}
               size="large"
               color="silver"
+              paramKey="envMod"
             />
             <TB303Knob
               label="Decay"
@@ -180,6 +187,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('decay', value)}
               size="large"
               color="silver"
+              paramKey="decay"
             />
           </div>
         </div>
@@ -196,6 +204,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('tuning', value)}
               size="medium"
               color="silver"
+              paramKey="tuning"
             />
 
             {/* Waveform Switch */}
@@ -229,6 +238,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('volume', value)}
               size="large"
               color="orange"
+              paramKey="volume"
             />
             <TB303Knob
               label="Accent"
@@ -236,6 +246,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
               onChange={(value) => onParamChange('accent', value)}
               size="medium"
               color="silver"
+              paramKey="accent"
             />
           </div>
         </div>

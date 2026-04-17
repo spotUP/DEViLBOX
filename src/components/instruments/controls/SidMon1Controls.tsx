@@ -151,32 +151,32 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
           />
         </div>
         <div className="grid grid-cols-4 gap-3">
-          <Knob value={config.attackSpeed ?? 0} min={0} max={255} step={1}
+          <Knob paramKey="sidmon1.attackSpeed" value={config.attackSpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('attackSpeed', Math.round(v), 20)}
             label="Atk Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.attackMax ?? 0} min={0} max={64} step={1}
+          <Knob paramKey="sidmon1.attackMax" value={config.attackMax ?? 0} min={0} max={64} step={1}
             onChange={(v) => updU8WithChipRam('attackMax', Math.round(v), 21)}
             label="Atk Max" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.decaySpeed ?? 0} min={0} max={255} step={1}
+          <Knob paramKey="sidmon1.decaySpeed" value={config.decaySpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('decaySpeed', Math.round(v), 22)}
             label="Dec Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.decayMin ?? 0} min={0} max={64} step={1}
+          <Knob paramKey="sidmon1.decayMin" value={config.decayMin ?? 0} min={0} max={64} step={1}
             onChange={(v) => updU8WithChipRam('decayMin', Math.round(v), 23)}
             label="Dec Min" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.sustain ?? 0} min={0} max={255} step={1}
+          <Knob paramKey="sidmon1.sustain" value={config.sustain ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('sustain', Math.round(v), 24)}
             label="Sustain" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
           {/* +25 is unused/padding — skipped */}
-          <Knob value={config.releaseSpeed ?? 0} min={0} max={255} step={1}
+          <Knob paramKey="sidmon1.releaseSpeed" value={config.releaseSpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => updU8WithChipRam('releaseSpeed', Math.round(v), 26)}
             label="Rel Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.releaseMin ?? 0} min={0} max={64} step={1}
+          <Knob paramKey="sidmon1.releaseMin" value={config.releaseMin ?? 0} min={0} max={64} step={1}
             onChange={(v) => updU8WithChipRam('releaseMin', Math.round(v), 27)}
             label="Rel Min" color={knob}
             formatValue={(v) => Math.round(v).toString()} />

@@ -15,6 +15,7 @@
  */
 
 import React, { useCallback } from 'react';
+import { useKnobImperative } from '@components/controls/useKnobImperative';
 
 // ============================================================================
 // theme/variables.js - exact values
@@ -218,8 +219,14 @@ const Knob: React.FC<{
   step: number;
   bufferSize?: number;
   children?: React.ReactNode;
-}> = ({ value, onChange, size, min, max, step, bufferSize = 360, children }) => {
+  paramKey?: string;
+}> = ({ value, onChange, size, min, max, step, bufferSize = 360, children, paramKey }) => {
   const rootRef = React.useRef<HTMLDivElement>(null);
+  // Imperative MIDI path: rotation updated directly on ref, skipping React.
+  const rotatorRef = useKnobImperative<HTMLDivElement>({
+    paramKey,
+    toRotation: (norm) => norm * bufferSize - bufferSize / 2,
+  });
 
   // Drag interaction
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -262,13 +269,16 @@ const Knob: React.FC<{
       }}
       onPointerDown={handlePointerDown}
     >
-      <div style={{
-        position: 'relative',
-        borderRadius: '50%',
-        height: '100%',
-        width: '100%',
-        transform: `rotate(${rotationAmount}deg)`,
-      }}>
+      <div
+        ref={rotatorRef}
+        style={{
+          position: 'relative',
+          borderRadius: '50%',
+          height: '100%',
+          width: '100%',
+          transform: `rotate(${rotationAmount}deg)`,
+        }}
+      >
         {children}
       </div>
     </div>
@@ -286,7 +296,8 @@ const DrumKnob: React.FC<{
   size?: number;
   label?: string;
   level?: boolean;
-}> = React.memo(({ value, onChange, size = 75, label = '', level = false }) => {
+  paramKey?: string;
+}> = React.memo(({ value, onChange, size = 75, label = '', level = false, paramKey }) => {
   const knobSize = Math.ceil(size * 0.6);
 
   return (
@@ -352,6 +363,7 @@ const DrumKnob: React.FC<{
             max={100}
             step={2}
             bufferSize={300}
+            paramKey={paramKey}
           >
             {/* Inner circle with drumHandle border */}
             <div style={{

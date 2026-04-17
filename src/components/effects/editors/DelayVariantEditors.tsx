@@ -328,6 +328,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
         <SectionHeader size="lg" color="#6366f1" title="Echo" />
         <div className="flex justify-around items-end">
           <Knob
+            paramKey="echo.mode"
             value={mode}
             min={1}
             max={12}
@@ -337,6 +338,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
             formatValue={(v) => `${Math.round(v)}`}
           />
           <Knob
+            paramKey="echo.rate"
             value={rate}
             min={50}
             max={1000}
@@ -349,6 +351,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
             formatValue={(v) => synced ? 'SYNC' : `${Math.round(v)}ms`}
           />
           <Knob
+            paramKey="echo.intensity"
             value={intensity}
             min={0}
             max={1.2}
@@ -364,6 +367,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
         <SectionHeader size="lg" color="#818cf8" title="Levels & EQ" />
         <div className="flex justify-around items-end">
           <Knob
+            paramKey="echo.echoVolume"
             value={echoVolume}
             min={0}
             max={1}
@@ -373,6 +377,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
             formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           />
           <Knob
+            paramKey="echo.reverbVolume"
             value={reverbVolume}
             min={0}
             max={1}

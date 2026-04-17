@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { useThemeStore } from '@stores/useThemeStore';
+import { useKnobImperative } from '@components/controls/useKnobImperative';
 
 interface TR707HardwareProps {
   parameters: Record<string, number>;
@@ -111,9 +112,11 @@ const TR707Knob: React.FC<{
   value: number;
   onChange: (value: number) => void;
   size?: 'small' | 'medium' | 'large';
-}> = ({ label, value, onChange, size = 'medium' }) => {
+  paramKey?: string;
+}> = ({ label, value, onChange, size = 'medium', paramKey }) => {
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isDark = currentThemeId !== 'cyan-lineart';
+  const indicatorRef = useKnobImperative<HTMLDivElement>({ paramKey });
 
   const sizeMap = {
     small: 'w-12 h-12',
@@ -165,6 +168,7 @@ const TR707Knob: React.FC<{
 
         {/* Knob indicator */}
         <div
+          ref={indicatorRef}
           className="absolute top-1 left-1/2 w-1 h-4 bg-white rounded-full -translate-x-1/2 shadow-md"
           style={{
             transform: `translateX(-50%) rotate(${rotation}deg)`,

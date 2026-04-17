@@ -612,15 +612,15 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Vibrato" />
         <div className="flex gap-3">
-          <Knob value={config.vibratoDelay} min={0} max={255} step={1}
+          <Knob paramKey="sonicarranger.vibratoDelay" value={config.vibratoDelay} min={0} max={255} step={1}
             onChange={(v) => updateParam('vibratoDelay', Math.round(v))}
             label="Delay" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibratoSpeed} min={0} max={65535} step={1}
+          <Knob paramKey="sonicarranger.vibratoSpeed" value={config.vibratoSpeed} min={0} max={65535} step={1}
             onChange={(v) => updateParam('vibratoSpeed', Math.round(v))}
             label="Speed" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
-          <Knob value={config.vibratoLevel} min={0} max={65535} step={1}
+          <Knob paramKey="sonicarranger.vibratoLevel" value={config.vibratoLevel} min={0} max={65535} step={1}
             onChange={(v) => updateParam('vibratoLevel', Math.round(v))}
             label="Level" color={knob}
             formatValue={(v) => Math.round(v).toString()} />
@@ -629,7 +629,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
       <div className={`rounded-lg border p-3 ${panelBg}`} style={panelStyle}>
         <SectionLabel color={accent} label="Portamento" />
         <div className="flex items-center gap-4">
-          <Knob value={config.portamentoSpeed} min={0} max={65535} step={1}
+          <Knob paramKey="sonicarranger.portamentoSpeed" value={config.portamentoSpeed} min={0} max={65535} step={1}
             onChange={(v) => updateParam('portamentoSpeed', Math.round(v))}
             label="Speed" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />

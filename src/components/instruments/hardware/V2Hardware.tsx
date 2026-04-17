@@ -6,12 +6,16 @@
  */
 
 import React from 'react';
+import { Knob } from '@components/controls/Knob';
 
 interface V2HardwareProps {
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
 }
 
+/** Thin wrapper that keeps V2Hardware's compact layout but delegates the actual
+ *  knob rendering + interaction to the shared Knob component (single source of
+ *  truth). Passes paramKey so MIDI-routed V2 params get the imperative fast path. */
 const V2Knob: React.FC<{
   label: string;
   value: number;
@@ -19,49 +23,23 @@ const V2Knob: React.FC<{
   max?: number;
   color?: string;
   onChange: (value: number) => void;
-}> = ({ label, value, min = 0, max = 127, color = '#33ccff', onChange }) => {
-  const norm = (value - min) / (max - min);
-  const angle = -135 + norm * 270;
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const step = (max - min) / 50;
-    const newVal = Math.max(min, Math.min(max, value + (e.deltaY < 0 ? step : -step)));
-    onChange(Math.round(newVal));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startVal = value;
-    const onMove = (ev: MouseEvent) => {
-      const delta = (startY - ev.clientY) * (max - min) / 150;
-      onChange(Math.round(Math.max(min, Math.min(max, startVal + delta))));
-    };
-    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-0.5 w-12">
-      <div
-        className="w-8 h-8 rounded-full border-2 cursor-pointer relative"
-        style={{ borderColor: color, background: '#1a1a2e' }}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        title={`${label}: ${Math.round(value)}`}
-      >
-        <div
-          className="absolute w-0.5 h-3 rounded-full"
-          style={{ background: color, top: '2px', left: '50%', transform: `translateX(-50%) rotate(${angle}deg)`, transformOrigin: 'bottom center' }}
-        />
-      </div>
-      <div className="text-[7px] font-bold uppercase tracking-wide text-center" style={{ color }}>{label}</div>
-      <div className="text-[7px] text-text-muted font-mono">{Math.round(value)}</div>
-    </div>
-  );
-};
+  paramKey?: string;
+}> = ({ label, value, min = 0, max = 127, color = '#33ccff', onChange, paramKey }) => (
+  <div className="w-12">
+    <Knob
+      value={value}
+      min={min}
+      max={max}
+      step={1}
+      onChange={(v) => onChange(Math.round(v))}
+      label={label}
+      size="sm"
+      color={color}
+      formatValue={(v) => Math.round(v).toString()}
+      paramKey={paramKey}
+    />
+  </div>
+);
 
 const SectionLabel: React.FC<{ label: string; color?: string }> = ({ label, color = '#33ccff' }) => (
   <div className="text-[9px] font-bold uppercase tracking-[0.2em] mb-1 pb-0.5 border-b" style={{ color, borderColor: `${color}40` }}>
@@ -93,7 +71,7 @@ export const V2Hardware: React.FC<V2HardwareProps> = ({ parameters, onParamChang
                 <V2Knob label="TRANS" value={p(`${prefix}.transpose`, 64)} color="#ffcc33" onChange={set(`${prefix}.transpose`)} />
                 <V2Knob label="DETUNE" value={p(`${prefix}.detune`, prefix === 'osc2' ? 74 : prefix === 'osc3' ? 54 : 64)} color="#ffcc33" onChange={set(`${prefix}.detune`)} />
                 <V2Knob label="COLOR" value={p(`${prefix}.color`, 64)} color="#ff9933" onChange={set(`${prefix}.color`)} />
-                <V2Knob label="VOL" value={p(`${prefix}.level`, prefix === 'osc1' ? 127 : 0)} color="#66ff99" onChange={set(`${prefix}.level`)} />
+                <V2Knob label="VOL" value={p(`${prefix}.level`, prefix === 'osc1' ? 127 : 0)} color="#66ff99" onChange={set(`${prefix}.level`)} paramKey={prefix === 'osc1' ? 'v2.osc1Level' : undefined} />
               </div>
             </div>
           ))}
@@ -105,8 +83,8 @@ export const V2Hardware: React.FC<V2HardwareProps> = ({ parameters, onParamChang
             <SectionLabel label="FILTER 1" color="#ff6633" />
             <div className="flex gap-1 justify-center">
               <V2Knob label="MODE" value={p('filter1.mode', 1)} min={0} max={7} color="#ff6633" onChange={set('filter1.mode')} />
-              <V2Knob label="CUT" value={p('filter1.cutoff', 127)} color="#ff6633" onChange={set('filter1.cutoff')} />
-              <V2Knob label="RES" value={p('filter1.resonance', 0)} color="#ff6633" onChange={set('filter1.resonance')} />
+              <V2Knob label="CUT" value={p('filter1.cutoff', 127)} color="#ff6633" onChange={set('filter1.cutoff')} paramKey="v2.filter1Cutoff" />
+              <V2Knob label="RES" value={p('filter1.resonance', 0)} color="#ff6633" onChange={set('filter1.resonance')} paramKey="v2.filter1Reso" />
             </div>
           </div>
           <div className="bg-black/30 rounded p-2">
@@ -131,10 +109,10 @@ export const V2Hardware: React.FC<V2HardwareProps> = ({ parameters, onParamChang
           <div className="bg-black/30 rounded p-2">
             <SectionLabel label="AMP ENV" color="#66ff99" />
             <div className="flex gap-1 justify-center">
-              <V2Knob label="ATK" value={p('envelope.attack', 0)} color="#66ff99" onChange={set('envelope.attack')} />
-              <V2Knob label="DEC" value={p('envelope.decay', 64)} color="#66ff99" onChange={set('envelope.decay')} />
-              <V2Knob label="SUS" value={p('envelope.sustain', 127)} color="#66ff99" onChange={set('envelope.sustain')} />
-              <V2Knob label="REL" value={p('envelope.release', 32)} color="#66ff99" onChange={set('envelope.release')} />
+              <V2Knob label="ATK" value={p('envelope.attack', 0)} color="#66ff99" onChange={set('envelope.attack')} paramKey="v2.envAttack" />
+              <V2Knob label="DEC" value={p('envelope.decay', 64)} color="#66ff99" onChange={set('envelope.decay')} paramKey="v2.envDecay" />
+              <V2Knob label="SUS" value={p('envelope.sustain', 127)} color="#66ff99" onChange={set('envelope.sustain')} paramKey="v2.envSustain" />
+              <V2Knob label="REL" value={p('envelope.release', 32)} color="#66ff99" onChange={set('envelope.release')} paramKey="v2.envRelease" />
             </div>
           </div>
           <div className="bg-black/30 rounded p-2">
