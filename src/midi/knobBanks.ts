@@ -785,3 +785,66 @@ export function getKnobPageCount(synthType: SynthType): number {
   if (allParams.length === 0) return 1; // Mixer fallback = 1 page
   return Math.ceil(allParams.length / 8);
 }
+
+/**
+ * Editor section → NKS section mapping.
+ * Maps SynthEditorTab IDs to the NKS section names used in NKS2 parameter definitions.
+ */
+const EDITOR_TAB_TO_NKS_SECTION: Record<string, string[]> = {
+  'oscillator': ['Synthesis'],
+  'envelope':   ['Envelope'],
+  'filter':     ['Filter'],
+  'modulation': ['Modulation', 'LFO'],
+  'output':     ['Output', 'Mixer'],
+  'special':    ['Macro', 'Sequencer', 'Arpeggiator'],
+  // 303-specific tabs
+  'main':       ['303 Main'],
+  'devilfish':  ['MOJO', 'DevilFish'],
+};
+
+/**
+ * Get the knob page index that best matches an editor section/tab.
+ * Returns the page number, or -1 if no match found.
+ *
+ * For curated multi-page banks (303, Klystrack, DX7): matches page names.
+ * For NKS2-generated banks: finds the page containing params from the matching section.
+ * For single-page curated banks: always returns 0.
+ */
+export function getKnobPageForSection(synthType: SynthType, section: string): number {
+  const legacyBank = getKnobBankForSynth(synthType);
+
+  if (legacyBank) {
+    const multi = getMultiPageBank(legacyBank);
+    if (multi) {
+      // Match section to page name (case-insensitive)
+      const sectionLower = section.toLowerCase();
+      const idx = multi.names.findIndex(name => name.toLowerCase().includes(sectionLower));
+      if (idx >= 0) return idx;
+
+      // Try mapping editor tab → page names via EDITOR_TAB_TO_NKS_SECTION
+      const nksSections = EDITOR_TAB_TO_NKS_SECTION[section];
+      if (nksSections) {
+        for (const ns of nksSections) {
+          const nsLower = ns.toLowerCase();
+          const pageIdx = multi.names.findIndex(name => name.toLowerCase().includes(nsLower));
+          if (pageIdx >= 0) return pageIdx;
+        }
+      }
+    }
+    return 0; // single-page bank
+  }
+
+  // NKS2: find the page containing params from the target section
+  const nksSections = EDITOR_TAB_TO_NKS_SECTION[section];
+  if (!nksSections) return 0;
+
+  const allParams = getPerformanceParams(synthType);
+  if (allParams.length === 0) return 0;
+
+  for (let i = 0; i < allParams.length; i++) {
+    if (nksSections.includes(allParams[i].section)) {
+      return Math.floor(i / 8);
+    }
+  }
+  return 0;
+}
