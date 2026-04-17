@@ -53,7 +53,6 @@ interface FT2ToolbarProps {
   onShowExport?: () => void;
   onShowHelp?: (tab?: string) => void;
   onShowInstrumentFX?: () => void;
-  onShowInstruments?: () => void;
   showPatterns?: boolean;
   showInstrumentFX?: boolean;
   compact?: boolean;
@@ -62,7 +61,6 @@ interface FT2ToolbarProps {
 export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   onShowExport,
   onShowHelp,
-  onShowInstruments,
 }) => {
   const {
     patterns,
@@ -607,7 +605,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
         <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
-        <Button variant="ghost" size="sm" onClick={onShowInstruments} title="Instrument editor">Instruments</Button>
         <Button
           variant={asidEnabled ? 'primary' : 'default'}
           size="sm"
