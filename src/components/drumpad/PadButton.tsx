@@ -23,7 +23,7 @@ interface PadButtonProps {
 export const PadButton: React.FC<PadButtonProps> = ({
   pad,
   isSelected,
-  isFocused = false,
+  isFocused: _isFocused = false,
   velocity,
   onTrigger,
   onRelease,
@@ -226,12 +226,11 @@ export const PadButton: React.FC<PadButtonProps> = ({
       ref={buttonRef}
       data-pad-id={pad.id}
       className={`
-        relative rounded-lg select-none overflow-hidden cursor-pointer
+        relative rounded-lg select-none overflow-hidden cursor-pointer outline-none
         ${padStyle.className}
         ${!isLoaded ? 'opacity-40' : ''}
         ${isPressed && isLoaded ? 'scale-95' : 'scale-100'}
         ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
-        ${isFocused && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-dark-bg' : ''}
         transform-gpu will-change-transform
         ${className}
       `}
