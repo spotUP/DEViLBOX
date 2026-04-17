@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@stores';
+import { useAudioStore } from '@stores/useAudioStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorControls } from '@hooks/views/useEditorControls';
 import { BG_MODES, getBgModeLabel } from './TrackerVisualBackground';
@@ -73,6 +74,10 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
+
+  // Volume
+  const masterVolume = useAudioStore(s => s.masterVolume);
+  const setMasterVolume = useAudioStore(s => s.setMasterVolume);
 
   // DOM-only: UI store for view-mode switching and groove dialog command
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -204,6 +209,18 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   return (
     <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px] overflow-hidden">
       <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-hidden">
+        {/* Master Volume */}
+        <input
+          type="range"
+          value={masterVolume}
+          onChange={(e) => setMasterVolume(Number(e.target.value))}
+          min="-60"
+          max="0"
+          step="1"
+          className="w-20"
+          title={`Volume: ${masterVolume} dB`}
+        />
+
         {/* Hardware System Preset Selector */}
         <div className="flex items-center gap-1.5">
           <Cpu size={14} className="shrink-0 text-text-secondary" />
