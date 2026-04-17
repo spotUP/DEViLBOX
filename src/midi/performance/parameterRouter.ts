@@ -849,6 +849,60 @@ import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
 import type { DrumPadXYMapping } from '../drumpadXYMap';
 import type { SynthType } from '../../types/instrument/base';
 
+// ── Joystick modulation snapshot/restore ──
+// Snapshots the synth's current param values on first joystick touch per pad.
+// On pad release, restores them so the preset sounds the same next trigger.
+const _xySnapshots = new Map<number, Map<string, number>>(); // padId → param → normalized
+
+/** Take a snapshot of the current synth values for XY-mapped params */
+function snapshotXYParams(padId: number, instId: number, mapping: DrumPadXYMapping): void {
+  if (_xySnapshots.has(padId)) return; // Already snapshotted
+  const snap = new Map<string, number>();
+  try {
+    const engine = getToneEngine();
+    engine.instruments.forEach((instrument, key) => {
+      if ((key >>> 16) !== instId) return;
+      const synthObj = instrument as unknown as Record<string, unknown>;
+      if (typeof synthObj.get !== 'function') return;
+      for (const axis of [mapping.x, mapping.y]) {
+        if (axis.target !== 'synth') continue;
+        const val = (synthObj as any).get(axis.param);
+        if (val !== undefined && typeof val === 'number') {
+          snap.set(axis.param, val);
+        }
+      }
+    });
+  } catch { /* ignore */ }
+  if (snap.size > 0) _xySnapshots.set(padId, snap);
+}
+
+/**
+ * Reset joystick-modulated params to their pre-modulation values.
+ * Call this from releasePad to restore the preset sound.
+ */
+export function resetDrumPadModulation(padId: number): void {
+  const snap = _xySnapshots.get(padId);
+  if (!snap) return;
+
+  // Resolve instId the same way routeDrumPadModulation does
+  const store = useDrumPadStore.getState();
+  const program = store.programs.get(store.currentProgramId);
+  if (!program) { _xySnapshots.delete(padId); return; }
+
+  const pad = program.pads.find(p => p.id === padId);
+  if (!pad) { _xySnapshots.delete(padId); return; }
+
+  let instId = PAD_INSTRUMENT_BASE + padId;
+  if (!pad.synthConfig?.synthType && pad.instrumentId != null) {
+    instId = pad.instrumentId;
+  }
+
+  for (const [param, value] of snap) {
+    sendDirectToSynth(instId, param, value);
+  }
+  _xySnapshots.delete(padId);
+}
+
 /**
  * Apply joystick XY modulation to held drum pads.
  *
@@ -886,6 +940,9 @@ export function routeDrumPadModulation(
     }
 
     const mapping = getDrumPadXYMapping(synthType);
+
+    // Snapshot current values on first joystick touch (for restore on release)
+    snapshotXYParams(padId, instId, mapping);
 
     if ((globalThis as Record<string, unknown>).MIDI_DEBUG) {
       console.log(`[DrumPadXY] pad=${padId} synth=${synthType} instId=${instId} X=${normalizedX?.toFixed(2)} Y=${normalizedY?.toFixed(2)} target=${mapping.x.target}/${mapping.y.target} mapping=${mapping.x.param}/${mapping.y.param}`);

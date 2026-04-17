@@ -31,6 +31,7 @@ import { applyVelocityCurve, PAD_INSTRUMENT_BASE } from '../../types/drumpad';
 import type { ScratchActionId } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
+import { resetDrumPadModulation } from '../../midi/performance/parameterRouter';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -411,6 +412,9 @@ export function useMIDIPadRouting() {
   const releasePad = useCallback((padId: number) => {
     if (!_heldPads.has(padId)) return;
     _heldPads.delete(padId);
+
+    // Restore joystick-modulated synth params to pre-modulation values
+    resetDrumPadModulation(padId);
 
     _noteRepeat?.stopRepeat(padId);
 

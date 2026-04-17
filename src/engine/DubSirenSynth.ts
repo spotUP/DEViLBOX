@@ -206,7 +206,13 @@ export class DubSirenSynth implements DevilboxSynth {
 
   get(param: string): number | undefined {
     switch (param) {
+      case 'frequency': return (Number(this.signal.value) - 100) / 900;
       case 'lfoRate': return (Number(this.lfo.frequency.value) - 0.1) / 19.9;
+      case 'lfoDepth': return Number(this.lfo.max) / 500;
+      case 'cutoff': {
+        const f = Number(this.filter.frequency.value);
+        return Math.log(f / 200) / Math.log(10000 / 200);
+      }
       case 'volume': return (Number(this._toneOutput.volume.value) + 40) / 40;
       default: return undefined;
     }
