@@ -489,7 +489,7 @@ async function loadDrumProgram(programId: string): Promise<void> {
 }
 
 /** Switch drum pad bank */
-async function setDrumBank(bank: 'A' | 'B' | 'C' | 'D'): Promise<void> {
+async function setDrumBank(bank: 'A' | 'B'): Promise<void> {
   const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
   useDrumPadStore.getState().setBank(bank);
 }

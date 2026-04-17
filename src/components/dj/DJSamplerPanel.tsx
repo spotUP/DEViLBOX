@@ -214,7 +214,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
 
   if (!currentProgram) return null;
 
-  const bankButtons: PadBank[] = ['A', 'B', 'C', 'D'];
+  const bankButtons: PadBank[] = ['A', 'B'];
   const bankLoadedCount = bankPads.filter(p => p.sample !== null).length;
 
   return (
