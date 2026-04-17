@@ -76,7 +76,6 @@ export function useGlobalPTT(): void {
         (async () => {
           const engine = await ensureFallbackEngine();
           if (!engine) return;
-          engine.setMicActive(true);
           engine.setMuted(false);
           useVocoderStore.getState().setActive(true);
           try { getDJEngineIfActive()?.mixer.duck(); } catch { /* ok */ }
@@ -88,7 +87,8 @@ export function useGlobalPTT(): void {
         registeredPTTUp();
       } else if (fallbackEngine) {
         fallbackEngine.setMuted(true);
-        fallbackEngine.setMicActive(false);
+        // Mic track stays enabled — cutting it causes a step-function click
+        // that gets re-emitted by the reverb/delay for seconds.
         useVocoderStore.getState().setActive(false);
         try { getDJEngineIfActive()?.mixer.unduck(); } catch { /* ok */ }
       }
