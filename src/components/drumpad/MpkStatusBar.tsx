@@ -25,6 +25,7 @@ import {
   getLearnSlotTarget,
   subscribeSlotBindings,
 } from '@/hooks/drumpad/useMIDIPadRouting';
+import { notify } from '@/stores/useNotificationStore';
 
 export const MpkStatusBar: React.FC = () => {
   const programs = useDrumPadStore((s) => s.programs);
@@ -54,6 +55,7 @@ export const MpkStatusBar: React.FC = () => {
         if (next > MPK_SLOT_COUNT) {
           setWizardSlot(null);
           cancelLearnSlotBinding();
+          notify.success(`MPK setup complete — ${MPK_SLOT_COUNT} slots bound`, 3000);
         } else {
           setWizardSlot(next);
           startLearnSlotBinding(next);
