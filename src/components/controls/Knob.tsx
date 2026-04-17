@@ -7,6 +7,7 @@ import React, { useRef, useCallback, useEffect, useState, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useThemeStore } from '@stores';
 import { haptics } from '@/utils/haptics';
+import { subscribeToParamLiveValue } from '@/midi/performance/parameterRouter';
 
 interface KnobProps {
   // Core (both versions)
@@ -32,6 +33,17 @@ interface KnobProps {
   bipolar?: boolean;
   formatValue?: (value: number) => string;
   step?: number;
+
+  /** Optional live-value subscription. When provided, the knob skips React
+   *  re-renders from `value` changes and updates the SVG indicator + arc
+   *  directly via refs on each subscriber tick. The callback receives a
+   *  normalized 0-1 value. Use for high-rate external drivers (MIDI, OSC). */
+  imperativeSubscribe?: (cb: (norm01: number) => void) => () => void;
+
+  /** Shorthand for the imperative fast path: pass a param key registered
+   *  with the parameterRouter (e.g. 'cutoff', 'dj.deckA.eqHi', 'siren.osc.frequency')
+   *  and the knob auto-subscribes via subscribeToParamLiveValue. */
+  paramKey?: string;
 }
 
 // Convert linear 0-1 to logarithmic value
@@ -68,12 +80,16 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   step,
   disabled = false,
   hideValue = false,
+  imperativeSubscribe,
+  paramKey,
 }) => {
   // Guard against undefined/NaN value prop (can happen if synth params aren't loaded yet)
   const safeValue = (value == null || isNaN(value)) ? (min ?? 0) : value;
   value = safeValue;
 
   const knobRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<SVGLineElement>(null);
+  const arcRef = useRef<SVGPathElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showNumericInput, setShowNumericInput] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
@@ -435,6 +451,47 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     y: center + (radius - 8) * Math.sin(((rotation - 90) * Math.PI) / 180),
   };
 
+  // Imperative DOM updates — bypass React render for high-rate driver callbacks.
+  // Writes x1/y1/x2/y2 on the indicator line and `d` on the arc directly.
+  // Either `imperativeSubscribe` (explicit subscriber fn) OR `paramKey`
+  // (auto-resolves via the parameter router's generic live-value registry).
+  useEffect(() => {
+    let subscribe = imperativeSubscribe;
+    if (!subscribe && paramKey) {
+      const key = paramKey;
+      subscribe = (cb) => subscribeToParamLiveValue(key, cb);
+    }
+    if (!subscribe) return;
+    const update = (norm01: number) => {
+      const safe = Math.max(0, Math.min(1, isNaN(norm01) ? 0 : norm01));
+      const rot = safe * 270 - 135;
+      const rad = ((rot - 90) * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const innerR = radius - 8;
+      const line = indicatorRef.current;
+      if (line) {
+        line.setAttribute('x1', String(center + innerR * cos));
+        line.setAttribute('y1', String(center + innerR * sin));
+        line.setAttribute('x2', String(center + radius * cos));
+        line.setAttribute('y2', String(center + radius * sin));
+      }
+      const arc = arcRef.current;
+      if (arc) {
+        // Match the render-time arc logic: bipolar from center, unipolar from -135.
+        const start = bipolar ? (safe >= 0.5 ? 0 : rot) : -135;
+        const end   = bipolar ? (safe >= 0.5 ? rot : 0) : rot;
+        const sp = polarToCartesian(start);
+        const ep = polarToCartesian(end);
+        const large = Math.abs(end - start) > 180 ? 1 : 0;
+        const sweep = end > start ? 1 : 0;
+        arc.setAttribute('d', `M ${sp.x} ${sp.y} A ${radius} ${radius} 0 ${large} ${sweep} ${ep.x} ${ep.y}`);
+      }
+    };
+    return subscribe(update);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imperativeSubscribe, paramKey, radius, center, bipolar]);
+
   return (
     <>
     <div
@@ -492,8 +549,9 @@ export const Knob: React.FC<KnobProps> = React.memo(({
           {/* Value arc */}
           {bipolar ? (
             // Bipolar: draw from center to value
-            displayNorm !== 0.5 && (
+            (displayNorm !== 0.5 || imperativeSubscribe) && (
               <path
+                ref={arcRef}
                 d={describeArc(
                   displayNorm > 0.5 ? centerAngle : valueAngle,
                   displayNorm > 0.5 ? valueAngle : centerAngle
@@ -503,22 +561,21 @@ export const Knob: React.FC<KnobProps> = React.memo(({
                 strokeWidth={stroke}
                 strokeLinecap="round"
                 style={{
-                  filter: isActive ? `drop-shadow(0 0 4px ${color})` : `drop-shadow(0 0 2px ${color})`,
-                  transition: displayValue !== undefined ? 'none' : 'stroke-dasharray 0.05s ease-out',
+                  filter: isActive ? `drop-shadow(0 0 4px ${color})` : undefined,
                 }}
               />
             )
           ) : (
             // Unipolar: draw from start to value
             <path
+              ref={arcRef}
               d={describeArc(-135, rotation)}
               fill="none"
               stroke={color}
               strokeWidth={stroke}
               strokeLinecap="round"
               style={{
-                filter: isActive ? `drop-shadow(0 0 4px ${color})` : `drop-shadow(0 0 2px ${color})`,
-                transition: displayValue !== undefined ? 'none' : 'stroke-dasharray 0.05s ease-out',
+                filter: isActive ? `drop-shadow(0 0 4px ${color})` : undefined,
               }}
             />
           )}
@@ -535,6 +592,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 
           {/* Indicator line */}
           <line
+            ref={indicatorRef}
             x1={indicatorStart.x}
             y1={indicatorStart.y}
             x2={indicatorEnd.x}
@@ -543,8 +601,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
             strokeWidth="2"
             strokeLinecap="round"
             style={{
-              filter: isActive ? `drop-shadow(0 0 3px ${color})` : 'none',
-              transition: displayValue !== undefined ? 'transform 0.016s linear' : 'transform 0.1s ease-out',
+              filter: isActive ? `drop-shadow(0 0 3px ${color})` : undefined,
+              willChange: 'transform',
             }}
           />
 
@@ -673,8 +731,12 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 }, (prevProps, nextProps) => {
   // Custom comparison for optimal memoization
   // onChange/onChangeRef handled via ref — no need to compare
+  // When imperativeSubscribe OR paramKey is active, ignore `value` changes —
+  // the DOM is updated via ref on each CC, React re-render would duplicate.
+  const fastPath = nextProps.imperativeSubscribe != null || nextProps.paramKey != null;
+  const valueStable = fastPath ? true : prevProps.value === nextProps.value;
   return (
-    prevProps.value === nextProps.value &&
+    valueStable &&
     prevProps.displayValue === nextProps.displayValue &&
     prevProps.isActive === nextProps.isActive &&
     prevProps.min === nextProps.min &&
@@ -683,7 +745,9 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     prevProps.color === nextProps.color &&
     prevProps.size === nextProps.size &&
     prevProps.disabled === nextProps.disabled &&
-    prevProps.hideValue === nextProps.hideValue
+    prevProps.hideValue === nextProps.hideValue &&
+    prevProps.imperativeSubscribe === nextProps.imperativeSubscribe &&
+    prevProps.paramKey === nextProps.paramKey
   );
 });
 
