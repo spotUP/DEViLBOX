@@ -473,97 +473,101 @@ class DJAutoDJ {
     this.preloading = true;
     console.log('[AutoDJ] preloadNextTrack() START');
 
-    const store = useDJStore.getState();
-    const playlist = this.getActivePlaylist();
-    if (!playlist) {
-      console.warn('[AutoDJ] preloadNextTrack() no playlist — aborting');
-      this.preloading = false;
-      return;
-    }
-
-    store.setAutoDJStatus('preloading');
-    let nextIdx = store.autoDJNextTrackIndex;
-    let attempts = 0;
-    let consecutiveNetworkFailures = 0;
-
-    console.log(`[AutoDJ] preloadNextTrack() starting loop: nextIdx=${nextIdx}, maxAttempts=${MAX_SKIP_ATTEMPTS}`);
-
-    while (attempts < MAX_SKIP_ATTEMPTS) {
-      const track = playlist.tracks[nextIdx];
-      if (!track) {
-        console.warn(`[AutoDJ] preloadNextTrack() track at index ${nextIdx} is null — wrapping to 0`);
-        nextIdx = 0;
-        if (attempts > 0) break;
-        attempts++;
-        continue;
+    // Single try/finally guarantees the preloading flag always resets, even
+    // on unexpected sync throws (e.g. isServerUnreachable, computeNextIndex).
+    // Previously the flag leaked on any throw path not explicitly guarded,
+    // blocking all future preloads for the rest of the session.
+    try {
+      const store = useDJStore.getState();
+      const playlist = this.getActivePlaylist();
+      if (!playlist) {
+        console.warn('[AutoDJ] preloadNextTrack() no playlist — aborting');
+        return;
       }
 
-      // Skip tracks already marked as bad (unless we've tried everything else)
-      if (track.isBad && attempts < MAX_SKIP_ATTEMPTS - 10) {
-        console.log(`[AutoDJ] Skipping bad track ${nextIdx}: ${track.trackName} (reason: ${track.badReason})`);
+      store.setAutoDJStatus('preloading');
+      let nextIdx = store.autoDJNextTrackIndex;
+      let attempts = 0;
+      let consecutiveNetworkFailures = 0;
+
+      console.log(`[AutoDJ] preloadNextTrack() starting loop: nextIdx=${nextIdx}, maxAttempts=${MAX_SKIP_ATTEMPTS}`);
+
+      while (attempts < MAX_SKIP_ATTEMPTS) {
+        const track = playlist.tracks[nextIdx];
+        if (!track) {
+          console.warn(`[AutoDJ] preloadNextTrack() track at index ${nextIdx} is null — wrapping to 0`);
+          nextIdx = 0;
+          if (attempts > 0) break;
+          attempts++;
+          continue;
+        }
+
+        // Skip tracks already marked as bad (unless we've tried everything else)
+        if (track.isBad && attempts < MAX_SKIP_ATTEMPTS - 10) {
+          console.log(`[AutoDJ] Skipping bad track ${nextIdx}: ${track.trackName} (reason: ${track.badReason})`);
+          attempts++;
+          nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
+          continue;
+        }
+
+        console.log(`[AutoDJ] Pre-rendering track ${nextIdx + 1}/${playlist.tracks.length} in background: ${track.trackName} (attempt ${attempts + 1}/${MAX_SKIP_ATTEMPTS})${track.isBad ? ' [RETRY BAD TRACK]' : ''}`);
+
+        try {
+          // Pre-render in background - UADE crashes happen here, isolated from playback
+          console.log(`[AutoDJ] ⏳ Starting background pre-render for: ${track.trackName}`);
+          const { preRenderTrack } = await import('./DJTrackLoader');
+          const preRendered = await preRenderTrack(track);
+
+          if (preRendered) {
+            // Success - save pre-rendered data for instant loading during transition
+            console.log(`[AutoDJ] ✅ Pre-render complete, stored for later: ${track.trackName} (${(preRendered.wavData.byteLength / 1024 / 1024).toFixed(1)}MB)`);
+            this.preRenderedTrack = { track, data: preRendered };
+            this.preloadedDeck = this.idleDeck;
+            this.preloadFailCount = 0;
+
+            useDJStore.getState().setAutoDJTrackIndices(
+              useDJStore.getState().autoDJCurrentTrackIndex,
+              nextIdx,
+            );
+            useDJStore.getState().setAutoDJStatus('transition-pending');
+            console.log(`[AutoDJ] Preload SUCCESS → deck ${this.idleDeck}, status=transition-pending`);
+            return;
+          } else {
+            console.warn(`[AutoDJ] ❌ Pre-render returned null for ${track.fileName}`);
+          }
+        } catch (err) {
+          console.error(`[AutoDJ] Preload exception for ${track.fileName}:`, err);
+        }
+
+        // Detect network-down vs bad-track: "Failed to fetch" means the server is unreachable
+        const isNetworkError = !navigator.onLine || await this.isServerUnreachable();
+        console.log(`[AutoDJ] Track load failed - network error: ${isNetworkError}, consecutiveNetworkFailures: ${consecutiveNetworkFailures}`);
+        if (isNetworkError) {
+          consecutiveNetworkFailures++;
+          if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
+            console.error(`[AutoDJ] Server unreachable — stopping preload after ${consecutiveNetworkFailures} consecutive network failures`);
+            this.preloadFailCount++;
+            this.lastPreloadFailTime = Date.now();
+            useDJStore.getState().setAutoDJStatus('preload-failed');
+            return;
+          }
+        } else {
+          consecutiveNetworkFailures = 0;
+        }
+
         attempts++;
         nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
-        continue;
+        console.warn(`[AutoDJ] Skipping unloadable track, trying next index ${nextIdx} (attempt ${attempts}/${MAX_SKIP_ATTEMPTS})`);
       }
 
-      console.log(`[AutoDJ] Pre-rendering track ${nextIdx + 1}/${playlist.tracks.length} in background: ${track.trackName} (attempt ${attempts + 1}/${MAX_SKIP_ATTEMPTS})${track.isBad ? ' [RETRY BAD TRACK]' : ''}`);
-
-      try {
-        // Pre-render in background - UADE crashes happen here, isolated from playback
-        console.log(`[AutoDJ] ⏳ Starting background pre-render for: ${track.trackName}`);
-        const { preRenderTrack } = await import('./DJTrackLoader');
-        const preRendered = await preRenderTrack(track);
-        
-        if (preRendered) {
-          // Success - save pre-rendered data for instant loading during transition
-          console.log(`[AutoDJ] ✅ Pre-render complete, stored for later: ${track.trackName} (${(preRendered.wavData.byteLength / 1024 / 1024).toFixed(1)}MB)`);
-          this.preRenderedTrack = { track, data: preRendered };
-          this.preloadedDeck = this.idleDeck;
-          this.preloadFailCount = 0;
-
-          useDJStore.getState().setAutoDJTrackIndices(
-            useDJStore.getState().autoDJCurrentTrackIndex,
-            nextIdx,
-          );
-          useDJStore.getState().setAutoDJStatus('transition-pending');
-          console.log(`[AutoDJ] Preload SUCCESS → deck ${this.idleDeck}, status=transition-pending`);
-          this.preloading = false;
-          return;
-        } else {
-          console.warn(`[AutoDJ] ❌ Pre-render returned null for ${track.fileName}`);
-        }
-      } catch (err) {
-        console.error(`[AutoDJ] Preload exception for ${track.fileName}:`, err);
-      }
-
-      // Detect network-down vs bad-track: "Failed to fetch" means the server is unreachable
-      const isNetworkError = !navigator.onLine || await this.isServerUnreachable();
-      console.log(`[AutoDJ] Track load failed - network error: ${isNetworkError}, consecutiveNetworkFailures: ${consecutiveNetworkFailures}`);
-      if (isNetworkError) {
-        consecutiveNetworkFailures++;
-        if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
-          console.error(`[AutoDJ] Server unreachable — stopping preload after ${consecutiveNetworkFailures} consecutive network failures`);
-          this.preloadFailCount++;
-          this.lastPreloadFailTime = Date.now();
-          useDJStore.getState().setAutoDJStatus('preload-failed');
-          this.preloading = false;
-          return;
-        }
-      } else {
-        consecutiveNetworkFailures = 0;
-      }
-
-      attempts++;
-      nextIdx = this.computeNextIndex(nextIdx, playlist.tracks.length);
-      console.warn(`[AutoDJ] Skipping unloadable track, trying next index ${nextIdx} (attempt ${attempts}/${MAX_SKIP_ATTEMPTS})`);
+      // All attempts exhausted (bad tracks, not network)
+      console.error('[AutoDJ] PRELOAD EXHAUSTED: Failed to preload any track after', MAX_SKIP_ATTEMPTS, 'attempts');
+      this.preloadFailCount++;
+      this.lastPreloadFailTime = Date.now();
+      useDJStore.getState().setAutoDJStatus('preload-failed');
+    } finally {
+      this.preloading = false;
     }
-
-    // All attempts exhausted (bad tracks, not network)
-    console.error('[AutoDJ] PRELOAD EXHAUSTED: Failed to preload any track after', MAX_SKIP_ATTEMPTS, 'attempts');
-    this.preloadFailCount++;
-    this.lastPreloadFailTime = Date.now();
-    useDJStore.getState().setAutoDJStatus('preload-failed');
-    this.preloading = false;
   }
 
   // ── Private: Transition ──────────────────────────────────────────────────
