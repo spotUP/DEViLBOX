@@ -214,6 +214,17 @@ export class DJMixerEngine {
     this.cueEngine = engine;
   }
 
+  /**
+   * Public accessor for the cue bus input — lets other engines (Modland
+   * preview, one-shot preview, etc.) route audio straight to headphones
+   * without ever hitting the master bus. Returns null before
+   * setCueEngine() has been called. Consumers should check for null and
+   * either fall back or wait.
+   */
+  getCueInput(): Tone.Gain | null {
+    return this.cueEngine?.getCueInput() ?? null;
+  }
+
   /** Enable/disable PFL for a deck (pre-fader listen to headphones) */
   setPFL(deck: DeckId, enabled: boolean): void {
     if (!this.cueEngine) {
