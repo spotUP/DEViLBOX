@@ -407,10 +407,20 @@ async function renderWithUADE(
   // player-filename limit with room for the extension.
   const baseName = filename.split(/[\\/]/).pop() || filename;
   const dotIdx = baseName.lastIndexOf('.');
-  const ext = dotIdx !== -1 ? baseName.slice(dotIdx + 1) : 'mod';
+  const ext = dotIdx !== -1 ? baseName.slice(dotIdx + 1).toLowerCase() : 'mod';
   const nameOnly = dotIdx !== -1 ? baseName.slice(0, dotIdx) : baseName;
   const safeName = nameOnly.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 20);
-  const safeFilename = `${safeName}.${ext}`;
+  // Some UADE eagleplayers identify their modules by filename PREFIX, not
+  // extension. Files from Modland's Fred Editor directory arrive as
+  // "<name>.fred" (extension) but UADE's Fred eagleplayer only triggers on
+  // "fred.<name>" (prefix) — without this swap UADE bails with
+  // "module check failed" / "Expected score name" before playback.
+  const EXT_TO_PREFIX: Record<string, string> = {
+    fred: 'fred',
+  };
+  const safeFilename = EXT_TO_PREFIX[ext]
+    ? `${EXT_TO_PREFIX[ext]}.${safeName}`
+    : `${safeName}.${ext}`;
   
   console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename} (${fileBuffer.byteLength} bytes)${companions?.length ? ` with ${companions.length} companion(s)` : ''}`);
 
