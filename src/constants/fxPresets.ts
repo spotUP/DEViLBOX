@@ -19,6 +19,9 @@ export type FxTag =
   | 'Lo-Fi' | 'Creative' | 'Space' | 'Dub' | 'Grit' | 'Modulation' | 'Ambient' | 'Texture'
   | 'Amp' | 'Guitar'
   | 'Reverb' | 'Delay' | 'Compression'
+  // Dub sub-categories — used alongside 'Dub' so users can drill into a
+  // specific dub flavour from the tag filter pills in the master FX dropdown.
+  | 'Dub Echo' | 'Dub Reverb' | 'Dub Filter' | 'Dub Siren' | 'Dub Mod'
   | 'Amiga' | 'C64';
 
 export interface FxPreset {
@@ -181,7 +184,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'Distortion', enabled: true, wet: 30, parameters: { distortion: 0.4 } },
       { category: 'tonejs', type: 'Filter', enabled: true, wet: 100, parameters: { frequency: 5000, type: 'lowpass', Q: 1.5 } },
     ] },
-  { name: 'Cassette Dub', description: 'Tape sim + delay — dubbed-to-tape degradation', tags: ['Lo-Fi', 'Dub'], gainCompensationDb: 0.8,
+  { name: 'Cassette Dub', description: 'Tape sim + delay — dubbed-to-tape degradation', tags: ['Lo-Fi', 'Dub', 'Dub Echo'], gainCompensationDb: 0.8,
     effects: [
       { category: 'wasm', type: 'TapeSimulator', enabled: true, wet: 50, parameters: { drive: 35, character: 50, bias: 50, shame: 30, hiss: 25, speed: 0 } },
       { category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 22, parameters: { delayTime: 0.3, feedback: 0.3 } },
@@ -314,7 +317,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -1.0, high: 1.0 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.003, release: 0.1 } },
     ] },
-  { name: 'Dub Echo', description: 'Ping-pong delay + reverb — classic dub bounce', tags: ['DJ', 'Dub', 'Delay'], gainCompensationDb: -3.4,
+  { name: 'Dub Echo', description: 'Ping-pong delay + reverb — classic dub bounce', tags: ['DJ', 'Dub', 'Dub Echo', 'Delay'], gainCompensationDb: -3.4,
     effects: [
       { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 35, parameters: { delayTime: 0.375, feedback: 0.4, maxDelay: 2 } },
       { category: 'tonejs', type: 'JCReverb', enabled: true, wet: 20, parameters: { roomSize: 0.6 } },
@@ -339,7 +342,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'tonejs', type: 'FrequencyShifter', enabled: true, wet: 70, parameters: { frequency: 5 } },
     ] },
-  { name: 'Feedback Loop', description: 'Self-oscillating delay — chaotic dub siren', tags: ['DJ', 'Dub', 'Creative'], gainCompensationDb: 0.7,
+  { name: 'Feedback Loop', description: 'Self-oscillating delay — chaotic dub siren', tags: ['DJ', 'Dub', 'Dub Siren', 'Creative'], gainCompensationDb: 0.7,
     effects: [
       { category: 'tonejs', type: 'FeedbackDelay', enabled: true, wet: 40, parameters: { delayTime: 0.25, feedback: 0.7, maxDelay: 2 } },
     ] },
@@ -366,7 +369,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'JCReverb', enabled: true, wet: 55, parameters: { roomSize: 0.9 } },
       { category: 'tonejs', type: 'Delay', enabled: true, wet: 18, parameters: { delayTime: 0.25, feedback: 0.3 } },
     ] },
-  { name: 'Spring Tank', description: 'Classic dub spring reverb — metallic drip', tags: ['Space', 'Dub', 'Reverb'], gainCompensationDb: -10.2,
+  { name: 'Spring Tank', description: 'Classic dub spring reverb — metallic drip', tags: ['Space', 'Dub', 'Dub Reverb', 'Reverb'], gainCompensationDb: -10.2,
     effects: [
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 50, parameters: { decay: 0.6, damping: 0.35, tension: 0.5, mix: 0.4, drip: 0.7, diffusion: 0.6 } },
     ] },
@@ -394,31 +397,31 @@ export const FX_PRESETS: FxPreset[] = [
     ] },
 
   // ═══ DUB ═══
-  { name: 'Dub Siren Echo', description: 'Space Echo + spring — classic dub siren', tags: ['Dub', 'Delay'], gainCompensationDb: -30.8,
+  { name: 'Dub Siren Echo', description: 'Space Echo + spring — classic dub siren', tags: ['Dub', 'Dub Siren', 'Dub Echo', 'Delay'], gainCompensationDb: -30.8,
     effects: [
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 50, parameters: { mode: 4, rate: 300, intensity: 0.65, echoVolume: 0.85, reverbVolume: 0.25, bpmSync: 1, syncDivision: '1/4' } },
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 25, parameters: { decay: 0.5, damping: 0.4, tension: 0.45, mix: 0.35, drip: 0.6, diffusion: 0.7 } },
     ] },
-  { name: 'King Tubby Filter', description: 'Resonant dub filter + echo — dramatic sweeps', tags: ['Dub', 'Creative'], gainCompensationDb: 1.1,
+  { name: 'King Tubby Filter', description: 'Resonant dub filter + echo — dramatic sweeps', tags: ['Dub', 'Dub Filter', 'Creative'], gainCompensationDb: 1.1,
     effects: [
       { category: 'tonejs', type: 'DubFilter', enabled: true, wet: 100, parameters: { cutoff: 30, resonance: 20, gain: 1.3 } },
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 375, intensity: 0.5, echoVolume: 0.7, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/8d' } },
     ] },
-  { name: 'Phaser Dub', description: 'Bi-Phase swirl + tape echo — spacey modulation', tags: ['Dub', 'Modulation'],
+  { name: 'Phaser Dub', description: 'Bi-Phase swirl + tape echo — spacey modulation', tags: ['Dub', 'Dub Mod', 'Modulation'],
     effects: [
       { category: 'tonejs', type: 'BiPhase', enabled: true, wet: 35, parameters: { rateA: 0.3, depthA: 0.7, rateB: 3.0, depthB: 0.5, feedback: 0.4, routing: 0 } },
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 4, rate: 500, intensity: 0.6, echoVolume: 0.8, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' } },
     ] },
-  { name: 'Tape Echo Wash', description: 'RE Tape Echo with wow/flutter — degraded repeats', tags: ['Dub', 'Delay', 'Lo-Fi'], gainCompensationDb: -2.4,
+  { name: 'Tape Echo Wash', description: 'RE Tape Echo with wow/flutter — degraded repeats', tags: ['Dub', 'Dub Echo', 'Delay', 'Lo-Fi'], gainCompensationDb: -2.4,
     effects: [
       { category: 'tonejs', type: 'RETapeEcho', enabled: true, wet: 45, parameters: { mode: 3, repeatRate: 0.5, intensity: 0.6, echoVolume: 0.8, wow: 0.3, flutter: 0.2, dirt: 0.15, inputBleed: 0.05, loopAmount: 0, playheadFilter: 1 } },
     ] },
-  { name: 'Dub Chamber', description: 'Spring reverb + tape echo — classic dub send', tags: ['Dub', 'Reverb', 'Delay'], gainCompensationDb: -15.4,
+  { name: 'Dub Chamber', description: 'Spring reverb + tape echo — classic dub send', tags: ['Dub', 'Dub Reverb', 'Dub Echo', 'Reverb', 'Delay'], gainCompensationDb: -15.4,
     effects: [
       { category: 'wasm', type: 'SpringReverb', enabled: true, wet: 60, parameters: { decay: 0.65, damping: 0.45, tension: 0.5, mix: 1.0, drip: 0.5, diffusion: 0.65 } },
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 40, parameters: { mode: 2, rate: 300, intensity: 0.5, echoVolume: 0.7, reverbVolume: 0.2, bass: 0.6, treble: 0.4 } },
     ] },
-  { name: 'Aelapse Dub', description: 'Tape delay + spring reverb combo — the Aelapse dub machine', tags: ['Dub', 'Delay', 'Creative'], gainCompensationDb: 1.2,
+  { name: 'Aelapse Dub', description: 'Tape delay + spring reverb combo — the Aelapse dub machine', tags: ['Dub', 'Dub Echo', 'Dub Reverb', 'Delay', 'Creative'], gainCompensationDb: 1.2,
     effects: [
       { category: 'wasm', type: 'Aelapse', enabled: true, wet: 60, parameters: { delayActive: 1, delayDryWet: 0.5, delaySeconds: 0.375, delayFeedback: 0.55, delayCutLow: 200, delayCutHi: 4000, delaySaturation: 0.3, delayDrift: 0.2, delayMode: 0, springsActive: 1, springsDryWet: 0.4, springsWidth: 0.7, springsLength: 0.6, springsDecay: 0.5, springsDamp: 0.4, springsShape: 0.5, springsTone: 0.5, springsScatter: 0.3, springsChaos: 0.2 } },
     ] },
@@ -607,7 +610,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'tonejs', type: 'AmbientDelay', enabled: true, wet: 60, parameters: { time: 375, feedback: 55, taps: 2, filterType: 'lowpass', filterFreq: 2500, filterQ: 1.5, modRate: 25, modDepth: 15, stereoSpread: 50, diffusion: 25 } },
     ] },
-  { name: 'Tape Echo', description: 'Warm tape delay with wow/flutter — dub, lo-fi', tags: ['Delay', 'Dub', 'Lo-Fi'], gainCompensationDb: -1.9,
+  { name: 'Tape Echo', description: 'Warm tape delay with wow/flutter — dub, lo-fi', tags: ['Delay', 'Dub', 'Dub Echo', 'Lo-Fi'], gainCompensationDb: -1.9,
     effects: [
       { category: 'wasm', type: 'RETapeEcho', enabled: true, wet: 60, parameters: { mode: 3, repeatRate: 0.45, intensity: 0.55, echoVolume: 0.8, wow: 0.15, flutter: 0.1, dirt: 0.2, inputBleed: 0, loopAmount: 0, playheadFilter: 1 } },
     ] },
@@ -615,7 +618,7 @@ export const FX_PRESETS: FxPreset[] = [
     effects: [
       { category: 'tonejs', type: 'PingPongDelay', enabled: true, wet: 60, parameters: { delayTime: 0.25, feedback: 0.45, maxDelay: 2 } },
     ] },
-  { name: 'Space Echo', description: 'Roland RE-201 multi-head — psychedelic, dub', tags: ['Delay', 'Dub', 'Space'], gainCompensationDb: 6.6,
+  { name: 'Space Echo', description: 'Roland RE-201 multi-head — psychedelic, dub', tags: ['Delay', 'Dub', 'Dub Echo', 'Space'], gainCompensationDb: 6.6,
     effects: [
       { category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 60, parameters: { mode: 3, rate: 350, intensity: 0.55, echoVolume: 0.8, reverbVolume: 0.3, bass: 0.5, treble: 0.6 } },
     ] },
@@ -764,7 +767,7 @@ export const FX_PRESETS: FxPreset[] = [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2, mid: 0.5, high: -1.5 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -18, ratio: 2.5, attack: 0.015, release: 0.25 } },
     ] },
-  { name: 'Paula Dub Sirens', description: 'Amiga dub — space echo, spring tank, heavy subs', tags: ['Amiga', 'Dub', 'Bass'], gainCompensationDb: -3.6,
+  { name: 'Paula Dub Sirens', description: 'Amiga dub — space echo, spring tank, heavy subs', tags: ['Amiga', 'Dub', 'Dub Siren', 'Dub Echo', 'Bass'], gainCompensationDb: -3.6,
     effects: [
       { category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 2.0, mid: -1.0, high: -0.5 } },
       { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -16, ratio: 3.5, attack: 0.008, release: 0.18 } },
