@@ -1369,6 +1369,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         }
       }
 
+      // Fallback: track has no known source scheme (old entries added before
+      // `local:` prefix persistence was wired up). Prompt for the file once,
+      // then upgrade the track: cache the bytes + flip fileName to `local:`
+      // so every future preview skips this prompt.
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '*/*';
@@ -1377,13 +1381,29 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         if (!file) return;
         try {
           const rawBuffer = await file.arrayBuffer();
+
+          // Upgrade: persist + rename track so next time it's a local: lookup.
+          try {
+            const { cacheSourceFile } = await import('@/engine/dj/DJAudioCache');
+            await cacheSourceFile(rawBuffer, file.name);
+            if (activePlaylistId) {
+              const playlist = useDJPlaylistStore.getState().playlists.find((p) => p.id === activePlaylistId);
+              const idx = playlist?.tracks.findIndex((t) => t.id === track.id);
+              if (idx !== undefined && idx >= 0) {
+                updateTrackMeta(activePlaylistId, idx, { fileName: 'local:' + file.name });
+              }
+            }
+          } catch (upgradeErr) {
+            console.warn('[DJPlaylistModal] Could not upgrade track to local: cache — will re-prompt next time:', upgradeErr);
+          }
+
           if (isAudioFile(file.name)) {
-            await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
+            await engine.loadAudioToDeck(deckId, rawBuffer, 'local:' + file.name);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else {
             const song = await parseModuleToSong(file);
-            cacheSong(file.name, song);
-            await loadSongToDeck(song, file.name, deckId, rawBuffer);
+            cacheSong('local:' + file.name, song);
+            await loadSongToDeck(song, 'local:' + file.name, deckId, rawBuffer);
           }
         } catch (err) {
           console.error(`[DJPlaylistModal] Failed to load track:`, err);
@@ -1391,7 +1411,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       };
       input.click();
     },
-    [loadSongToDeck],
+    [loadSongToDeck, activePlaylistId, updateTrackMeta],
   );
 
   const loadTrackWithProgress = useCallback(
