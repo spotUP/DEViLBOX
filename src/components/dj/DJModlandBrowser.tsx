@@ -5,8 +5,9 @@
  * from a single search bar. Downloads are proxied through the DEViLBOX server.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Globe, Search, Loader2, X, ListPlus, AlertCircle } from 'lucide-react';
+import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import {
   searchModland,
   getModlandFormats,
@@ -96,6 +97,12 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
 
   const isLoggedIn = useAuthStore(s => !!s.token);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Context menu — right-click on a result row to copy/move to playlists, load to deck, etc.
+  const contextMenu = useContextMenu();
+  const [contextMenuFile, setContextMenuFile] = useState<OnlineResult | null>(null);
+  const playlists = useDJPlaylistStore(s => s.playlists);
+  const activePlaylistId = useDJPlaylistStore(s => s.activePlaylistId);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -373,8 +380,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   // ── Add to playlist ─────────────────────────────────────────────────────
 
    const addToPlaylist = useCallback(
-    async (file: OnlineResult) => {
-      const playlistId = useDJPlaylistStore.getState().activePlaylistId;
+    async (file: OnlineResult, targetPlaylistId?: string) => {
+      const playlistId = targetPlaylistId ?? useDJPlaylistStore.getState().activePlaylistId;
       if (!playlistId) return;
 
       setDownloadingPaths((prev) => new Set(prev).add(file.key));
@@ -393,7 +400,10 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
             duration: 180,
             addedAt: Date.now(),
           });
-          setResults((prev) => prev.filter((r) => r.key !== file.key));
+          // Only clear the result on "add to active playlist" (the default button
+          // click path). When copying to a different playlist from the context
+          // menu, keep the result so the user can copy to more playlists.
+          if (!targetPlaylistId) setResults((prev) => prev.filter((r) => r.key !== file.key));
           return;
         }
 
@@ -423,7 +433,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
           duration,
           addedAt: Date.now(),
         });
-        setResults((prev) => prev.filter((r) => r.key !== file.key));
+        if (!targetPlaylistId) setResults((prev) => prev.filter((r) => r.key !== file.key));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to add to playlist');
       } finally {
@@ -436,6 +446,71 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     },
     [],
   );
+
+  // ── Context menu items ────────────────────────────────────
+  const contextMenuItems = useMemo((): MenuItemType[] => {
+    const file = contextMenuFile;
+    if (!file) return [];
+
+    const activePlaylistName = playlists.find((p) => p.id === activePlaylistId)?.name;
+    const items: MenuItemType[] = [
+      { id: 'load-1', label: 'Load to Deck 1', onClick: () => loadToDeck(file, 'A') },
+      { id: 'load-2', label: 'Load to Deck 2', onClick: () => loadToDeck(file, 'B') },
+      {
+        id: 'load-3',
+        label: 'Load to Deck 3',
+        onClick: () => {
+          if (!thirdDeckActive) useDJStore.getState().setThirdDeckActive(true);
+          loadToDeck(file, 'C');
+        },
+      },
+      { type: 'divider' },
+    ];
+
+    if (activePlaylistId) {
+      items.push({
+        id: 'add-active',
+        label: activePlaylistName ? `Add to "${activePlaylistName}"` : 'Add to active playlist',
+        onClick: () => addToPlaylist(file),
+      });
+    }
+
+    if (playlists.length > 0) {
+      items.push({
+        id: 'add-to',
+        label: 'Add to playlist…',
+        submenu: playlists.map((pl) => ({
+          id: `add-${pl.id}`,
+          label: pl.name,
+          onClick: () => addToPlaylist(file, pl.id),
+        })),
+      });
+    }
+
+    items.push({ type: 'divider' });
+    items.push({
+      id: 'copy-info',
+      label: 'Copy Track Info',
+      onClick: () => {
+        const info = [
+          `Name: ${file.filename}`,
+          file.format && `Format: ${file.format}`,
+          file.author && `Author: ${file.author}`,
+          `Source: ${file.source}`,
+          `Key: ${file.key}`,
+        ].filter(Boolean).join('\n');
+        navigator.clipboard.writeText(info);
+      },
+    });
+
+    return items;
+  }, [contextMenuFile, playlists, activePlaylistId, thirdDeckActive, loadToDeck, addToPlaylist]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, file: OnlineResult, idx: number) => {
+    setContextMenuFile(file);
+    setSelectedIndex(idx);
+    contextMenu.open(e);
+  }, [contextMenu]);
 
   // ── Keyboard navigation ─────────────────────────────────────────────
   const handleKeyDown = useCallback(
@@ -574,6 +649,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                 data-result-item
                 onClick={() => setSelectedIndex(idx)}
                 onDoubleClick={() => loadToDeck(file, pickFreeDeck())}
+                onContextMenu={(e) => handleContextMenu(e, file, idx)}
                 onPointerEnter={() => setHoveredIdx(idx)}
                 onPointerLeave={() => setHoveredIdx((prev) => (prev === idx ? null : prev))}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors cursor-pointer ${
@@ -694,6 +770,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
       )}
     </div>
     <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    <ContextMenu items={contextMenuItems} position={contextMenu.position} onClose={contextMenu.close} zIndex={99999} />
     </>
   );
 };
