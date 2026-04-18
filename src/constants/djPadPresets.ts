@@ -48,29 +48,30 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
     pad.color = mapping.color;
     const preset = DJ_ONE_SHOT_PRESETS[mapping.presetIndex];
     if (preset) {
-      // Ensure all required InstrumentConfig fields are present
+      // STRIP per-pad effect chains when loaded from the factory kit. Each
+      // preset authored in djOneShotPresets.ts carries TapeSaturation +
+      // Compressor + SpringReverb for standalone use — but 16 pads × 3 FX
+      // nodes = 48 effect instances (16 WASM SpringReverbs) which overloads
+      // the audio thread enough to slow playback. The shared Dub Bus already
+      // gives sirens/horns their dub character; route through it via
+      // `dubSend` for the same flavor at a tiny fraction of the CPU cost.
+      // Users who want the full chain back can add it via the pad editor.
       pad.synthConfig = {
         id: PAD_INSTRUMENT_BASE + pad.id,
         name: preset.name ?? mapping.label,
         type: preset.type ?? 'synth',
         synthType: preset.synthType ?? 'Synth',
-        effects: preset.effects ?? [],
         volume: preset.volume ?? 0,
         pan: preset.pan ?? 0,
         ...preset,
+        effects: [],
       } as import('../types/instrument/defaults').InstrumentConfig;
       pad.instrumentNote = 'C3';
-      
-      // Debug logging
-      if (process.env.NODE_ENV === 'development' && i === 0) {
-        console.log('[applyOneShotPads] First pad config:', {
-          padId: pad.id,
-          name: pad.name,
-          synthType: pad.synthConfig.synthType,
-          instrumentNote: pad.instrumentNote,
-          hasEffects: !!pad.synthConfig.effects,
-        });
-      }
+      // Dub-bus send — 40 % feels like the old TapeSat+Spring character
+      // without the per-pad CPU cost. Horns and impacts use less; sirens more.
+      pad.dubSend = mapping.category === 'Sirens' ? 0.55
+                  : mapping.category === 'Impacts' || mapping.category === 'Noise' ? 0.25
+                  : 0.40;
     }
   }
 }
@@ -158,11 +159,24 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'oneshots-live',
     name: 'One-Shots',
-    description: 'One-shot pads — horns, sirens, impacts, risers',
+    description: 'One-shot pads — horns, sirens, impacts, risers. Routes through the Dub Bus for shared reverb + echo character (ONE SpringReverb instance, not 16).',
     create: () => {
       const program = createEmptyProgram('D-02', 'One-Shots Live');
       applyOneShotPads(program, 0, 16);
       return program;
+    },
+    onApply: ({ setDubBus }) => {
+      // Dub Bus must be enabled for the pads' dubSend to route anywhere.
+      // Tame settings — the presets are one-shots, not sustained, so the
+      // bus just adds ambience + tape character, not huge echo tails.
+      setDubBus({
+        enabled: true,
+        hpfCutoff: 120,
+        springWet: 0.45,
+        echoWet: 0.30,
+        echoIntensity: 0.35,
+        returnGain: 0.85,
+      });
     },
   },
   {
