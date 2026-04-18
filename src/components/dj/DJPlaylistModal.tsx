@@ -664,15 +664,20 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       {playingDeck && <TrackScrubber {...playingDeck} />}
 
       {/* Render-in-progress bar — shown when the pipeline is rendering or
-          analyzing this track (Auto DJ pre-render, precache pass, Re-render
-          button, manual load). No scrubber renders in those cases because
-          the track isn't playing yet, so this gives immediate feedback that
-          something's happening. Indeterminate (CSS-animated) because the
-          pipeline doesn't expose chunk-level progress. */}
+          analyzing THIS specific track. Two visual modes:
+          - Active (has deck.analysisProgress): bright primary-color fill at
+            the track the user is actually loading to a deck (click-to-play,
+            re-render).
+          - Background (isPreRendering without a deck match): dim muted
+            shimmer for Auto-DJ pre-render of the NEXT track so the user
+            can distinguish "this row is loading for playback" from "this
+            row is being prepped in the background". Both used to render in
+            accent-primary, which looked like two tracks were playing at
+            once. */}
       {!playingDeck && isRendering && (
         <div
           className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/50 overflow-hidden pointer-events-none"
-          title={deckRenderProgress !== null ? `Rendering… ${Math.round(deckRenderProgress)}%` : 'Rendering / analyzing track…'}
+          title={deckRenderProgress !== null ? `Rendering… ${Math.round(deckRenderProgress)}%` : 'Pre-rendering in background (Auto DJ / precache)…'}
         >
           {deckRenderProgress !== null ? (
             // Real 0–100% fill from deck.analysisProgress (render = 0-50%,
@@ -684,10 +689,10 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
               style={{ width: `${deckRenderProgress}%` }}
             />
           ) : (
-            // Fallback: pipeline reports no real progress (background
-            // pre-render without a deck). Sweeping chunk at least signals
-            // "still working on it".
-            <div className="h-full w-1/3 bg-accent-primary animate-indeterminate" />
+            // Background pre-render (no deck targeting this track yet).
+            // Dim + narrow chunk so it reads as "working in the background"
+            // not "this track is loading for playback right now".
+            <div className="h-full w-1/5 bg-text-muted/25 animate-indeterminate" />
           )}
         </div>
       )}
