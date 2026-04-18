@@ -29,6 +29,30 @@ export function isAnalysisInflight(playlistId: string): boolean {
 // track stalls the whole run. 60 s is generous: most tracks render in <5 s.
 const SERVER_RENDER_TIMEOUT_MS = 60_000;
 
+/**
+ * Sleep that rejects immediately on AbortSignal instead of waiting out the
+ * timer. All analyzer delays (4 s Modland throttle, 1 s search throttle,
+ * 2 s retry pause, 60 s rate-limit backoff) route through this so hitting
+ * "cancel" doesn't make the user sit through a full throttle window.
+ */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('Aborted'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error('Aborted'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export interface AnalysisProgress {
   current: number;     // tracks processed so far (success + fail)
   total: number;
@@ -113,6 +137,14 @@ export function playlistNeedsAnalysis(playlist: DJPlaylist): boolean {
 }
 
 /**
+ * Count of tracks currently marked as failed (analysisSkipped=true with
+ * a remote source). Drives the "Retry failed" menu visibility/label.
+ */
+export function playlistFailedAnalysisCount(playlist: DJPlaylist): number {
+  return playlist.tracks.filter(t => trackHasRemoteSource(t) && t.analysisSkipped).length;
+}
+
+/**
  * Batch-analyze all tracks in a playlist that are missing BPM/key/energy.
  *
  * - Downloads Modland tracks one at a time
@@ -131,7 +163,7 @@ export async function analyzePlaylist(
   playlistId: string,
   onProgress?: (progress: AnalysisProgress) => void,
   onFixNeeded?: OnFixNeeded,
-  opts?: { force?: boolean; signal?: AbortSignal },
+  opts?: { force?: boolean; retryFailed?: boolean; signal?: AbortSignal },
 ): Promise<AnalysisResult> {
   // ── Concurrency guard ──────────────────────────────────────────────────
   // Second caller for the same playlist gets an empty result. Running two
@@ -148,10 +180,21 @@ export async function analyzePlaylist(
   // Capture track *ids* (not indices) so playlist edits during analysis don't
   // cause metadata writes to land on the wrong row. Indices are resolved
   // freshly against the live store on every read/write below.
+  //
+  // Three filter modes in priority order:
+  //   force        — every remote track, regardless of state (expensive,
+  //                  used by "Re-analyze all")
+  //   retryFailed  — only tracks currently flagged analysisSkipped (used by
+  //                  the "Retry failed analyses" menu item; much cheaper
+  //                  than force when only a few tracks need another try)
+  //   default      — bpm===0 && !analysisSkipped (new scan only)
+  const filter = (track: PlaylistTrack): boolean => {
+    if (opts?.force) return trackHasRemoteSource(track);
+    if (opts?.retryFailed) return trackHasRemoteSource(track) && !!track.analysisSkipped;
+    return trackShouldAnalyzeOnClick(track);
+  };
   const tracksToAnalyze = initialPlaylist.tracks
-    .filter((track) =>
-      opts?.force ? trackHasRemoteSource(track) : trackShouldAnalyzeOnClick(track)
-    )
+    .filter(filter)
     .map((track) => ({ trackId: track.id, snapshotName: track.trackName }));
 
   if (tracksToAnalyze.length === 0) return { analyzed: 0, failed: 0, total: 0, failures: [] } as AnalysisResult;
@@ -199,10 +242,15 @@ export async function analyzePlaylist(
       }
       const track = current.track;
       const isHVSC = track.fileName.startsWith('hvsc:');
-      const remotePath = isHVSC
+      // `let` (not `const`) so the 404 auto-fix can rewrite them when it
+      // redirects the download to a different Modland path. Downstream code
+      // (server analyze query, TFMX companion dir, UADE companion probe)
+      // reads these AFTER the download loop, so stale values would point
+      // the server + companion fetches at the wrong file.
+      let remotePath = isHVSC
         ? track.fileName.slice('hvsc:'.length)
         : track.fileName.slice('modland:'.length);
-      const filename = remotePath.split('/').pop() || 'download.mod';
+      let filename = remotePath.split('/').pop() || 'download.mod';
       const processed = analyzed + failed;
 
       onProgress?.({ current: processed + 1, total, analyzed, failed, trackName: track.trackName, status: 'analyzing' });
@@ -293,7 +341,15 @@ export async function analyzePlaylist(
                       if (curr) {
                         useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr.index, { fileName: newFileName });
                       }
+                      // Update the outer-scope remotePath + filename so
+                      // downstream code (server /render/analyze query,
+                      // TFMX smpl dirPath, UADE companion probes) uses the
+                      // NEW path. Without this, a 404 auto-fix redirect
+                      // succeeded at download but poisoned every subsequent
+                      // step with the stale original path.
                       currentPath = selectedPath;
+                      remotePath = selectedPath;
+                      filename = selectedPath.split('/').pop() || filename;
                       await new Promise(r => setTimeout(r, 2000));
                       continue; // retry download with new path
                     }

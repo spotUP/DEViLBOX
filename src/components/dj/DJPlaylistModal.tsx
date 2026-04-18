@@ -72,7 +72,7 @@ import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { smartSort, sortByBPM, sortByKey, sortByEnergy, sortByName } from '@/engine/dj/DJPlaylistSort';
 import { camelotDisplay, camelotColor } from '@/engine/dj/DJKeyUtils';
-import { analyzePlaylist, playlistNeedsAnalysis, type AnalysisProgress } from '@/engine/dj/DJPlaylistAnalyzer';
+import { analyzePlaylist, playlistNeedsAnalysis, playlistFailedAnalysisCount, type AnalysisProgress } from '@/engine/dj/DJPlaylistAnalyzer';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
@@ -1371,14 +1371,30 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   const needsAnalysis = activePlaylist ? playlistNeedsAnalysis(activePlaylist) : false;
 
+  const failedAnalysisCount = activePlaylist ? playlistFailedAnalysisCount(activePlaylist) : 0;
+
+  const runAnalyze = useCallback(async (opts: { force?: boolean; retryFailed?: boolean }) => {
+    if (!activePlaylistId || analysisProgress) return;
+    const pid = activePlaylistId;
+    try {
+      await analyzePlaylist(pid, (p) => {
+        setAnalysisProgressMap(prev => {
+          const next = new Map(prev);
+          next.set(pid, { ...p });
+          return next;
+        });
+      }, undefined, opts);
+    } finally {
+      setAnalysisProgressMap(prev => {
+        const next = new Map(prev);
+        next.delete(pid);
+        return next;
+      });
+    }
+  }, [activePlaylistId, analysisProgress]);
+
   const handleAnalyzeAll = useCallback(async () => {
     if (!activePlaylistId || analysisProgress) return;
-    // Snapshot the id so the background run is tied to the playlist the user
-    // triggered it on, not whatever's active when it finishes. User can
-    // switch playlists, edit a different one, come back — progress keeps
-    // writing to the right map entry.
-    const pid = activePlaylistId;
-
     // If every remote track already has BPM, no tracks match the default
     // filter. Treat the user's click as a request to re-analyze everything —
     // confirm first since it's expensive (full re-download of every track).
@@ -1399,23 +1415,12 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       if (!ok) return;
       force = true;
     }
+    await runAnalyze({ force });
+  }, [activePlaylistId, activePlaylist, analysisProgress, runAnalyze]);
 
-    try {
-      await analyzePlaylist(pid, (p) => {
-        setAnalysisProgressMap(prev => {
-          const next = new Map(prev);
-          next.set(pid, { ...p });
-          return next;
-        });
-      }, undefined, { force });
-    } finally {
-      setAnalysisProgressMap(prev => {
-        const next = new Map(prev);
-        next.delete(pid);
-        return next;
-      });
-    }
-  }, [activePlaylistId, activePlaylist, analysisProgress]);
+  const handleRetryFailed = useCallback(async () => {
+    await runAnalyze({ retryFailed: true });
+  }, [runAnalyze]);
 
   const handleCreate = useCallback(() => {
     if (!newName.trim()) return;
@@ -2647,6 +2652,17 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       onClick: handleAnalyzeAll,
       disabled: !!analysisProgress,
     });
+    // "Retry failed" — only when there are analysisSkipped tracks. Much
+    // cheaper than Re-analyze all: only the N skipped tracks get re-run.
+    if (failedAnalysisCount > 0) {
+      maintenanceItems.push({
+        id: 'retry-failed',
+        label: `Retry ${failedAnalysisCount} failed analys${failedAnalysisCount === 1 ? 'is' : 'es'}`,
+        icon: <RefreshCw size={12} />,
+        onClick: handleRetryFailed,
+        disabled: !!analysisProgress,
+      });
+    }
     if (uncachedCount > 0 && !precacheProgress) {
       maintenanceItems.push({
         id: 'precache',
@@ -2703,10 +2719,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     return items;
   }, [
     activePlaylist, activePlaylistId, isLoggedIn, savingPlaylistId,
-    needsAnalysis, analysisProgress, uncachedCount, precacheProgress,
+    needsAnalysis, failedAnalysisCount, analysisProgress, uncachedCount, precacheProgress,
     badTrackCount, retestingBad, playedCount,
     clonePlaylist, handleExportJSON, handleExportM3U, handleCloudSave,
-    handleToggleVisibility, handleAnalyzeAll, handlePrecache,
+    handleToggleVisibility, handleAnalyzeAll, handleRetryFailed, handlePrecache,
     handleRetestBadTracks, handleClearPlayed, handleDeletePlaylist,
   ]);
 
