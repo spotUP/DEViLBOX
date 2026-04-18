@@ -870,90 +870,80 @@ function createOverdrive(): DjFxAction {
 
 // ─── Tape / Vinyl Effects ─────────────────────────────────────────
 
+/**
+ * Pitch-ramp helper for tape/vinyl stop effects.
+ *
+ * Uses the same pattern as `createDeckBrake`: rAF-driven pitch pulldown on
+ * the active deck via `setDeckPitch`, then pause and restore pitch on release.
+ * Previous implementations ducked master gain instead of ramping pitch, which
+ * just faded the whole mix out briefly — not the "spinning down" sound users
+ * expect from tape-stop / vinyl-brake.
+ */
+function rampDeckStop(
+  id: DjFxActionId,
+  durationMs: number,
+  shape: 'quadratic' | 'cubic',
+  rafRef: { raf: number },
+): void {
+  cleanupFx(id);
+  const deckId = getActiveDeckId();
+  try {
+    const deck = getDJEngine().getDeck(deckId);
+    const startPitch = useDJStore.getState().decks[deckId]?.pitchOffset ?? 0;
+    const startRate = Math.pow(2, startPitch / 12);
+    const startTime = performance.now();
+    const animate = () => {
+      const progress = Math.min(1, (performance.now() - startTime) / durationMs);
+      // quadratic = tape feel (gradual); cubic = vinyl feel (abrupt, late drop)
+      const eased = shape === 'cubic' ? progress * progress * progress : progress * progress;
+      const rate = startRate * Math.max(0.01, 1 - eased);
+      useDJStore.getState().setDeckPitch(deckId, 12 * Math.log2(Math.max(0.01, rate)));
+      if (progress < 1) {
+        rafRef.raf = requestAnimationFrame(animate);
+      } else {
+        try { deck.pause(); } catch { /* */ }
+        useDJStore.getState().setDeckPlaying(deckId, false);
+        // Snap pitch back to the pre-stop value so the next play() resumes
+        // at the DJ's tempo instead of stuck at -infinity semitones.
+        useDJStore.getState().setDeckPitch(deckId, startPitch);
+        rafRef.raf = 0;
+      }
+    };
+    rafRef.raf = requestAnimationFrame(animate);
+  } catch { /* engine not ready */ }
+}
+
 function createTapeStop(): DjFxAction {
+  const ref = { raf: 0 };
   return {
     id: 'fx_tape_stop',
     name: 'Tape Stop',
     category: 'tape',
     mode: 'oneshot',
     engage() {
-      cleanupFx(this.id);
-      // Ramp playback rate to 0 over ~1 second by pitching down the master
-      const ctx = getCtx();
-      const masterGain = getMasterOutputNode();
-      if (!masterGain) return;
-
-      // Create pitch-shifting illusion via playback rate on a media element,
-      // or simpler: just duck volume with a descending pitch wobble
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = 0.5;
-      const oscGain = ctx.createGain();
-      oscGain.gain.value = 0;
-      osc.connect(oscGain);
-      oscGain.connect(ctx.destination);
-      osc.start();
-
-      // Fade master volume to 0 over 1.5s (tape stop effect)
-      const now = ctx.currentTime;
-      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-      masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-
-      const timer = setTimeout(() => {
-        masterGain.gain.setValueAtTime(1, ctx.currentTime);
-        cleanupFx(this.id);
-      }, 1600);
-
-      activeFx.set(this.id, {
-        nodes: [oscGain],
-        oscillator: osc,
-        timer,
-      });
+      // 1.2 s quadratic ramp — leisurely tape spindown.
+      rampDeckStop(this.id, 1200, 'quadratic', ref);
     },
     disengage() {
-      // Restore volume immediately on release
-      const ctx = getCtx();
-      const masterGain = getMasterOutputNode();
-      if (masterGain) {
-        masterGain.gain.cancelScheduledValues(ctx.currentTime);
-        masterGain.gain.setValueAtTime(1, ctx.currentTime);
-      }
+      if (ref.raf) { cancelAnimationFrame(ref.raf); ref.raf = 0; }
       cleanupFx(this.id);
     },
   };
 }
 
 function createVinylBrake(): DjFxAction {
+  const ref = { raf: 0 };
   return {
     id: 'fx_vinyl_brake',
     name: 'Vinyl Brake',
     category: 'tape',
     mode: 'oneshot',
     engage() {
-      cleanupFx(this.id);
-      const ctx = getCtx();
-      const masterGain = getMasterOutputNode();
-      if (!masterGain) return;
-
-      // Faster stop than tape (0.8s) with volume duck
-      const now = ctx.currentTime;
-      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
-      masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-
-      const timer = setTimeout(() => {
-        masterGain.gain.setValueAtTime(1, ctx.currentTime);
-        cleanupFx(this.id);
-      }, 900);
-
-      activeFx.set(this.id, { nodes: [], timer });
+      // 0.5 s cubic ramp — abrupt, hand-on-platter feel.
+      rampDeckStop(this.id, 500, 'cubic', ref);
     },
     disengage() {
-      const ctx = getCtx();
-      const masterGain = getMasterOutputNode();
-      if (masterGain) {
-        masterGain.gain.cancelScheduledValues(ctx.currentTime);
-        masterGain.gain.setValueAtTime(1, ctx.currentTime);
-      }
+      if (ref.raf) { cancelAnimationFrame(ref.raf); ref.raf = 0; }
       cleanupFx(this.id);
     },
   };
