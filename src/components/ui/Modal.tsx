@@ -143,14 +143,14 @@ export const Modal: React.FC<ModalProps> = ({
     }
   }, [isOpen, onClose, onConfirm, confirmDisabled, closeOnEscape, closeOnEnter]);
 
-  // Focus management: save previous focus, restore on close
+  // Focus management: save previous focus on open, restore on close.
+  // Depends ONLY on isOpen — must not re-run when handleKeyDown identity
+  // changes, otherwise every parent re-render would steal focus from inputs.
   useEffect(() => {
     if (!isOpen) return;
 
-    // Save the element that had focus before modal opened
     previouslyFocusedRef.current = document.activeElement as HTMLElement;
 
-    // Focus the first focusable element inside the modal, or the modal itself
     requestAnimationFrame(() => {
       if (!modalRef.current) return;
       const firstFocusable = modalRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
@@ -161,15 +161,21 @@ export const Modal: React.FC<ModalProps> = ({
       }
     });
 
-    // Add at capture phase to intercept before other handlers
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
-      document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      // Restore focus to previously focused element
       const prev = previouslyFocusedRef.current;
       if (prev && typeof prev.focus === 'function') {
         requestAnimationFrame(() => prev.focus());
       }
+    };
+  }, [isOpen]);
+
+  // Keyboard listener — re-registers when handleKeyDown identity changes,
+  // but doesn't touch focus state.
+  useEffect(() => {
+    if (!isOpen) return;
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
   }, [isOpen, handleKeyDown]);
 
