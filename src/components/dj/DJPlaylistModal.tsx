@@ -581,9 +581,14 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         {track.format}
       </span>
 
-      {/* BPM */}
-      <span className="text-[22px] font-mono text-text-muted/50 shrink-0 w-14 text-right">
-        {track.bpm > 0 ? track.bpm : ''}
+      {/* BPM — rounded to integer for display. Real BPM with decimals
+           (e.g. 198.8) overflows a fixed column; DJs don't care about
+           tenths in a list. Tooltip shows the precise value. */}
+      <span
+        className="text-[22px] font-mono text-text-muted/50 shrink-0 w-14 text-right"
+        title={track.bpm > 0 ? `${track.bpm} BPM` : undefined}
+      >
+        {track.bpm > 0 ? Math.round(track.bpm) : ''}
       </span>
 
       {/* Musical key (Camelot) */}
