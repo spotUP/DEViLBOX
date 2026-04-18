@@ -276,10 +276,15 @@ export class DrumPadEngine {
     this.dubBusNoise.buffer = noiseBuffer;
     this.dubBusNoise.loop = true;
     this.dubBusNoiseGain = this.context.createGain();
-    // Start at 0 — bus is disabled by default; setDubBusSettings ramps this
-    // up to -55 dBFS when the bus is enabled. Prevents any noise bleed
-    // through an "enabled" return path during the constructor window.
-    this.dubBusNoiseGain.gain.value = this.dubBusEnabled ? Math.pow(10, -55 / 20) : 0;
+    // **Gig fix (2026-04-18):** previously the pink-noise floor ramped up to
+    // -55 dBFS whenever the bus was enabled, to simulate vintage tape hiss.
+    // At -55 dBFS plus the bus return gain + echo intensity + spring reverb
+    // feedback, the hiss compounded into audible white noise whenever the
+    // user opened the drumpad view with a persisted bus-enabled state.
+    // Keeping the node plumbed in case we ever reintroduce a user-facing
+    // "tape hiss" knob, but gain is clamped to 0 at construction AND at
+    // every enable toggle below.
+    this.dubBusNoiseGain.gain.value = 0;
 
     // Wire the vintage Tubby/Scientist chain:
     //   input → HPF → TapeSat → Echo → Spring
@@ -426,6 +431,7 @@ export class DrumPadEngine {
     const decks: DeckId[] = deck === 'ALL' ? [...DECK_IDS] : [deck];
     const now = this.context.currentTime;
     const clamp = Math.max(0, Math.min(1, amount));
+    console.log(`[DubBus] openDeckTap ▶ deck=${decks.join(',')} amount=${clamp.toFixed(2)} attack=${attackSec}s release=${releaseSec}s`);
     for (const d of decks) {
       const g = this.dubDeckTaps.get(d)?.gain;
       if (!g) continue;
@@ -433,11 +439,12 @@ export class DrumPadEngine {
         g.cancelScheduledValues(now);
         g.setValueAtTime(g.value, now);
         g.linearRampToValueAtTime(clamp, now + attackSec);
-      } catch { /* ok */ }
+      } catch (err) { console.warn(`[DubBus] openDeckTap ramp failed for deck ${d}:`, err); }
     }
     const key = `open:${decks.join(',')}`;
     return this._scheduleExclusiveRelease(key, () => {
       const release = this.context.currentTime;
+      console.log(`[DubBus] openDeckTap ◀ close deck=${decks.join(',')} releaseSec=${releaseSec}`);
       for (const d of decks) {
         const g = this.dubDeckTaps.get(d)?.gain;
         if (!g) continue;
@@ -445,7 +452,7 @@ export class DrumPadEngine {
           g.cancelScheduledValues(release);
           g.setValueAtTime(g.value, release);
           g.linearRampToValueAtTime(0, release + releaseSec);
-        } catch { /* ok */ }
+        } catch (err) { console.warn(`[DubBus] openDeckTap close failed for deck ${d}:`, err); }
       }
     });
   }
@@ -462,9 +469,14 @@ export class DrumPadEngine {
     holdSec = 0.15,
     releaseSec = 0.25,
   ): void {
-    if (!this.dubBusEnabled) return;
+    if (!this.dubBusEnabled) {
+      console.warn('[DubBus] throwDeck ignored — bus disabled');
+      return;
+    }
+    console.log(`[DubBus] throwDeck ▶ deck=${deck} amount=${amount.toFixed(2)} holdSec=${holdSec} releaseSec=${releaseSec}`);
     const releaser = this.openDeckTap(deck, amount, 0.005, releaseSec);
     const timer = setTimeout(() => {
+      console.log(`[DubBus] throwDeck ◀ hold expired, closing tap deck=${deck}`);
       this.dubThrowTimers.delete(timer);
       releaser();
     }, Math.max(0, holdSec * 1000));
@@ -477,11 +489,16 @@ export class DrumPadEngine {
    * becomes the only thing heard. Releaser restores the deck and closes tap.
    */
   muteAndDub(deck: DeckId, amount = 1.0, releaseSec = 0.35): () => void {
-    if (!this.attachedMixer) return () => {};
+    if (!this.attachedMixer) {
+      console.warn('[DubBus] muteAndDub ignored — no mixer attached');
+      return () => {};
+    }
+    console.log(`[DubBus] muteAndDub ▶ deck=${deck} amount=${amount.toFixed(2)} releaseSec=${releaseSec}`);
     const restoreMute = this.attachedMixer.muteChannelForDub(deck);
     const closeTap = this.openDeckTap(deck, amount, 0.005, releaseSec);
     const key = `mutedub:${deck}`;
     return this._scheduleExclusiveRelease(key, () => {
+      console.log(`[DubBus] muteAndDub ◀ restoring dry deck=${deck}`);
       closeTap();
       restoreMute();
     });
@@ -493,7 +510,10 @@ export class DrumPadEngine {
    * isn't strong enough to contain the loop and output clips to infinity.
    */
   setSirenFeedback(amount: number, rampSec = 0.08): () => void {
-    if (!this.dubBusEnabled) return () => {};
+    if (!this.dubBusEnabled) {
+      console.warn('[DubBus] setSirenFeedback ignored — bus disabled');
+      return () => {};
+    }
     // Clamp to target level. On rapid retriggers the ramp always lands on
     // `target` rather than accumulating from whatever mid-decay value the
     // gain held — without this, mashing a siren pad could sneak the
@@ -503,6 +523,8 @@ export class DrumPadEngine {
     const target = Math.max(0, Math.min(0.95, amount));
     const now = this.context.currentTime;
     const g = this.dubBusFeedback.gain;
+    const prior = g.value;
+    console.log(`[DubBus] setSirenFeedback ▶ amount=${amount.toFixed(2)} target=${target.toFixed(2)} prior=${prior.toFixed(3)} rampSec=${rampSec}`);
     try {
       g.cancelScheduledValues(now);
       // Hold at LOWER of (current value, target) so retriggers never bump
@@ -510,15 +532,16 @@ export class DrumPadEngine {
       const startFrom = Math.min(g.value, target);
       g.setValueAtTime(startFrom, now);
       g.linearRampToValueAtTime(target, now + rampSec);
-    } catch { /* ok */ }
+    } catch (err) { console.warn('[DubBus] setSirenFeedback ramp failed:', err); }
     const key = 'siren';
     return this._scheduleExclusiveRelease(key, () => {
       const release = this.context.currentTime;
+      console.log(`[DubBus] setSirenFeedback ◀ releasing (ramp 0→0 over 0.2s) priorGain=${g.value.toFixed(3)}`);
       try {
         g.cancelScheduledValues(release);
         g.setValueAtTime(g.value, release);
         g.linearRampToValueAtTime(0, release + 0.2);
-      } catch { /* ok */ }
+      } catch (err) { console.warn('[DubBus] setSirenFeedback release failed:', err); }
     });
   }
 
@@ -721,6 +744,24 @@ export class DrumPadEngine {
     if (!changed) return;
 
     const merged: DubBusSettings = { ...this.dubBusSettings, ...settings };
+    // Log every *meaningful* settings write — enable flag, non-zero echo /
+    // spring / feedback / return changes. Skips incidental tweaks like
+    // tiny returnGain adjustments that happen during live mixing so the
+    // console doesn't flood. Suspicious-lingering-noise diagnostics rely
+    // on this to show which knob stayed high after the set ended.
+    try {
+      const flags: string[] = [];
+      if (typeof settings.enabled === 'boolean') flags.push(`enabled=${settings.enabled}`);
+      if (settings.echoIntensity !== undefined) flags.push(`echoIntensity=${settings.echoIntensity.toFixed(2)}`);
+      if (settings.echoWet !== undefined) flags.push(`echoWet=${settings.echoWet.toFixed(2)}`);
+      if (settings.springWet !== undefined) flags.push(`springWet=${settings.springWet.toFixed(2)}`);
+      if (settings.returnGain !== undefined) flags.push(`returnGain=${settings.returnGain.toFixed(2)}`);
+      if (settings.sidechainAmount !== undefined) flags.push(`sidechain=${settings.sidechainAmount.toFixed(2)}`);
+      if (settings.hpfCutoff !== undefined) flags.push(`hpfCutoff=${Math.round(settings.hpfCutoff)}Hz`);
+      if (flags.length > 0) {
+        console.log(`[DubBus] setDubBusSettings ${flags.join(' ')} _draining=${this._draining}`);
+      }
+    } catch { /* logging never breaks the setter */ }
     this.dubBusSettings = merged;
     if (typeof settings.enabled === 'boolean') {
       this.dubBusEnabled = settings.enabled;
@@ -732,12 +773,13 @@ export class DrumPadEngine {
       // silence when disabled — no rogue noise floor, no wasted CPU
       // feeding inaudible samples through the whole chain.
       try {
+        // Gig fix: keep the pink-noise floor at zero at all times. See the
+        // constructor note — the -55 dBFS floor was compounding through the
+        // echo/spring feedback loop into audible white noise the instant
+        // the user opened the drumpad view with a persisted enabled bus.
         const t = this.context.currentTime;
         this.dubBusNoiseGain.gain.cancelScheduledValues(t);
-        this.dubBusNoiseGain.gain.setValueAtTime(this.dubBusNoiseGain.gain.value, t);
-        this.dubBusNoiseGain.gain.linearRampToValueAtTime(
-          settings.enabled ? Math.pow(10, -55 / 20) : 0, t + 0.02,
-        );
+        this.dubBusNoiseGain.gain.setValueAtTime(0, t);
       } catch { /* ok */ }
       // Restore the bus input gain when re-enabling. dubPanic() mutes it
       // to 0 to drain the echo — re-enable needs to open the gate back up
