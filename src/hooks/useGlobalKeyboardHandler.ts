@@ -1931,11 +1931,12 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         }
       }
 
-      // DJ/VJ view: reserve Escape for the view-level panic handler
-      // (DJKeyboardHandler). Skipping the scheme lookup here prevents tracker
-      // schemes that bind Escape (e.g. protracker → show_main_screen) from
-      // stealing the key and switching back to tracker view.
-      if (_isDJVJ && e.key === 'Escape') {
+      // Escape outside the tracker view: reserve it for view-level panic
+      // handlers (DJKeyboardHandler, drumpad, etc). Skipping the scheme lookup
+      // here prevents tracker schemes that bind Escape (e.g. protracker →
+      // show_main_screen) from stealing the key and switching back to tracker
+      // view from DJ/VJ/drumpad/other non-tracker views.
+      if (e.key === 'Escape' && _activeView !== 'tracker') {
         return;
       }
 
