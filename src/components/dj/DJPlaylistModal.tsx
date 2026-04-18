@@ -123,6 +123,37 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Compact format label for list rows. Modland hands us long names
+ *  (e.g. "Protracker") that overflow a narrow badge; map the common
+ *  tracker formats to their canonical short code and leave everything
+ *  else truncated to 6 chars for predictable width. */
+function formatShort(fmt: string): string {
+  const key = fmt.toLowerCase().trim();
+  const map: Record<string, string> = {
+    'protracker': 'MOD',
+    'noisetracker': 'MOD',
+    'soundtracker': 'MOD',
+    'startrekker': 'AM',
+    'startrekker am': 'AM',
+    'fasttracker': 'XM',
+    'fasttracker 2': 'XM',
+    'impulse tracker': 'IT',
+    'screamtracker 3': 'S3M',
+    'screamtracker': 'S3M',
+    'octamed': 'MED',
+    'octamed soundstudio': 'MED',
+    'oktalyzer': 'OKT',
+    'digibooster pro': 'DBM',
+    'futurecomposer': 'FC',
+    'future composer': 'FC',
+    'ahx': 'AHX',
+    'hively tracker': 'HVL',
+    'thx': 'THX',
+  };
+  if (map[key]) return map[key];
+  return fmt.length <= 6 ? fmt.toUpperCase() : fmt.slice(0, 6).toUpperCase();
+}
+
 function formatTotalDuration(seconds: number): string {
   if (seconds >= 3600) {
     const h = Math.floor(seconds / 3600);
@@ -576,9 +607,12 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         )}
       </span>
 
-      {/* Format badge */}
-      <span className="text-[18px] font-mono text-text-muted/30 shrink-0 w-20 text-center px-1 bg-dark-bgTertiary rounded">
-        {track.format}
+      {/* Format badge — shortened for predictable column width */}
+      <span
+        className="text-[18px] font-mono text-text-muted/30 shrink-0 w-20 text-center px-1 bg-dark-bgTertiary rounded"
+        title={track.format}
+      >
+        {formatShort(track.format)}
       </span>
 
       {/* BPM — rounded to integer for display. Real BPM with decimals
