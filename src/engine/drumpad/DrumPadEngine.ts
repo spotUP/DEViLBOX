@@ -173,8 +173,15 @@ export class DrumPadEngine {
   constructor(context: AudioContext, outputDestination?: AudioNode) {
     this.context = context;
 
-    // Create master output — route to custom destination or default to context.destination
+    // Create master output — route to custom destination or default to context.destination.
+    // Default gain is -6 dB (0.5): the DJ deck path auto-normalizes to
+    // TARGET_RMS_DB = -14, while drumpad pads ship at native peak levels
+    // (most oneshot presets at -4 dBFS). Without this cut, pad hits sat
+    // ~10 dB above the deck bed and blew the PA. User can push it back up
+    // at will — there's no separate master volume UI for the drumpad bus
+    // yet, so a conservative default is the safer place to land.
     this.masterGain = this.context.createGain();
+    this.masterGain.gain.value = 0.5;
     this.masterGain.connect(outputDestination ?? this.context.destination);
 
     // Create separate output buses
