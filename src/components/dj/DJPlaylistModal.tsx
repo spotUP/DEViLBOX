@@ -167,7 +167,7 @@ function downloadFile(content: string, filename: string, mimeType: string): void
   URL.revokeObjectURL(url);
 }
 
-const TRACK_ROW_HEIGHT = 44;
+const TRACK_ROW_HEIGHT = 72;
 
 // ── Shared inline rename input ──────────────────────────────────────────────
 
@@ -508,62 +508,62 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       onPointerLeave={() => setIsHovered(false)}
     >
       {/* Drag handle */}
-      <div {...attributes} {...listeners} className="cursor-grab touch-none w-5 shrink-0 flex items-center justify-center">
-        <GripVertical size={14} className="text-text-muted/30 hover:text-text-muted/60" />
+      <div {...attributes} {...listeners} className="cursor-grab touch-none w-7 shrink-0 flex items-center justify-center">
+        <GripVertical size={22} className="text-text-muted/30 hover:text-text-muted/60" />
       </div>
 
       {/* Track number */}
-      <span className="text-[10px] font-mono text-text-muted/40 w-6 text-right shrink-0">
+      <span className="text-[20px] font-mono text-text-muted/40 w-10 text-right shrink-0">
         {index + 1}
       </span>
 
       {/* Status indicator */}
-      <span className="w-4 shrink-0 text-center">
+      <span className="w-6 shrink-0 text-center">
         {isLoading ? (
-          <span className="text-accent-primary text-[10px] animate-pulse font-bold" title={`Loading to deck ${loadingDeckId}`}>
+          <span className="text-accent-primary text-[20px] animate-pulse font-bold" title={`Loading to deck ${loadingDeckId}`}>
             {loadingDeckId}
           </span>
         ) : track.isBad ? (
-          <span className="text-accent-error text-[10px]" title={`Bad: ${track.badReason}`}>✗</span>
+          <span className="text-accent-error text-[20px]" title={`Bad: ${track.badReason}`}>✗</span>
         ) : playingDeck ? (
           <span
-            className="text-[10px] font-bold"
+            className="text-[20px] font-bold"
             style={{ color: playingDeck.deckId === 'A' ? '#00d4ff' : playingDeck.deckId === 'B' ? '#ef4444' : '#22c55e' }}
             title={`Playing on deck ${playingDeck.deckId}`}
           >
             {playingDeck.deckId}
           </span>
         ) : track.played ? (
-          <span className="text-accent-success/50 text-[10px]" title="Played">✓</span>
+          <span className="text-accent-success/50 text-[20px]" title="Played">✓</span>
         ) : isAutoDJCurrent ? (
-          <span className="text-accent-success text-[10px]" title="Now playing">▶</span>
+          <span className="text-accent-success text-[20px]" title="Now playing">▶</span>
         ) : isAutoDJNext ? (
-          <span className="text-accent-primary text-[10px]" title="Up next">▸</span>
+          <span className="text-accent-primary text-[20px]" title="Up next">▸</span>
         ) : null}
       </span>
 
       {/* Track name */}
-      <span className={`flex-1 text-[11px] font-mono truncate min-w-0 ${
+      <span className={`flex-1 text-[22px] font-mono truncate min-w-0 ${
         isLoading ? 'text-accent-primary' : track.isBad ? 'text-accent-error/80' : track.played ? 'text-text-muted/40' : 'text-text-primary'
       }`}>
         {track.trackName}
       </span>
 
       {/* Format badge */}
-      <span className="text-[9px] font-mono text-text-muted/30 shrink-0 w-12 text-center px-1 bg-dark-bgTertiary rounded">
+      <span className="text-[18px] font-mono text-text-muted/30 shrink-0 w-20 text-center px-1 bg-dark-bgTertiary rounded">
         {track.format}
       </span>
 
       {/* BPM */}
-      <span className="text-[11px] font-mono text-text-muted/50 shrink-0 w-8 text-right">
+      <span className="text-[22px] font-mono text-text-muted/50 shrink-0 w-14 text-right">
         {track.bpm > 0 ? track.bpm : ''}
       </span>
 
       {/* Musical key (Camelot) */}
-      <span className="shrink-0 w-10 text-center">
+      <span className="shrink-0 w-16 text-center">
         {track.musicalKey ? (
           <span
-            className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
+            className="text-[20px] font-mono font-bold px-1.5 py-0.5 rounded"
             style={{ color: camelotColor(track.musicalKey), backgroundColor: `${camelotColor(track.musicalKey)}15` }}
           >
             {camelotDisplay(track.musicalKey)}
@@ -572,9 +572,9 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Energy bar */}
-      <span className="shrink-0 w-10">
+      <span className="shrink-0 w-16">
         {track.energy != null && track.energy > 0 ? (
-          <div className="w-full h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden" title={`Energy: ${Math.round(track.energy * 100)}%`}>
+          <div className="w-full h-2 bg-dark-bgTertiary rounded-full overflow-hidden" title={`Energy: ${Math.round(track.energy * 100)}%`}>
             <div
               className="h-full rounded-full bg-accent-warning"
               style={{ width: `${track.energy * 100}%` }}
@@ -584,7 +584,7 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Duration */}
-      <span className="text-[11px] font-mono text-text-muted/40 shrink-0 w-10 text-right">
+      <span className="text-[22px] font-mono text-text-muted/40 shrink-0 w-16 text-right">
         {track.duration > 0 ? formatDuration(track.duration) : ''}
       </span>
 
@@ -2957,27 +2957,27 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
                 {/* Column headers (sortable) */}
                 {filteredTracks.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1 border-b border-dark-border bg-dark-bg/50 text-[9px] font-mono text-text-muted/40 uppercase tracking-wider select-none shrink-0">
-                    <span className="w-5 shrink-0" />
-                    <span className="w-6 text-right shrink-0">#</span>
-                    <span className="w-4 shrink-0" />
+                  <div className="flex items-center gap-2 px-3 py-1 border-b border-dark-border bg-dark-bg/50 text-[18px] font-mono text-text-muted/40 uppercase tracking-wider select-none shrink-0">
+                    <span className="w-7 shrink-0" />
+                    <span className="w-10 text-right shrink-0">#</span>
+                    <span className="w-6 shrink-0" />
                     <span className="flex-1 min-w-0 cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('name')}>
-                      Title {columnSort?.column === 'name' && (columnSort.dir === 'asc' ? <ChevronUp size={8} className="inline" /> : <ChevronDown size={8} className="inline" />)}
+                      Title {columnSort?.column === 'name' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
-                    <span className="shrink-0 w-12 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('format')}>
-                      Format {columnSort?.column === 'format' && (columnSort.dir === 'asc' ? <ChevronUp size={8} className="inline" /> : <ChevronDown size={8} className="inline" />)}
+                    <span className="shrink-0 w-20 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('format')}>
+                      Format {columnSort?.column === 'format' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
-                    <span className="shrink-0 w-8 text-right cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('bpm')}>
-                      BPM {columnSort?.column === 'bpm' && (columnSort.dir === 'asc' ? <ChevronUp size={8} className="inline" /> : <ChevronDown size={8} className="inline" />)}
+                    <span className="shrink-0 w-14 text-right cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('bpm')}>
+                      BPM {columnSort?.column === 'bpm' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
-                    <span className="shrink-0 w-10 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('key')}>
-                      Key {columnSort?.column === 'key' && (columnSort.dir === 'asc' ? <ChevronUp size={8} className="inline" /> : <ChevronDown size={8} className="inline" />)}
+                    <span className="shrink-0 w-16 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('key')}>
+                      Key {columnSort?.column === 'key' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
-                    <span className="shrink-0 w-10 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('energy')}>
-                      Energy {columnSort?.column === 'energy' && (columnSort.dir === 'asc' ? <ChevronUp size={8} className="inline" /> : <ChevronDown size={8} className="inline" />)}
+                    <span className="shrink-0 w-16 text-center cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('energy')}>
+                      Energy {columnSort?.column === 'energy' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
-                    <span className="shrink-0 w-10 text-right cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('time')}>
-                      Time {columnSort?.column === 'time' && (columnSort.dir === 'asc' ? <ChevronUp size={8} className="inline" /> : <ChevronDown size={8} className="inline" />)}
+                    <span className="shrink-0 w-16 text-right cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('time')}>
+                      Time {columnSort?.column === 'time' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
                     <span className="shrink-0 w-6" />
                     <span className="shrink-0 w-36" />
