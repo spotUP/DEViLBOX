@@ -71,8 +71,9 @@ const REGGAE_SOUNDSYSTEM: SampleFxPreset = {
   effects: [
     { id: 'sfx-eq', category: 'tonejs', type: 'EQ3', enabled: true, wet: 100, parameters: { low: 4, mid: -2, high: -2 } },
     { id: 'sfx-sat', category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 1400 } },
-    { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 28, parameters: { decay: 0.45, damping: 0.4, tension: 0.5, mix: 0.3, drip: 0.55, diffusion: 0.7 } },
-    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 32, parameters: { mode: 4, rate: 300, intensity: 0.18, echoVolume: 0.3, reverbVolume: 0.12, bpmSync: 1, syncDivision: '1/4' } },
+    { id: 'sfx-spring', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 30, parameters: { decay: 0.55, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.55, diffusion: 0.7 } },
+    // intensity 0.45 at rate 300ms → ~2s tail (tail stays below -40 dB within ~2s).
+    { id: 'sfx-echo', category: 'tonejs', type: 'SpaceEcho', enabled: true, wet: 35, parameters: { mode: 4, rate: 300, intensity: 0.45, echoVolume: 0.45, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/4' } },
   ],
 };
 

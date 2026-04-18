@@ -259,6 +259,48 @@ export class DJMixerEngine {
     }
   }
 
+  /**
+   * Get a post-EQ/pre-crossfader tap of a deck's signal for external listeners
+   * (e.g. the drumpad Dub Bus for King Tubby-style dub throws).
+   *
+   * The tap is read-only — connections made to the returned node do NOT affect
+   * the deck's main signal path. Callers connect this node into their own
+   * processing chain and modulate gain to capture deck audio on demand.
+   *
+   * Returns the existing deck input (a Tone.Gain); downstream `.connect(x)`
+   * calls add parallel paths without disturbing the crossfader/master flow.
+   */
+  getDeckTap(deck: DeckId): Tone.Gain | null {
+    return this.getInputForDeck(deck);
+  }
+
+  /**
+   * Mute a deck's contribution to the main mix briefly — used by dub-mute pads
+   * to silence the dry deck signal while its echo tail plays.
+   * Returns a function to restore the channel gain when the dub-mute ends.
+   * Ramps are click-free (5 ms down, 20 ms up).
+   */
+  muteChannelForDub(deck: DeckId): () => void {
+    const input = this.getInputForDeck(deck);
+    if (!input) return () => {};
+    const g = input.gain;
+    const now = Tone.now();
+    const prev = g.value;
+    try {
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(prev, now);
+      g.linearRampToValueAtTime(0, now + 0.005);
+    } catch { /* rampable */ }
+    return () => {
+      const n = Tone.now();
+      try {
+        g.cancelScheduledValues(n);
+        g.setValueAtTime(g.value, n);
+        g.linearRampToValueAtTime(prev, n + 0.02);
+      } catch { /* ok */ }
+    };
+  }
+
   // ==========================================================================
   // MASTER FX CHAIN
   // ==========================================================================
