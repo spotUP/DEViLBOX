@@ -8,6 +8,7 @@
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from './PadButton';
 import { DubBusPanel } from './DubBusPanel';
+import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import { ContextMenu, useContextMenu } from '@components/common/ContextMenu';
 import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
@@ -67,10 +68,19 @@ export const PadGrid: React.FC<PadGridProps> = ({
   }, [currentBank, releaseAllHeld]);
 
   // Dub Bus: mirror store settings into the shared pad engine so the
-  // standalone tracker/pad view gets the same bus as the DJ view.
+  // standalone tracker/pad view gets the same bus as the DJ view. Also
+  // (re-)attach the DJ mixer whenever the bus toggles on or whenever this
+  // view mounts — the singleton engine may have been created BEFORE the DJ
+  // engine existed, in which case its original attach was a no-op.
   const dubBus = useDrumPadStore((s) => s.dubBus);
   useEffect(() => {
-    engineRef.current?.setDubBusSettings(dubBus);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setDubBusSettings(dubBus);
+    try {
+      const dj = getDJEngineIfActive();
+      if (dj) engine.attachDJMixer(dj.mixer);
+    } catch { /* DJ engine not available — dub throws fall back to no-op */ }
   }, [dubBus, engineRef]);
 
   // Clean up velocity fade timers on unmount
