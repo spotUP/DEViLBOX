@@ -37,13 +37,13 @@ interface PhaseInfo {
 // ── Main API ─────────────────────────────────────────────────────────────────
 
 /**
- * Max semitone shift applied by auto-sync. Anything beyond ±3 semitones starts
+ * Max semitone shift applied by auto-sync. Anything beyond ±4 semitones starts
  * to sound chipmunk'd or muddy — if BPMs can't be matched within this window
  * (even with half/double-time fallback), we'd rather have a small tempo
  * mismatch than a musically ruined tune. Users can still manually push pitch
  * further via the pitch fader (engine clamp is ±16).
  */
-const AUTO_SYNC_MAX_SEMITONES = 3;
+const AUTO_SYNC_MAX_SEMITONES = 4;
 
 /**
  * Sync one deck's BPM to another using the most accurate BPM source available.
