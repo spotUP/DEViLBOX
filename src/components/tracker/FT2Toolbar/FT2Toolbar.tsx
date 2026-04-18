@@ -545,10 +545,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
         </div>
       <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar">
-        <DropdownButton items={hamburgerMenuItems} zIndex={200}>
-          <Button variant="ghost" size="sm" className="px-1.5" title="Menu">
-            <Menu size={16} />
-          </Button>
+        <DropdownButton
+          items={hamburgerMenuItems}
+          zIndex={200}
+          className="inline-flex items-center justify-center gap-2 font-medium transition-colors focus:outline-none btn-ghost btn-sm px-1.5"
+        >
+          <Menu size={16} />
         </DropdownButton>
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
                 onClick={(e) => {
