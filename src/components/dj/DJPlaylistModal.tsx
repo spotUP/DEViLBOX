@@ -909,6 +909,18 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         }
       }
     }
+    // previewingIndex tracks the row index being previewed — when we remove a
+    // row, every subsequent index shifts down by 1. Without this fix the
+    // Preview button shows Stop on the now-DIFFERENT row that inherited the
+    // removed row's index, and the row we actually previewed (shifted down)
+    // shows Play. Fix both cases: clear if it's the removed row, decrement
+    // if it was below.
+    setPreviewingIndex((prev) => {
+      if (prev == null) return prev;
+      if (prev === index) return null;
+      if (prev > index) return prev - 1;
+      return prev;
+    });
     rawRemoveTrack(playlistId, index);
   }, [rawRemoveTrack]);
   const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
