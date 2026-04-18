@@ -1182,6 +1182,49 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     overscan: 60,
   });
 
+  // ── Scroll-restore to the last-played track ─────────────────────────────
+  //
+  // When the modal opens (or the user clears an active search that was
+  // hiding the row), jump the virtualizer to whichever track was most
+  // recently previewed/loaded from this playlist. Without this, the user
+  // loses their place every time they close & reopen the modal, and the
+  // list snaps to index 0 after clearing a search — painful during a set.
+  //
+  // We ignore the restore if the user is actively searching (filteredTracks
+  // is a subset; the last-played track may not be in it) and only re-run
+  // when search transitions from filtered → unfiltered. `hasScrolledRef`
+  // tracks "have we already restored once for this mount" so the effect
+  // doesn't keep yanking the list away from the user as they scroll.
+  const lastPlayedTrackId = activePlaylist?.lastPlayedTrackId;
+  const hasScrolledRef = useRef(false);
+  const prevIsFilteredRef = useRef(isFiltered);
+  useEffect(() => {
+    if (isFiltered) {
+      // Entering a search — remember so we restore when they clear it.
+      prevIsFilteredRef.current = true;
+      return;
+    }
+    if (!lastPlayedTrackId) return;
+    const displayIdx = filteredTracks.findIndex((t) => t.id === lastPlayedTrackId);
+    if (displayIdx < 0) return;
+
+    const justClearedSearch = prevIsFilteredRef.current;
+    prevIsFilteredRef.current = false;
+
+    // Scroll once on first mount, and once more every time the user clears
+    // an active search. Skip thereafter so the modal stops fighting the
+    // user's wheel scrolls.
+    if (!hasScrolledRef.current || justClearedSearch) {
+      hasScrolledRef.current = true;
+      // Defer to next tick — the virtualizer needs the current scroll
+      // element to exist and have laid out the full list size before
+      // scrollToIndex can land accurately.
+      requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(displayIdx, { align: 'center' });
+      });
+    }
+  }, [isFiltered, lastPlayedTrackId, filteredTracks, virtualizer]);
+
   // ── @dnd-kit ──────────────────────────────────────────────────────────────
 
   const sensors = useSensors(
@@ -1744,12 +1787,16 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         try { applyPerSongMasterFx(track); } catch (err) {
           console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
         }
+        // Remember this track for scroll-restore on next modal open / search clear.
+        if (activePlaylistId) {
+          useDJPlaylistStore.getState().setLastPlayedTrack(activePlaylistId, track.id);
+        }
       } finally {
         setLoadingTrackIndex(null);
         setLoadingDeckId(null);
       }
     },
-    [loadTrackToDeck],
+    [loadTrackToDeck, activePlaylistId],
   );
 
   // ── Preview ──────────────────────────────────────────────────────────────
@@ -1796,6 +1843,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       try { applyPerSongMasterFx(track); } catch (err) {
         console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
       }
+      // Remember this track for scroll-restore on next modal open / search clear.
+      if (activePlaylistId) {
+        useDJPlaylistStore.getState().setLastPlayedTrack(activePlaylistId, track.id);
+      }
       try {
         getDJEngine().getDeck(deckId).play();
         useDJStore.getState().setDeckPlaying(deckId, true);
@@ -1804,7 +1855,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       previewDeckRef.current = null;
       setPreviewingIndex(null);
     }
-  }, [loadTrackToDeck, stopPreview]);
+  }, [loadTrackToDeck, stopPreview, activePlaylistId]);
 
   // NOTE: we intentionally do NOT stop the preview on unmount.
   // Closing the playlist modal to go back to the DJ view must leave the deck
