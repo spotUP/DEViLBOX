@@ -234,11 +234,18 @@ function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
     useShallow((s) => {
       for (const id of ['A', 'B', 'C'] as const) {
         const d = s.decks[id];
-        if (!d.isPlaying || d.fileName !== fileName) continue;
+        const fnMatch = d.fileName === fileName;
+        if (d.isPlaying && fnMatch) {
+          console.warn('[scrub] match', id, { playbackMode: d.playbackMode, durationMs: d.durationMs, totalPositions: d.totalPositions, songPos: d.songPos, audioPosition: d.audioPosition, fileName: d.fileName });
+        }
+        if (!d.isPlaying || !fnMatch) continue;
         const hasProgress =
           (d.playbackMode === 'audio' && d.durationMs > 0) ||
           (d.playbackMode === 'tracker' && d.totalPositions > 0);
-        if (!hasProgress) continue;
+        if (!hasProgress) {
+          console.warn('[scrub] no progress — gating scrubber', id, { playbackMode: d.playbackMode, durationMs: d.durationMs, totalPositions: d.totalPositions });
+          continue;
+        }
         return {
           deckId: id,
           playbackMode: d.playbackMode,
