@@ -1196,7 +1196,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   // tracks "have we already restored once for this mount" so the effect
   // doesn't keep yanking the list away from the user as they scroll.
   const lastPlayedTrackId = activePlaylist?.lastPlayedTrackId;
-  const hasScrolledRef = useRef(false);
+  const scrollAnchorRef = useRef<string | null>(null); // "<playlistId>:mounted" once scrolled
   const prevIsFilteredRef = useRef(isFiltered);
   useEffect(() => {
     if (isFiltered) {
@@ -1204,18 +1204,21 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       prevIsFilteredRef.current = true;
       return;
     }
-    if (!lastPlayedTrackId) return;
+    if (!activePlaylistId || !lastPlayedTrackId) return;
     const displayIdx = filteredTracks.findIndex((t) => t.id === lastPlayedTrackId);
     if (displayIdx < 0) return;
 
     const justClearedSearch = prevIsFilteredRef.current;
     prevIsFilteredRef.current = false;
 
-    // Scroll once on first mount, and once more every time the user clears
-    // an active search. Skip thereafter so the modal stops fighting the
-    // user's wheel scrolls.
-    if (!hasScrolledRef.current || justClearedSearch) {
-      hasScrolledRef.current = true;
+    // Scroll exactly once per (playlist, open) AND every time the user
+    // clears a search. Skip other re-renders so the modal stops fighting
+    // the user's manual wheel scrolls. Anchor keyed by activePlaylistId so
+    // switching playlists re-arms a one-shot scroll for the new list.
+    const anchor = activePlaylistId;
+    const needsInitialScroll = scrollAnchorRef.current !== anchor;
+    if (needsInitialScroll || justClearedSearch) {
+      scrollAnchorRef.current = anchor;
       // Defer to next tick — the virtualizer needs the current scroll
       // element to exist and have laid out the full list size before
       // scrollToIndex can land accurately.
@@ -1223,7 +1226,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         virtualizer.scrollToIndex(displayIdx, { align: 'center' });
       });
     }
-  }, [isFiltered, lastPlayedTrackId, filteredTracks, virtualizer]);
+  }, [isFiltered, lastPlayedTrackId, activePlaylistId, filteredTracks, virtualizer]);
 
   // ── @dnd-kit ──────────────────────────────────────────────────────────────
 
