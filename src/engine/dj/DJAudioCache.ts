@@ -513,6 +513,12 @@ export async function getCachedFilenames(): Promise<Set<string>> {
 /**
  * Get cached audio by filename (for playlist tracks that don't have the source buffer).
  * Scans all entries — use sparingly.
+ *
+ * Returns entries that have EITHER rendered audioData OR raw sourceData. Local
+ * files added via cacheSourceFile() have an empty audioData stub but real
+ * sourceData, and callers in the playlist loader need the sourceData to
+ * decode/render themselves. Filtering purely on audioData.byteLength would
+ * make those stubs invisible and force a file picker re-prompt.
  */
 export async function getCachedAudioByFilename(filename: string): Promise<CachedAudio | null> {
   try {
@@ -523,7 +529,10 @@ export async function getCachedAudioByFilename(filename: string): Promise<Cached
       const request = store.getAll();
       request.onsuccess = () => {
         const entries = request.result as CachedAudio[];
-        const match = entries.find(e => e.filename === filename && e.audioData.byteLength > 0);
+        const match = entries.find(e =>
+          e.filename === filename &&
+          (e.audioData.byteLength > 0 || (e.sourceData && e.sourceData.byteLength > 0))
+        );
         if (match) void touchCacheEntry(match.hash);
         resolve(match ?? null);
       };
