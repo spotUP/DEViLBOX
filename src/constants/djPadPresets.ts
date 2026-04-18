@@ -298,7 +298,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
         echoWet: 0.7,
         echoRateMs: 280,
         sidechainAmount: 0.5,
-        deckTapAmount: 1.0,
+        deckTapAmount: 0.6,
         throwBeats: 0.5,
         sirenFeedback: 0.85,
         filterDropHz: 220,
@@ -360,7 +360,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       echoRateMs: 340,         // free-run fallback
       echoSyncDivision: '1/8D',// dotted eighth — the roots skank
       sidechainAmount: 0.55,
-      deckTapAmount: 1.0,
+      deckTapAmount: 0.6,
       throwBeats: 0.5,
       sirenFeedback: 0.88,
       filterDropHz: 180,
@@ -426,7 +426,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       echoRateMs: 420,
       echoSyncDivision: '1/4',  // long quarter-note repeats
       sidechainAmount: 0.30,    // less pump → more chaos
-      deckTapAmount: 1.0,
+      deckTapAmount: 0.6,
       throwBeats: 1.0,          // full-beat grabs
       sirenFeedback: 0.95,      // nearly screaming
       filterDropHz: 120,        // very muffled drop
@@ -448,7 +448,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       echoRateMs: 360,
       echoSyncDivision: '1/8D',
       sidechainAmount: 0.50,
-      deckTapAmount: 1.0,
+      deckTapAmount: 0.6,
       throwBeats: 2.0,          // long 2-beat phrase grabs
       sirenFeedback: 0.85,
       filterDropHz: 160,
@@ -514,7 +514,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       echoRateMs: 480,
       echoSyncDivision: 'off',   // free-running — detached from grid
       sidechainAmount: 0.40,
-      deckTapAmount: 1.0,
+      deckTapAmount: 0.6,
       throwBeats: 0.5,
       sirenFeedback: 0.82,
       filterDropHz: 200,
