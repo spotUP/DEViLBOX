@@ -202,6 +202,22 @@ const _pendingReleases = new Map<number, ReturnType<typeof setTimeout>>();
 // here (their engage returns null).
 const _dubReleasers = new Map<number, () => void>();
 
+/**
+ * Panic-flush for the hook-side dub releasers. Called from PadGrid /
+ * DJSamplerPanel on `dub-panic` / `dj-panic` so quantized throws and
+ * hold-mode dub releasers don't linger in the module map after their
+ * engine-side cancels have already been fired by `clearAllPendingThrows`.
+ * Fires every releaser (so any held state the releaser guards gets
+ * restored), then clears the map.
+ */
+export function clearDubReleasers(): void {
+  const snapshot = Array.from(_dubReleasers.values());
+  _dubReleasers.clear();
+  for (const release of snapshot) {
+    try { release(); } catch { /* ok */ }
+  }
+}
+
 /** Returns the currently held pad IDs (for joystick modulation routing) */
 export function getHeldDrumPads(): number[] {
   return Array.from(_heldPads);
@@ -399,6 +415,10 @@ export function useMIDIPadRouting() {
         const bpm = useTransportStore.getState().bpm;
         const release = handler.engage(_engine, settings, bpm);
         if (release) _dubReleasers.set(padId, release);
+      } else {
+        // Stored pad references an action that no longer exists (schema drift).
+        // Warn loudly so it's visible in the console but don't crash.
+        console.warn(`[DubBus] Pad ${padId}: unknown dubAction '${pad.dubAction}' — re-assign the pad or reset its dub action in the context menu.`);
       }
     }
 
@@ -472,10 +492,53 @@ export function useMIDIPadRouting() {
 
         engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
 
-        // For sample-only pads (no sustained synth), auto-release after decay.
-        // Synth pads sustain while held — releasePad handles note-off.
-        if (!pad.synthConfig) {
-          const releaseDelayMs = Math.max(pad.decay, 100);
+        // Auto-release for pads that fire-and-forget. Two paths:
+        //   1. Sample-only pads — legacy behavior, use `pad.decay` (ms).
+        //   2. Synth pads in oneshot mode — DubSiren / Air Horn / Riser.
+        //      `pad.decay` defaults to 200 ms (short for drum hits) but a
+        //      Dub Siren's authored envelope (decay + release) can be
+        //      2+ seconds. Using 200 ms cuts sirens off mid-phase before
+        //      the LFO has even completed one cycle.
+        //
+        // For oneshot synths, derive the hold time from the synth's own
+        // envelope: attack + decay + release, capped at 8 s so runaway
+        // presets don't lock a voice forever.
+        const isOneshotSynth = !!pad.synthConfig && pad.playMode === 'oneshot';
+        if (!pad.synthConfig || isOneshotSynth) {
+          let releaseDelayMs: number;
+          if (isOneshotSynth && pad.synthConfig?.synthType === 'DubSiren') {
+            // DubSiren has no amp envelope — its audible duration comes from
+            // internal reverb.decay + delay feedback tail. Pad.decay=200ms
+            // default would cut siren off before the LFO finishes one cycle.
+            // Estimate the tail from the preset's reverb + delay settings,
+            // fall back to 2s if neither is configured. Capped at 8s to
+            // prevent accidentally-wild presets from locking a voice forever.
+            const ds = (pad.synthConfig as unknown as { dubSiren?: {
+              reverb?: { decay?: number; wet?: number };
+              delay?: { time?: number; feedback?: number; wet?: number };
+            } }).dubSiren;
+            const reverbTailMs = ds?.reverb?.decay ? ds.reverb.decay * 1000 : 0;
+            // Geometric decay: time for feedback to drop to -60 dB.
+            // ln(0.001) / ln(feedback) delay cycles, each `time` seconds.
+            let delayTailMs = 0;
+            if (ds?.delay?.feedback && ds.delay.time) {
+              const fb = Math.min(0.95, Math.max(0, ds.delay.feedback));
+              if (fb > 0.01) {
+                const cycles = Math.log(0.001) / Math.log(fb);
+                delayTailMs = cycles * ds.delay.time * 1000;
+              }
+            }
+            const tailMs = Math.max(reverbTailMs, delayTailMs);
+            releaseDelayMs = Math.max(500, Math.min(8000, tailMs + 500));
+            if (tailMs === 0) releaseDelayMs = 2000; // no tail info — default
+          } else if (isOneshotSynth && pad.synthConfig?.envelope) {
+            const env = pad.synthConfig.envelope;
+            // Envelope values are in ms per the store convention.
+            const total = (env.attack ?? 0) + (env.decay ?? 0) + (env.release ?? 0);
+            releaseDelayMs = Math.max(Math.min(total + 200, 8000), 500);
+          } else {
+            releaseDelayMs = Math.max(pad.decay, 100);
+          }
           const existing = _pendingReleases.get(instId);
           if (existing) clearTimeout(existing);
           const timer = setTimeout(() => {

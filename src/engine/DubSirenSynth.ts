@@ -159,7 +159,23 @@ export class DubSirenSynth implements DevilboxSynth {
     void velocity;
     const t = time || audioNow();
 
-    if (note) {
+    // Siren frequency is governed by the preset's `oscillator.frequency`
+    // (or the real-time Frequency knob). MIDI notes are intentionally
+    // IGNORED when the caller passes our "preset default" sentinel — the
+    // pad system passes C3 by default, and every other layer of the stack
+    // ('48', "48", 0.5 velocity triggers from note repeat) would otherwise
+    // override the authored frequency with ~131 Hz.
+    //
+    // Sentinels covered:
+    //   - 'C3' string (pad default for DubSiren presets)
+    //   - 48 numeric (MIDI C3)
+    //   - '48' stringified numeric (some callers normalize to strings)
+    //
+    // Any other note is treated as intentional and DOES override the
+    // frequency — that's the keyboard-playable siren path.
+    const isC3Sentinel =
+      note === 'C3' || note === 48 || note === '48';
+    if (note !== undefined && note !== null && !isC3Sentinel) {
       const freq = noteToFrequency(note);
       this.signal.setValueAtTime(freq, t);
     }

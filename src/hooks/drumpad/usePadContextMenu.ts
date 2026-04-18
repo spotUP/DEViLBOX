@@ -17,6 +17,21 @@ import { SYNTH_QUICK_PRESETS } from './useDJQuickAssignData';
 import { PAD_INSTRUMENT_BASE, createDefaultPadFX } from '@/types/drumpad';
 import type { DrumPad, OutputBus, VelocityCurve, ScratchActionId, DubActionId } from '@/types/drumpad';
 import { getDubActionsByGroup, getDubActionLabel } from '@/engine/drumpad/DubActions';
+
+/**
+ * Default trigger note for a pad based on its synth type.
+ *
+ * DubSiren-based presets (air horn, ambulance, rave siren, dub siren, foghorn
+ * etc.) expose their pitch via `oscillator.frequency` in the preset body, NOT
+ * via MIDI note. The synth treats C3 as a "preset default — do not override"
+ * sentinel and keeps its authored frequency. Passing C4 instead forces a
+ * pitch override and plays every siren at the wrong octave.
+ *
+ * All other synth types get C4, the usual keyboard-middle note.
+ */
+function defaultNoteForSynth(synthType?: string): string {
+  return synthType === 'DubSiren' ? 'C3' : 'C4';
+}
 import type { DrumMachineType, DrumType } from '@/types/instrument/drums';
 import { getDjFxByCategory, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import { DEFAULT_SCRATCH_PADS } from '@/constants/djPadModeDefaults';
@@ -470,7 +485,7 @@ function buildOneShotSubmenu(
                   ...preset,
                   name: presetInfo.name,
                 } as import('@/types/instrument/defaults').InstrumentConfig,
-                instrumentNote: 'C4',
+                instrumentNote: defaultNoteForSynth('DubSiren'),
                 playMode: 'oneshot',
                 color: presetInfo.color,
               });
@@ -724,7 +739,7 @@ function assignSynthWithPreset(
     name: preset.name || synthType,
     presetName: preset.name || undefined,
     synthConfig: presetConfig as any,
-    instrumentNote: 'C4',
+    instrumentNote: defaultNoteForSynth(synthType as string),
     playMode: 'oneshot',
   });
 }
@@ -782,7 +797,7 @@ function assignGeneralSynth(
       volume: 0,
       pan: 0,
     },
-    instrumentNote: 'C4',
+    instrumentNote: defaultNoteForSynth(synthType as string),
     playMode: 'oneshot',
   });
 }

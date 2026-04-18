@@ -23,8 +23,9 @@ const Slider: React.FC<{
   step: number;
   onChange: (v: number) => void;
   format?: (v: number) => string;
-}> = ({ label, value, min, max, step, onChange, format }) => (
-  <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+  disabled?: boolean;
+}> = ({ label, value, min, max, step, onChange, format, disabled }) => (
+  <label className={`flex items-center gap-3 text-[11px] font-mono ${disabled ? 'text-text-muted opacity-50' : 'text-text-secondary'}`}>
     <span className="w-24 shrink-0">{label}</span>
     <input
       type="range"
@@ -32,12 +33,31 @@ const Slider: React.FC<{
       max={max}
       step={step}
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="flex-1 accent-accent-primary"
+      className="flex-1 accent-accent-primary disabled:cursor-not-allowed"
     />
     <span className="w-14 shrink-0 text-right text-text-primary">
       {format ? format(value) : value.toFixed(2)}
     </span>
+  </label>
+);
+
+const Choice = <V extends string>({ label, value, options, onChange }: {
+  label: string;
+  value: V;
+  options: readonly { value: V; label: string }[];
+  onChange: (v: V) => void;
+}) => (
+  <label className="flex items-center gap-3 text-[11px] font-mono text-text-secondary">
+    <span className="w-24 shrink-0">{label}</span>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as V)}
+      className="flex-1 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary px-2 py-0.5 text-[11px] font-mono"
+    >
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
   </label>
 );
 
@@ -154,6 +174,19 @@ export const DubBusPanel: React.FC = () => {
             onChange={(v) => patch({ echoWet: v })}
             format={(v) => `${Math.round(v * 100)}%`}
           />
+          <Choice
+            label="Echo sync"
+            value={dubBus.echoSyncDivision}
+            options={[
+              { value: 'off',  label: 'Off (manual ms)' },
+              { value: '1/2',  label: 'Half note (long)' },
+              { value: '1/4',  label: 'Quarter (on-beat)' },
+              { value: '1/8D', label: 'Dotted 1/8 (dub skank)' },
+              { value: '1/8',  label: 'Eighth' },
+              { value: '1/16', label: 'Sixteenth (dense)' },
+            ] as const}
+            onChange={(v) => patch({ echoSyncDivision: v })}
+          />
           <Slider
             label="Echo rate"
             value={dubBus.echoRateMs}
@@ -161,7 +194,10 @@ export const DubBusPanel: React.FC = () => {
             max={800}
             step={5}
             onChange={(v) => patch({ echoRateMs: v })}
-            format={(v) => `${Math.round(v)} ms`}
+            disabled={dubBus.echoSyncDivision !== 'off'}
+            format={(v) =>
+              dubBus.echoSyncDivision === 'off' ? `${Math.round(v)} ms` : 'synced'
+            }
           />
           <Slider
             label="Sidechain duck"
@@ -195,6 +231,18 @@ export const DubBusPanel: React.FC = () => {
             step={0.125}
             onChange={(v) => patch({ throwBeats: v })}
             format={(v) => `${v.toFixed(2)} beats`}
+          />
+          <Choice
+            label="Throw quantize"
+            value={dubBus.throwQuantize}
+            options={[
+              { value: 'off',     label: 'Off (immediate)' },
+              { value: '1/16',    label: '1/16 (tight grid)' },
+              { value: '1/8',     label: '1/8 (half beat)' },
+              { value: 'offbeat', label: 'Offbeat (King Tubby)' },
+              { value: 'bar',     label: 'Bar (downbeat)' },
+            ] as const}
+            onChange={(v) => patch({ throwQuantize: v })}
           />
           <Slider
             label="Siren feedback"
