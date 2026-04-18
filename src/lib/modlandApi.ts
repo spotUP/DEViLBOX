@@ -155,8 +155,29 @@ export async function downloadTFMXCompanion(
  *
  * Returns array of all found companions (some formats have multiple).
  */
+/**
+ * Inspect a MOD buffer's 4-char signature at offset 1080 (0x438) to decide
+ * whether this is a Startrekker AM variant that might ship a .nt companion.
+ *
+ * Every ProTracker-family MOD has a magic here ('M.K.', '4CHN', 'FLT4',
+ * 'FLT8', etc.). Only the Startrekker flavours ('FLT4' / 'FLT8' / 'EX04' /
+ * 'EX08') are known to carry AM-synthesis data in a side-car .nt file — and
+ * even among those, most don't. For everything else, probing `.nt` burns a
+ * Modland request per track and paints a red 404 in the browser console
+ * (which looks like a real failure to the user). Gate the probe on magic
+ * so we only ask when it's plausible.
+ */
+function isLikelyStartrekkerAM(buffer: ArrayBuffer): boolean {
+  if (buffer.byteLength < 1084) return false;
+  const bytes = new Uint8Array(buffer, 1080, 4);
+  let magic = '';
+  for (const b of bytes) magic += String.fromCharCode(b);
+  return magic === 'FLT4' || magic === 'FLT8' || magic === 'EX04' || magic === 'EX08';
+}
+
 export async function downloadUADECompanions(
   mainPath: string,
+  mainBuffer?: ArrayBuffer,
 ): Promise<Array<{ filename: string; buffer: ArrayBuffer }>> {
   const lastSlash = mainPath.lastIndexOf('/');
   const dir = lastSlash >= 0 ? mainPath.slice(0, lastSlash + 1) : '';
@@ -174,8 +195,8 @@ export async function downloadUADECompanions(
   };
 
   // Jason Page: jpn.* → smp.*
-  if (basenameLower.startsWith('jpn.') || basenameLower.startsWith('jpnd.') || 
-      basenameLower.startsWith('jp.') || basenameLower.startsWith('jpo.') || 
+  if (basenameLower.startsWith('jpn.') || basenameLower.startsWith('jpnd.') ||
+      basenameLower.startsWith('jp.') || basenameLower.startsWith('jpo.') ||
       basenameLower.startsWith('jpold.')) {
     const suffix = basename.slice(basename.indexOf('.') + 1);
     await tryDownload('smp.' + suffix);
@@ -196,9 +217,17 @@ export async function downloadUADECompanions(
   }
 
   // Startrekker AM: .mod → .nt
+  //
+  // Only probe when the buffer's magic byte actually looks Startrekker-ish.
+  // Without this gate, every ProTracker MOD in a playlist generates a red
+  // 404 in the console as we blind-fetch a .nt that doesn't exist. If no
+  // buffer was handed in (legacy caller), fall back to the old blind probe
+  // so we don't regress Startrekker support for those paths.
   if (basenameLower.endsWith('.mod')) {
-    const nameNoExt = basename.slice(0, -4);
-    await tryDownload(nameNoExt + '.nt');
+    if (!mainBuffer || isLikelyStartrekkerAM(mainBuffer)) {
+      const nameNoExt = basename.slice(0, -4);
+      await tryDownload(nameNoExt + '.nt');
+    }
   }
 
   // Sonix: scan for .ss and .instr companions with same base name

@@ -413,7 +413,10 @@ export async function analyzePlaylist(
             }
             try {
               const { downloadUADECompanions } = await import('@/lib/modlandApi');
-              const companions = await downloadUADECompanions(remotePath);
+              // Pass the main buffer so Startrekker-AM detection can gate the
+              // .nt probe — without it, every ProTracker MOD generates a
+              // harmless red 404 in the console (looks like a real failure).
+              const companions = await downloadUADECompanions(remotePath, buffer);
               for (const c of companions) {
                 await cacheSourceFile(c.buffer, c.filename);
               }
