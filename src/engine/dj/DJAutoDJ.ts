@@ -194,6 +194,7 @@ class DJAutoDJ {
 
     this.preloading = false;
     this.preloadedDeck = null;
+    this.preRenderedTrack = null;
     this.startPolling();
     const finalIdx = useDJStore.getState().autoDJCurrentTrackIndex;
     console.log(`[AutoDJ] Enabled — starting from track ${finalIdx + 1}/${playlist.tracks.length}`);
@@ -206,7 +207,7 @@ class DJAutoDJ {
     this.cancelTransition();
     this.preloading = false;
     this.preloadedDeck = null;
-
+    this.preRenderedTrack = null;
 
     const store = useDJStore.getState();
     store.setAutoDJEnabled(false);
@@ -242,12 +243,22 @@ class DJAutoDJ {
     this.cancelTransition();
     this.preloading = false;
     this.preloadedDeck = null;
+    // CRITICAL: clear any stale pre-rendered track from a previous preload.
+    // Without this, triggerTransition would see the cached preRenderedTrack
+    // and load IT onto the idle deck, overwriting the jumped-to track
+    // loaded below.
+    this.preRenderedTrack = null;
 
     const track = playlist.tracks[index];
     store.setAutoDJStatus('preloading');
     store.setAutoDJTrackIndices(index, (index + 1) % playlist.tracks.length);
 
     const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
+    // Bail if user disabled Auto DJ during the load
+    if (!useDJStore.getState().autoDJEnabled) {
+      console.log('[AutoDJ] playFromIndex cancelled — user disabled');
+      return;
+    }
     if (!loaded) {
       store.setAutoDJStatus('playing');
       return;
@@ -271,6 +282,9 @@ class DJAutoDJ {
     } else {
       // Not preloaded yet — try to load and play immediately
       this.cancelTransition();
+      // Clear any stale preRenderedTrack so triggerTransition doesn't use it
+      // in place of the track we're about to load directly to the deck.
+      this.preRenderedTrack = null;
       const playlist = this.getActivePlaylist();
       if (!playlist) return;
 
@@ -287,6 +301,12 @@ class DJAutoDJ {
       store.setAutoDJStatus('preloading');
 
       const loaded = await loadPlaylistTrackToDeck(track, this.idleDeck);
+
+      // Bail if user disabled Auto DJ during the load
+      if (!useDJStore.getState().autoDJEnabled) {
+        console.log('[AutoDJ] skip cancelled — user disabled');
+        return;
+      }
 
       if (loaded) {
         this.preloadedDeck = this.idleDeck;
