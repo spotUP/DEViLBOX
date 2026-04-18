@@ -7,7 +7,7 @@
  * Uses design system tokens throughout — no raw Tailwind colors.
  */
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -65,6 +65,7 @@ import { useDJStore, type DeckId } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { seekDeckAudio, cueDeck } from '@/engine/dj/DJActions';
+import { subscribeRendering, isRenderingFileName } from '@/engine/dj/DJTrackLoader';
 import { markSeek } from './seekGuard';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
@@ -271,6 +272,20 @@ function useDeckRenderingTrack(fileName: string): boolean {
   });
 }
 
+/**
+ * Returns true if `preRenderTrack` is currently running for this fileName
+ * (Auto DJ pre-render, precache pass, etc.). These render-in-background
+ * paths don't load to a deck so `useDeckRenderingTrack` can't see them.
+ * Subscribes to the DJTrackLoader module-level rendering Set.
+ */
+function useIsPreRendering(fileName: string): boolean {
+  return useSyncExternalStore(
+    useCallback((cb) => subscribeRendering(cb), []),
+    useCallback(() => isRenderingFileName(fileName), [fileName]),
+    useCallback(() => false, []), // server snapshot — always false
+  );
+}
+
 const DECK_COLOR: Record<DeckId, string> = {
   A: 'bg-accent-primary',
   B: 'bg-accent-error',
@@ -450,9 +465,10 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
   const [isHovered, setIsHovered] = useState(false);
   const playingDeck = usePlayingDeckForTrack(track.fileName);
   const deckIsRendering = useDeckRenderingTrack(track.fileName);
+  const isPreRendering = useIsPreRendering(track.fileName);
   // Any source of "this row is busy rendering/loading" — merged so the bar
   // doesn't flicker between the deck's rendering → loading → playing states.
-  const isRendering = isReRendering || deckIsRendering;
+  const isRendering = isReRendering || deckIsRendering || isPreRendering;
 
   const bgClass = isLoading
     ? 'bg-accent-primary/10'
