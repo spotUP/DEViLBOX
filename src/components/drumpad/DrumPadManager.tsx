@@ -91,9 +91,15 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     
     useDrumPadStore.getState().saveProgram(program);
     loadProgram(program.id);
-    
+
     // Auto-switch to Bank A since presets load into Bank A
     useDrumPadStore.getState().setBank('A');
+
+    // Let the preset apply side-effects (e.g. King Tubby Dub Kit flips the
+    // Dub Bus on and dials in musical defaults so the kit is usable instantly).
+    preset.onApply?.({
+      setDubBus: useDrumPadStore.getState().setDubBus,
+    });
     
     if (process.env.NODE_ENV === 'development') {
       console.log('[handleLoadDJPreset] After loading, current program:', {
