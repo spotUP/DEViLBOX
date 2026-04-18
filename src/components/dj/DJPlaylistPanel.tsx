@@ -125,23 +125,12 @@ const TRACK_ROW_HEIGHT = 32;
 
 // ── DJ FX Presets (per-song master FX override) ─────────────────────────────
 //
-// Legacy compact list kept ONLY for backward compatibility: older playlist
-// tracks persisted `track.masterFxPreset` as one of these `key` strings. The
-// live per-song dropdown now sources the full master FX library from
-// `@/constants/fxPresets` (see DJPlaylistModal's MASTER_FX_GROUPS). Removing
-// this would break FX on every previously-saved playlist track that used the
-// old DJ Quick presets.
+// Legacy compact list is defined in @/engine/dj/DJPerSongFx so the
+// engine-side apply helper has no dependency back on this UI layer. We
+// re-export here to keep existing imports (components) working.
 
-export const DJ_FX_PRESETS = [
-  { key: 'reverb-wash',  label: 'Reverb',   effects: [{ type: 'Reverb' as const, wet: 60, params: { decay: 4, preDelay: 0.02 } }] },
-  { key: 'delay-echo',   label: 'Echo',     effects: [{ type: 'PingPongDelay' as const, wet: 40, params: { delayTime: '8n', feedback: 0.3 } }] },
-  { key: 'chorus-wide',  label: 'Chorus',   effects: [{ type: 'Chorus' as const, wet: 50, params: { frequency: 1.5, delayTime: 3.5, depth: 0.7 } }] },
-  { key: 'phaser',       label: 'Phaser',   effects: [{ type: 'Phaser' as const, wet: 50, params: { frequency: 0.5, octaves: 3, baseFrequency: 350 } }] },
-  { key: 'bitcrush',     label: 'Crush',    effects: [{ type: 'BitCrusher' as const, wet: 80, params: { bits: 8 } }] },
-  { key: 'flanger',      label: 'Flanger',  effects: [{ type: 'Chorus' as const, wet: 60, params: { frequency: 0.2, delayTime: 1, depth: 1 } }] },
-  { key: 'distortion',   label: 'Dist',     effects: [{ type: 'Distortion' as const, wet: 50, params: { distortion: 0.4 } }] },
-  { key: 'space-echo',   label: 'Space',    effects: [{ type: 'Reverb' as const, wet: 40, params: { decay: 6, preDelay: 0.05 } }, { type: 'PingPongDelay' as const, wet: 30, params: { delayTime: '4n', feedback: 0.4 } }] },
-] as const;
+export { DJ_FX_PRESETS } from '@/engine/dj/DJPerSongFx';
+import { DJ_FX_PRESETS } from '@/engine/dj/DJPerSongFx';
 
 // Full master FX library grouped by tag — matches the dropdown in
 // DJFxQuickPresets and DJPlaylistModal so per-song assignments pick from
@@ -879,39 +868,13 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       setLoadingDeckId(deckId);
       try {
         await loadTrackToDeck(track, deckId);
-        // Apply per-song master FX preset if set — tries master FX_PRESETS
-        // (new scheme) first, then falls back to the legacy DJ_FX_PRESETS
-        // key format for playlists saved before the master FX library was
-        // wired into the per-song dropdown.
-        if (track.masterFxPreset) {
-          try {
-            const { useAudioStore } = await import('@/stores/useAudioStore');
-            const fxPreset = FX_PRESETS.find((p) => p.name === track.masterFxPreset);
-            if (fxPreset) {
-              const effectConfigs = fxPreset.effects.map((fx, i) => ({
-                ...fx,
-                id: `persong-${fxPreset.name}-${i}`,
-              }));
-              useAudioStore.getState().setMasterEffects(effectConfigs, fxPreset.gainCompensationDb);
-              console.log(`[DJPlaylistPanel] Applied per-song FX preset: ${fxPreset.name}`);
-            } else {
-              const legacy = DJ_FX_PRESETS.find((p) => p.key === track.masterFxPreset);
-              if (legacy) {
-                const effectConfigs = legacy.effects.map((fx, i) => ({
-                  id: `persong-${legacy.key}-${i}`,
-                  category: 'tonejs' as const,
-                  type: fx.type,
-                  enabled: true,
-                  wet: fx.wet,
-                  parameters: fx.params as Record<string, number | string>,
-                }));
-                useAudioStore.getState().setMasterEffects(effectConfigs);
-                console.log(`[DJPlaylistPanel] Applied legacy per-song FX preset: ${legacy.label}`);
-              }
-            }
-          } catch (err) {
-            console.warn('[DJPlaylistPanel] Failed to apply per-song FX:', err);
-          }
+        // Apply/clear the per-song master FX override via the shared helper
+        // so tracks without a preset don't inherit the last track's FX.
+        try {
+          const { applyPerSongMasterFx } = await import('@/engine/dj/DJPerSongFx');
+          applyPerSongMasterFx(track);
+        } catch (err) {
+          console.warn('[DJPlaylistPanel] Failed to apply per-song FX:', err);
         }
       } finally {
         setLoadingTrackIndex(null);
