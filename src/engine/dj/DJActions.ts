@@ -657,6 +657,65 @@ export function djPanic(): void {
   useVocoderStore.getState().setPTT(false);
 }
 
+/**
+ * Nuclear kill — strongest possible teardown short of disposing the engine.
+ * Calls djPanic() and, in addition, clamps the master bus gain to 0 for
+ * 250 ms so any surviving audio (stuck worklet, long reverb tail, wedged
+ * feedback loop) is inaudible while the rest of panic's work completes.
+ * The master gain ramps back to 1 so the next deck press resumes normally.
+ *
+ * Also exposed as `window.__djKillAll()` so the DJ can mash it from the
+ * DevTools console during a live set if panic isn't reaching something.
+ */
+export function djKillAll(): void {
+  console.warn('[DJKillAll] NUCLEAR PANIC — silencing master bus + running djPanic()');
+
+  // 1. Clamp the master output gain to 0 for ~250 ms so nothing escapes
+  //    while we tear the bus down, then ramp it back up via the public
+  //    setMasterVolume API (which ramps over 20 ms on each side).
+  try {
+    const engine = getDJEngineIfActive();
+    if (engine) {
+      const prevMaster = useDJStore.getState().masterVolume;
+      engine.mixer.setMasterVolume(0);
+      setTimeout(() => {
+        try {
+          engine.mixer.setMasterVolume(prevMaster);
+        } catch { /* engine gone */ }
+      }, 250);
+    }
+  } catch (err) {
+    console.warn('[DJKillAll] master gain clamp failed:', err);
+  }
+
+  // 2. The full panic path (master FX cleared, dub bus drained, EQs
+  //    reset, LFOs stopped, channel mutes cleared, mic off, etc.).
+  djPanic();
+
+  // 3. Explicitly flush the dub bus store — the engine's dubPanic clears
+  //    internal state, but the mirror store value may be restored by a
+  //    React render cycle during the drain window. Force-writing enabled
+  //    = false AND echoWet/springWet = 0 lets the mirror push zeros to
+  //    the engine even after the 2 s _draining window ends.
+  try {
+    useDrumPadStore.getState().setDubBus({
+      enabled: false,
+      echoWet: 0,
+      springWet: 0,
+      echoIntensity: 0,
+      returnGain: 0,
+    });
+  } catch (err) {
+    console.warn('[DJKillAll] dub bus store flush failed:', err);
+  }
+}
+
+// Expose to window for emergency console access mid-gig. Typed narrowly
+// so we don't pollute the global shape beyond the one function we need.
+if (typeof window !== 'undefined') {
+  (window as unknown as { __djKillAll?: () => void }).__djKillAll = djKillAll;
+}
+
 // ============================================================================
 // PITCH
 // ============================================================================
