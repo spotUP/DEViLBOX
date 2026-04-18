@@ -13,6 +13,17 @@ import { cacheSourceFile } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import { isAudioFile } from '@/lib/audioFileUtils';
 
+// ── Concurrency guard ────────────────────────────────────────────────────────
+// Clicking "Analyze" twice on the same playlist used to spawn two loops that
+// both wrote to the store with stale indices and doubled the Modland traffic.
+// Module-level set so the guard survives React re-renders.
+const inflightAnalyses = new Set<string>();
+
+/** Whether analyzePlaylist is currently running for the given playlist id. */
+export function isAnalysisInflight(playlistId: string): boolean {
+  return inflightAnalyses.has(playlistId);
+}
+
 export interface AnalysisProgress {
   current: number;     // tracks processed so far (success + fail)
   total: number;
@@ -237,40 +248,57 @@ export async function analyzePlaylist(
         }
       }
 
-      // Send to server-side headless renderer for analysis.
-      const serverBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      // Route SIDs through the local pipeline — the server's /render/analyze
+      // only has UADE, which can't handle SIDs (every HVSC track was failing
+      // with 422). The client-side pipeline has WebSID rendering + Essentia
+      // analysis baked in and already returns bpm/musicalKey/energy/duration.
+      let result: { bpm: number; musicalKey: string; energy: number; duration: number };
 
-      // Detect TFMX companion file: mdat.* needs smpl.* from same directory
-      let companionParam = '';
-      if (!isHVSC) {
+      if (isHVSC) {
+        const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+        if (!pipelineResult.analysis) {
+          throw new Error('Local pipeline returned no analysis');
+        }
+        result = {
+          bpm: pipelineResult.analysis.bpm,
+          musicalKey: pipelineResult.analysis.musicalKey,
+          energy: pipelineResult.analysis.genre?.energy ?? 0,
+          duration: pipelineResult.duration,
+        };
+      } else {
+        // Modland tracker formats → server-side UADE (fast, uses server-side cache).
+        const serverBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+        // Detect TFMX companion file: mdat.* needs smpl.* from same directory
+        let companionParam = '';
         const baseName = filename.toLowerCase();
         if (baseName.startsWith('mdat.')) {
           const smplName = 'smpl.' + filename.slice(5);
           const dirPath = remotePath.split('/').slice(0, -1).join('/');
           companionParam = `&companion=${encodeURIComponent(dirPath + '/' + smplName)}`;
         }
+
+        const response = await fetch(
+          `${serverBase}/render/analyze?filename=${encodeURIComponent(filename)}${companionParam}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: buffer,
+          },
+        );
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => 'unknown');
+          throw new Error(`Server render failed (${response.status}): ${errText}`);
+        }
+
+        result = await response.json() as {
+          bpm: number;
+          musicalKey: string;
+          energy: number;
+          duration: number;
+        };
       }
-
-      const response = await fetch(
-        `${serverBase}/render/analyze?filename=${encodeURIComponent(filename)}${companionParam}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body: buffer,
-        },
-      );
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => 'unknown');
-        throw new Error(`Server render failed (${response.status}): ${errText}`);
-      }
-
-      const result = await response.json() as {
-        bpm: number;
-        musicalKey: string;
-        energy: number;
-        duration: number;
-      };
 
       // Update the playlist track with analysis results
       const meta: Partial<Pick<PlaylistTrack, 'bpm' | 'musicalKey' | 'energy' | 'duration'>> = {};
@@ -290,9 +318,11 @@ export async function analyzePlaylist(
       // so first play is instant after analysis. Without this, users had to
       // run Analyze AND Cache separately, each re-downloading every track.
       // Failures here don't fail the analysis — metadata is the important bit.
+      // For HVSC we already called loadOrEnqueue to analyze; that same call
+      // caches the rendered WAV, so skip the duplicate render here.
       try {
         await cacheSourceFile(buffer, filename);
-        if (!isAudioFile(filename)) {
+        if (!isAudioFile(filename) && !isHVSC) {
           await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
         }
         // Grab companion files too (TFMX mdat needs smpl; UADE multi-file formats)
