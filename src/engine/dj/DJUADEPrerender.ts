@@ -48,6 +48,7 @@ export async function loadUADEToDeck(
   bpm?: number,
   trackName?: string,
   storeFilename?: string,
+  companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
 ): Promise<{ cached: boolean; duration: number }> {
   const identity = storeFilename ?? filename;
 
@@ -61,7 +62,7 @@ export async function loadUADEToDeck(
 
     // If cached but not yet analyzed, trigger analysis in background
     if (!cached.beatGrid) {
-      void getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'normal').catch((err) => {
+      void getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'normal', companions).catch((err) => {
         console.warn(`[DJPrerender] Background analysis failed for ${filename}:`, err);
       });
     }
@@ -87,7 +88,7 @@ export async function loadUADEToDeck(
 
     try {
       // Use the high-priority pipeline to render and analyze
-      const result = await getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'high');
+      const result = await getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'high', companions);
 
       // Load the resulting WAV directly into audio mode
       const info = await engine.loadAudioToDeck(deckId, result.wavData, identity, trackName || filename, result.analysis?.bpm || bpm || 125);

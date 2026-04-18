@@ -61,6 +61,12 @@ export interface PipelineTask {
   /** Pre-existing WAV data (skip render, just load + analyze) */
   wavData?: ArrayBuffer;
   duration?: number;
+  /**
+   * Optional companion files forwarded to the render worker for multi-file
+   * formats like TFMX (mdat.<song> needs smpl.<song>). Without these, UADE
+   * fails with "uade_request_amiga_file: file not found" and returns -1.
+   */
+  companions?: Array<{ filename: string; buffer: ArrayBuffer }>;
 }
 
 interface QueueEntry {
@@ -99,15 +105,16 @@ export interface PipelineResult {
 // ── WAV Encoder ──────────────────────────────────────────────────────────────
 
 /**
- * Encode stereo Float32 PCM → 16-bit WAV ArrayBuffer.
- * Matches the format UADE.worklet.js _encodeWAV produces.
+ * Encode stereo Float32 PCM → mono 16-bit WAV ArrayBuffer.
+ * We downmix for DJ use because beat/key analysis is mono-friendly and
+ * halving the storage footprint matters for IndexedDB cache size.
  */
 function encodePCMToWAV(
   left: Float32Array,
-  _right: Float32Array,
+  right: Float32Array,
   sampleRate: number,
 ): ArrayBuffer {
-  const numChannels = 1; // Mono — mix L+R for DJ use
+  const numChannels = 1; // Mono downmix
   const bitsPerSample = 16;
   const numSamples = left.length;
   const dataSize = numSamples * numChannels * (bitsPerSample / 8);
@@ -134,10 +141,14 @@ function encodePCMToWAV(
   writeString(view, 36, 'data');
   view.setUint32(40, dataSize, true);
 
-  // Write mono 16-bit (UADE renders with panning=0.0 so L≡R)
+  /* Proper L+R downmix — the old implementation silently dropped the right
+   * channel. For UADE this was harmless (centre-panned mix) but for any
+   * hard-panned tracker content it lost half the audio. */
+  const hasRight = right !== left && right.length === left.length;
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
-    const s = Math.max(-1, Math.min(1, left[i]));
+    const mixed = hasRight ? (left[i] + right[i]) * 0.5 : left[i];
+    const s = Math.max(-1, Math.min(1, mixed));
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     offset += 2;
   }
@@ -226,37 +237,52 @@ export class DJPipeline {
   // ── Worker Lifecycle ─────────────────────────────────────────────────────
 
   private initWorkers(): void {
-    // Render worker
-    this.renderWorker = new Worker(
+    this.spawnRenderWorker();
+    this.spawnAnalysisWorker();
+  }
+
+  /**
+   * (Re)spawn the render worker. Called at init and after a worker crash so
+   * the pipeline can recover without an app restart — otherwise a single
+   * worker error would leave every subsequent task hanging on a dead Worker.
+   */
+  private spawnRenderWorker(): void {
+    try { this.renderWorker?.terminate(); } catch { /* already terminated */ }
+    const worker = new Worker(
       new URL('@/workers/dj-render.worker.ts', import.meta.url),
       { type: 'module' },
     );
-    this.renderWorker.onmessage = (e) => this.handleRenderMessage(e);
-    this.renderWorker.onerror = (e) => {
+    worker.onmessage = (e) => this.handleRenderMessage(e);
+    worker.onerror = (e) => {
       console.error('[DJPipeline] Render worker error:', e);
       for (const [, cb] of this.renderCallbacks) {
         cb.reject(new Error('Render worker crashed: ' + e.message));
       }
       this.renderCallbacks.clear();
+      // Respawn so the next enqueue doesn't hang on a dead worker.
+      this.spawnRenderWorker();
     };
+    worker.postMessage({ type: 'init' });
+    this.renderWorker = worker;
+  }
 
-    // Analysis worker
-    this.analysisWorker = new Worker(
+  private spawnAnalysisWorker(): void {
+    try { this.analysisWorker?.terminate(); } catch { /* already terminated */ }
+    const worker = new Worker(
       new URL('@/workers/dj-analysis.worker.ts', import.meta.url),
       { type: 'module' },
     );
-    this.analysisWorker.onmessage = (e) => this.handleAnalysisMessage(e);
-    this.analysisWorker.onerror = (e) => {
+    worker.onmessage = (e) => this.handleAnalysisMessage(e);
+    worker.onerror = (e) => {
       console.error('[DJPipeline] Analysis worker error:', e);
       for (const [, cb] of this.analysisCallbacks) {
         cb.reject(new Error('Analysis worker crashed: ' + e.message));
       }
       this.analysisCallbacks.clear();
+      this.spawnAnalysisWorker();
     };
-
-    // Init both
-    this.renderWorker.postMessage({ type: 'init' });
-    this.analysisWorker.postMessage({ type: 'init' });
+    worker.postMessage({ type: 'init' });
+    this.analysisWorker = worker;
   }
 
   private handleRenderMessage(e: MessageEvent): void {
@@ -379,9 +405,10 @@ export class DJPipeline {
     filename: string,
     deckId?: DeckId,
     priority: TaskPriority = 'normal',
+    companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
   ): Promise<PipelineResult> {
     const id = `${filename}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    return this.enqueue({ id, fileBuffer, filename, deckId, priority });
+    return this.enqueue({ id, fileBuffer, filename, deckId, priority, companions });
   }
 
   /**
@@ -420,6 +447,7 @@ export class DJPipeline {
     filename: string,
     deckId?: DeckId,
     priority: TaskPriority = 'high',
+    companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
   ): Promise<PipelineResult> {
     // Check cache
     const cached = await getCachedAudio(fileBuffer);
@@ -594,11 +622,16 @@ export class DJPipeline {
     const existing = this.inflight.get(hash);
     if (existing) {
       console.log(`[DJPipeline] In-flight dedup hit for ${filename} — waiting for existing render`);
-      return existing;
+      const result = await existing;
+      /* executeTask only applies deck state to the *first* requester's deckId;
+       * a second deck riding on the same render would otherwise never receive
+       * beatGrid / analysisState = 'ready' and show a blank waveform. */
+      if (deckId) this.applyResultToDeck(deckId, result);
+      return result;
     }
 
     // Full render + analysis needed
-    const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority);
+    const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority, companions);
     this.inflight.set(hash, promise);
     promise.finally(() => this.inflight.delete(hash));
     return promise;
@@ -612,6 +645,44 @@ export class DJPipeline {
   /** Whether the pipeline is actively processing. */
   get isActive(): boolean {
     return this.processing;
+  }
+
+  /**
+   * Apply a finished PipelineResult's analysis to a deck's store state.
+   * Called from executeTask for the primary task deck AND from loadOrEnqueue
+   * when an in-flight dedup caller attaches a second deck to the same render.
+   */
+  private applyResultToDeck(deckId: DeckId, result: PipelineResult): void {
+    const { analysis } = result;
+    if (!analysis) {
+      useDJStore.getState().setDeckState(deckId, { analysisState: 'ready' });
+      return;
+    }
+    const autoTrimDb = computeAutoTrim(analysis.rmsDb, analysis.peakDb);
+    const deckState = useDJStore.getState().decks[deckId];
+    const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
+    useDJStore.getState().setDeckState(deckId, {
+      analysisState: 'ready',
+      beatGrid: {
+        beats: analysis.beats,
+        downbeats: analysis.downbeats,
+        bpm: analysis.bpm,
+        timeSignature: analysis.timeSignature,
+      },
+      musicalKey: analysis.musicalKey,
+      keyConfidence: analysis.keyConfidence,
+      frequencyPeaks: analysis.frequencyPeaks.map(b => new Float32Array(b)),
+      rmsDb: analysis.rmsDb,
+      peakDb: analysis.peakDb,
+      trimGain,
+      genrePrimary: analysis.genre.primary,
+      genreSubgenre: analysis.genre.subgenre,
+      genreConfidence: analysis.genre.confidence,
+      mood: analysis.genre.mood,
+      energy: analysis.genre.energy,
+      danceability: analysis.genre.danceability,
+    });
+    autoMatchOnLoad(deckId);
   }
 
   /** Cancel all pending tasks (does not cancel in-progress task). */
@@ -661,14 +732,28 @@ export class DJPipeline {
     this.updateStoreQueue();
 
     try {
-      const TASK_TIMEOUT_MS = 60_000; // 60 seconds
-      const result = await Promise.race([
-        this.executeTask(task),
-        new Promise<never>((_, rej) =>
-          setTimeout(() => rej(new Error(`Task timeout after ${TASK_TIMEOUT_MS / 1000}s: ${task.filename}`)), TASK_TIMEOUT_MS)
-        ),
-      ]);
-      resolve(result);
+      /* 180s — generous enough for long UADE / SC68 tracks that can take
+       * 60-120s to render fully. Previously 60s would time-out mid-render
+       * and strand pending worker callbacks in their maps (leak). */
+      const TASK_TIMEOUT_MS = 180_000;
+      let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+      const timeoutPromise = new Promise<never>((_, rej) => {
+        timeoutHandle = setTimeout(() => {
+          // Reject any still-pending worker callbacks for this task so they
+          // drain from the maps instead of leaking forever.
+          const rcb = this.renderCallbacks.get(task.id);
+          if (rcb) { this.renderCallbacks.delete(task.id); rcb.reject(new Error('Task timeout')); }
+          const acb = this.analysisCallbacks.get(task.id);
+          if (acb) { this.analysisCallbacks.delete(task.id); acb.reject(new Error('Task timeout')); }
+          rej(new Error(`Task timeout after ${TASK_TIMEOUT_MS / 1000}s: ${task.filename}`));
+        }, TASK_TIMEOUT_MS);
+      });
+      try {
+        const result = await Promise.race([this.executeTask(task), timeoutPromise]);
+        resolve(result);
+      } finally {
+        if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+      }
     } catch (err) {
       console.error(`[DJPipeline] Task failed: ${task.filename}`, err);
       reject(err instanceof Error ? err : new Error(String(err)));
@@ -822,58 +907,25 @@ export class DJPipeline {
 
     // ── Update deck state ────────────────────────────────────────────────
     if (task.deckId) {
-      if (analysis) {
-        // Auto-gain: target -14 dB RMS (standard DJ loudness reference)
-        const autoTrimDb = computeAutoTrim(analysis.rmsDb, analysis.peakDb);
-        const deckState = useDJStore.getState().decks[task.deckId];
-        const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
+      const currentState = useDJStore.getState().decks[task.deckId];
+      /* Stale-render guard: if the user reloaded this deck mid-render, the
+       * loaded file no longer matches task.filename. Writing our analysis
+       * onto the new track's state would clobber its fresh beatGrid /
+       * musicalKey with old-track data. */
+      if (currentState.fileName === task.filename) {
+        this.applyResultToDeck(task.deckId, { wavData, duration, sampleRate, waveformPeaks, analysis });
 
-        useDJStore.getState().setDeckState(task.deckId, {
-          analysisState: 'ready',
-          beatGrid: {
-            beats: analysis.beats,
-            downbeats: analysis.downbeats,
-            bpm: analysis.bpm,
-            timeSignature: analysis.timeSignature,
-          },
-          musicalKey: analysis.musicalKey,
-          keyConfidence: analysis.keyConfidence,
-          frequencyPeaks: analysis.frequencyPeaks.map(b => new Float32Array(b)),
-          rmsDb: analysis.rmsDb,
-          peakDb: analysis.peakDb,
-          trimGain,
-          // Genre classification
-          genrePrimary: analysis.genre.primary,
-          genreSubgenre: analysis.genre.subgenre,
-          genreConfidence: analysis.genre.confidence,
-          mood: analysis.genre.mood,
-          energy: analysis.genre.energy,
-          danceability: analysis.genre.danceability,
-        });
-
-        // Auto-match BPM + phase to the master if the other deck is playing.
-        autoMatchOnLoad(task.deckId);
-      } else {
-        // Analysis failed but render succeeded
-        useDJStore.getState().setDeckState(task.deckId, {
-          analysisState: 'ready',
-        });
-      }
-
-      // ── Hot-swap from Tracker engine to Audio engine ───────────────────
-      // If the DJ engine is still active and this track is still on that deck,
-      // seamlessly switch to the pre-rendered high-quality WAV stream.
-      const djEngine = getDJEngineIfActive();
-      if (djEngine) {
-        const deck = djEngine.getDeck(task.deckId);
-        const currentState = useDJStore.getState().decks[task.deckId];
-        
-        // Only swap if the track hasn't changed while we were rendering
-        if (currentState.fileName === task.filename && currentState.playbackMode === 'tracker') {
-          void deck.hotSwapToAudio(wavData, task.filename).catch(err => {
-            console.warn(`[DJPipeline] Hot-swap failed for ${task.filename}:`, err);
-          });
+        // Hot-swap from Tracker engine to Audio engine if applicable.
+        if (currentState.playbackMode === 'tracker') {
+          const djEngine = getDJEngineIfActive();
+          if (djEngine) {
+            void djEngine.getDeck(task.deckId).hotSwapToAudio(wavData, task.filename).catch(err => {
+              console.warn(`[DJPipeline] Hot-swap failed for ${task.filename}:`, err);
+            });
+          }
         }
+      } else {
+        console.log(`[DJPipeline] Skipping stale state update: ${task.filename} no longer on deck ${task.deckId}`);
       }
     }
 
@@ -903,9 +955,24 @@ export class DJPipeline {
       this.renderCallbacks.set(task.id, { resolve, reject });
 
       const buffer = task.fileBuffer.slice(0); // Clone to transfer
+      const transferables: ArrayBuffer[] = [buffer];
+      // Clone companion buffers too — the originals may still be referenced
+      // by caller (playlist cache, auto-DJ pre-render) so we can't donate them.
+      const companions = task.companions?.map((cf) => {
+        const cloned = cf.buffer.slice(0);
+        transferables.push(cloned);
+        return { filename: cf.filename, buffer: cloned };
+      });
       this.renderWorker.postMessage(
-        { type: 'render', id: task.id, fileBuffer: buffer, filename: task.filename, subsong: task.subsong },
-        [buffer],
+        {
+          type: 'render',
+          id: task.id,
+          fileBuffer: buffer,
+          filename: task.filename,
+          subsong: task.subsong,
+          companions,
+        },
+        transferables,
       );
     });
   }

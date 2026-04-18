@@ -1549,9 +1549,18 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
-          const { downloadModlandFile } = await import('@/lib/modlandApi');
-          const buffer = await downloadModlandFile(modlandPath);
+          const { downloadModlandFile, downloadTFMXCompanion } = await import('@/lib/modlandApi');
+          // TFMX mdat.<song> needs its smpl.<song> companion in UADE's virtual
+          // FS — download both in parallel. downloadTFMXCompanion returns null
+          // for non-TFMX files, so this is a no-op for everything else.
+          const [buffer, tfmxCompanion] = await Promise.all([
+            downloadModlandFile(modlandPath),
+            downloadTFMXCompanion(modlandPath),
+          ]);
           const filename = modlandPath.split('/').pop() || 'download.mod';
+          const companions = tfmxCompanion
+            ? [{ filename: tfmxCompanion.filename, buffer: tfmxCompanion.buffer }]
+            : undefined;
 
           if (isAudioFile(filename)) {
             await engine.loadAudioToDeck(deckId, buffer, track.fileName);
@@ -1560,7 +1569,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
             // Pass track.fileName as the identity so the playlist row's
             // scrubber/isPlaying match works (otherwise the deck stores
             // `slipstream3.fc` and the row looks for `modland:pub/.../...`).
-            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName);
+            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName, companions);
             useDJStore.getState().setDeckViewMode('visualizer');
           } else {
             const blob = new File([buffer], filename, { type: 'application/octet-stream' });

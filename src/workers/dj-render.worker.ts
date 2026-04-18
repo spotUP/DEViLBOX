@@ -28,6 +28,13 @@ interface RenderRequest {
   fileBuffer: ArrayBuffer;
   filename: string;
   subsong?: number;
+  /**
+   * Optional companion files to register in UADE's virtual filesystem BEFORE
+   * loading the main module. Required for multi-file formats like TFMX
+   * (mdat.<name> needs smpl.<name>) and other two-file players. Each entry
+   * is passed to uade_wasm_add_extra_file() as-is.
+   */
+  companions?: Array<{ filename: string; buffer: ArrayBuffer }>;
 }
 
 interface InitRequest {
@@ -336,11 +343,47 @@ async function initUADE(forceReinit = false): Promise<void> {
   console.log('[DJRenderWorker] UADE engine initialized');
 }
 
+/**
+ * Write a companion file into UADE's virtual filesystem.
+ * Must be called AFTER initUADE and BEFORE _uade_wasm_load.
+ * Pattern mirrors the server-side renderer (server/src/routes/render.ts) and
+ * the main-thread worklet's _addCompanionFile.
+ */
+function addUADECompanion(wasm: any, filename: string, buffer: ArrayBuffer): void {
+  const data = new Uint8Array(buffer);
+  const dataPtr = wasm._malloc(data.byteLength);
+  if (!dataPtr) {
+    console.warn(`[DJRenderWorker/UADE] malloc failed for companion: ${filename}`);
+    return;
+  }
+  wasm.HEAPU8.set(data, dataPtr);
+
+  const nameLen = filename.length * 3 + 1;
+  const namePtr = wasm._malloc(nameLen);
+  if (!namePtr) {
+    wasm._free(dataPtr);
+    console.warn(`[DJRenderWorker/UADE] malloc failed for companion name: ${filename}`);
+    return;
+  }
+  wasm.stringToUTF8(filename, namePtr, nameLen);
+
+  const ret = wasm._uade_wasm_add_extra_file(namePtr, dataPtr, data.byteLength);
+  wasm._free(dataPtr);
+  wasm._free(namePtr);
+
+  if (ret === 0) {
+    console.log(`[DJRenderWorker/UADE] Companion registered: ${filename} (${data.byteLength} bytes)`);
+  } else {
+    console.warn(`[DJRenderWorker/UADE] Failed to register companion: ${filename} (ret=${ret})`);
+  }
+}
+
 async function renderWithUADE(
   fileBuffer: ArrayBuffer,
   filename: string,
   subsong: number,
   id: string,
+  companions?: Array<{ filename: string; buffer: ArrayBuffer }>,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
   // Force fresh UADE instance for each render — the IPC state machine
   // gets corrupted after a render cycle and cannot be reused.
@@ -369,9 +412,20 @@ async function renderWithUADE(
   const safeName = nameOnly.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 20);
   const safeFilename = `${safeName}.${ext}`;
   
-  console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename} (${fileBuffer.byteLength} bytes)`);
+  console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename} (${fileBuffer.byteLength} bytes)${companions?.length ? ` with ${companions.length} companion(s)` : ''}`);
 
   // No stabilization delay needed when reiniting fresh each time
+
+  // Register companion files BEFORE loading (TFMX mdat needs smpl, etc.)
+  // The companion filename must use the same safe-name rules as the module
+  // so UADE's virtual-FS lookup matches the name the player script requests.
+  const safeCompanions = companions?.map(cf => ({
+    filename: cf.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60),
+    buffer: cf.buffer,
+  })) ?? [];
+  for (const cf of safeCompanions) {
+    addUADECompanion(wasm, cf.filename, cf.buffer);
+  }
 
   // Load the file into UADE WASM memory
   const fileSize = fileBuffer.byteLength;
@@ -386,7 +440,7 @@ async function renderWithUADE(
 
   // Load the module (don't call stop() before load, it can confuse some players)
   let loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
-  
+
   if (loadResult !== 0) {
     console.warn(`[DJRenderWorker/UADE] First load failed (${loadResult}), force reinit and retry...`);
     // Force complete reinitialization - IPC buffers are corrupted
@@ -396,21 +450,27 @@ async function renderWithUADE(
     uadeInstance = null;
     await initUADE(true);
     const wasm2 = uadeInstance;
-    
+
+    // Re-register companions on the fresh UADE instance — reinit wipes the
+    // virtual FS, so a TFMX mdat retry would otherwise lose its smpl.
+    for (const cf of safeCompanions) {
+      addUADECompanion(wasm2, cf.filename, cf.buffer);
+    }
+
     // Reallocate and retry
     const filePtr2 = wasm2._malloc(fileSize);
     wasm2.HEAPU8.set(fileBytes, filePtr2);
     const fnamePtr2 = wasm2._malloc(fnameLen);
     wasm2.stringToUTF8(safeFilename, fnamePtr2, fnameLen);
-    
+
     loadResult = wasm2._uade_wasm_load(filePtr2, fileSize, fnamePtr2);
     wasm2._free(filePtr2);
     wasm2._free(fnamePtr2);
-    
+
     if (loadResult !== 0) {
       throw new Error(`UADE failed to load ${safeFilename} (error: ${loadResult})`);
     }
-    
+
     // Continue with the new wasm instance
     return renderWithUADEContinue(wasm2, safeFilename, subsong, id);
   }
@@ -1091,7 +1151,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
     case 'render': {
-      const { id, fileBuffer, filename, subsong = 0 } = msg;
+      const { id, fileBuffer, filename, subsong = 0, companions } = msg;
       try {
         let result: { left: Float32Array; right: Float32Array; sampleRate: number };
 
@@ -1122,7 +1182,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           // TODO: Implement synthesizer renderers (SunVox, V2, WaveSabre, etc.)
           throw new Error('Synthesizer formats not yet supported in DJ renderer (use main tracker)');
         } else if (isAmigaFormat(filename)) {
-          result = await renderWithUADE(fileBuffer, filename, subsong, id);
+          result = await renderWithUADE(fileBuffer, filename, subsong, id, companions);
         } else {
           result = await renderWithLibopenmpt(fileBuffer, filename, id);
         }
