@@ -17,6 +17,54 @@ import type { DeckId } from '../dj/DeckEngine';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
+/**
+ * Asymmetric tanh curve for WaveShaper — models transformer-coupled magnetic
+ * tape saturation. Positive half compresses a touch harder than the negative
+ * half; that asymmetry is the audible signature of tape vs. digital clipping.
+ * Called once at engine init; curve is static after that.
+ */
+function makeTapeSatCurve(drive: number): Float32Array<ArrayBuffer> {
+  const n = 4096;
+  // Construct with an explicit ArrayBuffer (not ArrayBufferLike) so the
+  // resulting typed array matches what WaveShaperNode.curve expects under
+  // TS strict lib types.
+  const curve = new Float32Array(new ArrayBuffer(n * 4));
+  const kPos = drive * 4;
+  const kNeg = drive * 4.4;  // +10% on negative half — asymmetric
+  const normPos = Math.tanh(kPos);
+  const normNeg = Math.tanh(kNeg);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = x >= 0
+      ? Math.tanh(x * kPos) / normPos
+      : Math.tanh(x * kNeg) / normNeg;
+  }
+  return curve;
+}
+
+/**
+ * Generate a pink noise AudioBuffer using Paul Kellet's three-stage filter.
+ * -3 dB/oct rolloff, cheap, and indistinguishable from "real" pink at the
+ * very low levels we'll play it back at. Mono buffer is fine — the noise
+ * floor of dub records was mono anyway (single tape head).
+ */
+function makePinkNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffer {
+  const sr = ctx.sampleRate;
+  const frames = Math.floor(sr * durationSec);
+  const buffer = ctx.createBuffer(1, frames, sr);
+  const data = buffer.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0;
+  for (let i = 0; i < frames; i++) {
+    const white = Math.random() * 2 - 1;
+    b0 = 0.99765 * b0 + white * 0.0990460;
+    b1 = 0.96300 * b1 + white * 0.2965164;
+    b2 = 0.57000 * b2 + white * 1.0526913;
+    // Sum + gentle normalization (Kellet's coefficients peak at ~2.6)
+    data[i] = (b0 + b1 + b2 + white * 0.1848) * 0.22;
+  }
+  return buffer;
+}
+
 interface VoiceState {
   source: AudioBufferSourceNode | null;
   gainNode: GainNode;
@@ -47,25 +95,42 @@ export class DrumPadEngine {
   private padEffects: Map<number, PadEffectsChain> = new Map();
   private _disposed = false;
 
-  // ─── Shared Dub Bus ────────────────────────────────────────────────────────
-  // One SpringReverb + one SpaceEcho for the whole kit. Three source families
-  // feed into `dubBusInput`:
+  // ─── Shared Dub Bus — Vintage King Tubby / Scientist chain ─────────────────
+  // Sources fanning into `dubBusInput`:
   //   1. Pads with dubSend > 0 — per-voice gain created in triggerPad().
-  //   2. DJ deck taps (A/B/C)  — gain=0 at rest, opened by dub-throw pads so
-  //      deck audio spills into the bus momentarily (King Tubby echo throws).
-  //   3. Feedback tap           — post-echo → feedback gain → input. Drives
-  //      the siren self-oscillation when raised high.
+  //   2. DJ deck taps (A/B/C)  — gain=0 at rest, opened by dub-throw pads.
+  //   3. Feedback tap           — post-echo → feedback → input (siren).
+  //   4. Noise source           — loop of pink noise ~-55 dBFS, baked into
+  //                               the mix so drops reveal the dub "floor".
   //
-  // Output chain (everything post-`echoOut`):
-  //   echoOut → sidechain (pumping) → LPF (filter drop) → return → masterGain
+  // Chain order (vintage authentic — matches 1970s Tubby/Scientist signal path):
+  //   input → HPF(180Hz) → TapeSat(asymmetric tanh) → Echo(RE-201) → Spring
+  //                                                                    ↓
+  //         ← feedback ← echoOut ─────────────────────────────────────┘
+  //   Spring.output → SidechainComp(fast, pumping) → GlueComp(slow, dubplate)
+  //                 → LPF(filter drop sweeps) → return → masterGain
+  //
+  // Key authenticity points:
+  //   - Echo → Spring (not Spring → Echo): every echo repeat gets washed with
+  //     plate/spring character. That's THE dub signature.
+  //   - Tape saturation BEFORE the echo: crunches input the way an MCI board
+  //     would, gives the echo something to chew on.
+  //   - Glue compressor AFTER pumping: recreates the slow compression of
+  //     cutting straight to acetate — softens transients on the tail.
+  //   - Pink noise floor: +minuscule hiss that becomes audible during mute-
+  //     and-dub drops, giving the dub "texture" a tape feel.
   private dubBusInput: GainNode;
   private dubBusHPF: BiquadFilterNode;
+  private dubBusTapeSat: WaveShaperNode;    // asymmetric tanh — MCI board bite
   private dubBusSpring: SpringReverbEffect;
   private dubBusEcho: SpaceEchoEffect;
-  private dubBusSidechain: DynamicsCompressorNode;
+  private dubBusSidechain: DynamicsCompressorNode;  // fast (pumping)
+  private dubBusGlue: DynamicsCompressorNode;       // slow (dubplate glue)
   private dubBusLPF: BiquadFilterNode;      // sweep-able LPF on return
   private dubBusReturn: GainNode;
   private dubBusFeedback: GainNode;         // echo → feedback → input (siren)
+  private dubBusNoise: AudioBufferSourceNode;  // pink noise loop
+  private dubBusNoiseGain: GainNode;           // -55 dBFS level
   private dubBusEnabled = DEFAULT_DUB_BUS.enabled;
   private dubBusSettings: DubBusSettings = { ...DEFAULT_DUB_BUS };
 
@@ -106,8 +171,21 @@ export class DrumPadEngine {
     this.dubBusHPF.frequency.value = this.dubBusSettings.hpfCutoff;
     this.dubBusHPF.Q.value = 0.707;
 
+    // Tape saturation — asymmetric tanh curve that models the positive/negative
+    // asymmetry of transformer-coupled magnetic tape. Softens positive peaks
+    // more than negative, which is what gives RE-201 / Studer saturation its
+    // distinctive warmth (not the razor-edge of digital clipping). Sits before
+    // the echo so the crunch gets chopped up into repeats, not smeared over
+    // the whole tail.
+    this.dubBusTapeSat = this.context.createWaveShaper();
+    this.dubBusTapeSat.curve = makeTapeSatCurve(0.35);
+    this.dubBusTapeSat.oversample = '2x';
+
+    // Spring reverb — tightened diffusion from 0.7 → 0.4 for a more
+    // pronounced single-slap character (less "cathedral", more "metal tank").
+    // That's what gives King Tubby's recordings their snappy springiness.
     this.dubBusSpring = new SpringReverbEffect({
-      decay: 0.55, damping: 0.4, tension: 0.5, mix: 0.5, drip: 0.6, diffusion: 0.7,
+      decay: 0.6, damping: 0.45, tension: 0.55, mix: 0.55, drip: 0.7, diffusion: 0.4,
       wet: this.dubBusSettings.springWet,
     });
 
@@ -119,20 +197,33 @@ export class DrumPadEngine {
       reverbVolume: 0.3,
       bass: 2,                              // gentle warmth
       treble: -2,                           // tame fizz on the tail
-      wow: 0.18,                            // tape flutter
+      wow: 0.35,                            // seasick tape flutter — Perry dial
       wet: this.dubBusSettings.echoWet,
     });
 
-    // Sidechain-style pumping: bus signal triggers its own compressor. Not a
-    // true kick-keyed sidechain (we'd need routing to a specific pad), but a
-    // fast-attack / fast-release compressor on the bus return produces the
-    // audible duck-on-hit pumping that defines the dub sound.
+    // Sidechain pumping — fast: catches transients, makes the tail breathe
+    // under the drums. Not a true kick-keyed sidechain (would need per-pad
+    // routing) but the fast-attack/release compression produces the same
+    // "duck on every hit" feel.
     this.dubBusSidechain = this.context.createDynamicsCompressor();
     this.dubBusSidechain.threshold.value = -28;
     this.dubBusSidechain.ratio.value = 6;
     this.dubBusSidechain.attack.value = 0.002;
     this.dubBusSidechain.release.value = 0.18;
     this.dubBusSidechain.knee.value = 6;
+
+    // Glue compressor — slow: models the compression character of cutting
+    // a dub straight to acetate lathe. Soft attack (30ms) lets transients
+    // through but then settles gently; long release (300ms) welds the whole
+    // tail into one coherent sustained thing instead of a pile of effects.
+    // This is the "finished dub record" texture that modern digital chains
+    // miss when they stop at the pumping compressor.
+    this.dubBusGlue = this.context.createDynamicsCompressor();
+    this.dubBusGlue.threshold.value = -14;
+    this.dubBusGlue.ratio.value = 3;
+    this.dubBusGlue.attack.value = 0.030;
+    this.dubBusGlue.release.value = 0.300;
+    this.dubBusGlue.knee.value = 8;
 
     // Sweepable LPF on the return — drops dub into "underwater" muffle.
     // Open position (~20 kHz) is effectively transparent.
@@ -152,20 +243,45 @@ export class DrumPadEngine {
     this.dubBusFeedback = this.context.createGain();
     this.dubBusFeedback.gain.value = 0;
 
-    // Wire: input → HPF → Spring.input
+    // Pink noise floor — ~-55 dBFS continuous noise that you don't notice
+    // during normal play, but becomes audible during mute-and-dub drops as
+    // the "tape hiss" texture of vintage dub records. Two-second loop buffer
+    // is enough to avoid obvious periodicity at this level.
+    const noiseBuffer = makePinkNoiseBuffer(this.context, 2);
+    this.dubBusNoise = this.context.createBufferSource();
+    this.dubBusNoise.buffer = noiseBuffer;
+    this.dubBusNoise.loop = true;
+    this.dubBusNoiseGain = this.context.createGain();
+    this.dubBusNoiseGain.gain.value = Math.pow(10, -55 / 20); // ~-55 dBFS
+
+    // Wire the vintage Tubby/Scientist chain:
+    //   input → HPF → TapeSat → Echo → Spring
+    //                           │
+    //                      feedback ← echoOut
+    //
+    //   Spring.output → Sidechain → Glue → LPF → return → masterGain
     this.dubBusInput.connect(this.dubBusHPF);
-    Tone.connect(this.dubBusHPF, this.dubBusSpring as unknown as Tone.InputNode);
-    // Spring.output → Echo.input
-    this.dubBusSpring.connect(this.dubBusEcho);
-    // Echo.output → [sidechain → LPF → return → masterGain] + [feedback → input]
+    this.dubBusHPF.connect(this.dubBusTapeSat);
+    Tone.connect(this.dubBusTapeSat, this.dubBusEcho as unknown as Tone.InputNode);
+    this.dubBusEcho.connect(this.dubBusSpring);
+    // Feedback regen: tap echo output (before spring) back into input.
+    // Pre-spring means the siren rings without flooding the spring with
+    // runaway self-oscillation.
     const echoOut = (this.dubBusEcho as unknown as { output: Tone.ToneAudioNode }).output;
-    Tone.connect(echoOut, this.dubBusSidechain as unknown as Tone.InputNode);
-    this.dubBusSidechain.connect(this.dubBusLPF);
-    this.dubBusLPF.connect(this.dubBusReturn);
-    this.dubBusReturn.connect(this.masterGain);
-    // Feedback regen: tap echo output into feedback gain into bus input
     Tone.connect(echoOut, this.dubBusFeedback as unknown as Tone.InputNode);
     this.dubBusFeedback.connect(this.dubBusInput);
+    // Post-spring output chain
+    const springOut = (this.dubBusSpring as unknown as { output: Tone.ToneAudioNode }).output;
+    Tone.connect(springOut, this.dubBusSidechain as unknown as Tone.InputNode);
+    this.dubBusSidechain.connect(this.dubBusGlue);
+    this.dubBusGlue.connect(this.dubBusLPF);
+    this.dubBusLPF.connect(this.dubBusReturn);
+    this.dubBusReturn.connect(this.masterGain);
+    // Noise source into input — runs always; masked by the return gain going
+    // to zero when the bus is disabled.
+    this.dubBusNoise.connect(this.dubBusNoiseGain);
+    this.dubBusNoiseGain.connect(this.dubBusInput);
+    this.dubBusNoise.start(0);
 
     // Create per-deck tap gains. Always exist so dub-action handlers can
     // modulate them without null checks; only feed audio when a DJ mixer is
@@ -191,6 +307,7 @@ export class DrumPadEngine {
     if (this.attachedMixer === mixer) return;
     this.detachDJMixer();
     this.attachedMixer = mixer;
+    let connectedCount = 0;
     for (const deck of DECK_IDS) {
       const mixerTap = mixer.getDeckTap(deck);
       const engineTap = this.dubDeckTaps.get(deck);
@@ -198,13 +315,18 @@ export class DrumPadEngine {
       try {
         // Bridge Tone.Gain → raw GainNode via native node.
         const native = getNativeAudioNode(mixerTap as unknown as Tone.ToneAudioNode);
-        if (!native) continue;
+        if (!native) {
+          console.warn(`[DrumPadEngine] attachDJMixer deck ${deck}: could not unwrap mixer tap to native node`);
+          continue;
+        }
         native.connect(engineTap);
         this.mixerTapConnections.push({ from: mixerTap, to: engineTap });
+        connectedCount++;
       } catch (err) {
         console.warn(`[DrumPadEngine] attachDJMixer: deck ${deck} tap connect failed:`, err);
       }
     }
+    console.log(`[DrumPadEngine] attachDJMixer: ${connectedCount}/${DECK_IDS.length} deck taps connected, busEnabled=${this.dubBusEnabled}`);
   }
 
   /** Tear down the deck-tap connections to the attached mixer. */
@@ -246,8 +368,15 @@ export class DrumPadEngine {
    * `releaseSec`. If the bus is disabled, returns a no-op releaser.
    */
   openDeckTap(deck: DeckId | 'ALL', amount = 1.0, attackSec = 0.005, releaseSec = 0.25): () => void {
-    if (!this.dubBusEnabled) return () => {};
+    if (!this.dubBusEnabled) {
+      console.log('[DubBus] openDeckTap ignored — bus disabled. Turn Dub Bus on.');
+      return () => {};
+    }
+    if (!this.attachedMixer) {
+      console.log('[DubBus] openDeckTap: no DJ mixer attached — deck tap will open but no deck audio will flow in');
+    }
     const decks: DeckId[] = deck === 'ALL' ? [...DECK_IDS] : [deck];
+    console.log(`[DubBus] openDeckTap deck=${deck} amount=${amount} mixerAttached=${!!this.attachedMixer}`);
     const now = this.context.currentTime;
     const clamp = Math.max(0, Math.min(1, amount));
     for (const d of decks) {
@@ -847,10 +976,16 @@ export class DrumPadEngine {
     this.dubDeckTaps.clear();
     // Cancel any in-flight dub action releasers before tearing nodes down.
     this.dubActionReleasers.clear();
+    // Stop the pink noise source first so it doesn't keep the graph alive.
+    try { this.dubBusNoise.stop(); } catch { /* may already be stopped */ }
+    try { this.dubBusNoise.disconnect(); } catch { /* ok */ }
+    try { this.dubBusNoiseGain.disconnect(); } catch { /* ok */ }
     try { this.dubBusInput.disconnect(); } catch { /* already disconnected */ }
     try { this.dubBusHPF.disconnect(); } catch { /* ok */ }
+    try { this.dubBusTapeSat.disconnect(); } catch { /* ok */ }
     try { this.dubBusFeedback.disconnect(); } catch { /* ok */ }
     try { this.dubBusSidechain.disconnect(); } catch { /* ok */ }
+    try { this.dubBusGlue.disconnect(); } catch { /* ok */ }
     try { this.dubBusLPF.disconnect(); } catch { /* ok */ }
     try { this.dubBusReturn.disconnect(); } catch { /* ok */ }
     try { this.dubBusSpring.dispose(); } catch { /* ok */ }
