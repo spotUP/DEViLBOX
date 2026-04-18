@@ -124,6 +124,13 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 const TRACK_ROW_HEIGHT = 32;
 
 // ── DJ FX Presets (per-song master FX override) ─────────────────────────────
+//
+// Legacy compact list kept ONLY for backward compatibility: older playlist
+// tracks persisted `track.masterFxPreset` as one of these `key` strings. The
+// live per-song dropdown now sources the full master FX library from
+// `@/constants/fxPresets` (see DJPlaylistModal's MASTER_FX_GROUPS). Removing
+// this would break FX on every previously-saved playlist track that used the
+// old DJ Quick presets.
 
 export const DJ_FX_PRESETS = [
   { key: 'reverb-wash',  label: 'Reverb',   effects: [{ type: 'Reverb' as const, wet: 60, params: { decay: 4, preDelay: 0.02 } }] },
@@ -135,6 +142,35 @@ export const DJ_FX_PRESETS = [
   { key: 'distortion',   label: 'Dist',     effects: [{ type: 'Distortion' as const, wet: 50, params: { distortion: 0.4 } }] },
   { key: 'space-echo',   label: 'Space',    effects: [{ type: 'Reverb' as const, wet: 40, params: { decay: 6, preDelay: 0.05 } }, { type: 'PingPongDelay' as const, wet: 30, params: { delayTime: '4n', feedback: 0.4 } }] },
 ] as const;
+
+// Full master FX library grouped by tag — matches the dropdown in
+// DJFxQuickPresets and DJPlaylistModal so per-song assignments pick from
+// the same master list the user sees everywhere else.
+import { FX_PRESETS } from '@/constants/fxPresets';
+const MASTER_FX_GROUPS: Array<{ category: string; presets: typeof FX_PRESETS }> = (() => {
+  const byCat: Record<string, typeof FX_PRESETS> = {};
+  for (const p of FX_PRESETS) {
+    const cat = p.tags[0] ?? 'Other';
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(p);
+  }
+  const cats = Object.keys(byCat).sort((a, b) => {
+    if (a === 'DJ') return -1;
+    if (b === 'DJ') return 1;
+    return a.localeCompare(b);
+  });
+  return cats.map((category) => ({ category, presets: byCat[category] }));
+})();
+
+/** Resolve the human-readable label for a stored masterFxPreset value.
+ *  Tries master FX_PRESETS first (new scheme — value is preset.name), then
+ *  falls back to legacy DJ_FX_PRESETS (value is preset.key). */
+function resolveFxPresetLabel(stored: string): string {
+  const fx = FX_PRESETS.find((p) => p.name === stored);
+  if (fx) return fx.name;
+  const legacy = DJ_FX_PRESETS.find((p) => p.key === stored);
+  return legacy?.label ?? stored;
+}
 
 // ── Sortable Track Row ──────────────────────────────────────────────────────
 
@@ -256,7 +292,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
       )}
       {/* Per-song FX preset indicator */}
       {track.masterFxPreset && (
-        <span className="text-[9px] font-mono text-purple-400 shrink-0 px-0.5 bg-purple-400/10 rounded" title={`FX: ${DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset)?.label ?? track.masterFxPreset}`}>
+        <span className="text-[9px] font-mono text-purple-400 shrink-0 px-0.5 bg-purple-400/10 rounded" title={`FX: ${resolveFxPresetLabel(track.masterFxPreset)}`}>
           FX
         </span>
       )}
@@ -267,7 +303,7 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
           className={`px-1 text-xs font-mono font-bold transition-colors ${isPreviewing ? 'text-green-400 hover:text-green-300' : 'text-text-muted/60 hover:text-text-muted'}`}
           title={isPreviewing ? 'Stop preview' : 'Preview track'}
         >{isPreviewing ? '■' : '▸'}</button>
-        {/* FX preset selector */}
+        {/* FX preset selector — sources the full master FX_PRESETS library */}
         <select
           value={track.masterFxPreset || ''}
           onClick={(e) => e.stopPropagation()}
@@ -276,8 +312,12 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
           title="Per-song master FX preset"
         >
           <option value="">FX</option>
-          {DJ_FX_PRESETS.map(p => (
-            <option key={p.key} value={p.key}>{p.label}</option>
+          {MASTER_FX_GROUPS.map(({ category, presets }) => (
+            <optgroup key={category} label={category}>
+              {presets.map((p) => (
+                <option key={p.name} value={p.name}>{p.name}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
         <button
@@ -834,25 +874,38 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       setLoadingDeckId(deckId);
       try {
         await loadTrackToDeck(track, deckId);
-        // Apply per-song master FX preset if set
+        // Apply per-song master FX preset if set — tries master FX_PRESETS
+        // (new scheme) first, then falls back to the legacy DJ_FX_PRESETS
+        // key format for playlists saved before the master FX library was
+        // wired into the per-song dropdown.
         if (track.masterFxPreset) {
-          const preset = DJ_FX_PRESETS.find(p => p.key === track.masterFxPreset);
-          if (preset) {
-            try {
-              const { useAudioStore } = await import('@/stores/useAudioStore');
-              const effectConfigs = preset.effects.map((fx, i) => ({
-                id: `persong-${preset.key}-${i}`,
-                category: 'tonejs' as const,
-                type: fx.type,
-                enabled: true,
-                wet: fx.wet,
-                parameters: fx.params as Record<string, number | string>,
+          try {
+            const { useAudioStore } = await import('@/stores/useAudioStore');
+            const fxPreset = FX_PRESETS.find((p) => p.name === track.masterFxPreset);
+            if (fxPreset) {
+              const effectConfigs = fxPreset.effects.map((fx, i) => ({
+                ...fx,
+                id: `persong-${fxPreset.name}-${i}`,
               }));
-              useAudioStore.getState().setMasterEffects(effectConfigs);
-              console.log(`[DJPlaylistPanel] Applied per-song FX preset: ${preset.label}`);
-            } catch (err) {
-              console.warn('[DJPlaylistPanel] Failed to apply per-song FX:', err);
+              useAudioStore.getState().setMasterEffects(effectConfigs, fxPreset.gainCompensationDb);
+              console.log(`[DJPlaylistPanel] Applied per-song FX preset: ${fxPreset.name}`);
+            } else {
+              const legacy = DJ_FX_PRESETS.find((p) => p.key === track.masterFxPreset);
+              if (legacy) {
+                const effectConfigs = legacy.effects.map((fx, i) => ({
+                  id: `persong-${legacy.key}-${i}`,
+                  category: 'tonejs' as const,
+                  type: fx.type,
+                  enabled: true,
+                  wet: fx.wet,
+                  parameters: fx.params as Record<string, number | string>,
+                }));
+                useAudioStore.getState().setMasterEffects(effectConfigs);
+                console.log(`[DJPlaylistPanel] Applied legacy per-song FX preset: ${legacy.label}`);
+              }
             }
+          } catch (err) {
+            console.warn('[DJPlaylistPanel] Failed to apply per-song FX:', err);
           }
         }
       } finally {
