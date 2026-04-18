@@ -25,6 +25,8 @@ export interface PlaylistTrack {
   fileName: string;
   /** Display name (from song.name or filename) */
   trackName: string;
+  /** Optional artist/author (e.g. from Modland's author field, HVSC's composer) */
+  author?: string;
   /** File format (MOD, XM, IT, S3M, etc.) */
   format: string;
   /** Detected BPM (0 if unknown) */
@@ -102,7 +104,7 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   markTrackBad: (playlistId: string, index: number, reason: string) => void;
   clearTrackBadFlag: (playlistId: string, index: number) => void;
