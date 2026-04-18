@@ -602,17 +602,22 @@ export class DJPipeline {
         };
       }
 
-      // No server cache — fall through to local analysis
+      // No server cache — fall through to local analysis.
+      // cacheSourceFile stores a stub entry with audioData.byteLength === 0
+      // (only sourceData is populated). Attempting decodeAudioData on the
+      // stub throws EncodingError; skip straight to re-render in that case.
       console.log(`[DJPipeline] Cached but unanalyzed: ${filename}`);
-      try {
-        const audioCtx = new OfflineAudioContext(2, 1, 44100);
-        const decoded = await audioCtx.decodeAudioData(cached.audioData.slice(0));
-        const left = decoded.getChannelData(0);
-        const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : left;
-        return this.analyzeOnly(fileBuffer, filename, left, right, decoded.sampleRate, deckId, priority);
-      } catch (err) {
-        console.warn(`[DJPipeline] Failed to decode cached audio for analysis, re-rendering: ${filename}`, err);
-        // Fall through to full render
+      if (cached.audioData.byteLength > 0) {
+        try {
+          const audioCtx = new OfflineAudioContext(2, 1, 44100);
+          const decoded = await audioCtx.decodeAudioData(cached.audioData.slice(0));
+          const left = decoded.getChannelData(0);
+          const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : left;
+          return this.analyzeOnly(fileBuffer, filename, left, right, decoded.sampleRate, deckId, priority);
+        } catch (err) {
+          console.warn(`[DJPipeline] Failed to decode cached audio for analysis, re-rendering: ${filename}`, err);
+          // Fall through to full render
+        }
       }
     }
 
