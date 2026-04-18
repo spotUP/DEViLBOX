@@ -207,6 +207,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       }
     );
 
+    // Push the PERSISTED cue device to the engine on mount. zustand
+    // .subscribe only fires on subsequent changes — without this, a
+    // returning user whose cueDeviceId was already in localStorage got
+    // no cue audio routed to their headphones until they re-opened the
+    // setup dialog and re-picked the device. Modland preview via the
+    // cue bus was silent because of this.
+    const initialCueDevice = useDJStore.getState().cueDeviceId;
+    if (initialCueDevice) {
+      void engine.cueEngine.setCueDevice(initialCueDevice);
+    }
+
     return () => {
       unsubscribePFLA();
       unsubscribePFLB();
