@@ -250,7 +250,10 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
       ref={setNodeRef}
       style={style}
       data-track-index={index}
-      className={`flex items-center gap-1.5 px-1.5 border-b border-dark-border transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''}`}
+      // select-none prevents the browser's native text-range selection from
+      // triggering on shift-click (which otherwise overlays a big blue
+      // highlight across rows and obscures the real multi-select state).
+      className={`flex items-center gap-1.5 px-1.5 border-b border-dark-border transition-colors cursor-pointer select-none ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''}`}
       onClick={(e) => onClick(index, e)}
       onDoubleClick={() => onDoubleClick(track, index)}
       onPointerEnter={() => setIsHovered(true)}
