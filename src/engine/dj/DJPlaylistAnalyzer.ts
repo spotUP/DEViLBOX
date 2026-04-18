@@ -76,15 +76,17 @@ export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
 }
 
 /**
- * Broader filter used when the user EXPLICITLY clicks Analyze. Bypasses
- * analysisSkipped so previously-failed tracks get a retry — the auto-
- * visibility check (trackNeedsAnalysis) still hides them so the button
- * doesn't stay lit forever on a dead playlist, but once the user clicks
- * for any reason we also retry the skipped ones.
+ * Filter for the normal (non-forced) click path. Same as trackNeedsAnalysis —
+ * respects analysisSkipped so tracks that fail persistently (e.g. a 422 from
+ * the server's SID renderer for a specific file) don't get retried on every
+ * Analyze click, burning Modland's 4s/track throttle.
+ *
+ * To explicitly retry skipped tracks: use the "Re-analyze all" option
+ * (force=true in analyzePlaylist), which bypasses both BPM and skipped
+ * checks for every remote track.
  */
 function trackShouldAnalyzeOnClick(track: PlaylistTrack): boolean {
-  if (!trackHasRemoteSource(track)) return false;
-  return track.bpm === 0;
+  return trackNeedsAnalysis(track);
 }
 
 /**
