@@ -1339,6 +1339,28 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     // switch playlists, edit a different one, come back — progress keeps
     // writing to the right map entry.
     const pid = activePlaylistId;
+
+    // If every remote track already has BPM, no tracks match the default
+    // filter. Treat the user's click as a request to re-analyze everything —
+    // confirm first since it's expensive (full re-download of every track).
+    let force = false;
+    if (activePlaylist && !playlistNeedsAnalysis(activePlaylist)) {
+      const remoteCount = activePlaylist.tracks.filter(
+        t => t.fileName.startsWith('modland:') || t.fileName.startsWith('hvsc:')
+      ).length;
+      if (remoteCount === 0) {
+        console.log('[DJPlaylistModal] No remote tracks to analyze');
+        return;
+      }
+      const ok = await showConfirm({
+        title: 'Re-analyze all tracks?',
+        message: `All ${remoteCount} remote tracks already have metadata. Re-analyze anyway? (Will re-download every track — Modland-throttled to ~1 per 4s.)`,
+        confirmLabel: 'Re-analyze',
+      });
+      if (!ok) return;
+      force = true;
+    }
+
     try {
       await analyzePlaylist(pid, (p) => {
         setAnalysisProgressMap(prev => {
@@ -1346,7 +1368,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           next.set(pid, { ...p });
           return next;
         });
-      });
+      }, undefined, { force });
     } finally {
       setAnalysisProgressMap(prev => {
         const next = new Map(prev);
@@ -1354,7 +1376,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         return next;
       });
     }
-  }, [activePlaylistId, analysisProgress]);
+  }, [activePlaylistId, activePlaylist, analysisProgress]);
 
   const handleCreate = useCallback(() => {
     if (!newName.trim()) return;
@@ -2577,15 +2599,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     }
 
     const maintenanceItems: MenuItemType[] = [];
-    if (needsAnalysis) {
-      maintenanceItems.push({
-        id: 'analyze',
-        label: 'Analyze unscanned',
-        icon: <BarChart3 size={12} />,
-        onClick: handleAnalyzeAll,
-        disabled: !!analysisProgress,
-      });
-    }
+    // Analyze entry is always present — label swaps to "Re-analyze all" when
+    // nothing needs analysis, which triggers a confirm-then-force-rescan flow.
+    maintenanceItems.push({
+      id: 'analyze',
+      label: needsAnalysis ? 'Analyze unscanned' : 'Re-analyze all tracks',
+      icon: <BarChart3 size={12} />,
+      onClick: handleAnalyzeAll,
+      disabled: !!analysisProgress,
+    });
     if (uncachedCount > 0 && !precacheProgress) {
       maintenanceItems.push({
         id: 'precache',
@@ -2980,10 +3002,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     )}
                   </div>
 
-                  {/* Analyze */}
-                  {needsAnalysis && !analysisProgress && (
-                    <Button variant="ghost" size="sm" onClick={handleAnalyzeAll} icon={<BarChart3 size={12} />} title="Analyze unscanned tracks for BPM, key, and energy">
-                      Analyze
+                  {/* Analyze — always visible so the user can force a re-scan. When
+                       everything already has BPM, click confirms then re-downloads all. */}
+                  {!analysisProgress && (
+                    <Button variant="ghost" size="sm" onClick={handleAnalyzeAll} icon={<BarChart3 size={12} />} title={needsAnalysis ? 'Analyze unscanned tracks for BPM, key, and energy' : 'Re-analyze all tracks (will re-download)'}>
+                      {needsAnalysis ? 'Analyze' : 'Re-analyze'}
                     </Button>
                   )}
                   {analysisProgress && (
