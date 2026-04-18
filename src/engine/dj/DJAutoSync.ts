@@ -37,9 +37,23 @@ interface PhaseInfo {
 // ── Main API ─────────────────────────────────────────────────────────────────
 
 /**
+ * Max semitone shift applied by auto-sync. Anything beyond ±3 semitones starts
+ * to sound chipmunk'd or muddy — if BPMs can't be matched within this window
+ * (even with half/double-time fallback), we'd rather have a small tempo
+ * mismatch than a musically ruined tune. Users can still manually push pitch
+ * further via the pitch fader (engine clamp is ±16).
+ */
+const AUTO_SYNC_MAX_SEMITONES = 3;
+
+/**
  * Sync one deck's BPM to another using the most accurate BPM source available.
  *
  * Priority: analysis BPM > Serato BPM > tracker-detected BPM
+ *
+ * Considers half-time and double-time as match candidates so a 170 BPM track
+ * and an 85 BPM track sync cleanly at 0 semitones. Clamps the final shift to
+ * ±AUTO_SYNC_MAX_SEMITONES.
+ *
  * Returns the semitone offset applied.
  */
 export function syncBPMToOther(deckId: DeckId, otherDeckId: DeckId): number {
@@ -53,10 +67,19 @@ export function syncBPMToOther(deckId: DeckId, otherDeckId: DeckId): number {
 
   if (targetBPM <= 0 || sourceBPM <= 0) return 0;
 
-  // Calculate semitone offset to match BPMs
-  const ratio = targetBPM / sourceBPM;
-  const semitones = 12 * Math.log2(ratio);
-  const clamped = Math.max(-16, Math.min(16, semitones));
+  // Pick the BPM ratio that needs the least pitch shift — direct, half-time
+  // (source was playing double-time), or double-time (source was half-time).
+  const candidates = [
+    targetBPM / sourceBPM,
+    targetBPM / (sourceBPM * 2),
+    (targetBPM * 2) / sourceBPM,
+  ];
+  const bestRatio = candidates.reduce((best, r) =>
+    Math.abs(Math.log2(r)) < Math.abs(Math.log2(best)) ? r : best
+  );
+
+  const semitones = 12 * Math.log2(bestRatio);
+  const clamped = Math.max(-AUTO_SYNC_MAX_SEMITONES, Math.min(AUTO_SYNC_MAX_SEMITONES, semitones));
 
   store.setDeckPitch(deckId, clamped);
 
