@@ -293,6 +293,13 @@ export class DeckEngine {
     const positionSec = this.replayer.getElapsedMs() / 1000;
     const pitch = this._currentPitchSemitones;
 
+    // Clear any pattern-scratch state before the mode swap — leftover
+    // patternScratchActive=true in audio mode suppresses reverb-send cleanup
+    // (see _disableReverbSend guard).
+    if (this.patternScratchActive) {
+      this.stopPattern();
+    }
+
     console.log(`[DeckEngine] Hot-swapping ${filename} from tracker to audio stream at ${positionSec.toFixed(2)}s`);
 
     // Load audio buffer (switches mode to 'audio' internally)
