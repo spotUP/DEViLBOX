@@ -1819,7 +1819,22 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const handleSetFxPreset = useCallback((index: number, preset: string | undefined) => {
     if (!activePlaylistId) return;
     updateTrackMeta(activePlaylistId, index, { masterFxPreset: preset });
-  }, [activePlaylistId, updateTrackMeta]);
+
+    // If this track is currently loaded on a playing deck, apply the new FX
+    // preset immediately — without this the dropdown change is silent until
+    // the track is reloaded. Reads store state after the updateTrackMeta
+    // above so applyPerSongMasterFx sees the new preset.
+    const track = activePlaylist?.tracks[index];
+    if (!track) return;
+    const decks = useDJStore.getState().decks;
+    const playingOnAnyDeck = (['A', 'B', 'C'] as const).some(
+      (id) => decks[id].fileName === track.fileName && decks[id].isPlaying,
+    );
+    if (playingOnAnyDeck) {
+      try { applyPerSongMasterFx({ ...track, masterFxPreset: preset }); }
+      catch (err) { console.warn('[DJPlaylistModal] Live per-song FX apply failed:', err); }
+    }
+  }, [activePlaylistId, activePlaylist, updateTrackMeta]);
 
   // ── Per-track re-render ──────────────────────────────────────────────────
   // Drops cached pre-render + stale analysis metadata (duration, BPM, isBad
