@@ -311,7 +311,9 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
           className="text-[9px] bg-transparent border border-dark-border/50 rounded text-text-muted/60 hover:text-text-muted px-0.5 max-w-[48px] cursor-pointer"
           title="Per-song master FX preset"
         >
-          <option value="">FX</option>
+          {/* Empty value + explicit "None" so selecting it reads as
+              "remove FX from this track" rather than an ambiguous blank. */}
+          <option value="">— None —</option>
           {MASTER_FX_GROUPS.map(({ category, presets }) => (
             <optgroup key={category} label={category}>
               {presets.map((p) => (
