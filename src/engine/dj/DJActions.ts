@@ -710,10 +710,70 @@ export function djKillAll(): void {
   }
 }
 
+/**
+ * Dump a full snapshot of dub-bus + drumpad state to the console. Used
+ * during live debugging when something is audible that shouldn't be —
+ * the output tells us which gain/wet/feedback/release is non-zero.
+ *
+ * Expose as window.__djDubDump(): call it anytime from DevTools to
+ * see the current mix without having to click through the UI.
+ */
+export function djDubDump(): void {
+  try {
+    const dpe = getDrumPadEngine();
+    if (!dpe) {
+      console.warn('[DubDump] no drumpad engine');
+      return;
+    }
+    // Access via the engine's public surface + a couple of non-private
+    // internals we read through typed accessors. Wrapped in try so a
+    // field-rename never silently breaks the dump.
+    const e = dpe as unknown as {
+      context: BaseAudioContext;
+      dubBusEnabled: boolean;
+      dubBusSettings: Record<string, unknown>;
+      dubBusInput: { gain: AudioParam };
+      dubBusReturn: { gain: AudioParam };
+      dubBusFeedback: { gain: AudioParam };
+      dubBusLPF: { frequency: AudioParam };
+      dubBusNoiseGain?: { gain: AudioParam };
+      dubDeckTaps: Map<string, { gain: AudioParam }>;
+      dubActionReleasers: Map<unknown, unknown>;
+      dubThrowTimers: Set<unknown>;
+      _draining?: boolean;
+    };
+    const deckTaps: Record<string, number> = {};
+    try { e.dubDeckTaps.forEach((tap, id) => { deckTaps[String(id)] = tap.gain.value; }); } catch { /* */ }
+    const storeDubBus = useDrumPadStore.getState().dubBus;
+    console.group('[DubDump] Dub bus state');
+    console.log('Engine enabled:', e.dubBusEnabled);
+    console.log('Engine _draining:', e._draining);
+    console.log('Input gain:', e.dubBusInput.gain.value.toFixed(4));
+    console.log('Return gain:', e.dubBusReturn.gain.value.toFixed(4));
+    console.log('Feedback gain (siren):', e.dubBusFeedback.gain.value.toFixed(4));
+    console.log('LPF cutoff (Hz):', Math.round(e.dubBusLPF.frequency.value));
+    if (e.dubBusNoiseGain) {
+      console.log('Pink-noise floor gain:', e.dubBusNoiseGain.gain.value.toFixed(6));
+    }
+    console.log('Deck taps:', deckTaps);
+    console.log('Active releasers:', e.dubActionReleasers.size);
+    console.log('Pending throw timers:', e.dubThrowTimers.size);
+    console.log('Engine settings:', e.dubBusSettings);
+    console.log('Store.dubBus:', storeDubBus);
+    const master = useAudioStore.getState().masterEffects;
+    console.log(`Master FX (${master.length}):`, master.map(fx => ({ type: fx.type, enabled: fx.enabled, wet: fx.wet })));
+    console.groupEnd();
+  } catch (err) {
+    console.warn('[DubDump] failed:', err);
+  }
+}
+
 // Expose to window for emergency console access mid-gig. Typed narrowly
-// so we don't pollute the global shape beyond the one function we need.
+// so we don't pollute the global shape beyond the functions we need.
 if (typeof window !== 'undefined') {
-  (window as unknown as { __djKillAll?: () => void }).__djKillAll = djKillAll;
+  const w = window as unknown as { __djKillAll?: () => void; __djDubDump?: () => void };
+  w.__djKillAll = djKillAll;
+  w.__djDubDump = djDubDump;
 }
 
 // ============================================================================
