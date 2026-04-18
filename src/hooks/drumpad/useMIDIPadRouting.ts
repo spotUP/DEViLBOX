@@ -12,7 +12,7 @@
  *   - Scratch actions
  *   - Note repeat
  *   - Velocity curves, mute groups, master level, bus levels sync
- *   - MIDI notes 36-43 → first 8 pads of current bank (drumpad/dj/vj views)
+ *   - MIDI notes 36-43 → first 8 pads of current bank (all views)
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -189,7 +189,15 @@ if (typeof window !== 'undefined') {
   (window as any).getMIDIPadLearningStatus = getMIDIPadLearningStatus;
   (window as any).resetMIDIPadLearning = resetMIDIPadLearning;
 }
-const PAD_VIEWS = new Set(['drumpad', 'dj', 'vj']);
+// Previously gated MIDI pad routing to just drumpad/dj/vj views, which meant
+// the controller went dead when the user was composing in tracker view,
+// mixing in arrangement, etc. The drum pad engine runs globally and its
+// audio graph is always connected, so there's no reason for a view-mode
+// guard — MIDI note-on from the hardware should always hit the pads.
+// Kept as an escape hatch in case we ever need to disable routing for a
+// specific view (leaving an empty set keeps the codepath and comments
+// straight without actually filtering anything).
+const EXCLUDED_PAD_VIEWS = new Set<string>();
 
 /* ── Module-level singleton engine ── */
 let _engine: DrumPadEngine | null = null;
@@ -683,8 +691,9 @@ export function useMIDIPadRouting() {
       const view = useUIStore.getState().activeView;
 
       // Program Change — the MPK Mini sends these from PROG SELECT + pad.
-      // PC value 0-7 loads DEViLBOX slot 1-8. Checked before the PAD_VIEWS
-      // guard so slot swaps happen even from tracker/mixer views.
+      // PC value 0-7 loads DEViLBOX slot 1-8. Checked before the view guard
+      // so slot swaps happen from every view (including the few that we
+      // might ever add to EXCLUDED_PAD_VIEWS).
       if (message.type === 'programChange' && message.program !== undefined) {
         const slot = (message.program % MPK_SLOT_COUNT) + 1;
         const id = mpkSlotId(slot);
@@ -693,7 +702,7 @@ export function useMIDIPadRouting() {
         return;
       }
 
-      if (!PAD_VIEWS.has(view)) return;
+      if (EXCLUDED_PAD_VIEWS.has(view)) return;
 
       if (message.note === undefined || message.note < MIDI_PAD_LO || message.note > MIDI_PAD_HI) return;
 
