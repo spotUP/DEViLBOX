@@ -58,15 +58,23 @@ const groupedPresets = (() => {
   return cats.map(cat => ({ category: cat, presets: byCategory[cat] }));
 })();
 
-// Collect all unique tags across all presets, DJ first
+// Collect all unique tags across all presets, DJ + Dub cluster first
 const ALL_TAGS: FxTag[] = (() => {
   const tags = new Set<FxTag>();
   for (const p of FX_PRESETS) for (const t of p.tags) tags.add(t);
   const arr = Array.from(tags).sort((a, b) => a.localeCompare(b));
-  // Move DJ to front
-  const djIdx = arr.indexOf('DJ');
-  if (djIdx > 0) { arr.splice(djIdx, 1); arr.unshift('DJ'); }
-  return arr;
+  // Pin DJ first, then Dub + its sub-categories, then the rest.
+  // Reggae/dub DJs typically want to drill into a specific dub flavour.
+  const priority: FxTag[] = ['DJ', 'Dub', 'Dub Echo', 'Dub Reverb', 'Dub Filter', 'Dub Siren', 'Dub Mod'];
+  const pinned: FxTag[] = [];
+  for (const t of priority) {
+    const idx = arr.indexOf(t);
+    if (idx >= 0) {
+      arr.splice(idx, 1);
+      pinned.push(t);
+    }
+  }
+  return [...pinned, ...arr];
 })();
 
 // ── Component ────────────────────────────────────────────────────────────────
