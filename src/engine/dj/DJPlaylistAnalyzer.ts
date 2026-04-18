@@ -62,11 +62,29 @@ export function trackHasRemoteSource(track: PlaylistTrack): boolean {
  * Check if a playlist track is missing metadata AND can be analyzed.
  * Only remote tracks (modland:/hvsc:) can be analyzed — local files
  * already had BPM detected at import time and can't be re-downloaded.
+ *
+ * Only BPM is required — it's the primary field that gates Auto DJ
+ * sync. Key/energy are nice-to-have (smart sort, transition-type
+ * selection) but missing them shouldn't force a re-download, otherwise
+ * a server that can't extract key for a given format would cause
+ * infinite re-analysis loops on every button click.
  */
 export function trackNeedsAnalysis(track: PlaylistTrack): boolean {
   if (track.analysisSkipped) return false;
   if (!trackHasRemoteSource(track)) return false;
-  return track.bpm === 0 || !track.musicalKey || track.energy == null;
+  return track.bpm === 0;
+}
+
+/**
+ * Broader filter used when the user EXPLICITLY clicks Analyze. Bypasses
+ * analysisSkipped so previously-failed tracks get a retry — the auto-
+ * visibility check (trackNeedsAnalysis) still hides them so the button
+ * doesn't stay lit forever on a dead playlist, but once the user clicks
+ * for any reason we also retry the skipped ones.
+ */
+function trackShouldAnalyzeOnClick(track: PlaylistTrack): boolean {
+  if (!trackHasRemoteSource(track)) return false;
+  return track.bpm === 0;
 }
 
 /**
@@ -98,9 +116,12 @@ export async function analyzePlaylist(
   const playlist = store.playlists.find(p => p.id === playlistId);
   if (!playlist) return { analyzed: 0, failed: 0, total: 0, failures: [] };
 
+  // Use the broader "on click" filter so user-triggered Analyze retries
+  // previously-failed (analysisSkipped) tracks — they have no metadata, we
+  // should give them another shot now that the user has explicitly asked.
   const tracksToAnalyze = playlist.tracks
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => trackNeedsAnalysis(track));
+    .filter(({ track }) => trackShouldAnalyzeOnClick(track));
 
   if (tracksToAnalyze.length === 0) return { analyzed: 0, failed: 0, total: 0, failures: [] } as AnalysisResult;
 
@@ -248,7 +269,10 @@ export async function analyzePlaylist(
       if (result.duration > 0) meta.duration = result.duration;
 
       if (Object.keys(meta).length > 0) {
-        useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, meta);
+        // Clear analysisSkipped when we got useful metadata — the track is
+        // no longer considered dead, and future automatic re-runs shouldn't
+        // skip it just because an earlier error flagged it.
+        useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, { ...meta, analysisSkipped: false });
       }
 
       // We already have the buffer downloaded — piggyback the precache work
