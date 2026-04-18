@@ -178,9 +178,18 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
   if (track.fileName.startsWith('modland:')) {
     const modlandPath = track.fileName.slice('modland:'.length);
     try {
-      const { downloadModlandFile } = await import('@/lib/modlandApi');
-      const buffer = await downloadModlandFile(modlandPath);
+      const { downloadModlandFile, downloadTFMXCompanion } = await import('@/lib/modlandApi');
+      // Grab the TFMX companion in parallel (no-op for non-TFMX formats).
+      // Auto DJ pre-render without this silently fails with UADE -1 on every
+      // mdat.* track in the playlist.
+      const [buffer, tfmxCompanion] = await Promise.all([
+        downloadModlandFile(modlandPath),
+        downloadTFMXCompanion(modlandPath),
+      ]);
       const filename = modlandPath.split('/').pop() || 'download.mod';
+      const companions = tfmxCompanion
+        ? [{ filename: tfmxCompanion.filename, buffer: tfmxCompanion.buffer }]
+        : undefined;
 
       if (isAudioFile(filename)) {
         // Audio file - no rendering needed
@@ -199,8 +208,8 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
       cacheSong(track.fileName, song);
       const bpmResult = detectBPM(song);
 
-      console.log(`[DJTrackLoader] Pre-rendering ${filename} in background...`);
-      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'high');
+      console.log(`[DJTrackLoader] Pre-rendering ${filename} in background${companions ? ` with ${companions.length} companion(s)` : ''}...`);
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'high', companions);
       console.log(`[DJTrackLoader] Pre-render complete: ${filename}`);
 
       return {
