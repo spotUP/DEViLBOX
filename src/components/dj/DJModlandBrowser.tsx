@@ -68,9 +68,11 @@ function hvscToResult(e: HVSCEntry): OnlineResult {
 
 interface DJModlandBrowserProps {
   onClose?: () => void;
+  /** `popover`: rounded card, capped at 400px (default). `fullHeight`: stretches to fill parent, no border. */
+  variant?: 'popover' | 'fullHeight';
 }
 
-export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) => {
+export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, variant = 'popover' }) => {
   const [query, setQuery] = useState('');
   const [source, setSource] = useState<SearchSource>('all');
   const [format, setFormat] = useState('');
@@ -385,6 +387,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
             duration: 180,
             addedAt: Date.now(),
           });
+          setResults((prev) => prev.filter((r) => r.key !== file.key));
           return;
         }
 
@@ -414,6 +417,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           duration,
           addedAt: Date.now(),
         });
+        setResults((prev) => prev.filter((r) => r.key !== file.key));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to add to playlist');
       } finally {
@@ -467,7 +471,11 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     <>
     <div
       ref={panelRef}
-      className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px] relative z-[99990]"
+      className={`bg-dark-bgSecondary flex flex-col gap-2 relative z-[99990] ${
+        variant === 'fullHeight'
+          ? 'h-full p-3'
+          : 'border border-dark-border rounded-lg p-3 max-h-[400px]'
+      }`}
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
