@@ -1373,7 +1373,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   const failedAnalysisCount = activePlaylist ? playlistFailedAnalysisCount(activePlaylist) : 0;
 
-  const runAnalyze = useCallback(async (opts: { force?: boolean; retryFailed?: boolean }) => {
+  const runAnalyze = useCallback(async (opts: { force?: boolean; retryFailed?: boolean; trackIds?: string[] }) => {
     if (!activePlaylistId || analysisProgress) return;
     const pid = activePlaylistId;
     try {
@@ -2274,6 +2274,21 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       items.push({ type: 'divider' });
     }
 
+    // Single-track Analyze — only makes sense for remote (modland/hvsc)
+    // sources. Local files already had BPM detected at import time, and
+    // the server renderer can't pull them down. Uses the same analyzer +
+    // progress path as the playlist-wide "Analyze" button; the playlist's
+    // live progress bar shows the one-track run too.
+    const isRemote = track.fileName.startsWith('modland:') || track.fileName.startsWith('hvsc:');
+    if (isRemote) {
+      items.push({
+        id: 'analyze-track',
+        label: track.bpm > 0 ? 'Re-analyze track' : 'Analyze track',
+        disabled: !!analysisProgress,
+        onClick: () => { void runAnalyze({ trackIds: [track.id] }); },
+      });
+    }
+
     items.push({
       id: 'edit-info',
       label: 'Edit Track Info',
@@ -2348,7 +2363,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     }
 
     return items;
-  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack]);
+  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack, runAnalyze, analysisProgress]);
 
   // ── Keyboard navigation ─────────────────────────────────────────────────
 
