@@ -520,7 +520,12 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       ref={setNodeRef}
       style={style}
       data-track-index={index}
-      className={`relative flex items-center gap-2 px-3 border-b border-dark-border/30 transition-colors cursor-pointer ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
+      // select-none — without it, shift-click on a row triggers the browser's
+      // native text-range selection across rows (the big blue highlight) even
+      // though our onClick also fires and updates multi-select. The native
+      // selection overlays the playlist selection chrome and reads as the
+      // wrong thing getting selected.
+      className={`relative flex items-center gap-2 px-3 border-b border-dark-border/30 transition-colors cursor-pointer select-none ${bgClass} ${isFocused ? 'ring-1 ring-accent-primary/40 ring-inset' : ''} ${isPreviewing ? 'border-l-2 border-l-accent-success' : ''}`}
       onClick={(e) => onClick(index, e)}
       onDoubleClick={() => onDoubleClick(track, index)}
       onPointerEnter={() => setIsHovered(true)}
