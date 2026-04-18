@@ -1816,7 +1816,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const handleDropOnPlaylist = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
-      e.stopPropagation();
+      // Do NOT stopPropagation — the drop zones are tagged with
+      // `data-dj-playlist-drop` so GlobalDragDropHandler sees the drop, clears
+      // its overlay, and skips its own file loader. If we stopPropagation here,
+      // the window-level drop listener never fires and the "Drop a file or
+      // folder here" overlay stays stuck until the user refreshes.
       if (!activePlaylistId) return;
 
       const droppedFiles = Array.from(e.dataTransfer.files);
@@ -2987,6 +2991,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                 {/* Track list */}
                 {filteredTracks.length === 0 ? (
                   <div
+                    data-dj-playlist-drop
                     className="flex-1 flex items-center justify-center border-2 border-dashed border-dark-border/30 m-4 rounded-xl"
                     onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-accent-primary/50', 'bg-accent-primary/5'); }}
                     onDragLeave={(e) => { e.currentTarget.classList.remove('border-accent-primary/50', 'bg-accent-primary/5'); }}
@@ -3007,6 +3012,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                 ) : (
                   <div
                     ref={scrollContainerRef}
+                    data-dj-playlist-drop
                     className="flex-1 overflow-y-auto min-h-0"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleDropOnPlaylist}

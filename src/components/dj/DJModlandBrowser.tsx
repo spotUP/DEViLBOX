@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Globe, Search, Loader2, X, ListPlus, AlertCircle } from 'lucide-react';
+import { Globe, Search, Loader2, X, ListPlus, AlertCircle, Play, Square } from 'lucide-react';
 import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import {
   searchModland,
@@ -103,6 +103,10 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   const [contextMenuFile, setContextMenuFile] = useState<OnlineResult | null>(null);
   const playlists = useDJPlaylistStore(s => s.playlists);
   const activePlaylistId = useDJPlaylistStore(s => s.activePlaylistId);
+
+  // Preview — single-flight play of the currently-hovered result via deck A.
+  const [previewingKey, setPreviewingKey] = useState<string | null>(null);
+  const previewDeckRef = useRef<'A' | null>(null);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -274,6 +278,23 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     items[selectedIndex]?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
+  // ── Preview (single-flight on deck A) ──────────────────────────────────
+
+  const stopPreview = useCallback(() => {
+    if (previewDeckRef.current) {
+      try {
+        getDJEngine().getDeck(previewDeckRef.current).stop();
+        useDJStore.getState().setDeckPlaying(previewDeckRef.current, false);
+      } catch { /* deck not ready */ }
+      previewDeckRef.current = null;
+    }
+    setPreviewingKey(null);
+  }, []);
+
+  // Stop preview when the browser unmounts so audio doesn't keep playing
+  // after the modal closes.
+  useEffect(() => stopPreview, [stopPreview]);
+
   // ── Download → Parse → Load to Deck ─────────────────────────────────────
 
   /** Pick the deck that isn't currently playing (fallback: A) */
@@ -376,6 +397,26 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     },
     [thirdDeckActive, onClose],
   );
+
+  // ── Preview handler (depends on loadToDeck) ─────────────────────────────
+
+  const handlePreview = useCallback(async (file: OnlineResult) => {
+    // Toggle off if already previewing this result.
+    if (previewingKey === file.key) { stopPreview(); return; }
+    stopPreview();
+    setPreviewingKey(file.key);
+    previewDeckRef.current = 'A';
+    try {
+      await loadToDeck(file, 'A');
+      try {
+        getDJEngine().getDeck('A').play();
+        useDJStore.getState().setDeckPlaying('A', true);
+      } catch { /* engine not ready */ }
+    } catch {
+      previewDeckRef.current = null;
+      setPreviewingKey(null);
+    }
+  }, [previewingKey, stopPreview, loadToDeck]);
 
   // ── Add to playlist ─────────────────────────────────────────────────────
 
@@ -677,10 +718,21 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                 </div>
 
                 {/* Actions */}
-                {isDownloading(file.key) ? (
+                {isDownloading(file.key) && previewingKey !== file.key ? (
                   <Loader2 size={12} className="animate-spin text-green-400" />
                 ) : (
                   <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handlePreview(file); }}
+                      className={`p-1 rounded transition-all ${
+                        previewingKey === file.key
+                          ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25 opacity-100'
+                          : `text-text-muted hover:text-text-primary ${hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`
+                      }`}
+                      title={previewingKey === file.key ? 'Stop preview' : 'Preview track'}
+                    >
+                      {previewingKey === file.key ? <Square size={12} /> : <Play size={12} />}
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); addToPlaylist(file); }}
                       className={`p-1 text-text-muted hover:text-amber-400 transition-opacity ${
