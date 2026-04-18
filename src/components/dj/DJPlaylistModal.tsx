@@ -258,17 +258,24 @@ function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
 }
 
 /**
- * Returns true if any deck is currently rendering this track (analysisState
- * === 'rendering'). Used to show a progress bar on the row while the pipeline
- * is pre-rendering or analyzing. Shallow-equal so idle rows don't re-render.
+ * Returns the render progress (0-100) from whichever deck is currently
+ * rendering this track, or null if no deck is rendering it. The pipeline
+ * updates `deck.analysisProgress` with a smoothed 0-100 value — render
+ * phase covers 0-50, analysis phase 50-100 — and also runs an interpolation
+ * ticker so the bar keeps advancing even between real progress events.
+ *
+ * Used to drive a real width-based progress fill on the playlist row, so
+ * the user sees smooth motion instead of a sweeping indeterminate chunk.
  */
-function useDeckRenderingTrack(fileName: string): boolean {
+function useDeckRenderingProgress(fileName: string): number | null {
   return useDJStore((s) => {
     for (const id of ['A', 'B', 'C'] as const) {
       const d = s.decks[id];
-      if (d.fileName === fileName && d.analysisState === 'rendering') return true;
+      if (d.fileName === fileName && d.analysisState === 'rendering') {
+        return d.analysisProgress ?? 0;
+      }
     }
-    return false;
+    return null;
   });
 }
 
@@ -464,7 +471,8 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
 
   const [isHovered, setIsHovered] = useState(false);
   const playingDeck = usePlayingDeckForTrack(track.fileName);
-  const deckIsRendering = useDeckRenderingTrack(track.fileName);
+  const deckRenderProgress = useDeckRenderingProgress(track.fileName);
+  const deckIsRendering = deckRenderProgress !== null;
   const isPreRendering = useIsPreRendering(track.fileName);
   // Any source of "this row is busy rendering/loading" — merged so the bar
   // doesn't flicker between the deck's rendering → loading → playing states.
@@ -662,8 +670,25 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
           something's happening. Indeterminate (CSS-animated) because the
           pipeline doesn't expose chunk-level progress. */}
       {!playingDeck && isRendering && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/50 overflow-hidden pointer-events-none" title="Rendering / analyzing track…">
-          <div className="h-full w-1/3 bg-accent-primary animate-indeterminate" />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/50 overflow-hidden pointer-events-none"
+          title={deckRenderProgress !== null ? `Rendering… ${Math.round(deckRenderProgress)}%` : 'Rendering / analyzing track…'}
+        >
+          {deckRenderProgress !== null ? (
+            // Real 0–100% fill from deck.analysisProgress (render = 0-50%,
+            // analyze = 50-100%, smoothed by the pipeline's interpolation
+            // ticker). transition-[width] gives a butter-smooth fill between
+            // discrete updates.
+            <div
+              className="h-full bg-accent-primary transition-[width] duration-200 ease-out"
+              style={{ width: `${deckRenderProgress}%` }}
+            />
+          ) : (
+            // Fallback: pipeline reports no real progress (background
+            // pre-render without a deck). Sweeping chunk at least signals
+            // "still working on it".
+            <div className="h-full w-1/3 bg-accent-primary animate-indeterminate" />
+          )}
         </div>
       )}
     </div>
