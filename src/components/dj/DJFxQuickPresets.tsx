@@ -74,12 +74,12 @@ const ALL_TAGS: FxTag[] = (() => {
 export const DJFxQuickPresets: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAddEffect, setShowAddEffect] = useState(false);
-  const [activePresetName, setActivePresetName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<FxTag | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const masterEffects = useAudioStore((s) => s.masterEffects);
   const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
   const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
   const user = useAuthStore((s) => s.user);
@@ -136,6 +136,34 @@ export const DJFxQuickPresets: React.FC = () => {
     if (isOpen) setUserPresets(getUserPresets());
   }, [isOpen, getUserPresets]);
 
+  // ── Active preset detection (driven by the live master FX chain) ────────
+  // Derived rather than stored: the button must reflect whatever preset is
+  // currently applied, regardless of how it got there — dropdown click,
+  // MasterEffectsModal load, playlist restore on reload, cloud sync, etc.
+  // A fingerprint compares effect type sequence + enabled flag + sorted
+  // parameters (id/category ignored). First match wins: factory presets
+  // are checked before user presets so a factory name isn't shadowed by a
+  // user preset with identical effects.
+  const activePresetName = useMemo(() => {
+    if (masterEffects.length === 0) return null;
+
+    const fingerprint = (effects: Array<{ type: string; enabled?: boolean; parameters?: Record<string, number | string> }>): string =>
+      effects.map(fx => {
+        const params = fx.parameters ?? {};
+        const sortedParams = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join(',');
+        return `${fx.type}|${fx.enabled !== false ? 1 : 0}|${sortedParams}`;
+      }).join('~');
+
+    const current = fingerprint(masterEffects);
+    for (const p of FX_PRESETS) {
+      if (fingerprint(p.effects) === current) return p.name;
+    }
+    for (const p of userPresets) {
+      if (fingerprint(p.effects) === current) return p.name;
+    }
+    return null;
+  }, [masterEffects, userPresets]);
+
   // ── Server sync helper (uses centralized cloudSync) ─────────────────────
 
   const syncToServer = useCallback((presets: UserMasterFxPreset[]) => {
@@ -147,9 +175,10 @@ export const DJFxQuickPresets: React.FC = () => {
   // The DJMixerEngine handles crossfading internally (equal-power, ~2 beats).
   // Just apply the new effects — the engine does the rest.
   const applyPreset = useCallback(
-    (newEffects: EffectConfig[], presetName: string, gainCompensationDb?: number) => {
+    (newEffects: EffectConfig[], _presetName: string, gainCompensationDb?: number) => {
+      // activePresetName is derived from masterEffects via fingerprint match,
+      // so setting the effects is enough — the button updates itself.
       setMasterEffects(newEffects, gainCompensationDb);
-      setActivePresetName(presetName);
       setIsOpen(false);
     },
     [setMasterEffects],
@@ -183,16 +212,14 @@ export const DJFxQuickPresets: React.FC = () => {
       const updated = getUserPresets().filter((p) => p.name !== name);
       localStorage.setItem(USER_PRESETS_KEY, JSON.stringify(updated));
       setUserPresets(updated);
-      if (activePresetName === name) setActivePresetName(null);
       // Sync to server
       await syncToServer(updated);
     },
-    [getUserPresets, activePresetName, syncToServer],
+    [getUserPresets, syncToServer],
   );
 
   const clearPresets = useCallback(() => {
     setMasterEffects([], 0);
-    setActivePresetName(null);
     setIsOpen(false);
   }, [setMasterEffects]);
 
@@ -222,7 +249,7 @@ export const DJFxQuickPresets: React.FC = () => {
         neuralModelIndex: availableEffect.neuralModelIndex,
         neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
       });
-      setActivePresetName(null);
+      // activePresetName auto-recomputes from the new masterEffects chain.
       // Don't close — let user add multiple effects
     },
     [addMasterEffectConfig],
@@ -270,7 +297,10 @@ export const DJFxQuickPresets: React.FC = () => {
             : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
           }`}
       >
-        <span className="truncate max-w-[120px]">
+        <span
+          className="truncate max-w-[180px]"
+          title={activePresetName ?? 'No preset — click to load FX presets'}
+        >
           {activePresetName || 'FX Presets'}
         </span>
         <ChevronDown size={12} className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
