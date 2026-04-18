@@ -1856,6 +1856,27 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         try { applyPerSongMasterFx(track); } catch (err) {
           console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
         }
+        // Auto-gain normalization — bring every track to ~the same loudness
+        // so you don't have to ride the channel faders between songs. Uses
+        // rmsDb/peakDb saved by the analyzer; if the track has neither
+        // (never analyzed), computeAutoTrim returns 0 and the deck plays at
+        // unity. Respects the user's per-deck autoGainEnabled toggle.
+        try {
+          if (track.rmsDb != null && track.peakDb != null) {
+            const { computeAutoTrim } = await import('@/engine/dj/DJPipeline');
+            const autoTrimDb = computeAutoTrim(track.rmsDb, track.peakDb);
+            const deckState = useDJStore.getState().decks[deckId];
+            if (deckState.autoGainEnabled) {
+              useDJStore.getState().setDeckState(deckId, {
+                rmsDb: track.rmsDb,
+                peakDb: track.peakDb,
+                trimGain: autoTrimDb,
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('[DJPlaylistModal] Auto-gain apply failed:', err);
+        }
         // Remember this track for scroll-restore on next modal open / search clear.
         if (activePlaylistId) {
           useDJPlaylistStore.getState().setLastPlayedTrack(activePlaylistId, track.id);
