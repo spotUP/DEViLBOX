@@ -24,10 +24,19 @@ import { useDJStore } from '@/stores/useDJStore';
  * @param engine - DJEngine instance
  * @param deckId - Target deck
  * @param fileBuffer - Module file data
- * @param filename - Original filename
+ * @param filename - The on-disk-style filename UADE / the pipeline uses for format
+ *                   detection (e.g. `slipstream3.fc`). Must match the actual file
+ *                   magic / eagleplayer prefix conventions.
  * @param renderIfMissing - Whether to pipeline render + analyze if not cached (default: false)
  * @param bpm - Optional BPM hint
  * @param trackName - Optional track name hint
+ * @param storeFilename - Optional identity filename for the deck's store entry
+ *                        (e.g. `modland:pub/.../slipstream3.fc` or `local:track.mod`).
+ *                        Defaults to `filename`. This is what the playlist row's
+ *                        `usePlayingDeckForTrack` compares against — when a track
+ *                        has a `modland:`/`local:`/`hvsc:` prefix, pass the
+ *                        prefixed form here so the scrubber, isPlaying badge,
+ *                        and deck-match lookups all work.
  * @returns Promise resolving to { cached: boolean, duration: number }
  */
 export async function loadUADEToDeck(
@@ -38,14 +47,17 @@ export async function loadUADEToDeck(
   renderIfMissing = false,
   bpm?: number,
   trackName?: string,
+  storeFilename?: string,
 ): Promise<{ cached: boolean; duration: number }> {
+  const identity = storeFilename ?? filename;
+
   // Check cache first
   const cached = await getCachedAudio(fileBuffer);
 
   if (cached) {
     // Load from cache (audio file mode)
-    console.log(`[DJPrerender] Loading cached audio for ${filename}`);
-    const info = await engine.loadAudioToDeck(deckId, cached.audioData, filename, trackName || cached.filename, bpm || cached.bpm);
+    console.log(`[DJPrerender] Loading cached audio for ${filename} as ${identity}`);
+    const info = await engine.loadAudioToDeck(deckId, cached.audioData, identity, trackName || cached.filename, bpm || cached.bpm);
 
     // If cached but not yet analyzed, trigger analysis in background
     if (!cached.beatGrid) {
@@ -60,12 +72,12 @@ export async function loadUADEToDeck(
   // Not cached
   if (renderIfMissing) {
     console.log(`[DJPrerender] ${filename} not cached, triggering background render + wait`);
-    
+
     // Also load the tracker song into the replayer for visuals while rendering
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
     const file = new File([fileBuffer], filename);
     const song = await parseModuleToSong(file);
-    await engine.loadToDeck(deckId, song, filename, bpm || 125);
+    await engine.loadToDeck(deckId, song, identity, bpm || 125);
 
     // Set loading state in UI (loadToDeck sets mode to audio and resets positions)
     useDJStore.getState().setDeckState(deckId, {
@@ -76,10 +88,10 @@ export async function loadUADEToDeck(
     try {
       // Use the high-priority pipeline to render and analyze
       const result = await getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'high');
-      
+
       // Load the resulting WAV directly into audio mode
-      const info = await engine.loadAudioToDeck(deckId, result.wavData, filename, trackName || filename, result.analysis?.bpm || bpm || 125);
-      
+      const info = await engine.loadAudioToDeck(deckId, result.wavData, identity, trackName || filename, result.analysis?.bpm || bpm || 125);
+
       return { cached: true, duration: info.duration };
     } catch (err) {
       console.error(`[DJPrerender] Failed to render ${filename}:`, err);

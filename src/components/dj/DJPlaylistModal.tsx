@@ -1292,7 +1292,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
             await engine.loadAudioToDeck(deckId, buffer, track.fileName);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else if (isUADEFormat(filename)) {
-            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName);
+            // Pass track.fileName as the identity so the playlist row's
+            // scrubber/isPlaying match works (otherwise the deck stores
+            // `slipstream3.fc` and the row looks for `modland:pub/.../...`).
+            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName);
             useDJStore.getState().setDeckViewMode('visualizer');
           } else {
             const blob = new File([buffer], filename, { type: 'application/octet-stream' });
@@ -1355,7 +1358,9 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               await engine.loadAudioToDeck(deckId, buffer, track.fileName, track.trackName);
               useDJStore.getState().setDeckViewMode('vinyl');
             } else if (isUADEFormat(filename)) {
-              await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName);
+              // Pass track.fileName as the identity so the playlist row's
+              // scrubber/isPlaying match works for local: UADE tracks too.
+              await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName);
               useDJStore.getState().setDeckViewMode('visualizer');
             } else {
               const blob = new File([buffer], filename, { type: 'application/octet-stream' });
