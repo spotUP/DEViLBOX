@@ -346,8 +346,9 @@ export const DJFxQuickPresets: React.FC = () => {
               )}
             </div>
 
-            {/* Category tag pills */}
-            <div className="px-2 pb-2 flex gap-1 overflow-x-auto scrollbar-none">
+            {/* Category tag pills — wrap rather than sideways-scroll so
+                 all tags (esp. the dub sub-categories) are visible at once. */}
+            <div className="px-2 pb-2 flex flex-wrap gap-1">
               <button
                 onClick={() => setActiveTag(null)}
                 className={`shrink-0 px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors
