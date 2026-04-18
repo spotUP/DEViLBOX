@@ -67,21 +67,52 @@ export const PadGrid: React.FC<PadGridProps> = ({
     releaseAllHeld();
   }, [currentBank, releaseAllHeld]);
 
-  // Dub Bus: mirror store settings into the shared pad engine so the
-  // standalone tracker/pad view gets the same bus as the DJ view. Also
-  // (re-)attach the DJ mixer whenever the bus toggles on or whenever this
-  // view mounts — the singleton engine may have been created BEFORE the DJ
-  // engine existed, in which case its original attach was a no-op.
+  // Dub Bus settings mirror — cheap, runs on every slider change.
   const dubBus = useDrumPadStore((s) => s.dubBus);
   useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.setDubBusSettings(dubBus);
-    try {
-      const dj = getDJEngineIfActive();
-      if (dj) engine.attachDJMixer(dj.mixer);
-    } catch { /* DJ engine not available — dub throws fall back to no-op */ }
+    engineRef.current?.setDubBusSettings(dubBus);
   }, [dubBus, engineRef]);
+
+  // DJ mixer (re-)attach runs ONCE on mount (and retries once a few ms later
+  // in case the DJ engine mounted after the pad-engine singleton was created).
+  // Must NOT run on every dubBus change — a re-attach disconnects/reconnects
+  // masterGain, which under load produces an audible click.
+  useEffect(() => {
+    const attach = () => {
+      const engine = engineRef.current;
+      if (!engine) return false;
+      try {
+        const dj = getDJEngineIfActive();
+        if (dj) { engine.attachDJMixer(dj.mixer); return true; }
+      } catch { /* DJ engine not available — dub throws fall back to no-op */ }
+      return false;
+    };
+    if (!attach()) {
+      const t = setTimeout(attach, 200);
+      return () => clearTimeout(t);
+    }
+  }, [engineRef]);
+
+  // ── Dub panic listener ──
+  // Fires when the user hits "KILL" in the Dub Bus popover. Drains the bus
+  // via the engine, then flips the store flag so the UI's "Enabled" toggle
+  // reflects the dead state. Also listens for `dj-panic` so ESC takes out
+  // the dub bus along with everything else.
+  useEffect(() => {
+    const onDubPanic = () => {
+      engineRef.current?.dubPanic();
+      useDrumPadStore.getState().setDubBus({ enabled: false });
+    };
+    const onDjPanic = () => {
+      engineRef.current?.dubPanic();
+    };
+    window.addEventListener('dub-panic', onDubPanic);
+    window.addEventListener('dj-panic', onDjPanic);
+    return () => {
+      window.removeEventListener('dub-panic', onDubPanic);
+      window.removeEventListener('dj-panic', onDjPanic);
+    };
+  }, [engineRef]);
 
   // Clean up velocity fade timers on unmount
   useEffect(() => {
