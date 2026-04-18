@@ -9,6 +9,9 @@
  */
 
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
+import { cacheSourceFile } from './DJAudioCache';
+import { getDJPipeline } from './DJPipeline';
+import { isAudioFile } from '@/lib/audioFileUtils';
 
 export interface AnalysisProgress {
   current: number;     // tracks processed so far (success + fail)
@@ -246,6 +249,37 @@ export async function analyzePlaylist(
 
       if (Object.keys(meta).length > 0) {
         useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, meta);
+      }
+
+      // We already have the buffer downloaded — piggyback the precache work
+      // so first play is instant after analysis. Without this, users had to
+      // run Analyze AND Cache separately, each re-downloading every track.
+      // Failures here don't fail the analysis — metadata is the important bit.
+      try {
+        await cacheSourceFile(buffer, filename);
+        if (!isAudioFile(filename)) {
+          await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+        }
+        // Grab companion files too (TFMX mdat needs smpl; UADE multi-file formats)
+        if (!isHVSC) {
+          const lcName = filename.toLowerCase();
+          if (lcName.startsWith('mdat.')) {
+            try {
+              const { downloadTFMXCompanion } = await import('@/lib/modlandApi');
+              const companion = await downloadTFMXCompanion(remotePath);
+              if (companion) await cacheSourceFile(companion.buffer, companion.filename);
+            } catch { /* non-fatal */ }
+          }
+          try {
+            const { downloadUADECompanions } = await import('@/lib/modlandApi');
+            const companions = await downloadUADECompanions(remotePath);
+            for (const c of companions) {
+              await cacheSourceFile(c.buffer, c.filename);
+            }
+          } catch { /* non-fatal */ }
+        }
+      } catch (cacheErr) {
+        console.warn(`[PlaylistAnalyzer] Cache+render failed for ${filename} (analysis metadata still saved):`, cacheErr);
       }
 
       consecutiveNetworkFailures = 0; // Reset on success
