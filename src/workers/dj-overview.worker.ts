@@ -9,10 +9,58 @@ import type { OverviewMsg, OverviewState, DeckColors } from '../engine/renderer/
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const POSITION_COLOR  = '#ef4444';
-const CUE_COLOR       = '#f59e0b';
-const LOOP_COLOR      = 'rgba(6, 182, 212, 0.25)';
-const LOOP_BORDER     = 'rgba(6, 182, 212, 0.6)';
+const POSITION_COLOR     = '#ef4444';
+const POSITION_GLOW      = 'rgba(239, 68, 68, 0.55)';
+const POSITION_EDGE      = '#7f1d1d'; // dark-red halo edge for extra contrast
+const CUE_COLOR          = '#f59e0b';
+const LOOP_COLOR         = 'rgba(6, 182, 212, 0.25)';
+const LOOP_BORDER        = 'rgba(6, 182, 212, 0.6)';
+
+/**
+ * Draw a highly visible playhead marker that stays legible against any
+ * waveform or frequency-band backdrop. From back to front:
+ *   1. Soft 14-px red glow so the eye catches it instantly.
+ *   2. 6-px bright red body with a 1-px dark halo at each edge for crisp
+ *      contrast against both light and dark waveform peaks.
+ *   3. 2-px white core down the middle so it still pops on saturated red
+ *      (frequency-band clipping, loop-fail pulse, etc.).
+ *   4. Filled triangle caps at top and bottom — the classic DJ-mixer
+ *      timeline playhead shape, doubles the silhouette so you can find
+ *      the marker in peripheral vision.
+ */
+function drawPositionMarker(
+  c: OffscreenCanvasRenderingContext2D,
+  x: number,
+  h: number,
+): void {
+  // 1. Soft outer glow
+  c.fillStyle = POSITION_GLOW;
+  c.fillRect(x - 7, 0, 14, h);
+  // 2a. Dark halo edges (crisp against bright-red underlying bars)
+  c.fillStyle = POSITION_EDGE;
+  c.fillRect(x - 4, 0, 1, h);
+  c.fillRect(x + 3, 0, 1, h);
+  // 2b. Bright red body
+  c.fillStyle = POSITION_COLOR;
+  c.fillRect(x - 3, 0, 6, h);
+  // 3. White core
+  c.fillStyle = '#ffffff';
+  c.fillRect(x - 1, 0, 2, h);
+  // 4. Triangle caps (top and bottom), 6 px wide
+  c.fillStyle = POSITION_COLOR;
+  c.beginPath();
+  c.moveTo(x - 5, 0);
+  c.lineTo(x + 5, 0);
+  c.lineTo(x, 5);
+  c.closePath();
+  c.fill();
+  c.beginPath();
+  c.moveTo(x - 5, h);
+  c.lineTo(x + 5, h);
+  c.lineTo(x, h - 5);
+  c.closePath();
+  c.fill();
+}
 
 // ─── Worker state ─────────────────────────────────────────────────────────────
 
@@ -172,10 +220,7 @@ function renderFrame(): void {
 
     if (durationSec > 0) {
       const posX = (audioPosition / durationSec) * width;
-      ctx.fillStyle = POSITION_COLOR;
-      ctx.fillRect(posX - 1, 0, 2, height);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(posX, 0, 1, height);
+      drawPositionMarker(ctx, posX, height);
     }
   } else {
     // ── Tracker module mode ──
@@ -270,10 +315,7 @@ function renderFrame(): void {
 
     if (total > 0) {
       const posX = ((songPos + 0.5) / total) * width;
-      ctx.fillStyle = POSITION_COLOR;
-      ctx.fillRect(posX - 1, 0, 2, height);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(posX, 0, 1, height);
+      drawPositionMarker(ctx, posX, height);
     }
   }
 
