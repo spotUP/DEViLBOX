@@ -256,6 +256,21 @@ function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
   );
 }
 
+/**
+ * Returns true if any deck is currently rendering this track (analysisState
+ * === 'rendering'). Used to show a progress bar on the row while the pipeline
+ * is pre-rendering or analyzing. Shallow-equal so idle rows don't re-render.
+ */
+function useDeckRenderingTrack(fileName: string): boolean {
+  return useDJStore((s) => {
+    for (const id of ['A', 'B', 'C'] as const) {
+      const d = s.decks[id];
+      if (d.fileName === fileName && d.analysisState === 'rendering') return true;
+    }
+    return false;
+  });
+}
+
 const DECK_COLOR: Record<DeckId, string> = {
   A: 'bg-accent-primary',
   B: 'bg-accent-error',
@@ -434,6 +449,10 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
 
   const [isHovered, setIsHovered] = useState(false);
   const playingDeck = usePlayingDeckForTrack(track.fileName);
+  const deckIsRendering = useDeckRenderingTrack(track.fileName);
+  // Any source of "this row is busy rendering/loading" — merged so the bar
+  // doesn't flicker between the deck's rendering → loading → playing states.
+  const isRendering = isReRendering || deckIsRendering;
 
   const bgClass = isLoading
     ? 'bg-accent-primary/10'
@@ -619,6 +638,18 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
 
       {/* Scrub bar — pinned to bottom, only while this track is playing on a deck in audio mode */}
       {playingDeck && <TrackScrubber {...playingDeck} />}
+
+      {/* Render-in-progress bar — shown when the pipeline is rendering or
+          analyzing this track (Auto DJ pre-render, precache pass, Re-render
+          button, manual load). No scrubber renders in those cases because
+          the track isn't playing yet, so this gives immediate feedback that
+          something's happening. Indeterminate (CSS-animated) because the
+          pipeline doesn't expose chunk-level progress. */}
+      {!playingDeck && isRendering && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/50 overflow-hidden pointer-events-none" title="Rendering / analyzing track…">
+          <div className="h-full w-1/3 bg-accent-primary animate-indeterminate" />
+        </div>
+      )}
     </div>
   );
 });
