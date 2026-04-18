@@ -54,7 +54,7 @@ import {
   Users,
   RefreshCw,
   Save,
-  MoreHorizontal,
+  Menu,
 } from 'lucide-react';
 import {
   useDJPlaylistStore,
@@ -2976,7 +2976,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                           items={headerMenuItems}
                           className="p-1 text-text-muted/50 hover:text-text-primary hover:bg-dark-bgHover rounded transition-colors shrink-0"
                         >
-                          <MoreHorizontal size={14} />
+                          <Menu size={14} />
                         </DropdownButton>
                         <span className="text-[10px] font-mono text-text-muted/50 ml-1 truncate">
                           {activePlaylist.tracks.length} tracks
