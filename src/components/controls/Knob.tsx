@@ -102,6 +102,11 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingValueRef = useRef<number | null>(null);
+  /* Imperative DOM update function — shared by the paramKey/imperativeSubscribe
+   * subscription AND by mouse/touch drag. When a fast path (paramKey) is
+   * active, React re-renders from value prop changes are memoed away, so the
+   * drag handler must push the visual update directly via this ref. */
+  const updateDomRef = useRef<((norm01: number) => void) | null>(null);
   const gradientId = useId();
   // Stable refs for values needed during drag (avoids stale closures).
   // Synced during render (not useEffect) to eliminate the timing gap between
@@ -325,6 +330,12 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       }
 
       pendingValueRef.current = newValue;
+      // When a fast-path subscription is active (paramKey/imperativeSubscribe),
+      // React re-renders from `value` prop changes are memoed away. Mouse drag
+      // must push the visual update through the same imperative DOM writer the
+      // subscription uses — otherwise the knob rotates audibly (audio tracks
+      // the store) but the SVG indicator sits still.
+      updateDomRef.current?.(newNorm);
       if (!rafRef.current) {
         rafRef.current = requestAnimationFrame(() => {
           if (pendingValueRef.current !== null) {
@@ -451,17 +462,10 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     y: center + (radius - 8) * Math.sin(((rotation - 90) * Math.PI) / 180),
   };
 
-  // Imperative DOM updates — bypass React render for high-rate driver callbacks.
+  // Imperative DOM updates — bypass React render for high-rate driver callbacks
+  // (MIDI/OSC) AND for mouse/touch drag when the memo is blocking value re-renders.
   // Writes x1/y1/x2/y2 on the indicator line and `d` on the arc directly.
-  // Either `imperativeSubscribe` (explicit subscriber fn) OR `paramKey`
-  // (auto-resolves via the parameter router's generic live-value registry).
   useEffect(() => {
-    let subscribe = imperativeSubscribe;
-    if (!subscribe && paramKey) {
-      const key = paramKey;
-      subscribe = (cb) => subscribeToParamLiveValue(key, cb);
-    }
-    if (!subscribe) return;
     const update = (norm01: number) => {
       const safe = Math.max(0, Math.min(1, isNaN(norm01) ? 0 : norm01));
       const rot = safe * 270 - 135;
@@ -488,6 +492,14 @@ export const Knob: React.FC<KnobProps> = React.memo(({
         arc.setAttribute('d', `M ${sp.x} ${sp.y} A ${radius} ${radius} 0 ${large} ${sweep} ${ep.x} ${ep.y}`);
       }
     };
+    updateDomRef.current = update;
+
+    let subscribe = imperativeSubscribe;
+    if (!subscribe && paramKey) {
+      const key = paramKey;
+      subscribe = (cb) => subscribeToParamLiveValue(key, cb);
+    }
+    if (!subscribe) return;
     return subscribe(update);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imperativeSubscribe, paramKey, radius, center, bipolar]);
