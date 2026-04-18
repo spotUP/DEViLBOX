@@ -1264,6 +1264,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           return;
         } catch (err) {
           console.error(`[DJPlaylistModal] Modland re-download failed:`, err);
+          // Bail instead of falling through to the local-file-picker branch
+          // below — the track has a modland: URL, not a local path, so asking
+          // the user to pick a file off disk is confusing and unwanted.
+          return;
         }
       }
 
