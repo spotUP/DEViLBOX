@@ -37,6 +37,10 @@ const MAX_CONSECUTIVE_NETWORK_FAILURES = 3;
 const MAX_PRELOAD_RETRIES = 10;  // Stop auto-DJ after this many consecutive preload failures
 const SKIP_TRANSITION_BARS = 4;
 
+// Set to true to re-enable verbose per-poll diagnostics. Off during gigs —
+// the chatty logs added noticeable overhead at 500ms × 20+ lines per tick.
+const DEBUG_POLL = false;
+
 
 // ── Singleton ────────────────────────────────────────────────────────────────
 
@@ -306,8 +310,8 @@ class DJAutoDJ {
     const timeRemaining = this.getTimeRemaining();
     this.pollCount++;
 
-    // Debug log every 10th poll (~5s)
-    if (this.pollCount % 10 === 0) {
+    // Verbose poll diagnostics — gated so gig-time console stays readable
+    if (DEBUG_POLL && this.pollCount % 10 === 0) {
       const cf = store.crossfaderPosition.toFixed(2);
       const aPlay = store.decks.A.isPlaying;
       const bPlay = store.decks.B.isPlaying;
@@ -359,7 +363,7 @@ class DJAutoDJ {
 
         // Check if it's time to start the transition
         const transitionDuration = this.getTransitionDurationSec();
-        if (this.pollCount % 4 === 0) {
+        if (DEBUG_POLL && this.pollCount % 4 === 0) {
           console.log(`[AutoDJ transition-pending] timeLeft=${timeRemaining.toFixed(1)}s, transitionDur=${transitionDuration.toFixed(1)}s, preloadedDeck=${this.preloadedDeck}`);
         }
         if (timeRemaining <= transitionDuration) {
@@ -418,7 +422,7 @@ class DJAutoDJ {
           this.crossfaderStuckCount = 0;
         }
 
-        if (this.pollCount % 4 === 0) {
+        if (DEBUG_POLL && this.pollCount % 4 === 0) {
           const incomingPlaying = store.decks[this.idleDeck].isPlaying;
           console.log(`[AutoDJ transition] outgoing=${this.activeDeck}:${outgoingPlaying} incoming=${this.idleDeck}:${incomingPlaying} cf=${crossfader.toFixed(2)} cfDone=${crossfaderDone} elapsed=${(transElapsed / 1000).toFixed(0)}s`);
         }
@@ -444,7 +448,7 @@ class DJAutoDJ {
         // Exponential backoff: 5s, 10s, 20s, 40s… capped at 60s
         const backoffMs = Math.min(60_000, 5_000 * Math.pow(2, this.preloadFailCount - 1));
         const elapsed = Date.now() - this.lastPreloadFailTime;
-        if (this.pollCount % 4 === 0) {
+        if (DEBUG_POLL && this.pollCount % 4 === 0) {
           console.log(`[AutoDJ preload-failed] failCount=${this.preloadFailCount}/${MAX_PRELOAD_RETRIES}, backoffMs=${backoffMs}, elapsed=${elapsed}ms, waiting=${elapsed < backoffMs}`);
         }
         if (elapsed < backoffMs) break; // Wait for backoff to expire
@@ -489,6 +493,9 @@ class DJAutoDJ {
       let nextIdx = store.autoDJNextTrackIndex;
       let attempts = 0;
       let consecutiveNetworkFailures = 0;
+      // Cache the server-reachable check per preloadNextTrack call so we don't
+      // ping the health endpoint once per failed track (was up to 50× per call).
+      let serverReachableCached: boolean | null = null;
 
       console.log(`[AutoDJ] preloadNextTrack() starting loop: nextIdx=${nextIdx}, maxAttempts=${MAX_SKIP_ATTEMPTS}`);
 
@@ -539,9 +546,19 @@ class DJAutoDJ {
           console.error(`[AutoDJ] Preload exception for ${track.fileName}:`, err);
         }
 
-        // Detect network-down vs bad-track: "Failed to fetch" means the server is unreachable
-        const isNetworkError = !navigator.onLine || await this.isServerUnreachable();
-        console.log(`[AutoDJ] Track load failed - network error: ${isNetworkError}, consecutiveNetworkFailures: ${consecutiveNetworkFailures}`);
+        // Detect network-down vs bad-track. Cache the server check — on a
+        // bad-link playlist (50 dead tracks), we'd otherwise ping the health
+        // endpoint 50× per preload attempt.
+        let isNetworkError: boolean;
+        if (!navigator.onLine) {
+          isNetworkError = true;
+        } else {
+          if (serverReachableCached === null) {
+            serverReachableCached = !(await this.isServerUnreachable());
+          }
+          isNetworkError = !serverReachableCached;
+        }
+        if (DEBUG_POLL) console.log(`[AutoDJ] Track load failed - network error: ${isNetworkError}, consecutiveNetworkFailures: ${consecutiveNetworkFailures}`);
         if (isNetworkError) {
           consecutiveNetworkFailures++;
           if (consecutiveNetworkFailures >= MAX_CONSECUTIVE_NETWORK_FAILURES) {
@@ -792,7 +809,7 @@ class DJAutoDJ {
       if (deck.playbackMode === 'audio') {
         const pos = deck.audioPlayer.getPosition();
         const dur = deck.audioPlayer.getDuration();
-        if (this.pollCount % 20 === 0) {
+        if (DEBUG_POLL && this.pollCount % 20 === 0) {
           console.log(`[AutoDJ getTimeRemaining] deck=${this.activeDeck} mode=audio pos=${pos.toFixed(2)}s dur=${dur.toFixed(2)}s remaining=${(dur - pos).toFixed(2)}s`);
         }
         if (dur > 0) return dur - pos;
@@ -800,14 +817,14 @@ class DJAutoDJ {
         const replayer = deck.replayer;
         const elapsedMs = replayer.getElapsedMs();
         const state = useDJStore.getState().decks[this.activeDeck];
-        if (this.pollCount % 20 === 0) {
+        if (DEBUG_POLL && this.pollCount % 20 === 0) {
           console.log(`[AutoDJ getTimeRemaining] deck=${this.activeDeck} mode=tracker elapsedMs=${elapsedMs} durationMs=${state.durationMs} remaining=${((state.durationMs - elapsedMs) / 1000).toFixed(2)}s`);
         }
         if (state.durationMs > 0) return (state.durationMs - elapsedMs) / 1000;
       }
     } catch (err) {
       // Engine not ready — fall back to store
-      if (this.pollCount % 20 === 0) {
+      if (DEBUG_POLL && this.pollCount % 20 === 0) {
         console.log(`[AutoDJ getTimeRemaining] FALLBACK to store (engine error):`, err);
       }
       const state = useDJStore.getState().decks[this.activeDeck];
