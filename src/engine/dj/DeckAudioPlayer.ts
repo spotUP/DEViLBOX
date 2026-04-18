@@ -210,21 +210,34 @@ export class DeckAudioPlayer {
     this._rateChangeTime = Tone.now();
     this._rateTrackingActive = wasPlaying;
     if (wasPlaying) {
-      // Snapshot old sources before stop — all of these are "dying" sources.
+      // Force-stop every currently-active source at the native AudioContext
+      // time WITHOUT a fadeout — bypassing Tone.Player's `stop()` which
+      // schedules a gain ramp to 0 and keeps the old audio audible during
+      // the fade. With a fadeout, `start(..., newOffset)` begins while the
+      // old sources are still ringing out → audible double playback (two
+      // copies of the track with an offset). Same pattern as setPlaybackRate
+      // already uses for multi-source zombie cleanup.
       const activeSources = (this.player as any)._activeSources as Set<any>;
-      const oldSources = new Set(activeSources);
-
-      // Stop current source then start fresh from new offset.
-      this.player.stop();
-      this.player.start(undefined, clamped);
-
-      // Remove old sources from _activeSources so that subsequent
-      // playbackRate changes (which call cancelStop() on ALL _activeSources)
-      // don't resurrect them. The old sources still complete their scheduled
-      // gain→0 fadeout and dispose themselves via their own internal timeouts.
-      for (const s of oldSources) {
-        activeSources.delete(s);
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      const rawNow = ctx.currentTime;
+      for (const s of activeSources) {
+        try {
+          // ToneBufferSource: cancel any pending stop, zero the gain envelope
+          // instantly, and stop the native source immediately.
+          if (typeof s.cancelStop === 'function') s.cancelStop();
+          if (s.gainNode?.gain) {
+            s.gainNode.gain.cancelScheduledValues(rawNow);
+            s.gainNode.gain.setValueAtTime(0, rawNow);
+          }
+          s.stop(rawNow);
+        } catch { /* already disposed */ }
       }
+      activeSources.clear();
+      // Also reset Tone.Player's internal state so `start()` treats this
+      // as a fresh start instead of queueing behind the just-killed sources.
+      try { (this.player as any)._state.setStateAtTime('stopped', rawNow); } catch { /* */ }
+
+      this.player.start(undefined, clamped);
     } else {
       this._pendingOffset = clamped;
       this._rateTrackingActive = false;
