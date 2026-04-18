@@ -386,7 +386,7 @@ export const useDJStore = create<DJStore>()(
     autoDJStatus: 'idle' as AutoDJStatus,
     autoDJCurrentTrackIndex: 0,
     autoDJNextTrackIndex: 1,
-    autoDJTransitionBars: 16,
+    autoDJTransitionBars: 8,
     autoDJShuffle: false,
     autoDJWithFilter: true,
 
