@@ -341,6 +341,8 @@ interface ModalTrackRowProps {
   onPreview: (track: PlaylistTrack, index: number) => void;
   onStopPreview: () => void;
   onSetFxPreset: (index: number, preset: string | undefined) => void;
+  onReRender: (track: PlaylistTrack, index: number) => void;
+  isReRendering: boolean;
 }
 
 const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
@@ -361,6 +363,8 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
   onPreview,
   onStopPreview,
   onSetFxPreset,
+  onReRender,
+  isReRendering,
 }) => {
   const {
     attributes,
@@ -537,6 +541,23 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
             title="Load to Deck 3"
           >3</button>
         )}
+        {/* Re-render — nukes cached pre-render + stale metadata (duration=0,
+            missing BPM, isBad flag) and re-fetches/renders from source. Useful
+            when a track shows partial data (e.g. `fuzzball-title.fred` with
+            0:00 duration) that suggests analysis failed the first time but
+            playback actually works. */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onReRender(track, index); }}
+          disabled={isReRendering}
+          title={isReRendering ? 'Re-rendering…' : 'Re-render track (clears cache + metadata)'}
+          className={`p-1 transition-colors rounded hover:bg-dark-bgHover ${
+            isReRendering
+              ? 'text-accent-primary animate-spin'
+              : 'text-text-muted/50 hover:text-accent-primary'
+          }`}
+        >
+          <RefreshCw size={10} />
+        </button>
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(index); }}
           title="Remove from playlist"
@@ -1419,6 +1440,44 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     if (!activePlaylistId) return;
     updateTrackMeta(activePlaylistId, index, { masterFxPreset: preset });
   }, [activePlaylistId, updateTrackMeta]);
+
+  // ── Per-track re-render ──────────────────────────────────────────────────
+  // Drops cached pre-render + stale analysis metadata (duration, BPM, isBad
+  // flag) and runs a fresh pre-render against the current code. Lets the user
+  // recover tracks that were marked bad by an earlier build (pre-sanitizer
+  // fix, pre-60s-timeout, etc.) without having to re-add them to the playlist.
+  const [reRenderingTracks, setReRenderingTracks] = useState<Set<string>>(new Set());
+  const handleReRender = useCallback(async (track: PlaylistTrack, index: number) => {
+    if (!activePlaylistId) return;
+    const realIndex = getRealIndex(index);
+    setReRenderingTracks(prev => new Set(prev).add(track.id));
+    try {
+      updateTrackMeta(activePlaylistId, realIndex, {
+        duration: 0,
+        bpm: 0,
+        isBad: false,
+        badReason: undefined,
+        analysisSkipped: false,
+      });
+      const { preRenderTrack } = await import('@/engine/dj/DJTrackLoader');
+      const result = await preRenderTrack(track);
+      if (result) {
+        updateTrackMeta(activePlaylistId, realIndex, {
+          duration: result.duration,
+          bpm: result.bpm,
+          isBad: false,
+        });
+      }
+    } catch (err) {
+      console.warn('[DJPlaylistModal] Re-render failed:', err);
+    } finally {
+      setReRenderingTracks(prev => {
+        const next = new Set(prev);
+        next.delete(track.id);
+        return next;
+      });
+    }
+  }, [activePlaylistId, getRealIndex, updateTrackMeta]);
 
   // ── Drop files onto playlist ──────────────────────────────────────────────
 
@@ -2628,6 +2687,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                                   onPreview={handlePreview}
                                   onStopPreview={stopPreview}
                                   onSetFxPreset={handleSetFxPreset}
+                                  onReRender={handleReRender}
+                                  isReRendering={reRenderingTracks.has(track.id)}
                                 />
                               </div>
                             );
