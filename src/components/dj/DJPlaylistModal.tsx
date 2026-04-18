@@ -935,8 +935,52 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const clearSelection = useDJPlaylistStore((s) => s.clearSelection);
   const setFocusedTrack = useDJPlaylistStore((s) => s.setFocusedTrack);
   const removeSelectedTracks = useDJPlaylistStore((s) => s.removeSelectedTracks);
-  const moveSelectedTracks = useDJPlaylistStore((s) => s.moveSelectedTracks);
+  const rawMoveSelectedTracks = useDJPlaylistStore((s) => s.moveSelectedTracks);
   const copySelectedTracks = useDJPlaylistStore((s) => s.copySelectedTracks);
+
+  /**
+   * Stop any deck that's currently playing any selected track, and reset
+   * the preview state if applicable. Called before moving/removing a set
+   * of selected tracks so audio doesn't continue against now-reparented
+   * entries and the Preview button doesn't render a stale Stop.
+   */
+  const stopAudioForSelectedTracks = useCallback(() => {
+    const store = useDJPlaylistStore.getState();
+    const pl = store.playlists.find(p => p.id === store.activePlaylistId);
+    if (!pl) return;
+    const indices = store.selectedTrackIndices;
+    if (indices.length === 0) return;
+    const fileNames = new Set<string>();
+    for (const i of indices) {
+      const t = pl.tracks[i];
+      if (t) fileNames.add(t.fileName);
+    }
+    const djState = useDJStore.getState();
+    for (const id of ['A', 'B', 'C'] as const) {
+      const fn = djState.decks[id].fileName;
+      if (fn && fileNames.has(fn)) {
+        try {
+          getDJEngine().getDeck(id).stop();
+          useDJStore.getState().setDeckPlaying(id, false);
+          useDJStore.getState().setDeckState(id, { fileName: null, trackName: undefined, isPlaying: false });
+        } catch { /* engine not ready */ }
+      }
+    }
+    setPreviewingIndex((prev) => (prev != null && indices.includes(prev)) ? null : prev);
+  }, []);
+
+  /**
+   * Wrap the store's moveSelectedTracks so audio is stopped BEFORE the
+   * move. Without this, a track playing on a deck would keep playing after
+   * its playlist entry has been reparented — and depending on timing the
+   * UI would still render the Preview-Stop button on the now-empty source
+   * row. User reported "sometimes the move didn't happen when the track
+   * was playing"; stopping audio first removes that class of races.
+   */
+  const moveSelectedTracks = useCallback((fromId: string, toId: string) => {
+    stopAudioForSelectedTracks();
+    rawMoveSelectedTracks(fromId, toId);
+  }, [rawMoveSelectedTracks, stopAudioForSelectedTracks]);
   const canUndo = useDJPlaylistStore((s) => s.canUndo);
   const canRedo = useDJPlaylistStore((s) => s.canRedo);
   const undo = useDJPlaylistStore((s) => s.undo);
