@@ -72,6 +72,11 @@ export interface DJPlaylist {
   cloudId?: string;
   /** Visibility: 'private' (default) or 'public' (visible to community) */
   visibility?: 'private' | 'public';
+  /** Id of the track most recently loaded to a deck / previewed from this
+   *  playlist. The modal uses it to scroll back to that row when the user
+   *  reopens the playlist or clears an active search. Persists across
+   *  sessions so the DJ can resume exactly where they left off. */
+  lastPlayedTrackId?: string;
 }
 
 interface DJPlaylistState {
@@ -106,6 +111,9 @@ interface DJPlaylistState {
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
   updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
+  /** Remember the last track loaded to a deck from this playlist.
+   *  Modal uses it to scroll-restore on open and after search clear. */
+  setLastPlayedTrack: (playlistId: string, trackId: string) => void;
   markTrackBad: (playlistId: string, index: number, reason: string) => void;
   clearTrackBadFlag: (playlistId: string, index: number) => void;
   clearAllBadFlags: (playlistId: string) => void;
@@ -454,6 +462,16 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
           const p = state.playlists.find((pl) => pl.id === playlistId);
           if (p && index >= 0 && index < p.tracks.length) {
             p.tracks[index].played = true;
+            p.lastPlayedTrackId = p.tracks[index].id;
+          }
+        });
+      },
+
+      setLastPlayedTrack: (playlistId: string, trackId: string) => {
+        set((state) => {
+          const p = state.playlists.find((pl) => pl.id === playlistId);
+          if (p && p.tracks.some((t) => t.id === trackId)) {
+            p.lastPlayedTrackId = trackId;
           }
         });
       },
