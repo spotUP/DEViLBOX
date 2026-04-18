@@ -417,12 +417,18 @@ async function renderWithUADE(
   // No stabilization delay needed when reiniting fresh each time
 
   // Register companion files BEFORE loading (TFMX mdat needs smpl, etc.)
-  // The companion filename must use the same safe-name rules as the module
-  // so UADE's virtual-FS lookup matches the name the player script requests.
-  const safeCompanions = companions?.map(cf => ({
-    filename: cf.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60),
-    buffer: cf.buffer,
-  })) ?? [];
+  //
+  // Do NOT sanitize the companion filename. UADE's eagleplayer requests the
+  // smpl companion using the SAME base name as the mdat it's currently
+  // playing. The main module's `safeName` regex only touches `nameOnly`
+  // (the segment before the first dot) — for TFMX that's just the "mdat"
+  // prefix, so the rest ("turrican 2 loading") is preserved verbatim.
+  // If we sanitize the companion here ("smpl.turrican 2 loading" →
+  // "smpl.turrican_2_loading"), UADE's request for "smpl.turrican 2 loading"
+  // misses the virtual FS and playback fails with score-died / ret=-1.
+  // Mirrors the main-thread worklet (public/uade/UADE.worklet.js) and the
+  // server-side renderer, both of which store companions unchanged.
+  const safeCompanions = companions ?? [];
   for (const cf of safeCompanions) {
     addUADECompanion(wasm, cf.filename, cf.buffer);
   }
