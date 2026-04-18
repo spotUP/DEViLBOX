@@ -1772,7 +1772,13 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     }
   }, [loadTrackToDeck, stopPreview]);
 
-  useEffect(() => stopPreview, [stopPreview]);
+  // NOTE: we intentionally do NOT stop the preview on unmount.
+  // Closing the playlist modal to go back to the DJ view must leave the deck
+  // playing — the "preview" here is really just loading+playing on deck A,
+  // which becomes the live DJ mix the user keeps spinning in the main view.
+  // Stopping on unmount used to kill the music mid-set, which is unacceptable
+  // for a live gig. The DJ engine owns deck lifetime; the modal is only a UI
+  // view over it.
 
   // ── Per-song FX ──────────────────────────────────────────────────────────
 
