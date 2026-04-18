@@ -147,9 +147,16 @@ const WHITE_NOISE_RISER: InstrumentPreset['config'] = {
   name: 'Noise Riser',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 800, decay: 100, sustain: 0, release: 150 },
+  // 2-second amp rise + 400 ms tail — long enough to build real tension.
+  // Sustain=0 means the note self-terminates after attack+decay (one-shot).
+  envelope: { attack: 2000, decay: 400, sustain: 0, release: 300 },
   filter: { type: 'lowpass', frequency: 300, Q: 10, rolloff: -24 },
   effects: [
+    // AutoFilter sweeps the filter from dark (200 Hz) up through 7 octaves
+    // over a 4-second LFO period — so the first 2 s of the note (attack)
+    // gets the upward half of the sweep, exactly when the amp is rising.
+    // That's what turns "noise fading in" into a proper opening-filter
+    // riser. Kept in the pad even in lean mode (AutoFilter is cheap CPU).
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 90, parameters: { frequency: 0.25, baseFrequency: 200, octaves: 7, type: 'sawtooth', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 3000 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 8, attack: 0.002, release: 0.06 } },

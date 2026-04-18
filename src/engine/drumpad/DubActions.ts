@@ -141,6 +141,46 @@ export const DUB_ACTION_HANDLERS: Record<DubActionId, DubActionHandler> = {
       return null;
     },
   },
+  dub_throw_short: {
+    label: 'Throw (short, 1/4 beat)',
+    group: 'Throw',
+    kind: 'oneshot',
+    engage: (engine, s, bpm) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      engine.throwDeck(deck, s.deckTapAmount, secPerBeat(bpm) * 0.25, 0.2);
+      return null;
+    },
+  },
+  dub_throw_long: {
+    label: 'Throw (long, 2 beats)',
+    group: 'Throw',
+    kind: 'oneshot',
+    engage: (engine, s, bpm) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      // Grabs a whole half-bar of audio — good for capturing a vocal
+      // phrase or melodic hook and echoing it out over the next couple of bars.
+      // Longer release (0.4s) so the tail breathes instead of choking off.
+      engine.throwDeck(deck, s.deckTapAmount, secPerBeat(bpm) * 2, 0.4);
+      return null;
+    },
+  },
+  dub_combo_drop: {
+    label: 'Combo Drop (mute + filter)',
+    group: 'Mute & Dub',
+    kind: 'hold',
+    engage: (engine, s) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      // The classic "drop": mute+dub takes the dry deck out, filter drop
+      // simultaneously muffles the dub return — then the filter opens back
+      // up on release while the deck fades in. Everything bundled in one pad.
+      const unmute = engine.muteAndDub(deck, s.deckTapAmount, 0.35);
+      const unfilter = engine.filterDrop(s.filterDropHz, 0.3, 0.5);
+      return () => { unmute(); unfilter(); };
+    },
+  },
 
   // ── Explicit per-deck throws (power-user pads) ──
   dub_throw_a: {
@@ -224,6 +264,26 @@ export const DUB_ACTION_HANDLERS: Record<DubActionId, DubActionHandler> = {
     group: 'Mute & Dub',
     kind: 'hold',
     engage: (engine, s) => engine.muteAndDub('C', s.deckTapAmount, 0.35),
+  },
+  dub_mute_all: {
+    label: 'Mute & Dub All (broadcast)',
+    group: 'Mute & Dub',
+    kind: 'hold',
+    engage: (engine, s) => {
+      // Mute every playing deck simultaneously — the full-mix "drop". Only
+      // the echo tail is audible for the duration of the hold. Loops over
+      // A/B/C and tracks per-deck releasers so release restores each deck
+      // independently (important for Deck C which bypasses the crossfader).
+      const state = useDJStore.getState();
+      const releasers: (() => void)[] = [];
+      for (const deck of ['A', 'B', 'C'] as const) {
+        if (state.decks[deck].isPlaying) {
+          releasers.push(engine.muteAndDub(deck, s.deckTapAmount, 0.35));
+        }
+      }
+      if (releasers.length === 0) return null;
+      return () => releasers.forEach((r) => { try { r(); } catch { /* ok */ } });
+    },
   },
 
   // ── FX — bus-only actions (don't need a deck source). ──
