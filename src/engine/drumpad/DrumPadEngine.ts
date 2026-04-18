@@ -842,8 +842,18 @@ export class DrumPadEngine {
       }
     }
 
-    // Stop any existing voice for this pad
-    this.stopPad(pad.id);
+    // Stop any existing voice for this pad. Use an immediate hard-stop
+    // (sync teardown) instead of the ramped stopPad so rapid-fire retriggers
+    // don't leave a ~60 ms cleanup timer hanging that will later kill the
+    // brand-new voice we're about to create. Previously this sequence races:
+    //   1. stopPad(pad.id) → schedules cleanupVoice in 60 ms
+    //   2. voices.set(pad.id, newVoice)
+    //   3. 60 ms timer fires → cleanupVoice(pad.id) reads THE NEW voice and
+    //      disconnects/stops it → pad goes silent after 60 ms.
+    // Same hazard with onended from the OLD source firing after replacement.
+    // Hard-stopping up-front kills the prior voice synchronously and cancels
+    // any pending cleanup, leaving the voices map clean before we populate it.
+    this.hardStopVoice(pad.id);
 
     // Enforce polyphony limit with voice stealing
     if (this.voices.size >= DrumPadEngine.MAX_VOICES) {
@@ -993,11 +1003,6 @@ export class DrumPadEngine {
     // Start playback — schedule at 0 (now) for minimum latency
     source.start(0, startOffset, playDuration);
 
-    // Auto-cleanup via onended (no extra silent-buffer timer node)
-    source.onended = () => {
-      this.cleanupVoice(pad.id);
-    };
-
     // Store voice state
     const voice: VoiceState = {
       source,
@@ -1010,7 +1015,58 @@ export class DrumPadEngine {
       velocity,
     };
 
+    // Auto-cleanup via onended (no extra silent-buffer timer node).
+    // Guard against voice replacement: if a newer voice has taken this pad's
+    // slot (e.g. rapid-fire retrigger), our onended must NOT tear that one
+    // down. Identity check on the source handles this cleanly.
+    source.onended = () => {
+      const current = this.voices.get(pad.id);
+      if (current?.source === source) {
+        this.cleanupVoice(pad.id);
+      } else {
+        // Stale onended — our source was replaced. Best-effort disconnect
+        // the local nodes so they're immediately GC-eligible.
+        try { source.disconnect(); } catch { /* ok */ }
+        try { gainNode.disconnect(); } catch { /* ok */ }
+        try { filterNode?.disconnect(); } catch { /* ok */ }
+        try { panNode.disconnect(); } catch { /* ok */ }
+        try { dubSendNode?.disconnect(); } catch { /* ok */ }
+      }
+    };
+
     this.voices.set(pad.id, voice);
+  }
+
+  /**
+   * Synchronously stop and disconnect a pad's current voice — no ramp, no
+   * timer. Used by `triggerPad` on retrigger so the replacement voice we're
+   * about to insert into the voices map isn't racing a 60 ms cleanup timer
+   * scheduled by the previous `stopPad` call. A tiny click is acceptable
+   * here; the alternative (the previous silent-after-60 ms bug) was worse.
+   */
+  private hardStopVoice(padId: number): void {
+    // Cancel any scheduled soft-stop cleanup timer first so it can't run
+    // against the voice we're about to insert.
+    const pending = this.pendingCleanupTimers.get(padId);
+    if (pending) {
+      clearTimeout(pending);
+      this.pendingCleanupTimers.delete(padId);
+    }
+    const voice = this.voices.get(padId);
+    if (!voice) return;
+    // Delete BEFORE disconnect so any onended that fires synchronously from
+    // source.stop() below sees no entry and short-circuits.
+    this.voices.delete(padId);
+    try {
+      voice.gainNode.gain.cancelScheduledValues(this.context.currentTime);
+      voice.gainNode.gain.setValueAtTime(0, this.context.currentTime);
+    } catch { /* ok */ }
+    try { voice.source?.stop(); } catch { /* already stopped */ }
+    try { voice.source?.disconnect(); } catch { /* ok */ }
+    try { voice.gainNode.disconnect(); } catch { /* ok */ }
+    try { voice.filterNode?.disconnect(); } catch { /* ok */ }
+    try { voice.panNode.disconnect(); } catch { /* ok */ }
+    try { voice.dubSendNode?.disconnect(); } catch { /* ok */ }
   }
 
   /**
@@ -1032,10 +1088,20 @@ export class DrumPadEngine {
     voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
     voice.gainNode.gain.linearRampToValueAtTime(0, now + fadeTime);
 
-    // Cleanup after fade completes
+    // Cleanup after fade completes. Snapshot the voice identity so the timer
+    // only tears down THIS voice — if another triggerPad inserts a new voice
+    // into this slot before the timer fires, we leave it alone.
+    const pendingSource = voice.source;
+    // Clear any earlier pending cleanup for this pad before replacing it.
+    const prior = this.pendingCleanupTimers.get(padId);
+    if (prior) clearTimeout(prior);
     const timer = setTimeout(() => {
       this.pendingCleanupTimers.delete(padId);
-      this.cleanupVoice(padId);
+      const cur = this.voices.get(padId);
+      if (cur?.source === pendingSource) {
+        this.cleanupVoice(padId);
+      }
+      // else: voice was replaced by a newer trigger — leave it alone.
     }, (fadeTime + 0.05) * 1000);
     this.pendingCleanupTimers.set(padId, timer);
   }
