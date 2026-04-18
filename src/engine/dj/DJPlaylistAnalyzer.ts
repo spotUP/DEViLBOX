@@ -111,17 +111,26 @@ export async function analyzePlaylist(
   playlistId: string,
   onProgress?: (progress: AnalysisProgress) => void,
   onFixNeeded?: OnFixNeeded,
+  opts?: { force?: boolean },
 ): Promise<AnalysisResult> {
   const store = useDJPlaylistStore.getState();
   const playlist = store.playlists.find(p => p.id === playlistId);
   if (!playlist) return { analyzed: 0, failed: 0, total: 0, failures: [] };
 
-  // Use the broader "on click" filter so user-triggered Analyze retries
-  // previously-failed (analysisSkipped) tracks — they have no metadata, we
-  // should give them another shot now that the user has explicitly asked.
+  // force=true: re-analyze every remote track regardless of existing metadata.
+  // Used by the "Analyze" button when everything is already scanned — lets
+  // the user re-download fresh server-side metadata (e.g. after fixing a
+  // server-side analyzer bug, or recovering wrong BPMs).
+  //
+  // Default (no force): use the broader "on click" filter so user-triggered
+  // Analyze retries previously-failed (analysisSkipped) tracks — they have
+  // no metadata, we should give them another shot now that the user has
+  // explicitly asked.
   const tracksToAnalyze = playlist.tracks
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => trackShouldAnalyzeOnClick(track));
+    .filter(({ track }) =>
+      opts?.force ? trackHasRemoteSource(track) : trackShouldAnalyzeOnClick(track)
+    );
 
   if (tracksToAnalyze.length === 0) return { analyzed: 0, failed: 0, total: 0, failures: [] } as AnalysisResult;
 
