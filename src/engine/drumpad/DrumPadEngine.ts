@@ -70,6 +70,11 @@ interface VoiceState {
   gainNode: GainNode;
   filterNode: BiquadFilterNode | null;
   panNode: StereoPannerNode;
+  // Per-voice dub send (null when pad.dubSend === 0). Held here so
+  // cleanupVoice can disconnect it — otherwise we leak orphan GainNodes
+  // connected to dubBusInput on every trigger and rely on GC to reclaim,
+  // which under long sessions builds up audible CPU overhead.
+  dubSendNode: GainNode | null;
   startTime: number;
   noteOffTime: number | null;
   velocity: number;
@@ -140,10 +145,19 @@ export class DrumPadEngine {
   private dubDeckTaps: Map<DeckId, GainNode> = new Map();
   private attachedMixer: DJMixerEngine | null = null;
   // Track mixer→tap connections so we can cleanly detach if the mixer changes.
-  private mixerTapConnections: Array<{ from: Tone.Gain; to: GainNode }> = [];
+  private mixerTapConnections: Array<{ nativeFrom: AudioNode; to: GainNode }> = [];
   // In-flight dub-action releasers, keyed so releasing the same action re-uses
   // (e.g. pressing the same throw pad while the prior one is decaying).
   private dubActionReleasers: Map<string, () => void> = new Map();
+  // Timers scheduled by throwDeck that will fire their releaser after the
+  // hold window expires. Held here so dispose() can clear them — otherwise
+  // a timer that fires post-dispose tries to write to torn-down AudioParams.
+  private dubThrowTimers: Set<ReturnType<typeof setTimeout>> = new Set();
+  // Once-per-engine warning latches so we don't flood the console during a
+  // live set if the bus is disabled or the mixer isn't attached. Reset when
+  // the condition clears (attach succeeds / bus gets enabled).
+  private _warnedBusDisabled = false;
+  private _warnedNoMixer = false;
 
   constructor(context: AudioContext, outputDestination?: AudioNode) {
     this.context = context;
@@ -252,7 +266,10 @@ export class DrumPadEngine {
     this.dubBusNoise.buffer = noiseBuffer;
     this.dubBusNoise.loop = true;
     this.dubBusNoiseGain = this.context.createGain();
-    this.dubBusNoiseGain.gain.value = Math.pow(10, -55 / 20); // ~-55 dBFS
+    // Start at 0 — bus is disabled by default; setDubBusSettings ramps this
+    // up to -55 dBFS when the bus is enabled. Prevents any noise bleed
+    // through an "enabled" return path during the constructor window.
+    this.dubBusNoiseGain.gain.value = this.dubBusEnabled ? Math.pow(10, -55 / 20) : 0;
 
     // Wire the vintage Tubby/Scientist chain:
     //   input → HPF → TapeSat → Echo → Spring
@@ -307,38 +324,53 @@ export class DrumPadEngine {
     if (this.attachedMixer === mixer) return;
     this.detachDJMixer();
     this.attachedMixer = mixer;
+    this._warnedNoMixer = false;  // we have a mixer now — reset warn latch
     let connectedCount = 0;
     for (const deck of DECK_IDS) {
       const mixerTap = mixer.getDeckTap(deck);
       const engineTap = this.dubDeckTaps.get(deck);
       if (!mixerTap || !engineTap) continue;
       try {
-        // Bridge Tone.Gain → raw GainNode via native node.
+        // Bridge Tone.Gain → raw GainNode via native node. Store the native
+        // ref (not the Tone wrapper) so detachDJMixer can disconnect using
+        // the same node identity — re-unwrapping the wrapper on detach risks
+        // returning a different internal node and silently leaking the tap.
         const native = getNativeAudioNode(mixerTap as unknown as Tone.ToneAudioNode);
         if (!native) {
           console.warn(`[DrumPadEngine] attachDJMixer deck ${deck}: could not unwrap mixer tap to native node`);
           continue;
         }
         native.connect(engineTap);
-        this.mixerTapConnections.push({ from: mixerTap, to: engineTap });
+        this.mixerTapConnections.push({ nativeFrom: native, to: engineTap });
         connectedCount++;
       } catch (err) {
         console.warn(`[DrumPadEngine] attachDJMixer: deck ${deck} tap connect failed:`, err);
       }
     }
-    console.log(`[DrumPadEngine] attachDJMixer: ${connectedCount}/${DECK_IDS.length} deck taps connected, busEnabled=${this.dubBusEnabled}`);
+    // ALSO reroute the engine's master output through mixer.samplerInput so
+    // that MIDI-triggered pad audio lands in the DJ master chain (master FX
+    // + limiter). Otherwise the singleton engine used by useMIDIPadRouting
+    // writes directly to ctx.destination, bypassing the DJ mix — that made
+    // dub throws via MIDI sound totally different from touch-triggered ones.
+    try {
+      this.rerouteOutput(mixer.samplerInput);
+    } catch (err) {
+      console.warn('[DrumPadEngine] attachDJMixer: reroute to samplerInput failed:', err);
+    }
+    console.log(`[DrumPadEngine] attachDJMixer: ${connectedCount}/${DECK_IDS.length} deck taps connected, busEnabled=${this.dubBusEnabled}, output→mixer.samplerInput`);
   }
 
   /** Tear down the deck-tap connections to the attached mixer. */
   detachDJMixer(): void {
-    for (const { from, to } of this.mixerTapConnections) {
-      try {
-        const native = getNativeAudioNode(from as unknown as Tone.ToneAudioNode);
-        native?.disconnect(to);
-      } catch { /* already gone */ }
+    for (const { nativeFrom, to } of this.mixerTapConnections) {
+      try { nativeFrom.disconnect(to); } catch { /* already gone */ }
     }
     this.mixerTapConnections = [];
     this.attachedMixer = null;
+    // Restore default output routing so pads still make sound when the DJ
+    // view isn't active. Caller that owns the destination (DJSamplerPanel)
+    // should reroute explicitly after detaching if needed.
+    try { this.rerouteOutput(this.context.destination); } catch { /* ok */ }
   }
 
   // ─── Dub Action API ────────────────────────────────────────────────────────
@@ -369,14 +401,19 @@ export class DrumPadEngine {
    */
   openDeckTap(deck: DeckId | 'ALL', amount = 1.0, attackSec = 0.005, releaseSec = 0.25): () => void {
     if (!this.dubBusEnabled) {
-      console.log('[DubBus] openDeckTap ignored — bus disabled. Turn Dub Bus on.');
+      // Log only the first time per engine — otherwise the console floods
+      // during a live set if the user forgot to enable the bus.
+      if (!this._warnedBusDisabled) {
+        console.warn('[DubBus] openDeckTap ignored — bus is disabled. Enable via the Dub Bus panel.');
+        this._warnedBusDisabled = true;
+      }
       return () => {};
     }
-    if (!this.attachedMixer) {
-      console.log('[DubBus] openDeckTap: no DJ mixer attached — deck tap will open but no deck audio will flow in');
+    if (!this.attachedMixer && !this._warnedNoMixer) {
+      console.warn('[DubBus] openDeckTap: no DJ mixer attached — deck tap will open but no deck audio will flow in (start a deck then retry).');
+      this._warnedNoMixer = true;
     }
     const decks: DeckId[] = deck === 'ALL' ? [...DECK_IDS] : [deck];
-    console.log(`[DubBus] openDeckTap deck=${deck} amount=${amount} mixerAttached=${!!this.attachedMixer}`);
     const now = this.context.currentTime;
     const clamp = Math.max(0, Math.min(1, amount));
     for (const d of decks) {
@@ -417,7 +454,11 @@ export class DrumPadEngine {
   ): void {
     if (!this.dubBusEnabled) return;
     const releaser = this.openDeckTap(deck, amount, 0.005, releaseSec);
-    setTimeout(releaser, Math.max(0, holdSec * 1000));
+    const timer = setTimeout(() => {
+      this.dubThrowTimers.delete(timer);
+      releaser();
+    }, Math.max(0, holdSec * 1000));
+    this.dubThrowTimers.add(timer);
   }
 
   /**
@@ -443,12 +484,21 @@ export class DrumPadEngine {
    */
   setSirenFeedback(amount: number, rampSec = 0.08): () => void {
     if (!this.dubBusEnabled) return () => {};
+    // Clamp to target level. On rapid retriggers the ramp always lands on
+    // `target` rather than accumulating from whatever mid-decay value the
+    // gain held — without this, mashing a siren pad could sneak the
+    // feedback up past the 0.95 cap via multiple overlapping ramps. The
+    // clamp preserves the "escalating scream" character by letting decay
+    // through naturally, but caps the re-ignite level.
     const target = Math.max(0, Math.min(0.95, amount));
     const now = this.context.currentTime;
     const g = this.dubBusFeedback.gain;
     try {
       g.cancelScheduledValues(now);
-      g.setValueAtTime(g.value, now);
+      // Hold at LOWER of (current value, target) so retriggers never bump
+      // feedback higher than the intended cap even if gain is already above it.
+      const startFrom = Math.min(g.value, target);
+      g.setValueAtTime(startFrom, now);
       g.linearRampToValueAtTime(target, now + rampSec);
     } catch { /* ok */ }
     const key = 'siren';
@@ -460,6 +510,105 @@ export class DrumPadEngine {
         g.linearRampToValueAtTime(0, release + 0.2);
       } catch { /* ok */ }
     });
+  }
+
+  /**
+   * Dub Panic — hard-flush the entire dub bus. Instantly silences audible
+   * output AND drains the SpaceEcho tape heads + SpringReverb tank so the
+   * bus is ready for a clean re-start instead of replaying whatever was
+   * caught in the internal delay lines.
+   *
+   * Called from:
+   *   - The "KILL" button in DubBusPanel
+   *   - The `dub-panic` window event (so keyboard shortcuts / panic hotkeys
+   *     can trigger it without React component coupling)
+   *   - The existing `dj-panic` (ESC in DJ view) event — dub bus is part of
+   *     "stop everything" semantics
+   *
+   * Sequence:
+   *   1. Cancel every in-flight releaser + throw timer — no late-firing ramps
+   *   2. Close deck taps immediately (no glide — a click here is preferable
+   *      to a lingering tail)
+   *   3. Zero siren feedback, open LPF fully
+   *   4. Ramp return gain to 0 (smooth — avoids click at the output)
+   *   5. Temporarily zero echo intensity + spring wet so the internal delay
+   *      lines drain through feedback multiplication instead of re-feeding
+   *      themselves indefinitely. Restore to the user's tuned values after
+   *      2 seconds so the bus is fresh when they re-enable it.
+   *   6. Flip the enabled flag — caller is expected to also update the store
+   *      so the UI reflects the kill state.
+   */
+  dubPanic(): void {
+    const now = this.context.currentTime;
+
+    // 1. Cancel every pending timer + releaser — no ghost ramps firing later.
+    for (const t of this.dubThrowTimers) clearTimeout(t);
+    this.dubThrowTimers.clear();
+    // Snapshot releasers before calling — each releaser mutates
+    // dubActionReleasers (via _scheduleExclusiveRelease's cleanup function),
+    // and iterating while mutating a Map is subtle. Snapshot + clear
+    // up-front, then fire the snapshots, guarantees every registered hold
+    // gets a release call even if the callbacks reorder the map.
+    const releasers = Array.from(this.dubActionReleasers.values());
+    this.dubActionReleasers.clear();
+    for (const release of releasers) {
+      try { release(); } catch { /* ok */ }
+    }
+
+    // 2. Slam deck taps shut. No ramp — a faint click is better than audio
+    //    slipping through during panic.
+    for (const tap of this.dubDeckTaps.values()) {
+      try {
+        tap.gain.cancelScheduledValues(now);
+        tap.gain.setValueAtTime(0, now);
+      } catch { /* ok */ }
+    }
+
+    // 3. Kill siren feedback + reset LPF to open.
+    try {
+      this.dubBusFeedback.gain.cancelScheduledValues(now);
+      this.dubBusFeedback.gain.setValueAtTime(0, now);
+      this.dubBusLPF.frequency.cancelScheduledValues(now);
+      this.dubBusLPF.frequency.setValueAtTime(20000, now);
+    } catch { /* ok */ }
+
+    // 4. Fast but smooth return ramp — 20 ms cuts audible tail almost
+    //    instantly without the click of an instant value change.
+    try {
+      const g = this.dubBusReturn.gain;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(0, now + 0.02);
+    } catch { /* ok */ }
+
+    // 5. Drain internal delay lines: zero feedback paths inside the echo and
+    //    the spring. With intensity=0, tape heads play their current content
+    //    once and then go silent (rate * 3 heads = max 900 ms of in-flight
+    //    signal). With spring.wet=0, the tank's ringing is excluded from the
+    //    return. We restore both after 2 s — enough time for the echo to
+    //    fully drain (at rate=300 ms that's more than 6 wraparounds).
+    const savedIntensity = this.dubBusSettings.echoIntensity;
+    const savedSpringWet = this.dubBusSettings.springWet;
+    try {
+      this.dubBusEcho.setIntensity(0);
+      this.dubBusSpring.wet = 0;
+    } catch { /* ok */ }
+
+    const timer = setTimeout(() => {
+      this.dubThrowTimers.delete(timer);
+      if (this._disposed) return;
+      try {
+        this.dubBusEcho.setIntensity(savedIntensity);
+        this.dubBusSpring.wet = savedSpringWet;
+      } catch { /* ok */ }
+    }, 2000);
+    this.dubThrowTimers.add(timer);
+
+    // 6. Reflect panic in our own state. Callers that want the store in
+    //    sync should set dubBus.enabled=false themselves.
+    this.dubBusEnabled = false;
+    this.dubBusSettings.enabled = false;
+    console.log('[DubBus] PANIC — bus flushed, internal buffers draining (2s).');
   }
 
   /**
@@ -503,6 +652,21 @@ export class DrumPadEngine {
     this.dubBusSettings = merged;
     if (typeof settings.enabled === 'boolean') {
       this.dubBusEnabled = settings.enabled;
+      // Reset "bus disabled" warn latch so the user gets a fresh warning if
+      // they later toggle back off without re-enabling — helpful during
+      // soundcheck when knobs move around.
+      if (settings.enabled) this._warnedBusDisabled = false;
+      // Gate the pink-noise source level alongside the bus return. Pure
+      // silence when disabled — no rogue noise floor, no wasted CPU
+      // feeding inaudible samples through the whole chain.
+      try {
+        const t = this.context.currentTime;
+        this.dubBusNoiseGain.gain.cancelScheduledValues(t);
+        this.dubBusNoiseGain.gain.setValueAtTime(this.dubBusNoiseGain.gain.value, t);
+        this.dubBusNoiseGain.gain.linearRampToValueAtTime(
+          settings.enabled ? Math.pow(10, -55 / 20) : 0, t + 0.02,
+        );
+      } catch { /* ok */ }
     }
     const now = this.context.currentTime;
     this.dubBusHPF.frequency.setTargetAtTime(merged.hpfCutoff, now, 0.02);
@@ -793,14 +957,17 @@ export class DrumPadEngine {
       gainNode.connect(outputBus);
     }
 
-    // Per-voice dub send — tap post-FX, per-voice GainNode dies with the voice.
-    // Creating one send node per voice (instead of per pad) avoids any
-    // persistent state; when source.onended fires, Web Audio GCs this subtree.
+    // Per-voice dub send — tap post-FX, held on voice state so cleanupVoice
+    // can disconnect it deterministically instead of waiting for GC. Under
+    // high polyphony a GC-only strategy accumulated hundreds of orphan
+    // GainNodes in a long session; explicit disconnect keeps the audio graph
+    // lean for hours of live use.
+    let dubSendNode: GainNode | null = null;
     if (this.dubBusEnabled && (pad.dubSend ?? 0) > 0) {
-      const voiceSend = this.context.createGain();
-      voiceSend.gain.value = pad.dubSend!;
-      voiceOutput.connect(voiceSend);
-      voiceSend.connect(this.dubBusInput);
+      dubSendNode = this.context.createGain();
+      dubSendNode.gain.value = pad.dubSend!;
+      voiceOutput.connect(dubSendNode);
+      dubSendNode.connect(this.dubBusInput);
     }
 
     // Lazily build effects chain for next trigger if pad has effects but no chain yet
@@ -837,6 +1004,7 @@ export class DrumPadEngine {
       gainNode,
       filterNode: filterNode!,
       panNode,
+      dubSendNode,
       startTime: now,
       noteOffTime: null,
       velocity,
@@ -912,6 +1080,9 @@ export class DrumPadEngine {
       voice.gainNode.disconnect();
       voice.filterNode?.disconnect();
       voice.panNode.disconnect();
+      // Disconnect the per-voice dub send so the GainNode is eligible for
+      // immediate GC instead of lingering attached to dubBusInput.
+      voice.dubSendNode?.disconnect();
       voice.source?.stop();
     } catch {
       // Ignore errors from already-stopped sources
@@ -974,7 +1145,11 @@ export class DrumPadEngine {
       try { tap.disconnect(); } catch { /* already disconnected */ }
     }
     this.dubDeckTaps.clear();
-    // Cancel any in-flight dub action releasers before tearing nodes down.
+    // Cancel any in-flight dub action releasers + pending throw timers before
+    // tearing nodes down — otherwise late-firing timers try to cancelScheduledValues
+    // on disposed AudioParams and spam the console with errors.
+    for (const t of this.dubThrowTimers) clearTimeout(t);
+    this.dubThrowTimers.clear();
     this.dubActionReleasers.clear();
     // Stop the pink noise source first so it doesn't keep the graph alive.
     try { this.dubBusNoise.stop(); } catch { /* may already be stopped */ }

@@ -189,39 +189,44 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'king-tubby-dub',
     name: 'King Tubby Dub Kit',
-    description: 'Dub throws, holds, mute-and-dub, siren, filter drop — plus siren/air-horn/riser pads. Enables the Dub Bus automatically.',
+    description: 'Auto-deck dub moves. Bank A = primary gestures (one pad per move, follows crossfader); Bank B = explicit targeting + siren/air-horn/riser synths. Enables the Dub Bus automatically.',
     create: () => {
       const program = createEmptyProgram('D-05', 'King Tubby Dub Kit');
 
-      // ── Bank A (pads 1–8): throws + mute-and-dub + siren ─────────────
-      // Throws are fire-and-forget, mute-and-dubs are hold-to-engage.
+      // ── Bank A (pads 1–8): auto-select primary moves ─────────────────
+      // Each pad resolves the active deck at press time based on crossfader
+      // position + channel volumes. One button per gesture regardless of
+      // which deck is playing. This is how real dub engineers work — they
+      // know "which signal is loud" and throw/mute THAT, not a named deck.
       const bankA: DubMapping[] = [
-        // Row 1: throws per deck + global
-        { label: 'Throw A',    color: '#ef4444', action: 'dub_throw_a',   mode: 'oneshot' },
-        { label: 'Throw B',    color: '#ef4444', action: 'dub_throw_b',   mode: 'oneshot' },
-        { label: 'Throw C',    color: '#ef4444', action: 'dub_throw_c',   mode: 'oneshot' },
-        { label: 'Throw All',  color: '#991b1b', action: 'dub_throw_all', mode: 'oneshot' },
-        // Row 2: mute-and-dub per deck + siren
-        { label: 'Mute/Dub A', color: '#8b5cf6', action: 'dub_mute_a',    mode: 'sustain' },
-        { label: 'Mute/Dub B', color: '#8b5cf6', action: 'dub_mute_b',    mode: 'sustain' },
-        { label: 'Mute/Dub C', color: '#8b5cf6', action: 'dub_mute_c',    mode: 'sustain' },
-        { label: 'Siren',      color: '#06b6d4', action: 'dub_siren',     mode: 'sustain' },
+        // Row 1: core moves
+        { label: 'Throw',       color: '#ef4444', action: 'dub_throw',       mode: 'oneshot' },
+        { label: 'Hold',        color: '#f59e0b', action: 'dub_hold',        mode: 'sustain' },
+        { label: 'Mute & Dub',  color: '#8b5cf6', action: 'dub_mute',        mode: 'sustain' },
+        { label: 'Slap Back',   color: '#f43f5e', action: 'dub_slap_back',   mode: 'oneshot' },
+        // Row 2: bus FX + broadcast variants
+        { label: 'Siren',       color: '#06b6d4', action: 'dub_siren',       mode: 'sustain' },
+        { label: 'Filter Drop', color: '#0891b2', action: 'dub_filter_drop', mode: 'sustain' },
+        { label: 'Throw All',   color: '#991b1b', action: 'dub_throw_all',   mode: 'oneshot' },
+        { label: 'Hold All',    color: '#b45309', action: 'dub_hold_all',    mode: 'sustain' },
       ];
       applyDubActionPads(program, 0, bankA);
 
-      // ── Bank B (pads 9–16): holds + filter drop + supporting synths ──
+      // ── Bank B (pads 9–16): explicit targeting + supporting synths ───
+      // For the DJ who wants "no, throw deck A specifically" overrides. Also
+      // the three classic sound-system synth sounds for moments the dub
+      // processor alone can't deliver.
       const bankBDub: DubMapping[] = [
-        { label: 'Hold A',       color: '#f59e0b', action: 'dub_hold_a',      mode: 'sustain' },
-        { label: 'Hold B',       color: '#f59e0b', action: 'dub_hold_b',      mode: 'sustain' },
-        { label: 'Hold C',       color: '#f59e0b', action: 'dub_hold_c',      mode: 'sustain' },
-        { label: 'Hold All',     color: '#b45309', action: 'dub_hold_all',    mode: 'sustain' },
-        { label: 'Filter Drop',  color: '#0891b2', action: 'dub_filter_drop', mode: 'sustain' },
+        { label: 'Throw A',    color: '#ef4444', action: 'dub_throw_a', mode: 'oneshot' },
+        { label: 'Throw B',    color: '#ef4444', action: 'dub_throw_b', mode: 'oneshot' },
+        { label: 'Throw C',    color: '#ef4444', action: 'dub_throw_c', mode: 'oneshot' },
+        { label: 'Mute/Dub A', color: '#8b5cf6', action: 'dub_mute_a',  mode: 'sustain' },
+        { label: 'Mute/Dub B', color: '#8b5cf6', action: 'dub_mute_b',  mode: 'sustain' },
       ];
       applyDubActionPads(program, 8, bankBDub);
 
       // Pads 14–16: supporting one-shot synths — classic sound-system tools
-      // that pair naturally with the dub moves. Each is a full synth pad so
-      // you can re-pitch / tweak the sound from the pad editor.
+      // that pair naturally with the dub moves.
       const bankBSynths: SynthMapping[] = [
         { label: 'Dub Siren',   color: '#fb923c', presetName: 'Dub Siren' },
         { label: 'Air Horn',    color: '#fbbf24', presetName: 'DJ Air Horn' },
@@ -253,18 +258,20 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
   {
     id: 'dub-moves-minimal',
     name: 'Dub Moves (Minimal)',
-    description: 'Compact 8-pad layout: throws + holds only. Fits any 8-pad controller.',
+    description: 'Compact 8-pad layout with auto-deck moves. Fits any 8-pad controller.',
     create: () => {
       const program = createEmptyProgram('D-06', 'Dub Moves');
+      // All auto-select variants — pads follow the active deck automatically,
+      // so the whole kit works no matter which deck is playing.
       const moves: DubMapping[] = [
-        { label: 'Throw A',   color: '#ef4444', action: 'dub_throw_a',   mode: 'oneshot' },
-        { label: 'Throw B',   color: '#ef4444', action: 'dub_throw_b',   mode: 'oneshot' },
-        { label: 'Throw C',   color: '#ef4444', action: 'dub_throw_c',   mode: 'oneshot' },
-        { label: 'Throw All', color: '#991b1b', action: 'dub_throw_all', mode: 'oneshot' },
-        { label: 'Hold A',    color: '#f59e0b', action: 'dub_hold_a',    mode: 'sustain' },
-        { label: 'Hold B',    color: '#f59e0b', action: 'dub_hold_b',    mode: 'sustain' },
-        { label: 'Hold C',    color: '#f59e0b', action: 'dub_hold_c',    mode: 'sustain' },
-        { label: 'Siren',     color: '#06b6d4', action: 'dub_siren',     mode: 'sustain' },
+        { label: 'Throw',       color: '#ef4444', action: 'dub_throw',       mode: 'oneshot' },
+        { label: 'Hold',        color: '#f59e0b', action: 'dub_hold',        mode: 'sustain' },
+        { label: 'Mute & Dub',  color: '#8b5cf6', action: 'dub_mute',        mode: 'sustain' },
+        { label: 'Slap Back',   color: '#f43f5e', action: 'dub_slap_back',   mode: 'oneshot' },
+        { label: 'Siren',       color: '#06b6d4', action: 'dub_siren',       mode: 'sustain' },
+        { label: 'Filter Drop', color: '#0891b2', action: 'dub_filter_drop', mode: 'sustain' },
+        { label: 'Throw All',   color: '#991b1b', action: 'dub_throw_all',   mode: 'oneshot' },
+        { label: 'Hold All',    color: '#b45309', action: 'dub_hold_all',    mode: 'sustain' },
       ];
       applyDubActionPads(program, 0, moves);
       return program;
