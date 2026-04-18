@@ -69,6 +69,10 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const autoDJBtnRef = useRef<HTMLButtonElement>(null);
   const [autoDJDropdownPos, setAutoDJDropdownPos] = useState({ top: 0, left: 0 });
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
+  const activePlaylistName = useDJPlaylistStore((s) => {
+    const p = s.playlists.find((pl) => pl.id === s.activePlaylistId);
+    return p?.name ?? null;
+  });
   const health = useDJHealth();
 
   // Sync status: poll phase alignment between decks at 10Hz with hysteresis
@@ -416,11 +420,19 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             </button>
             <button
               onClick={() => setShowPlaylistModal(true)}
-              className="px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
-                border-accent-primary bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
-              title="Open playlist manager"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono font-bold border transition-all
+                border-accent-primary bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 max-w-[280px]"
+              title={activePlaylistName ? `Active playlist: ${activePlaylistName}` : 'Open playlist manager'}
             >
-              Playlist
+              <span className="shrink-0">Playlist</span>
+              {activePlaylistName && (
+                <>
+                  <span className="text-accent-primary/40 shrink-0">·</span>
+                  <span className="truncate font-normal text-text-primary/80">
+                    {activePlaylistName}
+                  </span>
+                </>
+              )}
             </button>
           </div>
         </div>
