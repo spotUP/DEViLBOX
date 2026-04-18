@@ -154,6 +154,27 @@ export const PadGrid: React.FC<PadGridProps> = ({
     };
   }, []);
 
+  // ── External-trigger visual feedback ──
+  // MIDI / keyboard / programmatic triggers call into the hook's triggerPad
+  // directly and never hit handlePadTrigger. Mirror the velocity-flash
+  // behavior by listening for the hook's `drumpad-trigger` event so the
+  // on-screen pad lights up regardless of trigger source.
+  useEffect(() => {
+    const onExternalTrigger = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ padId: number; velocity: number }>).detail;
+      if (!detail) return;
+      const { padId, velocity } = detail;
+      setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
+      if (velocityTimersRef.current[padId]) clearTimeout(velocityTimersRef.current[padId]);
+      velocityTimersRef.current[padId] = setTimeout(() => {
+        setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
+        delete velocityTimersRef.current[padId];
+      }, 200);
+    };
+    window.addEventListener('drumpad-trigger', onExternalTrigger);
+    return () => window.removeEventListener('drumpad-trigger', onExternalTrigger);
+  }, []);
+
   // ── Pad trigger wrapper: delegates to hook + adds visual feedback ──
   const handlePadTrigger = useCallback((padId: number, velocity: number) => {
     hookTriggerPad(padId, velocity);
