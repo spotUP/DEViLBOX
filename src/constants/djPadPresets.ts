@@ -336,4 +336,229 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       store.setDubBus({ enabled: true });
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Sound-system / dub preset flavours — every kit uses the same 16-pad
+  // Bank A/B layout as King Tubby Dub, but each one ships a different dub-bus
+  // personality (HPF, springWet, echoWet/intensity/rate, sidechain, siren,
+  // sync division) so loading a preset sounds immediately distinct. All use
+  // auto-select moves so they work regardless of which deck is playing.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'scientist-dub',
+    name: 'Scientist Dub',
+    description: 'Heavy echo, deep HPF, long dotted-eighth repeats. Classic 70s roots dub — big, wet, hypnotic.',
+    create: () => buildFullDubKit('D-07', 'Scientist Dub'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 1.0,
+      hpfCutoff: 240,          // roll off more bass → tail sits above the mix
+      springWet: 0.45,
+      echoIntensity: 0.78,     // long trails, many repeats
+      echoWet: 0.85,
+      echoRateMs: 340,         // free-run fallback
+      echoSyncDivision: '1/8D',// dotted eighth — the roots skank
+      sidechainAmount: 0.55,
+      deckTapAmount: 1.0,
+      throwBeats: 0.5,
+      sirenFeedback: 0.88,
+      filterDropHz: 180,
+      throwQuantize: 'offbeat',// throws land on the "&"
+    }),
+  },
+  {
+    id: 'king-tubby-spring',
+    name: 'King Tubby Spring',
+    description: 'Spring-reverb dominant with tight short echo. Percussion slaps and sparse delays — the Waterhouse dub-plate sound.',
+    create: () => buildFullDubKit('D-08', 'King Tubby Spring'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 1.0,
+      hpfCutoff: 160,
+      springWet: 0.85,         // spring is the character
+      echoIntensity: 0.40,
+      echoWet: 0.45,
+      echoRateMs: 200,
+      echoSyncDivision: '1/8',
+      sidechainAmount: 0.35,
+      deckTapAmount: 0.9,
+      throwBeats: 0.25,        // short chops
+      sirenFeedback: 0.80,
+      filterDropHz: 260,
+      throwQuantize: '1/8',
+    }),
+  },
+  {
+    id: 'steppers-rub-a-dub',
+    name: 'Steppers Rub-a-Dub',
+    description: 'Tight 1/16 echoes, fast slaps, mild sidechain pump. Digital steppers / 80s dancehall feel.',
+    create: () => buildFullDubKit('D-09', 'Steppers Rub-a-Dub'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 0.95,
+      hpfCutoff: 220,
+      springWet: 0.30,
+      echoIntensity: 0.58,
+      echoWet: 0.65,
+      echoRateMs: 180,
+      echoSyncDivision: '1/16',// 16th stutter
+      sidechainAmount: 0.70,   // strong pump
+      deckTapAmount: 0.95,
+      throwBeats: 0.125,       // slap-back accents
+      sirenFeedback: 0.82,
+      filterDropHz: 240,
+      throwQuantize: '1/16',
+    }),
+  },
+  {
+    id: 'black-ark',
+    name: 'Lee Perry Black Ark',
+    description: 'Wild space echo with wow, screaming siren feedback, big filter drops. Experimental/psychedelic dub.',
+    create: () => buildFullDubKit('D-10', 'Black Ark'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 1.0,
+      hpfCutoff: 120,           // keep low end — Black Ark is bassy
+      springWet: 0.60,
+      echoIntensity: 0.82,      // runaway tails
+      echoWet: 0.90,
+      echoRateMs: 420,
+      echoSyncDivision: '1/4',  // long quarter-note repeats
+      sidechainAmount: 0.30,    // less pump → more chaos
+      deckTapAmount: 1.0,
+      throwBeats: 1.0,          // full-beat grabs
+      sirenFeedback: 0.95,      // nearly screaming
+      filterDropHz: 120,        // very muffled drop
+      throwQuantize: 'bar',     // bar-locked for maximum drama
+    }),
+  },
+  {
+    id: 'uk-soundsystem',
+    name: 'UK Sound System',
+    description: 'Sub-bass focus (low HPF), heavy echo, big throws. Channel One / Iration Steppas weight.',
+    create: () => buildFullDubKit('D-11', 'UK Sound System'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 1.0,
+      hpfCutoff: 80,            // almost no HPF → sub weight stays
+      springWet: 0.50,
+      echoIntensity: 0.70,
+      echoWet: 0.78,
+      echoRateMs: 360,
+      echoSyncDivision: '1/8D',
+      sidechainAmount: 0.50,
+      deckTapAmount: 1.0,
+      throwBeats: 2.0,          // long 2-beat phrase grabs
+      sirenFeedback: 0.85,
+      filterDropHz: 160,
+      throwQuantize: 'offbeat',
+    }),
+  },
+  {
+    id: 'digital-dub',
+    name: 'Digital Dub',
+    description: 'Crisp tight echoes, bright springs. Mad Professor / digital-era precision.',
+    create: () => buildFullDubKit('D-12', 'Digital Dub'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 0.95,
+      hpfCutoff: 300,           // brighter bus — cuts through
+      springWet: 0.40,
+      echoIntensity: 0.50,
+      echoWet: 0.60,
+      echoRateMs: 220,
+      echoSyncDivision: '1/8',
+      sidechainAmount: 0.60,
+      deckTapAmount: 0.90,
+      throwBeats: 0.5,
+      sirenFeedback: 0.80,
+      filterDropHz: 280,
+      throwQuantize: '1/8',
+    }),
+  },
+  {
+    id: 'ambient-dub',
+    name: 'Ambient Dub',
+    description: 'Long reverb, slow echo, spacious. Rhythm & Sound / Basic Channel atmosphere.',
+    create: () => buildFullDubKit('D-13', 'Ambient Dub'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 1.0,
+      hpfCutoff: 200,
+      springWet: 0.80,          // long spring tail
+      echoIntensity: 0.65,
+      echoWet: 0.55,
+      echoRateMs: 520,          // slow
+      echoSyncDivision: '1/2',  // half-note — very wide
+      sidechainAmount: 0.25,    // minimal pump → floating
+      deckTapAmount: 0.85,
+      throwBeats: 1.0,
+      sirenFeedback: 0.78,
+      filterDropHz: 200,
+      throwQuantize: 'bar',
+    }),
+  },
+  {
+    id: 'echo-chamber',
+    name: 'Echo Chamber',
+    description: 'Very long echo rates, low feedback — cavernous single-repeat slapbacks.',
+    create: () => buildFullDubKit('D-14', 'Echo Chamber'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 1.0,
+      hpfCutoff: 180,
+      springWet: 0.25,
+      echoIntensity: 0.35,       // only 1-2 repeats
+      echoWet: 0.80,             // but very wet
+      echoRateMs: 480,
+      echoSyncDivision: 'off',   // free-running — detached from grid
+      sidechainAmount: 0.40,
+      deckTapAmount: 1.0,
+      throwBeats: 0.5,
+      sirenFeedback: 0.82,
+      filterDropHz: 200,
+      throwQuantize: 'off',
+    }),
+  },
 ];
+
+/**
+ * Shared layout builder for sound-system / dub factory kits. Identical pad
+ * arrangement to the King Tubby kit (Bank A = single-deck gestures + FX,
+ * Bank B = combos + broadcast + synth one-shots), so users can swap presets
+ * without having to re-learn their muscle memory — only the bus personality
+ * changes between preset flavours.
+ */
+function buildFullDubKit(id: string, name: string): DrumProgram {
+  const program = createEmptyProgram(id, name);
+
+  const bankA: DubMapping[] = [
+    { label: 'Throw',       color: '#ef4444', action: 'dub_throw',       mode: 'oneshot' },
+    { label: 'Hold',        color: '#f59e0b', action: 'dub_hold',        mode: 'sustain' },
+    { label: 'Mute & Dub',  color: '#8b5cf6', action: 'dub_mute',        mode: 'sustain' },
+    { label: 'Slap Back',   color: '#f43f5e', action: 'dub_slap_back',   mode: 'oneshot' },
+    { label: 'Siren',       color: '#06b6d4', action: 'dub_siren',       mode: 'sustain' },
+    { label: 'Filter Drop', color: '#0891b2', action: 'dub_filter_drop', mode: 'sustain' },
+    { label: 'Short Throw', color: '#f87171', action: 'dub_throw_short', mode: 'oneshot' },
+    { label: 'Long Throw',  color: '#991b1b', action: 'dub_throw_long',  mode: 'oneshot' },
+  ];
+  applyDubActionPads(program, 0, bankA);
+
+  const bankBDub: DubMapping[] = [
+    { label: 'Combo Drop',  color: '#a78bfa', action: 'dub_combo_drop', mode: 'sustain' },
+    { label: 'Throw All',   color: '#7f1d1d', action: 'dub_throw_all',  mode: 'oneshot' },
+    { label: 'Hold All',    color: '#b45309', action: 'dub_hold_all',   mode: 'sustain' },
+    { label: 'Mute All',    color: '#6d28d9', action: 'dub_mute_all',   mode: 'sustain' },
+  ];
+  applyDubActionPads(program, 8, bankBDub);
+
+  const bankBSynths: SynthMapping[] = [
+    { label: 'Dub Siren',   color: '#fb923c', presetName: 'Dub Siren' },
+    { label: 'Air Horn',    color: '#fbbf24', presetName: 'DJ Air Horn' },
+    { label: 'Noise Riser', color: '#ec4899', presetName: 'Noise Riser' },
+  ];
+  applyOneShotByName(program, 13, bankBSynths);
+
+  return program;
+}
