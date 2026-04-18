@@ -187,6 +187,14 @@ class DJAutoDJ {
             // Mark track as played in the playlist
             const plId = useDJPlaylistStore.getState().activePlaylistId;
             if (plId) useDJPlaylistStore.getState().markTrackPlayed(plId, idx);
+            // Apply per-song master FX for the first-up track so it lands
+            // on the deck with the correct chain before play starts.
+            try {
+              const { applyPerSongMasterFx } = await import('./DJPerSongFx');
+              applyPerSongMasterFx(track);
+            } catch (err) {
+              console.warn('[AutoDJ] per-song FX apply failed for first track:', err);
+            }
             try {
               const deck = getDJEngine().getDeck(this.activeDeck);
               await deck.play();
@@ -729,6 +737,22 @@ class DJAutoDJ {
     store.setDeckPlaying(this.idleDeck, true);
     this.lastCrossfaderValue = -1;
     this.crossfaderStuckCount = 0;
+
+    // Apply per-song master FX for the incoming track so the preset takes
+    // effect the moment the crossfade starts. Manual loads do this in
+    // DJPlaylistModal's loadTrackWithProgress; Auto DJ's own load path
+    // (loadPreRenderedTrackToDeck / loadPlaylistTrackToDeck) doesn't, so
+    // per-song FX would otherwise never fire during Auto DJ transitions.
+    try {
+      const playlist = this.getActivePlaylist();
+      const incomingTrack = playlist?.tracks[store.autoDJNextTrackIndex];
+      if (incomingTrack) {
+        const { applyPerSongMasterFx } = await import('./DJPerSongFx');
+        applyPerSongMasterFx(incomingTrack);
+      }
+    } catch (err) {
+      console.warn('[AutoDJ] per-song FX apply failed:', err);
+    }
 
     const aFile = store.decks.A.fileName?.split('/').pop() ?? 'empty';
     const bFile = store.decks.B.fileName?.split('/').pop() ?? 'empty';
