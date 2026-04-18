@@ -92,6 +92,9 @@ export class DeckEngine {
   get isScratchActive(): boolean { return this._isScratchActive; }
   private backwardPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private decayRafId: number | null = null;
+  /* Timeouts scheduled by stopScratch (hardReset + phase-align). Tracked so
+   * dispose() can clear them — otherwise they fire on disposed audio nodes. */
+  private _stopScratchTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
 
   // Pattern scratch state — when a scratch preset button is active, the tracker
   // plays live at scratch speed during forward phases (full audio quality) and
@@ -207,10 +210,13 @@ export class DeckEngine {
     limiter.release.value = 0.01;    // 10ms release (fast recovery)
     this._brickwallLimiter = limiter;
     const nativeChannelGain = getNativeAudioNode(this.channelGain as unknown as Record<string, unknown>);
-    if (nativeChannelGain) {
+    const nativeOutput = getNativeAudioNode(options.outputNode as unknown as Record<string, unknown>);
+    if (nativeChannelGain && nativeOutput) {
       nativeChannelGain.connect(limiter);
-      limiter.connect((getNativeAudioNode(options.outputNode as unknown as Record<string, unknown>))!);
+      limiter.connect(nativeOutput);
     } else {
+      // Fallback to Tone-level wiring when either node has no native handle
+      // (e.g., test doubles) — bypasses the limiter but keeps audio flowing.
       this.channelGain.connect(options.outputNode);
     }
     // Analysers tap from channelGain (pre-limiter) for accurate waveform/spectrum display
@@ -360,6 +366,13 @@ export class DeckEngine {
     // Tracker replayer is only used for position tracking and visual feedback.
     this._playbackMode = 'audio';
 
+    // Clear pattern-scratch state from the previous track. Without this, a
+    // stuck patternScratchActive=true would steer setScratchVelocity into
+    // the pattern-scratch branch (line ~648) and suppress reverb-send
+    // cleanup in stopFaderLFO (line ~1139) even though no pattern is live.
+    this.patternScratchActive = false;
+    this.patternScratchDir = 1;
+
     this.unregisterOutputOverrides();
     this.restoreNativeRouting();
 
@@ -422,6 +435,10 @@ export class DeckEngine {
     this.replayer.stop();
     this.audioPlayer.stop();
     this._playbackMode = 'audio';
+
+    // Clear pattern-scratch state from previous track (see loadSong).
+    this.patternScratchActive = false;
+    this.patternScratchDir = 1;
 
     return this.audioPlayer.loadAudioFile(buffer, filename, precomputedPeaks);
   }
@@ -807,14 +824,18 @@ export class DeckEngine {
         this.replayer.setTempoMultiplier(this.restMultiplier);
       }
     };
-    setTimeout(hardReset, decayMs + 50);
-    setTimeout(hardReset, decayMs + 300);
+    const resetTimer = setTimeout(() => {
+      this._stopScratchTimeouts.delete(resetTimer);
+      hardReset();
+    }, decayMs + 50);
+    this._stopScratchTimeouts.add(resetTimer);
 
     // After the decay settles, nudge this deck back onto the beat grid so a
     // scratch never leaves the deck out of phase with the master. Only fires
     // when quantize is on, the OTHER deck is currently playing with a beat
     // grid, and this deck has its own grid.
-    setTimeout(() => {
+    const alignTimer = setTimeout(() => {
+      this._stopScratchTimeouts.delete(alignTimer);
       if (this._isScratchActive) return;
       const mode = getQuantizeMode();
       if (mode === 'off') return;
@@ -827,6 +848,7 @@ export class DeckEngine {
         phaseAlign(this.id, otherDeckId, mode === 'bar' ? 'bar' : 'beat');
       } catch { /* engine not ready */ }
     }, decayMs + 350);
+    this._stopScratchTimeouts.add(alignTimer);
   }
 
   /** Switch from forward playback to backward (reverse scratch). */
@@ -1267,6 +1289,11 @@ export class DeckEngine {
     this.filterLPF.Q.rampTo(this.filterResonance, 0.05);
   }
 
+  /** Current filter position: -1 (HPF fully closed) … 0 (bypass) … +1 (LPF fully closed). */
+  getFilterPosition(): number {
+    return this.filterPosition;
+  }
+
   // ==========================================================================
   // VOLUME (channel fader) + TRIM (auto-gain)
   // ==========================================================================
@@ -1453,6 +1480,10 @@ export class DeckEngine {
       clearTimeout(this.backwardPauseTimeoutId);
       this.backwardPauseTimeoutId = null;
     }
+    // Cancel any pending scratch-reset / phase-align timers so they can't
+    // fire on disposed audio nodes.
+    for (const t of this._stopScratchTimeouts) clearTimeout(t);
+    this._stopScratchTimeouts.clear();
     this.replayer.dispose();
     this.audioPlayer.dispose();
     this.fftAnalyser.dispose();
