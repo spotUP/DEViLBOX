@@ -397,23 +397,32 @@ export function crossfaderSweep(
 
   const clampedTarget = Math.max(0, Math.min(1, target));
 
-  const cancelSchedule = scheduleQuantized(referenceDeckId, () => {
-    const startVal = useDJStore.getState().crossfaderPosition;
-
-    startSweepTimer(sweep, key, durationMs, (_progress, eased) => {
-      const current = startVal + (clampedTarget - startVal) * eased;
-      try {
-        getDJEngine().setCrossfader(current);
-      } catch { /* engine not ready */ }
-      useDJStore.getState().setCrossfader(current);
-    }, onDone);
-  });
+  // Start the sweep IMMEDIATELY. Do NOT re-quantize here:
+  //
+  // Every caller in this file (beatMatchedTransition, filterBuildTransition,
+  // bassSwapTransition) already wraps crossfaderSweep in its own
+  // scheduleQuantized() that waits for the next downbeat. An inner
+  // scheduleQuantized would measure the phase a tick AFTER that downbeat
+  // fires — so `timeToNextDownbeat` sees barPhase≈0 and returns the FULL
+  // bar-period (≈1.9 s at 125 BPM) as the wait. That's the "crossfader
+  // stuck at 0.00 for 10 polls" bug users hit mid-Auto DJ transition: the
+  // fade sits still for two seconds, the AutoDJ watchdog gives up and
+  // force-snaps the crossfader, and the blend never happens. Kicking
+  // off the sweep synchronously keeps every transition as tight as the
+  // caller intended.
+  const startVal = useDJStore.getState().crossfaderPosition;
+  startSweepTimer(sweep, key, durationMs, (_progress, eased) => {
+    const current = startVal + (clampedTarget - startVal) * eased;
+    try {
+      getDJEngine().setCrossfader(current);
+    } catch { /* engine not ready */ }
+    useDJStore.getState().setCrossfader(current);
+  }, onDone);
 
   return () => {
     sweep.cancelled = true;
     clearInterval(sweep.id as ReturnType<typeof setInterval>);
     activeSweeps.delete(key);
-    cancelSchedule();
   };
 }
 
