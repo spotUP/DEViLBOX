@@ -75,28 +75,25 @@ function scPad(label: string, category: string, colorNum: number, actionId: Scra
 // ─── Default DJ FX Pads (16) ─────────────────────────────────────────────────
 
 export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
-  // Row 1: Deck filter & echo (real DJ engine effects)
+  // Row 1: Filter sweeps + big dub throws — the "make a moment" pads.
   fxPad('HPF Sweep',    'Deck',        DJ_DECK_FX,     'fx_deck_hpf_sweep'),
   fxPad('LPF Sweep',    'Deck',        DJ_DECK_FX,     'fx_deck_lpf_sweep'),
-  fxPad('Echo Out',     'Deck',        DJ_DELAY,       'fx_deck_echo_out'),
-  fxPad('Brake',        'Deck',        DJ_DISTORTION,  'fx_deck_brake'),
-  // Row 2: EQ kills & filter reset (real DJ engine effects)
+  fxPad('Dub Echo',     'Delay',       DJ_DELAY,       'fx_dub_echo'),
+  fxPad('Reverb Wash',  'Reverb',      DJ_REVERB,      'fx_reverb_wash'),
+  // Row 2: EQ kills + slip mode (live juggling essential).
   fxPad('Kill Lo',      'Deck',        DJ_STUTTER,     'fx_deck_kill_lo'),
   fxPad('Kill Mid',     'Deck',        DJ_DELAY,       'fx_deck_kill_mid'),
   fxPad('Kill Hi',      'Deck',        DJ_DECK_FX,     'fx_deck_kill_hi'),
-  fxPad('Filt Reset',   'Deck',        DJ_FILTER,      'fx_deck_filter_reset'),
-  // Row 3: Beat jumps (real DJ engine effects)
-  fxPad('Jump −16',     'Deck',        DJ_MODULATION,  'fx_deck_jump_m16'),
-  fxPad('Jump −4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_m4'),
-  fxPad('Jump +4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_p4'),
-  fxPad('Jump +16',     'Deck',        DJ_MODULATION,  'fx_deck_jump_p16'),
-  // Row 4: Performance FX (deck-scoped tape/vinyl moves + stutter + riser).
-  // The old `fx_dub_siren` / `fx_air_horn` slots were removed — those moved
-  // to the DubSiren synth family. Use the One-Shots or King Tubby Dub Kit
-  // preset to get a siren/horn pad with the full synth editor + dub bus.
+  fxPad('Slip',         'Deck',        DJ_DECK_FX,     'fx_slip_toggle'),
+  // Row 3: Delay + character throws — the "spice it up" pads.
+  fxPad('Ping Pong',    'Delay',       DJ_DELAY,       'fx_ping_pong'),
+  fxPad('Tape Echo',    'Delay',       DJ_TAPE,        'fx_tape_echo'),
+  fxPad('Phaser',       'Modulation',  DJ_MODULATION,  'fx_phaser'),
+  fxPad('Bitcrush',     'Distortion',  DJ_DISTORTION,  'fx_bitcrush'),
+  // Row 4: Stutter, tempo tricks, texture — the "rhythm break" pads.
   fxPad('Stutter 1/8',  'Stutter',     DJ_STUTTER,     'fx_stutter_8'),
-  fxPad('Tape Stop',    'Tape',        DJ_TAPE,        'fx_tape_stop'),
-  fxPad('Vinyl Brake',  'Tape',        DJ_DISTORTION,  'fx_vinyl_brake'),
+  fxPad('Stutter 1/16', 'Stutter',     DJ_STUTTER,     'fx_stutter_16'),
+  fxPad('Half Speed',   'Tape',        DJ_TAPE,        'fx_half_speed'),
   fxPad('Noise Riser',  'Filter',      DJ_FILTER,      'fx_noise_riser'),
 ];
 
