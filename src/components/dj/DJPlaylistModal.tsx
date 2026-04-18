@@ -234,18 +234,11 @@ function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
     useShallow((s) => {
       for (const id of ['A', 'B', 'C'] as const) {
         const d = s.decks[id];
-        const fnMatch = d.fileName === fileName;
-        if (d.isPlaying && fnMatch) {
-          console.warn('[scrub] match', id, { playbackMode: d.playbackMode, durationMs: d.durationMs, totalPositions: d.totalPositions, songPos: d.songPos, audioPosition: d.audioPosition, fileName: d.fileName });
-        }
-        if (!d.isPlaying || !fnMatch) continue;
+        if (!d.isPlaying || d.fileName !== fileName) continue;
         const hasProgress =
           (d.playbackMode === 'audio' && d.durationMs > 0) ||
           (d.playbackMode === 'tracker' && d.totalPositions > 0);
-        if (!hasProgress) {
-          console.warn('[scrub] no progress — gating scrubber', id, { playbackMode: d.playbackMode, durationMs: d.durationMs, totalPositions: d.totalPositions });
-          continue;
-        }
+        if (!hasProgress) continue;
         return {
           deckId: id,
           playbackMode: d.playbackMode,
@@ -691,7 +684,18 @@ interface DJPlaylistModalProps {
   onClose: () => void;
 }
 
+/**
+ * Outer shell — lightweight gate. When the modal is closed, this component
+ * runs zero store subscriptions / memos / effects. The heavy content lives
+ * in DJPlaylistModalContent and only mounts when `isOpen` becomes true.
+ */
 export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+  return <DJPlaylistModalContent onClose={onClose} />;
+};
+
+const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const isOpen = true;
   // ── Store bindings ──────────────────────────────────────────────────────
   const playlists = useDJPlaylistStore((s) => s.playlists);
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
