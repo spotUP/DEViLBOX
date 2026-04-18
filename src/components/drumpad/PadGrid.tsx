@@ -93,17 +93,25 @@ export const PadGrid: React.FC<PadGridProps> = ({
     }
   }, [engineRef]);
 
-  // ── Dub panic listener ──
-  // Fires when the user hits "KILL" in the Dub Bus popover. Drains the bus
-  // via the engine, then flips the store flag so the UI's "Enabled" toggle
-  // reflects the dead state. Also listens for `dj-panic` so ESC takes out
-  // the dub bus along with everything else.
+  // ── Dub / DJ panic listeners ──
+  // `dub-panic` fires from the "KILL" button in the Dub Bus popover and from
+  // ESC in the drumpad view. Drains the bus via the engine then flips the
+  // store flag so the UI reflects the dead state.
+  // `dj-panic` is the broader panic from the DJ view's ESC and from our own
+  // drumpad ESC — must ALSO release every held pad (dub hold, DJ FX sustain,
+  // PTT, synth note, sample sustain) plus stop every voice on the engine.
+  // Without this, a held pad at ESC time continues ringing after the panic
+  // "clears" everything else.
   useEffect(() => {
     const onDubPanic = () => {
       engineRef.current?.dubPanic();
       useDrumPadStore.getState().setDubBus({ enabled: false });
     };
     const onDjPanic = () => {
+      // Order matters: release hold-state first so per-action disengage
+      // (DJ FX, PTT, synth noteOff) runs before we kill the bus + voices.
+      releaseAllHeld();
+      engineRef.current?.stopAll();
       engineRef.current?.dubPanic();
     };
     window.addEventListener('dub-panic', onDubPanic);
@@ -112,7 +120,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
       window.removeEventListener('dub-panic', onDubPanic);
       window.removeEventListener('dj-panic', onDjPanic);
     };
-  }, [engineRef]);
+  }, [engineRef, releaseAllHeld]);
 
   // Clean up velocity fade timers on unmount
   useEffect(() => {
@@ -275,12 +283,14 @@ export const PadGrid: React.FC<PadGridProps> = ({
   const contextMenuCallbacks = useMemo(() => ({
     onEdit: (id: number) => onPadSelect(id),
     onPreview: (id: number) => {
-      const engine = engineRef.current;
-      if (engine) {
-        const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
-        const p = prog?.pads.find(pp => pp.id === id);
-        if (p) engine.triggerPad(p, 100);
-      }
+      // Use the full hook path — NOT engine.triggerPad directly — so Preview
+      // honours every pad action kind (synth attack, DJ FX engage, dub
+      // action, scratch, PTT) AND schedules a matching release ~300 ms later.
+      // The direct engine.triggerPad(pad, 100) call previously bypassed all
+      // of that, so previewing a sustain-mode synth pad or a dub-hold pad
+      // from the context menu left the pad stuck.
+      hookTriggerPad(id, 100);
+      setTimeout(() => hookReleasePad(id), 300);
     },
     onRename: (id: number) => {
       const prog = useDrumPadStore.getState().programs.get(useDrumPadStore.getState().currentProgramId);
@@ -297,7 +307,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
         onPadSelect(id);
       }
     },
-  }), [onPadSelect, onLoadSample, engineRef]);
+  }), [onPadSelect, onLoadSample, engineRef, hookTriggerPad, hookReleasePad]);
 
   const contextMenuItems = usePadContextMenu(contextMenuPadId, contextMenuCallbacks);
 

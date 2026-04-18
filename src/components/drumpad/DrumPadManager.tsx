@@ -109,16 +109,26 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     }
   }, [loadProgram]);
 
-  // Escape key handler — pad triggering handled by useDrumPadKeyboard hook
+  // Escape key handler — pad triggering handled by useDrumPadKeyboard hook.
+  //
+  // Every ESC must flush held pad state before changing modes. Otherwise a
+  // held dub hold / DJ FX sustain / PTT / synth note / sample sustain
+  // continues running after the user bailed out, which is exactly the
+  // "stuck note" scenario that ruins a live set. We broadcast `dub-panic`
+  // (PadGrid listens → engine.dubPanic) and `dj-panic` (DJ engine listens →
+  // drumpad stopAll + dub kill + EQ/filter reset), which together cover
+  // every pad action kind. It's safe to dispatch both even when only one
+  // view is mounted — unhandled panics are no-ops.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Escape to close (always works, even in inputs)
-      if (event.key === 'Escape') {
-        if (performanceMode) {
-          setPerformanceMode(false);
-        } else if (onClose) {
-          onClose();
-        }
+      if (event.key !== 'Escape') return;
+      // Always panic on ESC in drumpad view, regardless of mode.
+      window.dispatchEvent(new Event('dj-panic'));
+      window.dispatchEvent(new Event('dub-panic'));
+      if (performanceMode) {
+        setPerformanceMode(false);
+      } else if (onClose) {
+        onClose();
       }
     };
 

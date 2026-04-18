@@ -318,6 +318,13 @@ export function useMIDIPadRouting() {
       if (currentProgram && _engine) {
         const pad = currentProgram.pads.find(p => p.id === padId);
         if (pad) {
+          // Stop scratch actions — previously this loop only covered
+          // djFxAction/dubAction/pttAction/synth, leaving a scratch pad
+          // running forever on bank switch / ESC / dj-panic. The handler
+          // with start=false is the canonical "finish current cycle" path.
+          if (pad.scratchAction) {
+            SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
+          }
           if (pad.djFxAction) {
             DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
             setFxPadActive(padId, false);
@@ -354,6 +361,12 @@ export function useMIDIPadRouting() {
         }
       }
     });
+    // Also clear any orphaned dub releasers — defensive: if a dub pad
+    // somehow registered a releaser but the pad left _heldPads via a code
+    // path that skipped the release call, dubPanic() will also clean them,
+    // but we do it here for the same belt-and-braces reason.
+    _dubReleasers.forEach((release) => { try { release(); } catch { /* ok */ } });
+    _dubReleasers.clear();
     _heldPads.clear();
   }, [currentProgram, setFxPadActive]);
 
