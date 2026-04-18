@@ -209,7 +209,51 @@ async function preRenderTrackInternal(track: PlaylistTrack): Promise<PreRendered
     }
   }
 
-  // Local files not supported for pre-render (need file picker)
+  // `local:` — bytes live in the audio cache from when the user added the
+  // file. Pre-render them the same way as modland/hvsc so Auto DJ can
+  // pre-load and transition into local MP3s + tracker files.
+  if (track.fileName.startsWith('local:')) {
+    const filename = track.fileName.slice('local:'.length);
+    try {
+      const cached = await getCachedAudioByFilename(filename);
+      const buffer = cached?.sourceData;
+      if (!buffer || buffer.byteLength === 0) {
+        console.warn(`[DJTrackLoader] Local pre-render: ${filename} not in cache`);
+        return null;
+      }
+
+      if (isAudioFile(filename)) {
+        return {
+          wavData: buffer,
+          filename: track.fileName,
+          trackName: track.trackName || filename,
+          bpm: 125,
+          duration: 0,
+        };
+      }
+
+      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+      const song = await parseModuleToSong(blob);
+      cacheSong(track.fileName, song);
+      const bpmResult = detectBPM(song);
+
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'high');
+      return {
+        wavData: result.wavData,
+        filename: track.fileName,
+        trackName: song.name || track.trackName || filename,
+        bpm: result.analysis?.bpm || bpmResult.bpm,
+        song,
+        waveformPeaks: result.waveformPeaks,
+        duration: result.duration || 0,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Local pre-render failed: ${track.trackName || filename} — ${msg}`);
+      return null;
+    }
+  }
+
   return null;
 }
 
@@ -381,7 +425,57 @@ async function loadPlaylistTrackToDeckInternal(
     }
   }
 
-  // Local files cannot be auto-loaded without a file picker
-  console.warn(`[DJTrackLoader] Cannot auto-load local track: ${track.fileName}`);
+  // `local:` — user-added local file; bytes live in the audio cache from
+  // when the playlist entry was created. Pull them out and load the deck
+  // directly; no file-picker prompt.
+  if (track.fileName.startsWith('local:')) {
+    const filename = track.fileName.slice('local:'.length);
+    try {
+      const cached = await getCachedAudioByFilename(filename);
+      const buffer = cached?.sourceData;
+      if (!buffer || buffer.byteLength === 0) {
+        console.warn(`[DJTrackLoader] Local file ${filename} not found in cache`);
+        return false;
+      }
+
+      if (isAudioFile(filename)) {
+        await getDJEngine().loadAudioToDeck(deckId, buffer, track.fileName, track.trackName);
+        return true;
+      }
+
+      // Tracker file — parse + render through the pipeline, same as modland.
+      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+      const song = await parseModuleToSong(blob);
+      cacheSong(track.fileName, song);
+      const bpmResult = detectBPM(song);
+
+      useDJStore.getState().setDeckState(deckId, {
+        fileName: track.fileName,
+        trackName: song.name || track.trackName || filename,
+        detectedBPM: bpmResult.bpm,
+        effectiveBPM: bpmResult.bpm,
+        analysisState: 'rendering',
+        isPlaying: false,
+      });
+
+      const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+      await getDJEngine().loadAudioToDeck(
+        deckId,
+        result.wavData,
+        track.fileName,
+        song.name || track.trackName || filename,
+        result.analysis?.bpm || bpmResult.bpm,
+        song,
+      );
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[DJTrackLoader] Local load failed: ${track.trackName || filename} — ${msg}`);
+      return false;
+    }
+  }
+
+  // Files without a known source scheme can't be auto-loaded.
+  console.warn(`[DJTrackLoader] Cannot auto-load track: ${track.fileName}`);
   return false;
 }
