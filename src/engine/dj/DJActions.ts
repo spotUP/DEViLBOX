@@ -18,6 +18,7 @@ import { useDJSetStore } from '@/stores/useDJSetStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { useVocoderStore } from '@/stores/useVocoderStore';
 import { getDrumPadEngine, getNoteRepeatEngine } from '@/hooks/drumpad/useMIDIPadRouting';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
 import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
@@ -616,8 +617,23 @@ export function djPanic(): void {
 
   useAudioStore.getState().setMasterEffects([]);
 
-  getDrumPadEngine()?.stopAll();
+  // Panic the drumpad engine directly — can't rely on the `dj-panic` event
+  // listener to handle the dub bus, because that listener lives in PadGrid
+  // (drumpad view only). If the user is in DJ view when they hit ESC, the
+  // event fires but no one listens, so siren feedback / stuck holds keep
+  // the pink-noise floor amplified into sustained white noise.
+  const dpe = getDrumPadEngine();
+  if (dpe) {
+    dpe.stopAll();
+    dpe.dubPanic();
+  }
+  // Keep the store flag in sync with the engine's flushed state — without
+  // this the Dub Bus UI still reports "enabled", and any knob tweak would
+  // re-open the bus and bring the noise back.
+  useDrumPadStore.getState().setDubBus({ enabled: false });
   getNoteRepeatEngine()?.stopAll();
+  // Still fire the event for any other listeners (PadGrid, DJSamplerPanel)
+  // that may be mounted and holding releaser-state we don't know about.
   window.dispatchEvent(new CustomEvent('dj-panic'));
 
   cancelAllAutomation();
