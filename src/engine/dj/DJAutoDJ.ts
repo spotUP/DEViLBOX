@@ -125,6 +125,21 @@ class DJAutoDJ {
 
     const startIdx = startIndex ?? 0;
 
+    // Reset all transient per-session state. Without this, a previous
+    // Auto DJ run's shuffle order / counters / timing would bleed into
+    // the new run. Concretely: switching playlists between enables used
+    // to leave shuffleOrder holding indices from the OLD playlist,
+    // some possibly out-of-bounds for the new one.
+    this.shuffleOrder = [];
+    this.shufflePosition = -1;
+    this.staleCount = 0;
+    this.lastTimeRemaining = Infinity;
+    this.preloadFailCount = 0;
+    this.lastPreloadFailTime = 0;
+    this.transitionStartTime = 0;
+    this.lastCrossfaderValue = -1;
+    this.crossfaderStuckCount = 0;
+
     // Set crossfader to the active deck's side so the correct audio plays
     const crossfaderTarget = this.activeDeck === 'A' ? 0 : 1;
     try { getDJEngine().setCrossfader(crossfaderTarget); } catch { /* engine not ready */ }
