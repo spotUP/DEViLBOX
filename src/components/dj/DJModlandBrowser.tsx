@@ -291,9 +291,11 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     setPreviewingKey(null);
   }, []);
 
-  // Stop preview when the browser unmounts so audio doesn't keep playing
-  // after the modal closes.
-  useEffect(() => stopPreview, [stopPreview]);
+  // Intentionally do NOT stop the preview on unmount. Closing the Modland
+  // browser to go back to DJ view would otherwise kill whatever track is
+  // currently playing on deck A — catastrophic mid-gig. The DJ engine owns
+  // the deck; this component is only a UI view that triggered the load. Use
+  // the explicit Stop button if you want to kill it.
 
   // ── Download → Parse → Load to Deck ─────────────────────────────────────
 
