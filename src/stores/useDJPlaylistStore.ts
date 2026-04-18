@@ -41,6 +41,10 @@ export interface PlaylistTrack {
   musicalKey?: string;
   /** Energy level 0-1 from analysis */
   energy?: number;
+  /** Integrated RMS loudness in dB (negative, typical mastered music ≈ -14) */
+  rmsDb?: number;
+  /** Peak level in dB (negative, typical -1 to -3) */
+  peakDb?: number;
   /** True if analysis was skipped (404, render fail) — don't re-scan */
   analysisSkipped?: boolean;
   /** True if this track was played in the current session (cleared on playlist load) */
@@ -109,7 +113,7 @@ interface DJPlaylistState {
   removeTrack: (playlistId: string, index: number) => void;
   reorderTrack: (playlistId: string, fromIndex: number, toIndex: number) => void;
   sortTracks: (playlistId: string, sortedTracks: PlaylistTrack[]) => void;
-  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
+  updateTrackMeta: (playlistId: string, index: number, meta: Partial<Pick<PlaylistTrack, 'trackName' | 'author' | 'musicalKey' | 'energy' | 'rmsDb' | 'peakDb' | 'bpm' | 'duration' | 'fileName' | 'sourceUrl' | 'analysisSkipped' | 'played' | 'isBad' | 'badReason' | 'badTimestamp' | 'badFailCount' | 'masterFxPreset'>>) => void;
   markTrackPlayed: (playlistId: string, index: number) => void;
   /** Remember the last track loaded to a deck from this playlist.
    *  Modal uses it to scroll-restore on open and after search clear. */

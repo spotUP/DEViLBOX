@@ -364,7 +364,7 @@ export async function analyzePlaylist(
         // only has UADE, which can't handle SIDs (every HVSC track was failing
         // with 422). The client-side pipeline has WebSID rendering + Essentia
         // analysis baked in and already returns bpm/musicalKey/energy/duration.
-        let result: { bpm: number; musicalKey: string; energy: number; duration: number };
+        let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number };
 
         if (isHVSC) {
           const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
@@ -376,6 +376,8 @@ export async function analyzePlaylist(
             musicalKey: pipelineResult.analysis.musicalKey,
             energy: pipelineResult.analysis.genre?.energy ?? 0,
             duration: pipelineResult.duration,
+            rmsDb: pipelineResult.analysis.rmsDb,
+            peakDb: pipelineResult.analysis.peakDb,
           };
         } else {
           // Modland tracker formats → server-side UADE (fast, uses server cache).
@@ -432,11 +434,18 @@ export async function analyzePlaylist(
 
         // Update the playlist track with analysis results — by id, so a
         // mid-run reorder doesn't land the write on the wrong row.
-        const meta: Partial<Pick<PlaylistTrack, 'bpm' | 'musicalKey' | 'energy' | 'duration'>> = {};
+        const meta: Partial<Pick<PlaylistTrack, 'bpm' | 'musicalKey' | 'energy' | 'duration' | 'rmsDb' | 'peakDb'>> = {};
         if (result.bpm > 0) meta.bpm = result.bpm;
         if (result.musicalKey) meta.musicalKey = result.musicalKey;
         if (result.energy != null) meta.energy = result.energy;
         if (result.duration > 0) meta.duration = result.duration;
+        // HVSC path: loudness comes from the same pipeline call. Modland gets
+        // these via the piggyback render further down (server doesn't return
+        // rmsDb). Either way, persisting to the track lets DJTrackLoader /
+        // DJPlaylistModal apply auto-gain even when the IndexedDB cache is
+        // cold (e.g. after a cache eviction or on a different device).
+        if (result.rmsDb != null) meta.rmsDb = result.rmsDb;
+        if (result.peakDb != null) meta.peakDb = result.peakDb;
 
         if (Object.keys(meta).length > 0) {
           const curr = resolveCurrent(trackId);
@@ -454,7 +463,20 @@ export async function analyzePlaylist(
         try {
           await cacheSourceFile(buffer, filename);
           if (!isAudioFile(filename) && !isHVSC) {
-            await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+            const piggybackResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
+            // Capture loudness from the local render for Modland tracks —
+            // the server's /render/analyze response only returns bpm / key /
+            // energy / duration, so without this the track has no rmsDb for
+            // auto-gain normalization. Save alongside the server metadata.
+            if (piggybackResult.analysis) {
+              const curr2 = resolveCurrent(trackId);
+              if (curr2) {
+                useDJPlaylistStore.getState().updateTrackMeta(playlistId, curr2.index, {
+                  rmsDb: piggybackResult.analysis.rmsDb,
+                  peakDb: piggybackResult.analysis.peakDb,
+                });
+              }
+            }
           }
           // Grab companion files too (TFMX mdat needs smpl; UADE multi-file formats)
           if (!isHVSC) {
