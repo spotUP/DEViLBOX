@@ -789,15 +789,19 @@ class DJAutoDJ {
     const inEnergy = incoming.energy ?? 0.5;
     const keyCompat = keyCompatibility(outgoing.musicalKey, incoming.musicalKey);
 
-    // High energy + close BPM = punchy cut or bass swap
+    // Gig-fix (2026-04-18): NEVER auto-select a hard 'cut' transition.
+    // Previously the high-energy + close-BPM branch rolled a ~30-50%
+    // random chance of `'cut'`, which during a live set delivered a
+    // hard cut with no fade mid-song — caught on stage. Hard cuts
+    // remain available for explicit user-triggered moves via
+    // cutTransition() in DJQuantizedFX, but Auto DJ should only ever
+    // produce *blended* transitions (crossfade / bass-swap / echo-out /
+    // filter-build) that keep both tracks audible during the swap.
     if (bpmDiff < 4 && outEnergy > 0.6) {
-      const roll = Math.random();
       if (keyCompat === 'perfect' || keyCompat === 'energy-boost') {
-        // Compatible key → bass swap sounds great
-        if (roll < 0.3) return 'bass-swap';
-        if (roll < 0.5) return 'cut';
-      } else {
-        if (roll < 0.3) return 'cut';
+        // Compatible key → bass swap sounds great (still a crossfade
+        // under the hood, just with a bass-kill midpoint).
+        if (Math.random() < 0.3) return 'bass-swap';
       }
     }
 
