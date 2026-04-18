@@ -230,16 +230,18 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         <ErrorBoundary fallbackMessage="An error occurred in the drum pad interface.">
           {performanceMode ? (
             /* Performance Mode: fullscreen pads with minimal controls.
-             * Square-ish cap so pads don't stretch on ultrawide displays. */
-            <div className="flex-1 flex items-center justify-center overflow-auto p-4">
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-full max-w-[min(95vh,1400px)]">
-                  <PadGrid
-                    onPadSelect={setSelectedPadId}
-                    selectedPadId={selectedPadId}
-                    performanceMode
-                  />
-                </div>
+             * `flex-1 min-h-0` takes the remaining viewport height under the
+             * header; the inner div caps width on ultrawide displays while
+             * preserving full height for the grid. `h-full` must be on every
+             * node in the chain down to PadGrid, otherwise its `flex-1`
+             * pads collapse to zero and only the Bank selector renders. */
+            <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-4">
+              <div className="w-full h-full max-w-[min(160vh,1600px)]">
+                <PadGrid
+                  onPadSelect={setSelectedPadId}
+                  selectedPadId={selectedPadId}
+                  performanceMode
+                />
               </div>
             </div>
           ) : (
