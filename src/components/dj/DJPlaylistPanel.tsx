@@ -269,7 +269,9 @@ const SortableTrackRow: React.FC<SortableTrackRowProps> = React.memo(({
         {track.trackName}
       </span>
       {track.bpm > 0 && (
-        <span className="text-xs font-mono text-text-muted/40 shrink-0">{track.bpm}</span>
+        <span className="text-xs font-mono text-text-muted/40 shrink-0" title={`${track.bpm} BPM`}>
+          {Math.round(track.bpm)}
+        </span>
       )}
       {track.musicalKey && (
         <span
