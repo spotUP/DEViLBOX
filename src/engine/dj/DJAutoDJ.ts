@@ -18,7 +18,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngine } from './DJEngine';
 import {
-  beatMatchedTransition, setTrackedFilterPosition,
+  beatMatchedTransition,
   cutTransition, filterBuildTransition, bassSwapTransition, echoOutTransition,
 } from './DJQuantizedFX';
 import { loadPlaylistTrackToDeck } from './DJTrackLoader';
@@ -74,7 +74,12 @@ class DJAutoDJ {
   private transitionStartTime = 0;
   private lastCrossfaderValue = -1;
   private crossfaderStuckCount = 0;
-  private static readonly TRANSITION_TIMEOUT_MS = 30_000;
+  // Watchdog for stuck transitions. Max possible legit duration is 32 bars
+  // at 60 BPM = 128s. A transition running past 180s is almost certainly
+  // stuck (crossfade scheduler died, incoming deck silent, etc) and worth
+  // force-completing. Previously 30s, which force-aborted any 16-bar fade
+  // below 125 BPM and any 32-bar fade at any BPM.
+  private static readonly TRANSITION_TIMEOUT_MS = 180_000;
   private static readonly CROSSFADER_STUCK_POLLS = 10; // 5 seconds at 500ms
 
 
@@ -770,7 +775,6 @@ class DJAutoDJ {
       const outgoing = getDJEngine().getDeck(this.activeDeck);
       outgoing.stop();
       outgoing.setFilterPosition(0);
-      setTrackedFilterPosition(this.activeDeck, 0);
       outgoing.setVolume(1);
     } catch { /* engine not ready */ }
     useDJStore.getState().setDeckPlaying(this.activeDeck, false);
