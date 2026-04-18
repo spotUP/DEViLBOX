@@ -63,7 +63,7 @@ class DJAutoDJ {
   private preloading = false;
   private preloadedDeck: DeckId | null = null;
   private shuffleOrder: number[] = [];
-  private shufflePosition = 0;
+  private shufflePosition = -1;  // -1 = nothing played yet; next ++ yields 0
   // Stale position detection — if timeRemaining doesn't change for too long, force preload
   private lastTimeRemaining = Infinity;
   private staleCount = 0;
@@ -136,10 +136,9 @@ class DJAutoDJ {
       useAudioStore.getState().setMasterEffects(playlist.masterEffects);
     }
 
-    // If shuffle, generate shuffle order
-    if (store.autoDJShuffle) {
-      this.generateShuffleOrder(playlist.tracks.length, currentIndex);
-    }
+    // Shuffle order is lazy-generated on first computeNextIndex call if
+    // shuffle is on; no explicit init needed here. A redundant call was
+    // replacing the fresh shuffle used to compute the initial nextIndex.
 
     // If nothing is playing, find the first loadable track and play it
     if (!store.decks[this.activeDeck].isPlaying) {
@@ -891,11 +890,15 @@ class DJAutoDJ {
 
     const store = useDJStore.getState();
     if (store.autoDJShuffle) {
-      // Use shuffle order
-      this.shufflePosition++;
-      if (this.shufflePosition >= this.shuffleOrder.length) {
+      // Regenerate if empty or exhausted — checked BEFORE increment so that
+      // the first call after a fresh shuffle reads index 0 (the old code
+      // incremented first, which skipped the 0th slot of every cycle and
+      // also fell through to 0 on the very first call when the order was
+      // still empty).
+      if (this.shufflePosition + 1 >= this.shuffleOrder.length) {
         this.generateShuffleOrder(trackCount, currentIndex);
       }
+      this.shufflePosition++;
       return this.shuffleOrder[this.shufflePosition] ?? 0;
     }
 
@@ -910,7 +913,7 @@ class DJAutoDJ {
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
     this.shuffleOrder = indices;
-    this.shufflePosition = 0;
+    this.shufflePosition = -1;  // next computeNextIndex ++ yields 0
   }
 
   /** Check if the active deck is actually playing (reads engine first, falls back to store). */
