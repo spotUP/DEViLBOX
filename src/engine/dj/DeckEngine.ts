@@ -1235,11 +1235,16 @@ export class DeckEngine {
   // EQ (3-band: -24 to +6 dB)
   // ==========================================================================
 
-  setEQ(band: 'low' | 'mid' | 'high', dB: number): void {
+  setEQ(band: 'low' | 'mid' | 'high', dB: number, rampSec = 0.015): void {
     const clamped = Math.max(-12, Math.min(12, dB));
     this.eqValues[band] = clamped;
     if (!this.eqKillState[band]) {
-      this.eq3[band].value = clamped;
+      // Always ramp, even for knob twists — Tone.Signal.value = x is a zero-time
+      // step that clicks audibly when the delta is large (e.g. EQ preset 0 → +9).
+      // 15ms is short enough to feel instant for knob drags (smooths zipper
+      // noise without perceived lag); preset jumps pass a longer ramp for a
+      // proper audible crossfade.
+      this.eq3[band].rampTo(clamped, rampSec);
     }
   }
 

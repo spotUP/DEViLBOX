@@ -20,7 +20,7 @@ import { useVocoderStore } from '@/stores/useVocoderStore';
 import { getDrumPadEngine, getNoteRepeatEngine } from '@/hooks/drumpad/useMIDIPadRouting';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';
-import { quantizedEQKill, getQuantizeMode, setTrackedFilterPosition, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
+import { quantizedEQKill, getQuantizeMode, quantizeAction, cancelAllAutomation } from './DJQuantizedFX';
 import { syncBPMToOther, phaseAlign, snapPositionToBeat } from './DJAutoSync';
 import { DJBeatSync } from './DJBeatSync';
 import { getAutoDJ } from './DJAutoDJ';
@@ -312,9 +312,14 @@ export function applyEqPreset(deckId: DeckId, preset: DjEqPreset): void {
   });
   try {
     const deck = getDJEngine().getDeck(deckId);
-    deck.setEQ('low', preset.eqLow);
-    deck.setEQ('mid', preset.eqMid);
-    deck.setEQ('high', preset.eqHigh);
+    // Longer ramp on preset jumps so Flat → Deep / Punch / Warm reads as a
+    // smooth crossfade of the EQ curve, not a click + abrupt timbre shift.
+    // 250 ms is the sweet spot: fast enough to feel responsive to the tap,
+    // slow enough for the bass lift to audibly slide in.
+    const RAMP_SEC = 0.25;
+    deck.setEQ('low', preset.eqLow, RAMP_SEC);
+    deck.setEQ('mid', preset.eqMid, RAMP_SEC);
+    deck.setEQ('high', preset.eqHigh, RAMP_SEC);
   } catch { /* engine not ready */ }
 }
 
@@ -353,7 +358,6 @@ export function setDeckEQKill(
 export function setDeckFilter(deckId: DeckId, position: number): void {
   const clamped = Math.max(-1, Math.min(1, position));
   useDJStore.getState().setDeckFilter(deckId, clamped);
-  setTrackedFilterPosition(deckId, clamped);
   try {
     getDJEngine().getDeck(deckId).setFilterPosition(clamped);
   } catch { /* engine not ready */ }
