@@ -277,8 +277,15 @@ export class DJMixerEngine {
   /**
    * Mute a deck's contribution to the main mix briefly — used by dub-mute pads
    * to silence the dry deck signal while its echo tail plays.
-   * Returns a function to restore the channel gain when the dub-mute ends.
-   * Ramps are click-free (5 ms down, 20 ms up).
+   *
+   * Uses a 200 ms fade-out (not a brick-wall cut). The slow fade is key to
+   * the King Tubby mute-and-dub feel: as the dry deck rings down, its last
+   * 200 ms of audio is ALSO streaming through the open dub tap into the
+   * echo — so the echo's delay line has ~200 ms of content to repeat by
+   * the time dry is silent. Without this, at rate=300 ms there's a ~100 ms
+   * audible hole between dry going quiet and the first echo repeat hitting
+   * (the "abrupt silence" bug). Restore on release uses 30 ms — fast enough
+   * to feel like "back in the mix" but still smooth.
    */
   muteChannelForDub(deck: DeckId): () => void {
     const input = this.getInputForDeck(deck);
@@ -289,14 +296,14 @@ export class DJMixerEngine {
     try {
       g.cancelScheduledValues(now);
       g.setValueAtTime(prev, now);
-      g.linearRampToValueAtTime(0, now + 0.005);
+      g.linearRampToValueAtTime(0, now + 0.200);
     } catch { /* rampable */ }
     return () => {
       const n = Tone.now();
       try {
         g.cancelScheduledValues(n);
         g.setValueAtTime(g.value, n);
-        g.linearRampToValueAtTime(prev, n + 0.02);
+        g.linearRampToValueAtTime(prev, n + 0.030);
       } catch { /* ok */ }
     };
   }
