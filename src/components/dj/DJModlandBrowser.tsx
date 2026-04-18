@@ -104,8 +104,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   const playlists = useDJPlaylistStore(s => s.playlists);
   const activePlaylistId = useDJPlaylistStore(s => s.activePlaylistId);
 
-  // Preview — single-flight play of the currently-hovered result via deck A.
+  // Preview — single-flight direct-UADE playback. For UADE-family modules
+  // (mod/cust/smod/tfmx/hip/…) we feed the raw bytes straight to UADEEngine
+  // and route its output node into the DJ mixer's sampler input, no WAV
+  // render + no deck-load round trip. This makes preview effectively
+  // instant (<100 ms vs ~5-10 s for the pipeline path) since the search
+  // result just needs to AUDIBLE, not be ready for scrubbing / BPM sync /
+  // effects. Loading to a deck (the 1/2/3 buttons) still uses the full
+  // pre-render path so you get the whole beatgrid/key/etc.
   const [previewingKey, setPreviewingKey] = useState<string | null>(null);
+  const previewModeRef = useRef<'uade' | 'deck' | null>(null);
   const previewDeckRef = useRef<'A' | null>(null);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -281,13 +289,30 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   // ── Preview (single-flight on deck A) ──────────────────────────────────
 
   const stopPreview = useCallback(() => {
-    if (previewDeckRef.current) {
+    const mode = previewModeRef.current;
+    if (mode === 'uade') {
+      // Direct-UADE preview path: stop the engine + unplug its output from
+      // the mixer. Lazy-import the engine so we don't drag UADEEngine into
+      // the bundle on browsers that never opened the Modland browser.
+      void (async () => {
+        try {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          const uade = UADEEngine.getInstance();
+          uade.stop();
+          try {
+            const mixer = getDJEngine().mixer;
+            uade.output.disconnect(mixer.samplerInput);
+          } catch { /* already disconnected or engine gone */ }
+        } catch { /* UADE not loaded yet */ }
+      })();
+    } else if (mode === 'deck' && previewDeckRef.current) {
       try {
         getDJEngine().getDeck(previewDeckRef.current).stop();
         useDJStore.getState().setDeckPlaying(previewDeckRef.current, false);
       } catch { /* deck not ready */ }
-      previewDeckRef.current = null;
     }
+    previewModeRef.current = null;
+    previewDeckRef.current = null;
     setPreviewingKey(null);
   }, []);
 
@@ -407,6 +432,58 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     if (previewingKey === file.key) { stopPreview(); return; }
     stopPreview();
     setPreviewingKey(file.key);
+
+    // Direct-UADE path for Amiga/UADE modules: skip the render-to-WAV
+    // pipeline entirely. Download the bytes, hand them to UADEEngine,
+    // route UADE.output → DJ mixer sampler input, hit play. No deck
+    // involvement, no WAV render wait, no beatgrid/analysis overhead.
+    // Finishes in <100 ms after the download completes vs ~5-10 s for
+    // the pipeline path. SIDs + non-UADE trackers fall back to the
+    // original loadToDeck() path because UADE can't play them.
+    if (file.source === 'modland' && isUADEFormat(file.filename)) {
+      previewModeRef.current = 'uade';
+      try {
+        const [buffer, companion] = await Promise.all([
+          downloadModlandFile(file.key),
+          downloadTFMXCompanion(file.key),
+        ]);
+        // User may have hit Stop (or previewed something else) while we
+        // were downloading — bail out cleanly in that case.
+        if (previewingKey !== file.key && previewModeRef.current !== 'uade') {
+          return;
+        }
+
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        const uade = UADEEngine.getInstance();
+        await uade.ready();
+
+        if (companion) {
+          await uade.addCompanionFile(companion.filename, companion.buffer);
+        }
+
+        // Stop any prior UADE playback before loading a new module —
+        // leaving it playing leaks audio during the ~100 ms load window.
+        uade.stop();
+        await uade.load(buffer, file.filename);
+
+        // Connect UADE.output to the DJ mixer sampler input (the same
+        // summing bus the drumpad uses). Wrapped in try so re-connecting
+        // an already-connected node doesn't throw on some browsers.
+        try { uade.output.connect(getDJEngine().mixer.samplerInput); }
+        catch { /* already connected */ }
+
+        uade.play();
+        return;
+      } catch (err) {
+        console.warn('[ModlandBrowser] Direct UADE preview failed, falling back to pipeline:', err);
+        previewModeRef.current = null;
+        // Fall through to the pipeline path as a safety net.
+      }
+    }
+
+    // Fallback (SIDs, XM/IT/S3M, or if the UADE path errored above):
+    // use the old deck-load path which renders via the pipeline.
+    previewModeRef.current = 'deck';
     previewDeckRef.current = 'A';
     try {
       await loadToDeck(file, 'A');
@@ -416,6 +493,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
       } catch { /* engine not ready */ }
     } catch {
       previewDeckRef.current = null;
+      previewModeRef.current = null;
       setPreviewingKey(null);
     }
   }, [previewingKey, stopPreview, loadToDeck]);
