@@ -436,6 +436,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
           useDJPlaylistStore.getState().addTrack(playlistId, {
             fileName: cacheKey,
             trackName: file.filename.replace(/\.sid$/i, ''),
+            author: file.author || undefined,
             format: 'SID',
             bpm: 0,
             duration: 180,
@@ -469,6 +470,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         useDJPlaylistStore.getState().addTrack(playlistId, {
           fileName: cacheKey,
           trackName: song.name || file.filename,
+          author: file.author || undefined,
           format: file.format,
           bpm: bpmResult.bpm,
           duration,

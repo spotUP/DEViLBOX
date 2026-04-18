@@ -542,11 +542,14 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         ) : null}
       </span>
 
-      {/* Track name */}
-      <span className={`flex-1 text-[22px] font-mono truncate min-w-0 ${
+      {/* Track name + author (author is smaller, dimmer, single line) */}
+      <span className={`flex-1 min-w-0 flex flex-col justify-center leading-tight ${
         isLoading ? 'text-accent-primary' : track.isBad ? 'text-accent-error/80' : track.played ? 'text-text-muted/40' : 'text-text-primary'
       }`}>
-        {track.trackName}
+        <span className="text-[22px] font-mono truncate">{track.trackName}</span>
+        {track.author && (
+          <span className="text-[13px] font-mono text-text-muted/60 truncate">{track.author}</span>
+        )}
       </span>
 
       {/* Format badge */}
