@@ -55,14 +55,20 @@ export interface SampleLayer {
  */
 export type DubActionId =
   // ── Auto-select: resolves the currently-loudest playing deck at press ──
-  // Recommended primary layout. One pad per gesture regardless of which
-  // deck is playing — the kit follows the DJ's crossfader moves.
+  // Primary layout. One pad per gesture regardless of which deck is playing —
+  // the kit follows the DJ's crossfader automatically.
   | 'dub_throw' | 'dub_hold' | 'dub_mute'
-  // Quick single-slap variant — tiny grab, almost no tail. "Delay FX burst".
-  | 'dub_slap_back'
+  // Throw-length variants — different musical rhythmic feel
+  | 'dub_slap_back'      // 0.125 beats — tiny accent grab
+  | 'dub_throw_short'    // 0.25 beats  — quarter-beat chop
+  | 'dub_throw_long'     // 2 beats     — big half-bar phrase grab
+  // Combined "the drop" — simultaneous mute + filter sweep, the classic
+  // King Tubby move where the mix drops out AND ducks tonally at once.
+  | 'dub_combo_drop'
   // ── Broadcast: hit every playing deck at once ──
-  | 'dub_throw_all' | 'dub_hold_all'
-  // ── Explicit targeting: power-user pads that lock to a specific deck ──
+  | 'dub_throw_all' | 'dub_hold_all' | 'dub_mute_all'
+  // ── Explicit targeting (retained for context-menu power users; not in
+  //    the factory kit layout anymore since auto-select covers every case).
   | 'dub_throw_a' | 'dub_throw_b' | 'dub_throw_c'
   | 'dub_hold_a' | 'dub_hold_b' | 'dub_hold_c'
   | 'dub_mute_a' | 'dub_mute_b' | 'dub_mute_c'
@@ -198,14 +204,19 @@ export interface DubBusSettings {
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
   enabled: false,
-  returnGain: 0.8,
+  // Defaults tuned so dub moves are CLEARLY audible alongside the dry mix.
+  // Subtle settings produced "I hear mostly the music" — the dub tail was
+  // ~8 dB below the dry. These values put the tail within 3 dB of dry,
+  // which is where King Tubby / Scientist records actually sit.
+  returnGain: 1.0,       // full return — relies on echoWet/springWet for mix balance
   hpfCutoff: 180,
-  springWet: 0.4,
-  echoIntensity: 0.55,
-  echoWet: 0.5,
+  springWet: 0.55,       // was 0.4 — more audible spring tank character
+  echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
+  echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
   echoRateMs: 300,
   sidechainAmount: 0.4,
-  deckTapAmount: 0.9,
+  deckTapAmount: 1.0,    // was 0.9 — full deck signal into the tap; send gain is
+                         // already controlled by action releaseSec + pad assignment
   throwBeats: 0.5,
   sirenFeedback: 0.85,
   filterDropHz: 220,

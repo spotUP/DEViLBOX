@@ -39,6 +39,22 @@ function applyDjFxPads(program: DrumProgram, startPad: number, count: number): v
   }
 }
 
+// FX types that define the synth's SHAPE (filter sweeps, modulation, tone) —
+// kept even in "lean" factory-kit mode because without them presets like the
+// Noise Riser (AutoFilter does the filter sweep) become flat noise bursts.
+// Heavyweight FX (SpringReverb WASM, SpaceEcho delay lines) are stripped and
+// routed through the shared Dub Bus via dubSend — same flavor, 1/16 the cost.
+const LIGHT_FX_TYPES = new Set([
+  'AutoFilter', 'AutoWah', 'AutoPanner',
+  'TapeSaturation', 'Distortion', 'Chebyshev',
+  'Compressor', 'EQ3',
+  'Chorus', 'Phaser', 'Vibrato', 'Tremolo',
+  'FeedbackDelay', 'PingPongDelay',
+]);
+const HEAVY_FX_TYPES = new Set([
+  'SpringReverb', 'SpaceEcho', 'Reverb', 'JCReverb', 'FreeverbEffect',
+]);
+
 function applyOneShotPads(program: DrumProgram, startPad: number, count: number): void {
   for (let i = 0; i < count && i < DEFAULT_ONESHOT_PADS.length; i++) {
     const mapping = DEFAULT_ONESHOT_PADS[i];
@@ -48,14 +64,16 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
     pad.color = mapping.color;
     const preset = DJ_ONE_SHOT_PRESETS[mapping.presetIndex];
     if (preset) {
-      // STRIP per-pad effect chains when loaded from the factory kit. Each
-      // preset authored in djOneShotPresets.ts carries TapeSaturation +
-      // Compressor + SpringReverb for standalone use — but 16 pads × 3 FX
-      // nodes = 48 effect instances (16 WASM SpringReverbs) which overloads
-      // the audio thread enough to slow playback. The shared Dub Bus already
-      // gives sirens/horns their dub character; route through it via
-      // `dubSend` for the same flavor at a tiny fraction of the CPU cost.
-      // Users who want the full chain back can add it via the pad editor.
+      // Keep the SHAPE-defining FX (AutoFilter for riser sweeps, Compressor,
+      // TapeSat for warmth) but strip the expensive WASM/reverb tails. The
+      // dub bus supplies the reverb/echo character globally so we're not
+      // paying 16× for identical tails. Prevents the "16 SpringReverb
+      // instances crash the audio thread" issue while keeping presets like
+      // Noise Riser, Tension Swell, Filter Sweep sounding like themselves.
+      const rawFx = (preset as { effects?: Array<{ type: string }> }).effects ?? [];
+      const keptFx = rawFx.filter((fx) =>
+        LIGHT_FX_TYPES.has(fx.type) && !HEAVY_FX_TYPES.has(fx.type)
+      );
       pad.synthConfig = {
         id: PAD_INSTRUMENT_BASE + pad.id,
         name: preset.name ?? mapping.label,
@@ -64,11 +82,12 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
         volume: preset.volume ?? 0,
         pan: preset.pan ?? 0,
         ...preset,
-        effects: [],
+        effects: keptFx,
       } as import('../types/instrument/defaults').InstrumentConfig;
       pad.instrumentNote = 'C3';
-      // Dub-bus send — 40 % feels like the old TapeSat+Spring character
-      // without the per-pad CPU cost. Horns and impacts use less; sirens more.
+      // Dub-bus send — adds shared echo + spring reverb character on top of
+      // whatever the pad's own lightweight FX produce. Horns and impacts use
+      // less; sirens more (tails benefit from long echo).
       pad.dubSend = mapping.category === 'Sirens' ? 0.55
                   : mapping.category === 'Impacts' || mapping.category === 'Noise' ? 0.25
                   : 0.40;
@@ -207,37 +226,39 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => {
       const program = createEmptyProgram('D-05', 'King Tubby Dub Kit');
 
-      // ── Bank A (pads 1–8): auto-select primary moves ─────────────────
-      // Each pad resolves the active deck at press time based on crossfader
-      // position + channel volumes. One button per gesture regardless of
-      // which deck is playing. This is how real dub engineers work — they
-      // know "which signal is loud" and throw/mute THAT, not a named deck.
+      // ── Bank A (pads 1–8): core single-deck moves + bus FX + length variants ──
+      // Auto-select everywhere — each pad resolves the active deck at press
+      // time based on crossfader position + channel volume. One pad per
+      // gesture regardless of which deck is playing, exactly how real dub
+      // engineers work: they know "which signal is loud" and throw/mute THAT,
+      // not a named channel. Row 2 gives the classic FX (siren, filter drop)
+      // and throw-length variants for different rhythmic feels.
       const bankA: DubMapping[] = [
-        // Row 1: core moves
+        // Row 1: core single-deck moves — default throw length (0.5 beats)
         { label: 'Throw',       color: '#ef4444', action: 'dub_throw',       mode: 'oneshot' },
         { label: 'Hold',        color: '#f59e0b', action: 'dub_hold',        mode: 'sustain' },
         { label: 'Mute & Dub',  color: '#8b5cf6', action: 'dub_mute',        mode: 'sustain' },
         { label: 'Slap Back',   color: '#f43f5e', action: 'dub_slap_back',   mode: 'oneshot' },
-        // Row 2: bus FX + broadcast variants
+        // Row 2: bus FX + throw-length variants — different musical feel
         { label: 'Siren',       color: '#06b6d4', action: 'dub_siren',       mode: 'sustain' },
         { label: 'Filter Drop', color: '#0891b2', action: 'dub_filter_drop', mode: 'sustain' },
-        { label: 'Throw All',   color: '#991b1b', action: 'dub_throw_all',   mode: 'oneshot' },
-        { label: 'Hold All',    color: '#b45309', action: 'dub_hold_all',    mode: 'sustain' },
+        { label: 'Short Throw', color: '#f87171', action: 'dub_throw_short', mode: 'oneshot' },
+        { label: 'Long Throw',  color: '#991b1b', action: 'dub_throw_long',  mode: 'oneshot' },
       ];
       applyDubActionPads(program, 0, bankA);
 
-      // ── Bank B (pads 9–16): explicit targeting + supporting synths ───
-      // For the DJ who wants "no, throw deck A specifically" overrides. Also
-      // the three classic sound-system synth sounds for moments the dub
-      // processor alone can't deliver.
+      // ── Bank B (pads 9–16): combos + broadcast variants + supporting synths
+      // Combos bundle two gestures into one pad (e.g. "the drop" = mute + filter
+      // drop together). Broadcasts hit EVERY playing deck at once — massive
+      // full-mix moves. Synths are the classic sound-system one-shots.
       const bankBDub: DubMapping[] = [
-        { label: 'Throw A',    color: '#ef4444', action: 'dub_throw_a', mode: 'oneshot' },
-        { label: 'Throw B',    color: '#ef4444', action: 'dub_throw_b', mode: 'oneshot' },
-        { label: 'Throw C',    color: '#ef4444', action: 'dub_throw_c', mode: 'oneshot' },
-        { label: 'Mute/Dub A', color: '#8b5cf6', action: 'dub_mute_a',  mode: 'sustain' },
-        { label: 'Mute/Dub B', color: '#8b5cf6', action: 'dub_mute_b',  mode: 'sustain' },
+        { label: 'Combo Drop',  color: '#a78bfa', action: 'dub_combo_drop', mode: 'sustain' },
+        { label: 'Throw All',   color: '#7f1d1d', action: 'dub_throw_all',  mode: 'oneshot' },
+        { label: 'Hold All',    color: '#b45309', action: 'dub_hold_all',   mode: 'sustain' },
+        { label: 'Mute All',    color: '#6d28d9', action: 'dub_mute_all',   mode: 'sustain' },
       ];
       applyDubActionPads(program, 8, bankBDub);
+      // Pads 9+4=13 intentionally left empty for user customization.
 
       // Pads 14–16: supporting one-shot synths — classic sound-system tools
       // that pair naturally with the dub moves.
