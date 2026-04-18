@@ -133,10 +133,14 @@ export class DeckAudioPlayer {
 
   async play(): Promise<void> {
     if (!this._loaded || !this.player.buffer.loaded) {
-      return;
+      // Throw so callers (e.g. DJActions togglePlay) don't leave the store in
+      // a "playing" state when the engine actually has nothing to play.
+      // Silently returning here caused silent-playback desync where the UI
+      // showed the deck as active but no audio reached the bus.
+      throw new Error('DeckAudioPlayer.play() called before buffer loaded');
     }
     if (this.player.state === 'started') {
-      // Already playing
+      // Already playing — not an error
       return;
     }
     
