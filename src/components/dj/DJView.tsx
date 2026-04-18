@@ -247,11 +247,25 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
     }
   }, [masterEffectsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-save master FX to the active playlist whenever they change in DJ view
+  // Auto-save master FX to the active playlist whenever they change in DJ view.
+  // Filter out per-song chains (tagged by DJPerSongFx with "persong-" ids)
+  // before persisting — we don't want a transient per-song preset baked
+  // into playlist.masterEffects, because that would make:
+  //   (a) Auto DJ enable() start every session with the last track's
+  //       per-song FX as the baseline,
+  //   (b) cloud-saved playlists ship stale per-song chains to other users,
+  //   (c) a mid-session cloud restore of the playlist re-apply them as if
+  //       they were user-curated.
+  // Only manually-applied master FX (from DJFxQuickPresets /
+  // MasterEffectsModal — no persong- prefix) should persist to the playlist.
   const activePlaylistId = useDJPlaylistStore((s) => s.activePlaylistId);
   useEffect(() => {
     if (!activePlaylistId) return;
-    useDJPlaylistStore.getState().setPlaylistMasterEffects(activePlaylistId, masterEffects);
+    const isPerSongOnly =
+      masterEffects.length > 0 &&
+      masterEffects.every((e) => e.id?.startsWith('persong-'));
+    const toSave = isPerSongOnly ? [] : masterEffects;
+    useDJPlaylistStore.getState().setPlaylistMasterEffects(activePlaylistId, toSave);
   }, [masterEffectsKey, activePlaylistId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle loading a Serato track to a deck
