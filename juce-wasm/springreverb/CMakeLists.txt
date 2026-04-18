@@ -26,8 +26,14 @@ target_link_options(SpringReverbWASM PRIVATE
     "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createSpringReverbModule'"
-    "SHELL:-s ALLOW_MEMORY_GROWTH=0"
-    "SHELL:-s INITIAL_MEMORY=4194304"
+    # Shared module pattern: one WASM instance hosts every SpringReverbEffect C++
+    # object across the whole app (all drumpads + effect slots). Each instance
+    # carries ~324 KB of state (apBuf[4][8192] + combBuf[6][8192]). Growth is
+    # enabled so the heap expands as the drumpad/effect graph loads instances
+    # at startup, capped so we can't runaway-leak if something goes wrong.
+    "SHELL:-s ALLOW_MEMORY_GROWTH=1"
+    "SHELL:-s INITIAL_MEMORY=16777216"
+    "SHELL:-s MAXIMUM_MEMORY=134217728"
     "SHELL:-s ENVIRONMENT='web,worker'"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue']"
     "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free']"

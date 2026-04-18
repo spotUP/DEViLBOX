@@ -93,7 +93,14 @@ public:
 
             float input = mono + dripSample * 0.3f;
 
-            // 4-stage allpass diffuser
+            // 4-stage Schroeder allpass diffuser.
+            // Canonical form: y[n] = -g*x[n] + v[n-N]; v[n] = x[n] + g*y[n]
+            // DC gain = 1 (true allpass). Earlier `buf[idx] = x + g*buffered`
+            // wrote v[n-N] back into the state instead of y[n], which turned
+            // each stage into a DC-amplifying comb (DC gain ~2.63x at g=0.7);
+            // cascaded 4 stages could hit ~48x DC gain and pump the tank
+            // into saturation on any residual input (fixes the "silent after
+            // default FX" bug where the tank was blown up by SpaceEcho's tail).
             float diffused = input;
             for (int j = 0; j < 4; ++j) {
                 int sz = std::max(1, std::min((int)(apSizes_[j] * tensionScale), MAX_DELAY - 1));
@@ -101,7 +108,7 @@ public:
                 int& idx = apIdx_[j];
                 float buffered = buf[idx];
                 float ap_out = -diffused * diffusion_ + buffered;
-                buf[idx] = diffused + buffered * diffusion_;
+                buf[idx] = diffused + ap_out * diffusion_;
                 idx = (idx + 1) % sz;
                 diffused = ap_out;
             }
