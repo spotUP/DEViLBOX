@@ -118,8 +118,7 @@ class DJAutoDJ {
       this.idleDeck = 'B';
     }
 
-    const currentIndex = startIndex ?? 0;
-    const nextIndex = this.computeNextIndex(currentIndex, playlist.tracks.length);
+    const startIdx = startIndex ?? 0;
 
     // Set crossfader to the active deck's side so the correct audio plays
     const crossfaderTarget = this.activeDeck === 'A' ? 0 : 1;
@@ -128,7 +127,6 @@ class DJAutoDJ {
 
     store.setAutoDJEnabled(true);
     store.setAutoDJStatus('playing');
-    store.setAutoDJTrackIndices(currentIndex, nextIndex);
 
     // Apply playlist's saved master FX if present
     if (playlist.masterEffects && playlist.masterEffects.length > 0) {
@@ -136,14 +134,15 @@ class DJAutoDJ {
       useAudioStore.getState().setMasterEffects(playlist.masterEffects);
     }
 
-    // Shuffle order is lazy-generated on first computeNextIndex call if
-    // shuffle is on; no explicit init needed here. A redundant call was
-    // replacing the fresh shuffle used to compute the initial nextIndex.
+    // The actual currentIndex we end up on — may differ from startIdx if the
+    // first few tracks fail to load. We compute nextIndex ONCE at the end so
+    // shuffle mode's shufflePosition advances exactly one step per enable().
+    let finalCurrentIdx = startIdx;
 
     // If nothing is playing, find the first loadable track and play it
     if (!store.decks[this.activeDeck].isPlaying) {
       console.log(`[AutoDJ] No deck playing, loading first track to deck ${this.activeDeck}...`);
-      let idx = currentIndex;
+      let idx = startIdx;
       let loaded = false;
 
       for (let attempts = 0; attempts < playlist.tracks.length; attempts++) {
@@ -164,8 +163,7 @@ class DJAutoDJ {
             return null;
           }
           if (loaded) {
-            const nextIdx = this.computeNextIndex(idx, playlist.tracks.length);
-            useDJStore.getState().setAutoDJTrackIndices(idx, nextIdx);
+            finalCurrentIdx = idx;
             // Mark track as played in the playlist
             const plId = useDJPlaylistStore.getState().activePlaylistId;
             if (plId) useDJPlaylistStore.getState().markTrackPlayed(plId, idx);
@@ -181,7 +179,7 @@ class DJAutoDJ {
         }
         // Skip to next track
         idx = (idx + 1) % playlist.tracks.length;
-        if (idx === currentIndex) break; // Wrapped around — no loadable tracks
+        if (idx === startIdx) break; // Wrapped around — no loadable tracks
       }
 
       if (!loaded) {
@@ -190,6 +188,10 @@ class DJAutoDJ {
         return 'Could not load any tracks from playlist — check network connection';
       }
     }
+
+    // Now compute nextIndex — exactly once, against the final currentIndex
+    const nextIndex = this.computeNextIndex(finalCurrentIdx, playlist.tracks.length);
+    useDJStore.getState().setAutoDJTrackIndices(finalCurrentIdx, nextIndex);
 
     this.preloading = false;
     this.preloadedDeck = null;
