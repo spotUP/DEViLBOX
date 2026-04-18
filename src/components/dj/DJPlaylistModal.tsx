@@ -1958,8 +1958,20 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     const realIndex = getRealIndex(displayIndex);
     if (e.metaKey || e.ctrlKey) {
       toggleTrackSelection(realIndex);
-    } else if (e.shiftKey && lastClickedRef.current >= 0) {
-      selectTrackRange(lastClickedRef.current, realIndex);
+    } else if (e.shiftKey) {
+      // Pick an anchor even if the user hasn't single-clicked yet: fall back
+      // to the focused row, then the first already-selected row, then 0.
+      // Without this the very first shift-click of a session has no anchor
+      // (lastClickedRef = -1) and silently degrades to a single-select,
+      // which reads as "shift-click doesn't work".
+      const storeState = useDJPlaylistStore.getState();
+      const anchor =
+        lastClickedRef.current >= 0
+          ? lastClickedRef.current
+          : storeState.focusedTrackIndex >= 0
+          ? storeState.focusedTrackIndex
+          : storeState.selectedTrackIndices[0] ?? 0;
+      selectTrackRange(anchor, realIndex);
     } else {
       selectTrack(realIndex);
     }
