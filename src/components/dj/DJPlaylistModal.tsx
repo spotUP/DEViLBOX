@@ -1531,7 +1531,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   // ── Sort handlers ────────────────────────────────────────────────────────
 
-  const handleSort = useCallback((mode: 'smart' | 'bpm' | 'bpm-desc' | 'key' | 'energy' | 'name') => {
+  const handleSort = useCallback((mode: 'smart' | 'bpm' | 'bpm-desc' | 'key' | 'energy' | 'name' | 'broken') => {
     if (!activePlaylist) return;
     const tracks = [...activePlaylist.tracks];
     let sorted: PlaylistTrack[];
@@ -1542,6 +1542,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       case 'key': sorted = sortByKey(tracks); break;
       case 'energy': sorted = sortByEnergy(tracks); break;
       case 'name': sorted = sortByName(tracks); break;
+      case 'broken': {
+        // Bad tracks first — so the user can quickly re-render/remove them.
+        // Within each bucket, preserve the current order (stable partition).
+        const bad: PlaylistTrack[] = [];
+        const good: PlaylistTrack[] = [];
+        for (const t of tracks) (t.isBad ? bad : good).push(t);
+        sorted = [...bad, ...good];
+        break;
+      }
       default: sorted = tracks;
     }
     sortTracksAction(activePlaylist.id, sorted);
@@ -2479,6 +2488,14 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                             {{ bpm: 'BPM (low → high)', 'bpm-desc': 'BPM (high → low)', key: 'Key (Camelot)', energy: 'Energy', name: 'Name (A→Z)' }[mode]}
                           </button>
                         ))}
+                        <div className="border-t border-dark-border/20 my-0.5" />
+                        <button
+                          onClick={() => handleSort('broken')}
+                          className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-accent-error hover:bg-dark-bgHover transition-colors"
+                          title="Show all bad (unplayable) tracks at the top of the list"
+                        >
+                          ✗ Broken first
+                        </button>
                       </div>
                     )}
                   </div>
