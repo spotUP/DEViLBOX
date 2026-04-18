@@ -551,6 +551,24 @@ export class DrumPadEngine {
    */
   dubPanic(): void {
     const now = this.context.currentTime;
+    // Verbose live-gig logging: print the bus state BEFORE we start tearing
+    // it down so the DJ can see from the console what was active when
+    // panic fired. Cheap, fires once per panic, and makes post-gig diffs
+    // trivial.
+    try {
+      console.warn('[DubPanic] firing', {
+        enabled: this.dubBusEnabled,
+        inputGain: this.dubBusInput.gain.value,
+        returnGain: this.dubBusReturn.gain.value,
+        feedbackGain: this.dubBusFeedback.gain.value,
+        lpfHz: this.dubBusLPF.frequency.value,
+        echoIntensity: this.dubBusSettings.echoIntensity,
+        springWet: this.dubBusSettings.springWet,
+        activeReleasers: this.dubActionReleasers.size,
+        pendingTimers: this.dubThrowTimers.size,
+        activeDeckTaps: this.dubDeckTaps.size,
+      });
+    } catch { /* logging never breaks panic */ }
 
     // 1. Cancel every pending timer + releaser — no ghost ramps firing later.
     for (const t of this.dubThrowTimers) clearTimeout(t);
@@ -620,9 +638,12 @@ export class DrumPadEngine {
     } catch { /* ok */ }
     this._draining = true;
     try {
-      this.dubBusEcho.setIntensity(0);
+      // Instant zero — setIntensity() ramps over 100 ms and lets the
+      // delay line keep recirculating during the ramp, which is the
+      // "echo lingers forever" tail users hit during live panic.
+      this.dubBusEcho.setIntensityInstant(0);
       this.dubBusSpring.wet = 0;
-    } catch { /* ok */ }
+    } catch (err) { console.warn('[DubPanic] echo/spring zero failed:', err); }
     const drainTimer = setTimeout(() => {
       this.dubThrowTimers.delete(drainTimer);
       if (this._disposed) return;
