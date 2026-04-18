@@ -659,7 +659,12 @@ class DJAutoDJ {
         console.error('[AutoDJ] ❌ Failed to load pre-rendered track — aborting transition');
         this.preRenderedTrack = null;
         this.preloadedDeck = null;
-        useDJStore.getState().setAutoDJStatus('preload-failed');
+        // Revert to 'playing' rather than 'preload-failed'. The WAV data was
+        // already rendered successfully — the failure here is deck-load level
+        // (engine race, rare). 'preload-failed' would route into the network
+        // backoff path (5s+ retries) which is wrong for a transient engine
+        // issue. 'playing' lets the next poll try a fresh preload immediately.
+        useDJStore.getState().setAutoDJStatus('playing');
         return;
       }
       console.log(`[AutoDJ] ✅ Pre-rendered track loaded successfully to deck ${this.idleDeck}`);
