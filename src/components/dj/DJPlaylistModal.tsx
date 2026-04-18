@@ -881,7 +881,36 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const setActivePlaylist = useDJPlaylistStore((s) => s.setActivePlaylist);
   const addTrack = useDJPlaylistStore((s) => s.addTrack);
   const addTracks = useDJPlaylistStore((s) => s.addTracks);
-  const removeTrack = useDJPlaylistStore((s) => s.removeTrack);
+  const rawRemoveTrack = useDJPlaylistStore((s) => s.removeTrack);
+  /**
+   * Remove a track and also stop any audio attached to it. Before the store
+   * removes the entry we check every deck — any deck whose fileName matches
+   * gets `stop()` + deck state cleared + deckViewMode reset. Otherwise
+   * removing the playlist row leaves the deck playing it, which sounds
+   * broken to the user ("I removed the track but it's still playing!").
+   *
+   * Pipeline cancellation of an in-flight pre-render would be nicer but
+   * requires adding an abort path through the worker. The render finishing
+   * into cache is harmless — the playlist row is gone so the user won't see
+   * its progress bar, and the cache entry is just free pre-work.
+   */
+  const removeTrack = useCallback((playlistId: string, index: number) => {
+    const pl = useDJPlaylistStore.getState().playlists.find(p => p.id === playlistId);
+    const track = pl?.tracks[index];
+    if (track) {
+      const s = useDJStore.getState();
+      for (const id of ['A', 'B', 'C'] as const) {
+        if (s.decks[id].fileName === track.fileName) {
+          try {
+            getDJEngine().getDeck(id).stop();
+            useDJStore.getState().setDeckPlaying(id, false);
+            useDJStore.getState().setDeckState(id, { fileName: null, trackName: undefined, isPlaying: false });
+          } catch { /* engine / deck not ready */ }
+        }
+      }
+    }
+    rawRemoveTrack(playlistId, index);
+  }, [rawRemoveTrack]);
   const reorderTrack = useDJPlaylistStore((s) => s.reorderTrack);
   const sortTracksAction = useDJPlaylistStore((s) => s.sortTracks);
   const clonePlaylist = useDJPlaylistStore((s) => s.clonePlaylist);
