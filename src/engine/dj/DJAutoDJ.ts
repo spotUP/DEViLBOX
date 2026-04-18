@@ -572,9 +572,20 @@ class DJAutoDJ {
 
   // ── Private: Transition ──────────────────────────────────────────────────
 
-  private async triggerTransition(_userBars: number): Promise<void> {
+  private async triggerTransition(userBars: number): Promise<void> {
     const store = useDJStore.getState();
     if (!this.preloadedDeck) return;
+
+    // Flip status IMMEDIATELY, before any await, so the poll loop doesn't
+    // re-enter triggerTransition while loadPreRenderedTrackToDeck is in flight
+    // (status stays 'transition-pending' through the await otherwise, and the
+    // next 500ms poll would trigger a second transition — double deck swap).
+    if (store.autoDJStatus === 'transitioning') {
+      console.warn('[AutoDJ] triggerTransition() called while already transitioning — skipping duplicate');
+      return;
+    }
+    store.setAutoDJStatus('transitioning');
+    this.transitionStartTime = Date.now();
 
     // Load pre-rendered track instantly if available (background render complete)
     if (this.preRenderedTrack) {
@@ -601,16 +612,20 @@ class DJAutoDJ {
     const outState = store.decks[this.activeDeck];
     const inState = store.decks[this.idleDeck];
 
-    // Smart transition type selection
+    // Smart transition type selection (still informs WHICH transition)
     const transType = this.selectTransitionType(outState, inState);
 
-    // Smart transition duration
-    const bars = this.getSmartTransitionBars(outState, inState, transType);
+    // Transition duration is driven by the caller's userBars (either the
+    // user-configured autoDJTransitionBars or SKIP_TRANSITION_BARS). Cut is
+    // instant and echo-out has its own intrinsic 4-bar length. Using userBars
+    // for crossfade/filter-build/bass-swap ensures the fade completes within
+    // the time window the poll loop used to decide WHEN to trigger — an
+    // earlier bug let smart bars (up to 32) overrun the trigger window.
+    const bars = transType === 'cut' ? 1 : transType === 'echo-out' ? 4 : userBars;
 
     // Mark incoming deck as playing in the store
+    // (status + transitionStartTime already set at top of function for race guard)
     store.setDeckPlaying(this.idleDeck, true);
-    store.setAutoDJStatus('transitioning');
-    this.transitionStartTime = Date.now();
     this.lastCrossfaderValue = -1;
     this.crossfaderStuckCount = 0;
 
@@ -673,32 +688,6 @@ class DJAutoDJ {
 
     // Default: standard crossfade (always safe)
     return 'crossfade';
-  }
-
-  /**
-   * Smart transition duration based on context.
-   */
-  private getSmartTransitionBars(
-    outgoing: { effectiveBPM: number; energy?: number },
-    incoming: { effectiveBPM: number; energy?: number },
-    transType: TransitionType,
-  ): number {
-    // Cuts are instant
-    if (transType === 'cut') return 1;
-    // Echo out is short
-    if (transType === 'echo-out') return 4;
-
-    const bpmDiff = Math.abs((outgoing.effectiveBPM || 125) - (incoming.effectiveBPM || 125));
-    const energyJump = Math.abs((outgoing.energy ?? 0.5) - (incoming.energy ?? 0.5));
-
-    // Close BPM + high energy = short punchy
-    if (bpmDiff < 3 && (outgoing.energy ?? 0.5) > 0.6) return 4;
-    // Big BPM gap = longer blend to mask the difference
-    if (bpmDiff > 10) return 32;
-    // Big energy jump = medium to smooth it
-    if (energyJump > 0.3) return 16;
-    // Default
-    return 8;
   }
 
   private cancelTransition(): void {
