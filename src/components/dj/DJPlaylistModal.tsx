@@ -308,13 +308,15 @@ const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackM
       onPointerMove={onPointerMove}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="absolute bottom-0 left-0 right-0 h-1 bg-dark-bgTertiary/60 cursor-ew-resize group/scrub hover:h-1.5 transition-[height]"
-      title={`Deck ${deckId} · drag to scrub`}
+      className="absolute bottom-0 left-0 right-0 h-2 bg-dark-bgTertiary/70 cursor-ew-resize group/scrub hover:h-3 transition-[height]"
+      title={`Deck ${deckId} · drag to scrub ${playbackMode === 'tracker' ? `(song position ${songPos}/${totalPositions})` : ''}`}
     >
-      <div className={`h-full ${color}`} style={{ width: `${progress * 100}%` }} />
+      {/* Filled progress bar */}
+      <div className={`h-full ${color} opacity-70 group-hover/scrub:opacity-100 transition-opacity`} style={{ width: `${progress * 100}%` }} />
+      {/* Always-visible playhead thumb so users see the slider at a glance */}
       <div
-        className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full ${color} opacity-0 group-hover/scrub:opacity-100 transition-opacity pointer-events-none`}
-        style={{ left: `calc(${progress * 100}% - 5px)` }}
+        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} shadow-md border border-dark-bg group-hover/scrub:w-4 group-hover/scrub:h-4 transition-all pointer-events-none`}
+        style={{ left: `calc(${progress * 100}% - 6px)` }}
       />
     </div>
   );
