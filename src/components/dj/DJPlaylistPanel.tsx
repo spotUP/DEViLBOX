@@ -784,7 +784,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
             await engine.loadAudioToDeck(deckId, buffer, track.fileName);
             useDJStore.getState().setDeckViewMode('vinyl');
           } else if (isUADEFormat(filename)) {
-            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName);
+            // Pass track.fileName as identity so deck store / playlist row
+            // match for scrubber + isPlaying badge (see DJUADEPrerender).
+            await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName, track.fileName);
             useDJStore.getState().setDeckViewMode('visualizer');
           } else {
             const blob = new File([buffer], filename, { type: 'application/octet-stream' });
