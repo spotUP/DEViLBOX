@@ -1931,12 +1931,13 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         }
       }
 
-      // Escape outside the tracker view: reserve it for view-level panic
-      // handlers (DJKeyboardHandler, drumpad, etc). Skipping the scheme lookup
-      // here prevents tracker schemes that bind Escape (e.g. protracker →
-      // show_main_screen) from stealing the key and switching back to tracker
-      // view from DJ/VJ/drumpad/other non-tracker views.
+      // Escape outside the tracker view: run the universal panic (silences
+      // master FX, drumpad voices, dub bus, decks' stuck state, vocoder PTT).
+      // Then skip the scheme lookup so tracker schemes that bind Escape (e.g.
+      // protracker → show_main_screen) don't steal the key and switch back to
+      // tracker view from DJ/VJ/drumpad/other non-tracker views.
       if (e.key === 'Escape' && _activeView !== 'tracker') {
+        import('@/engine/dj/DJActions').then(({ djPanic }) => djPanic()).catch(() => { /* ok */ });
         return;
       }
 
