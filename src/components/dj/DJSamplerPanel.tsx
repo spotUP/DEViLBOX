@@ -10,6 +10,7 @@ import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react'
 import { PadButton } from '../drumpad/PadButton';
 import { DubBusPanel } from '../drumpad/DubBusPanel';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
+import { DUB_ACTION_HANDLERS } from '../../engine/drumpad/DubActions';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
@@ -74,6 +75,9 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   // Audio engine refs
   const engineRef = useRef<DrumPadEngine | null>(null);
   const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
+  // Active dub-action releasers per pad — called on pad release / panic. Throws
+  // (oneshot) never register here; their engage returns null and tails out alone.
+  const dubReleasersRef = useRef<Map<number, () => void>>(new Map());
 
   // Store state
   const { programs, currentProgramId, currentBank, setBank, loadProgram } = useDrumPadStore();
@@ -107,6 +111,11 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
       engine.detachDJMixer();
       noteRepeatRef.current?.dispose();
       engine.dispose();
+      // Release any outstanding dub-action holds before tearing down.
+      for (const release of dubReleasersRef.current.values()) {
+        try { release(); } catch { /* ok */ }
+      }
+      dubReleasersRef.current.clear();
       // Clear all velocity flash timers
       for (const timer of velocityTimersRef.current.values()) {
         clearTimeout(timer);
@@ -120,6 +129,12 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     const onPanic = () => {
       noteRepeatRef.current?.stopAll();
       engineRef.current?.stopAll();
+      // Close any in-flight dub-action releasers so siren / mute-dub /
+      // filter-drop don't stay stuck on after panic.
+      for (const release of dubReleasersRef.current.values()) {
+        try { release(); } catch { /* ok */ }
+      }
+      dubReleasersRef.current.clear();
     };
     window.addEventListener('dj-panic', onPanic);
     return () => window.removeEventListener('dj-panic', onPanic);
@@ -201,6 +216,21 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
         if (pad.scratchAction) {
           SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
         }
+
+        // Dub-bus action — King Tubby throws / holds / mutes / siren / filter.
+        // Fires before sample playback so even pads with both (rare) start
+        // their dub gesture on the pad's transient hit.
+        if (pad.dubAction) {
+          const prior = dubReleasersRef.current.get(padId);
+          if (prior) { prior(); dubReleasersRef.current.delete(padId); }
+          const handler = DUB_ACTION_HANDLERS[pad.dubAction];
+          if (handler) {
+            const settings = useDrumPadStore.getState().dubBus;
+            const release = handler.engage(engineRef.current, settings, bpm);
+            if (release) dubReleasersRef.current.set(padId, release);
+          }
+        }
+
         if (pad.sample) {
           engineRef.current.triggerPad(pad, velocity);
         }
@@ -221,9 +251,18 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
       setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
       velocityTimersRef.current.delete(padId);
     }, 200));
-  }, [currentProgram]);
+  }, [currentProgram, bpm]);
 
   const handlePadRelease = useCallback((padId: number) => {
+    // Dub-action releasers live on their own lifecycle; release even if the
+    // pad wasn't flagged as held (throws never register held, but siren /
+    // filter-drop / mute-dub do).
+    const release = dubReleasersRef.current.get(padId);
+    if (release) {
+      release();
+      dubReleasersRef.current.delete(padId);
+    }
+
     if (!heldPadsRef.current.has(padId)) return;
     heldPadsRef.current.delete(padId);
     noteRepeatRef.current?.stopRepeat(padId);
