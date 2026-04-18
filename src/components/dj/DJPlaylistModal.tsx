@@ -92,8 +92,8 @@ import {
   setPlaylistVisibility as apiSetVisibility,
   type CloudPlaylistSummary,
 } from '@/lib/playlistCloudApi';
-import { DJ_FX_PRESETS } from './DJPlaylistPanel';
 import { FX_PRESETS } from '@/constants/fxPresets';
+import { applyPerSongMasterFx } from '@/engine/dj/DJPerSongFx';
 
 // Group master FX presets by primary tag (first tag wins) for <optgroup>.
 // Module-scope so every row memo-reuses the same reference instead of
@@ -1738,37 +1738,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         } catch { /* deck may not be initialized yet */ }
 
         await loadTrackToDeck(track, deckId);
-        if (track.masterFxPreset) {
-          try {
-            const { useAudioStore } = await import('@/stores/useAudioStore');
-            // New-style: stored value is the master FX_PRESETS name.
-            const fxPreset = FX_PRESETS.find((p) => p.name === track.masterFxPreset);
-            if (fxPreset) {
-              const effectConfigs = fxPreset.effects.map((fx, i) => ({
-                ...fx,
-                id: `persong-${fxPreset.name}-${i}`,
-              }));
-              useAudioStore.getState().setMasterEffects(effectConfigs, fxPreset.gainCompensationDb);
-            } else {
-              // Legacy fallback: older tracks stored DJ_FX_PRESETS.key. Keep
-              // them working until the user opens the dropdown and picks a
-              // new master preset.
-              const legacy = DJ_FX_PRESETS.find((p) => p.key === track.masterFxPreset);
-              if (legacy) {
-                const effectConfigs = legacy.effects.map((fx, i) => ({
-                  id: `persong-${legacy.key}-${i}`,
-                  category: 'tonejs' as const,
-                  type: fx.type,
-                  enabled: true,
-                  wet: fx.wet,
-                  parameters: fx.params as Record<string, number | string>,
-                }));
-                useAudioStore.getState().setMasterEffects(effectConfigs);
-              }
-            }
-          } catch (err) {
-            console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
-          }
+        // Apply or clear the per-song master FX override. The helper clears
+        // any prior per-song chain when this track has no preset, which
+        // stops FX from leaking across tracks.
+        try { applyPerSongMasterFx(track); } catch (err) {
+          console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
         }
       } finally {
         setLoadingTrackIndex(null);
@@ -1814,6 +1788,14 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         useDJStore.getState().setDeckPlaying(deckId, false);
       } catch { /* */ }
       await loadTrackToDeck(track, deckId);
+      // Apply or clear per-song FX for this track. Without this, a per-song
+      // chain applied from a previous Load-to-Deck would keep playing on
+      // every subsequent preview. The helper only clears chains we ourselves
+      // applied (tagged with the "persong-" id prefix), leaving the user's
+      // manually-set master FX intact.
+      try { applyPerSongMasterFx(track); } catch (err) {
+        console.warn('[DJPlaylistModal] Failed to apply per-song FX:', err);
+      }
       try {
         getDJEngine().getDeck(deckId).play();
         useDJStore.getState().setDeckPlaying(deckId, true);
