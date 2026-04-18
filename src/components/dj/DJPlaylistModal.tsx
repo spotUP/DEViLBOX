@@ -589,27 +589,27 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
       </span>
 
       {/* Preview button */}
-      <span className="shrink-0 w-6 flex items-center justify-center">
+      <span className="shrink-0 w-10 flex items-center justify-center">
         <button
           onClick={(e) => { e.stopPropagation(); isPreviewing ? onStopPreview() : onPreview(track, index); }}
-          className={`p-1 rounded transition-all ${
+          className={`p-2 rounded transition-all ${
             isPreviewing
               ? 'text-accent-success bg-accent-success/15 hover:bg-accent-success/25'
               : `text-text-muted/30 hover:text-text-primary ${isHovered || isFocused ? 'opacity-100' : 'opacity-0'}`
           }`}
           title={isPreviewing ? 'Stop preview' : 'Preview track'}
         >
-          {isPreviewing ? <Square size={12} /> : <Play size={12} />}
+          {isPreviewing ? <Square size={22} /> : <Play size={22} />}
         </button>
       </span>
 
       {/* Actions (visible on hover) */}
-      <span className={`flex items-center gap-1 shrink-0 w-36 justify-end transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <span className={`flex items-center gap-2 shrink-0 w-72 justify-end transition-opacity ${isHovered || isFocused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <select
           value={track.masterFxPreset || ''}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => { e.stopPropagation(); onSetFxPreset(index, e.target.value || undefined); }}
-          className="text-[9px] bg-transparent border border-dark-border/50 rounded text-text-muted/50 hover:text-text-muted px-1 max-w-[48px] cursor-pointer"
+          className="text-[18px] bg-transparent border border-dark-border/50 rounded text-text-muted/50 hover:text-text-muted px-2 max-w-[96px] cursor-pointer"
           title="Per-song master FX preset"
         >
           <option value="">FX</option>
@@ -619,18 +619,18 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
         </select>
         <button
           onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'A', index); }}
-          className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-accent-primary hover:text-accent-primary/80 transition-colors rounded hover:bg-dark-bgHover"
+          className="px-3 py-1 text-[20px] font-mono font-bold text-accent-primary hover:text-accent-primary/80 transition-colors rounded hover:bg-dark-bgHover"
           title="Load to Deck 1"
         >1</button>
         <button
           onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'B', index); }}
-          className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-accent-error hover:text-accent-error/80 transition-colors rounded hover:bg-dark-bgHover"
+          className="px-3 py-1 text-[20px] font-mono font-bold text-accent-error hover:text-accent-error/80 transition-colors rounded hover:bg-dark-bgHover"
           title="Load to Deck 2"
         >2</button>
         {thirdDeckActive && (
           <button
             onClick={(e) => { e.stopPropagation(); onLoadToDeck(track, 'C', index); }}
-            className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-accent-success hover:text-accent-success/80 transition-colors rounded hover:bg-dark-bgHover"
+            className="px-3 py-1 text-[20px] font-mono font-bold text-accent-success hover:text-accent-success/80 transition-colors rounded hover:bg-dark-bgHover"
             title="Load to Deck 3"
           >3</button>
         )}
@@ -643,20 +643,20 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
           onClick={(e) => { e.stopPropagation(); onReRender(track, index); }}
           disabled={isReRendering}
           title={isReRendering ? 'Re-rendering…' : 'Re-render track (clears cache + metadata)'}
-          className={`p-1 transition-colors rounded hover:bg-dark-bgHover ${
+          className={`p-2 transition-colors rounded hover:bg-dark-bgHover ${
             isReRendering
               ? 'text-accent-primary animate-spin'
               : 'text-text-muted/50 hover:text-accent-primary'
           }`}
         >
-          <RefreshCw size={10} />
+          <RefreshCw size={20} />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(index); }}
           title="Remove from playlist"
-          className="p-1 text-accent-error/60 hover:text-accent-error transition-colors rounded hover:bg-dark-bgHover"
+          className="p-2 text-accent-error/60 hover:text-accent-error transition-colors rounded hover:bg-dark-bgHover"
         >
-          <X size={10} />
+          <X size={20} />
         </button>
       </span>
 
@@ -2979,8 +2979,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     <span className="shrink-0 w-16 text-right cursor-pointer hover:text-text-muted transition-colors" onClick={() => handleColumnSort('time')}>
                       Time {columnSort?.column === 'time' && (columnSort.dir === 'asc' ? <ChevronUp size={16} className="inline" /> : <ChevronDown size={16} className="inline" />)}
                     </span>
-                    <span className="shrink-0 w-6" />
-                    <span className="shrink-0 w-36" />
+                    <span className="shrink-0 w-10" />
+                    <span className="shrink-0 w-72" />
                   </div>
                 )}
 
