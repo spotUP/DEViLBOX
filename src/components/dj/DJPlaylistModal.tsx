@@ -634,7 +634,9 @@ const ModalTrackRow: React.FC<ModalTrackRowProps> = React.memo(({
           className="text-[18px] bg-transparent border border-dark-border/50 rounded text-text-muted/50 hover:text-text-muted px-2 max-w-[96px] cursor-pointer"
           title="Per-song master FX preset"
         >
-          <option value="">FX</option>
+          {/* Empty value + explicit "None" so selecting it reads as
+              "remove FX from this track" rather than an ambiguous blank. */}
+          <option value="">— None —</option>
           {MASTER_FX_GROUPS.map(({ category, presets }) => (
             <optgroup key={category} label={category}>
               {presets.map((p) => (
