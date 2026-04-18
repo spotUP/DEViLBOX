@@ -80,6 +80,18 @@ export default {
         'glow-sm': '0 0 10px var(--color-accent-glow)',
         'inner-glow': 'inset 0 0 20px var(--color-accent-glow)',
       },
+      keyframes: {
+        // Indeterminate progress bar — a bright chunk sweeping left-to-right
+        // across a muted bar. Used for "rendering / analyzing" states where
+        // we don't have chunk-level progress from the pipeline.
+        'indeterminate': {
+          '0%':   { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' },
+        },
+      },
+      animation: {
+        'indeterminate': 'indeterminate 1.2s ease-in-out infinite',
+      },
     },
   },
   plugins: [],
