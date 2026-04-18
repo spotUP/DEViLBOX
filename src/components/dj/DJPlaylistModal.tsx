@@ -706,6 +706,7 @@ interface PlaylistSidebarItemProps {
   editName: string;
   isAuthenticated: boolean;
   isSaving: boolean;
+  analysisProgress?: AnalysisProgress | null;
   onSelect: () => void;
   onStartEdit: () => void;
   onEditName: (name: string) => void;
@@ -724,6 +725,7 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
   editName,
   isAuthenticated: authed,
   isSaving,
+  analysisProgress,
   onSelect,
   onStartEdit,
   onEditName,
@@ -736,6 +738,10 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
 }) => {
   const totalDuration = playlist.tracks.reduce((s, t) => s + (t.duration || 0), 0);
   const badCount = playlist.tracks.filter(t => t.isBad).length;
+  const analyzing = analysisProgress && analysisProgress.total > 0;
+  const analysisPct = analyzing
+    ? Math.round((analysisProgress.current / analysisProgress.total) * 100)
+    : 0;
 
   // Only render inline edit UI when editing a non-active playlist — the header title
   // owns the edit UI for the active one (prevents two autoFocus inputs fighting for focus).
@@ -758,7 +764,7 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
     <div
       onClick={onSelect}
       onDoubleClick={onStartEdit}
-      className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-l-2 ${
+      className={`group relative flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-l-2 ${
         isActive
           ? 'border-accent-primary bg-accent-primary/10 text-text-primary'
           : 'border-transparent text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
@@ -775,11 +781,22 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
                 : <Lock size={9} className="text-text-muted/40 shrink-0" />}
             </span>
           )}
+          {analyzing && (
+            <span title={`Analyzing… ${analysisPct}%`} className="shrink-0 inline-flex">
+              <BarChart3 size={9} className="text-accent-primary animate-pulse" />
+            </span>
+          )}
         </div>
         <div className="text-[9px] font-mono text-text-muted/50">
-          {playlist.tracks.length} tracks
-          {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
-          {badCount > 0 && <span className="text-accent-error ml-1">· {badCount} bad</span>}
+          {analyzing ? (
+            <span className="text-accent-primary/80">Analyzing {analysisProgress.current}/{analysisProgress.total}</span>
+          ) : (
+            <>
+              {playlist.tracks.length} tracks
+              {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
+              {badCount > 0 && <span className="text-accent-error ml-1">· {badCount} bad</span>}
+            </>
+          )}
         </div>
       </div>
       <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -814,6 +831,22 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
           <Trash2 size={10} />
         </button>
       </span>
+
+      {/* Background-analysis progress bar, pinned to the bottom of the row.
+          Persists while the user switches to another playlist — so clicking
+          Analyze, then browsing or editing a different playlist, still shows
+          the first playlist's progress on its sidebar entry. */}
+      {analyzing && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-0.5 bg-dark-bgTertiary/40 overflow-hidden pointer-events-none"
+          title={`Analyzing ${analysisProgress.current}/${analysisProgress.total}`}
+        >
+          <div
+            className="h-full bg-accent-primary transition-[width] duration-200 ease-out"
+            style={{ width: `${analysisPct}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 });
@@ -892,7 +925,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
   const [editTrack, setEditTrack] = useState<{ index: number; track: PlaylistTrack } | null>(null);
   const [columnSort, setColumnSort] = useState<{ column: string; dir: 'asc' | 'desc' } | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+  // Per-playlist analysis progress map. Running analyses live here keyed by
+  // playlist ID, so switching the active playlist doesn't cancel or hide
+  // background runs. Each sidebar entry reads its own progress from the map.
+  const [analysisProgressMap, setAnalysisProgressMap] = useState<Map<string, AnalysisProgress>>(new Map());
+  const analysisProgress = activePlaylistId ? analysisProgressMap.get(activePlaylistId) ?? null : null;
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [savingPlaylistId, setSavingPlaylistId] = useState<string | null>(null);
   const [communityPlaylists, setCommunityPlaylists] = useState<CloudPlaylistSummary[]>([]);
@@ -1128,10 +1165,25 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   const handleAnalyzeAll = useCallback(async () => {
     if (!activePlaylistId || analysisProgress) return;
+    // Snapshot the id so the background run is tied to the playlist the user
+    // triggered it on, not whatever's active when it finishes. User can
+    // switch playlists, edit a different one, come back — progress keeps
+    // writing to the right map entry.
+    const pid = activePlaylistId;
     try {
-      await analyzePlaylist(activePlaylistId, (p) => setAnalysisProgress({ ...p }));
+      await analyzePlaylist(pid, (p) => {
+        setAnalysisProgressMap(prev => {
+          const next = new Map(prev);
+          next.set(pid, { ...p });
+          return next;
+        });
+      });
     } finally {
-      setAnalysisProgress(null);
+      setAnalysisProgressMap(prev => {
+        const next = new Map(prev);
+        next.delete(pid);
+        return next;
+      });
     }
   }, [activePlaylistId, analysisProgress]);
 
@@ -2450,6 +2502,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                   isActive={pl.id === activePlaylistId}
                   isEditing={editingPlaylistId === pl.id}
                   editName={editName}
+                  analysisProgress={analysisProgressMap.get(pl.id) ?? null}
                   isAuthenticated={isLoggedIn}
                   isSaving={savingPlaylistId === pl.id}
                   onSelect={() => setActivePlaylist(pl.id)}
