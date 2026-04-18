@@ -49,10 +49,16 @@ const LIGHT_FX_TYPES = new Set([
   'TapeSaturation', 'Distortion', 'Chebyshev',
   'Compressor', 'EQ3',
   'Chorus', 'Phaser', 'Vibrato', 'Tremolo',
-  'FeedbackDelay', 'PingPongDelay',
 ]);
+// Delays and reverbs are routed through the shared Dub Bus via `dubSend`.
+// Keeping 16 FeedbackDelay / PingPongDelay / SpringReverb / SpaceEcho
+// instances per one-shot kit stacks the audio graph with delay lines +
+// filter feedback loops — a measurable CPU hazard during a 2-hour set.
+// The shared bus supplies their character globally, so per-pad copies
+// are redundant as well as expensive.
 const HEAVY_FX_TYPES = new Set([
   'SpringReverb', 'SpaceEcho', 'Reverb', 'JCReverb', 'FreeverbEffect',
+  'FeedbackDelay', 'PingPongDelay',
 ]);
 
 function applyOneShotPads(program: DrumProgram, startPad: number, count: number): void {
@@ -84,7 +90,12 @@ function applyOneShotPads(program: DrumProgram, startPad: number, count: number)
         ...preset,
         effects: keptFx,
       } as import('../types/instrument/defaults').InstrumentConfig;
-      pad.instrumentNote = 'C3';
+      // Per-synth trigger note:
+      //   - DubSiren  → 'C3' sentinel ("use preset frequency unchanged")
+      //   - everything else → 'C4' (keyboard-middle); MonoSynth-based
+      //     risers / FMSynth growls at C3 play an octave below their
+      //     intended range, which bleeds into the bass and muddies.
+      pad.instrumentNote = preset.synthType === 'DubSiren' ? 'C3' : 'C4';
       // Dub-bus send — adds shared echo + spring reverb character on top of
       // whatever the pad's own lightweight FX produce. Horns and impacts use
       // less; sirens more (tails benefit from long echo).
@@ -158,7 +169,9 @@ function applyOneShotByName(program: DrumProgram, startPad: number, pads: SynthM
       pan: preset.pan ?? 0,
       ...preset,
     } as import('../types/instrument/defaults').InstrumentConfig;
-    pad.instrumentNote = 'C3';
+    // DubSiren uses C3 as the "no pitch override" sentinel so the preset's
+    // oscillator.frequency is honored; other synths get keyboard-middle C4.
+    pad.instrumentNote = preset.synthType === 'DubSiren' ? 'C3' : 'C4';
   });
 }
 
@@ -272,21 +285,29 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       return program;
     },
     // Flip the bus on and dial in dub-flattering defaults so the kit sounds
-    // right the instant it loads. User can still fiddle via the Dub Bus panel.
+    // right the instant it loads. Louder-than-subtle values: dub tail sits
+    // within ~3 dB of the dry mix (how Tubby/Scientist cuts actually sound).
+    // User can still tame via the Dub Bus panel.
     onApply: (store) => {
       store.setDubBus({
         enabled: true,
-        returnGain: 0.82,
+        returnGain: 1.0,
         hpfCutoff: 200,
-        springWet: 0.45,
-        echoIntensity: 0.6,
-        echoWet: 0.55,
+        springWet: 0.55,
+        echoIntensity: 0.62,
+        echoWet: 0.7,
         echoRateMs: 280,
         sidechainAmount: 0.5,
-        deckTapAmount: 0.9,
+        deckTapAmount: 1.0,
         throwBeats: 0.5,
         sirenFeedback: 0.85,
         filterDropHz: 220,
+        // BPM-sync ON for the King Tubby kit — the whole point of dub
+        // echoes is to lock to the groove. Dotted-eighth is the classic
+        // reggae/dub skank delay. Throw quantize stays 'off' so pad
+        // presses feel immediate; users can enable via the bus panel.
+        echoSyncDivision: '1/8D',
+        throwQuantize: 'off',
       });
     },
   },

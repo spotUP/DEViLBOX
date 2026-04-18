@@ -334,10 +334,24 @@ export async function createEffect(
     }
 
     case 'AutoFilter': {
+      // `type` here is the LFO WAVEFORM — validated against the four shapes
+      // Tone.LFO actually accepts. A cast to the broader ToneOscillatorType
+      // would let through 'pwm' / 'pulse' / 'sine2' etc., which throw at
+      // LFO construction and break the whole pad FX chain. `depth` was
+      // similarly being silently dropped. Fixing both is what lets preset-
+      // authored filter sweeps (Noise Riser, Tension Swell, etc.) actually
+      // sweep instead of running with default sine at half depth.
+      type LFOShape = 'sine' | 'square' | 'triangle' | 'sawtooth';
+      const LFO_SHAPES: readonly LFOShape[] = ['sine', 'square', 'triangle', 'sawtooth'];
+      const lfoType: LFOShape = LFO_SHAPES.includes(p.type as LFOShape)
+        ? (p.type as LFOShape)
+        : 'sine';
       const autoFilter = new Tone.AutoFilter({
         frequency: p.frequency || 1,
         baseFrequency: p.baseFrequency || 200,
         octaves: p.octaves || 2.6,
+        type: lfoType,
+        depth: typeof p.depth === 'number' ? p.depth : 1,
         filter: {
           type: p.filterType || 'lowpass',
           rolloff: -12,

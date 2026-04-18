@@ -200,6 +200,26 @@ export interface DubBusSettings {
   // Filter drop target in Hz — where the bus LPF drops to while a
   // dub_filter_drop pad is held. 80-600 Hz is the classic muffle range.
   filterDropHz: number;
+  // Echo rate BPM-sync — when non-'off', the SpaceEcho `rate` is derived
+  // live from transport BPM using the selected note division instead of
+  // the free-running `echoRateMs`. That's how classic dub delays stay
+  // locked to the groove: repeats hit on the beat subdivisions.
+  //   '1/4'  = quarter note   (one repeat per beat)
+  //   '1/8'  = eighth note    (tight stutter)
+  //   '1/8D' = dotted eighth  (the classic reggae/dub skank feel)
+  //   '1/16' = sixteenth      (very dense)
+  //   '1/2'  = half note      (long dub tail)
+  echoSyncDivision: 'off' | '1/4' | '1/8' | '1/8D' | '1/16' | '1/2';
+  // Throw quantize — when non-'off', dub throws wait for the next beat
+  // subdivision boundary before firing. Gives the pad a "locked-to-the-
+  // groove" feel instead of free-timing. 'offbeat' is the King Tubby
+  // signature: hits land on the "&" between beats so echoes fill onbeats.
+  //   'off'     = fire immediately
+  //   '1/16'    = tight grid — hit feels perfectly locked
+  //   '1/8'     = next eighth boundary
+  //   'offbeat' = next half-beat (the "&" between downbeats)
+  //   'bar'     = next downbeat only (biggest moves)
+  throwQuantize: 'off' | '1/16' | '1/8' | 'offbeat' | 'bar';
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -220,6 +240,13 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   throwBeats: 0.5,
   sirenFeedback: 0.85,
   filterDropHz: 220,
+  // BPM-sync defaults: both off. User opts in via the Dub Bus panel for
+  // locked-to-the-groove behavior. Defaulting sync on caused confusion in
+  // first-time UX where the tracker transport BPM (e.g. 120) didn't match
+  // the DJ deck's BPM (e.g. 140) — echoes felt "off" until the user
+  // realized they had to pick a sync division explicitly.
+  echoSyncDivision: 'off',
+  throwQuantize: 'off',
 };
 
 export interface DrumProgram {

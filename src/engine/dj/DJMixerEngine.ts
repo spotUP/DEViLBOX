@@ -287,23 +287,40 @@ export class DJMixerEngine {
    * (the "abrupt silence" bug). Restore on release uses 30 ms — fast enough
    * to feel like "back in the mix" but still smooth.
    */
+  /**
+   * Per-deck "pre-dub" gain reference. Captured ONCE when a deck is first
+   * pushed into a dub-mute state; ignored on overlapping retriggers so a
+   * rapid second press (during the 200 ms fade) doesn't save `0.3` as the
+   * restore target and leave the deck stuck at a low level forever.
+   */
+  private _preDubGain: Map<DeckId, number> = new Map();
+
   muteChannelForDub(deck: DeckId): () => void {
     const input = this.getInputForDeck(deck);
     if (!input) return () => {};
     const g = input.gain;
     const now = Tone.now();
-    const prev = g.value;
+    // Only capture the restore target the FIRST time this deck enters a dub
+    // state. If a prior mute-and-dub is still active (_preDubGain has an
+    // entry), trust that captured value and just extend/refresh the fade.
+    if (!this._preDubGain.has(deck)) {
+      this._preDubGain.set(deck, g.value);
+    }
     try {
       g.cancelScheduledValues(now);
-      g.setValueAtTime(prev, now);
+      g.setValueAtTime(g.value, now);
       g.linearRampToValueAtTime(0, now + 0.200);
     } catch { /* rampable */ }
     return () => {
+      // Restore to the originally-captured pre-dub value, then clear the
+      // per-deck entry so the NEXT mute-and-dub re-captures fresh.
+      const restoreTo = this._preDubGain.get(deck) ?? 1;
+      this._preDubGain.delete(deck);
       const n = Tone.now();
       try {
         g.cancelScheduledValues(n);
         g.setValueAtTime(g.value, n);
-        g.linearRampToValueAtTime(prev, n + 0.030);
+        g.linearRampToValueAtTime(restoreTo, n + 0.030);
       } catch { /* ok */ }
     };
   }

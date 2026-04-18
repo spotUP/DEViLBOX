@@ -16,7 +16,10 @@ import { getAudioContext } from '../../audio/AudioContextSingleton';
 import { useOrientation } from '@hooks/useOrientation';
 import type { PadBank } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
-import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
+import { useMIDIPadRouting, clearDubReleasers } from '@/hooks/drumpad/useMIDIPadRouting';
+import { useTransportStore } from '../../stores/useTransportStore';
+import { useDJStore } from '../../stores/useDJStore';
+import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/drumpad/DubActions';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
@@ -68,10 +71,25 @@ export const PadGrid: React.FC<PadGridProps> = ({
   }, [currentBank, releaseAllHeld]);
 
   // Dub Bus settings mirror — cheap, runs on every slider change.
+  // When `echoSyncDivision` is active, derive the echo rate from the
+  // currently-loudest playing deck's BPM (falls back to transport BPM
+  // when no deck is playing). Using the transport BPM directly was wrong
+  // in DJ view — syncing to 120 while a 140 BPM record spins sounds off.
   const dubBus = useDrumPadStore((s) => s.dubBus);
+  const transportBpm = useTransportStore((s) => s.bpm);
+  // Subscribe to deck-relevant fields so the effect re-runs when ANY
+  // source of "active BPM" changes (deck swaps, crossfader moves, etc.).
+  const djDeckSig = useDJStore((s) =>
+    `${s.decks.A.isPlaying ? s.decks.A.beatGrid?.bpm || s.decks.A.detectedBPM : 0}|` +
+    `${s.decks.B.isPlaying ? s.decks.B.beatGrid?.bpm || s.decks.B.detectedBPM : 0}|` +
+    `${s.decks.C.isPlaying ? s.decks.C.beatGrid?.bpm || s.decks.C.detectedBPM : 0}|` +
+    `${s.crossfaderPosition}`
+  );
   useEffect(() => {
-    engineRef.current?.setDubBusSettings(dubBus);
-  }, [dubBus, engineRef]);
+    const bpm = getActiveBpm();
+    const synced = bpmSyncedEchoRate(bpm, dubBus.echoSyncDivision, dubBus.echoRateMs);
+    engineRef.current?.setDubBusSettings({ ...dubBus, echoRateMs: synced });
+  }, [dubBus, transportBpm, djDeckSig, engineRef]);
 
   // DJ mixer (re-)attach runs ONCE on mount (and retries once a few ms later
   // in case the DJ engine mounted after the pad-engine singleton was created).
@@ -105,6 +123,10 @@ export const PadGrid: React.FC<PadGridProps> = ({
   useEffect(() => {
     const onDubPanic = () => {
       engineRef.current?.dubPanic();
+      // Clear hook-side releasers too — engine-side cancels already ran
+      // inside dubPanic, but _dubReleasers still holds stale entries that
+      // would fire no-op cancels on the next pad release.
+      clearDubReleasers();
       useDrumPadStore.getState().setDubBus({ enabled: false });
     };
     const onDjPanic = () => {
@@ -113,6 +135,9 @@ export const PadGrid: React.FC<PadGridProps> = ({
       releaseAllHeld();
       engineRef.current?.stopAll();
       engineRef.current?.dubPanic();
+      clearDubReleasers();
+      // Sync the store flag so the Dub Bus UI reflects the kill.
+      useDrumPadStore.getState().setDubBus({ enabled: false });
     };
     window.addEventListener('dub-panic', onDubPanic);
     window.addEventListener('dj-panic', onDjPanic);

@@ -35,6 +35,10 @@ interface ActiveSweep {
 // to 'beat' or 'off' via the Q button on the deck transport.
 let quantizeMode: QuantizeMode = 'bar';
 const activeSweeps = new Map<string, ActiveSweep>();
+/* Registry of scheduled-but-not-yet-fired quantized cancellers so the panic
+ * button (cancelAllAutomation) can abort them. Each scheduler adds its cancel
+ * on arm and removes itself on fire or explicit cancel. */
+const pendingSchedules = new Set<() => void>();
 
 /**
  * Start a timer-based animation loop that runs even when the page/element is
@@ -108,17 +112,28 @@ function scheduleQuantized(deckId: DeckId, action: () => void): () => void {
     return () => {};
   }
 
-  // Add micro-timing jitter for human feel (±30ms)
+  /* Humanize by 0..+30 ms only. We can't schedule earlier than the quantized
+   * boundary (setTimeout can't go negative), so we use positive-only jitter
+   * for a consistently-on-or-slightly-late human feel. The previous ±30 ms
+   * formula was asymmetric — negative jitter collapsed to "fire exactly
+   * on boundary" instead of early. */
+  let innerCancel: (() => void) | null = null;
   const jitteredAction = () => {
-    const jitter = (Math.random() - 0.5) * 2 * HUMANIZE_JITTER_MS;
-    if (jitter > 5) {
-      setTimeout(action, jitter);
-    } else {
-      action(); // fire slightly early or on-time
-    }
+    if (innerCancel) pendingSchedules.delete(innerCancel);
+    const jitter = Math.random() * HUMANIZE_JITTER_MS;
+    if (jitter > 2) setTimeout(action, jitter);
+    else action();
   };
 
-  return fn(deckId, jitteredAction);
+  innerCancel = fn(deckId, jitteredAction);
+  pendingSchedules.add(innerCancel);
+
+  return () => {
+    if (innerCancel) {
+      pendingSchedules.delete(innerCancel);
+      innerCancel();
+    }
+  };
 }
 
 // ── quantizeAction — universal beat-quantized transport scheduler ────────────
@@ -214,17 +229,26 @@ export function quantizeAction(
   });
 
   let cancelled = false;
+  let selfCancel: (() => void) | null = null;
   const timer = setTimeout(() => {
     if (cancelled) return;
+    if (selfCancel) pendingSchedules.delete(selfCancel);
     useDJStore.getState().setDeckPending(deckId, null);
     void action();
   }, etaMs);
 
-  return () => {
+  selfCancel = () => {
     if (cancelled) return;
     cancelled = true;
     clearTimeout(timer);
     useDJStore.getState().setDeckPending(deckId, null);
+  };
+  pendingSchedules.add(selfCancel);
+
+  return () => {
+    if (!selfCancel) return;
+    pendingSchedules.delete(selfCancel);
+    selfCancel();
   };
 }
 
@@ -244,6 +268,8 @@ export function quantizedEQKill(
       const deck = getDJEngine().getDeck(deckId);
       deck.setEQKill(band, enabled);
     } catch { /* engine not ready */ }
+    // Keep the kill button in the UI in sync with the engine state.
+    useDJStore.getState().setDeckEQKill(deckId, band, enabled);
   });
 }
 
@@ -254,6 +280,7 @@ export function instantEQKill(deckId: DeckId, band: EQBand, enabled: boolean): v
   try {
     getDJEngine().getDeck(deckId).setEQKill(band, enabled);
   } catch { /* engine not ready */ }
+  useDJStore.getState().setDeckEQKill(deckId, band, enabled);
 }
 
 // ── Filter Sweep (beat-timed) ────────────────────────────────────────────────
@@ -292,18 +319,19 @@ export function filterSweep(
 
   const clampedTarget = Math.max(-1, Math.min(1, target));
 
-  // Apply an immediate initial offset so even short taps are audible
+  // Apply an immediate initial offset so even short taps are audible.
+  // Read the starting position from the deck itself — it's the source of truth.
+  // The previous trackedFilterPositions map went stale whenever a caller
+  // (MIDI router, DJActions, AutoDJ, FX pads) moved the filter without
+  // going through this module.
   const INITIAL_JUMP = 0.15;
   let actualStart = 0;
   try {
-    actualStart = getTrackedFilterPosition(deckId);
-  } catch {
-    actualStart = 0;
-  }
+    actualStart = getDJEngine().getDeck(deckId).getFilterPosition();
+  } catch { /* engine not ready */ }
   const initialPos = actualStart + (clampedTarget - actualStart) * INITIAL_JUMP;
   try {
     getDJEngine().getDeck(deckId).setFilterPosition(initialPos);
-    setTrackedFilterPosition(deckId, initialPos);
   } catch { /* engine not ready */ }
   useDJStore.getState().setDeckFilter(deckId, initialPos);
 
@@ -317,7 +345,6 @@ export function filterSweep(
 
     try {
       getDJEngine().getDeck(deckId).setFilterPosition(current);
-      setTrackedFilterPosition(deckId, current);
     } catch { /* engine not ready */ }
     useDJStore.getState().setDeckFilter(deckId, current);
   }, onDone);
@@ -336,8 +363,10 @@ export function filterReset(deckId: DeckId): () => void {
   return scheduleQuantized(deckId, () => {
     try {
       getDJEngine().getDeck(deckId).setFilterPosition(0);
-      setTrackedFilterPosition(deckId, 0);
     } catch { /* engine not ready */ }
+    // Keep the UI filter knob in sync — without this the knob would stay
+    // wherever it was when reset fired.
+    useDJStore.getState().setDeckFilter(deckId, 0);
   });
 }
 
@@ -455,7 +484,6 @@ export function beatMatchedTransition(
           if (!cancelled) {
             try {
               getDJEngine().getDeck(fromDeck).setFilterPosition(-1);
-              setTrackedFilterPosition(fromDeck, -1);
             } catch { /* engine not ready */ }
           }
         })
@@ -533,7 +561,6 @@ export function filterBuildTransition(
     try {
       const engine = getDJEngine();
       engine.getDeck(toDeck).setFilterPosition(-0.8);
-      setTrackedFilterPosition(toDeck, -0.8);
       engine.getDeck(toDeck).play();
     } catch { /* */ }
 
@@ -553,7 +580,7 @@ export function filterBuildTransition(
       filterSweep(toDeck, 0, totalBeats, () => {
         // Ensure filter is fully open at end
         if (!cancelled) {
-          try { getDJEngine().getDeck(toDeck).setFilterPosition(0); setTrackedFilterPosition(toDeck, 0); } catch { /* */ }
+          try { getDJEngine().getDeck(toDeck).setFilterPosition(0); } catch { /* */ }
         }
       })
     );
@@ -582,6 +609,10 @@ export function bassSwapTransition(
 ): () => void {
   const cancellers: (() => void)[] = [];
   let cancelled = false;
+  /* True once we've set fromDeck's low EQ to -12 at the midpoint, so a cancel
+   * after midpoint but before phase 2 completes can still restore it. Without
+   * this, cancel would leave fromDeck permanently low-killed. */
+  let bassKilled = false;
 
   syncBPMToOther(toDeck, fromDeck);
   phaseAlign(toDeck, fromDeck, 'bar');
@@ -601,14 +632,14 @@ export function bassSwapTransition(
     } catch { /* */ }
 
     // Phase 1 (first half): crossfade to 50%, kill outgoing bass
-    const midTarget = toDeck === 'B' ? 0.5 : 0.5;
     cancellers.push(
-      crossfaderSweep(midTarget, halfBeats, fromDeck, () => {
+      crossfaderSweep(0.5, halfBeats, fromDeck, () => {
         if (cancelled) return;
         // At midpoint: kill outgoing bass, ensure incoming bass is full
         try {
           getDJEngine().getDeck(fromDeck).setEQ('low', -12);
           useDJStore.getState().setDeckEQ(fromDeck, 'low', -12);
+          bassKilled = true;
         } catch { /* */ }
 
         // Phase 2 (second half): complete crossfade
@@ -620,6 +651,7 @@ export function bassSwapTransition(
               try {
                 getDJEngine().getDeck(fromDeck).setEQ('low', 0);
                 useDJStore.getState().setDeckEQ(fromDeck, 'low', 0);
+                bassKilled = false;
                 getDJEngine().getDeck(fromDeck).stop();
               } catch { /* */ }
               useDJStore.getState().setDeckPlaying(fromDeck, false);
@@ -631,7 +663,18 @@ export function bassSwapTransition(
   });
 
   cancellers.push(cancelSchedule);
-  return () => { cancelled = true; cancellers.forEach(c => c()); };
+  return () => {
+    cancelled = true;
+    cancellers.forEach(c => c());
+    /* Recovery: if we were cancelled after the bass was killed at midpoint,
+     * restore the outgoing EQ so the deck isn't stuck with a low cut. */
+    if (bassKilled) {
+      try {
+        getDJEngine().getDeck(fromDeck).setEQ('low', 0);
+      } catch { /* engine not ready */ }
+      useDJStore.getState().setDeckEQ(fromDeck, 'low', 0);
+    }
+  };
 }
 
 // ── Echo-Out Transition ────────────────────────────────────────────────────
@@ -704,9 +747,15 @@ export function echoOut(
     durationMs = (beats * 60 / bpm) * 1000;
   } catch { /* fallback */ }
 
+  /* Capture pre-echo volume NOW (outside scheduleQuantized) so cancel-before-fire
+   * restores the correct level instead of the placeholder 1.0 default. */
   let startVol = 1;
+  try {
+    startVol = getDJEngine().getDeck(deckId).getVolume();
+  } catch { /* fallback */ }
 
   const cancelSchedule = scheduleQuantized(deckId, () => {
+    // Re-read in case the volume moved between arm-time and fire-time.
     try {
       startVol = getDJEngine().getDeck(deckId).getVolume();
     } catch { /* fallback */ }
@@ -719,19 +768,21 @@ export function echoOut(
       } catch { /* engine not ready */ }
       useDJStore.getState().setDeckVolume(deckId, volume);
     }, () => {
-      // Fade complete — stop deck at zero volume
+      /* Fade complete — stop the deck and restore volume to the pre-echo level
+       * on BOTH the engine and the store. Previously we only reset the store,
+       * so the engine stayed at 0 and the next play was silent. */
       try {
         const engine = getDJEngine();
         const deck = engine.getDeck(deckId);
-        deck.setVolume(0);
         if (deck.playbackMode === 'audio') {
           deck.audioPlayer.stop();
         } else {
           deck.pause();
         }
-        useDJStore.getState().setDeckPlaying(deckId, false);
-        useDJStore.getState().setDeckVolume(deckId, startVol);
+        deck.setVolume(startVol);
       } catch { /* engine not ready */ }
+      useDJStore.getState().setDeckPlaying(deckId, false);
+      useDJStore.getState().setDeckVolume(deckId, startVol);
       onDone?.();
     });
   });
@@ -741,10 +792,11 @@ export function echoOut(
     clearInterval(sweep.id as ReturnType<typeof setInterval>);
     activeSweeps.delete(key);
     cancelSchedule();
-    // Restore volume to pre-echo level
+    // Restore volume to pre-echo level on both engine and store.
     try {
       getDJEngine().getDeck(deckId).setVolume(startVol);
     } catch { /* engine not ready */ }
+    useDJStore.getState().setDeckVolume(deckId, startVol);
   };
 }
 
@@ -752,6 +804,8 @@ export function echoOut(
 
 /**
  * Cancel all active sweeps/automations (panic button).
+ * Covers both running sweeps (setInterval-driven) AND pending quantized
+ * scheduleQuantized/quantizeAction timers that haven't fired yet.
  */
 export function cancelAllAutomation(): void {
   activeSweeps.forEach((sweep) => {
@@ -759,6 +813,11 @@ export function cancelAllAutomation(): void {
     clearInterval(sweep.id as ReturnType<typeof setInterval>);
   });
   activeSweeps.clear();
+  const cancels = Array.from(pendingSchedules);
+  pendingSchedules.clear();
+  for (const cancel of cancels) {
+    try { cancel(); } catch { /* already cleared */ }
+  }
 }
 
 // ── Internal Helpers ─────────────────────────────────────────────────────────
@@ -772,13 +831,3 @@ function cancelSweep(key: string): void {
   }
 }
 
-/** Tracked filter positions so sweeps can read the current value */
-const trackedFilterPositions: Record<string, number> = {};
-
-function getTrackedFilterPosition(deckId: DeckId): number {
-  return trackedFilterPositions[deckId] ?? 0;
-}
-
-export function setTrackedFilterPosition(deckId: DeckId, value: number): void {
-  trackedFilterPositions[deckId] = value;
-}

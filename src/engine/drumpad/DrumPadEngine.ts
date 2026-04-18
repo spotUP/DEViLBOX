@@ -14,6 +14,7 @@ import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
+import { clearAllPendingThrows } from './DubActions';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
@@ -153,6 +154,15 @@ export class DrumPadEngine {
   // hold window expires. Held here so dispose() can clear them — otherwise
   // a timer that fires post-dispose tries to write to torn-down AudioParams.
   private dubThrowTimers: Set<ReturnType<typeof setTimeout>> = new Set();
+  // When true, setDubBusSettings suppresses writes to echoIntensity and
+  // springWet on the live nodes. Set by `dubPanic` while draining the echo
+  // / spring buffers; cleared by the restore timer after the drain window.
+  // Required because the store's mirror effect writes the user-configured
+  // values back on any dubBus change during the drain, which would override
+  // panic's `setIntensity(0)` and leave a loud echo ghost when the user
+  // re-enables the bus (audible at high intensity settings — ~-13 dB of
+  // the pre-panic tail at default intensity=0.62 after 1 s).
+  private _draining = false;
   // Once-per-engine warning latches so we don't flood the console during a
   // live set if the bus is disabled or the mixer isn't attached. Reset when
   // the condition clears (attach succeeds / bus gets enabled).
@@ -531,10 +541,11 @@ export class DrumPadEngine {
    *      to a lingering tail)
    *   3. Zero siren feedback, open LPF fully
    *   4. Ramp return gain to 0 (smooth — avoids click at the output)
-   *   5. Temporarily zero echo intensity + spring wet so the internal delay
-   *      lines drain through feedback multiplication instead of re-feeding
-   *      themselves indefinitely. Restore to the user's tuned values after
-   *      2 seconds so the bus is fresh when they re-enable it.
+   *   5. Mute the bus input so no new audio enters the echo/spring while
+   *      draining. Echo's own feedback path (intensity ~0.62) continues
+   *      recirculating the currently-buffered signal — but with the return
+   *      gain at 0 it's inaudible, and at 300 ms / 0.62 feedback it drops
+   *      ~4 dB per loop, reaching -40 dB within 2 s naturally.
    *   6. Flip the enabled flag — caller is expected to also update the store
    *      so the UI reflects the kill state.
    */
@@ -544,6 +555,15 @@ export class DrumPadEngine {
     // 1. Cancel every pending timer + releaser — no ghost ramps firing later.
     for (const t of this.dubThrowTimers) clearTimeout(t);
     this.dubThrowTimers.clear();
+    // Also cancel pending quantized throws that are waiting for a beat
+    // boundary. These live in a module-level set inside DubActions; without
+    // this call, a "bar"-quantized throw scheduled 2 s in the future would
+    // still fire during / after panic.
+    clearAllPendingThrows();
+    // Reset warn latches — next attempted throw should log again if bus
+    // is still disabled or mixer still detached.
+    this._warnedBusDisabled = false;
+    this._warnedNoMixer = false;
     // Snapshot releasers before calling — each releaser mutates
     // dubActionReleasers (via _scheduleExclusiveRelease's cleanup function),
     // and iterating while mutating a Map is subtle. Snapshot + clear
@@ -581,34 +601,54 @@ export class DrumPadEngine {
       g.linearRampToValueAtTime(0, now + 0.02);
     } catch { /* ok */ }
 
-    // 5. Drain internal delay lines: zero feedback paths inside the echo and
-    //    the spring. With intensity=0, tape heads play their current content
-    //    once and then go silent (rate * 3 heads = max 900 ms of in-flight
-    //    signal). With spring.wet=0, the tank's ringing is excluded from the
-    //    return. We restore both after 2 s — enough time for the echo to
-    //    fully drain (at rate=300 ms that's more than 6 wraparounds).
-    const savedIntensity = this.dubBusSettings.echoIntensity;
-    const savedSpringWet = this.dubBusSettings.springWet;
+    // 5. Mute the bus input AND kill the echo/spring internal feedback so
+    //    the delay buffers drain rather than recirculate. Input mute alone
+    //    isn't enough — at `intensity=0.62` with `rate=300 ms`, the buffer
+    //    only loses ~4 dB per loop, so 1 s of tail survives at ~-13 dB
+    //    and becomes audible the moment the user re-enables the bus.
+    //
+    //    `_draining` flag suppresses echo/spring writes from setDubBusSettings
+    //    during the 2 s drain window — otherwise the mirror effect's writes
+    //    (triggered by store changes, including the store.setDubBus({
+    //    enabled:false}) that usually accompanies panic) would restore the
+    //    user's intensity values mid-drain and stomp the zero.
+    try {
+      const ig = this.dubBusInput.gain;
+      ig.cancelScheduledValues(now);
+      ig.setValueAtTime(ig.value, now);
+      ig.linearRampToValueAtTime(0, now + 0.02);
+    } catch { /* ok */ }
+    this._draining = true;
     try {
       this.dubBusEcho.setIntensity(0);
       this.dubBusSpring.wet = 0;
     } catch { /* ok */ }
-
-    const timer = setTimeout(() => {
-      this.dubThrowTimers.delete(timer);
+    const drainTimer = setTimeout(() => {
+      this.dubThrowTimers.delete(drainTimer);
       if (this._disposed) return;
+      this._draining = false;
+      // Restore from the CURRENT settings (not a closure snapshot) so any
+      // knob tweaks the user made during the drain window are honored.
       try {
-        this.dubBusEcho.setIntensity(savedIntensity);
-        this.dubBusSpring.wet = savedSpringWet;
+        this.dubBusEcho.setIntensity(this.dubBusSettings.echoIntensity);
+        this.dubBusSpring.wet = this.dubBusSettings.springWet;
       } catch { /* ok */ }
     }, 2000);
-    this.dubThrowTimers.add(timer);
+    this.dubThrowTimers.add(drainTimer);
 
-    // 6. Reflect panic in our own state. Callers that want the store in
-    //    sync should set dubBus.enabled=false themselves.
+    // 6. Flip the engine's enabled flag. Intentionally do NOT write to
+    //    `this.dubBusSettings.enabled` — that's the "desired state" mirror
+    //    of the store, and pre-writing it would make the store's mirror
+    //    effect short-circuit via the equality check in setDubBusSettings
+    //    when it later pushes the same value. Instead let the caller's
+    //    `store.setDubBus({enabled:false})` flow through normally; its
+    //    engine-side write will find `dubBusSettings.enabled=true` !== false
+    //    and run the full disable path (noise gate, sync the flag, etc.).
+    const wasEnabled = this.dubBusEnabled;
     this.dubBusEnabled = false;
-    this.dubBusSettings.enabled = false;
-    console.log('[DubBus] PANIC — bus flushed, internal buffers draining (2s).');
+    if (wasEnabled) {
+      console.log('[DubBus] PANIC — bus flushed, internal buffers draining (2s).');
+    }
   }
 
   /**
@@ -648,6 +688,17 @@ export class DrumPadEngine {
 
   /** Update the dub bus settings (enable, gains, delay params). */
   setDubBusSettings(settings: Partial<DubBusSettings>): void {
+    // Short-circuit no-op writes. PadGrid + DJSamplerPanel mirror this state
+    // every time the store's `dubBus` OR the active deck's BPM changes —
+    // during a crossfader sweep that's ~60 Hz of identical settings being
+    // pushed. Without this guard we'd schedule dozens of AudioParam ramps
+    // per second across 6 params for zero audible change.
+    let changed = false;
+    for (const key of Object.keys(settings) as (keyof DubBusSettings)[]) {
+      if (this.dubBusSettings[key] !== settings[key]) { changed = true; break; }
+    }
+    if (!changed) return;
+
     const merged: DubBusSettings = { ...this.dubBusSettings, ...settings };
     this.dubBusSettings = merged;
     if (typeof settings.enabled === 'boolean') {
@@ -667,16 +718,46 @@ export class DrumPadEngine {
           settings.enabled ? Math.pow(10, -55 / 20) : 0, t + 0.02,
         );
       } catch { /* ok */ }
+      // Restore the bus input gain when re-enabling. dubPanic() mutes it
+      // to 0 to drain the echo — re-enable needs to open the gate back up
+      // or the bus would accept audio but produce nothing audible from new
+      // throws because no signal reaches the echo/spring chain.
+      if (settings.enabled) {
+        try {
+          const t = this.context.currentTime;
+          const ig = this.dubBusInput.gain;
+          ig.cancelScheduledValues(t);
+          ig.setValueAtTime(ig.value, t);
+          ig.linearRampToValueAtTime(1, t + 0.02);
+        } catch { /* ok */ }
+        // If the user re-enables mid-drain, cancel the drain and apply
+        // live echo/spring settings immediately. Otherwise the bus would
+        // run "mostly dry" for the remainder of the 2 s drain window —
+        // confusing when the user just clicked Enabled expecting full bus.
+        if (this._draining) {
+          this._draining = false;
+          try {
+            this.dubBusEcho.setIntensity(merged.echoIntensity);
+            this.dubBusSpring.wet = merged.springWet;
+          } catch { /* ok */ }
+        }
+      }
     }
     const now = this.context.currentTime;
     this.dubBusHPF.frequency.setTargetAtTime(merged.hpfCutoff, now, 0.02);
     this.dubBusReturn.gain.setTargetAtTime(
       this.dubBusEnabled ? merged.returnGain : 0, now, 0.02,
     );
-    this.dubBusSpring.wet = merged.springWet;
-    this.dubBusEcho.setIntensity(merged.echoIntensity);
+    // Suppress echo/spring writes while panic is draining the delay lines.
+    // The drain restore timer applies the user's settings at the end of the
+    // 2 s window. Without this guard, mirror-effect writes during drain
+    // would restore intensity mid-flight and leave residual echo on re-enable.
+    if (!this._draining) {
+      this.dubBusSpring.wet = merged.springWet;
+      this.dubBusEcho.setIntensity(merged.echoIntensity);
+      this.dubBusEcho.wet = merged.echoWet;
+    }
     this.dubBusEcho.setRate(merged.echoRateMs);
-    this.dubBusEcho.wet = merged.echoWet;
     // Sidechain depth maps to compressor threshold — more duck = lower threshold.
     // 0 → -6 dB threshold (barely compresses), 1 → -36 dB (heavy pumping).
     const threshold = -6 - merged.sidechainAmount * 30;
@@ -1216,6 +1297,7 @@ export class DrumPadEngine {
     // on disposed AudioParams and spam the console with errors.
     for (const t of this.dubThrowTimers) clearTimeout(t);
     this.dubThrowTimers.clear();
+    clearAllPendingThrows();
     this.dubActionReleasers.clear();
     // Stop the pink noise source first so it doesn't keep the graph alive.
     try { this.dubBusNoise.stop(); } catch { /* may already be stopped */ }
