@@ -238,8 +238,25 @@ class DJAutoDJ {
 
   /** Pause Auto DJ — stops polling/transitions but keeps current track playing. */
   pause(): void {
+    const wasTransitioning = useDJStore.getState().autoDJStatus === 'transitioning';
     this.stopPolling();
     this.cancelTransition();
+
+    if (wasTransitioning) {
+      // Don't leave the decks mid-mixed with the crossfader frozen partway.
+      // Force-complete the transition (stop outgoing, snap crossfader to
+      // target, swap active/idle) so pause leaves a clean single-deck state
+      // the poll loop can manage on resume.
+      console.log('[AutoDJ] Paused mid-transition — force-completing swap');
+      const store = useDJStore.getState();
+      const targetCf = this.idleDeck === 'B' ? 1 : 0;
+      try { getDJEngine().setCrossfader(targetCf); } catch { /* */ }
+      store.setCrossfader(targetCf);
+      try { getDJEngine().getDeck(this.activeDeck).stop(); } catch { /* */ }
+      store.setDeckPlaying(this.activeDeck, false);
+      this.completeTransition();
+    }
+
     useDJStore.getState().setAutoDJStatus('playing'); // keep status visible
     console.log('[AutoDJ] Paused');
   }
