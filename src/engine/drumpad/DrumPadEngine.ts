@@ -100,6 +100,7 @@ export class DrumPadEngine {
   private pendingCleanupTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
   private padEffects: Map<number, PadEffectsChain> = new Map();
   private _disposed = false;
+  private _miniDrainPending = false;
 
   // ─── Shared Dub Bus — Vintage King Tubby / Scientist chain ─────────────────
   // Sources fanning into `dubBusInput`:
@@ -405,8 +406,58 @@ export class DrumPadEngine {
       if (this.dubActionReleasers.get(key) === release) {
         this.dubActionReleasers.delete(key);
         release();
+        // If this was the LAST active dub releaser, mini-drain the echo /
+        // spring internals. Closing a tap only cuts *new* signal entering
+        // the bus — the SpaceEcho's delay buffer keeps recirculating the
+        // last ~300-600 ms of audio at intensity=0.62 (≈4 dB/loop, so
+        // ~2 s of audible tail) and the SpringReverb has a ~2.5 s natural
+        // decay. Both continue long after the user thinks the effect is
+        // over. The mini-drain slams echo intensity + spring wet to zero
+        // the instant the last pad releases, then ramps them back to the
+        // user's settings 180 ms later so the next action isn't dry.
+        this._miniDrainIfIdle();
       }
     };
+  }
+
+  /**
+   * If no dub releasers are active, snap echo-intensity + spring-wet to
+   * zero so tail decay stops immediately, then restore user settings
+   * after a short quiet window. Called on every releaser fire. Skipped
+   * while panic is draining (its 2 s drain is authoritative) or while
+   * the bus is disabled (nothing to drain).
+   */
+  private _miniDrainIfIdle(): void {
+    if (this._draining) return;
+    if (!this.dubBusEnabled) return;
+    if (this.dubActionReleasers.size > 0) return;
+    // Don't stack mini-drains — if one's already pending, let it finish.
+    if (this._miniDrainPending) return;
+    this._miniDrainPending = true;
+    const settings = this.dubBusSettings;
+    try {
+      this.dubBusEcho.setIntensityInstant(0);
+      this.dubBusSpring.wet = 0;
+      console.log('[DubBus] mini-drain ▶ last releaser fired, zeroed echo+spring');
+    } catch { /* ok */ }
+    const t = setTimeout(() => {
+      this.dubThrowTimers.delete(t);
+      this._miniDrainPending = false;
+      if (this._disposed) return;
+      // Abort the restore if panic fired during our quiet window — panic's
+      // own 2 s drain now owns the state, don't fight it.
+      if (this._draining) return;
+      // A new dub pad may have already engaged during the quiet window,
+      // in which case the user's settings are already back in force. Only
+      // restore if we're still the only reason echo/spring are muted.
+      if (this.dubActionReleasers.size > 0) return;
+      try {
+        this.dubBusEcho.setIntensity(settings.echoIntensity);
+        this.dubBusSpring.wet = settings.springWet;
+        console.log(`[DubBus] mini-drain ◀ restored echoIntensity=${settings.echoIntensity.toFixed(2)} springWet=${settings.springWet.toFixed(2)}`);
+      } catch { /* ok */ }
+    }, 180);
+    this.dubThrowTimers.add(t);
   }
 
   /**
@@ -414,7 +465,7 @@ export class DrumPadEngine {
    * hold until the returned releaser is called, then fade to 0 over
    * `releaseSec`. If the bus is disabled, returns a no-op releaser.
    */
-  openDeckTap(deck: DeckId | 'ALL', amount = 1.0, attackSec = 0.005, releaseSec = 0.25): () => void {
+  openDeckTap(deck: DeckId | 'ALL', amount = 1.0, attackSec = 0.005, releaseSec = 0.08): () => void {
     if (!this.dubBusEnabled) {
       // Log only the first time per engine — otherwise the console floods
       // during a live set if the user forgot to enable the bus.
