@@ -64,7 +64,7 @@ import {
 import { useDJStore, type DeckId } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { seekDeckAudio } from '@/engine/dj/DJActions';
+import { seekDeckAudio, cueDeck } from '@/engine/dj/DJActions';
 import { markSeek } from './seekGuard';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
@@ -93,6 +93,7 @@ import {
 } from '@/lib/playlistCloudApi';
 import { DJ_FX_PRESETS } from './DJPlaylistPanel';
 import { DJTrackEditModal } from './DJTrackEditModal';
+import { DJModlandBrowser } from './DJModlandBrowser';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -214,27 +215,38 @@ RenameInput.displayName = 'RenameInput';
 
 interface PlayingDeckInfo {
   deckId: DeckId;
+  playbackMode: 'tracker' | 'audio';
+  // Audio-mode fields
   audioPosition: number;
   durationMs: number;
+  // Tracker-mode fields
+  songPos: number;
+  totalPositions: number;
 }
 
 /**
- * Returns the deck currently playing this track in audio mode, or null.
- * Custom equality so rows whose track isn't playing never re-render on deck state.
+ * Returns the deck currently playing this track, or null. Handles both audio
+ * and tracker playback modes. Custom equality so rows whose track isn't
+ * playing never re-render on deck state.
  */
 function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
   return useDJStore(
     useShallow((s) => {
       for (const id of ['A', 'B', 'C'] as const) {
         const d = s.decks[id];
-        if (
-          d.fileName === fileName &&
-          d.isPlaying &&
-          d.playbackMode === 'audio' &&
-          d.durationMs > 0
-        ) {
-          return { deckId: id, audioPosition: d.audioPosition, durationMs: d.durationMs };
-        }
+        if (!d.isPlaying || d.fileName !== fileName) continue;
+        const hasProgress =
+          (d.playbackMode === 'audio' && d.durationMs > 0) ||
+          (d.playbackMode === 'tracker' && d.totalPositions > 0);
+        if (!hasProgress) continue;
+        return {
+          deckId: id,
+          playbackMode: d.playbackMode,
+          audioPosition: d.audioPosition,
+          durationMs: d.durationMs,
+          songPos: d.songPos,
+          totalPositions: d.totalPositions,
+        };
       }
       return null;
     })
@@ -247,20 +259,33 @@ const DECK_COLOR: Record<DeckId, string> = {
   C: 'bg-accent-success',
 };
 
-const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, audioPosition, durationMs }) => {
+const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackMode, audioPosition, durationMs, songPos, totalPositions }) => {
   const barRef = useRef<HTMLDivElement>(null);
-  const durationSec = durationMs / 1000;
-  const progress = durationSec > 0 ? Math.min(1, Math.max(0, audioPosition / durationSec)) : 0;
+
+  let progress = 0;
+  if (playbackMode === 'audio') {
+    const durationSec = durationMs / 1000;
+    progress = durationSec > 0 ? Math.min(1, Math.max(0, audioPosition / durationSec)) : 0;
+  } else {
+    progress = totalPositions > 0 ? Math.min(1, Math.max(0, songPos / totalPositions)) : 0;
+  }
 
   const seekFromEvent = useCallback((clientX: number) => {
     const bar = barRef.current;
-    if (!bar || durationSec <= 0) return;
+    if (!bar) return;
     const rect = bar.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
-    const t = (x / rect.width) * durationSec;
-    markSeek(deckId);
-    seekDeckAudio(deckId, t);
-  }, [deckId, durationSec]);
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    if (playbackMode === 'audio') {
+      const durationSec = durationMs / 1000;
+      if (durationSec <= 0) return;
+      markSeek(deckId);
+      seekDeckAudio(deckId, fraction * durationSec);
+    } else {
+      if (totalPositions <= 0) return;
+      const targetPos = Math.min(Math.floor(fraction * totalPositions), totalPositions - 1);
+      cueDeck(deckId, targetPos, 0);
+    }
+  }, [deckId, playbackMode, durationMs, totalPositions]);
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -721,6 +746,7 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [importingCloudId, setImportingCloudId] = useState<string | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [rightPaneTab, setRightPaneTab] = useState<'tracks' | 'online'>('tracks');
   const clipboardRef = useRef<{ tracks: PlaylistTrack[]; isCut: boolean }>({ tracks: [], isCut: false });
   const previewPlayerRef = useRef<AudioBufferSourceNode | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
@@ -1227,6 +1253,35 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
           return;
         } catch (err) {
           console.error(`[DJPlaylistModal] Modland re-download failed:`, err);
+        }
+      }
+
+      if (track.fileName.startsWith('hvsc:')) {
+        const hvscPath = track.fileName.slice('hvsc:'.length);
+        try {
+          const { downloadHVSCFile } = await import('@/lib/hvscApi');
+          const buffer = await downloadHVSCFile(hvscPath);
+          const filename = hvscPath.split('/').pop() || 'tune.sid';
+          const trackName = track.trackName || filename.replace(/\.sid$/i, '');
+
+          useDJStore.getState().setDeckState(deckId, {
+            fileName: track.fileName,
+            trackName,
+            detectedBPM: track.bpm || 125,
+            effectiveBPM: track.bpm || 125,
+            analysisState: 'rendering',
+            isPlaying: false,
+          });
+
+          const result = await getDJPipeline().loadOrEnqueue(buffer, filename, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, track.fileName, trackName, result.analysis?.bpm || track.bpm || 125);
+          if (useDJStore.getState().deckViewMode !== '3d') {
+            useDJStore.getState().setDeckViewMode('visualizer');
+          }
+          return;
+        } catch (err) {
+          console.error(`[DJPlaylistModal] HVSC load failed:`, err);
+          return;
         }
       }
 
@@ -2218,6 +2273,41 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
           <div className="flex-1 flex flex-col min-w-0 bg-dark-bgSecondary">
             {activePlaylist ? (
               <>
+                {/* Tab strip */}
+                <div className="flex items-center border-b border-dark-border bg-dark-bg/50 shrink-0">
+                  <button
+                    onClick={() => setRightPaneTab('tracks')}
+                    className={`px-4 py-2 text-[11px] font-mono font-bold border-b-2 transition-colors truncate max-w-[50%] ${
+                      rightPaneTab === 'tracks'
+                        ? 'border-accent-primary text-accent-primary bg-dark-bg/50'
+                        : 'border-transparent text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                    }`}
+                    title={activePlaylist.name}
+                  >
+                    <ListMusic size={11} className="inline mr-1.5 -mt-0.5" />
+                    {activePlaylist.name}
+                    <span className="ml-1.5 text-text-muted/50 font-normal">({activePlaylist.tracks.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setRightPaneTab('online')}
+                    className={`px-4 py-2 text-[11px] font-mono font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
+                      rightPaneTab === 'online'
+                        ? 'border-accent-primary text-accent-primary bg-dark-bg/50'
+                        : 'border-transparent text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+                    }`}
+                    title="Search Modland + HVSC online archives"
+                  >
+                    <Globe size={11} />
+                    Online Search
+                  </button>
+                </div>
+
+                {rightPaneTab === 'online' ? (
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <DJModlandBrowser variant="fullHeight" />
+                  </div>
+                ) : (
+                  <>
                 {/* Toolbar */}
                 <div className="px-3 py-2 border-b border-dark-border flex items-center gap-2">
                   {/* Playlist title + actions menu */}
@@ -2645,6 +2735,8 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                     </span>
                   )}
                 </div>
+                  </>
+                )}
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">

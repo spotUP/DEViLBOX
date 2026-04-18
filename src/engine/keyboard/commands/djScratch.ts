@@ -116,8 +116,11 @@ function stopPattern(): boolean {
 
   try {
     const deck = getDJEngine().getDeck(deckId);
-    // Finish current cycle gracefully (clean zero-crossing) instead of hard stop
-    deck.finishPatternCycle();
+    // Hard-stop and decay pitch/tempo back to rest over 300ms. `finishPatternCycle`
+    // waits for the cycle to end before restoring pitch, and some patterns
+    // (Orbit, Stab, etc.) that end in a backward phase can leave the song
+    // pitched down if anything interrupts the cycle-end tick.
+    deck.stopPattern();
     activePatterns[deckId] = null;
     useDJStore.getState().setDeckPattern(deckId, null);
     useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);

@@ -1038,7 +1038,13 @@ export class DeckEngine {
     // and note processing stays enabled so forward phases produce the full mix.
     // deckGain stays at 1 until the first backward phase.
 
-    // Special handling for BPM-synced patterns with custom fader scheduling
+    this.scratchPlayback.play(pattern, onWaiting);
+
+    // BPM-synced patterns with custom fader scheduling — must run AFTER
+    // `play()` because `play()` begins with a stopPattern() that cancels
+    // all scheduled gain values. Scheduling before play would leave the
+    // fader stuck at 1 (no chopping) — Crab/Transformer/8-Finger Crab
+    // would sound like normal playback.
     const bpm = this.getEffectiveBPM();
     if (pattern.name === 'Transformer') {
       this.scratchPlayback.scheduleTransformerFader(bpm);
@@ -1048,7 +1054,6 @@ export class DeckEngine {
       this.scratchPlayback.scheduleEightFingerCrabFader(bpm);
     }
 
-    this.scratchPlayback.play(pattern, onWaiting);
     this._enableReverbSend();
   }
 
