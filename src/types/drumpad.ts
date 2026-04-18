@@ -54,9 +54,19 @@ export interface SampleLayer {
  *                     back up on release.
  */
 export type DubActionId =
-  | 'dub_throw_a' | 'dub_throw_b' | 'dub_throw_c' | 'dub_throw_all'
-  | 'dub_hold_a' | 'dub_hold_b' | 'dub_hold_c' | 'dub_hold_all'
+  // ── Auto-select: resolves the currently-loudest playing deck at press ──
+  // Recommended primary layout. One pad per gesture regardless of which
+  // deck is playing — the kit follows the DJ's crossfader moves.
+  | 'dub_throw' | 'dub_hold' | 'dub_mute'
+  // Quick single-slap variant — tiny grab, almost no tail. "Delay FX burst".
+  | 'dub_slap_back'
+  // ── Broadcast: hit every playing deck at once ──
+  | 'dub_throw_all' | 'dub_hold_all'
+  // ── Explicit targeting: power-user pads that lock to a specific deck ──
+  | 'dub_throw_a' | 'dub_throw_b' | 'dub_throw_c'
+  | 'dub_hold_a' | 'dub_hold_b' | 'dub_hold_c'
   | 'dub_mute_a' | 'dub_mute_b' | 'dub_mute_c'
+  // ── Bus FX: no deck source needed ──
   | 'dub_siren'
   | 'dub_filter_drop';
 

@@ -122,7 +122,7 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
 };
 
 // Bump this when factory presets or stored schema changes — discards stale data
-const DRUMPAD_SCHEMA_VERSION = 24;
+const DRUMPAD_SCHEMA_VERSION = 25;
 const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 
 // Set when schema migration clears old data — prevents IndexedDB from overwriting factory presets
@@ -552,6 +552,10 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
         midiMappings,
         preferences,
         busLevels: get().busLevels,
+        // Dub Bus settings persist so the user's tuned chain (HPF cutoff,
+        // echo intensity, etc.) survives reloads — critical for gig prep
+        // where the venue's sweet spot takes a while to dial in.
+        dubBus: get().dubBus,
       };
 
       // NOTE: AudioBuffer is not JSON-serializable — audio data is NOT stored here.
@@ -624,6 +628,9 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           midiMappings: state.midiMappings || {},
           preferences: { ...DEFAULT_PREFERENCES, ...state.preferences },
           busLevels: state.busLevels || {},
+          // Merge saved dub-bus with defaults so fields added to the schema
+          // since the user last saved get sensible values rather than `undefined`.
+          dubBus: { ...DEFAULT_DUB_BUS, ...(state.dubBus || {}) },
         });
 
         if (process.env.NODE_ENV === 'development') {
