@@ -178,6 +178,21 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.feedbackGain.gain.rampTo(amount, 0.1);
   }
 
+  /**
+   * Set feedback intensity with NO ramp — used by dubPanic so the delay
+   * line stops recirculating the instant we decide to kill it. The normal
+   * 0.1 s ramp was the tail that made dub echoes "linger forever" after
+   * pad release + panic: during the ramp, feedback ≈0.9× per head, so a
+   * 300 ms delay line kept looping audible audio for ~1 s even though
+   * setIntensity(0) had already been called.
+   */
+  setIntensityInstant(amount: number) {
+    this._options.intensity = amount;
+    const t = this.feedbackGain.context.currentTime;
+    this.feedbackGain.gain.cancelScheduledValues(t);
+    this.feedbackGain.gain.setValueAtTime(amount, t);
+  }
+
   setEchoVolume(vol: number) {
     this._options.echoVolume = vol;
     this.echoGain.gain.rampTo(vol, 0.1);
