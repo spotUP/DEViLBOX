@@ -16,7 +16,7 @@ interface PadButtonProps {
   onRelease?: (padId: number) => void;  // For sustain mode
   onSelect: (padId: number) => void;
   onFocus?: () => void;  // Focus callback
-  onQuickAssign?: (padId: number, rect: DOMRect) => void;
+  onQuickAssign?: (padId: number, x: number, y: number) => void;
   className?: string;
 }
 
@@ -78,7 +78,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   }, []);
 
   // A pad is "loaded" if it has actual sound source assigned
-  const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction || pad.pttAction);
+  const hasActualData = !!(pad.sample || pad.synthConfig || pad.instrumentId != null || pad.djFxAction || pad.scratchAction || pad.pttAction || pad.dubAction);
   const isLoaded = hasActualData;
 
   const isFxActive = pad.djFxAction && activeFxPads.has(pad.id);
@@ -91,9 +91,13 @@ export const PadButton: React.FC<PadButtonProps> = ({
     
     // Empty pads: open context menu on left click for easy setup
     if (!isLoaded) {
+      // If a context menu is already open, the preceding pointerdown has
+      // just dismissed it via useClickOutside. Treat this click as the
+      // dismissal — don't immediately re-open the menu on this pad.
+      if (document.querySelector('[data-context-menu]')) return;
+
       if (onQuickAssign) {
-        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        onQuickAssign(pad.id, rect);
+        onQuickAssign(pad.id, event.clientX, event.clientY);
       }
       return;
     }
@@ -119,8 +123,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     if (onQuickAssign) {
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      onQuickAssign(pad.id, rect);
+      onQuickAssign(pad.id, event.clientX, event.clientY);
     }
   }, [pad.id, onQuickAssign]);
 
@@ -139,7 +142,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       const { pad, onTrigger, calculateVelocity, flashTrigger } = touchHandlersRef.current;
 
       // Check if pad is empty (same check as line 90 hasActualData)
-      const isEmpty = !pad.sample && !pad.synthConfig && pad.instrumentId == null && !pad.djFxAction && !pad.scratchAction && !pad.pttAction;
+      const isEmpty = !pad.sample && !pad.synthConfig && pad.instrumentId == null && !pad.djFxAction && !pad.scratchAction && !pad.pttAction && !pad.dubAction;
       if (isEmpty) {
         // Empty pads: do nothing on touch (use context menu to set up)
         return;

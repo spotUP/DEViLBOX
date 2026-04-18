@@ -8,18 +8,30 @@
  * embedded below — no duplicated ADSR / filter / oscillator controls.
  */
 
-import React, { useCallback, useMemo, useState, Suspense, lazy } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import type { DrumPad, OutputBus, VelocityCurve, SampleData } from '@/types/drumpad';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
 import type { EffectConfig } from '@typedefs/instrument';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
-import { VisualEffectEditorWrapper } from '../effects/VisualEffectEditors';
-import { AVAILABLE_EFFECTS } from '@constants/unifiedEffects';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { SAMPLE_FX_PRESETS } from '@constants/sampleFxPresets';
-import { X, Trash2 } from 'lucide-react';
+import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
+import { DJ_ONE_SHOT_PRESETS } from '@constants/djOneShotPresets';
+import { PAD_INSTRUMENT_BASE } from '@/types/drumpad';
+import { getToneEngine } from '@/engine/ToneEngine';
+import { X, Trash2, Play } from 'lucide-react';
+
+// Legacy DJ FX oneshot actions that duplicate the DubSiren synth.
+// When a pad is opened that still uses one of these, auto-upgrade it to a
+// proper synth-assigned pad using the matching DJ one-shot preset. The
+// sound is identical (same synth engine, same effect chain) but the pad
+// editor then shows the full DubSiren controls and preset picker instead
+// of the "this pad triggers a DJ action" stub.
+const DJFX_TO_SYNTH_PRESET: Record<string, string> = {
+  fx_dub_siren: 'Dub Siren',
+  fx_air_horn:  'DJ Air Horn',
+};
 
 const UnifiedInstrumentEditor = lazy(() => import('../instruments/editors/UnifiedInstrumentEditor'));
 
@@ -79,6 +91,35 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
     return programs.get(currentProgramId)?.pads.find((p) => p.id === padId);
   }, [programs, currentProgramId, padId]);
 
+  const { triggerPad: hookTriggerPad, releasePad: hookReleasePad } = useMIDIPadRouting();
+
+  // Auto-upgrade legacy `fx_dub_siren` / `fx_air_horn` DJ-action pads into
+  // proper DubSiren synth pads the first time the editor is opened. These
+  // actions duplicated the DubSiren synth, and users (rightly) expect to
+  // edit the sound as a synth — not behind a DJ-FX stub.
+  useEffect(() => {
+    if (!pad || pad.synthConfig) return;
+    const action = pad.djFxAction;
+    if (!action) return;
+    const presetName = DJFX_TO_SYNTH_PRESET[action];
+    if (!presetName) return;
+    const preset = DJ_ONE_SHOT_PRESETS.find((p) => p.name === presetName);
+    if (!preset) return;
+    const padInstId = PAD_INSTRUMENT_BASE + pad.id;
+    try { getToneEngine().disposeInstrument(padInstId); } catch { /* ok */ }
+    updatePad(pad.id, {
+      name: preset.name || pad.name,
+      presetName: preset.name,
+      djFxAction: undefined,
+      synthConfig: {
+        ...preset,
+        id: padInstId,
+      } as unknown as InstrumentConfig,
+      instrumentNote: pad.instrumentNote ?? 'C4',
+      playMode: pad.playMode ?? 'oneshot',
+    });
+  }, [pad, updatePad]);
+
   const [showSampleBrowser, setShowSampleBrowser] = useState(initialShowSampleBrowser);
 
   const handleSynthChange = useCallback((updates: Partial<InstrumentConfig>) => {
@@ -112,7 +153,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
   const kind: 'synth' | 'sample' | 'action' | 'empty' =
     pad.synthConfig ? 'synth'
     : pad.sample ? 'sample'
-    : (pad.djFxAction || pad.scratchAction || pad.pttAction) ? 'action'
+    : (pad.djFxAction || pad.scratchAction || pad.pttAction || pad.dubAction) ? 'action'
     : 'empty';
 
   return (
@@ -127,6 +168,24 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
             onChange={(e) => updatePad(pad.id, { name: e.target.value })}
             className="w-48 px-2 py-1 text-sm font-mono font-bold bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
           />
+          {kind !== 'empty' && (
+            <button
+              onMouseDown={() => hookTriggerPad(pad.id, 100)}
+              onMouseUp={() => hookReleasePad(pad.id)}
+              onMouseLeave={() => hookReleasePad(pad.id)}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); hookTriggerPad(pad.id, 100); }
+              }}
+              onKeyUp={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); hookReleasePad(pad.id); }
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded bg-accent-primary/20 border border-accent-primary/50 text-accent-primary hover:bg-accent-primary/30 active:bg-accent-primary/40 transition-colors"
+              title="Preview this pad (Space/Enter while focused)"
+            >
+              <Play className="w-3 h-3" />
+              Preview
+            </button>
+          )}
         </div>
         {onClose && (
           <button
@@ -206,6 +265,18 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose, initialSho
             onChange={(v) => updatePad(pad.id, { velocityCurve: v as VelocityCurve })}
             options={VELOCITY_CURVE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
             className="w-full px-2 py-1 text-xs font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
+          />
+        </Field>
+
+        <Field label={`Dub send (${Math.round((pad.dubSend ?? 0) * 100)}%)`}>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round((pad.dubSend ?? 0) * 100)}
+            onChange={(e) => updatePad(pad.id, { dubSend: Number(e.target.value) / 100 })}
+            className="w-full accent-accent-primary"
           />
         </Field>
       </div>
@@ -329,23 +400,6 @@ interface PadEffectsSectionProps {
 const PadEffectsSection: React.FC<PadEffectsSectionProps> = ({ pad, onEffectsChange, onLoadPreset }) => {
   const effects = pad.effects ?? [];
 
-  const addEffect = useCallback((effectId: string) => {
-    const avail = AVAILABLE_EFFECTS.find((e) => (e.type ?? `neural-${e.neuralModelIndex}`) === effectId);
-    if (!avail) return;
-    const type = avail.type ?? `NeuralEffect${avail.neuralModelIndex}`;
-    const params = getDefaultEffectParameters(type);
-    const next: EffectConfig = {
-      id: `pad-fx-${pad.id}-${Date.now()}`,
-      category: avail.category,
-      type: type as EffectConfig['type'],
-      enabled: true,
-      wet: 100,
-      parameters: params,
-      ...(avail.neuralModelIndex !== undefined ? { neuralModelIndex: avail.neuralModelIndex } : {}),
-    };
-    onEffectsChange([...effects, next]);
-  }, [effects, pad.id, onEffectsChange]);
-
   const removeEffect = useCallback((idx: number) => {
     onEffectsChange(effects.filter((_, i) => i !== idx));
   }, [effects, onEffectsChange]);
@@ -353,21 +407,6 @@ const PadEffectsSection: React.FC<PadEffectsSectionProps> = ({ pad, onEffectsCha
   const updateEffect = useCallback((idx: number, patch: Partial<EffectConfig>) => {
     onEffectsChange(effects.map((fx, i) => (i === idx ? { ...fx, ...patch } : fx)));
   }, [effects, onEffectsChange]);
-
-  const updateParameter = useCallback((idx: number, key: string, value: number | string) => {
-    onEffectsChange(effects.map((fx, i) => (i === idx ? { ...fx, parameters: { ...fx.parameters, [key]: value } } : fx)));
-  }, [effects, onEffectsChange]);
-
-  const updateParameters = useCallback((idx: number, params: Record<string, number | string>) => {
-    onEffectsChange(effects.map((fx, i) => (i === idx ? { ...fx, parameters: { ...fx.parameters, ...params } } : fx)));
-  }, [effects, onEffectsChange]);
-
-  const effectOptions = useMemo(() => (
-    AVAILABLE_EFFECTS.map((e) => ({
-      value: e.type ?? `neural-${e.neuralModelIndex}`,
-      label: `${e.group} · ${e.label}`,
-    }))
-  ), []);
 
   const presetOptions = useMemo(() => ([
     { value: '', label: '— Load FX preset —' },
@@ -388,15 +427,9 @@ const PadEffectsSection: React.FC<PadEffectsSectionProps> = ({ pad, onEffectsCha
           Effects ({effects.length})
         </span>
         <CustomSelect
-          value=""
+          value={pad.presetName ?? ''}
           onChange={handlePresetChange}
           options={presetOptions}
-          className="flex-1 px-2 py-1 text-xs font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
-        />
-        <CustomSelect
-          value=""
-          onChange={(v) => { if (v) addEffect(v); }}
-          options={[{ value: '', label: '＋ Add effect' }, ...effectOptions]}
           className="flex-1 px-2 py-1 text-xs font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
         />
         {effects.length > 0 && (
@@ -410,44 +443,27 @@ const PadEffectsSection: React.FC<PadEffectsSectionProps> = ({ pad, onEffectsCha
         )}
       </div>
 
-      {pad.presetName && (
-        <div className="text-[10px] font-mono text-text-muted">
-          Preset: <span className="text-accent-highlight">{pad.presetName}</span>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         {effects.map((fx, idx) => (
-          <div key={fx.id} className="border border-dark-borderLight rounded bg-dark-bgTertiary">
-            <div className="flex items-center justify-between px-2 py-1 border-b border-dark-border">
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-[10px] font-mono text-text-secondary">
-                  <input
-                    type="checkbox"
-                    checked={fx.enabled}
-                    onChange={(e) => updateEffect(idx, { enabled: e.target.checked })}
-                  />
-                  {fx.type}
-                </label>
-              </div>
-              <button
-                onClick={() => removeEffect(idx)}
-                className="p-1 text-text-muted hover:text-accent-error"
-                title="Remove effect"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-            {fx.enabled && (
-              <div className="p-2">
-                <VisualEffectEditorWrapper
-                  effect={fx}
-                  onUpdateParameter={(k, v) => updateParameter(idx, k, v)}
-                  onUpdateParameters={(params) => updateParameters(idx, params)}
-                  onUpdateWet={(w) => updateEffect(idx, { wet: w })}
-                />
-              </div>
-            )}
+          <div
+            key={fx.id}
+            className="flex items-center justify-between px-2 py-1 border border-dark-borderLight rounded bg-dark-bgTertiary"
+          >
+            <label className="flex items-center gap-1 text-[10px] font-mono text-text-secondary">
+              <input
+                type="checkbox"
+                checked={fx.enabled}
+                onChange={(e) => updateEffect(idx, { enabled: e.target.checked })}
+              />
+              {fx.type}
+            </label>
+            <button
+              onClick={() => removeEffect(idx)}
+              className="p-1 text-text-muted hover:text-accent-error"
+              title="Remove effect"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
           </div>
         ))}
       </div>

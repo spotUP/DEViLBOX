@@ -7,6 +7,7 @@
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from './PadButton';
+import { DubBusPanel } from './DubBusPanel';
 import { ContextMenu, useContextMenu } from '@components/common/ContextMenu';
 import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
@@ -64,6 +65,13 @@ export const PadGrid: React.FC<PadGridProps> = ({
     setPadVelocities({});
     releaseAllHeld();
   }, [currentBank, releaseAllHeld]);
+
+  // Dub Bus: mirror store settings into the shared pad engine so the
+  // standalone tracker/pad view gets the same bus as the DJ view.
+  const dubBus = useDrumPadStore((s) => s.dubBus);
+  useEffect(() => {
+    engineRef.current?.setDubBusSettings(dubBus);
+  }, [dubBus, engineRef]);
 
   // Clean up velocity fade timers on unmount
   useEffect(() => {
@@ -217,9 +225,9 @@ export const PadGrid: React.FC<PadGridProps> = ({
     );
   }
 
-  const handleQuickAssign = useCallback((padId: number, _rect: DOMRect) => {
+  const handleQuickAssign = useCallback((padId: number, x: number, y: number) => {
     setContextMenuPadId(padId);
-    const event = { clientX: _rect.left + _rect.width / 2, clientY: _rect.top + _rect.height / 2, preventDefault: () => {}, stopPropagation: () => {} } as unknown as React.MouseEvent;
+    const event = { clientX: x, clientY: y, preventDefault: () => {}, stopPropagation: () => {} } as unknown as React.MouseEvent;
     contextMenu.open(event);
   }, [contextMenu]);
 
@@ -266,6 +274,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
           <div className="text-xs text-text-muted font-mono">{currentProgram.id}</div>
         </div>
         <div className="flex items-center gap-2">
+          <DubBusPanel />
           <button
             onClick={() => engineRef.current?.stopAll()}
             className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-red-400 bg-dark-surface border border-dark-border rounded transition-colors"
