@@ -90,10 +90,13 @@ export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
   fxPad('Jump −4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_m4'),
   fxPad('Jump +4',      'Deck',        DJ_MODULATION,  'fx_deck_jump_p4'),
   fxPad('Jump +16',     'Deck',        DJ_MODULATION,  'fx_deck_jump_p16'),
-  // Row 4: Performance FX & sounds (master bus)
+  // Row 4: Performance FX (deck-scoped tape/vinyl moves + stutter + riser).
+  // The old `fx_dub_siren` / `fx_air_horn` slots were removed — those moved
+  // to the DubSiren synth family. Use the One-Shots or King Tubby Dub Kit
+  // preset to get a siren/horn pad with the full synth editor + dub bus.
   fxPad('Stutter 1/8',  'Stutter',     DJ_STUTTER,     'fx_stutter_8'),
-  fxPad('Dub Siren',    'Delay',       DJ_DELAY,       'fx_dub_siren'),
-  fxPad('Air Horn',     'Delay',       DJ_ONESHOT,     'fx_air_horn'),
+  fxPad('Tape Stop',    'Tape',        DJ_TAPE,        'fx_tape_stop'),
+  fxPad('Vinyl Brake',  'Tape',        DJ_DISTORTION,  'fx_vinyl_brake'),
   fxPad('Noise Riser',  'Filter',      DJ_FILTER,      'fx_noise_riser'),
 ];
 
