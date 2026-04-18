@@ -201,6 +201,12 @@ const _pendingReleases = new Map<number, ReturnType<typeof setTimeout>>();
 // release / releaseAllHeld / engine teardown. One-shot throws never register
 // here (their engage returns null).
 const _dubReleasers = new Map<number, () => void>();
+/** Failsafe watchdog timers — a dub action stuck "on" for more than
+ *  DUB_RELEASE_TIMEOUT_MS auto-releases so a lost MIDI note-off (or UI
+ *  race that drops a pointer-up) can't leave the siren / filter drop /
+ *  hold engaged forever. Cleared when the pad releases normally. */
+const _dubReleaseTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const DUB_RELEASE_TIMEOUT_MS = 30_000;
 
 /**
  * Panic-flush for the hook-side dub releasers. Called from PadGrid /
@@ -213,6 +219,8 @@ const _dubReleasers = new Map<number, () => void>();
 export function clearDubReleasers(): void {
   const snapshot = Array.from(_dubReleasers.values());
   _dubReleasers.clear();
+  for (const t of _dubReleaseTimers.values()) clearTimeout(t);
+  _dubReleaseTimers.clear();
   for (const release of snapshot) {
     try { release(); } catch { /* ok */ }
   }
@@ -409,12 +417,30 @@ export function useMIDIPadRouting() {
       // Stop any prior releaser for this pad so re-triggering doesn't leak.
       const prior = _dubReleasers.get(padId);
       if (prior) { prior(); _dubReleasers.delete(padId); }
+      const priorTimer = _dubReleaseTimers.get(padId);
+      if (priorTimer) { clearTimeout(priorTimer); _dubReleaseTimers.delete(padId); }
       const handler = DUB_ACTION_HANDLERS[pad.dubAction];
       if (handler) {
         const settings = useDrumPadStore.getState().dubBus;
         const bpm = useTransportStore.getState().bpm;
         const release = handler.engage(_engine, settings, bpm);
-        if (release) _dubReleasers.set(padId, release);
+        if (release) {
+          _dubReleasers.set(padId, release);
+          // Failsafe watchdog — if nothing releases the pad within 30 s
+          // (lost MIDI note-off, pointer-up race, window blur while held),
+          // auto-release so the effect doesn't linger forever.
+          const timer = setTimeout(() => {
+            _dubReleaseTimers.delete(padId);
+            const stillActive = _dubReleasers.get(padId);
+            if (stillActive === release) {
+              console.warn(`[DubBus] Pad ${padId} auto-released after ${DUB_RELEASE_TIMEOUT_MS / 1000}s — no note-off received`);
+              _dubReleasers.delete(padId);
+              _heldPads.delete(padId);
+              try { release(); } catch { /* ok */ }
+            }
+          }, DUB_RELEASE_TIMEOUT_MS);
+          _dubReleaseTimers.set(padId, timer);
+        }
       } else {
         // Stored pad references an action that no longer exists (schema drift).
         // Warn loudly so it's visible in the console but don't crash.
@@ -599,6 +625,9 @@ export function useMIDIPadRouting() {
     if (pad.dubAction) {
       const release = _dubReleasers.get(padId);
       if (release) { release(); _dubReleasers.delete(padId); }
+      // Cancel the failsafe watchdog — normal release path beat it.
+      const timer = _dubReleaseTimers.get(padId);
+      if (timer) { clearTimeout(timer); _dubReleaseTimers.delete(padId); }
     }
 
     // Release vocoder PTT
