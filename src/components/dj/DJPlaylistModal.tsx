@@ -1147,13 +1147,29 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           const isAudio = isAudioFile(file.name);
           const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
 
+          // Persist raw bytes to IndexedDB so playback + Auto DJ can load
+          // the file later without prompting for a file picker. Marker
+          // prefix `local:` on fileName routes loaders to the cache lookup.
+          const buffer = await file.arrayBuffer();
+          const { cacheSourceFile } = await import('@/engine/dj/DJAudioCache');
+          await cacheSourceFile(buffer, file.name);
+
           if (isAudio) {
+            // Decode to get duration; keep BPM 0 so analysis can pick it up.
+            let duration = 0;
+            try {
+              const ctx = new AudioContext();
+              const audioBuffer = await ctx.decodeAudioData(buffer.slice(0));
+              duration = audioBuffer.duration;
+              ctx.close();
+            } catch { /* duration stays 0 — Auto DJ will measure later */ }
+
             addTrack(activePlaylistId, {
-              fileName: file.name,
+              fileName: 'local:' + file.name,
               trackName: file.name.replace(/\.[^.]+$/, ''),
               format: fileExt,
               bpm: 0,
-              duration: 0,
+              duration,
               addedAt: Date.now(),
             });
           } else {
@@ -1163,7 +1179,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
             const duration = estimateSongDuration(song);
 
             addTrack(activePlaylistId, {
-              fileName: file.name,
+              fileName: 'local:' + file.name,
               trackName: song.name || file.name,
               format: fileExt,
               bpm: bpmResult.bpm,
@@ -1317,6 +1333,38 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           return;
         } catch (err) {
           console.error(`[DJPlaylistModal] HVSC load failed:`, err);
+          return;
+        }
+      }
+
+      // `local:` — file bytes are persisted in the DJ audio cache from when
+      // the user added the file to the playlist. Pull the bytes out and load
+      // them to the deck without prompting for a file picker.
+      if (track.fileName.startsWith('local:')) {
+        const filename = track.fileName.slice('local:'.length);
+        try {
+          const { getCachedAudioByFilename } = await import('@/engine/dj/DJAudioCache');
+          const cached = await getCachedAudioByFilename(filename);
+          const buffer = cached?.sourceData;
+          if (!buffer) {
+            console.warn(`[DJPlaylistModal] Local file ${filename} not in cache — falling back to file picker`);
+          } else {
+            if (isAudioFile(filename)) {
+              await engine.loadAudioToDeck(deckId, buffer, track.fileName, track.trackName);
+              useDJStore.getState().setDeckViewMode('vinyl');
+            } else if (isUADEFormat(filename)) {
+              await loadUADEToDeck(engine, deckId, buffer, filename, true, undefined, track.trackName);
+              useDJStore.getState().setDeckViewMode('visualizer');
+            } else {
+              const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+              const song = await parseModuleToSong(blob);
+              cacheSong(track.fileName, song);
+              await loadSongToDeck(song, track.fileName, deckId, buffer);
+            }
+            return;
+          }
+        } catch (err) {
+          console.error('[DJPlaylistModal] Local load failed:', err);
           return;
         }
       }
@@ -1496,13 +1544,27 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           const isAudio = isAudioFile(file.name);
           const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
 
+          // Persist to IndexedDB + use `local:` prefix so the loader can
+          // resolve the track without re-prompting the user for the file.
+          const buffer = await file.arrayBuffer();
+          const { cacheSourceFile } = await import('@/engine/dj/DJAudioCache');
+          await cacheSourceFile(buffer, file.name);
+
           if (isAudio) {
+            let duration = 0;
+            try {
+              const ctx = new AudioContext();
+              const audioBuffer = await ctx.decodeAudioData(buffer.slice(0));
+              duration = audioBuffer.duration;
+              ctx.close();
+            } catch { /* ok */ }
+
             addTrack(activePlaylistId, {
-              fileName: file.name,
+              fileName: 'local:' + file.name,
               trackName: file.name.replace(/\.[^.]+$/, ''),
               format: fileExt,
               bpm: 0,
-              duration: 0,
+              duration,
               addedAt: Date.now(),
             });
           } else {
@@ -1512,7 +1574,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
             const duration = estimateSongDuration(song);
 
             addTrack(activePlaylistId, {
-              fileName: file.name,
+              fileName: 'local:' + file.name,
               trackName: song.name || file.name,
               format: fileExt,
               bpm: bpmResult.bpm,
