@@ -349,13 +349,24 @@ async function renderWithUADE(
   await initUADE(true); // Force complete reinitialization
   const wasm = uadeInstance;
 
-  // Root cause fix: aggressive filename sanitization. 
-  // Many 68k eagleplayers have 32-char limits and break on paths or special chars.
+  // Filename sanitization for 68k eagleplayers.
+  //
+  // Many eagleplayers have 32-char filename limits and break on SPACES or
+  // path chars. But DOTS, HYPHENS, and UNDERSCORES are first-class in the
+  // eagleplayer ecosystem — formats like `smod.loader.tune` use the `smod.`
+  // prefix as the format signal, and stripping those dots kills prefix
+  // detection. Previous pass used `[^a-zA-Z0-9]` which mangled `smod.x.y`
+  // into `smod_x_y` (misidentified by UADE, caused "Expected score name"
+  // exits at init).
+  //
+  // New rule: preserve `A-Z a-z 0-9 . - _`, replace everything else with `_`.
+  // Keep the 20-char cap on the name portion to stay under the 32-char
+  // player-filename limit with room for the extension.
   const baseName = filename.split(/[\\/]/).pop() || filename;
   const dotIdx = baseName.lastIndexOf('.');
   const ext = dotIdx !== -1 ? baseName.slice(dotIdx + 1) : 'mod';
   const nameOnly = dotIdx !== -1 ? baseName.slice(0, dotIdx) : baseName;
-  const safeName = nameOnly.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20);
+  const safeName = nameOnly.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 20);
   const safeFilename = `${safeName}.${ext}`;
   
   console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename} (${fileBuffer.byteLength} bytes)`);

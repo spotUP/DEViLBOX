@@ -37,7 +37,11 @@ export interface PreRenderedTrack {
  * Returns pre-rendered data that can be loaded instantly via loadPreRenderedTrackToDeck().
  */
 export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedTrack | null> {
-  const PRERENDER_TIMEOUT_MS = 30000;
+  // 30 s was cutting off legitimate UADE tracks whose formats render slowly in
+  // WASM — FRED, Music Line, Future Player, Hippel-COSO, and the slower
+  // Future Composer variants. 60 s covers the long tail without delaying
+  // Auto DJ skip decisions unreasonably on actually-broken tracks.
+  const PRERENDER_TIMEOUT_MS = 60000;
   const timeoutPromise = new Promise<PreRenderedTrack | null>((_, reject) => {
     setTimeout(() => reject(new Error('Track pre-render timeout')), PRERENDER_TIMEOUT_MS);
   });
