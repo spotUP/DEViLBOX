@@ -73,6 +73,22 @@ export const DubBusPanel: React.FC = () => {
           <div className="flex items-center justify-between pb-1 border-b border-dark-borderLight">
             <span className="text-xs font-bold text-text-primary">Dub Bus</span>
             <div className="flex items-center gap-2">
+              {/* KILL — hard-flush the bus. Fires the `dub-panic` event which
+                  the engines' mount-useEffects listen to; they run
+                  engine.dubPanic() which closes every tap, zeroes feedback,
+                  opens the LPF, and drains the SpaceEcho + SpringReverb
+                  internal delay lines. Rescues the set when a hold pad got
+                  stuck or the echo feedback ran away. Also disables the bus
+                  in the store so the UI reflects the kill. */}
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new Event('dub-panic'));
+                }}
+                className="px-2 py-0.5 text-[10px] font-mono bg-accent-error/10 border border-accent-error/50 text-accent-error rounded hover:bg-accent-error/20"
+                title="Kill the dub bus — drains echo + spring, resets taps, disables bus"
+              >
+                KILL
+              </button>
               <button
                 onClick={() => applySoundSystemToBank()}
                 className="px-2 py-0.5 text-[10px] font-mono bg-accent-primary/10 border border-accent-primary/50 text-accent-primary rounded hover:bg-accent-primary/20"

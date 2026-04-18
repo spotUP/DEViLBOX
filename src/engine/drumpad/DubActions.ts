@@ -21,12 +21,55 @@
 import type { DrumPadEngine } from './DrumPadEngine';
 import type { DubActionId, DubBusSettings } from '@/types/drumpad';
 import type { DeckId } from '../dj/DeckEngine';
+import { useDJStore } from '@/stores/useDJStore';
 
 type Engage = (
   engine: DrumPadEngine,
   settings: DubBusSettings,
   bpm: number,
 ) => (() => void) | null;
+
+/**
+ * Resolve "the active deck" at the moment a dub pad is hit.
+ *
+ * Combines three signals to decide which deck is currently loudest in the
+ * main mix:
+ *   1. Is the deck playing at all? (non-playing decks never selected)
+ *   2. Crossfader position — A is suppressed when fader is far-right, B
+ *      when far-left; C bypasses the crossfader entirely.
+ *   3. Channel volume — even if the crossfader favors A, if A's fader is
+ *      down to 30% and B is at 80%, B is still louder.
+ *
+ * Returns null if no decks are playing. Falls back to the deck with the
+ * highest effective volume when multiple are audible simultaneously.
+ */
+function resolveActiveDeck(): DeckId | null {
+  const state = useDJStore.getState();
+  const x = state.crossfaderPosition;
+  const decks = state.decks;
+
+  // Constant-power crossfader coefficients (matches the mixer's 'smooth' curve)
+  const gainA = Math.cos(x * Math.PI * 0.5);
+  const gainB = Math.sin(x * Math.PI * 0.5);
+
+  const candidates: { deck: DeckId; volume: number }[] = [];
+  if (decks.A.isPlaying && gainA > 0.05) {
+    candidates.push({ deck: 'A', volume: decks.A.volume * gainA });
+  }
+  if (decks.B.isPlaying && gainB > 0.05) {
+    candidates.push({ deck: 'B', volume: decks.B.volume * gainB });
+  }
+  // Deck C bypasses the crossfader — it's in the mix whenever playing.
+  if (decks.C.isPlaying) {
+    candidates.push({ deck: 'C', volume: decks.C.volume });
+  }
+
+  if (candidates.length === 0) return null;
+  // Pick the loudest effective-volume deck; if tied, alphabetic order is fine
+  // because the user sees a deterministic result they can learn to predict.
+  candidates.sort((a, b) => b.volume - a.volume || a.deck.localeCompare(b.deck));
+  return candidates[0].deck;
+}
 
 type DubActionHandler = {
   /** Human-readable label for the context menu. */
@@ -52,7 +95,54 @@ function secPerBeat(bpm: number): number {
 }
 
 export const DUB_ACTION_HANDLERS: Record<DubActionId, DubActionHandler> = {
-  // ── Throws — momentary one-shots. Press grabs audio, decays on its own. ──
+  // ── Auto-select: resolve the active deck at press time, then throw/hold/mute.
+  //    These are the primary pads for live use — one button per gesture,
+  //    follows the DJ's crossfader moves automatically.
+  dub_throw: {
+    label: 'Throw (active deck)',
+    group: 'Throw',
+    kind: 'oneshot',
+    engage: (engine, s, bpm) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      engine.throwDeck(deck, s.deckTapAmount, secPerBeat(bpm) * s.throwBeats, 0.25);
+      return null;
+    },
+  },
+  dub_hold: {
+    label: 'Hold (active deck)',
+    group: 'Hold',
+    kind: 'hold',
+    engage: (engine, s) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      return engine.openDeckTap(deck, s.deckTapAmount, 0.005, 0.3);
+    },
+  },
+  dub_mute: {
+    label: 'Mute & Dub (active deck)',
+    group: 'Mute & Dub',
+    kind: 'hold',
+    engage: (engine, s) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      return engine.muteAndDub(deck, s.deckTapAmount, 0.35);
+    },
+  },
+  dub_slap_back: {
+    label: 'Slap Back (short)',
+    group: 'Throw',
+    kind: 'oneshot',
+    engage: (engine, s, bpm) => {
+      const deck = resolveActiveDeck();
+      if (!deck) return null;
+      // Very short grab + short release — one quick echo, no lingering tail.
+      engine.throwDeck(deck, s.deckTapAmount, secPerBeat(bpm) * 0.125, 0.12);
+      return null;
+    },
+  },
+
+  // ── Explicit per-deck throws (power-user pads) ──
   dub_throw_a: {
     label: 'Throw Deck A',
     group: 'Throw',
