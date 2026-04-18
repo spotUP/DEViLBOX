@@ -11,8 +11,9 @@ import type {
   MIDIMapping,
   SampleData,
   PadBank,
+  DubBusSettings,
 } from '../types/drumpad';
-import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName } from '../types/drumpad';
+import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName, DEFAULT_DUB_BUS } from '../types/drumpad';
 
 /** Build the 8 default MPK-linked program slots. */
 function buildMpkSlots(): Map<string, ReturnType<typeof createEmptyProgram>> {
@@ -87,6 +88,15 @@ interface DrumPadStore extends DrumPadState {
   busLevels: Record<string, number>;
   setBusLevel: (bus: string, level: number) => void;
 
+  // Dub Bus — shared send FX for all pads (one SpringReverb + one SpaceEcho).
+  // Settings live at store level so they persist with the program.
+  dubBus: DubBusSettings;
+  setDubBus: (patch: Partial<DubBusSettings>) => void;
+  setPadDubSend: (padId: number, value: number) => void;
+  /** Apply the "Sound System" one-click: enables bus + sets dubSend=0.4 on
+   *  every non-empty pad in the current bank. */
+  applySoundSystemToBank: () => void;
+
   // Persistence (localStorage — pad configs, no audio)
   saveToStorage: () => void;
   loadFromStorage: () => void;
@@ -112,7 +122,7 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
 };
 
 // Bump this when factory presets or stored schema changes — discards stale data
-const DRUMPAD_SCHEMA_VERSION = 20;
+const DRUMPAD_SCHEMA_VERSION = 24;
 const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
 
 // Set when schema migration clears old data — prevents IndexedDB from overwriting factory presets
@@ -139,6 +149,10 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   midiMappings: {},
   preferences: DEFAULT_PREFERENCES,
   busLevels: {} as Record<string, number>,
+
+  // Dub Bus state — starts disabled; turning it on via the UI (or
+  // applySoundSystemToBank) activates the shared SpringReverb + SpaceEcho.
+  dubBus: { ...DEFAULT_DUB_BUS },
 
   // Bank state
   currentBank: 'A' as PadBank,
@@ -456,6 +470,36 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       busLevels: { ...state.busLevels, [bus]: level },
     }));
     get().saveToStorage();
+  },
+
+  // Dub Bus actions — patch + persist. Engine listens via usePadEngineDubBus
+  // hook and pushes changes to the live DrumPadEngine.
+  setDubBus: (patch: Partial<DubBusSettings>) => {
+    set((state) => ({ dubBus: { ...state.dubBus, ...patch } }));
+    get().saveToStorage();
+  },
+
+  setPadDubSend: (padId: number, value: number) => {
+    const v = Math.max(0, Math.min(1, value));
+    get().updatePad(padId, { dubSend: v });
+  },
+
+  applySoundSystemToBank: () => {
+    const { programs, currentProgramId, currentBank } = get();
+    const program = programs.get(currentProgramId);
+    if (!program) return;
+    const bankPads = getBankPads(program.pads, currentBank);
+    // Enable the bus and set a musical default send on every non-empty pad.
+    // 0.4 is the sweet spot: clearly audible echo on the return, but the
+    // dry signal still reads as the primary hit. Kicks get half the send
+    // so the low end doesn't fight with the dub tail.
+    get().setDubBus({ enabled: true });
+    for (const pad of bankPads) {
+      const hasContent = !!pad.sample || !!pad.synthConfig;
+      if (!hasContent) continue;
+      const isKick = /kick|\bbd\b|bass\s*drum/i.test(pad.name);
+      get().updatePad(pad.id, { dubSend: isKick ? 0.2 : 0.4 });
+    }
   },
 
   // MIDI mapping

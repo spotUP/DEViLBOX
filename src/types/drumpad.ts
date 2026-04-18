@@ -37,6 +37,29 @@ export interface SampleLayer {
   levelOffset: number;               // dB adjustment (-24 to +24)
 }
 
+/**
+ * Dub action IDs — pad-fired "King Tubby moves" that route DJ deck audio
+ * into the shared Dub Bus. Behaviors:
+ *
+ *   dub_throw_*     — momentary one-shot: press grabs a slice of the deck
+ *                     into the echo, then releases on its own after ~1 beat.
+ *                     Dry deck audio never mutes.
+ *   dub_hold_*      — press-and-hold: deck audio feeds the bus while held,
+ *                     closes on release. Longer captures.
+ *   dub_mute_*      — "the drop": mutes dry deck + opens bus at full while
+ *                     held. The echo tail becomes the only audible deck.
+ *   dub_siren       — ramps bus feedback to near-unity → self-oscillating
+ *                     echo siren. Release ramps back down.
+ *   dub_filter_drop — sweeps bus LPF from open to muffled while held, opens
+ *                     back up on release.
+ */
+export type DubActionId =
+  | 'dub_throw_a' | 'dub_throw_b' | 'dub_throw_c' | 'dub_throw_all'
+  | 'dub_hold_a' | 'dub_hold_b' | 'dub_hold_c' | 'dub_hold_all'
+  | 'dub_mute_a' | 'dub_mute_b' | 'dub_mute_c'
+  | 'dub_siren'
+  | 'dub_filter_drop';
+
 export type ScratchActionId =
   | 'scratch_baby' | 'scratch_trans' | 'scratch_flare'
   | 'scratch_hydro' | 'scratch_crab'  | 'scratch_orbit'
@@ -108,13 +131,75 @@ export interface DrumPad {
   // DJ FX action (optional — momentary effect triggered on pad press/release)
   djFxAction?: DjFxActionId;
 
+  // Dub action (optional — routes DJ deck audio into the shared Dub Bus on
+  // press). Throws run their own timeline; hold/mute/siren/filter engage on
+  // press and release on pad release.
+  dubAction?: DubActionId;
+
   // Vocoder push-to-talk (optional — hold pad to talk, release to stop)
   pttAction?: boolean;
 
   // Effects chain for sample playback (separate from synthConfig.effects)
   // Applied by DrumPadEngine as send effects (reverb, delay, saturation, etc.)
   effects?: EffectConfig[];
+
+  // Dub send: post-fader send to the shared Dub Bus (one SpringReverb + one
+  // SpaceEcho for the whole DrumPadEngine). 0 = dry, 1 = equal dry + wet.
+  // This is how real dub/sound-system engineers work: one echo unit for the
+  // whole kit, each channel sends a controlled amount. Avoids stacking 16
+  // SpaceEcho instances with runaway feedback tails.
+  dubSend?: number;
 }
+
+/** Dub Bus — shared send FX for all drumpads. Settings apply engine-wide. */
+export interface DubBusSettings {
+  enabled: boolean;
+  // Return gain for the whole bus (0-1). 1 = full wet.
+  returnGain: number;
+  // HPF cutoff on the bus input — rolls bass off the send so the echo/reverb
+  // doesn't muddy the low end (classic dub trick). Default 180 Hz.
+  hpfCutoff: number;
+  // Spring reverb amount in the bus chain (0-1).
+  springWet: number;
+  // Space Echo intensity (feedback) — one shared delay, so this can run
+  // higher than a per-pad chain could. 0-0.85 sensible range.
+  echoIntensity: number;
+  // Space Echo wet amount (0-1).
+  echoWet: number;
+  // Space Echo rate in ms (shorter = tighter repeats, longer = more spaced).
+  echoRateMs: number;
+  // Sidechain-style duck on the bus return. When loud input hits the bus,
+  // the return briefly ducks so transients cut through the tail (the
+  // "pumping dub" effect). 0 = no duck, 1 = full duck.
+  sidechainAmount: number;
+  // How much of a deck's audio is injected into the bus when a dub-action
+  // pad fires (throw / hold / mute). 0-1; typical 0.85-1.0.
+  deckTapAmount: number;
+  // Throw duration in beats — how long the tap stays open for a
+  // dub_throw_* action before it begins releasing. 0.5 = eighth note.
+  throwBeats: number;
+  // Siren feedback target (0-0.95) — how hot the self-oscillation runs
+  // when a dub_siren pad is held. Above ~0.9 gets screaming.
+  sirenFeedback: number;
+  // Filter drop target in Hz — where the bus LPF drops to while a
+  // dub_filter_drop pad is held. 80-600 Hz is the classic muffle range.
+  filterDropHz: number;
+}
+
+export const DEFAULT_DUB_BUS: DubBusSettings = {
+  enabled: false,
+  returnGain: 0.8,
+  hpfCutoff: 180,
+  springWet: 0.4,
+  echoIntensity: 0.55,
+  echoWet: 0.5,
+  echoRateMs: 300,
+  sidechainAmount: 0.4,
+  deckTapAmount: 0.9,
+  throwBeats: 0.5,
+  sirenFeedback: 0.85,
+  filterDropHz: 220,
+};
 
 export interface DrumProgram {
   id: string;              // 'A-01' to 'Z-99'
@@ -177,6 +262,7 @@ export function createEmptyPad(id: number): DrumPad {
     sampleEnd: 1,
     reverse: false,
     layers: [],
+    dubSend: 0,
   };
 }
 
@@ -204,37 +290,51 @@ export const mpkSlotId = (n: number): string => `mpk-${n}`;
 export const mpkSlotName = (n: number): string => `Program ${n}`;
 
 /**
- * Default instrument FX chain for drumpad synths — Reggae Soundsystem.
- * Spring reverb + Space Echo + warm EQ — deep, dubby, but with tail values
- * that decay cleanly between hits rather than stacking into permanent wash.
+ * Default FX chain for every drumpad — Jamaican Sound System.
+ * Warm bass EQ → tape saturation → Space Echo (RE-201 style, ~6s tail)
+ * → spring tank. Signal path mirrors a real dub mixing chain.
  * Returns fresh array with unique IDs each call.
  */
 export function createDefaultPadFX(): EffectConfig[] {
   const ts = Date.now();
   return [
     {
+      // Warm dub EQ — bass lift, slight mid scoop, soften the highs.
       id: `pad-fx-eq-${ts}`,
       category: 'tonejs',
       type: 'EQ3',
       enabled: true,
       wet: 100,
-      parameters: { low: 2.5, mid: -1, high: -1.5 },
+      parameters: { low: 3, mid: -1, high: -1.5 },
     },
     {
-      id: `pad-fx-spring-${ts}`,
-      category: 'wasm',
-      type: 'SpringReverb',
+      // Tape saturation — that warm vintage console / Studer glue.
+      id: `pad-fx-tape-${ts}`,
+      category: 'tonejs',
+      type: 'TapeSaturation',
       enabled: true,
-      wet: 25,
-      parameters: { decay: 0.45, damping: 0.45, tension: 0.5, mix: 0.3, drip: 0.55, diffusion: 0.7 },
+      wet: 45,
+      parameters: { drive: 45, frequency: 1400 },
     },
     {
+      // Roland RE-201 Space Echo — the iconic dub delay.
+      // intensity 0.45 at rate 375ms (dotted 1/8 @ 120 BPM) → ~2s tail.
+      // Mode 4 = tape heads + built-in spring reverb for that classic RE-201 smear.
       id: `pad-fx-echo-${ts}`,
       category: 'tonejs',
       type: 'SpaceEcho',
       enabled: true,
-      wet: 32,
-      parameters: { mode: 4, rate: 300, intensity: 0.18, echoVolume: 0.3, reverbVolume: 0.12, bpmSync: 1, syncDivision: '1/4' },
+      wet: 45,
+      parameters: { mode: 4, rate: 375, intensity: 0.45, echoVolume: 0.45, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
+    },
+    {
+      // Spring reverb tank — sound system ambience with pronounced drip/boing.
+      id: `pad-fx-spring-${ts}`,
+      category: 'wasm',
+      type: 'SpringReverb',
+      enabled: true,
+      wet: 35,
+      parameters: { decay: 0.75, damping: 0.3, tension: 0.45, mix: 0.45, drip: 0.7, diffusion: 0.75 },
     },
   ] as EffectConfig[];
 }

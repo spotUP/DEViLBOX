@@ -8,6 +8,8 @@
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from '../drumpad/PadButton';
+import { DubBusPanel } from '../drumpad/DubBusPanel';
+import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
@@ -90,15 +92,21 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
 
     // Route through DJ mixer's sampler input if available, else fallback to destination
     const destination = djEngine?.mixer.samplerInput ?? undefined;
-    engineRef.current = new DrumPadEngine(audioContext, destination);
-    noteRepeatRef.current = new NoteRepeatEngine(engineRef.current);
+    const engine = new DrumPadEngine(audioContext, destination);
+    engineRef.current = engine;
+    noteRepeatRef.current = new NoteRepeatEngine(engine);
+
+    // Attach DJ mixer so dub-action pads can tap deck audio (King Tubby-style
+    // echo throws). Safe to skip if DJ isn't up — engine no-ops on dub actions.
+    if (djEngine) engine.attachDJMixer(djEngine.mixer);
 
     // Ensure samples are loaded
     useDrumPadStore.getState().loadFromIndexedDB(audioContext);
 
     return () => {
+      engine.detachDJMixer();
       noteRepeatRef.current?.dispose();
-      engineRef.current?.dispose();
+      engine.dispose();
       // Clear all velocity flash timers
       for (const timer of velocityTimersRef.current.values()) {
         clearTimeout(timer);
@@ -116,6 +124,15 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     window.addEventListener('dj-panic', onPanic);
     return () => window.removeEventListener('dj-panic', onPanic);
   }, []);
+
+  // ── Dub Bus: mirror store settings into the live engine ──
+  // Subscribes to store.dubBus and pushes changes to the DrumPadEngine's
+  // shared SpringReverb/SpaceEcho bus. Per-voice sends read pad.dubSend
+  // directly at trigger time, so we don't need to sync those here.
+  const dubBus = useDrumPadStore((s) => s.dubBus);
+  useEffect(() => {
+    engineRef.current?.setDubBusSettings(dubBus);
+  }, [dubBus]);
 
   // Sync master level
   useEffect(() => {
@@ -136,6 +153,22 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   }, [currentProgram]);
 
   // Sync note repeat
+  // Load a factory pad preset (King Tubby Dub Kit, DJ FX, etc.) and run its
+  // onApply hook so e.g. the Dub Bus flips on for dub-action kits. Kept here
+  // instead of the generic program dropdown so the DJ view gets the kit picker
+  // without needing to switch to the full drumpad manager.
+  const loadFactoryPreset = useCallback((presetId: string) => {
+    const preset = DJ_PAD_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    const program = preset.create();
+    useDrumPadStore.getState().saveProgram(program);
+    loadProgram(program.id);
+    useDrumPadStore.getState().setBank('A');
+    preset.onApply?.({
+      setDubBus: useDrumPadStore.getState().setDubBus,
+    });
+  }, [loadProgram]);
+
   useEffect(() => {
     noteRepeatEnabledRef.current = noteRepeatEnabled;
     noteRepeatRef.current?.setEnabled(noteRepeatEnabled);
@@ -235,6 +268,16 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
             }))}
             className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-surface border border-dark-border rounded text-text-secondary cursor-pointer"
           />
+          {/* Factory preset picker — loads the King Tubby dub kit / DJ FX /
+              one-shots / scratch master / dj complete / dub moves minimal
+              and runs their onApply hooks (e.g. auto-enable Dub Bus). */}
+          <CustomSelect
+            value=""
+            onChange={loadFactoryPreset}
+            placeholder="Preset..."
+            options={DJ_PAD_PRESETS.map((p) => ({ value: p.id, label: p.name }))}
+            className="px-1.5 py-0.5 text-[10px] font-mono bg-dark-surface border border-dark-border rounded text-text-secondary cursor-pointer"
+          />
         </div>
         <div className="flex items-center gap-1.5">
           {/* Bank buttons */}
@@ -254,6 +297,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
           <span className="text-[9px] font-mono text-text-muted ml-1">
             {bankLoadedCount}/16
           </span>
+          <DubBusPanel />
           <button
             onClick={() => engineRef.current?.stopAll()}
             className="px-1.5 py-0.5 text-[9px] font-mono text-red-400 hover:text-red-300 bg-dark-surface border border-dark-border rounded transition-colors"

@@ -30,6 +30,8 @@ import { getAudioContext } from '../../audio/AudioContextSingleton';
 import { applyVelocityCurve, PAD_INSTRUMENT_BASE, MPK_SLOT_COUNT, mpkSlotId } from '../../types/drumpad';
 import type { ScratchActionId } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
+import { DUB_ACTION_HANDLERS } from '../../engine/drumpad/DubActions';
+import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
 import { resetDrumPadModulation } from '../../midi/performance/parameterRouter';
 import { useVocoderStore } from '../../stores/useVocoderStore';
@@ -195,6 +197,10 @@ let _noteRepeat: NoteRepeatEngine | null = null;
 let _refCount = 0;
 const _heldPads = new Set<number>();
 const _pendingReleases = new Map<number, ReturnType<typeof setTimeout>>();
+// Active dub-action releasers keyed by padId — release is called on pad
+// release / releaseAllHeld / engine teardown. One-shot throws never register
+// here (their engage returns null).
+const _dubReleasers = new Map<number, () => void>();
 
 /** Returns the currently held pad IDs (for joystick modulation routing) */
 export function getHeldDrumPads(): number[] {
@@ -217,6 +223,14 @@ function getOrCreateEngine(): DrumPadEngine {
     _engine = new DrumPadEngine(ctx);
     _noteRepeat = new NoteRepeatEngine(_engine);
     useDrumPadStore.getState().loadFromIndexedDB(ctx);
+    // If a DJ engine is already up, attach its mixer so dub-action pads can
+    // tap deck audio. Otherwise the attach happens when the DJ view mounts
+    // (DJSamplerPanel calls attachDJMixer after creating its own engine too,
+    // but this covers the standalone-with-DJ-active case).
+    try {
+      const dj = getDJEngineIfActive();
+      if (dj) _engine.attachDJMixer(dj.mixer);
+    } catch { /* DJ engine not available */ }
   }
   return _engine;
 }
@@ -308,6 +322,10 @@ export function useMIDIPadRouting() {
             DJ_FX_ACTION_MAP[pad.djFxAction]?.disengage();
             setFxPadActive(padId, false);
           }
+          if (pad.dubAction) {
+            const release = _dubReleasers.get(padId);
+            if (release) { release(); _dubReleasers.delete(padId); }
+          }
           if (pad.pttAction) {
             useVocoderStore.getState().setPTT(false);
           }
@@ -353,6 +371,22 @@ export function useMIDIPadRouting() {
     // Scratch actions (start on note-on, stop on note-off via releasePad)
     if (pad.scratchAction) {
       SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(true);
+    }
+
+    // Dub-bus action — King Tubby-style deck tap/throw/mute/siren.
+    // Throws (oneshot) fire-and-forget; holds register a releaser on the
+    // module-level `_dubReleasers` map so pad release / panic closes them.
+    if (pad.dubAction && _engine) {
+      // Stop any prior releaser for this pad so re-triggering doesn't leak.
+      const prior = _dubReleasers.get(padId);
+      if (prior) { prior(); _dubReleasers.delete(padId); }
+      const handler = DUB_ACTION_HANDLERS[pad.dubAction];
+      if (handler) {
+        const settings = useDrumPadStore.getState().dubBus;
+        const bpm = useTransportStore.getState().bpm;
+        const release = handler.engage(_engine, settings, bpm);
+        if (release) _dubReleasers.set(padId, release);
+      }
     }
 
     // Vocoder PTT (push-to-talk via pad hold)
@@ -483,6 +517,12 @@ export function useMIDIPadRouting() {
     // Stop scratch action on release (finish current cycle gracefully)
     if (pad.scratchAction) {
       SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.(false);
+    }
+
+    // Release dub-bus action (hold-style only; throws already self-released).
+    if (pad.dubAction) {
+      const release = _dubReleasers.get(padId);
+      if (release) { release(); _dubReleasers.delete(padId); }
     }
 
     // Release vocoder PTT
