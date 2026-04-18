@@ -411,6 +411,13 @@ export function useMIDIPadRouting() {
     const pad = currentProgram.pads.find(p => p.id === padId);
     if (!pad) return;
 
+    // Emit a visual-feedback event so the PadGrid's velocity flash fires for
+    // MIDI / external triggers too, not only mouse/touch. Keeps the audio
+    // path unchanged; PadGrid listens on window.
+    try {
+      window.dispatchEvent(new CustomEvent('drumpad-trigger', { detail: { padId, velocity } }));
+    } catch { /* ok */ }
+
     const curvedVelocity = applyVelocityCurve(velocity, pad.velocityCurve);
 
     // Scratch actions (start on note-on, stop on note-off via releasePad)
