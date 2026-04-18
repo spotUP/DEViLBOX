@@ -795,6 +795,9 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           return;
         } catch (err) {
           console.error(`[DJPlaylistPanel] Modland re-download failed:`, err);
+          // Don't fall through to the local-file picker — a modland: track
+          // has no meaningful local path to offer the user. Fail quietly.
+          return;
         }
       }
 
