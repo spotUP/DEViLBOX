@@ -292,16 +292,23 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     const mode = previewModeRef.current;
     if (mode === 'uade') {
       // Direct-UADE preview path: stop the engine + unplug its output from
-      // the mixer. Lazy-import the engine so we don't drag UADEEngine into
-      // the bundle on browsers that never opened the Modland browser.
+      // the cue bus. Lazy-import the engine so we don't drag UADEEngine
+      // into the bundle on browsers that never opened the Modland browser.
       void (async () => {
         try {
           const { UADEEngine } = await import('@engine/uade/UADEEngine');
           const uade = UADEEngine.getInstance();
           uade.stop();
           try {
+            // Preview routes to the cue bus (headphones) — disconnect from
+            // both it and the legacy samplerInput so any older in-flight
+            // connection is cleaned up cleanly.
             const mixer = getDJEngine().mixer;
-            uade.output.disconnect(mixer.samplerInput);
+            const cueInput = mixer.getCueInput();
+            if (cueInput) {
+              try { uade.output.disconnect(cueInput.input as unknown as AudioNode); } catch { /* */ }
+            }
+            try { uade.output.disconnect(mixer.samplerInput); } catch { /* */ }
           } catch { /* already disconnected or engine gone */ }
         } catch { /* UADE not loaded yet */ }
       })();
@@ -466,11 +473,25 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
         uade.stop();
         await uade.load(buffer, file.filename);
 
-        // Connect UADE.output to the DJ mixer sampler input (the same
-        // summing bus the drumpad uses). Wrapped in try so re-connecting
-        // an already-connected node doesn't throw on some browsers.
-        try { uade.output.connect(getDJEngine().mixer.samplerInput); }
-        catch { /* already connected */ }
+        // Route UADE.output to the CUE bus (headphones) so preview is
+        // audible to the DJ but NOT to the crowd — classic sound-system
+        // workflow. Falls back to the master sampler input only if the
+        // cue engine hasn't been injected yet (e.g. pre-DJEngine init).
+        const mixer = getDJEngine().mixer;
+        const cueInput = mixer.getCueInput();
+        if (cueInput) {
+          try {
+            // Tone.Gain .input is the raw AudioNode the Tone-side graph
+            // expects to receive from. Connecting UADE's native GainNode
+            // straight to Tone's .input is safe because Web Audio treats
+            // both as AudioNode.
+            uade.output.connect(cueInput.input as unknown as AudioNode);
+          } catch { /* already connected */ }
+        } else {
+          console.warn('[ModlandBrowser] cue input unavailable — falling back to master sampler input');
+          try { uade.output.connect(mixer.samplerInput); }
+          catch { /* already connected */ }
+        }
 
         uade.play();
         return;
