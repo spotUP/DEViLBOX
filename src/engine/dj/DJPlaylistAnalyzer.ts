@@ -163,7 +163,7 @@ export async function analyzePlaylist(
   playlistId: string,
   onProgress?: (progress: AnalysisProgress) => void,
   onFixNeeded?: OnFixNeeded,
-  opts?: { force?: boolean; retryFailed?: boolean; signal?: AbortSignal },
+  opts?: { force?: boolean; retryFailed?: boolean; trackIds?: string[]; signal?: AbortSignal },
 ): Promise<AnalysisResult> {
   // ── Concurrency guard ──────────────────────────────────────────────────
   // Second caller for the same playlist gets an empty result. Running two
@@ -181,14 +181,19 @@ export async function analyzePlaylist(
   // cause metadata writes to land on the wrong row. Indices are resolved
   // freshly against the live store on every read/write below.
   //
-  // Three filter modes in priority order:
+  // Four filter modes in priority order:
+  //   trackIds     — specific tracks by id (context-menu "Analyze this
+  //                  track" — bypasses every other filter, always runs
+  //                  against the named tracks if they have a remote source)
   //   force        — every remote track, regardless of state (expensive,
   //                  used by "Re-analyze all")
   //   retryFailed  — only tracks currently flagged analysisSkipped (used by
   //                  the "Retry failed analyses" menu item; much cheaper
   //                  than force when only a few tracks need another try)
   //   default      — bpm===0 && !analysisSkipped (new scan only)
+  const trackIdSet = opts?.trackIds?.length ? new Set(opts.trackIds) : null;
   const filter = (track: PlaylistTrack): boolean => {
+    if (trackIdSet) return trackHasRemoteSource(track) && trackIdSet.has(track.id);
     if (opts?.force) return trackHasRemoteSource(track);
     if (opts?.retryFailed) return trackHasRemoteSource(track) && !!track.analysisSkipped;
     return trackShouldAnalyzeOnClick(track);
