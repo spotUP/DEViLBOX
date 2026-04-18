@@ -71,6 +71,18 @@ export const PadButton: React.FC<PadButtonProps> = ({
     decayTimerRef.current = requestAnimationFrame(decay);
   }, []);
 
+  // Fire the flash whenever the `velocity` prop ticks from 0 → nonzero — that's
+  // the signal that an EXTERNAL trigger hit (MIDI, keyboard, programmatic).
+  // Mouse/touch paths call flashTrigger directly and drive velocity=0 through
+  // props, so this effect only lights up on external events.
+  const prevVelocityRef = useRef(0);
+  useEffect(() => {
+    if (velocity > 0 && prevVelocityRef.current === 0) {
+      flashTrigger(velocity);
+    }
+    prevVelocityRef.current = velocity;
+  }, [velocity, flashTrigger]);
+
   // Calculate velocity based on click/touch position
   const calculateVelocity = useCallback((_clientY: number, _target: Element): number => {
     // Mouse/touch always triggers at full velocity — only MIDI controllers send real velocity
