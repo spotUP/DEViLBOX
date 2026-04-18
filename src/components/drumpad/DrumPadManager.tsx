@@ -129,17 +129,24 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
   // Determine if we're rendered as a full view (no onClose) or as a modal
   const isViewMode = !onClose;
 
+  // Perform mode takes over the full viewport (covering the app navbar +
+  // status bar) so pads get every pixel available. Otherwise the normal
+  // view-mode / modal shells apply.
+  const outerClass = performanceMode
+    ? 'fixed inset-0 z-[99995] bg-dark-bg flex flex-col overflow-hidden select-none font-mono'
+    : isViewMode
+      ? 'flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono'
+      : 'fixed inset-0 z-[99990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-300';
+
+  const innerClass = performanceMode
+    ? 'flex flex-col h-full w-full overflow-hidden'
+    : isViewMode
+      ? 'flex flex-col h-full w-full overflow-hidden'
+      : 'bg-dark-surface border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400';
+
   const content = (
-    <div className={
-      isViewMode
-        ? 'flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono'
-        : 'fixed inset-0 z-[99990] bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-300'
-    }>
-      <div className={
-        isViewMode
-          ? 'flex flex-col h-full w-full overflow-hidden'
-          : 'bg-dark-surface border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400'
-      }>
+    <div className={outerClass}>
+      <div className={innerClass}>
         {/* Header / Top Bar */}
         <div className={`flex items-center justify-between px-4 py-2 shrink-0 border-b border-dark-border ${
           performanceMode ? 'bg-dark-bg' : 'bg-dark-bgSecondary'
@@ -205,7 +212,8 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         {/* MPK-aligned status bar (slots 1-8, program name, bank A/B, knob labels) */}
         {!performanceMode && <MpkStatusBar />}
 
-        {/* Preset strip */}
+        {/* Preset strip — hidden in perform mode for a minimal live surface */}
+        {!performanceMode && (
         <div className="flex items-center gap-1 px-4 py-1.5 border-b border-dark-border bg-dark-bg shrink-0">
           <span className="text-[10px] font-mono text-text-muted mr-1">PRESETS</span>
           <CustomSelect
@@ -216,18 +224,22 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             className="px-2.5 py-1 text-[10px] font-mono font-bold rounded transition-colors bg-dark-bgTertiary border border-dark-border text-text-muted hover:text-text-primary hover:border-accent-highlight/50 cursor-pointer"
           />
         </div>
+        )}
 
         {/* Main content area */}
         <ErrorBoundary fallbackMessage="An error occurred in the drum pad interface.">
           {performanceMode ? (
-            /* Performance Mode: fullscreen pads with minimal controls */
-            <div className="flex-1 flex items-center justify-center overflow-auto">
-              <div style={{ width: '100%', maxWidth: 'min(900px, calc(100vh - 176px))' }}>
-                <PadGrid
-                  onPadSelect={setSelectedPadId}
-                  selectedPadId={selectedPadId}
-                  performanceMode
-                />
+            /* Performance Mode: fullscreen pads with minimal controls.
+             * Square-ish cap so pads don't stretch on ultrawide displays. */
+            <div className="flex-1 flex items-center justify-center overflow-auto p-4">
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="w-full max-w-[min(95vh,1400px)]">
+                  <PadGrid
+                    onPadSelect={setSelectedPadId}
+                    selectedPadId={selectedPadId}
+                    performanceMode
+                  />
+                </div>
               </div>
             </div>
           ) : (
