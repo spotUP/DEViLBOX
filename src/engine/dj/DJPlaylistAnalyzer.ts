@@ -265,8 +265,7 @@ export async function analyzePlaylist(
           : null;
 
         if (!cachedBuffer) {
-          await new Promise(r => setTimeout(r, isHVSC ? 500 : 4000));
-          if (opts?.signal?.aborted) break;
+          await abortableDelay(isHVSC ? 500 : 4000, opts?.signal);
         }
 
         let buffer: ArrayBuffer;
@@ -292,7 +291,7 @@ export async function analyzePlaylist(
                 if (retries > 8) throw dlErr;
                 const wait = Math.min(60000, 5000 * Math.pow(2, retries - 1));
                 console.log(`[PlaylistAnalyzer] Rate limited, waiting ${wait / 1000}s (retry ${retries}/8)...`);
-                await new Promise(r => setTimeout(r, wait));
+                await abortableDelay(wait, opts?.signal);
                 continue;
               }
               // On 404: search Modland for the filename and offer to auto-fix.
@@ -313,7 +312,7 @@ export async function analyzePlaylist(
                       }));
                       break;
                     }
-                    await new Promise(r => setTimeout(r, 1000)); // throttle between searches
+                    await abortableDelay(1000, opts?.signal); // throttle between searches
                   }
 
                   if (candidates.length > 0) {
@@ -350,7 +349,7 @@ export async function analyzePlaylist(
                       currentPath = selectedPath;
                       remotePath = selectedPath;
                       filename = selectedPath.split('/').pop() || filename;
-                      await new Promise(r => setTimeout(r, 2000));
+                      await abortableDelay(2000, opts?.signal);
                       continue; // retry download with new path
                     }
                   }
@@ -511,9 +510,10 @@ export async function analyzePlaylist(
           consecutiveNetworkFailures = 0; // Reset on non-network errors (404, parse errors, etc.)
         }
 
-        // Track name in the failure report is the snapshot name — if the user
-        // renamed mid-run, that's fine for the user-facing listing.
-        failures.push({ trackName: snapshotName, fileName: track.fileName, reason });
+        // Use the live track name (falling back to the snapshot) so a
+        // mid-run rename is reflected in the failure report and matches
+        // what the "analyzing" progress just showed the user.
+        failures.push({ trackName: track.trackName || snapshotName, fileName: track.fileName, reason });
         // Mark as skipped so it won't be re-scanned next time (id-resolved).
         const curr = resolveCurrent(trackId);
         if (curr) {
