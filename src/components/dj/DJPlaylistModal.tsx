@@ -222,6 +222,8 @@ interface PlayingDeckInfo {
   // Tracker-mode fields
   songPos: number;
   totalPositions: number;
+  // Hot cues for visual overlay (audio mode only — positions are ms from start)
+  hotCues: ReadonlyArray<{ position: number; color: string; name: string } | null>;
 }
 
 /**
@@ -246,6 +248,7 @@ function usePlayingDeckForTrack(fileName: string): PlayingDeckInfo | null {
           durationMs: d.durationMs,
           songPos: d.songPos,
           totalPositions: d.totalPositions,
+          hotCues: d.hotCues,
         };
       }
       return null;
@@ -259,16 +262,31 @@ const DECK_COLOR: Record<DeckId, string> = {
   C: 'bg-accent-success',
 };
 
-const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackMode, audioPosition, durationMs, songPos, totalPositions }) => {
+const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackMode, audioPosition, durationMs, songPos, totalPositions, hotCues }) => {
   const barRef = useRef<HTMLDivElement>(null);
 
   let progress = 0;
+  let currentLabel = '';
+  let totalLabel = '';
   if (playbackMode === 'audio') {
     const durationSec = durationMs / 1000;
     progress = durationSec > 0 ? Math.min(1, Math.max(0, audioPosition / durationSec)) : 0;
+    currentLabel = formatDuration(audioPosition);
+    totalLabel = durationSec > 0 ? formatDuration(durationSec) : '--:--';
   } else {
     progress = totalPositions > 0 ? Math.min(1, Math.max(0, songPos / totalPositions)) : 0;
+    currentLabel = `${songPos}`;
+    totalLabel = `${totalPositions}`;
   }
+
+  // Convert hot cue ms positions to scrubber fractions. Tracker mode has no
+  // durationMs so the ticks only appear in audio mode — which is how every
+  // deck plays tracker modules after pipeline pre-render anyway.
+  const hotCueTicks = playbackMode === 'audio' && durationMs > 0
+    ? hotCues
+        .map((cue, i) => cue ? { index: i, fraction: Math.max(0, Math.min(1, cue.position / durationMs)), color: cue.color, name: cue.name } : null)
+        .filter((t): t is NonNullable<typeof t> => t !== null)
+    : [];
 
   const seekFromEvent = useCallback((clientX: number) => {
     const bar = barRef.current;
@@ -309,15 +327,45 @@ const TrackScrubber: React.FC<PlayingDeckInfo> = React.memo(({ deckId, playbackM
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       className="absolute bottom-0 left-0 right-0 h-2 bg-dark-bgTertiary/70 cursor-ew-resize group/scrub hover:h-3 transition-[height]"
-      title={`Deck ${deckId} · drag to scrub ${playbackMode === 'tracker' ? `(song position ${songPos}/${totalPositions})` : ''}`}
+      title={`Deck ${deckId} · drag to scrub · ${currentLabel} / ${totalLabel}`}
     >
       {/* Filled progress bar */}
       <div className={`h-full ${color} opacity-70 group-hover/scrub:opacity-100 transition-opacity`} style={{ width: `${progress * 100}%` }} />
+
+      {/* Hot cue ticks — 2 px tall colored bars above the slider, visible
+          always so the user can eyeball their cue points while scrubbing.
+          Clicking on a tick jumps the playhead to that cue. */}
+      {hotCueTicks.map((tick) => (
+        <div
+          key={tick.index}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cue = hotCues[tick.index];
+            if (cue && durationMs > 0) {
+              markSeek(deckId);
+              seekDeckAudio(deckId, cue.position / 1000);
+            }
+          }}
+          className="absolute top-0 bottom-0 w-0.5 cursor-pointer hover:w-1 transition-[width]"
+          style={{ left: `${tick.fraction * 100}%`, backgroundColor: tick.color, boxShadow: `0 0 4px ${tick.color}` }}
+          title={`Hot cue ${tick.index + 1}${tick.name ? `: ${tick.name}` : ''} (click to jump)`}
+        />
+      ))}
+
       {/* Always-visible playhead thumb so users see the slider at a glance */}
       <div
         className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} shadow-md border border-dark-bg group-hover/scrub:w-4 group-hover/scrub:h-4 transition-all pointer-events-none`}
         style={{ left: `calc(${progress * 100}% - 6px)` }}
       />
+
+      {/* Time labels — visible on hover, positioned beside the thumb.
+          Fade in via group-hover so idle rows stay clean. */}
+      <div
+        className="absolute bottom-full mb-1 left-0 right-0 flex justify-between px-1 text-[9px] font-mono text-text-muted pointer-events-none opacity-0 group-hover/scrub:opacity-100 transition-opacity"
+      >
+        <span className="tabular-nums">{currentLabel}</span>
+        <span className="tabular-nums text-text-muted/70">{totalLabel}</span>
+      </div>
     </div>
   );
 });
