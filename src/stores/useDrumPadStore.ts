@@ -597,8 +597,13 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
           // Apply MPC field defaults for pads loaded from older versions
           const migratedPads = (prog.pads || []).map((p: DrumPad) => ({
             ...p,
-            // Migrate C3 → C4 (old default played too low — Z row instead of Q row)
-            instrumentNote: p.instrumentNote === 'C3' ? 'C4' : p.instrumentNote,
+            // instrumentNote preserved as-authored — the previous C3→C4 rewrite
+            // (a keyboard-row migration from years ago) broke DubSiren / Air
+            // Horn / Noise Riser presets, because those synths now use C3 as
+            // a "preset default, do not override pitch" sentinel. Bumping to
+            // C4 forced a pitch override and played every siren at the wrong
+            // frequency on reload. Leave the value alone.
+            instrumentNote: p.instrumentNote,
             muteGroup: p.muteGroup ?? 0,
             playMode: p.playMode ?? 'oneshot',
             sampleStart: p.sampleStart ?? 0,

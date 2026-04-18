@@ -18,7 +18,10 @@ import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import type { PadBank } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
 import { CustomSelect } from '@components/common/CustomSelect';
-import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
+import { useMIDIPadRouting, clearDubReleasers } from '@/hooks/drumpad/useMIDIPadRouting';
+import { bpmSyncedEchoRate, getActiveBpm } from '../../engine/drumpad/DubActions';
+import { useTransportStore } from '../../stores/useTransportStore';
+import { useDJStore } from '../../stores/useDJStore';
 
 // ============================================================================
 // COMPONENT
@@ -48,18 +51,26 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   const { programs, currentProgramId, currentBank, setBank, loadProgram } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
 
-  // ── Keep the engine attached to the DJ mixer ──
+  // ── DJ mixer attach (mount-only, with a short retry) ──
   // The singleton may have been created before the DJ engine came up (e.g.
-  // the user visited the tracker view first). Re-attach on every render so
-  // deck taps are wired regardless of init order. attachDJMixer early-returns
-  // when already connected to the same mixer, so this is cheap.
+  // user visited the tracker view first). Attach on mount; if DJ isn't up
+  // yet, retry once after 200 ms. MUST NOT run on every dubBus change —
+  // re-attach disconnects/reconnects masterGain which under load produces
+  // an audible click, and DubBusPanel knob twiddles would otherwise fire it.
   useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    try {
-      const dj = getDJEngineIfActive();
-      if (dj) engine.attachDJMixer(dj.mixer);
-    } catch { /* DJ engine not available — dub throws fall back to no-op */ }
+    const attach = () => {
+      const engine = engineRef.current;
+      if (!engine) return false;
+      try {
+        const dj = getDJEngineIfActive();
+        if (dj) { engine.attachDJMixer(dj.mixer); return true; }
+      } catch { /* ok */ }
+      return false;
+    };
+    if (!attach()) {
+      const t = setTimeout(attach, 200);
+      return () => clearTimeout(t);
+    }
   }, [engineRef]);
 
   // ── DJ panic: silence + flush the dub bus when ESC panic fires ──
@@ -70,12 +81,16 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     const onPanic = () => {
       releaseAllHeld();
       engineRef.current?.dubPanic();
+      clearDubReleasers();
+      // Sync the store so the Dub Bus UI reflects the killed state.
+      useDrumPadStore.getState().setDubBus({ enabled: false });
       for (const timer of velocityTimersRef.current.values()) clearTimeout(timer);
       velocityTimersRef.current.clear();
       setPadVelocities({});
     };
     const onDubPanic = () => {
       engineRef.current?.dubPanic();
+      clearDubReleasers();
       useDrumPadStore.getState().setDubBus({ enabled: false });
     };
     window.addEventListener('dj-panic', onPanic);
@@ -87,19 +102,22 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   }, [releaseAllHeld, engineRef]);
 
   // ── Dub Bus: mirror store settings into the live engine ──
-  // Subscribes to store.dubBus and pushes changes to the DrumPadEngine's
-  // shared SpringReverb/SpaceEcho bus. Per-voice sends read pad.dubSend
-  // directly at trigger time, so we don't need to sync those here.
+  // Derives echo rate from the active deck's BPM when sync is on — a
+  // 140 BPM record crossfader'd in won't sync to the tracker's 120 BPM.
+  // Subscribing to deck BPM + crossfader means echoes track the mix.
   const dubBus = useDrumPadStore((s) => s.dubBus);
+  const transportBpm = useTransportStore((s) => s.bpm);
+  const djDeckSig = useDJStore((s) =>
+    `${s.decks.A.isPlaying ? s.decks.A.beatGrid?.bpm || s.decks.A.detectedBPM : 0}|` +
+    `${s.decks.B.isPlaying ? s.decks.B.beatGrid?.bpm || s.decks.B.detectedBPM : 0}|` +
+    `${s.decks.C.isPlaying ? s.decks.C.beatGrid?.bpm || s.decks.C.detectedBPM : 0}|` +
+    `${s.crossfaderPosition}`
+  );
   useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    engine.setDubBusSettings(dubBus);
-    try {
-      const dj = getDJEngineIfActive();
-      if (dj) engine.attachDJMixer(dj.mixer);
-    } catch { /* ok */ }
-  }, [dubBus, engineRef]);
+    const bpm = getActiveBpm();
+    const synced = bpmSyncedEchoRate(bpm, dubBus.echoSyncDivision, dubBus.echoRateMs);
+    engineRef.current?.setDubBusSettings({ ...dubBus, echoRateMs: synced });
+  }, [dubBus, transportBpm, djDeckSig, engineRef]);
 
   // Sync master level
   useEffect(() => {
