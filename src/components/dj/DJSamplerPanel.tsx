@@ -1,61 +1,24 @@
 /**
- * DJSamplerPanel - Compact inline drum pad sampler for DJ view
+ * DJSamplerPanel - Compact inline drum pad sampler for DJ view.
  *
- * Routes audio through the DJ mixer's sampler input (bypasses crossfader,
- * goes through master FX + limiter). Reuses the existing drumpad store
- * and PadButton component.
+ * Uses the shared `useMIDIPadRouting` singleton engine — the same one MIDI
+ * triggers use — so touch and MIDI produce identical audio (same FX chain,
+ * same dub bus, same routing through the DJ mixer). Earlier versions ran a
+ * second local DrumPadEngine here, which caused divergent audio paths and
+ * duplicated WASM / noise sources.
  */
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from '../drumpad/PadButton';
 import { DubBusPanel } from '../drumpad/DubBusPanel';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
-import { DUB_ACTION_HANDLERS } from '../../engine/drumpad/DubActions';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
-import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
-import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
-import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
-import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
+import { resumeAudioContext } from '../../audio/AudioContextSingleton';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
-import { useTransportStore } from '../../stores/useTransportStore';
-import type { PadBank, ScratchActionId } from '../../types/drumpad';
+import type { PadBank } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
 import { CustomSelect } from '@components/common/CustomSelect';
-import {
-  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
-  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
-  djScratchUzi, djScratchTwiddle, djScratch8Crab, djScratch3Flare,
-  djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
-  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
-} from '../../engine/keyboard/commands/djScratch';
-
-const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
-  scratch_baby: djScratchBaby,
-  scratch_trans: djScratchTrans,
-  scratch_flare: djScratchFlare,
-  scratch_hydro: djScratchHydro,
-  scratch_crab: djScratchCrab,
-  scratch_orbit: djScratchOrbit,
-  scratch_chirp: djScratchChirp,
-  scratch_stab: djScratchStab,
-  scratch_scribble: djScratchScrbl,
-  scratch_tear: djScratchTear,
-  scratch_uzi: djScratchUzi,
-  scratch_twiddle: djScratchTwiddle,
-  scratch_8crab: djScratch8Crab,
-  scratch_3flare: djScratch3Flare,
-  scratch_laser: djScratchLaser,
-  scratch_phaser: djScratchPhaser,
-  scratch_tweak: djScratchTweak,
-  scratch_drag: djScratchDrag,
-  scratch_vibrato: djScratchVibrato,
-  scratch_stop: djScratchStop,
-  fader_lfo_off: djFaderLFOOff,
-  fader_lfo_1_4: djFaderLFO14,
-  fader_lfo_1_8: djFaderLFO18,
-  fader_lfo_1_16: djFaderLFO116,
-  fader_lfo_1_32: djFaderLFO132,
-};
+import { useMIDIPadRouting } from '@/hooks/drumpad/useMIDIPadRouting';
 
 // ============================================================================
 // COMPONENT
@@ -68,77 +31,60 @@ interface DJSamplerPanelProps {
 export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
   const [selectedPadId, setSelectedPadId] = useState<number | null>(null);
-  const heldPadsRef = useRef<Set<number>>(new Set());
   const velocityTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
-  const noteRepeatEnabledRef = useRef(false);
 
-  // Audio engine refs
-  const engineRef = useRef<DrumPadEngine | null>(null);
-  const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
-  // Active dub-action releasers per pad — called on pad release / panic. Throws
-  // (oneshot) never register here; their engage returns null and tails out alone.
-  const dubReleasersRef = useRef<Map<number, () => void>>(new Map());
+  // Shared full-featured pad engine (also handles MIDI routing). This hook
+  // owns the singleton DrumPadEngine and dispatches every pad action type
+  // (sample, synth, DJ FX, scratch, PTT, dub). Touch events from this panel
+  // go through the exact same path as MIDI hits.
+  const {
+    triggerPad: hookTriggerPad,
+    releasePad: hookReleasePad,
+    releaseAllHeld,
+    engineRef,
+  } = useMIDIPadRouting();
 
   // Store state
   const { programs, currentProgramId, currentBank, setBank, loadProgram } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
 
-  // Note repeat
-  const noteRepeatEnabled = useDrumPadStore(s => s.noteRepeatEnabled);
-  const noteRepeatRate = useDrumPadStore(s => s.noteRepeatRate);
-  const bpm = useTransportStore(s => s.bpm);
-  const busLevels = useDrumPadStore(s => s.busLevels);
-
-  // ── Initialize engine routed through DJ mixer ──
+  // ── Keep the engine attached to the DJ mixer ──
+  // The singleton may have been created before the DJ engine came up (e.g.
+  // the user visited the tracker view first). Re-attach on every render so
+  // deck taps are wired regardless of init order. attachDJMixer early-returns
+  // when already connected to the same mixer, so this is cheap.
   useEffect(() => {
-    const audioContext = getAudioContext();
-    const djEngine = getDJEngineIfActive();
+    const engine = engineRef.current;
+    if (!engine) return;
+    try {
+      const dj = getDJEngineIfActive();
+      if (dj) engine.attachDJMixer(dj.mixer);
+    } catch { /* DJ engine not available — dub throws fall back to no-op */ }
+  }, [engineRef]);
 
-    // Route through DJ mixer's sampler input if available, else fallback to destination
-    const destination = djEngine?.mixer.samplerInput ?? undefined;
-    const engine = new DrumPadEngine(audioContext, destination);
-    engineRef.current = engine;
-    noteRepeatRef.current = new NoteRepeatEngine(engine);
-
-    // Attach DJ mixer so dub-action pads can tap deck audio (King Tubby-style
-    // echo throws). Safe to skip if DJ isn't up — engine no-ops on dub actions.
-    if (djEngine) engine.attachDJMixer(djEngine.mixer);
-
-    // Ensure samples are loaded
-    useDrumPadStore.getState().loadFromIndexedDB(audioContext);
-
-    return () => {
-      engine.detachDJMixer();
-      noteRepeatRef.current?.dispose();
-      engine.dispose();
-      // Release any outstanding dub-action holds before tearing down.
-      for (const release of dubReleasersRef.current.values()) {
-        try { release(); } catch { /* ok */ }
-      }
-      dubReleasersRef.current.clear();
-      // Clear all velocity flash timers
-      for (const timer of velocityTimersRef.current.values()) {
-        clearTimeout(timer);
-      }
-      velocityTimersRef.current.clear();
-    };
-  }, []);
-
-  // ── DJ panic: silence local engine when ESC panic fires ──
+  // ── DJ panic: silence + flush the dub bus when ESC panic fires ──
+  // The hook's releaseAllHeld clears every per-pad releaser registered via
+  // the hook; engine.dubPanic() additionally flushes the SpaceEcho +
+  // SpringReverb internal delay lines so the bus is ready for clean restart.
   useEffect(() => {
     const onPanic = () => {
-      noteRepeatRef.current?.stopAll();
-      engineRef.current?.stopAll();
-      // Close any in-flight dub-action releasers so siren / mute-dub /
-      // filter-drop don't stay stuck on after panic.
-      for (const release of dubReleasersRef.current.values()) {
-        try { release(); } catch { /* ok */ }
-      }
-      dubReleasersRef.current.clear();
+      releaseAllHeld();
+      engineRef.current?.dubPanic();
+      for (const timer of velocityTimersRef.current.values()) clearTimeout(timer);
+      velocityTimersRef.current.clear();
+      setPadVelocities({});
+    };
+    const onDubPanic = () => {
+      engineRef.current?.dubPanic();
+      useDrumPadStore.getState().setDubBus({ enabled: false });
     };
     window.addEventListener('dj-panic', onPanic);
-    return () => window.removeEventListener('dj-panic', onPanic);
-  }, []);
+    window.addEventListener('dub-panic', onDubPanic);
+    return () => {
+      window.removeEventListener('dj-panic', onPanic);
+      window.removeEventListener('dub-panic', onDubPanic);
+    };
+  }, [releaseAllHeld, engineRef]);
 
   // ── Dub Bus: mirror store settings into the live engine ──
   // Subscribes to store.dubBus and pushes changes to the DrumPadEngine's
@@ -146,15 +92,21 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
   // directly at trigger time, so we don't need to sync those here.
   const dubBus = useDrumPadStore((s) => s.dubBus);
   useEffect(() => {
-    engineRef.current?.setDubBusSettings(dubBus);
-  }, [dubBus]);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setDubBusSettings(dubBus);
+    try {
+      const dj = getDJEngineIfActive();
+      if (dj) engine.attachDJMixer(dj.mixer);
+    } catch { /* ok */ }
+  }, [dubBus, engineRef]);
 
   // Sync master level
   useEffect(() => {
     if (engineRef.current && currentProgram) {
       engineRef.current.setMasterLevel(currentProgram.masterLevel);
     }
-  }, [currentProgram?.masterLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentProgram?.masterLevel, engineRef, currentProgram]);
 
   // Sync mute groups + pre-build effects chains
   useEffect(() => {
@@ -165,9 +117,8 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
         engineRef.current.updatePadEffects(padsWithEffects);
       }
     }
-  }, [currentProgram]);
+  }, [currentProgram, engineRef]);
 
-  // Sync note repeat
   // Load a factory pad preset (King Tubby Dub Kit, DJ FX, etc.) and run its
   // onApply hook so e.g. the Dub Bus flips on for dub-action kits. Kept here
   // instead of the generic program dropdown so the DJ view gets the kit picker
@@ -184,96 +135,26 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
     });
   }, [loadProgram]);
 
-  useEffect(() => {
-    noteRepeatEnabledRef.current = noteRepeatEnabled;
-    noteRepeatRef.current?.setEnabled(noteRepeatEnabled);
-  }, [noteRepeatEnabled]);
-
-  useEffect(() => {
-    noteRepeatRef.current?.setRate(noteRepeatRate as NoteRepeatRate);
-  }, [noteRepeatRate]);
-
-  useEffect(() => {
-    noteRepeatRef.current?.setBpm(bpm);
-  }, [bpm]);
-
-  // Sync bus levels
-  useEffect(() => {
-    if (!engineRef.current || !busLevels) return;
-    for (const [bus, level] of Object.entries(busLevels)) {
-      engineRef.current.setOutputLevel(bus, level);
-    }
-  }, [busLevels]);
-
   // ── Pad trigger / release ──
+  // Thin wrappers over the hook: flash the velocity indicator + forward to
+  // the shared engine. All the actual audio routing (sample / synth / DJ FX
+  // / scratch / dub-action) happens inside the hook's triggerPad.
   const handlePadTrigger = useCallback(async (padId: number, velocity: number) => {
     setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
     await resumeAudioContext();
+    hookTriggerPad(padId, velocity);
 
-    if (currentProgram && engineRef.current) {
-      const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad) {
-        if (pad.scratchAction) {
-          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
-        }
-
-        // Dub-bus action — King Tubby throws / holds / mutes / siren / filter.
-        // Fires before sample playback so even pads with both (rare) start
-        // their dub gesture on the pad's transient hit.
-        if (pad.dubAction) {
-          const prior = dubReleasersRef.current.get(padId);
-          if (prior) { prior(); dubReleasersRef.current.delete(padId); }
-          const handler = DUB_ACTION_HANDLERS[pad.dubAction];
-          if (handler) {
-            const settings = useDrumPadStore.getState().dubBus;
-            const release = handler.engage(engineRef.current, settings, bpm);
-            if (release) dubReleasersRef.current.set(padId, release);
-          }
-        }
-
-        if (pad.sample) {
-          engineRef.current.triggerPad(pad, velocity);
-        }
-        if (pad.playMode === 'sustain') {
-          heldPadsRef.current.add(padId);
-        }
-        if (noteRepeatEnabledRef.current && noteRepeatRef.current) {
-          noteRepeatRef.current.startRepeat(pad, velocity);
-          heldPadsRef.current.add(padId);
-        }
-      }
-    }
-
-    // Clear any existing velocity timer for this pad before setting a new one
     const existingTimer = velocityTimersRef.current.get(padId);
     if (existingTimer) clearTimeout(existingTimer);
     velocityTimersRef.current.set(padId, setTimeout(() => {
       setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
       velocityTimersRef.current.delete(padId);
     }, 200));
-  }, [currentProgram, bpm]);
+  }, [hookTriggerPad]);
 
   const handlePadRelease = useCallback((padId: number) => {
-    // Dub-action releasers live on their own lifecycle; release even if the
-    // pad wasn't flagged as held (throws never register held, but siren /
-    // filter-drop / mute-dub do).
-    const release = dubReleasersRef.current.get(padId);
-    if (release) {
-      release();
-      dubReleasersRef.current.delete(padId);
-    }
-
-    if (!heldPadsRef.current.has(padId)) return;
-    heldPadsRef.current.delete(padId);
-    noteRepeatRef.current?.stopRepeat(padId);
-
-    if (currentProgram && engineRef.current) {
-      const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad && pad.playMode === 'sustain') {
-        engineRef.current.stopPad(padId, pad.release / 1000);
-      }
-    }
-  }, [currentProgram]);
+    hookReleasePad(padId);
+  }, [hookReleasePad]);
 
   // ── Bank pads ──
   const bankPads = useMemo(() => {
@@ -283,6 +164,12 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
 
   // ── Program list for selector ──
   const programList = useMemo(() => Array.from(programs.values()), [programs]);
+
+  // Cleanup velocity timers on unmount
+  useEffect(() => () => {
+    for (const timer of velocityTimersRef.current.values()) clearTimeout(timer);
+    velocityTimersRef.current.clear();
+  }, []);
 
   if (!currentProgram) return null;
 
