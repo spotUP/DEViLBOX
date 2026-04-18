@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<AutoDJStatus, string> = {
   transitioning: 'bg-cyan-500 animate-pulse',
 };
 
-const TRANSITION_BAR_OPTIONS = [4, 8, 16, 32] as const;
+const TRANSITION_BAR_OPTIONS = [2, 4, 8, 16, 32] as const;
 
 interface DJAutoDJPanelProps {
   onClose?: () => void;
