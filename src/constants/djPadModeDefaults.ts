@@ -100,7 +100,8 @@ export const DEFAULT_DJFX_PADS: DjFxPadMapping[] = [
 // ─── Default One-Shot Pads (16) ──────────────────────────────────────────────
 
 export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
-  // Row 1: Horns (4) — instant recognition, DJ staples
+  // ── Bank A (pads 1-8): the hype layer — horns + sirens on hold ────────────
+  // Row 1: Horns (4) — instant recognition, reggae/dub sound-system staples
   osPad('Air Horn',      'Horns',       DJ_ONESHOT,     0),   // DJ_AIR_HORN
   osPad('Reggae Horn',   'Horns',       DJ_ONESHOT,     1),   // REGGAETON_HORN
   osPad('Dub Horn',      'Horns',       DJ_ONESHOT,     5),   // DUB_HORN
@@ -110,16 +111,23 @@ export const DEFAULT_ONESHOT_PADS: OneShotPadMapping[] = [
   osPad('Rave Siren',    'Sirens',      DJ_DISTORTION,  22),  // RAVE_SIREN
   osPad('Wobble',        'Sirens',      DJ_DISTORTION,  25),  // WOBBLE_SIREN
   osPad('Nuclear',       'Sirens',      DJ_DISTORTION,  24),  // NUCLEAR_ALARM
-  // Row 3: Impacts & FX (4) — punctuation and transitions
-  osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),  // SUB_DROP
-  osPad('Boom',          'Impacts',     DJ_MODULATION,  12),  // BOOM
-  osPad('Earthquake',    'Impacts',     DJ_MODULATION,  14),  // EARTHQUAKE
-  osPad('Dub Echo',      'Transitions', DJ_TAPE,        30),  // ECHO_WASHOUT (Dub Echo)
-  // Row 4: Lasers & Noise (4) — sci-fi and texture
-  osPad('DJ Laser',      'Lasers',      DJ_SCRATCH,     17),  // DJ_LASER
-  osPad('Glitch Zap',    'Lasers',      DJ_SCRATCH,     18),  // GLITCH_ZAP
-  osPad('Pew Pew',       'Lasers',      DJ_SCRATCH,     19),  // PEW_PEW
-  osPad('Acid Sweep',    'Transitions', DJ_FILTER,      31),  // REWIND (Acid Sweep)
+
+  // ── Bank B (pads 9-16): build → drop → transition — the "moment" layer ──
+  // Old Bank B had 3× lasers-in-a-row, a mislabeled REWIND ("Acid Sweep"),
+  // and no risers or classic rewinds. Rebuilt for a reggae/dub DJ set:
+  // reggae stabs + proper buildups on row 3, then classic sound-system
+  // moves on row 4 (rewind/tape stop/splash) that every dancehall DJ uses.
+
+  // Row 3: Stabs & Risers (4) — chord stab, brass stab, buildup, euphoria
+  osPad('Chord Stab',    'Horns',       DJ_ONESHOT,     3),   // CHORD_STAB
+  osPad('Brass Stab',    'Horns',       DJ_ONESHOT,     4),   // BRASS_STAB
+  osPad('Noise Riser',   'Risers',      DJ_FILTER,      6),   // WHITE_NOISE_RISER
+  osPad('Euphoria',      'Risers',      DJ_FILTER,      10),  // EUPHORIA_RISER
+  // Row 4: Classic sound-system moves + big drop
+  osPad('Rewind',        'Transitions', DJ_TAPE,        31),  // REWIND — the reggae classic
+  osPad('Tape Stop',     'Transitions', DJ_TAPE,        32),  // TAPE_STOP
+  osPad('Sub Drop',      'Impacts',     DJ_MODULATION,  11),  // SUB_DROP — one iconic drop, not three of them
+  osPad('Splash',        'Transitions', DJ_TAPE,        33),  // SPLASH
 ];
 
 // ─── Default Scratch Pads (16) ───────────────────────────────────────────────
