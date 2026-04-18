@@ -31,6 +31,40 @@ export interface PreRenderedTrack {
 }
 
 /**
+ * Module-level registry of fileNames currently being pre-rendered. Auto DJ
+ * pre-renders and precache passes don't load to a deck (they render in the
+ * background and cache the WAV), so `deck.analysisState === 'rendering'`
+ * never fires for them. This Set lets the playlist row subscribe directly
+ * to "is this fileName being rendered right now?" regardless of deck state.
+ *
+ * Small subscribe/notify pattern — no external store needed.
+ */
+const renderingFileNames = new Set<string>();
+const renderingListeners = new Set<() => void>();
+function notifyRenderingChange(): void {
+  for (const l of renderingListeners) {
+    try { l(); } catch { /* ignore listener errors */ }
+  }
+}
+function markRenderingStart(fileName: string): void {
+  renderingFileNames.add(fileName);
+  notifyRenderingChange();
+}
+function markRenderingEnd(fileName: string): void {
+  renderingFileNames.delete(fileName);
+  notifyRenderingChange();
+}
+/** Subscribe to rendering-set changes. Returns an unsubscribe fn. */
+export function subscribeRendering(listener: () => void): () => void {
+  renderingListeners.add(listener);
+  return () => { renderingListeners.delete(listener); };
+}
+/** Snapshot check — true if the fileName is in the rendering set right now. */
+export function isRenderingFileName(fileName: string): boolean {
+  return renderingFileNames.has(fileName);
+}
+
+/**
  * Pre-render a track in the background WITHOUT loading to a deck.
  * This isolates UADE crashes from the audio playback thread.
  * 
@@ -46,6 +80,7 @@ export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedT
     setTimeout(() => reject(new Error('Track pre-render timeout')), PRERENDER_TIMEOUT_MS);
   });
 
+  markRenderingStart(track.fileName);
   try {
     const result = await Promise.race([
       preRenderTrackInternal(track),
@@ -69,7 +104,7 @@ export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedT
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`[DJTrackLoader] Pre-render failed for ${track.fileName}:`, reason);
-    
+
     // Mark track as bad in the playlist
     const { useDJPlaylistStore } = await import('@/stores/useDJPlaylistStore');
     const playlistId = useDJPlaylistStore.getState().activePlaylistId;
@@ -80,8 +115,10 @@ export async function preRenderTrack(track: PlaylistTrack): Promise<PreRenderedT
         useDJPlaylistStore.getState().markTrackBad(playlistId, index, reason);
       }
     }
-    
+
     return null;
+  } finally {
+    markRenderingEnd(track.fileName);
   }
 }
 
