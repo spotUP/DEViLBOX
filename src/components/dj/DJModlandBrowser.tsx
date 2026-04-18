@@ -87,6 +87,12 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [, setLoadedDecks] = useState<Set<string>>(new Set());
   const [ratings, setRatings] = useState<RatingMap>({});
+  // Row hover is tracked in React state instead of via Tailwind's
+  // `group-hover:*` CSS because StarRating re-renders rapidly on per-star
+  // mouse-enter — Chrome sometimes drops the ancestor `:hover` state for
+  // a frame during class-change reconciliation, causing the row's action
+  // buttons to flicker in and out while the cursor is still over the row.
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const isLoggedIn = useAuthStore(s => !!s.token);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -568,7 +574,9 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                 data-result-item
                 onClick={() => setSelectedIndex(idx)}
                 onDoubleClick={() => loadToDeck(file, pickFreeDeck())}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors group cursor-pointer ${
+                onPointerEnter={() => setHoveredIdx(idx)}
+                onPointerLeave={() => setHoveredIdx((prev) => (prev === idx ? null : prev))}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors cursor-pointer ${
                   idx === selectedIndex
                     ? 'bg-green-900/20 border-green-700/50'
                     : 'bg-dark-bg border-dark-borderLight hover:border-dark-border'
@@ -599,27 +607,30 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                   <>
                     <button
                       onClick={(e) => { e.stopPropagation(); addToPlaylist(file); }}
-                      className="p-1 text-text-muted hover:text-amber-400 transition-colors
-                                 opacity-0 group-hover:opacity-100"
+                      className={`p-1 text-text-muted hover:text-amber-400 transition-opacity ${
+                        hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                      }`}
                       title="Add to active playlist"
                     >
                       <ListPlus size={12} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); loadToDeck(file, 'A'); }}
-                      className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                      className={`px-2 py-1 text-[10px] font-mono font-bold rounded
                                  bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                 hover:bg-blue-800/40 hover:text-blue-300 transition-colors
-                                 opacity-0 group-hover:opacity-100"
+                                 hover:bg-blue-800/40 hover:text-blue-300 transition-opacity ${
+                        hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                      }`}
                     >
                       1
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); loadToDeck(file, 'B'); }}
-                      className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                      className={`px-2 py-1 text-[10px] font-mono font-bold rounded
                                  bg-red-900/30 text-red-400 border border-red-800/50
-                                 hover:bg-red-800/40 hover:text-red-300 transition-colors
-                                 opacity-0 group-hover:opacity-100"
+                                 hover:bg-red-800/40 hover:text-red-300 transition-opacity ${
+                        hoveredIdx === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                      }`}
                     >
                       2
                     </button>
@@ -631,8 +642,11 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                       }}
                       className={`px-2 py-1 text-[10px] font-mono font-bold rounded
                                  bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
-                                 hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
-                                 opacity-0 group-hover:opacity-100 ${!thirdDeckActive ? 'opacity-0 group-hover:opacity-50' : ''}`}
+                                 hover:bg-emerald-800/40 hover:text-emerald-300 transition-opacity ${
+                        hoveredIdx === idx
+                          ? (thirdDeckActive ? 'opacity-100' : 'opacity-50')
+                          : 'opacity-0 pointer-events-none'
+                      }`}
                     >
                       3
                     </button>
