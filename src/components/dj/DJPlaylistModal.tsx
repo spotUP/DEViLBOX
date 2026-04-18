@@ -2533,7 +2533,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="fullscreen" closeOnEscape closeOnBackdropClick={false}>
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full font-mono">
         {/* Header */}
         <ModalHeader
           title="Playlist Manager"
