@@ -167,6 +167,49 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 
 const TRACK_ROW_HEIGHT = 44;
 
+// ── Shared inline rename input ──────────────────────────────────────────────
+
+interface RenameInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  inputClassName: string;
+  buttonSize?: number;
+}
+
+const RenameInput: React.FC<RenameInputProps> = ({ value, onChange, onCommit, onCancel, inputClassName, buttonSize = 14 }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, []);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.stopPropagation(); onCommit(); }
+          if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
+        }}
+        className={inputClassName}
+      />
+      <button onMouseDown={(e) => e.preventDefault()} onClick={onCommit} className="p-1 text-accent-success hover:text-accent-success/80 shrink-0" title="Save (Enter)">
+        <Check size={buttonSize} />
+      </button>
+      <button onMouseDown={(e) => e.preventDefault()} onClick={onCancel} className="p-1 text-text-muted hover:text-text-primary shrink-0" title="Cancel (Esc)">
+        <X size={buttonSize} />
+      </button>
+    </>
+  );
+};
+RenameInput.displayName = 'RenameInput';
+
 // ── Playing-deck lookup + inline scrubber ────────────────────────────────────
 
 interface PlayingDeckInfo {
@@ -531,23 +574,14 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
   if (isEditing && !isActive) {
     return (
       <div className="flex items-center gap-1 px-2 py-1.5">
-        <input
-          ref={(el) => {
-            if (el && document.activeElement !== el) {
-              el.focus();
-              el.select();
-            }
-          }}
+        <RenameInput
           value={editName}
-          onChange={(e) => onEditName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onFinishEdit();
-            if (e.key === 'Escape') onCancelEdit();
-          }}
-          className="flex-1 px-2 py-0.5 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary min-w-0"
+          onChange={onEditName}
+          onCommit={onFinishEdit}
+          onCancel={onCancelEdit}
+          inputClassName="flex-1 px-2 py-0.5 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary min-w-0"
+          buttonSize={12}
         />
-        <button onMouseDown={(e) => e.preventDefault()} onClick={onFinishEdit} className="p-0.5 text-accent-success hover:text-accent-success/80"><Check size={12} /></button>
-        <button onMouseDown={(e) => e.preventDefault()} onClick={onCancelEdit} className="p-0.5 text-text-muted hover:text-text-primary"><X size={12} /></button>
       </div>
     );
   }
@@ -2189,25 +2223,13 @@ export const DJPlaylistModal: React.FC<DJPlaylistModalProps> = ({ isOpen, onClos
                   {/* Playlist title + actions menu */}
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     {editingPlaylistId && editingPlaylistId === activePlaylistId ? (
-                      <>
-                        <input
-                          ref={(el) => {
-                            if (el && document.activeElement !== el) {
-                              el.focus();
-                              el.select();
-                            }
-                          }}
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRename(editingPlaylistId);
-                            if (e.key === 'Escape') setEditingPlaylistId(null);
-                          }}
-                          className="flex-1 min-w-0 px-2 py-0.5 text-[13px] font-mono font-bold bg-dark-bgTertiary border border-accent-primary/60 rounded text-text-primary"
-                        />
-                        <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleRename(editingPlaylistId)} className="p-1 text-accent-success hover:text-accent-success/80 shrink-0" title="Save (Enter)"><Check size={14} /></button>
-                        <button onMouseDown={(e) => e.preventDefault()} onClick={() => setEditingPlaylistId(null)} className="p-1 text-text-muted hover:text-text-primary shrink-0" title="Cancel (Esc)"><X size={14} /></button>
-                      </>
+                      <RenameInput
+                        value={editName}
+                        onChange={setEditName}
+                        onCommit={() => handleRename(editingPlaylistId)}
+                        onCancel={() => setEditingPlaylistId(null)}
+                        inputClassName="flex-1 min-w-0 px-2 py-0.5 text-[13px] font-mono font-bold bg-dark-bgTertiary border border-accent-primary/60 rounded text-text-primary"
+                      />
                     ) : (
                       <>
                         <span
