@@ -228,15 +228,23 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // Subtle settings produced "I hear mostly the music" — the dub tail was
   // ~8 dB below the dry. These values put the tail within 3 dB of dry,
   // which is where King Tubby / Scientist records actually sit.
-  returnGain: 1.0,       // full return — relies on echoWet/springWet for mix balance
+  // Gig-fix (2026-04-18): dropped returnGain 1.0 → 0.55. At 1.0 the dub
+  // tail hit the master bus at parity with deck output — sirens + echo
+  // throws were ~+6 dB hotter than the music. 0.55 sits it ~-5 dB under
+  // the dry mix, which is where real dub records actually mix (the tail
+  // supports, never dominates). User can push it back up via the Dub
+  // Bus panel return knob if they want.
+  returnGain: 0.55,
   hpfCutoff: 180,
   springWet: 0.55,       // was 0.4 — more audible spring tank character
   echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
   echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
   echoRateMs: 300,
   sidechainAmount: 0.4,
-  deckTapAmount: 1.0,    // was 0.9 — full deck signal into the tap; send gain is
-                         // already controlled by action releaseSec + pad assignment
+  deckTapAmount: 0.75,   // gig-fix: was 1.0 — tap is ALREADY hitting a
+                         // bus with echo+spring+feedback; full deck into
+                         // it stacks on top of the dry mix and overloads
+                         // the return. 0.75 = -2.5 dB lands cleanly.
   throwBeats: 0.5,
   sirenFeedback: 0.85,
   filterDropHz: 220,

@@ -207,7 +207,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
         springWet: 0.45,
         echoWet: 0.30,
         echoIntensity: 0.35,
-        returnGain: 0.85,
+        returnGain: 0.5,       // gig-fix 2026-04-18: was 0.85 — one-shot presets should stay well under the dry mix
       });
     },
   },
@@ -291,7 +291,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     onApply: (store) => {
       store.setDubBus({
         enabled: true,
-        returnGain: 1.0,
+        returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
         hpfCutoff: 200,
         springWet: 0.55,
         echoIntensity: 0.62,
@@ -352,7 +352,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-07', 'Scientist Dub'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 1.0,
+      returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
       hpfCutoff: 240,          // roll off more bass → tail sits above the mix
       springWet: 0.45,
       echoIntensity: 0.78,     // long trails, many repeats
@@ -374,7 +374,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-08', 'King Tubby Spring'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 1.0,
+      returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
       hpfCutoff: 160,
       springWet: 0.85,         // spring is the character
       echoIntensity: 0.40,
@@ -396,7 +396,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-09', 'Steppers Rub-a-Dub'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 0.95,
+      returnGain: 0.58,      // gig-fix 2026-04-18: was 0.95 — preset was roughly +4 dB hot
       hpfCutoff: 220,
       springWet: 0.30,
       echoIntensity: 0.58,
@@ -418,7 +418,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-10', 'Black Ark'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 1.0,
+      returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
       hpfCutoff: 120,           // keep low end — Black Ark is bassy
       springWet: 0.60,
       echoIntensity: 0.82,      // runaway tails
@@ -440,7 +440,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-11', 'UK Sound System'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 1.0,
+      returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
       hpfCutoff: 80,            // almost no HPF → sub weight stays
       springWet: 0.50,
       echoIntensity: 0.70,
@@ -462,7 +462,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-12', 'Digital Dub'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 0.95,
+      returnGain: 0.58,      // gig-fix 2026-04-18: was 0.95 — preset was roughly +4 dB hot
       hpfCutoff: 300,           // brighter bus — cuts through
       springWet: 0.40,
       echoIntensity: 0.50,
@@ -484,7 +484,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-13', 'Ambient Dub'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 1.0,
+      returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
       hpfCutoff: 200,
       springWet: 0.80,          // long spring tail
       echoIntensity: 0.65,
@@ -506,7 +506,7 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
     create: () => buildFullDubKit('D-14', 'Echo Chamber'),
     onApply: (store) => store.setDubBus({
       enabled: true,
-      returnGain: 1.0,
+      returnGain: 0.6,       // gig-fix 2026-04-18: was 1.0 — dub tail sat on top of the mix
       hpfCutoff: 180,
       springWet: 0.25,
       echoIntensity: 0.35,       // only 1-2 repeats
