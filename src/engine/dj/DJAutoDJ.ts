@@ -148,10 +148,22 @@ class DJAutoDJ {
       let loaded = false;
 
       for (let attempts = 0; attempts < playlist.tracks.length; attempts++) {
+        // Bail if the user disabled Auto DJ while we were awaiting a load.
+        // Without this check, a stale load could resolve and start playing
+        // on the deck after the user has already clicked Disable.
+        if (!useDJStore.getState().autoDJEnabled) {
+          console.log('[AutoDJ] enable() cancelled mid-load — user disabled');
+          return null;
+        }
         const track = playlist.tracks[idx];
         if (track) {
           console.log(`[AutoDJ] Trying track ${idx}: "${track.trackName}" (${track.fileName.substring(0, 60)}...)`);
           loaded = await loadPlaylistTrackToDeck(track, this.activeDeck);
+          // Re-check after the await — user may have disabled during the load
+          if (!useDJStore.getState().autoDJEnabled) {
+            console.log('[AutoDJ] enable() cancelled after load — user disabled');
+            return null;
+          }
           if (loaded) {
             const nextIdx = this.computeNextIndex(idx, playlist.tracks.length);
             useDJStore.getState().setAutoDJTrackIndices(idx, nextIdx);
@@ -402,23 +414,32 @@ class DJAutoDJ {
         }
 
         const crossfader = store.crossfaderPosition;
+        const crossfaderTarget = this.idleDeck === 'B' ? 1 : 0;
         const crossfaderDone = this.idleDeck === 'B' ? crossfader >= 0.98
           : this.idleDeck === 'A' ? crossfader <= 0.02 : false;
 
         // ── Crossfader stuck guard ──
-        // If user dragged crossfader away from target, force it back
-        if (Math.abs(crossfader - this.lastCrossfaderValue) < 0.01) {
-          this.crossfaderStuckCount++;
-        } else {
+        // Measure distance-to-target per poll. If distance isn't decreasing,
+        // the fade is stalled (user dragged it away, or the sweep died).
+        // Old logic compared raw movement vs 0.01 which falsely flagged slow
+        // legitimate fades (32-bar at 125 BPM moves only ~0.008/poll) as
+        // stuck and force-snapped the crossfader mid-fade.
+        const prevDistance = this.lastCrossfaderValue < 0
+          ? Infinity
+          : Math.abs(this.lastCrossfaderValue - crossfaderTarget);
+        const currDistance = Math.abs(crossfader - crossfaderTarget);
+        // Progressing = distance to target decreased by ANY amount
+        if (currDistance < prevDistance) {
           this.crossfaderStuckCount = 0;
+        } else {
+          this.crossfaderStuckCount++;
         }
         this.lastCrossfaderValue = crossfader;
 
         if (this.crossfaderStuckCount >= DJAutoDJ.CROSSFADER_STUCK_POLLS && !crossfaderDone) {
-          const targetCf = this.idleDeck === 'B' ? 1 : 0;
-          console.warn(`[AutoDJ] Crossfader stuck at ${crossfader.toFixed(2)} for ${this.crossfaderStuckCount} polls — forcing to ${targetCf}`);
-          try { getDJEngine().setCrossfader(targetCf); } catch { /* */ }
-          store.setCrossfader(targetCf);
+          console.warn(`[AutoDJ] Crossfader stuck at ${crossfader.toFixed(2)} for ${this.crossfaderStuckCount} polls — forcing to ${crossfaderTarget}`);
+          try { getDJEngine().setCrossfader(crossfaderTarget); } catch { /* */ }
+          store.setCrossfader(crossfaderTarget);
           this.crossfaderStuckCount = 0;
         }
 
