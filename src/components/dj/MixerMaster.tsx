@@ -88,12 +88,12 @@ export const MixerMaster: React.FC = () => {
       <Knob
         value={masterVolume}
         min={0}
-        max={1.5}
+        max={2.0}
         onChange={handleVolumeChange}
         label="MST"
         size="sm"
         color="#ffffff"
-        defaultValue={1}
+        defaultValue={2.0}
         formatValue={formatMaster}
         hideValue
         title="Master volume — controls overall output level"
