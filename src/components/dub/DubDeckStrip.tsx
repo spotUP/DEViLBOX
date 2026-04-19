@@ -17,7 +17,7 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { fire, setDubBusForRouter, subscribeDubRouter } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
-import { getDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
+import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
 import { DubLaneTimeline } from './DubLaneTimeline';
 
 export const DubDeckStrip: React.FC = () => {
@@ -47,10 +47,15 @@ export const DubDeckStrip: React.FC = () => {
   // so fire() has somewhere to send events. Cleared on unmount so out-of-
   // tracker-view fire() calls fail loud (warn + no-op) instead of silently
   // routing to a bus that isn't on screen.
+  //
+  // ensureDrumPadEngine() — the DubBus lives inside DrumPadEngine which is
+  // lazily created on first drumpad interaction. Tracker-only sessions never
+  // touched the drumpad → engine was null → no bus → silent no-op on fire().
+  // Ensuring it here makes the bus available the instant the tracker view
+  // mounts.
   useEffect(() => {
-    const engine = getDrumPadEngine();
-    const bus = engine?.getDubBus() ?? null;
-    setDubBusForRouter(bus);
+    const engine = ensureDrumPadEngine();
+    setDubBusForRouter(engine.getDubBus());
     return () => setDubBusForRouter(null);
   }, []);
 
