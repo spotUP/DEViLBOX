@@ -2073,11 +2073,13 @@ export class ToneEngine {
               urls[baseNote] = sampleUrl;
             }
 
+            const sampleBad = new Set<number>();
             instrument = new Tone.Sampler({
               urls,
               volume: getNormalizedVolume('Sampler', config.volume),
               onerror: (err: Error) => {
-                console.error(`[ToneEngine] Sampler ${instrumentId} failed to load sample:`, err);
+                sampleBad.add(instrumentId);
+                console.warn(`[ToneEngine] Sampler ${instrumentId} "${config.name ?? '?'}" has unusable audio data — skipping (${(err as Error)?.message ?? err})`);
               },
             });
             this.instrumentSynthTypes.set(key, 'Sampler');
@@ -2093,7 +2095,10 @@ export class ToneEngine {
                   const audioBuffer = await this.decodeAudioData(arrayBuffer);
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
                 } catch (err) {
-                  console.error(`[ToneEngine] Sampler ${instrumentId} URL decode failed:`, err);
+                  // If Tone.Sampler already reported this one as bad, don't double-log.
+                  if (!sampleBad.has(instrumentId)) {
+                    console.warn(`[ToneEngine] Sampler ${instrumentId} "${config.name ?? '?'}" URL decode failed — skipping (${(err as Error)?.message ?? err})`);
+                  }
                 }
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
