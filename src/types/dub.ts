@@ -142,7 +142,7 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
 export type QuantizeMode = 'off' | '1/16' | '1/8' | 'offbeat' | 'bar';
 
 /** A single recorded dub move. Lives on the pattern's dubLane.events[].
- *  Stored sorted by beat so DubLanePlayer can advance a cursor in O(1)/tick. */
+ *  Stored sorted by `row` so DubLanePlayer can advance a cursor in O(1)/tick. */
 export interface DubEvent {
   /** Stable uuid — survives edits so the lane editor can reference events. */
   id: string;
@@ -150,10 +150,10 @@ export interface DubEvent {
   moveId: string;
   /** Target tracker channel (0-based). Undefined for global moves (siren, master drop, …). */
   channelId?: number;
-  /** Quantized beat within pattern (float). */
-  beat: number;
+  /** Quantized row within pattern (float — fractional for sub-row placement). */
+  row: number;
   /** For hold-style moves: filled on release. Undefined = trigger/one-shot. */
-  durationBeats?: number;
+  durationRows?: number;
   /** Move-specific params — e.g. echoThrow: { throwBeats, feedbackBoost }. */
   params: Record<string, number>;
   /** Kept so the lane editor can re-quantize later without losing user intent. */
