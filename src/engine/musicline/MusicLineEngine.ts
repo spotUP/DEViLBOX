@@ -7,6 +7,12 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
 export interface MusicLineSongInfo {
   title: string;
@@ -33,19 +39,10 @@ export interface MusicLineArpEntry {
 
 type PositionCallback = (update: MusicLinePositionUpdate) => void;
 
-export class MusicLineEngine {
+export class MusicLineEngine extends WASMSingletonBase {
   private static instance: MusicLineEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _rejectInit: ((err: Error) => void) | null = null;
   private _loadPromise: Promise<MusicLineSongInfo> | null = null;
   private _resolveLoad: ((info: MusicLineSongInfo) => void) | null = null;
@@ -53,18 +50,23 @@ export class MusicLineEngine {
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _endedCallbacks: Set<() => void> = new Set();
   private _playing = false;
-  private _disposed = false;
+
+  private _patternCallbacks: Map<string, (data: any) => void> = new Map();
+  private _requestId = 0;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
+    super();
+    // Replace the base init promise with one that carries a reject handle,
+    // so upstream errors surface on ready().
     this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
       this._rejectInit = reject;
     });
-
-    this.initialize();
+    this.initialize(MusicLineEngine.cache).catch((err) => {
+      this._rejectInit?.(err instanceof Error ? err : new Error(String(err)));
+      this._rejectInit = null;
+      this._resolveInit = null;
+    });
   }
 
   static getInstance(): MusicLineEngine {
@@ -85,67 +87,16 @@ export class MusicLineEngine {
     return !!MusicLineEngine.instance && !MusicLineEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await MusicLineEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[MusicLineEngine] Initialization failed:', err);
-      if (this._rejectInit) {
-        this._rejectInit(err instanceof Error ? err : new Error(String(err)));
-        this._rejectInit = null;
-        this._resolveInit = null;
-      }
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'musicline',
+      workletFile: 'MusicLine.worklet.js',
+      wasmFile: 'MusicLine.wasm',
+      jsFile: 'MusicLine.js',
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      // Register worklet module with this context (may already be registered)
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}musicline/MusicLine.worklet.js`);
-      } catch (e) {
-        console.warn('[MusicLineEngine] addModule failed (may already be registered):', e);
-      }
-
-      // Fetch WASM binary and JS code (shared across contexts)
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}musicline/MusicLine.wasm`),
-          fetch(`${baseUrl}musicline/MusicLine.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten ESM output for worklet Function() execution
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'musicline-processor', {
@@ -216,16 +167,11 @@ export class MusicLineEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: MusicLineEngine.wasmBinary,
-      jsCode: MusicLineEngine.jsCode,
+      wasmBinary: MusicLineEngine.cache.wasmBinary,
+      jsCode: MusicLineEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  /** Wait for WASM initialization to complete */
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   /** Load a .ml song from binary data */
@@ -302,9 +248,6 @@ export class MusicLineEngine {
 
   /**
    * Wire this engine's position-update stream into a PlaybackCoordinator.
-   * Throttles to row-change events and dispatches via
-   * coordinator.dispatchEnginePosition. Returns an unsubscribe function the
-   * caller stores so it can detach on stop().
    */
   subscribeToCoordinator(coordinator: import('@engine/PlaybackCoordinator').PlaybackCoordinator): () => void {
     let lastRow = -1;
@@ -338,9 +281,6 @@ export class MusicLineEngine {
   // --------------------------------------------------------------------------
   // Pattern data access (read/write via WASM bridge)
   // --------------------------------------------------------------------------
-
-  private _patternCallbacks: Map<string, (data: any) => void> = new Map();
-  private _requestId = 0;
 
   /** Get pattern data for a specific part index. Returns array of 128 rows. */
   getPatternData(partIdx: number): Promise<Array<{ note: number; inst: number; fx: number[] }>> {
@@ -483,10 +423,11 @@ export class MusicLineEngine {
     });
   }
 
-  dispose(): void {
+  override dispose(): void {
+    // Original used stop() + disconnect() (no 'dispose' message). Preserve.
     this._disposed = true;
     this.stop();
-    this.workletNode?.disconnect();
+    try { this.workletNode?.disconnect(); } catch { /* */ }
     this.workletNode = null;
     this._positionCallbacks.clear();
     this._endedCallbacks.clear();
