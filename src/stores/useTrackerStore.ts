@@ -271,6 +271,10 @@ interface TrackerStore {
   shrinkPattern: (index: number) => void;
   reorderPatterns: (oldIndex: number, newIndex: number) => void;
   updatePatternName: (index: number, name: string) => void;
+  /** Replace the dub lane on pattern `index`. Used by DubRecorder during live
+   *  capture and by the lane editor for offline edits. Lane is optional — pass
+   *  `null` or `undefined` to clear it. */
+  setPatternDubLane: (index: number, lane: import('../types/dub').DubLane | null | undefined) => void;
   // updateTimeSignature: (index: number, signature: Partial<TimeSignature>) => void;
   // updateAllTimeSignatures: (signature: Partial<TimeSignature>) => void;
 
@@ -1456,6 +1460,14 @@ export const useTrackerStore = create<TrackerStore>()(
         if (index >= 0 && index < state.patterns.length && name.trim()) {
           state.patterns[index].name = name.trim();
         }
+      }),
+
+    setPatternDubLane: (index, lane) =>
+      set((state) => {
+        if (index < 0 || index >= state.patterns.length) return;
+        // Undefined/null = clear. Otherwise replace (Immer handles immutable update).
+        if (lane == null) delete state.patterns[index].dubLane;
+        else state.patterns[index].dubLane = lane;
       }),
 
     // Channel management
