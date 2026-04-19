@@ -58,6 +58,133 @@ interface ChannelFilterRoute {
 type ParameterRoute = ConfigRoute | VSTBridgeRoute | EffectRoute | ChannelFilterRoute;
 
 // ============================================================================
+// Dub Studio routing
+// ============================================================================
+
+/**
+ * Move-kind metadata for every dub move. Triggers fire once on a value
+ * crossing 0.5 upward; holds fire on upward crossing and dispose on
+ * downward crossing (matching momentary-pad CC semantics: 127 = press,
+ * 0 = release).
+ *
+ * Per-channel moves are addressed via `dub.<moveId>.ch<N>` — the `.chN`
+ * suffix (0-indexed) gets parsed into a channelId. Global moves use the
+ * plain `dub.<moveId>` form.
+ */
+const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
+  echoThrow:         'trigger',
+  dubStab:           'trigger',
+  channelThrow:      'trigger',
+  channelMute:       'hold',
+  springSlam:        'trigger',
+  filterDrop:        'hold',
+  dubSiren:          'hold',
+  tapeWobble:        'hold',
+  snareCrack:        'trigger',
+  delayTimeThrow:    'trigger',
+  backwardReverb:    'trigger',
+  masterDrop:        'hold',
+  tapeStop:          'trigger',
+  transportTapeStop: 'trigger',
+  toast:             'hold',
+};
+
+/**
+ * Continuous bus parameters — each maps to a field on useDrumPadStore.dubBus.
+ * Value transforms normalize 0..1 → the expected setting range.
+ */
+const DUB_BUS_PARAMS: Record<string, { field: string; transform?: (n: number) => number }> = {
+  'dub.echoIntensity':   { field: 'echoIntensity' },
+  'dub.echoWet':         { field: 'echoWet' },
+  'dub.echoRateMs':      { field: 'echoRateMs',   transform: (n) => 40 + n * 960 },     // 40..1000 ms
+  'dub.springWet':       { field: 'springWet' },
+  'dub.returnGain':      { field: 'returnGain' },
+  'dub.hpfCutoff':       { field: 'hpfCutoff',    transform: (n) => 20 + n * 980 },     // 20..1000 Hz
+  'dub.sidechainAmount': { field: 'sidechainAmount' },
+};
+
+// Hold-disposer map. Key = full param name (including optional `.chN`).
+const dubHoldDisposers = new Map<string, { dispose(): void }>();
+// Last-seen CC value per param — crossings drive press/release semantics.
+const dubLastValues = new Map<string, number>();
+
+function parseDubMoveParam(param: string): { moveId: string; channelId?: number } | null {
+  if (!param.startsWith('dub.')) return null;
+  const rest = param.slice(4);
+  const parts = rest.split('.');
+  const moveId = parts[0];
+  if (!(moveId in DUB_MOVE_KINDS)) return null;
+  if (parts.length === 1) return { moveId };
+  const chMatch = parts[1].match(/^ch(\d+)$/);
+  if (chMatch) return { moveId, channelId: parseInt(chMatch[1], 10) };
+  return { moveId };
+}
+
+function routeDubParameter(param: string, value: number): void {
+  // 1. Continuous bus settings
+  const busDef = DUB_BUS_PARAMS[param];
+  if (busDef) {
+    const v = busDef.transform ? busDef.transform(value) : value;
+    void import('../../stores/useDrumPadStore').then(({ useDrumPadStore }) => {
+      useDrumPadStore.getState().setDubBus({ [busDef.field]: v });
+    });
+    return;
+  }
+
+  // 2. Bus enable/disable toggle
+  if (param === 'dub.enabled') {
+    const on = value > 0.5;
+    void import('../../stores/useDrumPadStore').then(({ useDrumPadStore }) => {
+      useDrumPadStore.getState().setDubBus({ enabled: on });
+    });
+    return;
+  }
+
+  // 3. REC arm toggle
+  if (param === 'dub.armed') {
+    const on = value > 0.5;
+    void import('../../stores/useDubStore').then(({ useDubStore }) => {
+      useDubStore.getState().setArmed(on);
+    });
+    return;
+  }
+
+  // 4. Moves — trigger on upward cross, release holds on downward cross
+  const parsed = parseDubMoveParam(param);
+  if (!parsed) return;
+  const { moveId, channelId } = parsed;
+  const kind = DUB_MOVE_KINDS[moveId];
+
+  const prev = dubLastValues.get(param) ?? 0;
+  dubLastValues.set(param, value);
+  const wasPressed = prev > 0.5;
+  const isPressed = value > 0.5;
+
+  if (kind === 'trigger') {
+    if (!wasPressed && isPressed) {
+      void import('../../engine/dub/DubRouter').then(({ fire }) => {
+        fire(moveId, channelId, {}, 'live');
+      });
+    }
+    return;
+  }
+
+  // hold semantics
+  if (!wasPressed && isPressed) {
+    void import('../../engine/dub/DubRouter').then(({ fire }) => {
+      const disp = fire(moveId, channelId, {}, 'live');
+      if (disp) dubHoldDisposers.set(param, disp);
+    });
+  } else if (wasPressed && !isPressed) {
+    const disp = dubHoldDisposers.get(param);
+    if (disp) {
+      dubHoldDisposers.delete(param);
+      try { disp.dispose(); } catch { /* ok */ }
+    }
+  }
+}
+
+// ============================================================================
 // Route Tables
 // Encode the same knowledge as the old updateBankParameter switch,
 // but in a data-driven format keyed by MappableParameter.
@@ -501,6 +628,14 @@ export function routeParameterToEngine(
   // Master FX parameters are routed separately (not per-instrument)
   if (param.startsWith('masterFx.')) {
     routeMasterFXParameter(param, normalizedValue);
+    return;
+  }
+
+  // Dub Studio parameters — triggers/holds for moves, plus continuous bus
+  // settings. Handled before the PARAMETER_ROUTES lookup so `dub.*` never
+  // falls into the synth-fallback path.
+  if (param.startsWith('dub.')) {
+    routeDubParameter(param, normalizedValue);
     return;
   }
 
