@@ -24,6 +24,9 @@ import { tapeWobble } from './moves/tapeWobble';
 import { masterDrop } from './moves/masterDrop';
 import { snareCrack } from './moves/snareCrack';
 import { tapeStop } from './moves/tapeStop';
+import { backwardReverb } from './moves/backwardReverb';
+import { toast } from './moves/toast';
+import { transportTapeStop } from './moves/transportTapeStop';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -41,9 +44,9 @@ const MOVES: Record<string, DubMove> = {
   masterDrop,
   snareCrack,
   tapeStop,
-  // Future moves register here: backwardReverb (needs real-time buffer
-  // capture + reverse-playback — Phase 3), toast (needs mic-input / vocal
-  // track integration — Phase 3+).
+  backwardReverb,
+  toast,
+  transportTapeStop,
 };
 
 /**

@@ -143,6 +143,12 @@ export class DubBus {
   // setInterval handles for continuous modulation moves (tapeWobble).
   // Kept separate because clearInterval / clearTimeout aren't cross-compatible.
   private wobbleHandles: Set<ReturnType<typeof setInterval>> = new Set();
+  // Reverse-capture worklet — lazily allocated on first backwardReverb fire.
+  // Sits as a silenced tap off `input` and maintains a 2 s ring buffer so
+  // snapshots can be time-reversed and played back through the bus chain.
+  private reverseCapture: AudioWorkletNode | null = null;
+  private reverseCaptureSilencer: GainNode | null = null;
+  private reverseCaptureInit: Promise<void> | null = null;
   // When true, setSettings suppresses writes to echoIntensity and
   // springWet on the live nodes. Set by `dubPanic` while draining the echo
   // / spring buffers; cleared by the restore timer after the drain window.
@@ -1015,6 +1021,120 @@ export class DubBus {
    * time itself).
    */
   /**
+   * Lazily install the ReverseCapture worklet and wire it as a silenced tap
+   * off `input`. First call fetches the worklet module; subsequent calls
+   * resolve immediately. The tap node must have its output connected to
+   * something (else Web Audio won't pull audio through it and the ring stays
+   * empty) — we route through a silenced gain → destination so no audio
+   * leaks out.
+   */
+  private async _ensureReverseCapture(): Promise<AudioWorkletNode | null> {
+    if (this.reverseCapture) return this.reverseCapture;
+    if (this.reverseCaptureInit) {
+      await this.reverseCaptureInit;
+      return this.reverseCapture;
+    }
+    this.reverseCaptureInit = (async () => {
+      try {
+        const baseUrl = (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/';
+        const cacheBuster = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV ? `?v=${Date.now()}` : '';
+        await this.context.audioWorklet.addModule(`${baseUrl}dub/ReverseCapture.worklet.js${cacheBuster}`);
+        const node = new AudioWorkletNode(this.context, 'reverse-capture', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [2],
+        });
+        const silencer = this.context.createGain();
+        silencer.gain.value = 0;
+        this.input.connect(node);
+        node.connect(silencer);
+        silencer.connect(this.context.destination);
+        this.reverseCapture = node;
+        this.reverseCaptureSilencer = silencer;
+      } catch (e) {
+        console.warn('[DubBus] ReverseCapture init failed:', e);
+      }
+    })();
+    await this.reverseCaptureInit;
+    return this.reverseCapture;
+  }
+
+  /**
+   * Backward Reverb — classic dub move where the last N seconds of bus
+   * input are time-reversed and played back through the bus chain. Because
+   * the reversed signal hits echo + spring on its way out, the reverb
+   * "builds up" into the original attack rather than tailing out from it.
+   * Not a simple spring-wet swell — that's audibly different.
+   *
+   * Fire-and-forget: each call snapshots the ring, plays the reversed
+   * buffer exactly once, and disconnects the source when playback ends.
+   * Stacks cleanly — multiple simultaneous reverses don't collide.
+   */
+  async backwardReverb(durationSec = 0.8): Promise<void> {
+    if (!this.enabled) return;
+    const node = await this._ensureReverseCapture();
+    if (!node) return;
+
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        node.port.removeEventListener('message', handler);
+        resolve();
+      }, 1000);
+
+      const handler = (ev: MessageEvent) => {
+        const msg = ev.data;
+        if (!msg || msg.cmd !== 'snapshot') return;
+        clearTimeout(timeout);
+        node.port.removeEventListener('message', handler);
+        try {
+          // Copy into fresh ArrayBuffer-backed Float32Arrays so the TS strict
+          // Float32Array<ArrayBuffer> signature of copyToChannel matches (the
+          // message port's received arrays are Float32Array<ArrayBufferLike>).
+          const srcLeft = msg.left as Float32Array;
+          const srcRight = msg.right as Float32Array;
+          const frames = Number(msg.frames) || srcLeft.length;
+          if (!frames) { resolve(); return; }
+          const left = new Float32Array(new ArrayBuffer(frames * 4));
+          const right = new Float32Array(new ArrayBuffer(frames * 4));
+          left.set(srcLeft);
+          right.set(srcRight);
+          const buffer = this.context.createBuffer(2, frames, this.context.sampleRate);
+          buffer.copyToChannel(left, 0);
+          buffer.copyToChannel(right, 1);
+          const src = this.context.createBufferSource();
+          src.buffer = buffer;
+          // Play straight into bus input so echo + spring process the
+          // reversed signal. Ramp in/out over 5ms each side to avoid a
+          // click on the attack sample and tail sample (which were the
+          // live bus's "now" and "N seconds ago", not necessarily zero).
+          const shaper = this.context.createGain();
+          shaper.gain.value = 0;
+          src.connect(shaper);
+          shaper.connect(this.input);
+          const now = this.context.currentTime;
+          const durationPlayed = frames / this.context.sampleRate;
+          shaper.gain.setValueAtTime(0, now);
+          shaper.gain.linearRampToValueAtTime(1, now + 0.005);
+          shaper.gain.setValueAtTime(1, now + Math.max(0.01, durationPlayed - 0.005));
+          shaper.gain.linearRampToValueAtTime(0, now + durationPlayed);
+          src.start(now);
+          src.stop(now + durationPlayed + 0.01);
+          src.onended = () => {
+            try { shaper.disconnect(); } catch { /* ok */ }
+          };
+        } catch (err) {
+          console.warn('[DubBus] backwardReverb playback failed:', err);
+        }
+        resolve();
+      };
+
+      node.port.addEventListener('message', handler);
+      node.port.start?.();
+      node.port.postMessage({ cmd: 'snapshot', durationSec });
+    });
+  }
+
+  /**
    * Tape Stop — the classic reel-to-reel slowdown on the bus tail. Not a
    * transport-level speed change (which would require per-engine coordination
    * across libopenmpt / UADE / Hively / Furnace); instead, this is a
@@ -1149,6 +1269,11 @@ export class DubBus {
     // on disposed AudioParams and spam the console with errors.
     for (const h of this.wobbleHandles) clearInterval(h);
     this.wobbleHandles.clear();
+    // Tear down the reverse-capture tap + its silencer if they were allocated
+    try { this.reverseCapture?.disconnect(); } catch { /* ok */ }
+    try { this.reverseCaptureSilencer?.disconnect(); } catch { /* ok */ }
+    this.reverseCapture = null;
+    this.reverseCaptureSilencer = null;
     for (const t of this.throwTimers) clearTimeout(t);
     this.throwTimers.clear();
     clearAllPendingThrows();

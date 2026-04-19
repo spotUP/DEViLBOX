@@ -304,6 +304,26 @@ export class LibopenmptEngine {
 
   private _pendingData: ArrayBuffer | null = null;
 
+  /**
+   * Scale playback tempo without changing pitch. Factor 1.0 = normal speed;
+   * 0.5 = half speed (same pitch); 2.0 = double. Uses libopenmpt's
+   * `play.tempo_factor` ctl which adjusts tick rate at the sequencer level.
+   */
+  setTempoFactor(factor: number): void {
+    const clamped = Math.max(0.05, Math.min(4.0, factor));
+    this.workletNode?.port.postMessage({ cmd: 'setTempo', val: clamped });
+  }
+
+  /**
+   * Scale playback pitch without changing tempo. Factor 1.0 = original;
+   * 0.5 = octave down; 2.0 = octave up. Together with setTempoFactor this
+   * gives a real tape-stop (tempo and pitch drop together).
+   */
+  setPitchFactor(factor: number): void {
+    const clamped = Math.max(0.05, Math.min(4.0, factor));
+    this.workletNode?.port.postMessage({ cmd: 'setPitch', val: clamped });
+  }
+
   play(): void {
     if (!this._available || !this.workletNode) {
       console.warn('[LibopenmptEngine] play() aborted: available =', this._available, 'workletNode =', !!this.workletNode);
