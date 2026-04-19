@@ -993,6 +993,59 @@ export class DubBus {
   }
 
   /**
+   * Solo a single channel's dub tap for the window of a move. Snapshot every
+   * registered channelTap's gain, zero all except `channelId`, return a
+   * releaser that restores the snapshot. Caller schedules the release when
+   * the effect completes (triggers) or drives it on pointer release (holds).
+   *
+   * Effect: while soloed, only `channelId`'s audio feeds the bus chain
+   * (echo, spring, etc.). So a Spring Slam or Filter Drop fired "on
+   * channel 3" only splashes / sweeps channel 3's content.
+   *
+   * No-op + empty releaser when bus is disabled.
+   */
+  soloChannelTap(channelId: number, attackSec = 0.005): () => void {
+    if (!this.enabled) return () => {};
+    // Snapshot current gains so release can restore exact values (including
+    // any mid-flight rampTo on other taps).
+    const snapshot = new Map<number, number>();
+    for (const [id, tap] of this.channelTaps) {
+      snapshot.set(id, tap.gain.value);
+    }
+    const now = this.context.currentTime;
+    for (const [id, tap] of this.channelTaps) {
+      if (id === channelId) continue;
+      try {
+        tap.gain.cancelScheduledValues(now);
+        tap.gain.setValueAtTime(tap.gain.value, now);
+        tap.gain.linearRampToValueAtTime(0, now + attackSec);
+      } catch { /* ok */ }
+    }
+    // Also bump the target channel to full so the solo "opens" its tap
+    // even if the user had its send low.
+    const tgt = this.channelTaps.get(channelId);
+    if (tgt) {
+      try {
+        tgt.gain.cancelScheduledValues(now);
+        tgt.gain.setValueAtTime(tgt.gain.value, now);
+        tgt.gain.linearRampToValueAtTime(1, now + attackSec);
+      } catch { /* ok */ }
+    }
+    return () => {
+      const release = this.context.currentTime;
+      for (const [id, gain] of snapshot) {
+        const tap = this.channelTaps.get(id);
+        if (!tap) continue;
+        try {
+          tap.gain.cancelScheduledValues(release);
+          tap.gain.setValueAtTime(tap.gain.value, release);
+          tap.gain.linearRampToValueAtTime(gain, release + 0.08);
+        } catch { /* ok */ }
+      }
+    };
+  }
+
+  /**
    * Spring Slam — temporarily crank spring wet to `amount` (default 1.0),
    * then restore the user's baseline after `ms`. Designed for rhythmic
    * "splash" hits where a drum/clap gets a sudden tail of metal-tank
