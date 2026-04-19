@@ -21,6 +21,11 @@
  */
 
 import { VOCODER_PRESETS, type CarrierType as StoreCarrierType } from '@/stores/useVocoderStore';
+import {
+  createWASMAssetsCache,
+  loadWASMAssets,
+  type WASMAssetsCache,
+} from '@/engine/wasm/WASMSingletonBase';
 
 export type VocoderCarrierType = 0 | 1 | 2 | 3; // 0 saw, 1 square, 2 noise, 3 chord
 
@@ -44,10 +49,9 @@ export interface VocoderCoreOptions {
 }
 
 export class VocoderCore {
-  // Static cache — one WASM fetch + one addModule per AudioContext
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static loadedContexts = new WeakSet<BaseAudioContext>();
-  private static initPromises = new Map<BaseAudioContext, Promise<void>>();
+  // Shared WASM-only cache (no Emscripten JS glue — the worklet instantiates the
+  // WASM binary directly). One fetch + one addModule per AudioContext.
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
   private static preloadStarted = false;
 
   /**
@@ -98,7 +102,7 @@ export class VocoderCore {
    */
   async init(): Promise<void> {
     await VocoderCore.ensureLoaded(this.audioContext);
-    if (!VocoderCore.wasmBinary) {
+    if (!VocoderCore.cache.wasmBinary) {
       throw new Error('VocoderCore: WASM binary unavailable');
     }
 
@@ -136,7 +140,7 @@ export class VocoderCore {
 
       node.port.postMessage({
         type: 'init',
-        wasmBinary: VocoderCore.wasmBinary,
+        wasmBinary: VocoderCore.cache.wasmBinary,
         sampleRate: this.audioContext.sampleRate,
         bands: this.opts.bands,
         filtersPerBand: this.opts.filtersPerBand,
@@ -174,27 +178,14 @@ export class VocoderCore {
 
   // ── Static loader ──────────────────────────────────────────────────────
 
-  private static async ensureLoaded(context: AudioContext): Promise<void> {
-    if (VocoderCore.loadedContexts.has(context)) return;
-    const existing = VocoderCore.initPromises.get(context);
-    if (existing) return existing;
-
-    const p = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}vocoder/Vocoder.worklet.js?v=1`);
-      } catch { /* may already be registered */ }
-
-      if (!VocoderCore.wasmBinary) {
-        const resp = await fetch(`${baseUrl}vocoder/Vocoder.wasm`);
-        if (!resp.ok) throw new Error(`Failed to fetch Vocoder.wasm: ${resp.status}`);
-        VocoderCore.wasmBinary = await resp.arrayBuffer();
-      }
-      VocoderCore.loadedContexts.add(context);
-    })();
-
-    VocoderCore.initPromises.set(context, p);
-    return p;
+  private static ensureLoaded(context: AudioContext): Promise<void> {
+    return loadWASMAssets(context, VocoderCore.cache, {
+      dir: 'vocoder',
+      workletFile: 'Vocoder.worklet.js',
+      wasmFile: 'Vocoder.wasm',
+      // No jsFile — the worklet instantiates the WASM directly.
+      workletCacheBust: true,
+    });
   }
 
   // ── Public API ─────────────────────────────────────────────────────────

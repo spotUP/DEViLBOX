@@ -1,6 +1,11 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { TB303Config } from '@typedefs/instrument';
 import { getDevilboxAudioContext, noteToMidi, noteToFrequency, audioNow, timeToSeconds } from '@/utils/audio-context';
+import {
+  createWASMAssetsCache,
+  loadWASMAssets,
+  type WASMAssetsCache,
+} from '@/engine/wasm/WASMSingletonBase';
 
 /**
  * DB303 Parameter Names
@@ -85,9 +90,8 @@ export class DB303Synth implements DevilboxSynth {
   readonly output: GainNode;
 
   private workletNode: AudioWorkletNode | null = null;
-  // Track which contexts have the worklet module loaded
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  // Shared WASM asset cache (binary + JS glue, keyed per AudioContext).
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   // Native overdrive nodes — created lazily when amount > 0
   private overdrive: WaveShaperNode | null = null;
@@ -146,62 +150,34 @@ export class DB303Synth implements DevilboxSynth {
     }
   }
 
-  // Cache for WASM binary and JS code
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
+  /**
+   * DB303 needs a custom JS transform on top of the default:
+   *   - strips ENVIRONMENT_IS_NODE blocks (Emscripten's `await import('fs')`
+   *     path doesn't work in AudioWorklet scope)
+   *   - exposes wasmMemory on Module so C++-side helpers can read it
+   *   - rewrites `new URL(a, b).href` to plain string concat
+   *   - appends `var DB303 = createDB303Module;` so the worklet can grab the
+   *     factory by the short name it expects
+   */
+  private static transformDB303Glue(code: string): string {
+    const out = code
+      .replace(/import\.meta\.url/g, "'.'")
+      .replace(/export\s+default\s+\w+;?/g, '')
+      .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
+      .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+      .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+      .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
+    return out + '\nvar DB303 = createDB303Module;';
+  }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    // Check if this specific context already has the worklet loaded
-    if (this.loadedContexts.has(context)) return;
-
-    // Check if there's already an initialization in progress for this context
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      // Load worklet module for THIS context
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}db303/DB303.worklet.js`);
-      } catch {
-        // Module might already be added to this context
-      }
-
-      // Fetch WASM and JS code (shared across all contexts)
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}db303/DB303.wasm`),
-          fetch(`${baseUrl}db303/DB303.js`)
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten ES module output to be compatible with
-          // new Function() execution in AudioWorklet scope:
-          // 1. Replace import.meta.url (not available outside ES modules)
-          // 2. Remove export default statement
-          // 3. Alias the factory function to 'DB303' for the worklet
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
-            .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
-          code += '\nvar DB303 = createDB303Module;';
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
+  private static ensureInitialized(context: AudioContext): Promise<void> {
+    return loadWASMAssets(context, DB303Synth.cache, {
+      dir: 'db303',
+      workletFile: 'DB303.worklet.js',
+      wasmFile: 'DB303.wasm',
+      jsFile: 'DB303.js',
+      transformJS: DB303Synth.transformDB303Glue,
+    });
   }
 
   private createNode(): void {
@@ -231,8 +207,8 @@ export class DB303Synth implements DevilboxSynth {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: DB303Synth.wasmBinary,
-      jsCode: DB303Synth.jsCode
+      wasmBinary: DB303Synth.cache.wasmBinary,
+      jsCode: DB303Synth.cache.jsCode
     });
 
     // Flush queued parameters immediately via postMessage. The worklet's

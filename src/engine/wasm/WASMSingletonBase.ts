@@ -48,8 +48,12 @@ export interface WASMLoaderConfig {
   workletFile: string;
   /** Filename of the WASM binary, e.g. "JamCracker.wasm". */
   wasmFile: string;
-  /** Filename of the Emscripten JS glue, e.g. "JamCracker.js". */
-  jsFile: string;
+  /**
+   * Filename of the Emscripten JS glue, e.g. "JamCracker.js". Omit for engines
+   * whose worklet instantiates the WASM binary directly (e.g. VocoderCore) —
+   * in that case only the wasm binary is fetched and cached.
+   */
+  jsFile?: string;
   /**
    * Optional: override the default JS transform used to make the Emscripten
    * output runnable inside `new Function(code)` in the worklet. Most engines
@@ -100,15 +104,25 @@ export async function loadWASMAssets(
       /* Module might already be registered — not fatal. */
     }
 
-    if (!cache.wasmBinary || !cache.jsCode) {
-      const [wasmResponse, jsResponse] = await Promise.all([
-        fetch(`${baseUrl}${config.dir}/${config.wasmFile}`),
-        fetch(`${baseUrl}${config.dir}/${config.jsFile}`),
-      ]);
-      if (wasmResponse.ok) cache.wasmBinary = await wasmResponse.arrayBuffer();
-      if (jsResponse.ok) {
-        const raw = await jsResponse.text();
-        cache.jsCode = config.transformJS ? config.transformJS(raw) : defaultWASMTransform(raw);
+    const needsWasm = !cache.wasmBinary;
+    const needsJs = !!config.jsFile && !cache.jsCode;
+
+    if (needsWasm || needsJs) {
+      const fetches: Promise<Response>[] = [];
+      if (needsWasm) fetches.push(fetch(`${baseUrl}${config.dir}/${config.wasmFile}`));
+      if (needsJs) fetches.push(fetch(`${baseUrl}${config.dir}/${config.jsFile}`));
+      const responses = await Promise.all(fetches);
+      let idx = 0;
+      if (needsWasm) {
+        const r = responses[idx++];
+        if (r.ok) cache.wasmBinary = await r.arrayBuffer();
+      }
+      if (needsJs) {
+        const r = responses[idx++];
+        if (r.ok) {
+          const raw = await r.text();
+          cache.jsCode = config.transformJS ? config.transformJS(raw) : defaultWASMTransform(raw);
+        }
       }
     }
 
