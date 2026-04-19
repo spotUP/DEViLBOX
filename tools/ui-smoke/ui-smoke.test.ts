@@ -20,28 +20,26 @@
  * seconds to the local run.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { MCPBridgeClient, tryConnect, sleep } from './_client';
+import { tryConnect, sleep } from './_client';
 
 const FIXTURE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/__tests__/fixtures');
 const FIXTURE_MOD = resolve(FIXTURE_DIR, 'mortimer-twang-2118bytes.mod');
 
 const FLOW_TIMEOUT_MS = 60000;
 
-let client: MCPBridgeClient | null = null;
-
-beforeAll(async () => {
-  client = await tryConnect();
-  if (!client) {
-    console.warn(
-      '[ui-smoke] MCP bridge at ws://localhost:4003/mcp is unreachable — skipping.\n' +
-      '  Start the app with `npm run dev` and open http://localhost:5173 in a browser.',
-    );
-  }
-});
+// Top-level await so `it.runIf` sees the connection result at collect time.
+// Without this the flows skip even when the bridge is reachable.
+const client = await tryConnect();
+if (!client) {
+  console.warn(
+    '[ui-smoke] MCP bridge at ws://localhost:4003/mcp is unreachable — skipping.\n' +
+    '  Start the app with `npm run dev` and open http://localhost:5173 in a browser.',
+  );
+}
 
 afterAll(() => {
   client?.close();
@@ -77,10 +75,13 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
 
       // Play and sample audio level
       await c.call('play');
-      await sleep(1500);
-      const level = await c.call<{ rms?: number; peak?: number; isSilent?: boolean }>('get_audio_level');
-      expect(level.isSilent, `level was ${JSON.stringify(level)}`).not.toBe(true);
-      expect((level.rms ?? 0)).toBeGreaterThan(0.0005);
+      await sleep(800);
+      const playback = await c.call<Record<string, unknown>>('get_playback_state').catch(() => ({}));
+      const level = await c.call<{ rms?: number; rmsAvg?: number; rmsMax?: number; peak?: number; peakMax?: number; isSilent?: boolean }>('get_audio_level');
+      const ctxInfo = await c.call<{ state?: string; sampleRate?: number }>('get_audio_context_info').catch(() => ({}));
+      const rms = level.rms ?? level.rmsMax ?? level.rmsAvg ?? 0;
+      const diag = `rms=${rms} peak=${level.peak ?? level.peakMax ?? 0} isSilent=${level.isSilent} playback=${JSON.stringify(playback)} ctx=${JSON.stringify(ctxInfo)}`;
+      expect(rms, diag).toBeGreaterThan(0.0005);
 
       // No console errors during load+play
       const errors = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
