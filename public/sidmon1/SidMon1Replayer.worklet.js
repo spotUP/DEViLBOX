@@ -49,10 +49,19 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
             }
 
             heapU8.set(uint8Data, wasmPtr);
-            this.module._player_load(wasmPtr, uint8Data.length);
+            // `player_load` returns 1 on success, 0 on parse failure (e.g. the
+            // file's "SID-MON BY R.v.VLIET" marker is missing or offsets are
+            // bogus). Previously we ignored the return value and posted
+            // moduleLoaded regardless — consumers thought load succeeded,
+            // silence detector eventually gave up.
+            const loadOk = this.module._player_load(wasmPtr, uint8Data.length);
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
+            if (!loadOk) {
+              this.port.postMessage({ type: 'error', message: 'SidMon1 module parse failed — file is not a valid SM1 module (missing magic marker or bad offsets)' });
+              return;
+            }
             this.port.postMessage({ type: 'moduleLoaded' });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
