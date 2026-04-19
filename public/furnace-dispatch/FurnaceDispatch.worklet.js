@@ -94,6 +94,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // Each slot renders only channels in its channelMask to outputs[slotIndex+1].
     // Uses mute-and-re-render: save mute state → isolate → render → restore.
     this.isolationSlots = [null, null, null, null];
+    // Per-channel dub sends — array of 32 booleans. Lazy activation: the
+    // channel is only included in the dub render loop when enabled. Must
+    // match MAX_DUB_CHANNELS and DUB_OUTPUT_BASE in ChannelRoutedEffects.ts.
+    this.dubChannelEnabled = new Array(32).fill(false);
 
     // Exported WASM functions (cwrap'd)
     this.wasm = null;
@@ -421,6 +425,37 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (data.slotIndex >= 0 && data.slotIndex < 4 && this.isolationSlots[data.slotIndex]) {
           this.isolationSlots[data.slotIndex].channelMask = data.channelMask;
         }
+        break;
+      }
+
+      case 'dubChannelEnable': {
+        const ch = data.channel ?? data.val?.channel;
+        if (typeof ch === 'number' && ch >= 0 && ch < 32) {
+          this.dubChannelEnabled[ch] = true;
+        }
+        break;
+      }
+      case 'dubChannelDisable': {
+        const ch = data.channel ?? data.val?.channel;
+        if (typeof ch === 'number' && ch >= 0 && ch < 32) {
+          this.dubChannelEnabled[ch] = false;
+        }
+        break;
+      }
+      case 'dubChannelDisableAll': {
+        for (let i = 0; i < 32; i++) this.dubChannelEnabled[i] = false;
+        break;
+      }
+      case 'diagDub': {
+        const active = [];
+        for (let i = 0; i < 32; i++) if (this.dubChannelEnabled[i]) active.push(i);
+        this.port.postMessage({
+          type: 'diagDub',
+          activeChannels: active,
+          activeCount: active.length,
+          chipCount: this.chips.size,
+          totalChannels: [...this.chips.values()].reduce((sum, c) => sum + c.numChannels, 0),
+        });
         break;
       }
 
@@ -1135,6 +1170,58 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             this._badChips.add(chip.platformType);
             const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
             this.port.postMessage({ type: 'error', message: msg });
+          }
+        }
+      }
+
+      // --- Render per-channel dub sends ---
+      // For each active dub channel, solo the (chip, localCh) pair and render
+      // into outputs[DUB_OUTPUT_BASE + globalCh]. Same mute-and-re-render
+      // pattern as isolation slots but with a 1-channel mask per pass.
+      const DUB_OUTPUT_BASE = 5;  // must match ChannelRoutedEffects.ts
+      const hasDub = this.dubChannelEnabled && this.dubChannelEnabled.some(Boolean);
+      if (hasDub) {
+        for (let globalCh = 0; globalCh < 32; globalCh++) {
+          if (!this.dubChannelEnabled[globalCh]) continue;
+
+          const slotOutput = outputs[DUB_OUTPUT_BASE + globalCh];
+          if (!slotOutput || slotOutput.length === 0) continue;
+          const slotL = slotOutput[0];
+          const slotR = slotOutput[1] || slotOutput[0];
+          slotL.fill(0);
+          slotR.fill(0);
+
+          // Find the chip that owns globalCh and its local index
+          let targetChip = null;
+          let targetLocalCh = -1;
+          for (const chip of this.chips.values()) {
+            const chipOff = chipOffsets.get(chip.platformType) || 0;
+            if (globalCh >= chipOff && globalCh < chipOff + chip.numChannels) {
+              targetChip = chip;
+              targetLocalCh = globalCh - chipOff;
+              break;
+            }
+          }
+          if (!targetChip) continue;
+
+          try {
+            // Mute every channel on the target chip except targetLocalCh
+            for (let ch = 0; ch < targetChip.numChannels; ch++) {
+              this.wasm.mute(targetChip.handle, ch, ch === targetLocalCh ? 0 : 1);
+            }
+            this.wasm.render(targetChip.handle, this.outputPtrL, this.outputPtrR, numSamples);
+            this.updateBufferViews();
+            const amp = POST_AMP[targetChip.platformType] || 1.0;
+            for (let i = 0; i < numSamples; i++) {
+              slotL[i] = this.outputBufferL[i] * amp;
+              slotR[i] = this.outputBufferR[i] * amp;
+            }
+            // Restore all channels on this chip to unmuted
+            for (let ch = 0; ch < targetChip.numChannels; ch++) {
+              this.wasm.mute(targetChip.handle, ch, 0);
+            }
+          } catch (e) {
+            // Non-fatal — main output still works
           }
         }
       }

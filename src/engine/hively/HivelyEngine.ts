@@ -55,6 +55,10 @@ type PositionCallback = (update: HivelyPositionUpdate) => void;
 
 export class HivelyEngine extends WASMSingletonBase implements IsolationCapableEngine {
   private static readonly MAX_ISOLATION_SLOTS = 4;
+  /** Per-channel dub-send outputs. HVL songs are typically 4-6 channels but
+   * the worklet exposes 32 slots for API consistency with LibOpenMPT. Unused
+   * indices skip rendering entirely. */
+  private static readonly MAX_DUB_CHANNELS = 32;
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: HivelyEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
@@ -102,9 +106,11 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
   protected createNode(): void {
     const ctx = this.audioContext;
 
+    // 37 stereo outputs: [0]=main mix, [1..4]=isolation slots, [5..36]=dub sends.
+    const TOTAL_OUTPUTS = 1 + HivelyEngine.MAX_ISOLATION_SLOTS + HivelyEngine.MAX_DUB_CHANNELS;
     this.workletNode = new AudioWorkletNode(ctx, 'hively-processor', {
-      outputChannelCount: [2, 2, 2, 2, 2],
-      numberOfOutputs: 1 + HivelyEngine.MAX_ISOLATION_SLOTS,
+      outputChannelCount: new Array(TOTAL_OUTPUTS).fill(2),
+      numberOfOutputs: TOTAL_OUTPUTS,
     });
 
     this.workletNode.port.onmessage = (event) => {
@@ -223,6 +229,10 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.workletNode?.port.postMessage({ type: 'enableOsc' });
+    // Re-hydrate per-channel dub sends (idempotent when no channels active).
+    void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+      try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
+    });
   }
 
   stop(): void {
