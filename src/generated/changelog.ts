@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-17T16:02:54.404Z
+ * Generated: 2026-04-18T19:48:42.870Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5559';
-export const BUILD_NUMBER = '5559';
-export const BUILD_HASH = '358052ea0';
-export const BUILD_DATE = '2026-04-17';
+export const BUILD_VERSION = '1.0.5750';
+export const BUILD_NUMBER = '5750';
+export const BUILD_HASH = 'f02aa07d5';
+export const BUILD_DATE = '2026-04-18';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,208 +30,208 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5559',
-    date: '2026-04-17',
+    version: '1.0.5750',
+    date: '2026-04-18',
     changes: [
       {
         type: 'fix',
-        "description": "Revert \"Remove tracker GL renderer, move fullscreen/smooth to proper locations, fix beat markers\""
+        "description": "Auto DJ never picks a hard 'cut' transition mid-set"
       },
       {
         type: 'fix',
-        "description": "Revert \"Fix: restore line number highlight to accent color, only change row backgrounds\""
+        "description": "Master bus defaults to -6 dB so pads don't eat the DJ mix"
       },
       {
         type: 'fix',
-        "description": "Adjust 12 FX preset gain compensation values from final audit"
+        "description": "Persisted cue device is restored to the cue engine on DJ view mount"
       },
       {
         type: 'fix',
-        "description": "Restore line number highlight to accent color, only change row backgrounds"
-      },
-      {
-        type: 'fix',
-        "description": "Remove tracker GL renderer, move fullscreen/smooth to proper locations, fix beat markers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MIDI button style, remove Save asterisk, shrink volume slider"
-      },
-      {
-        type: 'improvement',
-        "description": "Move volume slider to pattern editor header, normalize font sizes"
-      },
-      {
-        type: 'fix',
-        "description": "Fix tab bar spacing, rename FT2 references to DEViLBOX"
-      },
-      {
-        type: 'fix',
-        "description": "Move MIDI and volume to FT2 toolbar, fix tab bar layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove gap between tabs and FT2 panel, move Collab to NavBar"
-      },
-      {
-        type: 'improvement',
-        "description": "Move hamburger menu to far left of button row"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove Instruments button from FT2 toolbar"
-      },
-      {
-        type: 'improvement',
-        "description": "Normalize NavBar right-section gap to match EditorControlsBar"
+        "description": "Drop deckTapAmount 1.0 → 0.6 on the main dub kits"
       },
       {
         type: 'feature',
-        "description": "Add hamburger menu to FT2 toolbar"
-      },
-      {
-        type: 'improvement',
-        "description": "Move Play Song/Pattern buttons to left of Load button"
-      },
-      {
-        type: 'improvement',
-        "description": "Move Sign In to far right, Collab + Volume to EditorControlsBar"
-      },
-      {
-        type: 'improvement',
-        "description": "Move Desktop App download button next to version number"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove Studio view"
-      },
-      {
-        type: 'fix',
-        "description": "Fix FT2 toolbar input spacing — uniform 6px gap between fields"
-      },
-      {
-        type: 'improvement',
-        "description": "Normalize Mute/Stepped/Groove button spacing in EditorControlsBar"
-      },
-      {
-        type: 'improvement',
-        "description": "Move Find button from FT2 toolbar to EditorControlsBar"
-      },
-      {
-        type: 'improvement',
-        "description": "Move Ghost Patterns toggle from toolbar to Settings dialog"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove dead Order button and Import button from toolbar"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove dead Order button from EditorControlsBar"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove recording settings button next to REC in EditorControlsBar"
-      },
-      {
-        type: 'improvement',
-        "description": "Halve spacing between FT2 toolbar inputs"
-      },
-      {
-        type: 'improvement',
-        "description": "Reorder FT2 toolbar: Position, Pattern, Length, Edit Step, Speed, BPM"
-      },
-      {
-        type: 'improvement',
-        "description": "Swap BPM and Pattern positions in FT2 toolbar"
+        "description": "Modland preview routes to the cue bus (headphones only)"
       },
       {
         type: 'feature',
-        "description": "Add bass-lock crossover to master FX chain"
-      },
-      {
-        type: 'improvement',
-        "description": "Recalibrate FX preset compensation with full-spectrum test tone"
+        "description": "Add \"Analyze track\" to the playlist row context menu"
       },
       {
         type: 'feature',
-        "description": "Add DJ Quick EQ presets — one-tap EQ curves per deck"
-      },
-      {
-        type: 'fix',
-        "description": "Hide visualizer/oscilloscope on inactive/empty DJ decks"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove Tape Stop master FX preset"
+        "description": "Modland preview plays via UADE directly — no render wait"
       },
       {
         type: 'feature',
-        "description": "Add per-preset gain compensation for consistent DJ FX volume"
-      },
-      {
-        type: 'fix',
-        "description": "DJ oscilloscope no longer shows on empty decks"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove blue focus ring from drum pads"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove 'Dub Sirens Live' and 'Pitch Up +3' from master FX presets"
-      },
-      {
-        type: 'improvement',
-        "description": "Tame SpaceEcho feedback — echoes decay naturally instead of ringing forever"
-      },
-      {
-        type: 'fix',
-        "description": "Oneshot pads play to completion instead of cutting on release"
-      },
-      {
-        type: 'fix',
-        "description": "Remove auto-save/restore environment on playlist switch"
+        "description": "Rebuild One-Shots Live Bank B for reggae/dub gigs"
       },
       {
         type: 'feature',
-        "description": "Add FX presets for sample pads — reggae sound system edition"
+        "description": "Persist loudness + auto-gain manual loads"
       },
       {
         type: 'fix',
-        "description": "Override Tailwind preflight border-color globally"
+        "description": "Dub bus sits under the mix — sirens/echoes no longer clobber decks"
       },
       {
         type: 'fix',
-        "description": "Set default border/divide color to design system token"
+        "description": "Dub effects release crisply — mini-drain on last pad release"
       },
       {
         type: 'fix',
-        "description": "Playlist column alignment, save-as, sidebar search"
-      },
-      {
-        type: 'fix',
-        "description": "Tone down playlist divider opacity to match design system"
-      },
-      {
-        type: 'improvement',
-        "description": "Full reggae sound system treatment on ALL 33 DJ one-shot presets"
-      },
-      {
-        type: 'fix',
-        "description": "Cloud playlist save includes full DJ environment"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve DJ one-shot presets: punchier effects, honest names, better pad layout"
+        "description": "Kill the dub-bus pink-noise floor that was producing white noise"
       },
       {
         type: 'feature',
-        "description": "Cloud playlist save with public/private visibility"
+        "description": "Animate pad buttons on external triggers (MIDI/keyboard)"
+      },
+      {
+        type: 'fix',
+        "description": "Drum-pad controller triggers pads in every view"
+      },
+      {
+        type: 'fix',
+        "description": "ESC triggers djPanic in every non-tracker view"
+      },
+      {
+        type: 'fix',
+        "description": "Dub panic actually zeros echo feedback + emergency kill hook"
+      },
+      {
+        type: 'fix',
+        "description": "30s auto-release watchdog for stuck dub actions"
+      },
+      {
+        type: 'fix',
+        "description": "DjPanic directly calls dubPanic + resets store"
+      },
+      {
+        type: 'fix',
+        "description": "Crossfader no longer stalls at 0 for a full bar mid-transition"
+      },
+      {
+        type: 'feature',
+        "description": "Eight sound-system / dub flavour presets"
       },
       {
         type: 'improvement',
-        "description": "Increase drumpad preset name text to 27px"
+        "description": "Wrap tag filter pills instead of sideways scroll"
+      },
+      {
+        type: 'feature',
+        "description": "Beef up the deck-overview playhead so it's easy to spot"
+      },
+      {
+        type: 'feature',
+        "description": "Add dub sub-category tag filters"
+      },
+      {
+        type: 'improvement',
+        "description": "Swap ⋯ dropdown icon for a hamburger (≡)"
+      },
+      {
+        type: 'fix',
+        "description": "Analyzer 404 auto-fix no longer poisons downstream work"
+      },
+      {
+        type: 'feature',
+        "description": "\"Retry failed analyses\" menu option"
+      },
+      {
+        type: 'fix',
+        "description": "Stop spamming 404s for .nt companions on plain MODs"
+      },
+      {
+        type: 'fix',
+        "description": "Compact format badge — Protracker→MOD etc"
+      },
+      {
+        type: 'fix',
+        "description": "Round BPM in list rows so decimals don't overflow"
+      },
+      {
+        type: 'fix',
+        "description": "Harden analyzePlaylist against mid-run playlist edits + hangs"
+      },
+      {
+        type: 'fix',
+        "description": "Route SIDs through local pipeline, not server UADE"
+      },
+      {
+        type: 'fix',
+        "description": "No retry-storm on persistent fails + skip 0-byte stub decode"
+      },
+      {
+        type: 'feature',
+        "description": "Analyze button always visible; supports force re-scan"
+      },
+      {
+        type: 'fix',
+        "description": "BPM-only gate + retry analysisSkipped on explicit click"
+      },
+      {
+        type: 'fix',
+        "description": ".fred files need prefix-form filename for UADE"
+      },
+      {
+        type: 'improvement',
+        "description": "Scope scroll-restore anchor to playlist id"
+      },
+      {
+        type: 'feature',
+        "description": "Dub bus + performance-throw actions overhaul"
+      },
+      {
+        type: 'feature',
+        "description": "Scroll-restore to last-played track on modal open"
+      },
+      {
+        type: 'fix',
+        "description": "Mouse drag animates when paramKey is set"
+      },
+      {
+        type: 'fix',
+        "description": "Apply per-song FX live from dropdown + during Auto DJ"
+      },
+      {
+        type: 'fix',
+        "description": "Don't auto-save per-song FX chains into playlist.masterEffects"
+      },
+      {
+        type: 'fix',
+        "description": "Per-song FX stops leaking across playlist tracks"
+      },
+      {
+        type: 'fix',
+        "description": "Stop native text-range selection from hijacking shift-click"
+      },
+      {
+        type: 'feature',
+        "description": "Explicit \"None\" option in per-song FX dropdown"
+      },
+      {
+        type: 'fix',
+        "description": "Stop sanitizing TFMX companion filenames"
+      },
+      {
+        type: 'fix',
+        "description": "Per-song FX dropdown now lists the full master FX library"
+      },
+      {
+        type: 'feature',
+        "description": "FX preset button shows the currently active preset"
+      },
+      {
+        type: 'fix',
+        "description": "TFMX companion files now reach the playlist render worker"
+      },
+      {
+        type: 'fix',
+        "description": "Closing playlist modal / Modland browser no longer stops deck audio"
+      },
+      {
+        type: 'feature',
+        "description": "Smooth crossfade when applying deck EQ presets"
       }
     ]
   }
