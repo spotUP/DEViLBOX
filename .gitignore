@@ -1,6 +1,9 @@
 # NKS SDK docs (confidential - NDA)
 docs/nks-sdk-private/
 
+# Superpowers brainstorm session content (visual companion mockups)
+.superpowers/
+
 # Logs
 logs
 *.log
