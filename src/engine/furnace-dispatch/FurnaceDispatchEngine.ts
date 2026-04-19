@@ -13,6 +13,10 @@ import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
+import {
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+} from '@engine/wasm/WASMSingletonBase';
 
 /** Furnace platform types (matching C++ DivSystem enum in sysDef.h) */
 export const FurnaceDispatchPlatform = {
@@ -928,11 +932,14 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   // Command log callbacks for automation capture
   private _cmdLogCallbacks: Set<(entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void> = new Set();
 
-  // Cache for WASM binary and JS code
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  // Shared WASM asset cache (binary + JS glue + per-context registration state).
+  //
+  // FurnaceDispatch cannot use the full `loadWASMAssets()` helper because it has
+  // engine-specific addModule behaviour (context-resume recovery, explicit
+  // InvalidStateError retry, URL polyfill prepended to the glue, no-store
+  // cache on fetches). It *does* share the same cache shape, so the fields
+  // below reuse `WASMAssetsCache` to keep the storage consistent.
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   // Effect router for translating tracker effects to dispatch commands
   private effectRouter = new FurnaceEffectRouter();
@@ -1117,8 +1124,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       this.workletNode.port.postMessage({
         type: 'init',
         sampleRate: nativeCtx.sampleRate,
-        wasmBinary: FurnaceDispatchEngine.wasmBinary,
-        jsCode: FurnaceDispatchEngine.jsCode
+        wasmBinary: FurnaceDispatchEngine.cache.wasmBinary,
+        jsCode: FurnaceDispatchEngine.cache.jsCode
       });
 
       // Wait for worklet WASM compilation to complete
@@ -1145,9 +1152,9 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   }
 
   private static async ensureModuleLoaded(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
+    if (this.cache.loadedContexts.has(context)) return;
 
-    const existingPromise = this.initPromises.get(context);
+    const existingPromise = this.cache.initPromises.get(context);
     if (existingPromise) return existingPromise;
 
     const initPromise = (async () => {
@@ -1192,14 +1199,14 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       }
 
       // Fetch WASM and JS code (shared across contexts)
-      if (!this.wasmBinary || !this.jsCode) {
+      if (!this.cache.wasmBinary || !this.cache.jsCode) {
         const [wasmResponse, jsResponse] = await Promise.all([
           fetch(`${baseUrl}furnace-dispatch/FurnaceDispatch.wasm${cacheBuster}`, { cache: 'no-store' }),
           fetch(`${baseUrl}furnace-dispatch/FurnaceDispatch.js${cacheBuster}`, { cache: 'no-store' })
         ]);
 
         if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
+          this.cache.wasmBinary = await wasmResponse.arrayBuffer();
         }
         if (jsResponse.ok) {
           let code = await jsResponse.text();
@@ -1213,21 +1220,21 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
             .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
             .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
           code += '\nvar createFurnaceDispatch = createFurnaceDispatch || Module;';
-          this.jsCode = code;
+          this.cache.jsCode = code;
         }
       }
 
       // Only mark context as loaded if the worklet module was actually loaded
       // Don't cache on suspended context — allow retry when context is running
       if (workletModuleLoaded) {
-        this.loadedContexts.add(context);
+        this.cache.loadedContexts.add(context);
       } else {
         // Remove from initPromises so retry is possible
-        this.initPromises.delete(context);
+        this.cache.initPromises.delete(context);
       }
     })();
 
-    this.initPromises.set(context, initPromise);
+    this.cache.initPromises.set(context, initPromise);
     return initPromise;
   }
 

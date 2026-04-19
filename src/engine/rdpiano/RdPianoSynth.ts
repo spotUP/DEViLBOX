@@ -13,6 +13,11 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
+import {
+  createWASMAssetsCache,
+  loadWASMAssets,
+  type WASMAssetsCache,
+} from '@/engine/wasm/WASMSingletonBase';
 
 // Parameter IDs (must match C++ enum)
 const PARAM = {
@@ -102,10 +107,23 @@ export class RdPianoSynth implements DevilboxSynth {
 
   // Static caches shared across instances
   private static romCache = new Map<string, ArrayBuffer>();
-  private static isWorkletLoaded = false;
-  private static workletLoadPromise: Promise<void> | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  /**
+   * RdPiano's Emscripten glue needs a slightly different transform than the
+   * default — notably it substitutes `import.meta.url` with the actual base
+   * URL (so inline Emscripten URL resolution still lands inside `public/
+   * rdpiano/`) and strips the `ENVIRONMENT_IS_NODE` fs-import block.
+   */
+  private static transformRdPianoGlue(code: string): string {
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    return code
+      .replace(/import\.meta\.url/g, `"${baseUrl}rdpiano/"`)
+      .replace(/export\s+default\s+\w+;?\s*$/, '')
+      .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
+      .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
+      .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
+  }
 
   constructor(config: Partial<RdPianoConfig> = {}) {
     this.audioContext = getDevilboxAudioContext();
@@ -133,46 +151,17 @@ export class RdPianoSynth implements DevilboxSynth {
 
   private async initialize(): Promise<void> {
     try {
-      const rawContext = this.audioContext;
-      const baseUrl = import.meta.env.BASE_URL || '/';
+      await loadWASMAssets(this.audioContext, RdPianoSynth.cache, {
+        dir: 'rdpiano',
+        workletFile: 'RdPiano.worklet.js',
+        wasmFile: 'RdPiano.wasm',
+        jsFile: 'RdPiano.js',
+        transformJS: RdPianoSynth.transformRdPianoGlue,
+        workletCacheBust: true,
+      });
 
-      // Load worklet module (once per session)
-      if (!RdPianoSynth.isWorkletLoaded) {
-        if (!RdPianoSynth.workletLoadPromise) {
-          // Add cache-busting timestamp to force reload of worklet changes
-          const cacheBuster = `?v=${Date.now()}`;
-          RdPianoSynth.workletLoadPromise = rawContext.audioWorklet.addModule(
-            `${baseUrl}rdpiano/RdPiano.worklet.js${cacheBuster}`
-          );
-        }
-        await RdPianoSynth.workletLoadPromise;
-        RdPianoSynth.isWorkletLoaded = true;
-      }
-
-      // Fetch WASM binary and JS glue (cached)
-      if (!RdPianoSynth.wasmBinary || !RdPianoSynth.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}rdpiano/RdPiano.wasm`),
-          fetch(`${baseUrl}rdpiano/RdPiano.js`),
-        ]);
-        if (!wasmResponse.ok || !jsResponse.ok) {
-          throw new Error('Failed to fetch RdPiano WASM files');
-        }
-        const [wasmBinary, jsCodeRaw] = await Promise.all([
-          wasmResponse.arrayBuffer(),
-          jsResponse.text(),
-        ]);
-        // Preprocess JS code for AudioWorklet new Function() compatibility:
-        // 1. Replace import.meta.url (not available in Function constructor scope)
-        // 2. Remove ES module export statement (invalid syntax in Function body)
-        // 3. Strip Node.js-specific dynamic import block (fails in worklet context)
-        RdPianoSynth.jsCode = jsCodeRaw
-          .replace(/import\.meta\.url/g, `"${baseUrl}rdpiano/"`)
-          .replace(/export\s+default\s+\w+;?\s*$/, '')
-          .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-          .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
-          .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
-        RdPianoSynth.wasmBinary = wasmBinary;
+      if (!RdPianoSynth.cache.wasmBinary || !RdPianoSynth.cache.jsCode) {
+        throw new Error('Failed to load RdPiano WASM assets');
       }
 
       // Create AudioWorklet node
@@ -206,8 +195,8 @@ export class RdPianoSynth implements DevilboxSynth {
       // Send WASM init
       this._worklet.port.postMessage({
         type: 'init',
-        wasmBinary: RdPianoSynth.wasmBinary,
-        jsCode: RdPianoSynth.jsCode,
+        wasmBinary: RdPianoSynth.cache.wasmBinary,
+        jsCode: RdPianoSynth.cache.jsCode,
       });
 
       // Connect to output
