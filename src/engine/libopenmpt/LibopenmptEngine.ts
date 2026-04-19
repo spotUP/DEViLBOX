@@ -64,6 +64,9 @@ export class LibopenmptEngine {
 
   /** Per-channel effect isolation: tracks which slots are active and their channel masks. */
   static readonly MAX_ISOLATION_SLOTS = 4;
+  /** Per-channel dub-send outputs. Indices [MAX_DUB_OFFSET + ch] on the worklet. */
+  static readonly MAX_DUB_CHANNELS = 32;
+  static readonly DUB_OUTPUT_BASE = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS; // = 5
   private _isolationSlotMasks: (number | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
 
   /** Subscribe to transport events (seek, pause, unpause, stop) for syncing isolation nodes. */
@@ -126,11 +129,14 @@ export class LibopenmptEngine {
       return;
     }
 
-    // 5 stereo outputs: [0]=main mix, [1..4]=isolation slots for per-channel effects
+    // 37 stereo outputs: [0]=main mix, [1..4]=isolation slots for per-channel
+    // effects, [5..36]=per-channel dub sends (lazy — muted output costs nothing
+    // in the worklet). See src/engine/tone/ChannelRoutedEffects.ts.
+    const TOTAL_OUTPUTS = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS + LibopenmptEngine.MAX_DUB_CHANNELS;
     this.workletNode = new AudioWorkletNode(this.context, 'libopenmpt-processor', {
       numberOfInputs: 0,
-      numberOfOutputs: 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS,
-      outputChannelCount: [2, 2, 2, 2, 2],
+      numberOfOutputs: TOTAL_OUTPUTS,
+      outputChannelCount: new Array(TOTAL_OUTPUTS).fill(2),
     });
 
     this.workletNode.port.onmessage = this.handleMessage.bind(this);
@@ -335,6 +341,9 @@ export class LibopenmptEngine {
     try {
       void import('../../stores/useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
         scheduleWasmEffectRebuild();
+      });
+      void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+        try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
       });
     } catch (e) {
       console.warn('[LibopenmptEngine] Failed to rebuild isolation after play:', e);

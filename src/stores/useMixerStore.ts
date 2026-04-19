@@ -866,14 +866,21 @@ export const useMixerStore = create<MixerStore>()(
       }
     },
 
-    // Dub bus send
+    // Dub bus send — routes through the multi-output WASM worklet via
+    // ChannelRoutedEffects. Tracker worklets (LibOpenMPT/Furnace/Hively/UADE)
+    // dedicate outputs [5..36] to per-channel dub taps; the manager owns
+    // those 32 GainNodes and lazily activates them as needed.
     setChannelDubSend(ch: number, amount: number): void {
       const clamped = Math.max(0, Math.min(1, amount));
       set((state) => {
         if (ch < 0 || ch >= state.channels.length) return;
         state.channels[ch].dubSend = clamped;
       });
-      getChannelEffectsManager().setChannelDubSend(ch, clamped);
+      try {
+        getChannelRoutedEffectsManager()?.setChannelDubSend(ch, clamped);
+      } catch (e) {
+        console.warn('[MixerStore] setChannelDubSend: manager unavailable', e);
+      }
     },
 
     // Send levels

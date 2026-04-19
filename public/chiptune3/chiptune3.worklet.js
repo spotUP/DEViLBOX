@@ -44,6 +44,11 @@ function writeAsciiToMemory(str,buffer,dontAddNull){for(let i=0;i<str.length;++i
 // Maximum number of isolation slots for per-channel effect routing.
 // Output 0 = main mix, outputs 1..MAX = isolation slots.
 const MAX_ISOLATION_SLOTS = 4
+// Per-channel dub sends — lazily allocated secondary instances that solo
+// one channel each and render into output[DUB_OUTPUT_BASE + ch].
+// Must match DUB_OUTPUT_BASE + MAX_DUB_CHANNELS in ChannelRoutedEffects.ts.
+const DUB_OUTPUT_BASE = 5
+const MAX_DUB_CHANNELS = 32
 
 class MPT extends AudioWorkletProcessor {
 	constructor(options) {
@@ -61,6 +66,10 @@ class MPT extends AudioWorkletProcessor {
 		// Per-channel effect isolation: secondary module instances that render
 		// only specific channels. All share the same process() call for perfect sync.
 		this.isolationSlots = new Array(MAX_ISOLATION_SLOTS).fill(null)
+		// Per-channel dub sends — one secondary module instance per active dub
+		// channel, soloing that channel and rendering into output[DUB_OUTPUT_BASE+ch].
+		// Lazy: only populated for channels the UI has toggled on (amount > 0).
+		this.dubSlots = new Array(MAX_DUB_CHANNELS).fill(null)
 		this.moduleBuffer = null  // Cached ArrayBuffer for creating isolation instances
 		// Dual mute mask tracking: user mute/solo vs isolation exclusion.
 		// The effective main mask = userMuteMask & ~isolatedBits.
@@ -182,6 +191,32 @@ class MPT extends AudioWorkletProcessor {
 			}
 		}
 
+		// Render per-channel dub sends into outputs[5..36]. Each dub slot is a
+		// secondary module instance that solos one channel. Inactive slots leave
+		// their output untouched — Web Audio guarantees zero-fill of unwritten
+		// output buffers, so silent channels cost nothing in the render path.
+		for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+			const slot = this.dubSlots[ch]
+			if (!slot || !slot.modulePtr || !slot.leftPtr || !slot.rightPtr) continue
+			const outIdx = DUB_OUTPUT_BASE + ch
+			const outSlot = outputList[outIdx]
+			if (!outSlot || !outSlot[0] || !outSlot[1]) continue
+
+			// Solo channel `ch` — all other channels muted in this instance.
+			// Re-apply every render in case a loop/seek reset cleared the mute.
+			const soloMask = (1 << ch) & this.userMuteMask
+			this.applyChannelIsolation_(slot.extPtr, slot.muteFunc, slot.volumeFunc, soloMask)
+
+			const bufLen = left.length
+			const frames = libopenmpt._openmpt_module_read_float_stereo(
+				slot.modulePtr, sampleRate, bufLen, slot.leftPtr, slot.rightPtr
+			)
+			if (frames > 0) {
+				outSlot[0].set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
+				outSlot[1].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
+			}
+		}
+
 		// Periodic diagnostic logging (every ~2 seconds at 48kHz/128 = 375 renders/sec)
 		if (this.isolatedBits && ++this._diagCounter >= 750) {
 			this._diagCounter = 0
@@ -247,6 +282,7 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'stop':
 				this.teardownAllIsolation_()
+				this.teardownAllDubSlots_()
 				this.stop()
 				break
 			case 'meta':
@@ -337,6 +373,18 @@ class MPT extends AudioWorkletProcessor {
 				this.isolatedBits = ~v & ((1 << Math.min(this.channels || 32, 32)) - 1)
 				this.recomputeMainMask_()
 				break
+			case 'dubChannelEnable':
+				// Begin rendering channel `v.channel` into output[DUB_OUTPUT_BASE+channel].
+				// Lazily allocates a secondary module instance soloing that channel.
+				this.addDubSlot_(v.channel)
+				break
+			case 'dubChannelDisable':
+				// Stop rendering channel `v.channel` — frees the secondary instance.
+				this.removeDubSlot_(v.channel)
+				break
+			case 'dubChannelDisableAll':
+				this.teardownAllDubSlots_()
+				break
 			case 'diagIsolation':
 				// Diagnostic: report current isolation state
 				this.port.postMessage({
@@ -399,6 +447,7 @@ class MPT extends AudioWorkletProcessor {
 
 	play(buffer, paused = false) {
 		this.teardownAllIsolation_()
+		this.teardownAllDubSlots_()
 		this.stop()
 		this.lastStateRow = -1
 		this.lastStateOrder = -1
@@ -866,13 +915,125 @@ class MPT extends AudioWorkletProcessor {
 	}
 
 	/**
-	 * Apply a callback to each active isolation slot.
+	 * Apply a callback to each active isolation slot AND every active dub
+	 * slot. Used by transport handlers (pause/unpause/setPos) so secondary
+	 * instances stay in lockstep with the main module.
 	 */
 	forEachIsolationSlot_(fn) {
 		for (let i = 0; i < MAX_ISOLATION_SLOTS; i++) {
 			const slot = this.isolationSlots[i]
 			if (slot && slot.modulePtr) fn(slot)
 		}
+		for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+			const slot = this.dubSlots[ch]
+			if (slot && slot.modulePtr) fn(slot)
+		}
+	}
+
+	// ============================================
+	// DUB SLOT MANAGEMENT (per-channel solo render)
+	// ============================================
+
+	/**
+	 * Allocate a dub slot for `channelIndex` — a secondary module instance
+	 * soloing that channel, rendered into output[DUB_OUTPUT_BASE+channelIndex].
+	 * No-op if the slot is already allocated. Structurally identical to an
+	 * isolation slot with channelMask = 1<<channelIndex.
+	 */
+	addDubSlot_(channelIndex) {
+		if (channelIndex < 0 || channelIndex >= MAX_DUB_CHANNELS) return
+		if (this.dubSlots[channelIndex]) return  // already allocated
+		if (!this.moduleBuffer || !libopenmpt._openmpt_module_ext_create_from_memory) return
+		if (!this.muteFunc || !libopenmpt.wasmTable) return
+
+		const byteArray = new Int8Array(this.moduleBuffer)
+		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
+		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
+
+		const extPtr = libopenmpt._openmpt_module_ext_create_from_memory(
+			ptrToFile, byteArray.byteLength, 0, 0, 0, 0, 0, 0, 0
+		)
+		libopenmpt._free(ptrToFile)
+		if (!extPtr) return
+
+		const modulePtr = libopenmpt._openmpt_module_ext_get_module(extPtr)
+		if (!modulePtr) { libopenmpt._openmpt_module_ext_destroy(extPtr); return }
+
+		// Extract mute + volume function pointers from interactive interface.
+		let muteFunc = 0, volumeFunc = 0
+		if (libopenmpt._openmpt_module_ext_get_interface && libopenmpt.stackSave) {
+			const INTERACTIVE_STRUCT_SIZE = 64
+			const ifacePtr = libopenmpt._malloc(INTERACTIVE_STRUCT_SIZE)
+			if (ifacePtr) {
+				for (let i = 0; i < INTERACTIVE_STRUCT_SIZE; i++) libopenmpt.HEAPU8[ifacePtr + i] = 0
+				const stack = libopenmpt.stackSave()
+				const ok = libopenmpt._openmpt_module_ext_get_interface(
+					extPtr, asciiToStack('interactive'), ifacePtr, INTERACTIVE_STRUCT_SIZE
+				)
+				libopenmpt.stackRestore(stack)
+				if (ok) {
+					const read32 = libopenmpt.HEAPU32
+						? (off) => libopenmpt.HEAPU32[(ifacePtr + off) >> 2]
+						: (off) => new DataView(libopenmpt.HEAPU8.buffer).getUint32(ifacePtr + off, true)
+					volumeFunc = read32(32)  // set_channel_volume
+					muteFunc = read32(40)    // set_channel_mute_status
+				}
+				libopenmpt._free(ifacePtr)
+			}
+		}
+		if (!muteFunc) { libopenmpt._openmpt_module_ext_destroy(extPtr); return }
+
+		// Match main module config + Amiga resampler emulation.
+		libopenmpt._openmpt_module_set_repeat_count(modulePtr, this.config.repeatCount)
+		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, this.config.stereoSeparation)
+		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
+		if (libopenmpt.stackSave) {
+			const stack = libopenmpt.stackSave()
+			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
+			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
+			libopenmpt.stackRestore(stack)
+		}
+
+		// Sync to main module's current position so audio is in lockstep.
+		if (this.modulePtr) {
+			const order = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
+			const row = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
+			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
+		}
+
+		const maxFramesPerChunk = 128
+		const leftPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
+		const rightPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
+
+		const soloMask = (1 << channelIndex) & this.userMuteMask
+		this.applyChannelIsolation_(extPtr, muteFunc, volumeFunc, soloMask)
+
+		this.dubSlots[channelIndex] = {
+			modulePtr, extPtr, muteFunc, volumeFunc,
+			leftPtr, rightPtr,
+			channelMask: 1 << channelIndex,
+			paused: this.paused,
+		}
+	}
+
+	/**
+	 * Free the dub slot for `channelIndex` — destroys the secondary module
+	 * instance and frees its render buffers.
+	 */
+	removeDubSlot_(channelIndex) {
+		if (channelIndex < 0 || channelIndex >= MAX_DUB_CHANNELS) return
+		const slot = this.dubSlots[channelIndex]
+		if (!slot) return
+		if (slot.extPtr) libopenmpt._openmpt_module_ext_destroy(slot.extPtr)
+		else if (slot.modulePtr) libopenmpt._openmpt_module_destroy(slot.modulePtr)
+		if (slot.leftPtr) libopenmpt._free(slot.leftPtr)
+		if (slot.rightPtr) libopenmpt._free(slot.rightPtr)
+		this.dubSlots[channelIndex] = null
+	}
+
+	/** Free every dub slot (called on stop/dispose). */
+	teardownAllDubSlots_() {
+		for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) this.removeDubSlot_(ch)
 	}
 
 	/**
