@@ -8,33 +8,31 @@
  * Multiple SidMonSynth instances share this single engine.
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class SidMonEngine {
+function sidMonTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
+    .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
+}
+
+export class SidMonEngine extends WASMSingletonBase {
   private static instance: SidMonEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
-  private _disposed = false;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(SidMonEngine.cache);
   }
 
   static getInstance(): SidMonEngine {
@@ -48,60 +46,17 @@ export class SidMonEngine {
     return !!SidMonEngine.instance && !SidMonEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await SidMonEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[SidMonEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'sidmon',
+      workletFile: 'SidMon.worklet.js',
+      wasmFile: 'SidMon.wasm',
+      jsFile: 'SidMon.js',
+      transformJS: sidMonTransform,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}sidmon/SidMon.worklet.js`);
-      } catch {
-        /* Module might already be registered */
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}sidmon/SidMon.wasm`),
-          fetch(`${baseUrl}sidmon/SidMon.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            // Expose heap views on Module so worklet can access them as this.wasm.HEAPU8 / HEAPF32
-            .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
-            .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'sidmon-processor', {
@@ -121,7 +76,6 @@ export class SidMonEngine {
 
         case 'error':
           console.error('[SidMonEngine]', data.message);
-          // Unblock any pending waitForPlayerHandle() callers (e.g. pool-full) with sentinel -1
           if (this._playerHandleResolvers.length > 0) {
             const resolve = this._playerHandleResolvers.shift()!;
             resolve(-1);
@@ -140,15 +94,11 @@ export class SidMonEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: SidMonEngine.wasmBinary,
-      jsCode: SidMonEngine.jsCode,
+      wasmBinary: SidMonEngine.cache.wasmBinary,
+      jsCode: SidMonEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   sendMessage(msg: Record<string, unknown>, transfers?: Transferable[]): void {
@@ -166,11 +116,8 @@ export class SidMonEngine {
     });
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     if (SidMonEngine.instance === this) {
       SidMonEngine.instance = null;
     }
