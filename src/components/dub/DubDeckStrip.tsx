@@ -30,6 +30,7 @@ export const DubDeckStrip: React.FC = () => {
   const setDubBus = useDrumPadStore(s => s.setDubBus);
 
   const channels = useMixerStore(s => s.channels);
+  const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
   const patternIdx = useTrackerStore(s => s.currentPatternIndex);
   const pattern = useTrackerStore(s => s.patterns[patternIdx]);
   const selectedChannel = useCursorStore(s => s.cursor.channelIndex);
@@ -55,6 +56,25 @@ export const DubDeckStrip: React.FC = () => {
     dubLanePlayer.setLane(pattern?.dubLane ?? null);
   }, [pattern]);
 
+  // Auto-apply a default send on tracker channels when the bus is enabled and
+  // nothing is configured yet. Without this, toggling Bus ON and clicking a
+  // channel's Echo Throw button would silently no-op (no tap registered in
+  // DubBus.channelTaps). Mirrors the drumpad's applySoundSystemToBank flow
+  // but targets tracker channels via useMixerStore.setChannelDubSend.
+  const visibleChannelCount = pattern?.channels.length ?? 4;
+  useEffect(() => {
+    if (!busEnabled) return;
+    const nothingConfigured = channels.slice(0, visibleChannelCount).every(c => (c?.dubSend ?? 0) === 0);
+    if (!nothingConfigured) return;
+    for (let i = 0; i < visibleChannelCount; i++) {
+      setChannelDubSend(i, 0.4);
+    }
+  // We intentionally don't depend on `channels` — the effect is about the
+  // transition to enabled + first-time setup. Once any channel has dubSend>0
+  // this effect no-ops. Future changes are user-driven via the mini-strip.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busEnabled, visibleChannelCount, setChannelDubSend]);
+
   // REC indicator flash on each capture — drives a brief pulse on the REC pill.
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
 
@@ -65,8 +85,6 @@ export const DubDeckStrip: React.FC = () => {
     }
     fire('echoThrow', channelId);
   }, [busEnabled]);
-
-  const visibleChannelCount = pattern?.channels.length ?? 4;
 
   return (
     <div className="flex flex-col gap-1 px-2 py-1 bg-dark-bgSecondary border-t border-dark-border font-mono">
