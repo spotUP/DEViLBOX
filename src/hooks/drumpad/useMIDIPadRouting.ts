@@ -244,6 +244,16 @@ export function getDrumPadEngine(): DrumPadEngine | null {
   return _engine;
 }
 
+/**
+ * Ensure the singleton DrumPadEngine exists, creating it if necessary.
+ * Used by tracker-view consumers that need the shared DubBus (owned by
+ * DrumPadEngine) before any drumpad interaction has triggered construction.
+ * Safe to call multiple times — returns the same instance.
+ */
+export function ensureDrumPadEngine(): DrumPadEngine {
+  return getOrCreateEngine();
+}
+
 /** Returns the singleton NoteRepeatEngine instance (for panic / shared access). */
 export function getNoteRepeatEngine(): NoteRepeatEngine | null {
   return _noteRepeat;
