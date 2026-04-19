@@ -31,6 +31,7 @@ const MOVE_COLOR: Record<string, string> = {
   tapeWobble: 'bg-accent-warning/70',
   masterDrop: 'bg-accent-error/70',
   snareCrack: 'bg-text-primary',
+  tapeStop: 'bg-accent-secondary/70',
 };
 
 export const DubLaneTimeline: React.FC = () => {

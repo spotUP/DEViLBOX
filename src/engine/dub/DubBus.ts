@@ -1015,6 +1015,66 @@ export class DubBus {
    * time itself).
    */
   /**
+   * Tape Stop — the classic reel-to-reel slowdown on the bus tail. Not a
+   * transport-level speed change (which would require per-engine coordination
+   * across libopenmpt / UADE / Hively / Furnace); instead, this is a
+   * bus-only effect that reads as "the dub tail melts into the floor":
+   *   - LPF sweeps down to 80 Hz over downSec (all HF gone)
+   *   - Echo rate ramps up ×2.5 over the same window (tail slows, pitch drops)
+   *   - return gain ramps to 0 in the last 15% (muffled silence to cap the drop)
+   * After holdSec, every param snaps back to the user's baseline. Fire-and-
+   * forget; owns its own timeline, no disposer. No-op when bus disabled.
+   */
+  tapeStop(downSec = 0.6, holdSec = 0.15): void {
+    if (!this.enabled) return;
+    const now = this.context.currentTime;
+    const baselineReturn = this.settings.returnGain;
+    const baselineRate = this.settings.echoRateMs;
+    try {
+      // LPF sweep down
+      const f = this.lpf.frequency;
+      f.cancelScheduledValues(now);
+      f.setValueAtTime(f.value, now);
+      f.exponentialRampToValueAtTime(80, now + downSec);
+      // Echo rate ramp up — stepped calls so setRate's internal ramps stack
+      const steps = 8;
+      for (let i = 1; i <= steps; i++) {
+        const v = baselineRate + (baselineRate * 1.5) * (i / steps);
+        const t = setTimeout(() => {
+          this.throwTimers.delete(t);
+          try { this.echo.setRate(Math.min(1500, v)); } catch { /* ok */ }
+        }, (downSec * 1000) * (i / steps));
+        this.throwTimers.add(t);
+      }
+      // Return gain to 0 in the final 15% — the muffled drop-off
+      const rg = this.return_.gain;
+      rg.cancelScheduledValues(now);
+      rg.setValueAtTime(rg.value, now);
+      rg.linearRampToValueAtTime(rg.value, now + downSec * 0.85);
+      rg.linearRampToValueAtTime(0, now + downSec);
+    } catch { /* ok */ }
+
+    // Restore after hold window
+    const restoreAt = setTimeout(() => {
+      this.throwTimers.delete(restoreAt);
+      if (this._disposed) return;
+      const t2 = this.context.currentTime;
+      try {
+        const f = this.lpf.frequency;
+        f.cancelScheduledValues(t2);
+        f.setValueAtTime(f.value, t2);
+        f.exponentialRampToValueAtTime(20000, t2 + 0.15);
+        this.echo.setRate(baselineRate);
+        const rg = this.return_.gain;
+        rg.cancelScheduledValues(t2);
+        rg.setValueAtTime(rg.value, t2);
+        rg.linearRampToValueAtTime(this.enabled ? baselineReturn : 0, t2 + 0.08);
+      } catch { /* ok */ }
+    }, (downSec + holdSec) * 1000);
+    this.throwTimers.add(restoreAt);
+  }
+
+  /**
    * Fire a short white-noise burst straight into the bus input. Shaped by a
    * fast attack-decay envelope so it reads as a "crack" not a "shhh". The
    * burst inherits whatever processing the bus currently has — spring
