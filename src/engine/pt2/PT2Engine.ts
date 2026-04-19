@@ -5,6 +5,7 @@
  * Follows the HivelyEngine pattern: static WASM/JS caching, per-context worklet loading.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -82,7 +83,18 @@ export class PT2Engine extends WASMSingletonBase {
   }
 
   static getInstance(): PT2Engine {
-    if (!PT2Engine.instance || PT2Engine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !PT2Engine.instance ||
+      PT2Engine.instance._disposed ||
+      PT2Engine.instance.audioContext !== currentCtx
+    ) {
+      if (PT2Engine.instance && !PT2Engine.instance._disposed) {
+        PT2Engine.instance.dispose();
+      }
       PT2Engine.instance = new PT2Engine();
     }
     return PT2Engine.instance;

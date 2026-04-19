@@ -5,6 +5,7 @@
  * Emulates Z80 CPU + QSound DSP via the highly_quixotic library.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -22,7 +23,18 @@ export class QsfEngine extends WASMSingletonBase {
   }
 
   static getInstance(): QsfEngine {
-    if (!QsfEngine.instance || QsfEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !QsfEngine.instance ||
+      QsfEngine.instance._disposed ||
+      QsfEngine.instance.audioContext !== currentCtx
+    ) {
+      if (QsfEngine.instance && !QsfEngine.instance._disposed) {
+        QsfEngine.instance.dispose();
+      }
       QsfEngine.instance = new QsfEngine();
     }
     return QsfEngine.instance;

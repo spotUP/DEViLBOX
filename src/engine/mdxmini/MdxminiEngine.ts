@@ -5,6 +5,7 @@
  * Plays Sharp X68000 MDX files with built-in YM2151 emulation.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -22,7 +23,18 @@ export class MdxminiEngine extends WASMSingletonBase {
   }
 
   static getInstance(): MdxminiEngine {
-    if (!MdxminiEngine.instance || MdxminiEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !MdxminiEngine.instance ||
+      MdxminiEngine.instance._disposed ||
+      MdxminiEngine.instance.audioContext !== currentCtx
+    ) {
+      if (MdxminiEngine.instance && !MdxminiEngine.instance._disposed) {
+        MdxminiEngine.instance.dispose();
+      }
       MdxminiEngine.instance = new MdxminiEngine();
     }
     return MdxminiEngine.instance;

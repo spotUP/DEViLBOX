@@ -5,6 +5,7 @@
  * Follows the PreTrackerEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   WASMSingletonBase,
@@ -33,7 +34,18 @@ export class PumaTrackerEngine extends WASMSingletonBase {
   }
 
   static getInstance(): PumaTrackerEngine {
-    if (!PumaTrackerEngine.instance || PumaTrackerEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !PumaTrackerEngine.instance ||
+      PumaTrackerEngine.instance._disposed ||
+      PumaTrackerEngine.instance.audioContext !== currentCtx
+    ) {
+      if (PumaTrackerEngine.instance && !PumaTrackerEngine.instance._disposed) {
+        PumaTrackerEngine.instance.dispose();
+      }
       PumaTrackerEngine.instance = new PumaTrackerEngine();
     }
     return PumaTrackerEngine.instance;
