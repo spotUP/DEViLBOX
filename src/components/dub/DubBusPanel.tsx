@@ -10,7 +10,7 @@
  * open. Emits no audio of its own until a pad with dubSend > 0 triggers.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import type { DubBusSettings } from '@/types/dub';
 import { Speaker } from 'lucide-react';
@@ -66,11 +66,33 @@ export const DubBusPanel: React.FC = () => {
   const setDubBus = useDrumPadStore((s) => s.setDubBus);
   const applySoundSystemToBank = useDrumPadStore((s) => s.applySoundSystemToBank);
   const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const patch = useCallback((p: Partial<DubBusSettings>) => setDubBus(p), [setDubBus]);
 
+  // Close on click/tap outside, and on Esc. Only wire listeners while open so
+  // we're not paying for a global mousedown listener when the panel is closed.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (target && wrapperRef.current && !wrapperRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapperRef}>
       <button
         onClick={() => setOpen((v) => !v)}
         title="Dub Bus — shared send FX for all pads"
