@@ -311,6 +311,17 @@ export const useTransportStore = create<TransportStore>()(
         const prevRow = state.currentRow;
         state.currentRow = row;
 
+        // Phase 1 of Tracker Dub Studio: fire any lane events whose row has
+        // arrived. Safe to call on every row advance — the player's internal
+        // cursor makes this O(1) per tick when no events match. The require()
+        // matches the file's pattern for avoiding circular imports at startup.
+        if (state.isPlaying) {
+          try {
+            const { dubLanePlayer } = require('../engine/dub/DubLanePlayer');
+            dubLanePlayer.onTick(row);
+          } catch { /* player not yet loaded — ignore on first boot */ }
+        }
+
         // Follow playback: sync cursor to playback row
         if (state.isPlaying) {
           try {
