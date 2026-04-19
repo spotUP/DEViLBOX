@@ -177,36 +177,10 @@ describe('WASMSingletonBase subclasses — lifecycle contract', () => {
     ).toEqual([]);
   });
 
-  // Known offenders: getInstance does not reference `audioContext`, so a swap
-  // (dev HMR, page reload, context restart) leaves them attached to a dead
-  // AudioContext → silent playback. This is the SidMon1 regression class.
-  const CONTEXT_GUARD_DEBT = new Set([
-    'BdEngine',
-    'CoreDesignEngine',
-    'CpsycleEngine',
-    'EupminiEngine',
-    'FmplayerEngine',
-    'FredEditorReplayerEngine',
-    'IxalanceEngine',
-    'MaEngine',
-    'MdxminiEngine',
-    'PreTrackerEngine',
-    'PT2Engine',
-    'PumaTrackerEngine',
-    'QsfEngine',
-    'RobHubbardEngine',
-    'Sc68Engine',
-    'Sd2Engine',
-    // SidMon1Engine — fixed, removed from this allowlist. The lifecycle
-    // test will now fail if SidMon1Engine loses its AudioContext guard.
-    'SidMon1ReplayerEngine',
-    'SidMonEngine',
-    'SonixEngine',
-    'StartrekkerAMEngine',
-    'SteveTurnerEngine',
-    'SunVoxEngine',
-    'ZxtuneEngine',
-  ]);
+  // Zero-debt: every WASMSingletonBase subclass now guards the AudioContext
+  // swap in getInstance (see JamCrackerEngine:48-63). If a new engine lands
+  // without the guard, this test fails with its name.
+  const CONTEXT_GUARD_DEBT = new Set<string>();
 
   it('subclasses guard the AudioContext swap in getInstance (existing debt locked)', () => {
     const missing: string[] = [];

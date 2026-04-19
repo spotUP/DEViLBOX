@@ -5,6 +5,7 @@
  * Follows the JamCrackerEngine/FCEngine/PreTrackerEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -22,7 +23,18 @@ export class IxalanceEngine extends WASMSingletonBase {
   }
 
   static getInstance(): IxalanceEngine {
-    if (!IxalanceEngine.instance || IxalanceEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !IxalanceEngine.instance ||
+      IxalanceEngine.instance._disposed ||
+      IxalanceEngine.instance.audioContext !== currentCtx
+    ) {
+      if (IxalanceEngine.instance && !IxalanceEngine.instance._disposed) {
+        IxalanceEngine.instance.dispose();
+      }
       IxalanceEngine.instance = new IxalanceEngine();
     }
     return IxalanceEngine.instance;

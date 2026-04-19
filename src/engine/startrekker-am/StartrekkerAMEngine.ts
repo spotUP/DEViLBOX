@@ -5,6 +5,7 @@
  * main thread and sent to the AudioWorklet via 'init' message (no fetch in worklet).
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -29,7 +30,18 @@ export class StartrekkerAMEngine extends WASMSingletonBase {
   }
 
   static getInstance(): StartrekkerAMEngine {
-    if (!StartrekkerAMEngine.instance || StartrekkerAMEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !StartrekkerAMEngine.instance ||
+      StartrekkerAMEngine.instance._disposed ||
+      StartrekkerAMEngine.instance.audioContext !== currentCtx
+    ) {
+      if (StartrekkerAMEngine.instance && !StartrekkerAMEngine.instance._disposed) {
+        StartrekkerAMEngine.instance.dispose();
+      }
       StartrekkerAMEngine.instance = new StartrekkerAMEngine();
     }
     return StartrekkerAMEngine.instance;
