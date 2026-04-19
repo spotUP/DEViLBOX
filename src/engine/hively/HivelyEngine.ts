@@ -9,6 +9,28 @@ import { getDevilboxAudioContext } from '@/utils/audio-context';
 import type { IsolationCapableEngine } from '@engine/tone/ChannelRoutedEffects';
 import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffects';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
+
+/** Hively appends a defensive factory-name hint (see original source). */
+function hivelyTransform(code: string): string {
+  let out = code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
+    .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
+  // Dynamic-factory-name alias — preserve the original's two-step fallback exactly.
+  out += '\nvar createHively = createHively || ' + (out.match(/var\s+(\w+)\s*=\s*\(\s*\)\s*=>/)?.[1] ?? 'createHively') + ';';
+  if (!out.includes('var createHively =')) {
+    out += '\n// Factory is already named createHively via EXPORT_NAME';
+  }
+  return out;
+}
 
 export interface HivelyTuneInfo {
   name: string;
@@ -31,38 +53,22 @@ export interface HivelyPositionUpdate {
 
 type PositionCallback = (update: HivelyPositionUpdate) => void;
 
-export class HivelyEngine implements IsolationCapableEngine {
+export class HivelyEngine extends WASMSingletonBase implements IsolationCapableEngine {
   private static readonly MAX_ISOLATION_SLOTS = 4;
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: HivelyEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _tunePromise: Promise<HivelyTuneInfo> | null = null;
   private _resolveTune: ((info: HivelyTuneInfo) => void) | null = null;
   private _rejectTune: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
-  private _disposed = false;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(HivelyEngine.cache);
   }
 
   static getInstance(): HivelyEngine {
@@ -82,71 +88,18 @@ export class HivelyEngine implements IsolationCapableEngine {
     return !!HivelyEngine.instance && !HivelyEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await HivelyEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[HivelyEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'hively',
+      workletFile: 'Hively.worklet.js',
+      wasmFile: 'Hively.wasm',
+      jsFile: 'Hively.js',
+      transformJS: hivelyTransform,
+      workletCacheBust: true,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      // Register worklet module with this context
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}hively/Hively.worklet.js?v=${Date.now()}`);
-      } catch {
-        // Module might already be registered
-      }
-
-      // Fetch WASM binary and JS code (shared across contexts)
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}hively/Hively.wasm`),
-          fetch(`${baseUrl}hively/Hively.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten ESM output for worklet Function() execution
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            // All HEAPxx vars are closure-local in the Emscripten factory and are never
-            // written to the Module object returned by createHively(). Mirror the two
-            // views the worklet uses (HEAPU8 for byte copies, HEAPF32 for decoded audio)
-            // onto Module inside updateMemoryViews() so they stay current after memory grows.
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          code += '\nvar createHively = createHively || ' + code.match(/var\s+(\w+)\s*=\s*\(\s*\)\s*=>/)?.[1] + ';';
-          // Simpler approach: just make sure the factory is accessible
-          if (!code.includes('var createHively =')) {
-            code += '\n// Factory is already named createHively via EXPORT_NAME';
-          }
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'hively-processor', {
@@ -194,7 +147,6 @@ export class HivelyEngine implements IsolationCapableEngine {
             this._resolveTune = null;
             this._rejectTune = null;
           }
-          // Unblock any pending waitForPlayerHandle() callers (e.g. pool-full) with sentinel -1
           if (this._playerHandleResolvers.length > 0) {
             const resolve = this._playerHandleResolvers.shift()!;
             resolve(-1);
@@ -234,16 +186,11 @@ export class HivelyEngine implements IsolationCapableEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: HivelyEngine.wasmBinary,
-      jsCode: HivelyEngine.jsCode,
+      wasmBinary: HivelyEngine.cache.wasmBinary,
+      jsCode: HivelyEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  /** Wait for WASM initialization to complete */
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   /** Load a .hvl or .ahx tune from binary data */
@@ -392,15 +339,12 @@ export class HivelyEngine implements IsolationCapableEngine {
     this.workletNode.port.postMessage({ type: 'diagIsolation' });
   }
 
-  dispose(): void {
-    this._disposed = true;
+  override dispose(): void {
     for (let i = 0; i < HivelyEngine.MAX_ISOLATION_SLOTS; i++) {
       if (this._isolationSlotMasks[i] !== null) this.removeIsolation(i);
     }
     this._isolationSlotMasks.fill(null);
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+    super.dispose();
     this._positionCallbacks.clear();
     this._songEndCallbacks.clear();
     if (HivelyEngine.instance === this) {

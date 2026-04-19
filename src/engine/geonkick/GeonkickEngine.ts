@@ -12,6 +12,12 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
 /** Matches gkick_filter_type in src/dsp/src/geonkick.h. */
 export const GeonkickFilterType = {
@@ -47,10 +53,6 @@ export const GeonkickKickEnvelope = {
 } as const;
 export type GeonkickKickEnvelope = (typeof GeonkickKickEnvelope)[keyof typeof GeonkickKickEnvelope];
 
-/**
- * Per-oscillator envelope slots. Matches GKICK_OSC_*_ENVELOPE in
- * src/dsp/src/synthesizer.h.
- */
 export const GeonkickOscEnvelope = {
   Amplitude:    0,
   Frequency:    1,
@@ -59,12 +61,6 @@ export const GeonkickOscEnvelope = {
 } as const;
 export type GeonkickOscEnvelope = (typeof GeonkickOscEnvelope)[keyof typeof GeonkickOscEnvelope];
 
-/**
- * One envelope control point. x and y are normalised to [0, 1]:
- *   x = time as a fraction of the kick length (0 = start, 1 = end)
- *   y = value as a fraction of the parameter's dynamic range
- *   controlPoint = true means this is a curve-shaping handle, not a vertex
- */
 export interface GeonkickEnvelopePoint {
   x: number;
   y: number;
@@ -81,32 +77,21 @@ function serializeEnvelopePoints(points: GeonkickEnvelopePoint[]): Float32Array 
   return out;
 }
 
-export class GeonkickEngine {
+export class GeonkickEngine extends WASMSingletonBase {
   private static instance: GeonkickEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _rejectInit: ((err: Error) => void) | null = null;
-  private _disposed = false;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
+    super();
+    // Replace the base class's init promise with one that also holds a reject
+    // handle (so worklet errors during init can reject() the consumer's ready()).
     this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
       this._rejectInit = reject;
     });
-
-    this.initialize();
+    this.initialize(GeonkickEngine.cache);
   }
 
   static getInstance(): GeonkickEngine {
@@ -128,66 +113,16 @@ export class GeonkickEngine {
     return !!GeonkickEngine.instance && !GeonkickEngine.instance._disposed;
   }
 
-  /** Resolves when the worklet has created its WASM synth instance. */
-  ready(): Promise<void> {
-    return this._initPromise;
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'geonkick',
+      workletFile: 'Geonkick.worklet.js',
+      wasmFile: 'Geonkick.wasm',
+      jsFile: 'Geonkick.js',
+    };
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await GeonkickEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[GeonkickEngine] initialization failed:', err);
-      this._rejectInit?.(err as Error);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-    const existing = this.initPromises.get(context);
-    if (existing) return existing;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      await context.audioWorklet.addModule(`${baseUrl}geonkick/Geonkick.worklet.js`);
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResp, jsResp] = await Promise.all([
-          fetch(`${baseUrl}geonkick/Geonkick.wasm`),
-          fetch(`${baseUrl}geonkick/Geonkick.js`),
-        ]);
-        if (wasmResp.ok) this.wasmBinary = await wasmResp.arrayBuffer();
-        if (jsResp.ok) {
-          let code = await jsResp.text();
-          // Transform the Emscripten glue so it evaluates cleanly inside
-          // `new Function()` in an AudioWorklet context, and so HEAPF32 /
-          // HEAPU8 become accessible via the returned Module object.
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(
-              /HEAPU8=new Uint8Array\(b\);/,
-              'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;',
-            )
-            .replace(
-              /HEAPF32=new Float32Array\(b\);/,
-              'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;',
-            );
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     this.workletNode = new AudioWorkletNode(this.audioContext, 'geonkick-processor', {
       outputChannelCount: [2],
       numberOfOutputs: 1,
@@ -209,8 +144,8 @@ export class GeonkickEngine {
 
     this.workletNode.port.postMessage({
       type: 'init',
-      wasmBinary: GeonkickEngine.wasmBinary,
-      jsCode: GeonkickEngine.jsCode,
+      wasmBinary: GeonkickEngine.cache.wasmBinary,
+      jsCode: GeonkickEngine.cache.jsCode,
     });
   }
 
@@ -279,7 +214,6 @@ export class GeonkickEngine {
     this.workletNode?.port.postMessage({ type: 'setDistortionEnabled', enabled });
   }
 
-  /** Drive amount; 1.0 is unity, higher values push harder into saturation. */
   setDistortionDrive(drive: number): void {
     this.workletNode?.port.postMessage({
       type: 'setDistortionDrive',
@@ -287,7 +221,6 @@ export class GeonkickEngine {
     });
   }
 
-  /** Distortion out-limiter ("volume" knob in the upstream UI). */
   setDistortionVolume(volume: number): void {
     this.workletNode?.port.postMessage({
       type: 'setDistortionVolume',
@@ -296,7 +229,6 @@ export class GeonkickEngine {
   }
 
   // ── Oscillators ─────────────────────────────────────────────────────────
-  // 9 oscillators per instrument: 0..2 = group 0, 3..5 = group 1, 6..8 = group 2.
 
   enableOscillator(oscIndex: number, enabled: boolean): void {
     this.workletNode?.port.postMessage({
@@ -409,10 +341,6 @@ export class GeonkickEngine {
 
   // ── Envelopes ───────────────────────────────────────────────────────────
 
-  /**
-   * Replace a kick-level envelope (amp, freq, filter cutoff, pitch shift,
-   * distortion, etc.). Triggers a rebake on the worker stub.
-   */
   setKickEnvelope(envType: GeonkickKickEnvelope, points: GeonkickEnvelopePoint[]): void {
     if (!this.workletNode || points.length === 0) return;
     const serialized = serializeEnvelopePoints(points);
@@ -426,7 +354,6 @@ export class GeonkickEngine {
     );
   }
 
-  /** Replace a per-oscillator envelope (0..8 for oscIndex, 0..3 for envIndex). */
   setOscillatorEnvelope(
     oscIndex: number,
     envIndex: GeonkickOscEnvelope,
@@ -445,18 +372,8 @@ export class GeonkickEngine {
     );
   }
 
-  dispose(): void {
-    if (this._disposed) return;
-    this._disposed = true;
-    if (this.workletNode) {
-      try {
-        this.workletNode.port.postMessage({ type: 'dispose' });
-      } catch {
-        /* port may already be closed */
-      }
-      this.workletNode.disconnect();
-      this.workletNode = null;
-    }
+  override dispose(): void {
+    super.dispose();
     try {
       this.output.disconnect();
     } catch {
