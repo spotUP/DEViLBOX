@@ -160,9 +160,6 @@ function deepClonePlaylists(playlists: DJPlaylist[]): DJPlaylist[] {
 
 const MAX_UNDO = 30;
 
-// SID playlist detection keywords (used by repairSIDTracks below)
-const SID_PLAYLIST_KEYWORDS = ['sid', 'c64', 'commodore', 'dual sid', '6581', '8580'];
-
 // ── Store ────────────────────────────────────────────────────────────────────
 
 export const useDJPlaylistStore = create<DJPlaylistState>()(
@@ -744,8 +741,6 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             pl.environment = undefined;
             pl.masterEffects = undefined;
           }
-          // Async migration: resolve SID tracks missing hvsc: prefix
-          repairSIDTracks(state.playlists);
         }
       },
     },
@@ -762,153 +757,6 @@ function pushUndo(state: DJPlaylistState): void {
   state._redoStack = [];
   state.canUndo = true;
   state.canRedo = false;
-}
-
-// ── Repair SID tracks missing hvsc: prefix ───────────────────────────────────
-
-function isSIDPlaylist(name: string): boolean {
-  const lower = name.toLowerCase();
-  return SID_PLAYLIST_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-async function repairSIDTracks(playlists: DJPlaylist[]): Promise<void> {
-  const toFix: { playlistId: string; index: number; track: PlaylistTrack }[] = [];
-
-  for (const pl of playlists) {
-    const plIsSID = isSIDPlaylist(pl.name);
-    for (let i = 0; i < pl.tracks.length; i++) {
-      const t = pl.tracks[i];
-      if (t.fileName.startsWith('hvsc:') || t.fileName.startsWith('modland:')) continue;
-
-      // Detect SID by: playlist name keywords, format field, or .sid extension
-      const isSID = plIsSID ||
-        t.format === 'SID' ||
-        t.fileName.toLowerCase().endsWith('.sid') ||
-        t.trackName?.toLowerCase().endsWith('.sid');
-      if (isSID) toFix.push({ playlistId: pl.id, index: i, track: t });
-    }
-  }
-  if (toFix.length === 0) return;
-
-  console.log(`[DJPlaylistStore] Repairing ${toFix.length} SID tracks missing hvsc: prefix...`);
-
-  try {
-    const { searchHVSC } = await import('@/lib/hvscApi');
-    let fixed = 0;
-
-    for (const { playlistId, index, track } of toFix) {
-      try {
-        const raw = (track.trackName || track.fileName);
-        // Step 1: basic cleanup (keep hyphens — they're part of HVSC filenames)
-        const stripped = raw
-          .replace(/\.sid$/i, '')
-          .replace(/\s*\([^)]*\)\s*$/i, '')     // strip any trailing parenthetical: (sid), (DCP), (Low+High, Res. F)
-          .replace(/^(\d{1,3})\.\s*/, '')         // strip leading track number "01. "
-          .replace(/\s+(?:2SID|3SID|SCC\s+Extended)\s*$/i, '') // strip SID variant suffixes
-          .trim();
-        if (!stripped) continue;
-
-        // Step 2: split artist/title on " - " BEFORE replacing hyphens
-        let artist = '';
-        let songTitle = '';
-        const dashSplit = stripped.split(/\s+-\s+/);
-        if (dashSplit.length >= 2) {
-          artist = dashSplit[0].replace(/_/g, ' ').trim();
-          songTitle = dashSplit.slice(1).join(' - ').replace(/_/g, ' ').trim();
-        } else {
-          // No " - " separator — try double-space split (old format)
-          const underscored = stripped.replace(/_/g, ' ');
-          const parts = underscored.split(/\s{2,}/);
-          if (parts.length >= 2) {
-            artist = parts[0].trim();
-            songTitle = parts.slice(1).join(' ').trim();
-          } else {
-            songTitle = underscored;
-          }
-        }
-        // Also strip 2SID/SCC Extended from song title after splitting
-        songTitle = songTitle
-          .replace(/\s+(?:2SID|3SID|SCC\s+Extended)\s*$/i, '')
-          .trim();
-
-        type HVSCResult = { isDirectory: boolean; name: string; path: string; author?: string };
-        const filterSID = (r: HVSCResult) => !r.isDirectory && r.path.toLowerCase().endsWith('.sid');
-
-        // Build search queries in priority order
-        let sidResults: HVSCResult[] = [];
-        const searches: string[] = [];
-
-        // 1. Song title (most specific — preserves hyphens like "Disco-Data")
-        if (songTitle.length >= 2) searches.push(songTitle);
-        // 2. Artist + song title
-        if (artist && songTitle && artist !== songTitle) searches.push(`${artist} ${songTitle}`);
-        // 3. Fallback: shorter queries — multi-word titles often fail the API
-        const words = songTitle.split(/[\s-]+/).filter(w => w.length >= 3);
-        if (words.length > 2) searches.push(words.slice(0, 2).join(' '));
-        // 4. Single longest word (catches "Doublebass v2" → "Doublebass")
-        const longest = words.length > 0 ? words.reduce((a, b) => a.length >= b.length ? a : b) : '';
-        if (longest.length >= 4 && !searches.includes(longest)) searches.push(longest);
-        // 5. Final fallback: full cleaned string
-        if (searches.length === 0) searches.push(stripped.replace(/_/g, ' '));
-
-        for (const query of searches) {
-          sidResults = (await searchHVSC(query, 100)).filter(filterSID);
-          if (sidResults.length > 0) break;
-          await new Promise(r => setTimeout(r, 150));
-        }
-
-        // Score results: prefer exact name match, then artist match, then first result
-        let match: HVSCResult | undefined;
-        if (sidResults.length > 0) {
-          // Normalize for comparison: underscores→spaces, hyphens→hyphens, lowercase
-          const norm = (s: string) => s.toLowerCase().replace(/\.sid$/i, '').replace(/_/g, ' ').trim();
-          const lowerSong = norm(songTitle);
-          const lowerArtist = artist.toLowerCase();
-
-          // Exact song name match
-          match = sidResults.find(r => norm(r.name) === lowerSong);
-          // Also try with hyphens normalized to spaces on both sides
-          if (!match) {
-            const flatSong = lowerSong.replace(/-/g, ' ');
-            match = sidResults.find(r => norm(r.name).replace(/-/g, ' ') === flatSong);
-          }
-          // Partial song name match + artist in path/author
-          if (!match && lowerArtist) {
-            match = sidResults.find(r => {
-              const rName = norm(r.name);
-              const rPath = r.path.toLowerCase();
-              const rAuthor = (r.author || '').toLowerCase();
-              return rName.includes(lowerSong) &&
-                (rPath.includes(lowerArtist) || rAuthor.includes(lowerArtist));
-            });
-          }
-          // Partial song name match
-          if (!match) {
-            match = sidResults.find(r => norm(r.name).includes(lowerSong));
-          }
-          if (!match) match = sidResults[0];
-        }
-
-        if (match) {
-          useDJPlaylistStore.getState().updateTrackMeta(playlistId, index, {
-            fileName: `hvsc:${match.path}`,
-            trackName: track.trackName || match.name.replace(/\.sid$/i, ''),
-          });
-          fixed++;
-          console.log(`[DJPlaylistStore] Fixed: "${songTitle}" → hvsc:${match.path}`);
-        } else {
-          // Track exists in playlist but no HVSC match — not an error, just unmatched
-        }
-        await new Promise(r => setTimeout(r, 150));
-      } catch (err) {
-        console.warn(`[DJPlaylistStore] Failed to repair "${track.trackName}":`, err);
-      }
-    }
-
-    console.log(`[DJPlaylistStore] SID repair complete: ${fixed}/${toFix.length} fixed`);
-  } catch (err) {
-    console.warn('[DJPlaylistStore] SID repair skipped (server unavailable):', err);
-  }
 }
 
 // ── Auto-import bundled playlists on first launch ────────────────────────────
