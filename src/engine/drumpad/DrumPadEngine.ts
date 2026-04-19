@@ -205,15 +205,31 @@ export class DrumPadEngine {
    * feeding the dub bus long after the note releases — the echo never gets
    * a chance to decay because new input keeps arriving. With this fade the
    * bus stops receiving signal ~100ms after the pad release, and the echo
-   * tail then decays on its own at its natural rate (~4s at intensity 0.62).
+   * tail then decays on its own at its natural rate.
+   *
+   * When the last synth tap on the bus detaches AND no dub-action releasers
+   * are active, trigger the bus's mini-drain so the echo's recirculating
+   * energy snaps to zero for a 180ms window. Without this, rapid-fire stress
+   * testing accumulates energy in the echo's internal feedback loop that
+   * keeps ringing (the "pulsating bass tail after 20s" the user reported)
+   * long after every pad has released.
    */
   detachSynthPadDubSend(padId: number, fadeSec = 0.1): void {
     const existing = this.synthPadDubSends.get(padId);
     if (!existing) return;
     this.synthPadDubSends.delete(padId);
     const { tap } = existing;
-    if (fadeSec <= 0) {
+    const finishDisconnect = () => {
       try { tap.disconnect(); } catch { /* ok */ }
+      // If this was the last synth tap, mini-drain the bus so any accumulated
+      // echo energy stops ringing. Safe no-op when dub actions are in flight —
+      // the mini-drain checks for that.
+      if (this.synthPadDubSends.size === 0) {
+        try { this.dubBus.miniDrainIfIdle(); } catch { /* ok */ }
+      }
+    };
+    if (fadeSec <= 0) {
+      finishDisconnect();
       return;
     }
     const now = this.context.currentTime;
@@ -222,9 +238,7 @@ export class DrumPadEngine {
       tap.gain.setValueAtTime(tap.gain.value, now);
       tap.gain.linearRampToValueAtTime(0, now + fadeSec);
     } catch { /* ok */ }
-    setTimeout(() => {
-      try { tap.disconnect(); } catch { /* ok */ }
-    }, Math.ceil(fadeSec * 1000) + 20);
+    setTimeout(finishDisconnect, Math.ceil(fadeSec * 1000) + 20);
   }
 
   setDubBusSettings(settings: Partial<DubBusSettings>): void {

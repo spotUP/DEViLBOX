@@ -383,6 +383,14 @@ export class DubBus {
    * while panic is draining (its 2 s drain is authoritative) or while
    * the bus is disabled (nothing to drain).
    */
+  /**
+   * Public entry for consumers that feed the bus without going through a
+   * dub-action releaser — currently: the drumpad synth-pad tap, which
+   * detaches on pad release and wants the tail to stop shortly after.
+   * Delegates to the same internal mini-drain used by action releasers.
+   */
+  miniDrainIfIdle(): void { this._miniDrainIfIdle(); }
+
   private _miniDrainIfIdle(): void {
     if (this._draining) return;
     if (!this.enabled) return;
