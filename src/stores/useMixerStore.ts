@@ -575,6 +575,7 @@ export interface MixerChannelState {
   effects: [string | null, string | null]; // 2 FX slots: effect type name or null (legacy)
   insertEffects: EffectConfig[]; // Full insert effect chain (up to 4)
   sendLevels: number[]; // Send levels per return bus (0-1), indexed by bus number
+  dubSend: number;  // 0–1 send into shared DubBus (0 = no send, 1 = full send)
 }
 
 function defaultChannels(): MixerChannelState[] {
@@ -587,6 +588,7 @@ function defaultChannels(): MixerChannelState[] {
     effects: [null, null],
     insertEffects: [],
     sendLevels: [0, 0, 0, 0], // 4 send buses
+    dubSend: 0,               // dub bus send (0 = off)
   }));
 }
 
@@ -644,6 +646,9 @@ interface MixerStoreActions {
   toggleChannelInsertEffect: (ch: number, effectIndex: number) => void;
   moveChannelInsertEffect: (ch: number, fromIndex: number, toIndex: number) => void;
   updateChannelInsertEffect: (ch: number, effectIndex: number, updates: Partial<EffectConfig>) => void;
+
+  // Dub bus send
+  setChannelDubSend: (ch: number, amount: number) => void;
 
   // Send levels
   setChannelSendLevel: (ch: number, sendIndex: number, level: number) => void;
@@ -859,6 +864,16 @@ export const useMixerStore = create<MixerStore>()(
           } catch { /* manager not initialized yet */ }
         }
       }
+    },
+
+    // Dub bus send
+    setChannelDubSend(ch: number, amount: number): void {
+      const clamped = Math.max(0, Math.min(1, amount));
+      set((state) => {
+        if (ch < 0 || ch >= state.channels.length) return;
+        state.channels[ch].dubSend = clamped;
+      });
+      getChannelEffectsManager().setChannelDubSend(ch, clamped);
     },
 
     // Send levels

@@ -13,6 +13,7 @@
 
 import * as Tone from 'tone';
 import type { EffectConfig } from '@typedefs/instrument';
+import type { DubBus } from './dub/DubBus';
 import { createEffect } from './factories/EffectFactory';
 import { applyEffectParametersDiff } from './tone/EffectParameterEngine';
 
@@ -30,6 +31,10 @@ interface ChannelFXChain {
 
 class ChannelEffectsManager {
   private chains: Map<number, ChannelFXChain> = new Map();
+  // Per-channel dub-send taps. Each tap sits on the channel's FX-chain output,
+  // fans audio into DubBus.inputNode at the channel's dubSend gain. Created
+  // lazily on first non-zero setChannelDubSend call; destroyed when amount → 0.
+  private dubSendTaps: Map<number, Tone.Gain> = new Map();
 
   /**
    * Get or create the effect chain for a channel.
@@ -243,9 +248,80 @@ class ChannelEffectsManager {
   }
 
   /**
+   * Set the dub-send level for a channel. Creates the tap on first non-zero
+   * call; updates its gain on subsequent calls; tears down when amount=0.
+   *
+   * The tap reads from the channel's FX-chain output (post-effects) and writes
+   * into the shared DubBus via getDubBus(). Mirrors the pattern used by
+   * DrumPadEngine.attachSynthPadDubSend().
+   *
+   * Also registers the tap with DubBus so openChannelTap (echoThrow) can
+   * address this channel's send by ID.
+   */
+  setChannelDubSend(channelIndex: number, amount: number): void {
+    const clamped = Math.max(0, Math.min(1, amount));
+    const existing = this.dubSendTaps.get(channelIndex);
+
+    if (clamped <= 0) {
+      // Teardown path
+      if (!existing) return;
+      try { existing.disconnect(); existing.dispose(); } catch { /* ok */ }
+      this.dubSendTaps.delete(channelIndex);
+      try { this.getDubBus()?.unregisterChannelTap(channelIndex); } catch { /* ok */ }
+      return;
+    }
+
+    if (existing) {
+      // Update gain smoothly — no node rebuild
+      existing.gain.rampTo(clamped, 0.02);
+      return;
+    }
+
+    // Create path: first non-zero call for this channel
+    const dubBus = this.getDubBus();
+    if (!dubBus) {
+      console.warn(`[ChannelFX] setChannelDubSend(ch=${channelIndex}): no DubBus available — engine not ready yet`);
+      return;
+    }
+    const chain = this.getOrCreateChain(channelIndex);
+    const tap = new Tone.Gain(clamped);
+    chain.output.connect(tap);
+    // Tone.Gain → native GainNode: use Tone.connect with cast (same pattern as DubBus internal wiring)
+    Tone.connect(tap, dubBus.inputNode as unknown as Tone.InputNode);
+    this.dubSendTaps.set(channelIndex, tap);
+    dubBus.registerChannelTap(channelIndex, tap);
+  }
+
+  /**
+   * Resolve the shared DubBus via DrumPadEngine. Returns null until the engine
+   * has been created (first pad trigger or DJ view open). Uses a lazy dynamic
+   * import of getDrumPadEngine to avoid a hard module-load circular dep between
+   * the engine layer and the hook layer.
+   */
+  private getDubBus(): DubBus | null {
+    try {
+      // Lazy import: getDrumPadEngine is only needed at runtime, not at module
+      // load time. The dynamic require avoids a load-time circular dependency
+      // since useMIDIPadRouting imports DrumPadEngine which doesn't import us.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getDrumPadEngine } = require('../hooks/drumpad/useMIDIPadRouting') as {
+        getDrumPadEngine: () => import('../engine/drumpad/DrumPadEngine').DrumPadEngine | null;
+      };
+      return getDrumPadEngine()?.getDubBus() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Dispose all channel effect chains.
    */
   disposeAll(): void {
+    // Tear down dub-send taps first (they connect output → dubBus.inputNode)
+    for (const tap of this.dubSendTaps.values()) {
+      try { tap.disconnect(); tap.dispose(); } catch { /* ok */ }
+    }
+    this.dubSendTaps.clear();
     for (const chain of this.chains.values()) {
       for (const fx of chain.effects) {
         try { fx.node.disconnect(); } catch { /* ok */ }
@@ -263,6 +339,13 @@ class ChannelEffectsManager {
    * Dispose a single channel's effects.
    */
   disposeChannel(channelIndex: number): void {
+    // Tear down dub-send tap for this channel if present
+    const tap = this.dubSendTaps.get(channelIndex);
+    if (tap) {
+      try { tap.disconnect(); tap.dispose(); } catch { /* ok */ }
+      this.dubSendTaps.delete(channelIndex);
+      try { this.getDubBus()?.unregisterChannelTap(channelIndex); } catch { /* ok */ }
+    }
     const chain = this.chains.get(channelIndex);
     if (!chain) return;
     for (const fx of chain.effects) {
