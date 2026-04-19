@@ -123,10 +123,13 @@ export class DubBus {
   // (default 40 Hz = effectively off) so drumpad pads + tracker channels,
   // which feed the bus input directly, pass their bass through.
   private deckHpf!: BiquadFilterNode;
-  // Tracker channel taps — per-channel Tone.Gain nodes registered by
-  // ChannelEffectsManager when a channel's dubSend > 0. Used by openChannelTap
-  // so echoThrow can momentarily bump a channel's send to full.
-  private channelTaps: Map<number, Tone.Gain> = new Map();
+  // Tracker channel taps — per-channel native GainNode instances registered by
+  // ChannelRoutedEffects when a channel's dubSend > 0. Used by openChannelTap
+  // so echoThrow can momentarily bump a channel's send to full. Native
+  // GainNodes (not Tone.Gain) because the worklet output is a raw AudioNode;
+  // wrapping in Tone.Gain would add an unnecessary node without buying
+  // anything (all the methods we use are native AudioParam APIs).
+  private channelTaps: Map<number, GainNode> = new Map();
   private attachedMixer: DJMixerEngine | null = null;
   // Track mixer→tap connections so we can cleanly detach if the mixer changes.
   private mixerTapConnections: Array<{ nativeFrom: AudioNode; to: GainNode }> = [];
@@ -888,12 +891,12 @@ export class DubBus {
 
   // ─── Tracker Channel Tap API ───────────────────────────────────────────────
 
-  /** Called by ChannelEffectsManager when a per-channel tap is created. */
-  registerChannelTap(channelId: number, tap: Tone.Gain): void {
+  /** Called by ChannelRoutedEffects when a per-channel tap is created. */
+  registerChannelTap(channelId: number, tap: GainNode): void {
     this.channelTaps.set(channelId, tap);
   }
 
-  /** Called by ChannelEffectsManager when a tap is torn down (dubSend → 0). */
+  /** Called by ChannelRoutedEffects when a tap is torn down (dubSend → 0). */
   unregisterChannelTap(channelId: number): void {
     this.channelTaps.delete(channelId);
   }
@@ -914,14 +917,16 @@ export class DubBus {
 
     const baseline = tap.gain.value;
     const clamped = Math.min(1, Math.max(0, amount));
-    tap.gain.cancelScheduledValues(this.context.currentTime);
-    tap.gain.rampTo(clamped, attackSec);
+    const now = this.context.currentTime;
+    tap.gain.cancelScheduledValues(now);
+    tap.gain.setValueAtTime(tap.gain.value, now);
+    tap.gain.linearRampToValueAtTime(clamped, now + attackSec);
 
     return () => {
       const release = this.context.currentTime;
       tap.gain.cancelScheduledValues(release);
       tap.gain.setValueAtTime(tap.gain.value, release);
-      tap.gain.rampTo(baseline, 0.08);
+      tap.gain.linearRampToValueAtTime(baseline, release + 0.08);
     };
   }
 

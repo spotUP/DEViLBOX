@@ -2,8 +2,10 @@
  * ChannelRoutedEffects — Per-channel effect routing via multi-output worklet.
  *
  * Architecture: Any engine implementing IsolationCapableEngine can provide
- * per-channel isolation. The worklet has 5 outputs: output[0] = main mix,
- * outputs[1-4] = isolation slots. Each slot renders ONLY the target channels.
+ * per-channel isolation. The worklet has 37 outputs total:
+ *   - output[0]            = main mix
+ *   - output[1..4]         = isolation slots (shared pool, per-channel effects)
+ *   - output[5..36]        = per-channel dub sends (32 slots, one per channel)
  *
  * Supported engines:
  *   - LibOpenMPT: secondary openmpt module instances in lockstep
@@ -13,7 +15,7 @@
  *
  *   worklet output[0] (main mix, isolated ch muted) → gainNode → synthBus → master
  *   worklet output[1] (ch1 only) → BitCrusher → masterEffectsInput
- *   worklet output[2] (ch3 only) → Reverb → masterEffectsInput
+ *   worklet output[5+ch]  → channelDubGain[ch] → DubBus.inputNode
  */
 
 import * as Tone from 'tone';
@@ -21,6 +23,11 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { createEffect } from '../factories/EffectFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { applyEffectParametersDiff } from './EffectParameterEngine';
+
+/** First worklet output index dedicated to per-channel dub sends. */
+export const DUB_OUTPUT_BASE = 5;
+/** Max tracker channels that can be dubbed simultaneously (per-engine). */
+export const MAX_DUB_CHANNELS = 32;
 
 /**
  * Interface for any WASM engine that supports per-channel isolation via
@@ -88,6 +95,23 @@ export class ChannelRoutedEffectsManager {
    */
   private sidechainConsumers = new Map<number, Set<AudioNode>>();
   private sidechainTaps = new Map<number, { slotIndex: number; outputGain: GainNode }>();
+
+  /**
+   * Dub bus wiring — per-channel GainNode array. Each gain:
+   *   worklet output[DUB_OUTPUT_BASE + ch] → channelDubGains[ch] → dubBusInput
+   *
+   * Gains exist for the lifetime of the manager once setupDubBusWiring runs.
+   * The worklet→gain connection is established lazily on first non-zero
+   * setChannelDubSend (so muted channels cost nothing in the worklet).
+   * Survives engine rebuilds via rebuildDubConnections(), which re-posts
+   * dubChannelEnable + re-connects worklet outputs to the pre-existing gains.
+   */
+  private dubBusInput: AudioNode | null = null;
+  private channelDubGains: (GainNode | null)[] = new Array(MAX_DUB_CHANNELS).fill(null);
+  /** Target gain value each channel should ramp to. Persists across engine rebuilds. */
+  private channelDubSendValues: number[] = new Array(MAX_DUB_CHANNELS).fill(0);
+  /** Active state — true when the worklet is rendering this channel into its dub output. */
+  private channelDubActive: boolean[] = new Array(MAX_DUB_CHANNELS).fill(false);
 
   constructor(masterEffectsInput: Tone.Gain) {
     this.masterEffectsInput = masterEffectsInput;
@@ -216,6 +240,171 @@ export class ChannelRoutedEffectsManager {
     this.sidechainTaps.set(channelIndex, { slotIndex: freeSlot, outputGain });
     console.log(`[ChannelRoutedEffects] Sidechain tap: slot ${freeSlot} → ch${channelIndex + 1} (routed back to mix)`);
     return true;
+  }
+
+  // ── Per-channel dub bus wiring ──────────────────────────────────
+
+  /**
+   * Allocate 32 per-channel GainNodes and wire them into the DubBus input.
+   * Called once by DubDeckStrip on mount, after ensureDrumPadEngine() has
+   * constructed the DubBus. Idempotent — repeat calls with the same
+   * dubBusInput are no-ops; a different dubBusInput tears down the old wiring
+   * first.
+   *
+   * The GainNodes exist independently of any engine. setChannelDubSend uses
+   * `dubBusInput.context` to stay in the correct audio graph.
+   */
+  setupDubBusWiring(dubBusInput: AudioNode): void {
+    if (this.dubBusInput === dubBusInput) return;
+    // Tear down existing wiring if we're switching buses (rare — happens if
+    // the DubBus is disposed and recreated).
+    if (this.dubBusInput) this._teardownDubWiring();
+
+    this.dubBusInput = dubBusInput;
+    const ctx = dubBusInput.context as AudioContext;
+    for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      g.connect(dubBusInput);
+      this.channelDubGains[ch] = g;
+    }
+    console.log(`[ChannelRoutedEffects] Dub bus wiring ready (32 per-channel gains → dubBusInput)`);
+  }
+
+  private _teardownDubWiring(): void {
+    for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+      const g = this.channelDubGains[ch];
+      if (g) {
+        try { g.disconnect(); } catch { /* ok */ }
+      }
+      this.channelDubGains[ch] = null;
+      this.channelDubActive[ch] = false;
+    }
+    this.dubBusInput = null;
+  }
+
+  /**
+   * Set the dub-send level for tracker channel `ch`. Lazy activation: on first
+   * non-zero call, asks the active isolation engine to start rendering this
+   * channel into output[DUB_OUTPUT_BASE + ch], connects that output to the
+   * per-channel GainNode, and registers the gain with DubBus so
+   * openChannelTap (echoThrow) can address it. On return to zero, asks the
+   * worklet to stop rendering + disconnects.
+   *
+   * Graceful fallback: if setupDubBusWiring hasn't run yet, or no isolation
+   * engine is active, the call warns and returns — the UI knob continues to
+   * move but no audio flows. Re-hydrated via rebuildDubConnections() when an
+   * engine becomes available or restarts.
+   */
+  setChannelDubSend(channelIndex: number, amount: number): void {
+    if (channelIndex < 0 || channelIndex >= MAX_DUB_CHANNELS) return;
+    const clamped = Math.max(0, Math.min(1, amount));
+    this.channelDubSendValues[channelIndex] = clamped;
+
+    const gain = this.channelDubGains[channelIndex];
+    if (!gain || !this.dubBusInput) {
+      console.warn('[ChannelRoutedEffects] setChannelDubSend: dub wiring not set up — caller should invoke setupDubBusWiring first');
+      return;
+    }
+
+    // Always ramp the gain value — works even before the engine is available.
+    const ctx = this.dubBusInput.context as AudioContext;
+    const now = ctx.currentTime;
+    try {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(clamped, now + 0.02);
+    } catch (e) {
+      console.warn('[ChannelRoutedEffects] setChannelDubSend ramp failed:', e);
+    }
+
+    // Lazy activation / deactivation of the worklet render path.
+    const isActive = this.channelDubActive[channelIndex];
+    const shouldBeActive = clamped > 0;
+    if (shouldBeActive && !isActive) {
+      void this._activateDubChannel(channelIndex);
+    } else if (!shouldBeActive && isActive) {
+      void this._deactivateDubChannel(channelIndex);
+    }
+  }
+
+  private async _activateDubChannel(channelIndex: number): Promise<void> {
+    const gain = this.channelDubGains[channelIndex];
+    if (!gain) return;
+    const engine = await getActiveIsolationEngine();
+    if (!engine?.isAvailable()) return;
+    const worklet = engine.getWorkletNode();
+    if (!worklet) return;
+
+    worklet.port.postMessage({ cmd: 'dubChannelEnable', val: { channel: channelIndex } });
+    try {
+      worklet.connect(gain, DUB_OUTPUT_BASE + channelIndex);
+    } catch (e) {
+      console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${DUB_OUTPUT_BASE + channelIndex}:`, e);
+      return;
+    }
+    this.channelDubActive[channelIndex] = true;
+
+    // Register with DubBus so echoThrow can find the tap.
+    try {
+      const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
+      const bus = getDrumPadEngine()?.getDubBus();
+      bus?.registerChannelTap(channelIndex, gain);
+    } catch { /* DubBus not available */ }
+    console.log(`[ChannelRoutedEffects] Dub channel ${channelIndex} activated`);
+  }
+
+  private async _deactivateDubChannel(channelIndex: number): Promise<void> {
+    const gain = this.channelDubGains[channelIndex];
+    if (!gain) return;
+    const engine = await getActiveIsolationEngine();
+    const worklet = engine?.getWorkletNode();
+    if (worklet) {
+      worklet.port.postMessage({ cmd: 'dubChannelDisable', val: { channel: channelIndex } });
+      try { worklet.disconnect(gain, DUB_OUTPUT_BASE + channelIndex); } catch { /* ok */ }
+    }
+    this.channelDubActive[channelIndex] = false;
+
+    try {
+      const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
+      const bus = getDrumPadEngine()?.getDubBus();
+      bus?.unregisterChannelTap(channelIndex);
+    } catch { /* ok */ }
+  }
+
+  /**
+   * Re-establish worklet→gain connections for every active dub channel.
+   * Called after a new song loads (engine's worklet is reused but its play()
+   * path resets module state). The GainNodes + send values are preserved, so
+   * the effect is just re-firing dubChannelEnable + reconnect.
+   */
+  async rebuildDubConnections(): Promise<void> {
+    if (!this.dubBusInput) return;
+    const engine = await getActiveIsolationEngine();
+    if (!engine?.isAvailable()) return;
+    const worklet = engine.getWorkletNode();
+    if (!worklet) return;
+
+    for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
+      if (this.channelDubSendValues[ch] <= 0) continue;
+      const gain = this.channelDubGains[ch];
+      if (!gain) continue;
+      // Fire enable + reconnect. Safe to disconnect first even if not
+      // currently connected (try/catch eats the error).
+      worklet.port.postMessage({ cmd: 'dubChannelEnable', val: { channel: ch } });
+      try { worklet.disconnect(gain, DUB_OUTPUT_BASE + ch); } catch { /* first-time */ }
+      try {
+        worklet.connect(gain, DUB_OUTPUT_BASE + ch);
+        this.channelDubActive[ch] = true;
+        // Re-register with DubBus (channelTaps map is cleared on bus dispose)
+        try {
+          const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');
+          getDrumPadEngine()?.getDubBus()?.registerChannelTap(ch, gain);
+        } catch { /* ok */ }
+      } catch (e) {
+        console.warn(`[ChannelRoutedEffects] rebuildDubConnections: ch${ch} connect failed:`, e);
+      }
+    }
   }
 
   // ── Per-channel effect routing ──────────────────────────────────
@@ -421,6 +610,7 @@ export class ChannelRoutedEffectsManager {
     }
     // On dispose, also clear consumer requests (they won't survive a new manager)
     this.sidechainConsumers.clear();
+    this._teardownDubWiring();
   }
 }
 
