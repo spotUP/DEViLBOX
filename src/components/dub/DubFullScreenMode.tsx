@@ -415,8 +415,33 @@ export const DubFullScreenMode: React.FC = () => {
               <span>{Math.round(dubBusSettings.echoRateMs ?? 0)} ms</span>
             </div>
           </div>
+          <div className="p-2 rounded border border-dark-borderLight bg-dark-bgSecondary text-[10px]">
+            <div className="text-text-muted mb-1">VOICE · {presetLabel(dubBusSettings.characterPreset)}</div>
+            <div className="flex justify-between text-text-primary">
+              <span>Bass shelf</span>
+              <span>{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{(dubBusSettings.bassShelfGainDb ?? 0).toFixed(1)} dB @ {Math.round(dubBusSettings.bassShelfFreqHz ?? 0)}</span>
+            </div>
+            <div className="flex justify-between text-text-primary">
+              <span>Mid scoop</span>
+              <span>{(dubBusSettings.midScoopGainDb ?? 0) > 0 ? '+' : ''}{(dubBusSettings.midScoopGainDb ?? 0).toFixed(1)} dB @ {Math.round(dubBusSettings.midScoopFreqHz ?? 0)}</span>
+            </div>
+            <div className="flex justify-between text-text-primary">
+              <span>Stereo width</span>
+              <span>{(dubBusSettings.stereoWidth ?? 1).toFixed(2)}×</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+function presetLabel(p: string | undefined): string {
+  switch (p) {
+    case 'tubby':        return 'King Tubby';
+    case 'scientist':    return 'Scientist';
+    case 'perry':        return 'Lee Perry';
+    case 'madProfessor': return 'Mad Professor';
+    default:             return 'Custom';
+  }
+}

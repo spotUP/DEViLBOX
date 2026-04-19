@@ -93,6 +93,29 @@ export interface DubBusSettings {
   //   'offbeat' = next half-beat (the "&" between downbeats)
   //   'bar'     = next downbeat only (biggest moves)
   throwQuantize: 'off' | '1/16' | '1/8' | 'offbeat' | 'bar';
+
+  // ─── Sound coloring (research doc 2026-04-20_dub-sound-coloring.md) ──────
+  // King Tubby bass shelf — resonant lowshelf at 90 Hz for the dub "weight."
+  // Gain in dB (negative = cut), Q around 0.7-1.0 for musical shelf.
+  // Default +3 dB to give the bus some inherent dub heft out of the box.
+  bassShelfGainDb: number;
+  bassShelfFreqHz: number;
+  bassShelfQ: number;
+  // Scientist mid-scoop — peaking cut around 700 Hz for the "hollow" dub
+  // space that lets vocals + horns pop through the echo tail. Gain in dB
+  // (negative = cut). Default 0 — engage per-engineer via CHARACTER preset.
+  midScoopGainDb: number;
+  midScoopFreqHz: number;
+  midScoopQ: number;
+  // Master bus stereo width at the return (M/S matrix).
+  //   0.0 = mono (Perry / Tubby era)
+  //   1.0 = neutral stereo (what you have today)
+  //   2.0 = doubled side signal (Mad Professor ping-pong width)
+  stereoWidth: number;
+
+  // Engineer character preset — applies a curated snapshot of every
+  // coloring param when selected. 'custom' = user-edited, don't overwrite.
+  characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor';
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -135,6 +158,114 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // realized they had to pick a sync division explicitly.
   echoSyncDivision: 'off',
   throwQuantize: 'off',
+
+  // Coloring defaults — mild Tubby shelf out of the box so the bus has
+  // some inherent dub character, mid scoop off (engaged per preset),
+  // neutral stereo width. User picks a CHARACTER to load the full voicing.
+  bassShelfGainDb:  3,
+  bassShelfFreqHz:  90,
+  bassShelfQ:       0.9,
+  midScoopGainDb:   0,
+  midScoopFreqHz:   700,
+  midScoopQ:        1.4,
+  stereoWidth:      1.0,
+  characterPreset:  'custom',
+};
+
+// ─── Engineer character presets ─────────────────────────────────────────────
+// Each preset snapshots the coloring params + echo + spring for a signature
+// dub engineer voicing. See research doc
+// thoughts/shared/research/2026-04-20_dub-sound-coloring.md for the sourcing
+// behind each value (console, reverb type, quoted rules).
+//
+// Triggered via setDubBus({ characterPreset: 'tubby' | ... }) — the mirror
+// effect in the bus consumer merges the preset's fields over current
+// settings. Only the fields each preset is *defining* are listed; other
+// params (return gain, sidechain amount) stay at user setting.
+
+export interface DubCharacterPreset {
+  label: string;
+  description: string;
+  overrides: Partial<DubBusSettings>;
+  // Non-settings params (spring params + character flags) are applied
+  // directly to the bus by DubBus.applyCharacterPreset().
+  springsLength?: number;
+  springsDamp?: number;
+  springsChaos?: number;
+  springsScatter?: number;
+  springsTone?: number;
+  tapeSatDrive?: number;  // 0..1 — TapeSat WaveShaper curve drive
+}
+
+export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPreset'], 'custom'>, DubCharacterPreset> = {
+  tubby: {
+    label: 'King Tubby',
+    description: 'Dark, noisy, loose-spring. Stepped filter + tape-echo feedback. Narrow stereo. Light bus compression.',
+    overrides: {
+      hpfCutoff:      100,
+      bassShelfGainDb: 6, bassShelfFreqHz: 90,  bassShelfQ: 0.9,
+      midScoopGainDb:  0,
+      echoIntensity:  0.55,
+      echoRateMs:     300,
+      echoWet:        0.7,
+      springWet:      0.55,
+      sidechainAmount: 0.3,
+      stereoWidth:    0.5,  // narrow — 4-track console + loose spring
+    },
+    springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
+    tapeSatDrive:  0.40,
+  },
+  scientist: {
+    label: 'Scientist',
+    description: 'Bright, dry, precise. Plate not spring. ZERO bus compression. Extreme mid-scoop on drops.',
+    overrides: {
+      hpfCutoff:       80,
+      bassShelfGainDb: 3,
+      midScoopGainDb: -6, midScoopFreqHz: 700, midScoopQ: 1.4,  // the signature Scientist scoop
+      echoIntensity:  0.45,
+      echoRateMs:     280,
+      echoWet:        0.6,
+      springWet:      0.45,   // plate decays faster than spring; less wet
+      sidechainAmount: 0.6,   // more pumping to compensate for no bus comp
+      stereoWidth:    1.2,
+    },
+    springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.65,
+    tapeSatDrive:  0.30,
+  },
+  perry: {
+    label: 'Lee "Scratch" Perry',
+    description: 'Stacked tape saturation. Near-mono. Kickable spring with high chaos. Dark shelf, subtractive air.',
+    overrides: {
+      hpfCutoff:       40,
+      bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
+      midScoopGainDb: -2, midScoopFreqHz: 800,
+      echoIntensity:  0.75,   // 0.75 → ~4 audible repeats (near-feedback)
+      echoRateMs:     380,
+      echoWet:        0.8,
+      springWet:      0.70,
+      sidechainAmount: 0.4,
+      stereoWidth:    0.3,  // near-mono — Perry's defining texture
+    },
+    springsLength: 0.65, springsDamp: 0.10, springsChaos: 0.80, springsScatter: 0.80, springsTone: 0.40,
+    tapeSatDrive:  0.65,   // heavy drive to approximate 3-bounce stack
+  },
+  madProfessor: {
+    label: 'Mad Professor',
+    description: 'Hi-fi clarity. Low shelf + high shelf air. Wide ping-pong stereo. Lush long springs.',
+    overrides: {
+      hpfCutoff:       35,
+      bassShelfGainDb: 3, bassShelfFreqHz: 70, bassShelfQ: 0.7,
+      midScoopGainDb:  0,
+      echoIntensity:  0.40,   // cleaner, fewer repeats
+      echoRateMs:     360,
+      echoWet:        0.55,
+      springWet:      0.55,
+      sidechainAmount: 0.5,
+      stereoWidth:    1.6,  // wide — Ariwa signature
+    },
+    springsLength: 0.50, springsDamp: 0.50, springsChaos: 0.10, springsScatter: 0.50, springsTone: 0.60,
+    tapeSatDrive:  0.15,   // pristine
+  },
 };
 
 // ─── Phase 1: dub lane + event types ──────────────────────────────────────
