@@ -1,0 +1,47 @@
+name: Nightly regression
+
+# Runs once a day against main. Catches regressions that slip between pushes
+# (e.g. a dependency update shipping via Dependabot, or a subtle flake that
+# only surfaces after several runs).
+#
+# TODO(infra): when self-hosted runners with the Reference Music tree and a
+# headless Chromium are available, extend this workflow with:
+#   - `npm run test:playback` (requires dev server at :5173 + MCP relay :4003)
+#   - `npm run test:furnace`  (requires upstream Furnace CLI on PATH)
+#   - `npm run test:ui-smoke` (Puppeteer flows — Phase 3.1)
+# Until then, the nightly job reinforces the push-gate tests and surfaces
+# new engine contract drift via the lifecycle allowlist.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 04:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: CI regression gate
+        run: npm run test:ci
+
+      - name: Effects compliance
+        run: npm run test:compliance
+
+      # The full unit suite (many parsers need Reference Music/ locally) is
+      # skipped on GitHub-hosted runners. Run locally before release:
+      #   npm test
