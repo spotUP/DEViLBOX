@@ -533,6 +533,17 @@ export function useMIDIPadRouting() {
 
         engine.triggerNoteAttack(instId, note, 0, normalizedVel, config);
 
+        // Route the synth pad's output into the shared dub bus at pad.dubSend
+        // level. Tap lives on the instrument's effect-chain output, so this
+        // only kicks in once the chain has been built by ToneEngine. Attaching
+        // on every trigger is cheap: identical source → gain-only update.
+        const padDubSend = pad.dubSend ?? 0;
+        if (padDubSend > 0) {
+          _engine.attachSynthPadDubSend(pad.id, instId, padDubSend);
+        } else {
+          _engine.detachSynthPadDubSend(pad.id);
+        }
+
         // Auto-release for pads that fire-and-forget. Two paths:
         //   1. Sample-only pads — legacy behavior, use `pad.decay` (ms).
         //   2. Synth pads in oneshot mode — DubSiren / Air Horn / Riser.

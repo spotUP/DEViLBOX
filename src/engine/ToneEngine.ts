@@ -1484,6 +1484,21 @@ export class ToneEngine {
   }
 
   /**
+   * Return the final output Gain of an instrument's effect chain, if it has
+   * been built. Used by the drumpad's dub-bus tap to feed synth-pad audio
+   * into the shared dub bus (see DrumPadEngine.attachSynthPadDubSend).
+   *
+   * Returns `undefined` when:
+   *   - The instrument has never been triggered (chain not built yet).
+   *   - The composite key doesn't match (wrong channelIndex).
+   * Callers should attempt re-attachment on the NEXT trigger rather than retry.
+   */
+  public getInstrumentChainOutput(instrumentId: number, channelIndex?: number): Tone.Gain | undefined {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    return this.instrumentEffectChains.get(key)?.output;
+  }
+
+  /**
    * Generate composite key for per-channel instrument instances
    */
   public getInstrumentKey(instrumentId: number, channelIndex?: number): number {
