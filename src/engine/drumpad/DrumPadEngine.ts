@@ -12,6 +12,7 @@ import { createEffectChain } from '../factories/EffectFactory';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { DubBus } from '../dub/DubBus';
+import { getToneEngine } from '../ToneEngine';
 
 
 interface VoiceState {
@@ -51,6 +52,14 @@ export class DrumPadEngine {
 
   // Dub bus — see src/engine/dub/DubBus.ts
   private dubBus!: DubBus;
+
+  // Synth-pad dub sends. Keyed by padId; each entry taps the synth's effect
+  // chain output (from ToneEngine) and routes it through a per-pad Gain into
+  // the shared DubBus input. Lives as long as the pad's instrument lives.
+  private synthPadDubSends: Map<number, {
+    tap: GainNode;
+    source: Tone.ToneAudioNode;
+  }> = new Map();
 
   constructor(context: AudioContext, outputDestination?: AudioNode) {
     this.context = context;
@@ -142,6 +151,57 @@ export class DrumPadEngine {
   }
 
   getDubBusInput(): AudioNode { return this.dubBus.inputNode; }
+
+  /**
+   * Route a synth pad's post-effects audio into the dub bus at `amount` gain.
+   * Called by useMIDIPadRouting after triggering a synth pad with dubSend > 0.
+   *
+   * The tap lives for the life of the instrument; repeat calls update the send
+   * gain in place (for live dubSend knob changes). Passing `amount <= 0`, or
+   * calling detachSynthPadDubSend, removes the tap.
+   *
+   * Silently no-ops when the bus is disabled or when the instrument's effect
+   * chain hasn't been built yet (the caller will retry on the next trigger).
+   */
+  attachSynthPadDubSend(padId: number, instrumentId: number, amount: number): void {
+    if (!this.dubBus.isEnabled || amount <= 0) {
+      this.detachSynthPadDubSend(padId);
+      return;
+    }
+    const instOutput = getToneEngine().getInstrumentChainOutput(instrumentId);
+    if (!instOutput) return; // chain not built yet — caller retries next trigger
+
+    const existing = this.synthPadDubSends.get(padId);
+    if (existing && existing.source === instOutput) {
+      // Same instrument — just update the send gain in place.
+      existing.tap.gain.setTargetAtTime(amount, this.context.currentTime, 0.02);
+      return;
+    }
+    // Instrument changed (or first attach) — tear down any stale tap.
+    if (existing) {
+      try { existing.tap.disconnect(); } catch { /* ok */ }
+      this.synthPadDubSends.delete(padId);
+    }
+
+    const tap = this.context.createGain();
+    tap.gain.value = amount;
+    try {
+      Tone.connect(instOutput, tap as unknown as Tone.InputNode);
+      tap.connect(this.dubBus.inputNode);
+      this.synthPadDubSends.set(padId, { tap, source: instOutput });
+    } catch (err) {
+      console.warn(`[DrumPadEngine] attachSynthPadDubSend pad ${padId}: connect failed`, err);
+      try { tap.disconnect(); } catch { /* ok */ }
+    }
+  }
+
+  /** Remove a pad's synth dub-bus tap. No-op if none exists. */
+  detachSynthPadDubSend(padId: number): void {
+    const existing = this.synthPadDubSends.get(padId);
+    if (!existing) return;
+    try { existing.tap.disconnect(); } catch { /* ok */ }
+    this.synthPadDubSends.delete(padId);
+  }
 
   setDubBusSettings(settings: Partial<DubBusSettings>): void {
     this.dubBus.setSettings(settings);
