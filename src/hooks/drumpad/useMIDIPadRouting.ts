@@ -595,6 +595,11 @@ export function useMIDIPadRouting() {
           if (existing) clearTimeout(existing);
           const timer = setTimeout(() => {
             try { engine.triggerNoteRelease(instId, note, 0, config); } catch { /* ignore */ }
+            // Also fade out the dub-bus tap so the echo tail can actually
+            // decay. Without this the synth's own release/reverb tail keeps
+            // feeding the bus for seconds, stretching the dub tail into tens
+            // of seconds on bass-pad synths with long internal reverb.
+            try { _engine?.detachSynthPadDubSend(pad.id); } catch { /* ignore */ }
             _pendingReleases.delete(instId);
           }, releaseDelayMs);
           _pendingReleases.set(instId, timer);
@@ -686,6 +691,9 @@ export function useMIDIPadRouting() {
           const note = pad.instrumentNote || 'C4';
           getToneEngine().triggerNoteRelease(instId, note, 0, config);
         }
+        // Fade out the dub-bus tap so the echo can decay — see the same
+        // call in the auto-release path above for why this matters.
+        try { _engine.detachSynthPadDubSend(pad.id); } catch { /* ignore */ }
       } catch { /* ignore */ }
     }
   }, [currentProgram, setFxPadActive]);
