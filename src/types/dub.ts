@@ -108,7 +108,14 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   // supports, never dominates). User can push it back up via the Dub
   // Bus panel return knob if they want.
   returnGain: 0.55,
-  hpfCutoff: 180,
+  // HPF default is 40 Hz — effectively off. Dub Bus is used across drumpad,
+  // tracker, and DJ views, but only the DJ view benefits from rolling bass
+  // off the send (deck kick + echo = mud). Drumpad + tracker mix per
+  // channel/pad, so the kick is already placed; HPF at 180 Hz stripped the
+  // low end of a bassy tom or synth bass before the echo could do anything
+  // with it. DJ users who want the dub-trick HPF raise it via the Dub Bus
+  // panel slider (20-600 Hz range).
+  hpfCutoff: 40,
   springWet: 0.55,       // was 0.4 — more audible spring tank character
   echoIntensity: 0.62,   // was 0.55 — 4-5 repeats before decay
   echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
