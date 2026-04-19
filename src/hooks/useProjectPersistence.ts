@@ -875,8 +875,13 @@ export function useProjectPersistence() {
     };
   }, [isDirty, scheduleAutoSave]);
 
-  // Warn before unload if there are unsaved changes
+  // Warn before unload if there are unsaved changes — production only.
+  // In dev, the dialog blocks hot reloads / MCP page reloads and wedges the
+  // browser tab, so we silently autosave if explicitlySaved was on and skip
+  // the confirm. Dirty state persists in IndexedDB regardless via
+  // saveProjectToStorage, so nothing is actually lost.
   useEffect(() => {
+    if (import.meta.env.DEV) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty) {
         if (explicitlySaved) void saveProjectToStorage();
