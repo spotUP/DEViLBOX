@@ -32,6 +32,7 @@
     "test:playback": "npx tsx tools/playback-smoke-test.ts --check-baseline",
     "test:playback:update": "npx tsx tools/playback-smoke-test.ts --write-baseline",
     "test:ui-smoke": "vitest run --config tools/ui-smoke/vitest.config.ts",
+    "test:furnace": "vitest run --config tools/furnace-audit/vitest.config.ts",
     "test:ui": "vitest --ui",
     "lint": "eslint .",
     "preview": "vite preview",
