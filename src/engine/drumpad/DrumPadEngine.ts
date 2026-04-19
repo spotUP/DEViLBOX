@@ -152,6 +152,9 @@ export class DrumPadEngine {
 
   getDubBusInput(): AudioNode { return this.dubBus.inputNode; }
 
+  /** Expose the DubBus instance so ChannelEffectsManager can register channel taps. */
+  getDubBus(): DubBus { return this.dubBus; }
+
   /**
    * Route a synth pad's post-effects audio into the dub bus at `amount` gain.
    * Called by useMIDIPadRouting after triggering a synth pad with dubSend > 0.
