@@ -1014,6 +1014,45 @@ export class DubBus {
    * a fixed-rate wobble into the tape head read point, not the delay
    * time itself).
    */
+  /**
+   * Fire a short white-noise burst straight into the bus input. Shaped by a
+   * fast attack-decay envelope so it reads as a "crack" not a "shhh". The
+   * burst inherits whatever processing the bus currently has — spring
+   * reverb catches the tail and adds the classic metal-tank ping that
+   * makes snare/hihat accents come alive in dub.
+   *
+   * @param durationMs  Total duration of the noise burst (default 40ms)
+   * @param level       Peak gain 0..1 (default 0.6)
+   */
+  fireNoiseBurst(durationMs = 40, level = 0.6): void {
+    if (!this.enabled) return;
+    try {
+      // Generate ~200ms of white noise so the buffer outlives any reasonable
+      // burst duration. Re-used per call — cheap vs. the echo/spring work.
+      const sr = this.context.sampleRate;
+      const frames = Math.ceil((durationMs + 20) * sr / 1000);
+      const buf = this.context.createBuffer(1, frames, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.context.createBufferSource();
+      src.buffer = buf;
+      const gain = this.context.createGain();
+      gain.gain.value = 0;
+      src.connect(gain);
+      gain.connect(this.input);
+      const now = this.context.currentTime;
+      const peak = Math.min(1, Math.max(0, level));
+      // Attack 1ms → decay to 0 over remaining duration. Exponential-ish via
+      // setTargetAtTime gives a snappier crack than a linear ramp.
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(peak, now + 0.001);
+      gain.gain.setTargetAtTime(0, now + 0.001, durationMs / 3000);
+      src.start(now);
+      src.stop(now + durationMs / 1000 + 0.02);
+      src.onended = () => { try { gain.disconnect(); } catch { /* ok */ } };
+    } catch { /* best-effort */ }
+  }
+
   startTapeWobble(depthMs = 30, rateHz = 2.5): () => void {
     if (!this.enabled) return () => {};
     const baseline = this.settings.echoRateMs;
