@@ -64,6 +64,7 @@ import { FurnaceView } from '@components/furnace/FurnaceView';
 import { Sc68Visualizer } from './Sc68Visualizer';
 import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
+import { DubDeckStrip } from '@components/dub/DubDeckStrip';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
 
 interface TrackerViewProps {
@@ -770,6 +771,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {/* Pattern Bottom Bar — edit step, octave, column toggles (tracker view only) */}
           {!editorFullscreen && viewMode === 'tracker' && (
             <PatternBottomBar />
+          )}
+
+          {/* Dub Deck Strip — tracker-mode-only performance surface for the
+              shared dub bus. Registers the DubBus with the router, starts
+              the recorder, keeps the lane player synced to the current pattern. */}
+          {!editorFullscreen && viewMode === 'tracker' && (
+            <DubDeckStrip />
           )}
 
         </div>
