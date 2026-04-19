@@ -183,6 +183,26 @@ export const DubDeckStrip: React.FC = () => {
   }, [busEnabled, visibleChannelCount, setChannelDubSend]);
 
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
+  const setFullScreen = useDubStore(s => s.setFullScreen);
+
+  // Enter Full-Screen Dub Mode via backtick (`). Spec originally proposed
+  // Tab but that already toggles next/prev channel in the pattern editor
+  // (PatternEditorCanvas.tsx:1188). Backtick is unbound in every tracker
+  // scheme and sits under the Esc row for one-finger muscle-memory.
+  // Works from anywhere in the app (tracker view) as long as focus isn't
+  // inside a text input.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== '`') return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      setFullScreen(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [setFullScreen]);
 
   // Sustained-hold channel tap (Echo Throw baseline).
   const toggleHold = useCallback((channelId: number) => {
@@ -262,6 +282,14 @@ export const DubDeckStrip: React.FC = () => {
         <span className="text-text-muted">
           {pattern?.dubLane?.events.length ?? 0} events on this pattern
         </span>
+        <button
+          className="px-2 py-0.5 rounded border border-accent-primary text-accent-primary hover:bg-accent-primary/10"
+          onClick={() => setFullScreen(true)}
+          title="Enter Full-Screen Dub Mode (key: ` backtick)"
+        >
+          DUB MODE
+          <kbd className="ml-1 px-1 py-0.5 text-[8px] bg-dark-bgTertiary border border-dark-borderLight rounded">`</kbd>
+        </button>
         <button
           className="px-2 py-0.5 rounded bg-accent-error text-text-inverse font-semibold hover:bg-accent-error/80"
           onClick={() => window.dispatchEvent(new Event('dub-panic'))}
