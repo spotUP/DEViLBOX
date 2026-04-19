@@ -181,7 +181,7 @@ export class DrumPadEngine {
     // at will — there's no separate master volume UI for the drumpad bus
     // yet, so a conservative default is the safer place to land.
     this.masterGain = this.context.createGain();
-    this.masterGain.gain.value = 0.5;
+    this.masterGain.gain.value = 0.25;
     this.masterGain.connect(outputDestination ?? this.context.destination);
 
     // Create separate output buses
@@ -1362,6 +1362,16 @@ export class DrumPadEngine {
    */
   setMasterLevel(level: number): void {
     this.masterGain.gain.value = level / 127;
+  }
+
+  /** Set master gain directly in linear units (0..N). */
+  setMasterVolume(value: number): void {
+    this.masterGain.gain.setTargetAtTime(Math.max(0, Math.min(4, value)), this.context.currentTime, 0.01);
+  }
+
+  /** Read master gain (linear units). */
+  getMasterVolume(): number {
+    return this.masterGain.gain.value;
   }
 
   /**
