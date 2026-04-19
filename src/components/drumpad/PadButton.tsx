@@ -3,9 +3,10 @@
  */
 
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import type { DrumPad } from '../../types/drumpad';
+import type { DrumPad, SampleData } from '../../types/drumpad';
 import { useUIStore } from '@stores/useUIStore';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { getAudioContext } from '../../audio/AudioContextSingleton';
 
 interface PadButtonProps {
   pad: DrumPad;
@@ -34,11 +35,64 @@ export const PadButton: React.FC<PadButtonProps> = ({
 }) => {
   const useHex = useUIStore(s => s.useHexNumbers);
   const activeFxPads = useDrumPadStore(s => s.activeFxPads);
+  const loadSampleToPad = useDrumPadStore(s => s.loadSampleToPad);
 
   const [isPressed, setIsPressed] = useState(false);
   const [triggerIntensity, setTriggerIntensity] = useState(0); // 0-1 animated flash
+  const [isDropTarget, setIsDropTarget] = useState(false);
   const decayTimerRef = useRef<number | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // ── Drag-and-drop: drop an audio file directly onto a pad to load it ─────
+  // The pad advertises itself via `data-sample-drop-zone` so GlobalDragDrop-
+  // Handler at App level skips the drop (see its escape hatch for that attr).
+  // We decode the file via the shared AudioContext, then call loadSampleToPad
+  // — same path the sample-browser takes once it resolves to a SampleData.
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLButtonElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDropTarget(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLButtonElement>) => {
+    // relatedTarget is the element being entered; if it's still inside this pad,
+    // we're just moving over child elements and should stay highlighted.
+    const rt = e.relatedTarget as Node | null;
+    if (rt && e.currentTarget.contains(rt)) return;
+    setIsDropTarget(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLButtonElement>) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    // Intentionally do NOT stopPropagation — we want the drop to bubble to
+    // GlobalDragDropHandler's window listener so its isDragging state flips
+    // back to false and the "Drop a file here" overlay dismisses. That handler
+    // already early-returns when the target has `data-sample-drop-zone`
+    // (set on this button below), so no double-handling.
+    setIsDropTarget(false);
+
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    try {
+      const audioContext = getAudioContext();
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const name = file.name.replace(/\.[^/.]+$/, '');
+      const sampleData: SampleData = {
+        id: `drop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name,
+        audioBuffer,
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+      };
+      await loadSampleToPad(pad.id, sampleData);
+    } catch (err) {
+      console.error('[PadButton] Failed to decode dropped file:', file.name, err);
+    }
+  }, [pad.id, loadSampleToPad]);
 
   // Animate velocity flash decay
   useEffect(() => {
@@ -240,12 +294,14 @@ export const PadButton: React.FC<PadButtonProps> = ({
     <button
       ref={buttonRef}
       data-pad-id={pad.id}
+      data-sample-drop-zone
       className={`
         relative rounded-lg select-none overflow-hidden cursor-pointer outline-none
         ${padStyle.className}
         ${!isLoaded ? 'opacity-40' : ''}
         ${isPressed && isLoaded ? 'scale-95' : 'scale-100'}
         ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
+        ${isDropTarget ? 'ring-2 ring-accent-success ring-offset-2 ring-offset-dark-bg' : ''}
         transform-gpu will-change-transform
         ${className}
       `}
@@ -258,6 +314,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onFocus={onFocus}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       tabIndex={0}
       aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty - click to assign)'}`}
       aria-pressed={isPressed}
