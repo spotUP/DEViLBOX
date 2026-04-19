@@ -9,13 +9,12 @@
  * into the current pattern's dubLane when armed.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useDubStore } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useCursorStore } from '@/stores/useCursorStore';
-import { fire, setDubBusForRouter } from '@/engine/dub/DubRouter';
+import { fire, setDubBusForRouter, subscribeDubRouter } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { getDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
@@ -33,7 +32,16 @@ export const DubDeckStrip: React.FC = () => {
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
   const patternIdx = useTrackerStore(s => s.currentPatternIndex);
   const pattern = useTrackerStore(s => s.patterns[patternIdx]);
-  const selectedChannel = useCursorStore(s => s.cursor.channelIndex);
+
+  // Click-flash state — which channel button flashed most recently, driven by
+  // both on-screen clicks and the W keybind. Visual-only feedback so users
+  // can see which channel their last throw targeted. Fades after 400 ms.
+  const [flashedChannel, setFlashedChannel] = useState<number | null>(null);
+  useEffect(() => {
+    if (flashedChannel === null) return;
+    const t = setTimeout(() => setFlashedChannel(null), 400);
+    return () => clearTimeout(t);
+  }, [flashedChannel]);
 
   // Register the shared DubBus with the router while this view is mounted,
   // so fire() has somewhere to send events. Cleared on unmount so out-of-
@@ -49,6 +57,18 @@ export const DubDeckStrip: React.FC = () => {
   // Start the recorder for the lifetime of this component.
   useEffect(() => {
     return startDubRecorder();
+  }, []);
+
+  // Flash the button when ANY live Echo Throw fires — keyboard W, UI click,
+  // MIDI (future). Lane-replayed events skipped so replay doesn't constantly
+  // light up the UI.
+  useEffect(() => {
+    return subscribeDubRouter((ev) => {
+      if (ev.moveId !== 'echoThrow') return;
+      if (ev.source !== 'live') return;
+      if (ev.channelId === undefined) return;
+      setFlashedChannel(ev.channelId);
+    });
   }, []);
 
   // Keep the lane player in sync with the current pattern's dubLane.
@@ -83,6 +103,8 @@ export const DubDeckStrip: React.FC = () => {
       console.warn('[DubDeckStrip] Echo Throw ignored — bus is disabled. Click the Dub Bus button.');
       return;
     }
+    // fire() publishes a router event which our subscriber picks up and
+    // triggers the flash — no need to setFlashedChannel here directly.
     fire('echoThrow', channelId);
   }, [busEnabled]);
 
@@ -138,14 +160,14 @@ export const DubDeckStrip: React.FC = () => {
           {Array.from({ length: visibleChannelCount }, (_, i) => {
             const ch = channels[i];
             const hasDubSend = (ch?.dubSend ?? 0) > 0;
-            const isSelected = i === selectedChannel;
+            const isFlashed = i === flashedChannel;
             return (
               <button
                 key={i}
                 className={
                   'px-1.5 py-0.5 rounded border transition-colors min-w-[28px] ' +
-                  (isSelected
-                    ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
+                  (isFlashed
+                    ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                     : hasDubSend
                       ? 'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
                       : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
