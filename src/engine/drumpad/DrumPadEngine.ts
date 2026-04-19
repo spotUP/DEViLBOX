@@ -195,12 +195,36 @@ export class DrumPadEngine {
     }
   }
 
-  /** Remove a pad's synth dub-bus tap. No-op if none exists. */
-  detachSynthPadDubSend(padId: number): void {
+  /**
+   * Remove a pad's synth dub-bus tap. Fades the send gain to 0 over `fadeSec`
+   * (default 100ms — enough to avoid a click, short enough to actually cut
+   * the bass tail) then disconnects the tap. Immediate disconnect via
+   * `fadeSec = 0` for the hard-panic case.
+   *
+   * Why the fade: without it, any synth with internal reverb/delay keeps
+   * feeding the dub bus long after the note releases — the echo never gets
+   * a chance to decay because new input keeps arriving. With this fade the
+   * bus stops receiving signal ~100ms after the pad release, and the echo
+   * tail then decays on its own at its natural rate (~4s at intensity 0.62).
+   */
+  detachSynthPadDubSend(padId: number, fadeSec = 0.1): void {
     const existing = this.synthPadDubSends.get(padId);
     if (!existing) return;
-    try { existing.tap.disconnect(); } catch { /* ok */ }
     this.synthPadDubSends.delete(padId);
+    const { tap } = existing;
+    if (fadeSec <= 0) {
+      try { tap.disconnect(); } catch { /* ok */ }
+      return;
+    }
+    const now = this.context.currentTime;
+    try {
+      tap.gain.cancelScheduledValues(now);
+      tap.gain.setValueAtTime(tap.gain.value, now);
+      tap.gain.linearRampToValueAtTime(0, now + fadeSec);
+    } catch { /* ok */ }
+    setTimeout(() => {
+      try { tap.disconnect(); } catch { /* ok */ }
+    }, Math.ceil(fadeSec * 1000) + 20);
   }
 
   setDubBusSettings(settings: Partial<DubBusSettings>): void {
