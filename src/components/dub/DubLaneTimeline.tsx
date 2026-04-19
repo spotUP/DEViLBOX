@@ -29,6 +29,8 @@ const MOVE_COLOR: Record<string, string> = {
   channelThrow: 'bg-accent-primary/70',
   delayTimeThrow: 'bg-accent-highlight/70',
   tapeWobble: 'bg-accent-warning/70',
+  masterDrop: 'bg-accent-error/70',
+  snareCrack: 'bg-text-primary',
 };
 
 export const DubLaneTimeline: React.FC = () => {
