@@ -947,6 +947,24 @@ export class DubBus {
     this.throwTimers.add(t);
   }
 
+  /**
+   * Spring Slam — temporarily crank spring wet to `amount` (default 1.0),
+   * then restore the user's baseline after `ms`. Designed for rhythmic
+   * "splash" hits where a drum/clap gets a sudden tail of metal-tank
+   * reverb and then snaps back. Mirrors modulateFeedback's pattern so
+   * disposal works the same way. No-op when bus is disabled.
+   */
+  slamSpring(amount = 1.0, ms = 400): void {
+    if (!this.enabled) return;
+    const target = Math.min(1.0, Math.max(0, amount));
+    try { this.spring.wet = target; } catch { /* ok */ }
+    const t = setTimeout(() => {
+      this.throwTimers.delete(t);
+      try { this.spring.wet = this.settings.springWet; } catch { /* ok */ }
+    }, ms);
+    this.throwTimers.add(t);
+  }
+
   /** Dispose and release all bus resources. */
   dispose(): void {
     this._disposed = true;

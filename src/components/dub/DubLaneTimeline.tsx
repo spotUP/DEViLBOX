@@ -21,7 +21,11 @@ import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 // Move-id → token color class. New moves add entries here as they land.
 const MOVE_COLOR: Record<string, string> = {
   echoThrow: 'bg-accent-primary',
-  // Future: dubStab: 'bg-accent-highlight', channelMute: 'bg-accent-error', …
+  dubStab: 'bg-accent-highlight',
+  filterDrop: 'bg-accent-secondary',
+  dubSiren: 'bg-accent-warning',
+  springSlam: 'bg-accent-success',
+  // Future: channelMute: 'bg-accent-error', …
 };
 
 export const DubLaneTimeline: React.FC = () => {
