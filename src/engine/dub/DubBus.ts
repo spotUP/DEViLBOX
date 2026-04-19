@@ -391,6 +391,25 @@ export class DubBus {
    */
   miniDrainIfIdle(): void { this._miniDrainIfIdle(); }
 
+  /**
+   * Abort an in-flight mini-drain and restore echo/spring to the user's
+   * current settings immediately. Called when a new consumer attaches to
+   * the bus (e.g. a synth pad just triggered) — without this, the drain
+   * keeps echo muted for its full window (up to ~1s) while the new pad is
+   * playing, so the user hears zero echo on rapid-fire playing.
+   *
+   * Safe no-op when no drain is pending.
+   */
+  abortMiniDrain(): void {
+    if (!this._miniDrainPending) return;
+    this._miniDrainPending = false;
+    try {
+      this.echo.setIntensity(this.settings.echoIntensity);
+      this.spring.wet = this.settings.springWet;
+      console.log(`[DubBus] mini-drain ✗ aborted — new consumer attached; echoIntensity=${this.settings.echoIntensity.toFixed(2)} springWet=${this.settings.springWet.toFixed(2)}`);
+    } catch { /* ok */ }
+  }
+
   private _miniDrainIfIdle(): void {
     if (this._draining) return;
     if (!this.enabled) return;
