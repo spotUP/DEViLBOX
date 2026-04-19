@@ -381,9 +381,15 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       }
     }
 
+    // A sample REPLACES any prior sound source on the pad. Without this,
+    // dropping a sample onto a pad that already had a synth left both wired
+    // — the pad played the sample AND the synth on every trigger.
     get().updatePad(padId, {
       sample: processedSample,
       name: sample.name,
+      synthConfig: undefined,
+      instrumentId: undefined,
+      presetName: undefined,
     });
     // Audio data changed — persist to IndexedDB (async, fire-and-forget)
     get().saveToIndexedDB();
