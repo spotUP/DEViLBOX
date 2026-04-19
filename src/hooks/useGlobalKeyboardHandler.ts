@@ -139,7 +139,6 @@ import {
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { useDrumPadStore } from '@stores/useDrumPadStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -1942,29 +1941,14 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
         return;
       }
 
-      // Dub Studio — W fires Echo Throw on the currently selected tracker
-      // channel. Tracker-view-only, no modifiers. Handled BEFORE scheme
-      // lookup so the protracker scheme's `W` note binding doesn't steal it
-      // when the Dub Bus is enabled. When the bus is OFF the key falls
-      // through to the normal note-entry scheme — W stays usable for typing
-      // notes when not dubbing.
-      if (
-        e.code === 'KeyW' &&
-        _activeView === 'tracker' &&
-        !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey &&
-        !e.repeat
-      ) {
-        const dubEnabled = useDrumPadStore.getState().dubBus.enabled;
-        if (dubEnabled) {
-          e.preventDefault();
-          e.stopPropagation();
-          import('@/engine/dub/DubRouter').then(({ fire }) => {
-            const selectedCh = useCursorStore.getState().cursor.channelIndex;
-            fire('echoThrow', selectedCh);
-          }).catch(() => { /* ok */ });
-          return;
-        }
-      }
+      // Dub Studio keyboard bindings — deliberately left unbound in edit
+      // mode. Every letter key in the tracker view has a note-entry meaning
+      // under at least one keyboard scheme (W = C# on Protracker row, R/T/Y
+      // = E/F/F# on second octave, etc.), so a global dub key would stomp
+      // the user's ability to type notes while the bus is on. Dub moves are
+      // fired through DubDeckStrip UI buttons in edit mode; context-aware
+      // keyboard bindings land with Full-Screen Dub Mode (Tab shell, spec
+      // 2026-04-19-tracker-dub-studio-design.md §"Layout — two shells").
 
       // Normalize the event
       const normalized = KeyboardNormalizer.normalize(e);
