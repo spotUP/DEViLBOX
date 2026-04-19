@@ -5,7 +5,26 @@
  * Follows the HivelyEngine pattern: static WASM/JS caching, per-context worklet loading.
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
+
+/** PT2 appends a defensive comment footer referencing the EXPORT_NAME factory. */
+function pt2Transform(code: string): string {
+  let out = code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
+    .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
+  if (!out.includes('var createPT2Replayer =')) {
+    out += '\n// Factory is already named createPT2Replayer via EXPORT_NAME';
+  }
+  return out;
+}
 
 export interface PT2ModuleInfo {
   name: string;
@@ -43,19 +62,10 @@ type SampleInfoCallback = (samples: PT2SampleInfo[]) => void;
 type OrderListCallback = (orders: ArrayBuffer, length: number) => void;
 type SaveCallback = (data: ArrayBuffer) => void;
 
-export class PT2Engine {
+export class PT2Engine extends WASMSingletonBase {
   private static instance: PT2Engine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _modulePromise: Promise<PT2ModuleInfo> | null = null;
   private _resolveModule: ((info: PT2ModuleInfo) => void) | null = null;
   private _rejectModule: ((err: Error) => void) | null = null;
@@ -65,17 +75,10 @@ export class PT2Engine {
   private _orderListCallbacks: Set<OrderListCallback> = new Set();
   private _saveCallbacks: Array<SaveCallback> = [];
   private _songEndCallbacks: Set<() => void> = new Set();
-  private _disposed = false;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(PT2Engine.cache);
   }
 
   static getInstance(): PT2Engine {
@@ -89,65 +92,17 @@ export class PT2Engine {
     return !!PT2Engine.instance && !PT2Engine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await PT2Engine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[PT2Engine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'pt2',
+      workletFile: 'PT2Player.worklet.js',
+      wasmFile: 'PT2Player.wasm',
+      jsFile: 'PT2Player.js',
+      transformJS: pt2Transform,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      // Register worklet module
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}pt2/PT2Player.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
-
-      // Fetch WASM binary and JS code (shared across contexts)
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}pt2/PT2Player.wasm`),
-          fetch(`${baseUrl}pt2/PT2Player.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten ESM output for worklet Function() execution
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          if (!code.includes('var createPT2Replayer =')) {
-            code += '\n// Factory is already named createPT2Replayer via EXPORT_NAME';
-          }
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'pt2-player-processor', {
@@ -231,15 +186,11 @@ export class PT2Engine {
     // Send init with WASM binary and JS code
     this.workletNode.port.postMessage({
       type: 'init',
-      wasmBinary: PT2Engine.wasmBinary,
-      jsCode: PT2Engine.jsCode,
+      wasmBinary: PT2Engine.cache.wasmBinary,
+      jsCode: PT2Engine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   /** Load a MOD file from binary data */
@@ -387,11 +338,8 @@ export class PT2Engine {
     }
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     this._positionCallbacks.clear();
     this._patternDataCallbacks.clear();
     this._sampleInfoCallbacks.clear();
