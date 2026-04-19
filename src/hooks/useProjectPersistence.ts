@@ -114,8 +114,11 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  * - 19: Tracker channels now use monophonic synth instances (MonoSynth/FMSynth/AMSynth)
  *       instead of PolySynth wrappers. Enables FT2-style frequency modulation for
  *       arpeggio, vibrato, portamento effects. Old PolySynth instances incompatible.
+ * - 20: Phase 1 of Tracker Dub Studio — Pattern.dubLane added for per-pattern
+ *       dub automation (DubEvent[] recorded live or written in the lane editor).
+ *       Purely additive; patterns without dubLane load identically to v19.
  */
-const SCHEMA_VERSION = 19;
+const SCHEMA_VERSION = 20;
 
 interface SavedProject {
   version: string;
