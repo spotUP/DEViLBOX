@@ -8,6 +8,7 @@
  * Multiple SidMon1Synth instances share this single engine.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -36,7 +37,21 @@ export class SidMon1Engine extends WASMSingletonBase {
   }
 
   static getInstance(): SidMon1Engine {
-    if (!SidMon1Engine.instance || SidMon1Engine.instance._disposed) {
+    // Guard against stale AudioContext — dev HMR, page reload, iOS suspend/
+    // resume, or a manual context restart can replace the context without
+    // disposing the engine. Staying attached to a dead context is silent at
+    // runtime: the worklet stops producing audio with no error. This was the
+    // root cause of the twice-reverted SidMon1 migration. See
+    // JamCrackerEngine.getInstance (lines 48-63) for the reference pattern.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !SidMon1Engine.instance ||
+      SidMon1Engine.instance._disposed ||
+      SidMon1Engine.instance.audioContext !== currentCtx
+    ) {
+      if (SidMon1Engine.instance && !SidMon1Engine.instance._disposed) {
+        SidMon1Engine.instance.dispose();
+      }
       SidMon1Engine.instance = new SidMon1Engine();
     }
     return SidMon1Engine.instance;
