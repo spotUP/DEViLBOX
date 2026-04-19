@@ -3,6 +3,8 @@
  * Aligned with FastTracker II / XM format with DEViLBOX extensions
  */
 
+import type { DubLane } from './dub';
+
 /**
  * XM-Compatible Note Value
  * 0 = no note (empty)
@@ -188,6 +190,13 @@ export interface Pattern {
   channels: ChannelData[];
   bpm?: number; // Optional override
   importMetadata?: ImportMetadata; // MOD/XM import metadata
+  /**
+   * Per-pattern dub automation lane. Phase 1 of the Tracker Dub Studio.
+   * Undefined = pattern has never been dubbed — loads + plays identically to
+   * pre-Phase-1 projects. Events are performed via DubRouter.fire during
+   * playback (see DubLanePlayer).
+   */
+  dubLane?: DubLane;
 }
 
 /**
