@@ -116,6 +116,13 @@ export class DubBus {
   // DJ mixer, the mixer's deck input connects INTO these, which feed the bus.
   // Dub-action pads raise these gains to spill deck audio into the bus.
   private deckTaps: Map<DeckId, GainNode> = new Map();
+  // Deck-only HPF, hardcoded at 180 Hz. Every deck tap routes through this
+  // before reaching the bus input, so DJ use ALWAYS "dodges kicks" — deck
+  // bass never enters the echo tail, keeping the kick punchy and the dub
+  // texture clean. The bus-wide hpf (above) stays at the user's setting
+  // (default 40 Hz = effectively off) so drumpad pads + tracker channels,
+  // which feed the bus input directly, pass their bass through.
+  private deckHpf!: BiquadFilterNode;
   // Tracker channel taps — per-channel Tone.Gain nodes registered by
   // ChannelEffectsManager when a channel's dubSend > 0. Used by openChannelTap
   // so echoThrow can momentarily bump a channel's send to full.
@@ -284,6 +291,16 @@ export class DubBus {
     this.noiseGain.connect(this.input);
     this.noise.start(0);
 
+    // DJ-only HPF — single instance shared across all deck taps. Fixed at
+    // 180 Hz so the DJ path always dodges kicks regardless of the user's
+    // bus-wide hpf setting. Not exposed as a user knob — this is a
+    // structural DJ-use convention, not a preset tweakable.
+    this.deckHpf = this.context.createBiquadFilter();
+    this.deckHpf.type = 'highpass';
+    this.deckHpf.frequency.value = 180;
+    this.deckHpf.Q.value = 0.707;
+    this.deckHpf.connect(this.input);
+
     // Create per-deck tap gains. Always exist so dub-action handlers can
     // modulate them without null checks; only feed audio when a DJ mixer is
     // attached via attachDJMixer(). At rest gain=0 so bus hears nothing from
@@ -291,7 +308,7 @@ export class DubBus {
     for (const deck of DECK_IDS) {
       const tap = this.context.createGain();
       tap.gain.value = 0;
-      tap.connect(this.input);
+      tap.connect(this.deckHpf);   // routed through DJ-only HPF, not direct to input
       this.deckTaps.set(deck, tap);
     }
   }
