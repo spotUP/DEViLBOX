@@ -28,6 +28,12 @@ interface DubStore {
    *  UI subscribes for a brief REC-indicator flash on every capture. */
   lastCapturedAt: number | null;
   markCaptured: () => void;
+
+  /** Full-Screen Dub Mode toggle. When true, DubFullScreenMode renders over
+   *  the tracker view with gig-sized buttons, big KILL, and context-aware
+   *  keyboard bindings (no note entry in this mode). Tab toggles. */
+  fullScreen: boolean;
+  setFullScreen: (v: boolean) => void;
 }
 
 export const useDubStore = create<DubStore>((set) => ({
@@ -36,6 +42,9 @@ export const useDubStore = create<DubStore>((set) => ({
 
   lastCapturedAt: null,
   markCaptured: () => set({ lastCapturedAt: performance.now() }),
+
+  fullScreen: false,
+  setFullScreen: (v) => set({ fullScreen: v }),
 }));
 
 /**
