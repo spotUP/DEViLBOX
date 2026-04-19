@@ -878,12 +878,18 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         } catch (err) {
           console.warn('[DJPlaylistPanel] Failed to apply per-song FX:', err);
         }
+        // Mark as played so the user can track what's been played across
+        // view switches / modal toggles during a live set.
+        if (activePlaylistId) {
+          useDJPlaylistStore.getState().setLastPlayedTrack(activePlaylistId, track.id);
+          useDJPlaylistStore.getState().markTrackPlayed(activePlaylistId, index);
+        }
       } finally {
         setLoadingTrackIndex(null);
         setLoadingDeckId(null);
       }
     },
-    [loadTrackToDeck],
+    [loadTrackToDeck, activePlaylistId],
   );
 
   // ── Preview playback (loads to idle deck for audition) ────────────────────
