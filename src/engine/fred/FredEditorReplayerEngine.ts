@@ -5,6 +5,7 @@
  * Follows the SteveTurnerEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   WASMSingletonBase,
@@ -29,7 +30,18 @@ export class FredEditorReplayerEngine extends WASMSingletonBase {
   }
 
   static getInstance(): FredEditorReplayerEngine {
-    if (!FredEditorReplayerEngine.instance || FredEditorReplayerEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !FredEditorReplayerEngine.instance ||
+      FredEditorReplayerEngine.instance._disposed ||
+      FredEditorReplayerEngine.instance.audioContext !== currentCtx
+    ) {
+      if (FredEditorReplayerEngine.instance && !FredEditorReplayerEngine.instance._disposed) {
+        FredEditorReplayerEngine.instance.dispose();
+      }
       FredEditorReplayerEngine.instance = new FredEditorReplayerEngine();
     }
     return FredEditorReplayerEngine.instance;

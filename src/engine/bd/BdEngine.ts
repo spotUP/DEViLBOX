@@ -4,6 +4,7 @@
  * Follows the MaEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -21,7 +22,18 @@ export class BdEngine extends WASMSingletonBase {
   }
 
   static getInstance(): BdEngine {
-    if (!BdEngine.instance || BdEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !BdEngine.instance ||
+      BdEngine.instance._disposed ||
+      BdEngine.instance.audioContext !== currentCtx
+    ) {
+      if (BdEngine.instance && !BdEngine.instance._disposed) {
+        BdEngine.instance.dispose();
+      }
       BdEngine.instance = new BdEngine();
     }
     return BdEngine.instance;

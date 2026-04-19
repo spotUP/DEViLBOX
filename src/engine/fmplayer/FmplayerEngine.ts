@@ -10,6 +10,7 @@
  *   9    : ADPCM    (bit 15,    value 0x8000)
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -75,7 +76,18 @@ export class FmplayerEngine extends WASMSingletonBase {
   }
 
   static getInstance(): FmplayerEngine {
-    if (!FmplayerEngine.instance || FmplayerEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !FmplayerEngine.instance ||
+      FmplayerEngine.instance._disposed ||
+      FmplayerEngine.instance.audioContext !== currentCtx
+    ) {
+      if (FmplayerEngine.instance && !FmplayerEngine.instance._disposed) {
+        FmplayerEngine.instance.dispose();
+      }
       FmplayerEngine.instance = new FmplayerEngine();
     }
     return FmplayerEngine.instance;

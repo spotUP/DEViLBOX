@@ -9,6 +9,7 @@
  * via a Promise queue keyed by response type + optional handle.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -122,7 +123,18 @@ export class SunVoxEngine extends WASMSingletonBase {
   // ── Singleton ──────────────────────────────────────────────────────────────
 
   static getInstance(): SunVoxEngine {
-    if (!SunVoxEngine.instance || SunVoxEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !SunVoxEngine.instance ||
+      SunVoxEngine.instance._disposed ||
+      SunVoxEngine.instance.audioContext !== currentCtx
+    ) {
+      if (SunVoxEngine.instance && !SunVoxEngine.instance._disposed) {
+        SunVoxEngine.instance.dispose();
+      }
       SunVoxEngine.instance = new SunVoxEngine();
     }
     return SunVoxEngine.instance;

@@ -6,6 +6,7 @@
  * and live playback state (position/row).
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import { getToneEngine } from '@engine/ToneEngine';
 import type { IsolationCapableEngine } from '@/engine/tone/ChannelRoutedEffects';
 import {
@@ -143,7 +144,18 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
   }
 
   static getInstance(): PreTrackerEngine {
-    if (!PreTrackerEngine.instance || PreTrackerEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !PreTrackerEngine.instance ||
+      PreTrackerEngine.instance._disposed ||
+      PreTrackerEngine.instance.audioContext !== currentCtx
+    ) {
+      if (PreTrackerEngine.instance && !PreTrackerEngine.instance._disposed) {
+        PreTrackerEngine.instance.dispose();
+      }
       PreTrackerEngine.instance = new PreTrackerEngine();
     }
     return PreTrackerEngine.instance;
