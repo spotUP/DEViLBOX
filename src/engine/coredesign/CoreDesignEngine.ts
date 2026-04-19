@@ -4,28 +4,27 @@
  * Follows the standard WASM engine pattern (like ArtOfNoiseEngine).
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class CoreDesignEngine {
+/** CoreDesign only strips the ESM markers — no wasmBinary / HEAP rewrites. */
+function coreDesignTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '');
+}
+
+export class CoreDesignEngine extends WASMSingletonBase {
   private static instance: CoreDesignEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
-
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-    this._initPromise = new Promise<void>((resolve) => { this._resolveInit = resolve; });
-    this.initialize();
+    super();
+    this.initialize(CoreDesignEngine.cache);
   }
 
   static getInstance(): CoreDesignEngine {
@@ -39,48 +38,17 @@ export class CoreDesignEngine {
     return !!CoreDesignEngine.instance && !CoreDesignEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await CoreDesignEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[CoreDesignEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'coredesign',
+      workletFile: 'CoreDesign.worklet.js',
+      wasmFile: 'CoreDesign.wasm',
+      jsFile: 'CoreDesign.js',
+      transformJS: coreDesignTransform,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-    const existing = this.initPromises.get(context);
-    if (existing) return existing;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}coredesign/CoreDesign.worklet.js`);
-      } catch { /* Module may already be registered */ }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResp, jsResp] = await Promise.all([
-          fetch(`${baseUrl}coredesign/CoreDesign.wasm`),
-          fetch(`${baseUrl}coredesign/CoreDesign.js`),
-        ]);
-        if (wasmResp.ok) this.wasmBinary = await wasmResp.arrayBuffer();
-        if (jsResp.ok) {
-          let code = await jsResp.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '');
-          this.jsCode = code;
-        }
-      }
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
     this.workletNode = new AudioWorkletNode(ctx, 'coredesign-processor', {
       outputChannelCount: [2],
@@ -106,14 +74,12 @@ export class CoreDesignEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: CoreDesignEngine.wasmBinary,
-      jsCode: CoreDesignEngine.jsCode,
+      wasmBinary: CoreDesignEngine.cache.wasmBinary,
+      jsCode: CoreDesignEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
   }
-
-  async ready(): Promise<void> { return this._initPromise; }
 
   async loadTune(data: ArrayBuffer): Promise<void> {
     await this._initPromise;
@@ -135,10 +101,11 @@ export class CoreDesignEngine {
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  dispose(): void {
+  override dispose(): void {
+    // Custom: original used `stop` not `dispose` as shutdown signal, preserve.
     this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'stop' });
-    this.workletNode?.disconnect();
+    try { this.workletNode?.port.postMessage({ type: 'stop' }); } catch { /* */ }
+    try { this.workletNode?.disconnect(); } catch { /* */ }
     this.workletNode = null;
     if (CoreDesignEngine.instance === this) CoreDesignEngine.instance = null;
   }
