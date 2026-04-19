@@ -13,15 +13,22 @@
  */
 
 import { echoThrow } from './moves/echoThrow';
+import { dubStab } from './moves/dubStab';
+import { filterDrop } from './moves/filterDrop';
+import { dubSiren } from './moves/dubSiren';
+import { springSlam } from './moves/springSlam';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
 
 const MOVES: Record<string, DubMove> = {
   echoThrow,
-  // Future moves register here: dubStab, channelMute, channelThrow,
-  // springSlam, filterDrop, backwardReverb, toast, siren, tapeStop,
-  // tapeWobble, snareCrack, delayTimeThrow, masterDrop.
+  dubStab,
+  filterDrop,
+  dubSiren,
+  springSlam,
+  // Future moves register here: channelMute, channelThrow, backwardReverb,
+  // toast, tapeStop, tapeWobble, snareCrack, delayTimeThrow, masterDrop.
 };
 
 /**
