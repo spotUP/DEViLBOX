@@ -19,7 +19,7 @@ import type { PadBank } from '../../types/drumpad';
 import { getBankPads } from '../../types/drumpad';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useMIDIPadRouting, clearDubReleasers } from '@/hooks/drumpad/useMIDIPadRouting';
-import { bpmSyncedEchoRate, getActiveBpm } from '../../engine/drumpad/DubActions';
+import { bpmSyncedEchoRate, getActiveBpm } from '../../engine/dub/DubActions';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useDJStore } from '../../stores/useDJStore';
 

@@ -30,7 +30,7 @@ import { getAudioContext } from '../../audio/AudioContextSingleton';
 import { applyVelocityCurve, PAD_INSTRUMENT_BASE, MPK_SLOT_COUNT, mpkSlotId } from '../../types/drumpad';
 import type { ScratchActionId } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
-import { DUB_ACTION_HANDLERS } from '../../engine/drumpad/DubActions';
+import { DUB_ACTION_HANDLERS } from '../../engine/dub/DubActions';
 import { getDJEngineIfActive } from '../../engine/dj/DJEngine';
 import { quantizeAction, getQuantizeMode } from '../../engine/dj/DJQuantizedFX';
 import { resetDrumPadModulation } from '../../midi/performance/parameterRouter';

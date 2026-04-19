@@ -14,7 +14,7 @@ import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
-import { clearAllPendingThrows } from './DubActions';
+import { clearAllPendingThrows } from '../dub/DubActions';
 
 const DECK_IDS: DeckId[] = ['A', 'B', 'C'];
 
