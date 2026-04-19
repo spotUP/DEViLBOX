@@ -9,15 +9,16 @@
  * into the current pattern's dubLane when armed.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDubStore } from '@/stores/useDubStore';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { fire, setDubBusForRouter, subscribeDubRouter } from '@/engine/dub/DubRouter';
+import { setDubBusForRouter, subscribeDubRouter } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
+import { Knob } from '@components/controls/Knob';
 import { DubLaneTimeline } from './DubLaneTimeline';
 
 export const DubDeckStrip: React.FC = () => {
@@ -33,15 +34,42 @@ export const DubDeckStrip: React.FC = () => {
   const patternIdx = useTrackerStore(s => s.currentPatternIndex);
   const pattern = useTrackerStore(s => s.patterns[patternIdx]);
 
-  // Click-flash state — which channel button flashed most recently, driven by
-  // both on-screen clicks and the W keybind. Visual-only feedback so users
-  // can see which channel their last throw targeted. Fades after 400 ms.
+  // Click-flash state — which channel most recently fired a stab (keyboard
+  // W). Fades after 400 ms. Separate from heldChannels below (which is the
+  // sustained toggle state).
   const [flashedChannel, setFlashedChannel] = useState<number | null>(null);
   useEffect(() => {
     if (flashedChannel === null) return;
     const t = setTimeout(() => setFlashedChannel(null), 400);
     return () => clearTimeout(t);
   }, [flashedChannel]);
+
+  // Dub-hold toggles: each channel button is an independent on/off. Multiple
+  // channels can be "dub-held" simultaneously — classic multi-channel desk
+  // performance. Releasers come from DubBus.openChannelTap and are called on
+  // un-toggle OR on KILL / bus-disable / unmount.
+  const [heldChannels, setHeldChannels] = useState<Set<number>>(new Set());
+  const heldReleasers = useRef<Map<number, () => void>>(new Map());
+
+  const releaseAllHeld = useCallback(() => {
+    for (const release of heldReleasers.current.values()) {
+      try { release(); } catch { /* ok */ }
+    }
+    heldReleasers.current.clear();
+    setHeldChannels(new Set());
+  }, []);
+
+  // Kill / bus-disable must release every held channel so tails decay cleanly.
+  useEffect(() => {
+    const handler = () => releaseAllHeld();
+    window.addEventListener('dub-panic', handler);
+    return () => window.removeEventListener('dub-panic', handler);
+  }, [releaseAllHeld]);
+  useEffect(() => {
+    if (!busEnabled) releaseAllHeld();
+  }, [busEnabled, releaseAllHeld]);
+  // Unmount: release everything so navigating away doesn't leak held taps.
+  useEffect(() => releaseAllHeld, [releaseAllHeld]);
 
   // Register the shared DubBus with the router while this view is mounted,
   // so fire() has somewhere to send events. Cleared on unmount so out-of-
@@ -103,16 +131,35 @@ export const DubDeckStrip: React.FC = () => {
   // REC indicator flash on each capture — drives a brief pulse on the REC pill.
   const capturedRecently = lastCapturedAt !== null && (performance.now() - lastCapturedAt) < 300;
 
-  const fireEchoThrow = useCallback((channelId: number) => {
+  /**
+   * Toggle a channel's dub-hold. When turning ON, open the channel's tap to
+   * full (1.0) and store the releaser. When turning OFF, call the releaser
+   * (ramps back to baseline). Independent per channel — multiple simultaneous
+   * holds are supported.
+   */
+  const toggleHold = useCallback((channelId: number) => {
     if (!busEnabled) {
-      console.warn('[DubDeckStrip] Echo Throw ignored — bus is disabled. Click the Dub Bus button.');
+      console.warn('[DubDeckStrip] Hold ignored — bus is disabled.');
       return;
     }
-    // Flash immediately on click — doesn't wait for router roundtrip.
-    // Keyboard/MIDI paths still get the flash via the router subscription
-    // in the mount effect above.
-    setFlashedChannel(channelId);
-    fire('echoThrow', channelId);
+    const engine = ensureDrumPadEngine();
+    const bus = engine.getDubBus();
+    const isHeld = heldReleasers.current.has(channelId);
+
+    if (isHeld) {
+      const release = heldReleasers.current.get(channelId);
+      heldReleasers.current.delete(channelId);
+      setHeldChannels(prev => {
+        const next = new Set(prev);
+        next.delete(channelId);
+        return next;
+      });
+      try { release?.(); } catch { /* ok */ }
+    } else {
+      const release = bus.openChannelTap(channelId, 1.0, 0.02);
+      heldReleasers.current.set(channelId, release);
+      setHeldChannels(prev => new Set(prev).add(channelId));
+    }
   }, [busEnabled]);
 
   return (
@@ -160,40 +207,59 @@ export const DubDeckStrip: React.FC = () => {
         </button>
       </div>
 
-      {/* Channel row: Echo Throw button per channel */}
+      {/* Channel row: stab button + dubSend knob per channel.
+          Two complementary paradigms — button = one-shot Echo Throw (drum
+          machine / Scientist era), knob = continuous dubSend fader (King
+          Tubby riding the desk). Both bound to the same channel. */}
       <div className="flex items-center gap-1 text-[9px]">
         <span className="text-text-muted w-14 shrink-0">CH ▸</span>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {Array.from({ length: visibleChannelCount }, (_, i) => {
             const ch = channels[i];
-            const hasDubSend = (ch?.dubSend ?? 0) > 0;
+            const dubSend = ch?.dubSend ?? 0;
+            const hasDubSend = dubSend > 0;
+            const isHeld = heldChannels.has(i);
             const isFlashed = i === flashedChannel;
             return (
-              <button
-                key={i}
-                className={
-                  'px-1.5 py-0.5 rounded border min-w-[28px] transition-all duration-150 ' +
-                  (isFlashed
-                    ? 'bg-accent-primary border-accent-primary text-text-inverse scale-110 shadow-[0_0_8px_var(--color-accent-primary)]'
-                    : hasDubSend
-                      ? 'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
-                      : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
-                }
-                onClick={() => fireEchoThrow(i)}
-                title={
-                  `Echo Throw ch ${i + 1}${ch ? ' · ' + ch.name : ''}` +
-                  (hasDubSend ? ` · send ${Math.round((ch?.dubSend ?? 0) * 100)}%` : ' · no dub send')
-                }
-                disabled={!busEnabled}
-              >
-                {i + 1}
-              </button>
+              <div key={i} className="flex items-center gap-1">
+                <button
+                  className={
+                    'px-1.5 py-0.5 rounded border min-w-[28px] transition-all duration-150 ' +
+                    (isHeld
+                      ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-[0_0_8px_var(--color-accent-primary)]'
+                      : isFlashed
+                        ? 'bg-accent-highlight/30 border-accent-highlight text-accent-highlight'
+                        : hasDubSend
+                          ? 'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
+                          : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
+                  }
+                  onClick={() => toggleHold(i)}
+                  title={
+                    `Ch ${i + 1}${ch ? ' · ' + ch.name : ''} — click to ${isHeld ? 'STOP' : 'START'} dubbing this channel` +
+                    ` (multiple channels can dub simultaneously · W key fires a stab on the selected channel)`
+                  }
+                  disabled={!busEnabled}
+                >
+                  {i + 1}
+                </button>
+                <Knob
+                  value={dubSend}
+                  min={0}
+                  max={1}
+                  size="sm"
+                  onChange={(v) => setChannelDubSend(i, v)}
+                  title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%`}
+                  disabled={!busEnabled}
+                  hideValue
+                  formatValue={(v) => `${Math.round(v * 100)}%`}
+                />
+              </div>
             );
           })}
         </div>
         <span className="flex-1" />
         <span className="text-text-muted">
-          Press <kbd className="px-1 py-0.5 rounded bg-dark-bgTertiary border border-dark-borderLight">W</kbd> to throw selected channel
+          <kbd className="px-1 py-0.5 rounded bg-dark-bgTertiary border border-dark-borderLight">W</kbd> = stab selected ch
         </span>
       </div>
 
