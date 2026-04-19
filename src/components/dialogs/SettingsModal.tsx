@@ -455,43 +455,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </div>
               </section>
 
-              {/* Other Visual */}
-              <section>
-                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">OTHER</h3>
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <label className="text-ft2-text text-xs font-mono">Custom Banner:</label>
-                        <span className="text-[9px] text-ft2-textDim font-mono">Shows in visualizer</span>
-                      </div>
-                      <div className="flex gap-1">
-                        <label className="text-[9px] font-mono px-2 py-0.5 rounded border bg-transparent border-ft2-border text-ft2-textDim hover:border-ft2-text cursor-pointer transition-colors">
-                          Upload
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            if (file.size > 512 * 1024) { alert('Image must be under 512KB'); return; }
-                            const reader = new FileReader();
-                            reader.onload = () => s.setCustomBannerImage(reader.result as string);
-                            reader.readAsDataURL(file);
-                            e.target.value = '';
-                          }} />
-                        </label>
-                        {s.customBannerImage && (
-                          <button onClick={() => s.setCustomBannerImage(null)}
-                            className="text-[9px] font-mono px-2 py-0.5 rounded border bg-transparent border-ft2-border text-accent-error hover:border-accent-error transition-colors">Remove</button>
-                        )}
-                      </div>
-                    </div>
-                    {s.customBannerImage && (
-                      <div className="flex items-center justify-center bg-black/30 rounded p-1" style={{ maxHeight: 48 }}>
-                        <img src={s.customBannerImage!} alt="Banner preview" style={{ maxHeight: 40, maxWidth: '100%', objectFit: 'contain' }} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
             </>
           )}
 
