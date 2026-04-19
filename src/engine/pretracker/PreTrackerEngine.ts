@@ -6,9 +6,25 @@
  * and live playback state (position/row).
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { IsolationCapableEngine } from '@/engine/tone/ChannelRoutedEffects';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
+
+/** PreTracker adds HEAP32 rewrite. */
+function preTrackerTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
+    .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;')
+    .replace(/HEAP32=new Int32Array\(b\);/, 'HEAP32=new Int32Array(b);Module["HEAP32"]=HEAP32;');
+}
 
 export interface PreTrackerMetadata {
   title: string;
@@ -105,21 +121,10 @@ type InstPatternCallback = (patterns: (PreTrackerInstPattern | null)[]) => void;
 type RawFileCallback = (data: ArrayBuffer | null) => void;
 type RawInstInfoCallback = (instruments: (number[] | null)[]) => void;
 
-export class PreTrackerEngine implements IsolationCapableEngine {
+export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapableEngine {
   static readonly MAX_ISOLATION_SLOTS = 4;
   private static instance: PreTrackerEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
-
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _metadata: PreTrackerMetadata | null = null;
   private _metadataCallbacks: MetadataCallback[] = [];
@@ -133,14 +138,8 @@ export class PreTrackerEngine implements IsolationCapableEngine {
   private _row = 0;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(PreTrackerEngine.cache);
   }
 
   static getInstance(): PreTrackerEngine {
@@ -158,60 +157,19 @@ export class PreTrackerEngine implements IsolationCapableEngine {
   get position(): number { return this._position; }
   get row(): number { return this._row; }
 
-  private async initialize(): Promise<void> {
-    try {
-      await PreTrackerEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[PreTrackerEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    // NOTE: worklet file is CamelCase "PreTracker.worklet.js" but the wasm/js
+    // glue uses lowercase "Pretracker.wasm/Pretracker.js" — preserve exactly.
+    return {
+      dir: 'pretracker',
+      workletFile: 'PreTracker.worklet.js',
+      wasmFile: 'Pretracker.wasm',
+      jsFile: 'Pretracker.js',
+      transformJS: preTrackerTransform,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}pretracker/PreTracker.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}pretracker/Pretracker.wasm`),
-          fetch(`${baseUrl}pretracker/Pretracker.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;')
-            .replace(/HEAP32=new Int32Array\(b\);/, 'HEAP32=new Int32Array(b);Module["HEAP32"]=HEAP32;');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'pretracker-processor', {
@@ -324,8 +282,8 @@ export class PreTrackerEngine implements IsolationCapableEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: PreTrackerEngine.wasmBinary,
-      jsCode: PreTrackerEngine.jsCode,
+      wasmBinary: PreTrackerEngine.cache.wasmBinary,
+      jsCode: PreTrackerEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
@@ -353,10 +311,6 @@ export class PreTrackerEngine implements IsolationCapableEngine {
       adsrAttack: f[3], adsrDecay: f[4], adsrSustain: f[5],
       adsrRelease: f[6], patternSteps: f[7],
     };
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
@@ -515,11 +469,8 @@ export class PreTrackerEngine implements IsolationCapableEngine {
     }
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     if (PreTrackerEngine.instance === this) {
       PreTrackerEngine.instance = null;
     }
