@@ -23,7 +23,7 @@ import {
 } from '@/types/instrument';
 import { WavetableSynth } from '../WavetableSynth';
 import { DrumKitSynth } from '../DrumKitSynth';
-import { DubSirenSynth } from '../DubSirenSynth';
+import { DubSirenSynth } from '../dub/DubSirenSynth';
 import { SpaceLaserSynth } from '../SpaceLaserSynth';
 import { SynareSynth } from '../SynareSynth';
 import { SAMSynth } from '../sam/SAMSynth';
