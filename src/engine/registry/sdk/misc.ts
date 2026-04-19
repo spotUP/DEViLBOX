@@ -10,7 +10,7 @@
 import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
-import { DubSirenSynth } from '../../DubSirenSynth';
+import { DubSirenSynth } from '../../dub/DubSirenSynth';
 import { SpaceLaserSynth } from '../../SpaceLaserSynth';
 import { V2Synth } from '../../v2/V2Synth';
 import { V2SpeechSynth } from '../../v2/V2SpeechSynth';
