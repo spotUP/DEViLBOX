@@ -6,7 +6,8 @@
  */
 
 import * as Tone from 'tone';
-import type { DrumPad, DubBusSettings } from '../../types/drumpad';
+import type { DrumPad } from '../../types/drumpad';
+import type { DubBusSettings } from '../../types/dub';
 import { createEffectChain } from '../factories/EffectFactory';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';

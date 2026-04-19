@@ -19,7 +19,7 @@
  */
 
 import type { DrumPadEngine } from '../drumpad/DrumPadEngine';
-import type { DubActionId, DubBusSettings } from '@/types/drumpad';
+import type { DubActionId, DubBusSettings } from '@/types/dub';
 import type { DeckId } from '../dj/DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';
 import { onNextDownbeat, getPhaseInfo } from '../dj/DJAutoSync';
