@@ -13,8 +13,8 @@
  */
 
 import * as Tone from 'tone';
-import type { DubBusSettings } from '../../types/drumpad';
-import { DEFAULT_DUB_BUS } from '../../types/drumpad';
+import type { DubBusSettings } from '../../types/dub';
+import { DEFAULT_DUB_BUS } from '../../types/dub';
 import { SpringReverbEffect } from '../effects/SpringReverbEffect';
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { getNativeAudioNode } from '@utils/audio-context';

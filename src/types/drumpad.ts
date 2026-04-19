@@ -7,14 +7,9 @@ import type { EffectConfig } from './instrument/effects';
 import type { SynthType, EnvelopeConfig } from './instrument/base';
 import type { DrumType, DrumMachineType } from './instrument/drums';
 import type { DjFxActionId } from '../engine/drumpad/DjFxActions';
-import type { DubActionId, DubBusSettings } from './dub';
-import { DEFAULT_DUB_BUS } from './dub';
-
-// Dub types moved to a dedicated module during Phase 0 of the Tracker Dub Studio work.
-// Re-exported here for backward compatibility during the transition. Importers will
-// be migrated to @/types/dub directly in Task 8 of the Phase 0 plan.
-export type { DubActionId, DubBusSettings };
-export { DEFAULT_DUB_BUS };
+// Dub types live in ./dub (Phase 0 of the Tracker Dub Studio refactor).
+// DubActionId is imported here only because DrumPad.dubAction references it.
+import type { DubActionId } from './dub';
 
 export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';

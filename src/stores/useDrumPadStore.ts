@@ -11,9 +11,10 @@ import type {
   MIDIMapping,
   SampleData,
   PadBank,
-  DubBusSettings,
 } from '../types/drumpad';
-import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName, DEFAULT_DUB_BUS } from '../types/drumpad';
+import { createEmptyProgram, createEmptyPad, getBankPads, MPK_SLOT_COUNT, mpkSlotId, mpkSlotName } from '../types/drumpad';
+import type { DubBusSettings } from '../types/dub';
+import { DEFAULT_DUB_BUS } from '../types/dub';
 
 /** Build the 8 default MPK-linked program slots. */
 function buildMpkSlots(): Map<string, ReturnType<typeof createEmptyProgram>> {
