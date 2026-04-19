@@ -129,3 +129,40 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   echoSyncDivision: 'off',
   throwQuantize: 'off',
 };
+
+// ─── Phase 1: dub lane + event types ──────────────────────────────────────
+// Per-pattern automation: dub moves performed live (or written offline in
+// the lane editor) are serialised as DubEvents and replayed by DubLanePlayer
+// on each tracker tick. See:
+//   thoughts/shared/plans/2026-04-19-tracker-dub-studio-phase-1-plan.md
+
+/** Quantize modes — shared between Echo Throw's snap-to-grid behavior and
+ *  future moves. 'off' fires immediately; everything else snaps to the next
+ *  corresponding beat subdivision boundary relative to transport.currentBeat. */
+export type QuantizeMode = 'off' | '1/16' | '1/8' | 'offbeat' | 'bar';
+
+/** A single recorded dub move. Lives on the pattern's dubLane.events[].
+ *  Stored sorted by beat so DubLanePlayer can advance a cursor in O(1)/tick. */
+export interface DubEvent {
+  /** Stable uuid — survives edits so the lane editor can reference events. */
+  id: string;
+  /** Move registry key — 'echoThrow' today; 'dubStab', 'channelMute', … in later phases. */
+  moveId: string;
+  /** Target tracker channel (0-based). Undefined for global moves (siren, master drop, …). */
+  channelId?: number;
+  /** Quantized beat within pattern (float). */
+  beat: number;
+  /** For hold-style moves: filled on release. Undefined = trigger/one-shot. */
+  durationBeats?: number;
+  /** Move-specific params — e.g. echoThrow: { throwBeats, feedbackBoost }. */
+  params: Record<string, number>;
+  /** Kept so the lane editor can re-quantize later without losing user intent. */
+  sourceQuantize?: QuantizeMode;
+}
+
+/** Per-pattern dub lane. `enabled: false` mute/solos the whole lane so the
+ *  user can audition the naked song (and still perform moves live on top). */
+export interface DubLane {
+  enabled: boolean;
+  events: DubEvent[];
+}
