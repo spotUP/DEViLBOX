@@ -36,7 +36,7 @@ export class DubSirenSynth implements DevilboxSynth {
       reverb: { ...DEFAULT_CONFIG.reverb, ...config?.reverb },
     };
 
-    // Output: native GainNode bridged from Tone.js Volume
+    // Output: native GainNode bridged from Tone.js Volume.
     this.output = getDevilboxAudioContext().createGain();
     this._toneOutput = new Tone.Volume(0);
     const nativeOut = getNativeAudioNode(this._toneOutput);
