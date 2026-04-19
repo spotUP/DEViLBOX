@@ -7,6 +7,12 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
 export interface JamCrackerTuneInfo {
   songLength: number;
@@ -24,35 +30,24 @@ export interface JamCrackerPositionUpdate {
 
 type PositionCallback = (update: JamCrackerPositionUpdate) => void;
 
-export class JamCrackerEngine {
+export class JamCrackerEngine extends WASMSingletonBase {
   private static instance: JamCrackerEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _tunePromise: Promise<JamCrackerTuneInfo> | null = null;
   private _resolveTune: ((info: JamCrackerTuneInfo) => void) | null = null;
   private _rejectTune: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
-  private _disposed = false;
+
+  private _patternCallbacks: Map<string, (data: any) => void> = new Map();
+  private _songStructureResolve: ((data: any) => void) | null = null;
+  private _saveResolve: ((data: Uint8Array) => void) | null = null;
+  private _requestId = 0;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(JamCrackerEngine.cache);
   }
 
   static getInstance(): JamCrackerEngine {
@@ -71,60 +66,16 @@ export class JamCrackerEngine {
     return !!JamCrackerEngine.instance && !JamCrackerEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await JamCrackerEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[JamCrackerEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'jamcracker',
+      workletFile: 'JamCracker.worklet.js',
+      wasmFile: 'JamCracker.wasm',
+      jsFile: 'JamCracker.js',
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}jamcracker/JamCracker.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}jamcracker/JamCracker.wasm`),
-          fetch(`${baseUrl}jamcracker/JamCracker.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten output for worklet Function() execution
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'jamcracker-processor', {
@@ -218,15 +169,11 @@ export class JamCrackerEngine {
     // Send init message with WASM binary and JS code
     this.workletNode.port.postMessage({
       type: 'init',
-      wasmBinary: JamCrackerEngine.wasmBinary,
-      jsCode: JamCrackerEngine.jsCode,
+      wasmBinary: JamCrackerEngine.cache.wasmBinary,
+      jsCode: JamCrackerEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<JamCrackerTuneInfo> {
@@ -285,11 +232,6 @@ export class JamCrackerEngine {
   // --------------------------------------------------------------------------
   // Pattern data access
   // --------------------------------------------------------------------------
-
-  private _patternCallbacks: Map<string, (data: any) => void> = new Map();
-  private _songStructureResolve: ((data: any) => void) | null = null;
-  private _saveResolve: ((data: Uint8Array) => void) | null = null;
-  private _requestId = 0;
 
   /** Get pattern data with retry on timeout */
   getPatternData(patIdx: number): Promise<{
@@ -370,11 +312,8 @@ export class JamCrackerEngine {
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     this._positionCallbacks.clear();
     this._songEndCallbacks.clear();
     if (JamCrackerEngine.instance === this) {

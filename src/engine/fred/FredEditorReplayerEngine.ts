@@ -5,38 +5,27 @@
  * Follows the SteveTurnerEngine singleton pattern.
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class FredEditorReplayerEngine {
+export class FredEditorReplayerEngine extends WASMSingletonBase {
   private static instance: FredEditorReplayerEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
   private _pendingRequests: Map<number, { resolve: (data: unknown) => void }> = new Map();
   private _nextRequestId = 1;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    // Connect to destination for note preview
+    super();
+    // Connect to destination for note preview (unlike most whole-song replayers,
+    // this engine is also used for instrument-preview from the editor panel).
     this.output.connect(this.audioContext.destination);
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    this.initialize(FredEditorReplayerEngine.cache);
   }
 
   static getInstance(): FredEditorReplayerEngine {
@@ -50,59 +39,16 @@ export class FredEditorReplayerEngine {
     return !!FredEditorReplayerEngine.instance && !FredEditorReplayerEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await FredEditorReplayerEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[FredEditorReplayerEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'fred-wasm',
+      workletFile: 'FredEditorReplayer.worklet.js',
+      wasmFile: 'FredEditorReplayer.wasm',
+      jsFile: 'FredEditorReplayer.js',
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}fred-wasm/FredEditorReplayer.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}fred-wasm/FredEditorReplayer.wasm`),
-          fetch(`${baseUrl}fred-wasm/FredEditorReplayer.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'fred-editor-replayer-processor', {
@@ -154,15 +100,11 @@ export class FredEditorReplayerEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: FredEditorReplayerEngine.wasmBinary,
-      jsCode: FredEditorReplayerEngine.jsCode,
+      wasmBinary: FredEditorReplayerEngine.cache.wasmBinary,
+      jsCode: FredEditorReplayerEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
@@ -232,11 +174,8 @@ export class FredEditorReplayerEngine {
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     if (FredEditorReplayerEngine.instance === this) {
       FredEditorReplayerEngine.instance = null;
     }
