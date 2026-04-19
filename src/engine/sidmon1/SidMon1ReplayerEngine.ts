@@ -13,6 +13,7 @@
  * bug rather than a TS-side problem. Leaving a separate TODO for that.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   WASMSingletonBase,
@@ -36,7 +37,18 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
   }
 
   static getInstance(): SidMon1ReplayerEngine {
-    if (!SidMon1ReplayerEngine.instance || SidMon1ReplayerEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !SidMon1ReplayerEngine.instance ||
+      SidMon1ReplayerEngine.instance._disposed ||
+      SidMon1ReplayerEngine.instance.audioContext !== currentCtx
+    ) {
+      if (SidMon1ReplayerEngine.instance && !SidMon1ReplayerEngine.instance._disposed) {
+        SidMon1ReplayerEngine.instance.dispose();
+      }
       SidMon1ReplayerEngine.instance = new SidMon1ReplayerEngine();
     }
     return SidMon1ReplayerEngine.instance;

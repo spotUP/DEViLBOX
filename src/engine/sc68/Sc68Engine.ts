@@ -4,6 +4,7 @@
  * Follows the JamCrackerEngine/PreTrackerEngine/HippelEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -21,7 +22,18 @@ export class Sc68Engine extends WASMSingletonBase {
   }
 
   static getInstance(): Sc68Engine {
-    if (!Sc68Engine.instance || Sc68Engine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !Sc68Engine.instance ||
+      Sc68Engine.instance._disposed ||
+      Sc68Engine.instance.audioContext !== currentCtx
+    ) {
+      if (Sc68Engine.instance && !Sc68Engine.instance._disposed) {
+        Sc68Engine.instance.dispose();
+      }
       Sc68Engine.instance = new Sc68Engine();
     }
     return Sc68Engine.instance;

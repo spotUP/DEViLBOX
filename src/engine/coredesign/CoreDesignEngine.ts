@@ -4,6 +4,7 @@
  * Follows the standard WASM engine pattern (like ArtOfNoiseEngine).
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -28,7 +29,18 @@ export class CoreDesignEngine extends WASMSingletonBase {
   }
 
   static getInstance(): CoreDesignEngine {
-    if (!CoreDesignEngine.instance || CoreDesignEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !CoreDesignEngine.instance ||
+      CoreDesignEngine.instance._disposed ||
+      CoreDesignEngine.instance.audioContext !== currentCtx
+    ) {
+      if (CoreDesignEngine.instance && !CoreDesignEngine.instance._disposed) {
+        CoreDesignEngine.instance.dispose();
+      }
       CoreDesignEngine.instance = new CoreDesignEngine();
     }
     return CoreDesignEngine.instance;
