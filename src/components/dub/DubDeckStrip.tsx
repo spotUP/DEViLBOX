@@ -18,6 +18,8 @@ import { setDubBusForRouter, subscribeDubRouter } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
+import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffects';
+import { getToneEngine } from '@/engine/ToneEngine';
 import { Knob } from '@components/controls/Knob';
 import { DubLaneTimeline } from './DubLaneTimeline';
 
@@ -83,7 +85,18 @@ export const DubDeckStrip: React.FC = () => {
   // mounts.
   useEffect(() => {
     const engine = ensureDrumPadEngine();
-    setDubBusForRouter(engine.getDubBus());
+    const bus = engine.getDubBus();
+    setDubBusForRouter(bus);
+    // Hand the DubBus input to ChannelRoutedEffects so it can allocate the
+    // 32 per-channel GainNodes and wire them to the bus. Idempotent — safe
+    // to call every mount. Without this step setChannelDubSend warns and
+    // no-ops (the UI knob moves but no audio flows).
+    try {
+      const mgr = getChannelRoutedEffectsManager(getToneEngine().masterEffectsInput);
+      mgr.setupDubBusWiring(bus.inputNode);
+    } catch (e) {
+      console.warn('[DubDeckStrip] setupDubBusWiring failed:', e);
+    }
     return () => setDubBusForRouter(null);
   }, []);
 
