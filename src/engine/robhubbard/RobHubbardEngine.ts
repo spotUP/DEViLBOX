@@ -8,6 +8,7 @@
  * Multiple RobHubbardSynth instances share this single engine.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -37,7 +38,18 @@ export class RobHubbardEngine extends WASMSingletonBase {
   }
 
   static getInstance(): RobHubbardEngine {
-    if (!RobHubbardEngine.instance || RobHubbardEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !RobHubbardEngine.instance ||
+      RobHubbardEngine.instance._disposed ||
+      RobHubbardEngine.instance.audioContext !== currentCtx
+    ) {
+      if (RobHubbardEngine.instance && !RobHubbardEngine.instance._disposed) {
+        RobHubbardEngine.instance.dispose();
+      }
       RobHubbardEngine.instance = new RobHubbardEngine();
     }
     return RobHubbardEngine.instance;

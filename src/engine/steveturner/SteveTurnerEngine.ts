@@ -5,6 +5,7 @@
  * Follows the PumaTrackerEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   WASMSingletonBase,
@@ -29,7 +30,18 @@ export class SteveTurnerEngine extends WASMSingletonBase {
   }
 
   static getInstance(): SteveTurnerEngine {
-    if (!SteveTurnerEngine.instance || SteveTurnerEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !SteveTurnerEngine.instance ||
+      SteveTurnerEngine.instance._disposed ||
+      SteveTurnerEngine.instance.audioContext !== currentCtx
+    ) {
+      if (SteveTurnerEngine.instance && !SteveTurnerEngine.instance._disposed) {
+        SteveTurnerEngine.instance.dispose();
+      }
       SteveTurnerEngine.instance = new SteveTurnerEngine();
     }
     return SteveTurnerEngine.instance;

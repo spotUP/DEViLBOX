@@ -5,6 +5,7 @@
  * Follows the JamCrackerEngine/FCEngine/PreTrackerEngine singleton pattern.
  */
 
+import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -22,7 +23,18 @@ export class CpsycleEngine extends WASMSingletonBase {
   }
 
   static getInstance(): CpsycleEngine {
-    if (!CpsycleEngine.instance || CpsycleEngine.instance._disposed) {
+    // AudioContext-swap guard (see JamCrackerEngine:48-63 for the reference).
+    // Without this, the engine stays attached to a dead context on HMR /
+    // iOS suspend / page reload and goes silent with no error.
+    const currentCtx = getDevilboxAudioContext();
+    if (
+      !CpsycleEngine.instance ||
+      CpsycleEngine.instance._disposed ||
+      CpsycleEngine.instance.audioContext !== currentCtx
+    ) {
+      if (CpsycleEngine.instance && !CpsycleEngine.instance._disposed) {
+        CpsycleEngine.instance.dispose();
+      }
       CpsycleEngine.instance = new CpsycleEngine();
     }
     return CpsycleEngine.instance;
