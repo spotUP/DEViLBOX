@@ -18,6 +18,20 @@ import { registerIsolationEngineResolver } from '@engine/tone/ChannelRoutedEffec
 import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
+
+/** UADE only strips ESM markers — no HEAP rewrites (the worklet handles memory views itself). */
+function uadeTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
+}
 
 export interface UADEScanRow {
   period: number;
@@ -114,21 +128,12 @@ export interface UADEChannelData {
 type PositionCallback = (update: UADEPositionUpdate) => void;
 type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => void;
 
-export class UADEEngine implements IsolationCapableEngine {
+export class UADEEngine extends WASMSingletonBase implements IsolationCapableEngine {
   private static readonly MAX_ISOLATION_SLOTS = 4;
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: UADEEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _rejectInit: ((err: Error) => void) | null = null;
   private _initProgress = 0;
   private _initPhase = '';
@@ -157,7 +162,6 @@ export class UADEEngine implements IsolationCapableEngine {
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
-  private _disposed = false;
   // Pending readString requests: Map<requestId, {resolve, reject}>
   private _readStringPending: Map<number, { resolve: (s: string) => void; reject: (e: Error) => void }> = new Map();
   private _readStringNextId = 0;
@@ -189,15 +193,23 @@ export class UADEEngine implements IsolationCapableEngine {
   private _poisoned = false;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
+    super();
+    // Override base init promise with one that carries a reject handle.
     this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
       this._rejectInit = reject;
     });
+    this.initialize(UADEEngine.cache);
+  }
 
-    this.initialize();
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'uade',
+      workletFile: 'UADE.worklet.js',
+      wasmFile: 'UADE.wasm',
+      jsFile: 'UADE.js',
+      transformJS: uadeTransform,
+    };
   }
 
   static getInstance(): UADEEngine {
@@ -221,67 +233,7 @@ export class UADEEngine implements IsolationCapableEngine {
     return !!UADEEngine.instance && !UADEEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await UADEEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[UADEEngine] Initialization failed:', err);
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}uade/UADE.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
-
-      // Fetch WASM binary and JS glue code (shared across contexts, lazy-loaded)
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}uade/UADE.wasm`),
-          fetch(`${baseUrl}uade/UADE.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        } else {
-          throw new Error('[UADEEngine] Failed to fetch UADE.wasm');
-        }
-
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten output for worklet Function() execution:
-          // - Replace import.meta.url (not available in worklet scope)
-          // - Remove ESM export statements
-          // - Ensure wasmBinary is read from Module config
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
-          this.jsCode = code;
-        } else {
-          throw new Error('[UADEEngine] Failed to fetch UADE.js');
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'uade-processor', {
@@ -555,11 +507,11 @@ export class UADEEngine implements IsolationCapableEngine {
     };
 
     this.workletNode.port.postMessage(
-      { type: 'init', sampleRate: ctx.sampleRate, wasmBinary: UADEEngine.wasmBinary, jsCode: UADEEngine.jsCode },
-      UADEEngine.wasmBinary ? [UADEEngine.wasmBinary] : []
+      { type: 'init', sampleRate: ctx.sampleRate, wasmBinary: UADEEngine.cache.wasmBinary, jsCode: UADEEngine.cache.jsCode },
+      UADEEngine.cache.wasmBinary ? [UADEEngine.cache.wasmBinary] : []
     );
-    // Note: transferring the buffer clears the static cache; re-fetch on next load if needed
-    UADEEngine.wasmBinary = null;
+    // Note: transferring the buffer clears the cache; re-fetch on next load if needed
+    UADEEngine.cache.wasmBinary = null;
 
     this.workletNode.connect(this.output);
 
@@ -572,10 +524,6 @@ export class UADEEngine implements IsolationCapableEngine {
     };
   }
 
-  /** Wait for WASM initialization to complete */
-  async ready(): Promise<void> {
-    return this._initPromise;
-  }
 
   /**
    * Preemptive reinit — call before loading a new song to avoid delay during playback.
@@ -1229,15 +1177,12 @@ export class UADEEngine implements IsolationCapableEngine {
     this.workletNode.port.postMessage({ type: 'diagIsolation' });
   }
 
-  dispose(): void {
-    this._disposed = true;
+  override dispose(): void {
     for (let i = 0; i < UADEEngine.MAX_ISOLATION_SLOTS; i++) {
       if (this._isolationSlotMasks[i] !== null) this.removeIsolation(i);
     }
     this._isolationSlotMasks.fill(null);
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+    super.dispose();
     this._positionCallbacks.clear();
     this._channelCallbacks.clear();
     this._songEndCallbacks.clear();
