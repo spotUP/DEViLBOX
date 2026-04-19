@@ -15,7 +15,7 @@
 import * as Tone from 'tone';
 import type { DubBusSettings } from '../../types/dub';
 import { DEFAULT_DUB_BUS } from '../../types/dub';
-import { SpringReverbEffect } from '../effects/SpringReverbEffect';
+import { AelapseEffect, PARAM_SPRINGS_DRYWET } from '../effects/AelapseEffect';
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
@@ -100,7 +100,27 @@ export class DubBus {
   private input: GainNode;
   private hpf: BiquadFilterNode;
   private tapeSat: WaveShaperNode;    // asymmetric tanh — MCI board bite
-  private spring: SpringReverbEffect;
+  /** Aelapse-ported spring-reverb DSP (C++ → WASM). Replaces the old
+   *  Tone.js-based SpringReverbEffect — proper tank simulation with chaos,
+   *  damping, and per-spring scatter. Delay side disabled since the bus
+   *  already runs SpaceEcho as its dedicated tape-head chain. */
+  private spring: AelapseEffect;
+  /** Cached mirror of the current springs dry/wet so dubPanic + mini-drain
+   *  can zero it and restore without re-reading the engine. Mirrors what
+   *  SpringReverbEffect's `.wet` used to hold inline. */
+  private _springWetCache: number = 0.55;
+
+  /** Set the Aelapse springs dry/wet AND cache it. Use everywhere old code
+   *  did `this.spring.wet = v`. */
+  private _setSpringWet(v: number): void {
+    this._springWetCache = v;
+    try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, v); } catch { /* ok */ }
+  }
+
+  /** Read the current springs dry/wet — diagnostic for gig-sims/tests.
+   *  AelapseEffect doesn't expose a param reader, so we mirror it in
+   *  `_springWetCache`. */
+  getSpringWet(): number { return this._springWetCache; }
   private echo: SpaceEchoEffect;
   private sidechain: DynamicsCompressorNode;  // fast (pumping)
   private glue: DynamicsCompressorNode;       // slow (dubplate glue)
@@ -193,12 +213,28 @@ export class DubBus {
     this.tapeSat.curve = makeTapeSatCurve(0.35);
     this.tapeSat.oversample = '2x';
 
-    // Spring reverb — tightened diffusion from 0.7 → 0.4 for a more
-    // pronounced single-slap character (less "cathedral", more "metal tank").
-    // That's what gives King Tubby's recordings their snappy springiness.
-    this.spring = new SpringReverbEffect({
-      decay: 0.6, damping: 0.45, tension: 0.55, mix: 0.55, drip: 0.7, diffusion: 0.4,
-      wet: this.settings.springWet,
+    // Spring reverb — Aelapse (C++ → WASM port of the smiarx/aelapse spring
+    // tank sim). Parameters tuned for King Tubby "metal tank" character:
+    // short length + heavy damping + scatter + a touch of chaos gives the
+    // snappy single-slap that defines the dub spring sound. Delay side
+    // disabled because DubBus already runs SpaceEcho as its dedicated
+    // tape-head chain.
+    this._springWetCache = this.settings.springWet;
+    this.spring = new AelapseEffect({
+      delayActive:    false,
+      springsActive:  true,
+      springsDryWet:  this.settings.springWet,
+      springsWidth:   1.0,   // full stereo splay
+      springsLength:  0.35,  // short tank — slap, not cathedral
+      springsDecay:   0.45,  // moderate decay
+      springsDamp:    0.55,  // heavy damping tames HF ring
+      springsShape:   0.30,  // softer transient shape
+      springsTone:    0.55,  // slight high-mid emphasis
+      springsScatter: 0.60,  // strong per-spring scatter = metallic character
+      springsChaos:   0.15,  // a touch of chaos for organic motion
+      wet:            1.0,   // dry/wet happens via springsDryWet; Aelapse
+                             // top-level wet stays at 1 so the chain passes
+                             // through fully processed audio.
     });
 
     this.echo = new SpaceEchoEffect({
@@ -438,7 +474,7 @@ export class DubBus {
     this._miniDrainPending = false;
     try {
       this.echo.setIntensity(this.settings.echoIntensity);
-      this.spring.wet = this.settings.springWet;
+      this._setSpringWet(this.settings.springWet);
       console.log(`[DubBus] mini-drain ✗ aborted — new consumer attached; echoIntensity=${this.settings.echoIntensity.toFixed(2)} springWet=${this.settings.springWet.toFixed(2)}`);
     } catch { /* ok */ }
   }
@@ -462,7 +498,7 @@ export class DubBus {
     const drainMs = Math.max(250, settings.echoRateMs * 3 + 200);
     try {
       this.echo.setIntensityInstant(0);
-      this.spring.wet = 0;
+      this._setSpringWet(0);
       console.log(`[DubBus] mini-drain ▶ last releaser fired, zeroed echo+spring (drain ${drainMs} ms)`);
     } catch { /* ok */ }
     const t = setTimeout(() => {
@@ -478,7 +514,7 @@ export class DubBus {
       if (this.actionReleasers.size > 0) return;
       try {
         this.echo.setIntensity(settings.echoIntensity);
-        this.spring.wet = settings.springWet;
+        this._setSpringWet(settings.springWet);
         console.log(`[DubBus] mini-drain ◀ restored echoIntensity=${settings.echoIntensity.toFixed(2)} springWet=${settings.springWet.toFixed(2)}`);
       } catch { /* ok */ }
     }, drainMs);
@@ -741,7 +777,7 @@ export class DubBus {
       // delay line keep recirculating during the ramp, which is the
       // "echo lingers forever" tail users hit during live panic.
       this.echo.setIntensityInstant(0);
-      this.spring.wet = 0;
+      this._setSpringWet(0);
     } catch (err) { console.warn('[DubPanic] echo/spring zero failed:', err); }
     const drainTimer = setTimeout(() => {
       this.throwTimers.delete(drainTimer);
@@ -751,7 +787,7 @@ export class DubBus {
       // knob tweaks the user made during the drain window are honored.
       try {
         this.echo.setIntensity(this.settings.echoIntensity);
-        this.spring.wet = this.settings.springWet;
+        this._setSpringWet(this.settings.springWet);
       } catch { /* ok */ }
     }, 2000);
     this.throwTimers.add(drainTimer);
@@ -868,7 +904,7 @@ export class DubBus {
           this._draining = false;
           try {
             this.echo.setIntensity(merged.echoIntensity);
-            this.spring.wet = merged.springWet;
+            this._setSpringWet(merged.springWet);
           } catch { /* ok */ }
         }
       }
@@ -883,7 +919,7 @@ export class DubBus {
     // 2 s window. Without this guard, mirror-effect writes during drain
     // would restore intensity mid-flight and leave residual echo on re-enable.
     if (!this._draining) {
-      this.spring.wet = merged.springWet;
+      this._setSpringWet(merged.springWet);
       this.echo.setIntensity(merged.echoIntensity);
       this.echo.wet = merged.echoWet;
     }
@@ -966,10 +1002,10 @@ export class DubBus {
   slamSpring(amount = 1.0, ms = 400): void {
     if (!this.enabled) return;
     const target = Math.min(1.0, Math.max(0, amount));
-    try { this.spring.wet = target; } catch { /* ok */ }
+    this._setSpringWet(target);
     const t = setTimeout(() => {
       this.throwTimers.delete(t);
-      try { this.spring.wet = this.settings.springWet; } catch { /* ok */ }
+      this._setSpringWet(this.settings.springWet);
     }, ms);
     this.throwTimers.add(t);
   }
