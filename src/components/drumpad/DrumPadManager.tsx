@@ -17,6 +17,10 @@ import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
+import { Knob } from '@components/controls/Knob';
+import { getDrumPadEngine, getNoteRepeatEngine } from '@/hooks/drumpad/useMIDIPadRouting';
+import { useAudioStore } from '@/stores/useAudioStore';
+import { getToneEngine } from '@/engine/ToneEngine';
 
 
 /** Mini performance status: BPM + active deck letters */
@@ -53,6 +57,51 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
   // Performance mode: fullscreen pads with minimal UI
   const [performanceMode, setPerformanceMode] = useState(false);
+
+  // Drumpad master volume (last-resort balance against DJ output)
+  const [drumpadMaster, setDrumpadMaster] = useState(() => {
+    return getDrumPadEngine()?.getMasterVolume() ?? 0.25;
+  });
+  const handleDrumpadMasterChange = useCallback((v: number) => {
+    setDrumpadMaster(v);
+    // Sample pads + dub bus go through DrumPadEngine.masterGain
+    getDrumPadEngine()?.setMasterVolume(v);
+    // Synth pads (DubSiren, Synare, TB303, etc.) flow through ToneEngine.synthBus —
+    // the drumpad masterGain never sees them, so we must drop synthBus too.
+    try {
+      const te = getToneEngine();
+      te.synthBus.gain.setTargetAtTime(Math.max(0, Math.min(4, v)), te.synthBus.context.currentTime, 0.01);
+    } catch { /* engine not ready */ }
+  }, []);
+
+  // On mount, push the initial PAD value to synthBus so synth pads match the
+  // knob's state without needing the user to touch it.
+  useEffect(() => {
+    try {
+      const te = getToneEngine();
+      te.synthBus.gain.setTargetAtTime(Math.max(0, Math.min(4, drumpadMaster)), te.synthBus.context.currentTime, 0.01);
+    } catch { /* engine not ready */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const formatDrumpadMaster = useCallback((v: number) => {
+    if (v <= 0) return '-\u221E';
+    const dB = 20 * Math.log10(v);
+    return `${dB >= -0.5 ? '0' : dB.toFixed(0)}`;
+  }, []);
+
+  const handleKillFX = useCallback(() => {
+    const dpe = getDrumPadEngine();
+    if (dpe) {
+      dpe.stopAll();
+      dpe.dubPanic();
+    }
+    useDrumPadStore.getState().setDubBus({ enabled: false });
+    useAudioStore.getState().setMasterEffects([]);
+    getNoteRepeatEngine()?.stopAll();
+    // Release any still-held synth-pad notes via ToneEngine
+    try { getToneEngine().releaseAll(); } catch { /* ok */ }
+    window.dispatchEvent(new CustomEvent('dj-panic'));
+  }, []);
 
   // DJ presets — action-only select (no persistent selection)
 
@@ -196,6 +245,28 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             {performanceMode && <PerformanceStatus />}
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 px-2 py-1 rounded border border-dark-borderLight bg-dark-bgTertiary" title="Drumpad master volume (last-resort balance vs DJ output)">
+              <span className="text-[9px] font-mono text-text-muted uppercase tracking-wider">PAD</span>
+              <Knob
+                value={drumpadMaster}
+                min={0}
+                max={2.0}
+                onChange={handleDrumpadMasterChange}
+                size="sm"
+                color="#ffffff"
+                defaultValue={0.25}
+                formatValue={formatDrumpadMaster}
+                hideValue
+                title="Drumpad master volume"
+              />
+            </div>
+            <button
+              onClick={handleKillFX}
+              className="px-3 py-1.5 text-xs font-mono border rounded transition-colors text-accent-error hover:text-text-primary hover:bg-accent-error bg-dark-bgTertiary border-accent-error/50"
+              title="Kill all effects — stops dub bus, master FX, held pads, note-repeats (does not stop the music)"
+            >
+              KILL FX
+            </button>
             <button
               onClick={() => setPerformanceMode(!performanceMode)}
               className={`px-3 py-1.5 text-xs font-mono border rounded transition-colors flex items-center gap-1.5 ${
