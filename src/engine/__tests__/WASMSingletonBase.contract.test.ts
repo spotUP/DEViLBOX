@@ -15,10 +15,28 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync, statSync, existsSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { glob } from 'node:fs/promises';
+
+/**
+ * Recursively walk a directory and yield every `.ts` file that doesn't
+ * live under a `__tests__` segment. `fs/promises#glob` would be nicer
+ * but is Node 22+; CI still runs on Node 20.
+ */
+function walkTs(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
+      out.push(...walkTs(full));
+    } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
 
 interface LoaderConfig {
   engineFile: string;
@@ -36,11 +54,9 @@ const PUBLIC_DIR = join(REPO_ROOT, 'public');
  * Find every engine file under src/engine/ that extends WASMSingletonBase.
  * Does not descend into __tests__ directories.
  */
-async function findEngineFiles(): Promise<string[]> {
+function findEngineFiles(): string[] {
   const files: string[] = [];
-  for await (const entry of glob('src/engine/**/*.ts', { cwd: REPO_ROOT })) {
-    const full = join(REPO_ROOT, entry);
-    if (entry.includes('__tests__')) continue;
+  for (const full of walkTs(join(REPO_ROOT, 'src/engine'))) {
     const src = readFileSync(full, 'utf-8');
     if (/extends\s+WASMSingletonBase\b/.test(src)) {
       files.push(full);
@@ -89,8 +105,8 @@ function extractLoaderConfig(engineFile: string): LoaderConfig | null {
 let configs: LoaderConfig[] = [];
 
 describe('WASMSingletonBase subclasses — static loader contract', () => {
-  beforeAll(async () => {
-    const files = await findEngineFiles();
+  beforeAll(() => {
+    const files = findEngineFiles();
     configs = files
       .map(extractLoaderConfig)
       .filter((c): c is LoaderConfig => c !== null);
