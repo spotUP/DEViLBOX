@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-04-18T19:48:42.870Z
+ * Generated: 2026-04-19T16:43:23.354Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.5750';
-export const BUILD_NUMBER = '5750';
-export const BUILD_HASH = 'f02aa07d5';
-export const BUILD_DATE = '2026-04-18';
+export const BUILD_VERSION = '1.0.5769';
+export const BUILD_NUMBER = '5769';
+export const BUILD_HASH = '273ba91e4';
+export const BUILD_DATE = '2026-04-19';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,89 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.5750',
+    version: '1.0.5769',
+    date: '2026-04-19',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Route synth pads through the dub bus via pad.dubSend"
+      },
+      {
+        type: 'fix',
+        "description": "Close DubBusPanel on click outside / Esc"
+      },
+      {
+        type: 'improvement',
+        "description": "Drop transition re-exports, migrate importers to @/types/dub"
+      },
+      {
+        type: 'improvement',
+        "description": "Move DubBusPanel to src/components/dub/"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract DubBus from DrumPadEngine"
+      },
+      {
+        type: 'feature',
+        "description": "Test(dub): add pure-function regression floor for DubActions"
+      },
+      {
+        type: 'improvement',
+        "description": "Move DubActions to src/engine/dub/"
+      },
+      {
+        type: 'improvement',
+        "description": "Move DubSirenSynth to src/engine/dub/"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract dub types to src/types/dub.ts"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: ignore .superpowers/ and drop tracked scheduler lockfile"
+      },
+      {
+        type: 'feature',
+        "description": "PAD master knob + Kill FX button in the manager header"
+      },
+      {
+        type: 'feature',
+        "description": "Mark tracks as played across view switches"
+      },
+      {
+        type: 'feature',
+        "description": "Auto DJ warns when playlist has missing analysis data"
+      },
+      {
+        type: 'fix',
+        "description": "Route XM/IT/S3M/modern-MOD analysis through the local pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "Rewrite auto-gain — target -6 dB RMS, +9 dB fallback, no peak clamp"
+      },
+      {
+        type: 'feature',
+        "description": "Master volume ceiling 1.5 → 2.0, tighter limiter (-0.3 dBFS, hard knee)"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(settings): remove half-wired customBannerImage feature"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(drumpad): remove dead ConfirmDialog component"
+      }
+    ]
+  },
+  {
+    version: '2026-04-18',
     date: '2026-04-18',
     changes: [
       {
@@ -156,82 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Route SIDs through local pipeline, not server UADE"
-      },
-      {
-        type: 'fix',
-        "description": "No retry-storm on persistent fails + skip 0-byte stub decode"
-      },
-      {
-        type: 'feature',
-        "description": "Analyze button always visible; supports force re-scan"
-      },
-      {
-        type: 'fix',
-        "description": "BPM-only gate + retry analysisSkipped on explicit click"
-      },
-      {
-        type: 'fix',
-        "description": ".fred files need prefix-form filename for UADE"
-      },
-      {
-        type: 'improvement',
-        "description": "Scope scroll-restore anchor to playlist id"
-      },
-      {
-        type: 'feature',
-        "description": "Dub bus + performance-throw actions overhaul"
-      },
-      {
-        type: 'feature',
-        "description": "Scroll-restore to last-played track on modal open"
-      },
-      {
-        type: 'fix',
-        "description": "Mouse drag animates when paramKey is set"
-      },
-      {
-        type: 'fix',
-        "description": "Apply per-song FX live from dropdown + during Auto DJ"
-      },
-      {
-        type: 'fix',
-        "description": "Don't auto-save per-song FX chains into playlist.masterEffects"
-      },
-      {
-        type: 'fix',
-        "description": "Per-song FX stops leaking across playlist tracks"
-      },
-      {
-        type: 'fix',
-        "description": "Stop native text-range selection from hijacking shift-click"
-      },
-      {
-        type: 'feature',
-        "description": "Explicit \"None\" option in per-song FX dropdown"
-      },
-      {
-        type: 'fix',
-        "description": "Stop sanitizing TFMX companion filenames"
-      },
-      {
-        type: 'fix',
-        "description": "Per-song FX dropdown now lists the full master FX library"
-      },
-      {
-        type: 'feature',
-        "description": "FX preset button shows the currently active preset"
-      },
-      {
-        type: 'fix',
-        "description": "TFMX companion files now reach the playlist render worker"
-      },
-      {
-        type: 'fix',
-        "description": "Closing playlist modal / Modland browser no longer stops deck audio"
-      },
-      {
-        type: 'feature',
-        "description": "Smooth crossfade when applying deck EQ presets"
       }
     ]
   }
