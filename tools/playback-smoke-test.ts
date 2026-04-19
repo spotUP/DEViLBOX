@@ -36,6 +36,8 @@
  *   npx tsx tools/playback-smoke-test.ts --only AHX,MOD    # test specific families only (substring match)
  *   npx tsx tools/playback-smoke-test.ts --resume          # skip tests that passed in the last run (reads /tmp/final-audit.txt)
  *   npx tsx tools/playback-smoke-test.ts --lockstep        # enable Furnace lock-step command comparison (slow)
+ *   npx tsx tools/playback-smoke-test.ts --write-baseline  # snapshot current results to tools/baselines/playback-smoke.json
+ *   npx tsx tools/playback-smoke-test.ts --check-baseline  # diff current run against baseline; exit non-zero on regressions
  *
  * === HOW IT WORKS ===
  *   1. Connects to the MCP WebSocket relay at ws://localhost:4003/mcp
@@ -1015,6 +1017,8 @@ async function main(): Promise<void> {
   const furnaceOnly = args.includes('--furnace-only');
   const fxOnly = args.includes('--fx-only');
   const pushResults = args.includes('--push-results');
+  const writeBaseline = args.includes('--write-baseline');
+  const checkBaseline = args.includes('--check-baseline');
   const skipFx = args.includes('--skip-fx');
   const skipFurnace = args.includes('--skip-furnace');
   const lockstep = args.includes('--lockstep');
@@ -1361,7 +1365,95 @@ async function main(): Promise<void> {
     }
   }
 
-  process.exit(failed > 0 ? 1 : 0);
+  // ── Baseline diffing (Phase 2.4) ──────────────────────────────────────────
+  // --write-baseline → serialize current results to tools/baselines/
+  // --check-baseline → diff against baseline, exit non-zero on regression
+  let baselineFailures = 0;
+  if (writeBaseline || checkBaseline) {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const selfDir = path.dirname(fileURLToPath(import.meta.url));
+    const baselineDir = path.resolve(selfDir, 'baselines');
+    const baselinePath = path.resolve(baselineDir, 'playback-smoke.json');
+
+    if (writeBaseline) {
+      if (!fs.existsSync(baselineDir)) fs.mkdirSync(baselineDir, { recursive: true });
+      const snapshot: BaselineSnapshot = {
+        updatedAt: new Date().toISOString(),
+        entries: results.map((r) => ({
+          name: r.name,
+          family: r.family,
+          status: r.status,
+          rmsAvg: r.rmsAvg ?? 0,
+          instrumentCount: r.verification?.instrumentCount ?? 0,
+        })),
+      };
+      fs.writeFileSync(baselinePath, JSON.stringify(snapshot, null, 2) + '\n');
+      console.log('');
+      console.log(`== Wrote baseline to ${baselinePath} (${snapshot.entries.length} entries)`);
+    }
+
+    if (checkBaseline) {
+      console.log('');
+      console.log('== Checking against baseline ==');
+      if (!fs.existsSync(baselinePath)) {
+        console.error(`  No baseline at ${baselinePath}. Run with --write-baseline first.`);
+        process.exit(3);
+      }
+      const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf-8')) as BaselineSnapshot;
+      const byName = new Map(baseline.entries.map((e) => [e.name, e]));
+      const regressions: Array<{ name: string; kind: string; detail: string }> = [];
+
+      for (const r of results) {
+        const prev = byName.get(r.name);
+        if (!prev) continue; // new test — not a regression
+        if (prev.status === 'pass' && r.status !== 'pass') {
+          regressions.push({
+            name: r.name,
+            kind: 'STATUS_REGRESSION',
+            detail: `was pass, now ${r.status} (${r.reason ?? 'unknown'})`,
+          });
+          continue;
+        }
+        if (
+          prev.status === 'pass' &&
+          r.status === 'pass' &&
+          prev.rmsAvg > 0 &&
+          (r.rmsAvg ?? 0) < prev.rmsAvg * 0.5
+        ) {
+          regressions.push({
+            name: r.name,
+            kind: 'SILENT_REGRESSION',
+            detail: `rms ${prev.rmsAvg.toFixed(4)} → ${(r.rmsAvg ?? 0).toFixed(4)} (< 50% baseline)`,
+          });
+        }
+      }
+      if (regressions.length === 0) {
+        console.log(`  OK — no regressions against baseline of ${baseline.updatedAt}`);
+      } else {
+        console.log(`  ${regressions.length} regression(s) vs baseline of ${baseline.updatedAt}:`);
+        for (const r of regressions) {
+          console.log(`    x [${r.kind}] ${r.name} — ${r.detail}`);
+        }
+        baselineFailures = regressions.length;
+      }
+    }
+  }
+
+  process.exit(failed > 0 || baselineFailures > 0 ? 1 : 0);
+}
+
+interface BaselineEntry {
+  name: string;
+  family: string;
+  status: 'pass' | 'fail' | 'skip';
+  rmsAvg: number;
+  instrumentCount: number;
+}
+interface BaselineSnapshot {
+  updatedAt: string;
+  entries: BaselineEntry[];
 }
 
 main().catch((err) => {
