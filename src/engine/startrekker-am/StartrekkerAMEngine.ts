@@ -5,22 +5,16 @@
  * main thread and sent to the AudioWorklet via 'init' message (no fetch in worklet).
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class StartrekkerAMEngine {
+export class StartrekkerAMEngine extends WASMSingletonBase {
   private static instance: StartrekkerAMEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
-
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   // Per-channel voice state: { instrumentId, samplePosition (0-1) }
   private _voiceState: Array<{ instr: number; pos: number }> = [
@@ -30,14 +24,8 @@ export class StartrekkerAMEngine {
   private _voiceListeners: Set<(voices: Array<{ instr: number; pos: number }>) => void> = new Set();
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(StartrekkerAMEngine.cache);
   }
 
   static getInstance(): StartrekkerAMEngine {
@@ -51,58 +39,16 @@ export class StartrekkerAMEngine {
     return !!StartrekkerAMEngine.instance && !StartrekkerAMEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await StartrekkerAMEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[StartrekkerAMEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'startrekker-am',
+      workletFile: 'StartrekkerAM.worklet.js',
+      wasmFile: 'StartrekkerAM.wasm',
+      jsFile: 'StartrekkerAM.js',
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existing = this.initPromises.get(context);
-    if (existing) return existing;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(
-          `${baseUrl}startrekker-am/StartrekkerAM.worklet.js`
-        );
-      } catch {
-        // Module may already be registered
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResp, jsResp] = await Promise.all([
-          fetch(`${baseUrl}startrekker-am/StartrekkerAM.wasm`),
-          fetch(`${baseUrl}startrekker-am/StartrekkerAM.js`),
-        ]);
-        if (wasmResp.ok) this.wasmBinary = await wasmResp.arrayBuffer();
-        if (jsResp.ok) {
-          let code = await jsResp.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'startrekker-am-processor', {
@@ -143,15 +89,11 @@ export class StartrekkerAMEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: StartrekkerAMEngine.wasmBinary,
-      jsCode: StartrekkerAMEngine.jsCode,
+      wasmBinary: StartrekkerAMEngine.cache.wasmBinary,
+      jsCode: StartrekkerAMEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   /**
@@ -236,11 +178,12 @@ export class StartrekkerAMEngine {
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  dispose(): void {
+  override dispose(): void {
+    // Custom shutdown (stop message, not dispose) preserved from original.
     this._disposed = true;
     this._voiceListeners.clear();
-    this.workletNode?.port.postMessage({ type: 'stop' });
-    this.workletNode?.disconnect();
+    try { this.workletNode?.port.postMessage({ type: 'stop' }); } catch { /* */ }
+    try { this.workletNode?.disconnect(); } catch { /* */ }
     this.workletNode = null;
     if (StartrekkerAMEngine.instance === this) {
       StartrekkerAMEngine.instance = null;
