@@ -28,6 +28,38 @@ import type { DeckId } from './DeckEngine';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
+/**
+ * Pure gain calculation for the three crossfader curves. Extracted so tests
+ * can pin the math without spinning up Tone.js / an AudioContext — a
+ * frequent regression surface (164 DJ fixes in 3 months, April 2026).
+ *
+ * @param position — 0 (full A) to 1 (full B).
+ * @param curve    — 'linear' | 'cut' | 'smooth'.
+ * @returns        — [gainA, gainB] multipliers in [0, 1].
+ */
+export function computeCrossfaderGains(
+  position: number,
+  curve: CrossfaderCurve,
+): [number, number] {
+  switch (curve) {
+    case 'linear':
+      return [1 - position, position];
+    case 'cut': {
+      const cutThreshold = 0.05;
+      return [
+        position > 1 - cutThreshold ? 0 : 1,
+        position < cutThreshold ? 0 : 1,
+      ];
+    }
+    case 'smooth':
+    default:
+      return [
+        Math.cos(position * Math.PI / 2),
+        Math.sin(position * Math.PI / 2),
+      ];
+  }
+}
+
 export class DJMixerEngine {
   // Crossfader inputs — Deck engines connect to these
   readonly inputA: Tone.Gain;
@@ -139,30 +171,7 @@ export class DJMixerEngine {
   }
 
   private applyCrossfader(): void {
-    let gainA: number;
-    let gainB: number;
-
-    switch (this.curve) {
-      case 'linear':
-        gainA = 1 - this.position;
-        gainB = this.position;
-        break;
-
-      case 'cut': {
-        // Hard cut: full volume except near the opposite end
-        const cutThreshold = 0.05;
-        gainA = this.position > (1 - cutThreshold) ? 0 : 1;
-        gainB = this.position < cutThreshold ? 0 : 1;
-        break;
-      }
-
-      case 'smooth':
-      default:
-        // Constant power: cos/sin curve (no volume dip in the middle)
-        gainA = Math.cos(this.position * Math.PI / 2);
-        gainB = Math.sin(this.position * Math.PI / 2);
-        break;
-    }
+    const [gainA, gainB] = computeCrossfaderGains(this.position, this.curve);
 
     // Smooth ramp to avoid clicks — use a very short ramp even for zero
     // (2ms is fast enough to feel instant but avoids audible clicks during fast scratches)

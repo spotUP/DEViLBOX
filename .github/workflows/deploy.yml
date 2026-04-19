@@ -29,10 +29,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Tests skipped: most require Reference Music/ fixtures that only exist locally.
-      # TODO: separate CI-safe tests from fixture-dependent tests.
+      # CI-safe tests only. Fixture-dependent parser tests (that read from the
+      # local `Reference Music/` tree) still run locally via `npm test`, not here.
+      - name: Type check
+        run: npm run type-check
 
+      - name: CI regression gate
+        run: npm run test:ci
 
+      - name: Effects compliance
+        run: npm run test:compliance
 
       - name: Build for custom server
         run: npm run build
