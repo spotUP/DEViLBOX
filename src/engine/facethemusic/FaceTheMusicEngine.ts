@@ -6,28 +6,33 @@
 
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class FaceTheMusicEngine {
+function faceTheMusicTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/self\.location\.href/g, "'.'")
+    .replace(/_scriptName=globalThis\.document\?\.currentScript\?\.src/, '_scriptName="."')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
+    .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
+}
+
+export class FaceTheMusicEngine extends WASMSingletonBase {
   private static instance: FaceTheMusicEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
   private _songEndCallback: (() => void) | null = null;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-    this._initPromise = new Promise<void>((resolve) => { this._resolveInit = resolve; });
-    this.initialize();
+    super();
+    this.initialize(FaceTheMusicEngine.cache);
   }
 
   static getInstance(): FaceTheMusicEngine {
@@ -49,51 +54,18 @@ export class FaceTheMusicEngine {
     return !!FaceTheMusicEngine.instance && !FaceTheMusicEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await FaceTheMusicEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[FaceTheMusicEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'facethemusic',
+      workletFile: 'FaceTheMusic.worklet.js',
+      wasmFile: 'FaceTheMusic.wasm',
+      jsFile: 'FaceTheMusic.js',
+      transformJS: faceTheMusicTransform,
+      workletCacheBust: true,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      try { await context.audioWorklet.addModule(`${baseUrl}facethemusic/FaceTheMusic.worklet.js?v=${Date.now()}`); } catch { /* already registered */ }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}facethemusic/FaceTheMusic.wasm`),
-          fetch(`${baseUrl}facethemusic/FaceTheMusic.js`),
-        ]);
-        if (wasmResponse.ok) this.wasmBinary = await wasmResponse.arrayBuffer();
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/self\.location\.href/g, "'.'")
-            .replace(/_scriptName=globalThis\.document\?\.currentScript\?\.src/, '_scriptName="."')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
-            .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
-          this.jsCode = code;
-        }
-      }
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
     this.workletNode = new AudioWorkletNode(ctx, 'facethemusic-processor', {
       outputChannelCount: [2], numberOfOutputs: 1,
@@ -124,12 +96,10 @@ export class FaceTheMusicEngine {
 
     this.workletNode.port.postMessage({
       type: 'init', sampleRate: ctx.sampleRate,
-      wasmBinary: FaceTheMusicEngine.wasmBinary, jsCode: FaceTheMusicEngine.jsCode,
+      wasmBinary: FaceTheMusicEngine.cache.wasmBinary, jsCode: FaceTheMusicEngine.cache.jsCode,
     });
     this.workletNode.connect(this.output);
   }
-
-  async ready(): Promise<void> { return this._initPromise; }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
@@ -147,11 +117,18 @@ export class FaceTheMusicEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });  }  /** Set an instrument parameter by name */  setInstrumentParam(instrument: number, param: string, value: number): void {    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });  }  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  /** Edit a pattern cell in the WASM replayer */
+  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
+    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  }
+
+  /** Set an instrument parameter by name */
+  setInstrumentParam(instrument: number, param: string, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
+  }
+
+  override dispose(): void {
+    super.dispose();
     if (FaceTheMusicEngine.instance === this) FaceTheMusicEngine.instance = null;
   }
 }
