@@ -156,24 +156,21 @@ describe('WASMSingletonBase subclasses — lifecycle contract', () => {
     ).toEqual([]);
   });
 
-  // Known offenders: getInstance does not reference `_disposed`. Fixing these
-  // prevents zombie-reuse after a dispose() — low-severity but real.
-  const DISPOSED_GUARD_DEBT = new Set([
-    'SymphonieEngine',
-  ]);
-
-  it('subclasses guard `_disposed` in getInstance (existing debt locked)', () => {
+  it('every subclass guards dispose state in getInstance (either `_disposed` or `isDisposed`)', () => {
     const missing: string[] = [];
     for (const e of engines) {
       const m = e.src.match(/\bstatic\s+getInstance\s*\([^)]*\)[^{]*\{([\s\S]*?)\n\s*\}/);
       if (!m) continue;
       const body = m[1];
-      if (!/_disposed\b/.test(body)) missing.push(e.className);
+      // Accept either the protected field or its public getter — both
+      // short-circuit on the same condition.
+      if (!/\b_disposed\b/.test(body) && !/\bisDisposed\b/.test(body)) {
+        missing.push(e.className);
+      }
     }
-    const newOffenders = missing.filter((n) => !DISPOSED_GUARD_DEBT.has(n));
     expect(
-      newOffenders,
-      `new engines with zombie-reuse risk: ${newOffenders.join(', ')}. Follow JamCrackerEngine.ts:48-63 as reference.`,
+      missing,
+      `engines with zombie-reuse risk: ${missing.join(', ')}. Follow JamCrackerEngine.ts:48-63 as reference.`,
     ).toEqual([]);
   });
 
