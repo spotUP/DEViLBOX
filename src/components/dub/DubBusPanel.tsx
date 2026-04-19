@@ -12,7 +12,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
-import type { DubBusSettings } from '@/types/drumpad';
+import type { DubBusSettings } from '@/types/dub';
 import { Speaker } from 'lucide-react';
 
 const Slider: React.FC<{

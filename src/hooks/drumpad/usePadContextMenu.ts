@@ -15,7 +15,8 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { PAD_COLOR_PRESETS } from '@/constants/padColorPresets';
 import { SYNTH_QUICK_PRESETS } from './useDJQuickAssignData';
 import { PAD_INSTRUMENT_BASE, createDefaultPadFX } from '@/types/drumpad';
-import type { DrumPad, OutputBus, VelocityCurve, ScratchActionId, DubActionId } from '@/types/drumpad';
+import type { DrumPad, OutputBus, VelocityCurve, ScratchActionId } from '@/types/drumpad';
+import type { DubActionId } from '@/types/dub';
 import { getDubActionsByGroup, getDubActionLabel } from '@/engine/dub/DubActions';
 
 /**

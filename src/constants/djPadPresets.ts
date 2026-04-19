@@ -3,7 +3,8 @@
  */
 
 import { createEmptyProgram } from '../types/drumpad';
-import type { DrumProgram, DubActionId, DubBusSettings } from '../types/drumpad';
+import type { DrumProgram } from '../types/drumpad';
+import type { DubActionId, DubBusSettings } from '../types/dub';
 import { DJ_ONE_SHOT_PRESETS } from './djOneShotPresets';
 import { DEFAULT_DJFX_PADS, DEFAULT_ONESHOT_PADS, DEFAULT_SCRATCH_PADS } from './djPadModeDefaults';
 import { PAD_INSTRUMENT_BASE } from '../types/drumpad';
