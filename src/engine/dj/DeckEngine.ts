@@ -1306,7 +1306,7 @@ export class DeckEngine {
   /** Set the trim/auto-gain level in dB (applied to deckGain node) */
   setTrimGain(dB: number): void {
     const linear = Math.pow(10, dB / 20);
-    this.deckGain.gain.rampTo(Math.max(0, Math.min(4, linear)), 0.05);
+    this.deckGain.gain.rampTo(Math.max(0, Math.min(8, linear)), 0.05);
   }
 
   setVolume(value: number): void {

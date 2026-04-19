@@ -26,19 +26,22 @@ import { autoMatchOnLoad } from './DJAutoSync';
 
 // ── Auto-gain ────────────────────────────────────────────────────────────────
 
-const TARGET_RMS_DB = -14;
-const PEAK_HEADROOM_DB = -1; // never push peaks above this
+const TARGET_RMS_DB = -6;
+const UNANALYZED_FALLBACK_TRIM_DB = 9; // unanalyzed tracks get a conservative lift
 
 /**
  * Compute auto-gain trim in dB from analysis data.
- * Targets -14 dB RMS but clamps so peaks never exceed -1 dB (prevents clipping).
+ * Pure RMS-based targeting — no peak clamp. The master limiter at -0.3 dBFS
+ * is the real ceiling, so auto-gain can push cold tracks up to +18 dB freely.
+ *
+ * When a track has no analysis data (rmsDb <= -80, the sentinel), we fall
+ * back to a +9 dB lift — loud enough to match drumpad synths without
+ * exceeding the limiter's ability to catch peaks.
  */
-export function computeAutoTrim(rmsDb: number, peakDb: number): number {
-  if (rmsDb <= -80) return 0; // no meaningful audio
+export function computeAutoTrim(rmsDb: number, _peakDb: number): number {
+  if (rmsDb <= -80) return UNANALYZED_FALLBACK_TRIM_DB;
   const rmsBasedTrim = TARGET_RMS_DB - rmsDb;
-  // Clamp: if applying this trim would push peaks above headroom, reduce it
-  const maxTrimFromPeak = peakDb > -80 ? (PEAK_HEADROOM_DB - peakDb) : 12;
-  return Math.max(-12, Math.min(12, Math.min(rmsBasedTrim, maxTrimFromPeak)));
+  return Math.max(-12, Math.min(18, rmsBasedTrim));
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -457,12 +460,13 @@ export class DJPipeline {
 
       // Update deck state immediately
       if (deckId) {
-        // Auto-gain: target -14 dB RMS
+        // Auto-gain: target -6 dB RMS
         const rmsDb = cached.rmsDb ?? -100;
         const peakDb = cached.peakDb ?? -100;
         const autoTrimDb = computeAutoTrim(rmsDb, peakDb);
         const deckState = useDJStore.getState().decks[deckId];
         const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
+        console.warn(`[DJ auto-gain] deck=${deckId} rms=${rmsDb.toFixed(1)}dB peak=${peakDb.toFixed(1)}dB → trim=${trimGain.toFixed(1)}dB (autoGain=${deckState.autoGainEnabled})`);
 
         useDJStore.getState().setDeckState(deckId, {
           analysisState: 'ready',
