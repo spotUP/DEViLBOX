@@ -399,10 +399,19 @@ export class DubBus {
     if (this._miniDrainPending) return;
     this._miniDrainPending = true;
     const settings = this.settings;
+    // Drain window must be longer than the echo's longest delay head so the
+    // buffer fully flushes while feedback is 0. SpaceEchoEffect runs three
+    // heads at rate × 1, 2, 3, so the longest tap is `rate * 3`. Add 200 ms
+    // of safety margin, and floor at 250 ms for very short rates. Without
+    // this scaling a 300 ms echo rate leaves ~720 ms of stale buffer content
+    // at restore time — that's the "pulsating bass tail that ever so slowly
+    // gets quieter" the user reported (it was the buffer re-entering the
+    // feedback loop at intensity=0.45 after restore).
+    const drainMs = Math.max(250, settings.echoRateMs * 3 + 200);
     try {
       this.echo.setIntensityInstant(0);
       this.spring.wet = 0;
-      console.log('[DubBus] mini-drain ▶ last releaser fired, zeroed echo+spring');
+      console.log(`[DubBus] mini-drain ▶ last releaser fired, zeroed echo+spring (drain ${drainMs} ms)`);
     } catch { /* ok */ }
     const t = setTimeout(() => {
       this.throwTimers.delete(t);
@@ -420,7 +429,7 @@ export class DubBus {
         this.spring.wet = settings.springWet;
         console.log(`[DubBus] mini-drain ◀ restored echoIntensity=${settings.echoIntensity.toFixed(2)} springWet=${settings.springWet.toFixed(2)}`);
       } catch { /* ok */ }
-    }, 180);
+    }, drainMs);
     this.throwTimers.add(t);
   }
 
