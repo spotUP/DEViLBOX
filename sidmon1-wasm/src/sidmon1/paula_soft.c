@@ -86,8 +86,12 @@ void paula_dma_write(uint16_t dmacon) {
     int i;
     for (i = 0; i < PAULA_CHANNELS; i++) {
         if (dmacon & (1 << i)) {
-            if (enable) {
-                // DMA enable: apply shadow registers and start from beginning
+            // Edge-triggered: enabling DMA while already enabled is a NOP
+            // (matches real Amiga hardware — only off→on transitions apply
+            // the shadow pointer/length and restart from the beginning).
+            // FlodJS / SidMon 1 keep `chan.enabled = 1` every tick without
+            // wanting a re-trigger; idempotent enable is required there.
+            if (enable && !s_ch[i].dma_on) {
                 apply_pending(&s_ch[i]);
                 s_ch[i].pos = 0.0f;
             }
