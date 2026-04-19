@@ -197,7 +197,8 @@ describe('WASMSingletonBase subclasses — lifecycle contract', () => {
     'RobHubbardEngine',
     'Sc68Engine',
     'Sd2Engine',
-    'SidMon1Engine',          // the canonical scar
+    // SidMon1Engine — fixed, removed from this allowlist. The lifecycle
+    // test will now fail if SidMon1Engine loses its AudioContext guard.
     'SidMon1ReplayerEngine',
     'SidMonEngine',
     'SonixEngine',
