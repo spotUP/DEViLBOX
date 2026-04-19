@@ -896,6 +896,10 @@ export type OscDataCallback = (channels: (Int16Array | null)[]) => void;
 export class FurnaceDispatchEngine implements IsolationCapableEngine {
   private static instance: FurnaceDispatchEngine | null = null;
   private static readonly MAX_ISOLATION_SLOTS = 4;
+  /** Per-channel dub-send outputs. Furnace songs can exceed 32 global
+   * channels with multi-chip, but capping at 32 keeps the worklet sane.
+   * chip-offset translation handled worklet-side when the message arrives. */
+  private static readonly MAX_DUB_CHANNELS = 32;
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
 
   private workletNode: AudioWorkletNode | null = null;
@@ -1084,9 +1088,10 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       // Create worklet node using native AudioWorkletNode
       // (toneCreateAudioWorkletNode was throwing InvalidStateError)
       try {
+        const TOTAL_OUTPUTS = 1 + FurnaceDispatchEngine.MAX_ISOLATION_SLOTS + FurnaceDispatchEngine.MAX_DUB_CHANNELS;
         this.workletNode = new AudioWorkletNode(nativeCtx, 'furnace-dispatch-processor', {
-          numberOfOutputs: 1 + FurnaceDispatchEngine.MAX_ISOLATION_SLOTS,
-          outputChannelCount: [2, 2, 2, 2, 2],
+          numberOfOutputs: TOTAL_OUTPUTS,
+          outputChannelCount: new Array(TOTAL_OUTPUTS).fill(2),
           processorOptions: { sampleRate: nativeCtx.sampleRate }
         });
         console.log('[FurnaceDispatch] Worklet node created successfully');
@@ -2023,6 +2028,10 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   /** Start sequencer playback from given position */
   seqPlay(order = 0, row = 0): void {
     this.workletNode?.port.postMessage({ type: 'seqPlay', order, row });
+    // Re-hydrate per-channel dub sends (idempotent when none active).
+    void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+      try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
+    });
   }
 
   /** Stop sequencer playback */

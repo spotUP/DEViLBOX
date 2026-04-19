@@ -26,6 +26,10 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.isolationSlots = [null, null, null, null];
     this.isoRings = [null, null, null, null]; // { ringL, ringR, ringWritePos, ringReadPos, ringAvailable }
     this.savedChannelGains = null; // saved gains during isolation render
+    // Per-channel dub-send state — lazily allocated ring buffers mirror
+    // isoRings. Indices match MAX_DUB_CHANNELS in ChannelRoutedEffects.ts.
+    this.dubChannelEnabled = new Array(32).fill(false);
+    this.dubRings = new Array(32).fill(null);
 
     // Per-channel oscilloscope
     this.oscEnabled = false;
@@ -205,6 +209,51 @@ class HivelyProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      // --- Per-channel dub sends — 32-slot array, lazily allocated. One extra
+      //     render pass per active channel with that channel soloed via
+      //     _hively_set_channel_gain; samples land in output[5+ch].
+      case 'dubChannelEnable': {
+        const ch = data.channel ?? data.val?.channel;
+        if (typeof ch === 'number' && ch >= 0 && ch < 32) {
+          this.dubChannelEnabled[ch] = true;
+          if (!this.dubRings[ch]) {
+            this.dubRings[ch] = {
+              ringL: new Float32Array(this.ringSize),
+              ringR: new Float32Array(this.ringSize),
+              ringWritePos: 0, ringReadPos: 0, ringAvailable: 0,
+            };
+          }
+        }
+        break;
+      }
+      case 'dubChannelDisable': {
+        const ch = data.channel ?? data.val?.channel;
+        if (typeof ch === 'number' && ch >= 0 && ch < 32) {
+          this.dubChannelEnabled[ch] = false;
+          this.dubRings[ch] = null;
+        }
+        break;
+      }
+      case 'dubChannelDisableAll': {
+        for (let i = 0; i < 32; i++) {
+          this.dubChannelEnabled[i] = false;
+          this.dubRings[i] = null;
+        }
+        break;
+      }
+      case 'diagDub': {
+        const active = [];
+        for (let i = 0; i < 32; i++) if (this.dubChannelEnabled[i]) active.push(i);
+        this.port.postMessage({
+          type: 'diagDub',
+          dubChannelEnabled: [...this.dubChannelEnabled],
+          activeChannels: active,
+          activeCount: active.length,
+          wasmChannels: this.wasm?._hively_get_channels ? this.wasm._hively_get_channels() : null,
+        });
+        break;
+      }
+
       case 'enableOsc': {
         const nc = this.wasm?._hively_get_channels ? this.wasm._hively_get_channels() : 4;
         this.oscEnabled = true;
@@ -379,8 +428,9 @@ class HivelyProcessor extends AudioWorkletProcessor {
     }
 
     const hasIsolation = this.isolationSlots.some(s => s !== null);
+    const hasDub = this.dubChannelEnabled && this.dubChannelEnabled.some(Boolean);
     const hasSplitApi = typeof this.wasm._hively_tick_frame === 'function';
-    const needsSplit = hasIsolation || this.oscEnabled;
+    const needsSplit = hasIsolation || hasDub || this.oscEnabled;
 
     if (!needsSplit || !hasSplitApi) {
       // Fast path: no isolation or oscilloscope, use combined decode
@@ -445,6 +495,35 @@ class HivelyProcessor extends AudioWorkletProcessor {
           ring.ringR[ring.ringWritePos] = heapF32[offsetR + i];
           ring.ringWritePos = (ring.ringWritePos + 1) % this.ringSize;
           ring.ringAvailable++;
+        }
+      }
+    }
+
+    // 6a. Per-channel dub sends — one re-render pass per active dub channel.
+    //     Solo target channel (all others gain=0), render into dubRings[ch].
+    if (hasDub) {
+      for (let ch = 0; ch < 32; ch++) {
+        if (!this.dubChannelEnabled[ch]) continue;
+        if (ch >= numChannels) continue;  // HVL only has numChannels active
+        const ring = this.dubRings[ch];
+        if (!ring) continue;
+
+        this.wasm._hively_restore_voice_positions();
+        for (let c = 0; c < numChannels; c++) {
+          this.wasm._hively_set_channel_gain(c, c === ch ? 1.0 : 0.0);
+        }
+        const dubSamples = this.wasm._hively_render_frame(this.decodePtrL, this.decodePtrR);
+        if (dubSamples > 0) {
+          const heapF32 = this.wasm.HEAPF32;
+          const offL = this.decodePtrL >> 2;
+          const offR = this.decodePtrR >> 2;
+          for (let i = 0; i < dubSamples; i++) {
+            if (ring.ringAvailable >= this.ringSize) break;
+            ring.ringL[ring.ringWritePos] = heapF32[offL + i];
+            ring.ringR[ring.ringWritePos] = heapF32[offR + i];
+            ring.ringWritePos = (ring.ringWritePos + 1) % this.ringSize;
+            ring.ringAvailable++;
+          }
         }
       }
     }
@@ -563,6 +642,27 @@ class HivelyProcessor extends AudioWorkletProcessor {
           ring.ringReadPos = (ring.ringReadPos + 1) % this.ringSize;
         }
         ring.ringAvailable -= isoAvail;
+      }
+
+      // ── Dub-send outputs (one per active dub channel) ──
+      const DUB_OUTPUT_BASE = 5;
+      for (let ch = 0; ch < 32; ch++) {
+        if (!this.dubChannelEnabled[ch]) continue;
+        const ring = this.dubRings[ch];
+        if (!ring) continue;
+        const slotOutput = outputs[DUB_OUTPUT_BASE + ch];
+        if (!slotOutput || slotOutput.length === 0) continue;
+        const slotL = slotOutput[0];
+        const slotR = slotOutput[1] || slotOutput[0];
+        slotL.fill(0);
+        slotR.fill(0);
+        const dubAvail = Math.min(numSamples, ring.ringAvailable);
+        for (let i = 0; i < dubAvail; i++) {
+          slotL[i] = ring.ringL[ring.ringReadPos];
+          slotR[i] = ring.ringR[ring.ringReadPos];
+          ring.ringReadPos = (ring.ringReadPos + 1) % this.ringSize;
+        }
+        ring.ringAvailable -= dubAvail;
       }
     }
 
