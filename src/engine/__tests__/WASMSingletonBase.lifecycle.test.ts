@@ -14,10 +14,9 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { glob } from 'node:fs/promises';
 
 interface EngineFile {
   path: string;
@@ -27,11 +26,25 @@ interface EngineFile {
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-async function findEngineFiles(): Promise<EngineFile[]> {
+/** Recursively yield .ts files under dir, skipping __tests__ and node_modules.
+ *  Node 20 compatibility: can't use fs/promises#glob (Node 22+). */
+function walkTs(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
+      out.push(...walkTs(full));
+    } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+function findEngineFiles(): EngineFile[] {
   const out: EngineFile[] = [];
-  for await (const entry of glob('src/engine/**/*.ts', { cwd: REPO_ROOT })) {
-    if (entry.includes('__tests__')) continue;
-    const full = join(REPO_ROOT, entry);
+  for (const full of walkTs(join(REPO_ROOT, 'src/engine'))) {
     const src = readFileSync(full, 'utf-8');
     const m = src.match(/export\s+class\s+(\w+)\s+extends\s+WASMSingletonBase\b/);
     if (!m) continue;
@@ -43,8 +56,8 @@ async function findEngineFiles(): Promise<EngineFile[]> {
 let engines: EngineFile[] = [];
 
 describe('WASMSingletonBase subclasses — lifecycle contract', () => {
-  beforeAll(async () => {
-    engines = await findEngineFiles();
+  beforeAll(() => {
+    engines = findEngineFiles();
   });
 
   it('finds a plausible number of subclasses (>= 50)', () => {
