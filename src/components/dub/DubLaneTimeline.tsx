@@ -25,7 +25,10 @@ const MOVE_COLOR: Record<string, string> = {
   filterDrop: 'bg-accent-secondary',
   dubSiren: 'bg-accent-warning',
   springSlam: 'bg-accent-success',
-  // Future: channelMute: 'bg-accent-error', …
+  channelMute: 'bg-accent-error',
+  channelThrow: 'bg-accent-primary/70',
+  delayTimeThrow: 'bg-accent-highlight/70',
+  tapeWobble: 'bg-accent-warning/70',
 };
 
 export const DubLaneTimeline: React.FC = () => {
