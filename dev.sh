@@ -2,7 +2,7 @@
 # dev.sh — DEViLBOX full-stack dev launcher
 #
 # Kills any existing processes on the dev ports, then starts:
-#   • API server    (Express + SC compile)   → http://localhost:3001  [logs/backend.log]
+#   • API server    (Express + SC compile)   → http://localhost:3011  [logs/backend.log]
 #   • Collab server (WebSocket signaling)    → ws://localhost:4002    [logs/collab.log]
 #   • MCP relay     (WS bridge for AI/MCP)  → ws://localhost:4003    [started by API server]
 #   • Frontend      (Vite)                  → http://localhost:5173  [stdout — always visible]
@@ -19,7 +19,7 @@ set -euo pipefail
 ulimit -n 65536 2>/dev/null || true
 
 FRONTEND_PORT=5173
-BACKEND_PORT=3001
+BACKEND_PORT=3011
 COLLAB_PORT=4002
 MCP_PORT=4003
 FORMAT_PORT=4444
@@ -52,10 +52,22 @@ kill_port "$COLLAB_PORT"
 kill_port "$MCP_PORT"
 kill_port "$FORMAT_PORT"
 kill_port "$FRONTEND_PORT"
-# Kill any orphaned tsx watch processes from a previous dev.sh run
-pkill -f "tsx watch collab-server" 2>/dev/null || true
-pkill -f "tsx watch src/index.ts" 2>/dev/null || true
-pkill -f "tsx.*format-server" 2>/dev/null || true
+
+# Kill any orphaned tsx processes whose cwd is inside THIS repo — catches
+# leftovers from a previous dev.sh run without touching other projects that
+# happen to also use `tsx watch src/index.ts` (an extremely common entrypoint).
+kill_project_tsx_orphans() {
+  local pids pid cwd
+  pids=$(pgrep -f 'tsx' 2>/dev/null || true)
+  for pid in $pids; do
+    cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}')
+    if [ -n "$cwd" ] && [[ "$cwd" == "$SCRIPT_DIR"* ]]; then
+      warn "Killing orphan tsx process $pid (cwd: $cwd)"
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+  done
+}
+kill_project_tsx_orphans
 
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
 BACKEND_PID=""
