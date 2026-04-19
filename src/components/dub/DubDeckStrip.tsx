@@ -103,8 +103,10 @@ export const DubDeckStrip: React.FC = () => {
       console.warn('[DubDeckStrip] Echo Throw ignored — bus is disabled. Click the Dub Bus button.');
       return;
     }
-    // fire() publishes a router event which our subscriber picks up and
-    // triggers the flash — no need to setFlashedChannel here directly.
+    // Flash immediately on click — doesn't wait for router roundtrip.
+    // Keyboard/MIDI paths still get the flash via the router subscription
+    // in the mount effect above.
+    setFlashedChannel(channelId);
     fire('echoThrow', channelId);
   }, [busEnabled]);
 
@@ -165,9 +167,9 @@ export const DubDeckStrip: React.FC = () => {
               <button
                 key={i}
                 className={
-                  'px-1.5 py-0.5 rounded border transition-colors min-w-[28px] ' +
+                  'px-1.5 py-0.5 rounded border min-w-[28px] transition-all duration-150 ' +
                   (isFlashed
-                    ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
+                    ? 'bg-accent-primary border-accent-primary text-text-inverse scale-110 shadow-[0_0_8px_var(--color-accent-primary)]'
                     : hasDubSend
                       ? 'bg-dark-bgTertiary border-dark-borderLight text-text-primary hover:border-accent-primary'
                       : 'bg-dark-bgTertiary border-dark-border text-text-muted hover:text-text-primary')
