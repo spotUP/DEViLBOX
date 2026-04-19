@@ -18,7 +18,7 @@
  * the actions safe to assign when running outside the DJ view.
  */
 
-import type { DrumPadEngine } from './DrumPadEngine';
+import type { DrumPadEngine } from '../drumpad/DrumPadEngine';
 import type { DubActionId, DubBusSettings } from '@/types/drumpad';
 import type { DeckId } from '../dj/DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';

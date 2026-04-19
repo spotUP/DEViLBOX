@@ -19,7 +19,7 @@ import { getBankPads } from '../../types/drumpad';
 import { useMIDIPadRouting, clearDubReleasers } from '@/hooks/drumpad/useMIDIPadRouting';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useDJStore } from '../../stores/useDJStore';
-import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/drumpad/DubActions';
+import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
