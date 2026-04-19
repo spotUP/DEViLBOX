@@ -71,6 +71,11 @@ export class DJMicEngine {
   get isActive(): boolean { return this._active; }
   get isRecording(): boolean { return this._recording; }
 
+  /** Expose the raw mic source node so external paths (e.g. dub bus toast
+   *  move) can tap it in parallel without interfering with the primary
+   *  mic → mixer routing. Returns null when the mic isn't started. */
+  getSourceNode(): MediaStreamAudioSourceNode | null { return this._sourceNode; }
+
   // ── Recording ─────────────────────────────────────────────────────────
 
   /** Start recording mic audio to Opus/WebM */
