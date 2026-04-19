@@ -14,7 +14,7 @@
 
 import * as Tone from 'tone';
 import type { DubBusSettings } from '../../types/dub';
-import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS } from '../../types/dub';
+import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS, snapToAltecStep } from '../../types/dub';
 import {
   AelapseEffect,
   PARAM_SPRINGS_DRYWET,
@@ -106,7 +106,14 @@ export class DubBus {
   //   - Pink noise floor: +minuscule hiss that becomes audible during mute-
   //     and-dub drops, giving the dub "texture" a tape feel.
   private input: GainNode;
+  /** Altec-style HPF — 3 cascaded biquads (6 dB/oct each) = 18 dB/oct
+   *  composite slope, matching the original Altec 9069B 3rd-order T-network.
+   *  `this.hpf` is stage 1 (primary reference used elsewhere in the bus);
+   *  stages 2-3 chain internally. Stepped mode (settings.hpfStepped) snaps
+   *  frequency to the 11 Altec positions; continuous mode is a smooth sweep. */
   private hpf: BiquadFilterNode;
+  private hpf2: BiquadFilterNode;
+  private hpf3: BiquadFilterNode;
   // ─── Sound coloring stage (research 2026-04-20_dub-sound-coloring.md) ──
   // King Tubby bass shelf — resonant low-shelf at ~90 Hz for the dub
   // "weight." Sits after the HPF so it doesn't amplify sub-rumble.
@@ -123,6 +130,41 @@ export class DubBus {
   private stereoInvertR: GainNode;
   private stereoMerge: ChannelMergerNode;
   private tapeSat: WaveShaperNode;    // asymmetric tanh — MCI board bite
+
+  // ─── Perry tape stack (optional alt to single tapeSat) ─────────────────
+  // Models the 4-track-bounce workflow Perry used at Black Ark — each bus
+  // signal hits 3 WaveShapers in parallel, each with different drive +
+  // uncorrelated wow (independent LFO phase). Perceptually: more "compressed
+  // + gritty with organic motion" vs a single-path saturator.
+  //
+  // Always constructed to keep the graph stable. Enabled/disabled via
+  // crossfade between `tapeSatBypass` (normal path) and `tapeStackMix`
+  // (the 3-path sum). Switching is smooth, not re-wired.
+  private tapeStackPaths: Array<{
+    inGain: GainNode;       // per-path input split
+    delay: DelayNode;       // wow — tiny delay modulated by path LFO
+    delayLfo: OscillatorNode;
+    delayLfoGain: GainNode;
+    shaper: WaveShaperNode; // per-path saturation at different drive
+    outGain: GainNode;      // per-path mix → tapeStackMix
+  }> = [];
+  private tapeStackMix: GainNode;    // sum of 3 paths, gated by tapeSatMode
+  private tapeSatBypass: GainNode;   // single-path pass, gated by tapeSatMode
+
+  // ─── Liquid sweep — parallel comb filter with LFO ─────────────────────
+  // Flanger-family short-delay comb (1-10 ms modulated delay + feedback)
+  // taking the user's "liquid drums" motion cue. Feedback loop has an HPF
+  // to prevent sub build-up each recirculation (critical for dub — fb
+  // without HPF muddies instantly on reggae basslines). Parallel send
+  // off the HPF cascade output; summed at tapeSat input so the flanged
+  // signal gets saturation + echo + spring like the dry.
+  private sweepInput: GainNode;       // parallel tap point
+  private sweepDelay: DelayNode;
+  private sweepLfo: OscillatorNode;
+  private sweepLfoGain: GainNode;
+  private sweepFeedback: GainNode;
+  private sweepFeedbackHpf: BiquadFilterNode;
+  private sweepOutput: GainNode;      // wet amount (0..1)
   /** Aelapse-ported spring-reverb DSP (C++ → WASM). Replaces the old
    *  Tone.js-based SpringReverbEffect — proper tank simulation with chaos,
    *  damping, and per-spring scatter. Delay side disabled since the bus
@@ -221,10 +263,24 @@ export class DubBus {
     this.input = this.context.createGain();
     this.input.gain.value = 1;
 
+    // HPF cascade (18 dB/oct). All three stages share frequency + Q at runtime.
+    const initialHpfFreq = this.settings.hpfStepped
+      ? snapToAltecStep(this.settings.hpfCutoff)
+      : this.settings.hpfCutoff;
     this.hpf = this.context.createBiquadFilter();
     this.hpf.type = 'highpass';
-    this.hpf.frequency.value = this.settings.hpfCutoff;
+    this.hpf.frequency.value = initialHpfFreq;
     this.hpf.Q.value = 0.707;
+    this.hpf2 = this.context.createBiquadFilter();
+    this.hpf2.type = 'highpass';
+    this.hpf2.frequency.value = initialHpfFreq;
+    this.hpf2.Q.value = 0.707;
+    this.hpf3 = this.context.createBiquadFilter();
+    this.hpf3.type = 'highpass';
+    this.hpf3.frequency.value = initialHpfFreq;
+    this.hpf3.Q.value = 0.707;
+    this.hpf.connect(this.hpf2);
+    this.hpf2.connect(this.hpf3);
 
     // Tubby bass shelf — resonant low-shelf at 90 Hz (research default).
     // Positioned AFTER the HPF so the shelf doesn't re-amplify rumble the
@@ -244,6 +300,40 @@ export class DubBus {
     this.midScoop.Q.value = this.settings.midScoopQ;
     this.midScoop.gain.value = this.settings.midScoopGainDb;
 
+    // Liquid sweep — parallel comb-filter branch. See class-level docstring.
+    // The LFO runs continuously (can't stop + restart an OscillatorNode),
+    // so "off" = sweepOutput.gain = 0. Starts at the preset's amount + LFO
+    // rate + depth; mid-session updates via setSettings.
+    this.sweepInput = this.context.createGain();
+    this.sweepInput.gain.value = 1;
+    this.sweepDelay = this.context.createDelay(0.02);  // max 20 ms
+    this.sweepDelay.delayTime.value = 0.005;            // 5 ms center
+    this.sweepLfo = this.context.createOscillator();
+    this.sweepLfo.type = 'sine';
+    this.sweepLfo.frequency.value = this.settings.sweepRateHz;
+    this.sweepLfoGain = this.context.createGain();
+    this.sweepLfoGain.gain.value = this.settings.sweepDepthMs / 1000;  // ms → sec
+    this.sweepLfo.connect(this.sweepLfoGain);
+    this.sweepLfoGain.connect(this.sweepDelay.delayTime);
+    this.sweepLfo.start();
+    this.sweepFeedback = this.context.createGain();
+    this.sweepFeedback.gain.value = this.settings.sweepFeedback;
+    this.sweepFeedbackHpf = this.context.createBiquadFilter();
+    this.sweepFeedbackHpf.type = 'highpass';
+    this.sweepFeedbackHpf.frequency.value = 200;
+    this.sweepFeedbackHpf.Q.value = 0.707;
+    // Wet send level — 0 disables the branch entirely.
+    this.sweepOutput = this.context.createGain();
+    this.sweepOutput.gain.value = this.settings.sweepAmount;
+    // Topology: hpf3 → sweepInput → sweepDelay → sweepOutput
+    //                                ↓ (feedback branch)
+    //                     sweepFeedback → sweepFeedbackHpf → sweepDelay
+    this.sweepInput.connect(this.sweepDelay);
+    this.sweepDelay.connect(this.sweepFeedback);
+    this.sweepFeedback.connect(this.sweepFeedbackHpf);
+    this.sweepFeedbackHpf.connect(this.sweepDelay);
+    this.sweepDelay.connect(this.sweepOutput);
+
     // Tape saturation — asymmetric tanh curve that models the positive/negative
     // asymmetry of transformer-coupled magnetic tape. Softens positive peaks
     // more than negative, which is what gives RE-201 / Studer saturation its
@@ -253,6 +343,47 @@ export class DubBus {
     this.tapeSat = this.context.createWaveShaper();
     this.tapeSat.curve = makeTapeSatCurve(0.35);
     this.tapeSat.oversample = '2x';
+    // Single-path bypass gate — gain 1 when tapeSatMode='single', 0 when 'stack'.
+    this.tapeSatBypass = this.context.createGain();
+    this.tapeSatBypass.gain.value = this.settings.tapeSatMode === 'single' ? 1 : 0;
+
+    // Build the 3-path tape stack. Each path: split-in (1/3 gain) → wow
+    // delay (modulated by its own LFO with distinct starting phase) →
+    // WaveShaper (distinct drive) → per-path mix gain. All 3 sum into
+    // tapeStackMix, which is gated to 0 in 'single' mode.
+    this.tapeStackMix = this.context.createGain();
+    this.tapeStackMix.gain.value = this.settings.tapeSatMode === 'stack' ? 1 : 0;
+    const STACK_DRIVES = [0.25, 0.45, 0.65];
+    const STACK_WOW_HZ = [0.27, 0.41, 0.53];      // Hz — uncorrelated
+    const STACK_WOW_MS = [0.0012, 0.0022, 0.0034];// ±ms excursion (tiny)
+    const stackStart = this.context.currentTime + 0.01;
+    for (let i = 0; i < 3; i++) {
+      const inGain = this.context.createGain();
+      inGain.gain.value = 1 / 3;   // split evenly
+      const delay = this.context.createDelay(0.01);
+      delay.delayTime.value = 0.002;
+      const lfo = this.context.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = STACK_WOW_HZ[i];
+      const lfoGain = this.context.createGain();
+      lfoGain.gain.value = STACK_WOW_MS[i];
+      lfo.connect(lfoGain).connect(delay.delayTime);
+      // Phase offset — start each LFO at a distinct point so wow phases
+      // don't realign. OscillatorNode doesn't expose phase directly, so we
+      // start the 2nd and 3rd LFOs slightly later (millisecond offsets).
+      lfo.start(stackStart + i * 0.137);
+      const shaper = this.context.createWaveShaper();
+      shaper.curve = makeTapeSatCurve(STACK_DRIVES[i]);
+      shaper.oversample = '2x';
+      const outGain = this.context.createGain();
+      outGain.gain.value = 1;
+      // Wiring: inGain → delay → shaper → outGain → tapeStackMix
+      inGain.connect(delay);
+      delay.connect(shaper);
+      shaper.connect(outGain);
+      outGain.connect(this.tapeStackMix);
+      this.tapeStackPaths.push({ inGain, delay, delayLfo: lfo, delayLfoGain: lfoGain, shaper, outGain });
+    }
 
     // Spring reverb — Aelapse (C++ → WASM port of the smiarx/aelapse spring
     // tank sim). Parameters tuned for King Tubby "metal tank" character:
@@ -385,9 +516,29 @@ export class DubBus {
     //
     //   Spring.output → Sidechain → Glue → MidScoop → LPF → StereoMS → return → master
     this.input.connect(this.hpf);
-    this.hpf.connect(this.bassShelf);
+    // hpf → hpf2 → hpf3 chain was wired in construction; hpf3 is the cascade output.
+    this.hpf3.connect(this.bassShelf);
+    // bassShelf output feeds BOTH the single-path saturator AND the 3-path
+    // stack in parallel. The two paths crossfade via tapeSatBypass/tapeStackMix
+    // gains on their output side; echo input receives their sum.
     this.bassShelf.connect(this.tapeSat);
-    Tone.connect(this.tapeSat, this.echo as unknown as Tone.InputNode);
+    this.tapeSat.connect(this.tapeSatBypass);
+    for (const path of this.tapeStackPaths) {
+      this.bassShelf.connect(path.inGain);
+    }
+    // Parallel liquid-sweep branch — taps hpf3 output, sums into the
+    // saturator input (pre-shaper) so flanged audio also gets the tape
+    // coloring + stack behavior when enabled.
+    this.hpf3.connect(this.sweepInput);
+    this.sweepOutput.connect(this.tapeSat);
+    for (const path of this.tapeStackPaths) {
+      this.sweepOutput.connect(path.inGain);
+    }
+    // Both saturator paths feed the echo via their gating gains — single
+    // path through tapeSatBypass (gain=1 in single mode), stack path through
+    // tapeStackMix (gain=1 in stack mode). Only one is audible at a time.
+    Tone.connect(this.tapeSatBypass, this.echo as unknown as Tone.InputNode);
+    Tone.connect(this.tapeStackMix, this.echo as unknown as Tone.InputNode);
     this.echo.connect(this.spring);
     // Feedback regen: tap echo output (before spring) back into input.
     // Pre-spring means the siren rings without flooding the spring with
@@ -984,7 +1135,13 @@ export class DubBus {
       }
     }
     const now = this.context.currentTime;
-    this.hpf.frequency.setTargetAtTime(merged.hpfCutoff, now, 0.02);
+    // Stepped mode: snap HPF cutoff to the nearest Altec position before
+    // writing. Keeps the "Big Knob" staccato character on presets + user
+    // drags alike. Continuous mode passes the raw value through.
+    const hpfFreq = merged.hpfStepped ? snapToAltecStep(merged.hpfCutoff) : merged.hpfCutoff;
+    this.hpf.frequency.setTargetAtTime(hpfFreq, now, 0.02);
+    this.hpf2.frequency.setTargetAtTime(hpfFreq, now, 0.02);
+    this.hpf3.frequency.setTargetAtTime(hpfFreq, now, 0.02);
     this.return_.gain.setTargetAtTime(
       this.enabled ? merged.returnGain : 0, now, 0.02,
     );
@@ -1012,6 +1169,23 @@ export class DubBus {
     this.midScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
     this.midScoop.gain.setTargetAtTime(merged.midScoopGainDb, now, 0.02);
     this._applyStereoWidth(merged.stereoWidth);
+    // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
+    // the branch; LFO keeps running (can't stop OscillatorNode).
+    const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
+    this.sweepOutput.gain.setTargetAtTime(sweepAmt, now, 0.02);
+    const sweepRate = Math.max(0.05, Math.min(5, merged.sweepRateHz));
+    this.sweepLfo.frequency.setTargetAtTime(sweepRate, now, 0.02);
+    const sweepDepthSec = Math.max(0, Math.min(9, merged.sweepDepthMs)) / 1000;
+    this.sweepLfoGain.gain.setTargetAtTime(sweepDepthSec, now, 0.02);
+    const sweepFb = Math.max(0, Math.min(0.85, merged.sweepFeedback));
+    this.sweepFeedback.gain.setTargetAtTime(sweepFb, now, 0.02);
+    // Tape sat mode crossfade — both gates ramp over 60ms so switching
+    // mid-gig doesn't click. Same time constant intentional: gains sum
+    // near 1 during the overlap which is fine (quiet crossfade dip is
+    // inaudible on dub tails).
+    const wantStack = merged.tapeSatMode === 'stack';
+    this.tapeSatBypass.gain.setTargetAtTime(wantStack ? 0 : 1, now, 0.03);
+    this.tapeStackMix.gain.setTargetAtTime(wantStack ? 1 : 0, now, 0.03);
 
     // Character-preset selection: apply the preset's overrides + spring
     // params on first sight, then flip back to 'custom' so subsequent user

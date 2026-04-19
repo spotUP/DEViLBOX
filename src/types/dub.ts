@@ -116,6 +116,30 @@ export interface DubBusSettings {
   // Engineer character preset — applies a curated snapshot of every
   // coloring param when selected. 'custom' = user-edited, don't overwrite.
   characterPreset: 'custom' | 'tubby' | 'scientist' | 'perry' | 'madProfessor';
+
+  // ─── Altec-style stepped HPF (Tubby "Big Knob") ─────────────────────────
+  // When true, the bus snaps hpfCutoff to the nearest of 11 discrete Altec
+  // positions (70/100/150/250/500/1k/2k/3k/5k/7.5k/10k Hz) on every write.
+  // Gives the rhythmic-click feel of Tubby sweeping his 9069B passive
+  // filter on effect-return channels. Independent of HPF slope (which is
+  // always 18 dB/oct as of 2026-04-20 — 3-biquad cascade).
+  hpfStepped: boolean;
+
+  // ─── Liquid sweep — parallel short-delay comb filter with LFO ──────────
+  // Dub's "liquid drums" motion. Technically a flanger (1-10ms modulated
+  // delay + feedback); in practice the move also overlaps phaser territory
+  // and swept-filter pseudo-phasing on returns. One amount knob: 0 = off,
+  // 1 = full parallel send. Rate + depth expose per-preset for character.
+  sweepAmount: number;   // 0..1, wet send level
+  sweepRateHz: number;   // LFO rate, 0.05-5 Hz (dub norm: 0.1-0.5)
+  sweepDepthMs: number;  // delay-time sweep excursion ±ms
+  sweepFeedback: number; // 0-0.85, how "resonant" the comb gets
+
+  // ─── Tape saturation mode ──────────────────────────────────────────────
+  // 'single': one WaveShaper (current default).
+  // 'stack':  3 parallel WaveShapers with different drives + uncorrelated
+  //           wow, modeling Perry's 4-track-bounce tape-stacking at 7.5ips.
+  tapeSatMode: 'single' | 'stack';
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -170,7 +194,31 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   midScoopQ:        1.4,
   stereoWidth:      1.0,
   characterPreset:  'custom',
+
+  hpfStepped:       false,
+  sweepAmount:      0,
+  sweepRateHz:      0.15,
+  sweepDepthMs:     4,
+  sweepFeedback:    0.72,
+  tapeSatMode:      'single',
 };
+
+/** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
+ *  pasttofuturereverbs.gumroad.com. Discrete positions the original unit
+ *  clicked through — reproducing this is what gives the "Big Knob" sweep
+ *  its characteristic rhythmic staccato. */
+export const ALTEC_HPF_STEPS = [70, 100, 150, 250, 500, 1000, 2000, 3000, 5000, 7500, 10000] as const;
+
+/** Snap a frequency to the nearest Altec step (log-spaced). */
+export function snapToAltecStep(hz: number): number {
+  let nearest: number = ALTEC_HPF_STEPS[0];
+  let best = Math.abs(Math.log(hz) - Math.log(nearest));
+  for (const step of ALTEC_HPF_STEPS) {
+    const d = Math.abs(Math.log(hz) - Math.log(step));
+    if (d < best) { best = d; nearest = step; }
+  }
+  return nearest;
+}
 
 // ─── Engineer character presets ─────────────────────────────────────────────
 // Each preset snapshots the coloring params + echo + spring for a signature
@@ -203,6 +251,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     description: 'Dark, noisy, loose-spring. Stepped filter + tape-echo feedback. Narrow stereo. Light bus compression.',
     overrides: {
       hpfCutoff:      100,
+      hpfStepped:     true,   // the "Big Knob" rhythmic staccato sweeps
       bassShelfGainDb: 6, bassShelfFreqHz: 90,  bassShelfQ: 0.9,
       midScoopGainDb:  0,
       echoIntensity:  0.55,
@@ -211,6 +260,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       springWet:      0.55,
       sidechainAmount: 0.3,
       stereoWidth:    0.5,  // narrow — 4-track console + loose spring
+      sweepAmount:    0,      // no flanger; Tubby's "sweep" was filter, not comb
+      tapeSatMode:   'single',
     },
     springsLength: 0.35, springsDamp: 0.55, springsChaos: 0.20, springsScatter: 0.60, springsTone: 0.55,
     tapeSatDrive:  0.40,
@@ -220,6 +271,7 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
     description: 'Bright, dry, precise. Plate not spring. ZERO bus compression. Extreme mid-scoop on drops.',
     overrides: {
       hpfCutoff:       80,
+      hpfStepped:      false,
       bassShelfGainDb: 3,
       midScoopGainDb: -6, midScoopFreqHz: 700, midScoopQ: 1.4,  // the signature Scientist scoop
       echoIntensity:  0.45,
@@ -228,15 +280,18 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       springWet:      0.45,   // plate decays faster than spring; less wet
       sidechainAmount: 0.6,   // more pumping to compensate for no bus comp
       stereoWidth:    1.2,
+      sweepAmount:    0,
+      tapeSatMode:   'single',
     },
     springsLength: 0.55, springsDamp: 0.25, springsChaos: 0.40, springsScatter: 0.40, springsTone: 0.65,
     tapeSatDrive:  0.30,
   },
   perry: {
     label: 'Lee "Scratch" Perry',
-    description: 'Stacked tape saturation. Near-mono. Kickable spring with high chaos. Dark shelf, subtractive air.',
+    description: 'Stacked tape saturation. Near-mono. Kickable spring with high chaos. Dark shelf, subtractive air. Phaser-like comb sweep on parallel send.',
     overrides: {
       hpfCutoff:       40,
+      hpfStepped:      false,
       bassShelfGainDb: 2, bassShelfFreqHz: 80, bassShelfQ: 0.5,
       midScoopGainDb: -2, midScoopFreqHz: 800,
       echoIntensity:  0.75,   // 0.75 → ~4 audible repeats (near-feedback)
@@ -245,15 +300,24 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       springWet:      0.70,
       sidechainAmount: 0.4,
       stereoWidth:    0.3,  // near-mono — Perry's defining texture
+      // Perry had actual phasers (Mutron Bi-Phase, Eventide, MXR Phase 90)
+      // on guitars and vocals. We approximate the family of motion effects
+      // with the sweep — a parallel short-delay comb filter with LFO.
+      sweepAmount:    0.35,
+      sweepRateHz:    0.15,   // slow, Space Echo wow territory
+      sweepDepthMs:   6,
+      sweepFeedback:  0.72,
+      tapeSatMode:    'stack', // 3 parallel tape paths ≈ 4-track bouncing
     },
     springsLength: 0.65, springsDamp: 0.10, springsChaos: 0.80, springsScatter: 0.80, springsTone: 0.40,
-    tapeSatDrive:  0.65,   // heavy drive to approximate 3-bounce stack
+    tapeSatDrive:  0.55,   // per-path drive; stack provides total character
   },
   madProfessor: {
     label: 'Mad Professor',
     description: 'Hi-fi clarity. Low shelf + high shelf air. Wide ping-pong stereo. Lush long springs.',
     overrides: {
       hpfCutoff:       35,
+      hpfStepped:      false,
       bassShelfGainDb: 3, bassShelfFreqHz: 70, bassShelfQ: 0.7,
       midScoopGainDb:  0,
       echoIntensity:  0.40,   // cleaner, fewer repeats
@@ -262,6 +326,8 @@ export const DUB_CHARACTER_PRESETS: Record<Exclude<DubBusSettings['characterPres
       springWet:      0.55,
       sidechainAmount: 0.5,
       stereoWidth:    1.6,  // wide — Ariwa signature
+      sweepAmount:    0,
+      tapeSatMode:   'single',
     },
     springsLength: 0.50, springsDamp: 0.50, springsChaos: 0.10, springsScatter: 0.50, springsTone: 0.60,
     tapeSatDrive:  0.15,   // pristine
