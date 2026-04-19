@@ -167,7 +167,7 @@ DEViLBOX has an MCP server that gives Claude **full programmatic control** of th
 
 ### Prerequisites
 
-1. **Dev server running FIRST:** `npm run dev` (starts Vite on :5173, Express on :3001, **WS relay on :4003**)
+1. **Dev server running FIRST:** `npm run dev` (starts Vite on :5173, Express on :3011, **WS relay on :4003**)
 2. **Browser open:** Navigate to `http://localhost:5173` — the MCP bridge auto-connects in dev mode
 3. **Click in the browser** to unlock the AudioContext (required for audio tools)
 

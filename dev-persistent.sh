@@ -49,7 +49,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start backend server
-echo "[$(date)] Starting backend server on port 3001..."
+echo "[$(date)] Starting backend server on port 3011..."
 cd server && npm run dev > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
