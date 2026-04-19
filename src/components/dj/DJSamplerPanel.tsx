@@ -10,7 +10,7 @@
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from '../drumpad/PadButton';
-import { DubBusPanel } from '../drumpad/DubBusPanel';
+import { DubBusPanel } from '../dub/DubBusPanel';
 import { DJ_PAD_PRESETS } from '../../constants/djPadPresets';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { resumeAudioContext } from '../../audio/AudioContextSingleton';

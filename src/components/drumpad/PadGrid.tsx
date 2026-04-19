@@ -7,7 +7,7 @@
 
 import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { PadButton } from './PadButton';
-import { DubBusPanel } from './DubBusPanel';
+import { DubBusPanel } from '../dub/DubBusPanel';
 import { getDJEngineIfActive } from '@/engine/dj/DJEngine';
 import { ContextMenu, useContextMenu } from '@components/common/ContextMenu';
 import { usePadContextMenu } from '@/hooks/drumpad/usePadContextMenu';
