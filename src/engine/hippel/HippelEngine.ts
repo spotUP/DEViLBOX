@@ -6,27 +6,20 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class HippelEngine {
+export class HippelEngine extends WASMSingletonBase {
   private static instance: HippelEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
-
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-    this._initPromise = new Promise<void>((resolve) => { this._resolveInit = resolve; });
-    this.initialize();
+    super();
+    this.initialize(HippelEngine.cache);
   }
 
   static getInstance(): HippelEngine {
@@ -49,49 +42,16 @@ export class HippelEngine {
     this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await HippelEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[HippelEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'hippel',
+      workletFile: 'Hippel.worklet.js',
+      wasmFile: 'Hippel.wasm',
+      jsFile: 'Hippel.js',
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      try { await context.audioWorklet.addModule(`${baseUrl}hippel/Hippel.worklet.js`); } catch { /* already registered */ }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}hippel/Hippel.wasm`),
-          fetch(`${baseUrl}hippel/Hippel.js`),
-        ]);
-        if (wasmResponse.ok) this.wasmBinary = await wasmResponse.arrayBuffer();
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          this.jsCode = code;
-        }
-      }
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
     this.workletNode = new AudioWorkletNode(ctx, 'hippel-processor', {
       outputChannelCount: [2], numberOfOutputs: 1,
@@ -124,12 +84,10 @@ export class HippelEngine {
 
     this.workletNode.port.postMessage({
       type: 'init', sampleRate: ctx.sampleRate,
-      wasmBinary: HippelEngine.wasmBinary, jsCode: HippelEngine.jsCode,
+      wasmBinary: HippelEngine.cache.wasmBinary, jsCode: HippelEngine.cache.jsCode,
     });
     this.workletNode.connect(this.output);
   }
-
-  async ready(): Promise<void> { return this._initPromise; }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
@@ -147,11 +105,8 @@ export class HippelEngine {
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     if (HippelEngine.instance === this) HippelEngine.instance = null;
   }
 }

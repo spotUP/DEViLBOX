@@ -9,34 +9,33 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
-export class TFMXEngine {
+function tfmxTransform(code: string): string {
+  return code
+    .replace(/import\.meta\.url/g, "'.'")
+    .replace(/export\s+default\s+\w+;?/g, '')
+    .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+    .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
+    .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
+}
+
+export class TFMXEngine extends WASMSingletonBase {
   private static instance: TFMXEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
-  private _disposed = false;
   private _positionCallbacks: Array<(update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => void> = [];
   private _moduleLoadedResolvers: Array<(info: { voices: number; songs: number; duration: number }) => void> = [];
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(TFMXEngine.cache);
   }
 
   static getInstance(): TFMXEngine {
@@ -55,61 +54,17 @@ export class TFMXEngine {
     return !!TFMXEngine.instance && !TFMXEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await TFMXEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[TFMXEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'tfmx',
+      workletFile: 'TFMX.worklet.js',
+      wasmFile: 'TFMX.wasm',
+      jsFile: 'TFMX.js',
+      transformJS: tfmxTransform,
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}tfmx/TFMX.worklet.js`);
-      } catch {
-        /* Module might already be registered */
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}tfmx/TFMX.wasm`),
-          fetch(`${baseUrl}tfmx/TFMX.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten ESM output for worklet Function() execution
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            // Expose heap views on Module so worklet can access them as this.wasm.HEAPU8 / HEAPF32
-            .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
-            .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'tfmx-processor', {
@@ -170,15 +125,11 @@ export class TFMXEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: TFMXEngine.wasmBinary,
-      jsCode: TFMXEngine.jsCode,
+      wasmBinary: TFMXEngine.cache.wasmBinary,
+      jsCode: TFMXEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   sendMessage(msg: Record<string, unknown>, transfers?: Transferable[]): void {
@@ -296,12 +247,9 @@ export class TFMXEngine {
     }
   }
 
-  dispose(): void {
-    this._disposed = true;
+  override dispose(): void {
+    super.dispose();
     this._positionCallbacks = [];
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
     if (TFMXEngine.instance === this) {
       TFMXEngine.instance = null;
     }
