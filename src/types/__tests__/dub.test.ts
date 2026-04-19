@@ -1,0 +1,79 @@
+/**
+ * Pure-function coverage for the dub type module's helpers.
+ * Complements src/engine/dub/__tests__/DubRouter.test.ts (runtime) and
+ * src/midi/performance/__tests__/dubRouting.test.ts (MIDI CC router).
+ */
+
+import { describe, it, expect } from 'vitest';
+import { snapToAltecStep, ALTEC_HPF_STEPS, DUB_CHARACTER_PRESETS, DEFAULT_DUB_BUS } from '../dub';
+
+describe('snapToAltecStep', () => {
+  it('snaps to the exact step when input matches one', () => {
+    for (const step of ALTEC_HPF_STEPS) {
+      expect(snapToAltecStep(step)).toBe(step);
+    }
+  });
+
+  it('snaps to the nearest step in log-space', () => {
+    // 180 is log-nearest to 150 (log(180)≈5.193, log(150)≈5.011, log(250)≈5.521)
+    expect(snapToAltecStep(180)).toBe(150);
+    // 800 is nearer to 1000 (log 800 ≈ 6.685, 1000 ≈ 6.908, 500 ≈ 6.215)
+    expect(snapToAltecStep(800)).toBe(1000);
+    // 120 is log-nearer to 100 than to 150
+    expect(snapToAltecStep(120)).toBe(100);
+    // 4500 is nearer to 5000 than to 3000
+    expect(snapToAltecStep(4500)).toBe(5000);
+  });
+
+  it('clamps above/below the range to first/last step', () => {
+    expect(snapToAltecStep(20)).toBe(70);       // below range
+    expect(snapToAltecStep(25000)).toBe(10000); // above range
+  });
+});
+
+describe('DUB_CHARACTER_PRESETS', () => {
+  it('has all 4 documented engineer presets', () => {
+    expect(Object.keys(DUB_CHARACTER_PRESETS).sort()).toEqual(
+      ['madProfessor', 'perry', 'scientist', 'tubby'],
+    );
+  });
+
+  it('tubby enables stepped HPF + mid-scoop off + narrow stereo', () => {
+    const p = DUB_CHARACTER_PRESETS.tubby;
+    expect(p.overrides.hpfStepped).toBe(true);
+    expect(p.overrides.midScoopGainDb).toBe(0);
+    expect(p.overrides.stereoWidth).toBeLessThan(1);
+  });
+
+  it('scientist has the signature -6dB mid-scoop at 700Hz', () => {
+    const p = DUB_CHARACTER_PRESETS.scientist;
+    expect(p.overrides.midScoopGainDb).toBe(-6);
+    expect(p.overrides.midScoopFreqHz).toBe(700);
+  });
+
+  it('perry enables tape stack + non-zero sweep amount + near-mono', () => {
+    const p = DUB_CHARACTER_PRESETS.perry;
+    expect(p.overrides.tapeSatMode).toBe('stack');
+    expect(p.overrides.sweepAmount).toBeGreaterThan(0);
+    expect(p.overrides.stereoWidth).toBeLessThan(0.5);
+  });
+
+  it('madProfessor is wide + pristine (low tapeSatDrive)', () => {
+    const p = DUB_CHARACTER_PRESETS.madProfessor;
+    expect(p.overrides.stereoWidth).toBeGreaterThan(1.3);
+    expect(p.tapeSatDrive).toBeLessThan(0.25);
+    expect(p.overrides.tapeSatMode).toBe('single');
+  });
+});
+
+describe('DEFAULT_DUB_BUS', () => {
+  it('starts with sweep disabled and single-path tapeSat', () => {
+    expect(DEFAULT_DUB_BUS.sweepAmount).toBe(0);
+    expect(DEFAULT_DUB_BUS.tapeSatMode).toBe('single');
+    expect(DEFAULT_DUB_BUS.hpfStepped).toBe(false);
+  });
+
+  it('has characterPreset: custom by default (no auto-preset on fresh engine)', () => {
+    expect(DEFAULT_DUB_BUS.characterPreset).toBe('custom');
+  });
+});
