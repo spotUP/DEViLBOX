@@ -9,7 +9,13 @@
  * via a Promise queue keyed by response type + optional handle.
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  loadWASMAssets,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -70,21 +76,11 @@ interface PendingResolvers<T> {
 
 // ── Engine ───────────────────────────────────────────────────────────────────
 
-export class SunVoxEngine {
+export class SunVoxEngine extends WASMSingletonBase {
   private static instance: SunVoxEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
   private _rejectInit: ((err: Error) => void) | null = null;
-  private _disposed = false;
 
   // Promise queues for async responses — keyed by "type:handle" or just "type"
   private _handleQueue: Array<PendingResolvers<number>> = [];
@@ -104,15 +100,23 @@ export class SunVoxEngine {
   private _moduleLevelsQueue: Map<number, PendingResolvers<Float32Array>> = new Map();
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
+    super();
+    // Replace the base init promise with one that carries a reject handle.
     this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
       this._rejectInit = reject;
     });
+    this.initializeSunVox();
+  }
 
-    this.initialize();
+  protected getLoaderConfig(): WASMLoaderConfig {
+    return {
+      dir: 'sunvox',
+      workletFile: 'SunVox.worklet.js',
+      wasmFile: 'SunVox.wasm',
+      jsFile: 'SunVox.js',
+      workletCacheBust: true,
+    };
   }
 
   // ── Singleton ──────────────────────────────────────────────────────────────
@@ -130,43 +134,17 @@ export class SunVoxEngine {
 
   // ── Init ───────────────────────────────────────────────────────────────────
 
-  private async initialize(): Promise<void> {
+  /**
+   * Override of initialize() that resumes the AudioContext before loading the
+   * worklet module. iOS won't complete addModule() on a suspended context, so
+   * we poll up to 2s for 'running' before delegating to the shared loader.
+   */
+  private async initializeSunVox(): Promise<void> {
     try {
-      console.log('[SunVoxEngine] ensureInitialized start');
-      await SunVoxEngine.ensureInitialized(this.audioContext);
-      console.log('[SunVoxEngine] ensureInitialized done, creating node');
-      this.createNode();
-      console.log('[SunVoxEngine] node created, init message sent');
-    } catch (err) {
-      console.error('[SunVoxEngine] Initialization failed:', err);
-      // Propagate to _initPromise so ready() rejects instead of hanging forever
-      if (this._rejectInit) {
-        this._rejectInit(err instanceof Error ? err : new Error(String(err)));
-        this._rejectInit = null;
-        this._resolveInit = null;
-      }
-    }
-  }
-
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      // AudioContext must be running for addModule to complete reliably.
-      // Fire-and-forget resume (never await — on iOS, awaiting resume() outside a
-      // synchronous gesture handler hangs forever). Poll briefly for state change.
-      // Cast to string: standardized-audio-context types AudioContextState without
-      // 'running' (uses 'interrupted' instead), causing TS2367 narrowing errors below.
+      const context = this.audioContext;
       if ((context.state as string) !== 'running') {
         console.log('[SunVoxEngine] context suspended — resuming before addModule');
         context.resume().catch(() => {});
-        // Give the context up to 2 s to reach 'running'. On desktop Chrome this
-        // takes < 10 ms; on iOS it requires a prior user gesture to succeed.
         for (let i = 0; i < 40 && (context.state as string) !== 'running'; i++) {
           await new Promise(resolve => setTimeout(resolve, 50));
         }
@@ -176,59 +154,20 @@ export class SunVoxEngine {
       }
       console.log('[SunVoxEngine] calling addModule, context.state:', context.state);
 
-      // Register worklet module with this AudioContext
-      try {
-        // Cache-bust the worklet URL — AudioWorklet.addModule caches aggressively
-        // and public/ files don't get Vite hash suffixes.
-        await context.audioWorklet.addModule(`${baseUrl}sunvox/SunVox.worklet.js?v=${Date.now()}`);
-        console.log('[SunVoxEngine] addModule done');
-      } catch (e) {
-        // Module might already be registered in this context
-        console.warn('[SunVoxEngine] addModule threw (may be already registered):', e);
+      await loadWASMAssets(this.audioContext, SunVoxEngine.cache, this.getLoaderConfig());
+      this.createNode();
+      console.log('[SunVoxEngine] node created, init message sent');
+    } catch (err) {
+      console.error('[SunVoxEngine] Initialization failed:', err);
+      if (this._rejectInit) {
+        this._rejectInit(err instanceof Error ? err : new Error(String(err)));
+        this._rejectInit = null;
+        this._resolveInit = null;
       }
-
-      // Fetch WASM binary and JS glue code (cached across contexts)
-      console.log('[SunVoxEngine] fetching WASM + JS, cached:', !!this.wasmBinary);
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}sunvox/SunVox.wasm`),
-          fetch(`${baseUrl}sunvox/SunVox.js`),
-        ]);
-        console.log('[SunVoxEngine] fetch done, wasm ok:', wasmResponse.ok, 'js ok:', jsResponse.ok);
-
-        if (!wasmResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.wasm: ${wasmResponse.status}`);
-        if (!jsResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.js: ${jsResponse.status}`);
-
-        this.wasmBinary = await wasmResponse.arrayBuffer();
-
-        let code = await jsResponse.text();
-        // Transform Emscripten output for Function() execution inside the worklet.
-        // The official SunVox library v2.1.4d exports `SunVoxLib` as an IIFE.
-        code = code
-          .replace(/import\.meta\.url/g, "'.'")
-          .replace(/export\s+default\s+\w+;?/g, '')
-          .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-          // Mirror HEAPU8/HEAPF32 onto Module so the worklet can access them
-          // after memory grows (updateMemoryViews is closure-local in Emscripten)
-          .replace(
-            /HEAPU8=new Uint8Array\(b\);/,
-            'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;',
-          )
-          .replace(
-            /HEAPF32=new Float32Array\(b\);/,
-            'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;',
-          );
-        this.jsCode = code;
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
+    }
   }
 
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'sunvox-processor', {
@@ -245,8 +184,8 @@ export class SunVoxEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: SunVoxEngine.wasmBinary ? new Uint8Array(SunVoxEngine.wasmBinary) : null,
-      jsCode: SunVoxEngine.jsCode,
+      wasmBinary: SunVoxEngine.cache.wasmBinary ? new Uint8Array(SunVoxEngine.cache.wasmBinary) : null,
+      jsCode: SunVoxEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
@@ -740,12 +679,9 @@ export class SunVoxEngine {
 
   // ── Teardown ───────────────────────────────────────────────────────────────
 
-  dispose(): void {
-    this._disposed = true;
+  override dispose(): void {
     this._rejectAll(new Error('SunVoxEngine disposed'));
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+    super.dispose();
     if (SunVoxEngine.instance === this) {
       SunVoxEngine.instance = null;
     }
