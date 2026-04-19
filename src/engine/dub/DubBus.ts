@@ -116,6 +116,10 @@ export class DubBus {
   // DJ mixer, the mixer's deck input connects INTO these, which feed the bus.
   // Dub-action pads raise these gains to spill deck audio into the bus.
   private deckTaps: Map<DeckId, GainNode> = new Map();
+  // Tracker channel taps — per-channel Tone.Gain nodes registered by
+  // ChannelEffectsManager when a channel's dubSend > 0. Used by openChannelTap
+  // so echoThrow can momentarily bump a channel's send to full.
+  private channelTaps: Map<number, Tone.Gain> = new Map();
   private attachedMixer: DJMixerEngine | null = null;
   // Track mixer→tap connections so we can cleanly detach if the mixer changes.
   private mixerTapConnections: Array<{ nativeFrom: AudioNode; to: GainNode }> = [];
@@ -865,6 +869,62 @@ export class DubBus {
     return { ...this.settings };
   }
 
+  // ─── Tracker Channel Tap API ───────────────────────────────────────────────
+
+  /** Called by ChannelEffectsManager when a per-channel tap is created. */
+  registerChannelTap(channelId: number, tap: Tone.Gain): void {
+    this.channelTaps.set(channelId, tap);
+  }
+
+  /** Called by ChannelEffectsManager when a tap is torn down (dubSend → 0). */
+  unregisterChannelTap(channelId: number): void {
+    this.channelTaps.delete(channelId);
+  }
+
+  /**
+   * Echo Throw entry point — momentarily bump the channel's tap gain to
+   * `amount` (regardless of the user's baseline dubSend), then close back
+   * to the baseline when the returned releaser fires. Mirrors openDeckTap.
+   *
+   * Returns a releaser that ramps the tap back to its baseline; echoThrow
+   * schedules this after throwBeats. No-ops cleanly when the bus is disabled
+   * or no tap is registered for this channel (dubSend = 0 / engine not ready).
+   */
+  openChannelTap(channelId: number, amount: number, attackSec = 0.005): () => void {
+    if (!this.enabled) return () => {};
+    const tap = this.channelTaps.get(channelId);
+    if (!tap) return () => {};
+
+    const baseline = tap.gain.value;
+    const clamped = Math.min(1, Math.max(0, amount));
+    tap.gain.cancelScheduledValues(this.context.currentTime);
+    tap.gain.rampTo(clamped, attackSec);
+
+    return () => {
+      const release = this.context.currentTime;
+      tap.gain.cancelScheduledValues(release);
+      tap.gain.setValueAtTime(tap.gain.value, release);
+      tap.gain.rampTo(baseline, 0.08);
+    };
+  }
+
+  /**
+   * Temporarily boost echo feedback by `delta`, clamp to maxFeedback=0.95,
+   * then restore the user's echoIntensity after `ms`. No-ops when disabled.
+   * Used by echoThrow + (future) dubStab to create the "swelling echo tail"
+   * that is the defining Echo Throw sound.
+   */
+  modulateFeedback(delta: number, ms: number): void {
+    if (!this.enabled) return;
+    const target = Math.min(0.95, this.settings.echoIntensity + Math.max(0, delta));
+    try { this.echo.setIntensityInstant(target); } catch { /* ok */ }
+    const t = setTimeout(() => {
+      this.throwTimers.delete(t);
+      try { this.echo.setIntensity(this.settings.echoIntensity); } catch { /* ok */ }
+    }, ms);
+    this.throwTimers.add(t);
+  }
+
   /** Dispose and release all bus resources. */
   dispose(): void {
     this._disposed = true;
@@ -874,6 +934,9 @@ export class DubBus {
       try { tap.disconnect(); } catch { /* already disconnected */ }
     }
     this.deckTaps.clear();
+    // Channel taps are owned by ChannelEffectsManager — just clear our registry.
+    // The actual Tone.Gain nodes are disposed by ChannelEffectsManager.disposeAll().
+    this.channelTaps.clear();
     // Cancel any in-flight dub action releasers + pending throw timers before
     // tearing nodes down — otherwise late-firing timers try to cancelScheduledValues
     // on disposed AudioParams and spam the console with errors.
