@@ -130,6 +130,10 @@ type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => voi
 
 export class UADEEngine extends WASMSingletonBase implements IsolationCapableEngine {
   private static readonly MAX_ISOLATION_SLOTS = 4;
+  /** Per-channel dub-send outputs. UADE has 4 Paula channels — the worklet
+   * exposes 32 dub slots for consistency with the other isolation engines
+   * (LibOpenMPT uses all 32 for XM; unused indices are simply idle no-ops). */
+  private static readonly MAX_DUB_CHANNELS = 32;
   private _isolationSlotMasks: (number | null)[] = new Array(4).fill(null);
   private static instance: UADEEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
@@ -236,9 +240,12 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   protected createNode(): void {
     const ctx = this.audioContext;
 
+    // 37 stereo outputs: [0]=main mix, [1..4]=isolation slots for per-channel
+    // effects, [5..36]=per-channel dub sends. See ChannelRoutedEffects.ts.
+    const TOTAL_OUTPUTS = 1 + UADEEngine.MAX_ISOLATION_SLOTS + UADEEngine.MAX_DUB_CHANNELS;
     this.workletNode = new AudioWorkletNode(ctx, 'uade-processor', {
-      outputChannelCount: [2, 2, 2, 2, 2],
-      numberOfOutputs: 1 + UADEEngine.MAX_ISOLATION_SLOTS,
+      outputChannelCount: new Array(TOTAL_OUTPUTS).fill(2),
+      numberOfOutputs: TOTAL_OUTPUTS,
     });
 
     this.workletNode.port.onmessage = (event) => {
@@ -646,6 +653,12 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     // Enable per-channel oscilloscope capture (4 Paula channels)
     useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
     this.workletNode?.port.postMessage({ type: 'enableOsc' });
+    // Re-hydrate the per-channel dub sends so a new tune picks them up
+    // without the user having to toggle the knobs. Matches LibOpenMPT's
+    // `_rebuildIsolationAfterPlay` hook.
+    void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+      try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
+    });
   }
 
   stop(): void {

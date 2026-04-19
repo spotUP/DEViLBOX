@@ -470,6 +470,35 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      // --- Per-channel dub sends — Paula has 4 channels; indices >=4 are no-ops.
+      case 'dubChannelEnable': {
+        const ch = data.channel ?? data.val?.channel;
+        if (typeof ch === 'number' && ch >= 0 && ch < 4) {
+          this._dubChannelEnabled[ch] = true;
+        }
+        break;
+      }
+      case 'dubChannelDisable': {
+        const ch = data.channel ?? data.val?.channel;
+        if (typeof ch === 'number' && ch >= 0 && ch < 4) {
+          this._dubChannelEnabled[ch] = false;
+        }
+        break;
+      }
+      case 'dubChannelDisableAll': {
+        for (let i = 0; i < 4; i++) this._dubChannelEnabled[i] = false;
+        break;
+      }
+      case 'diagDub': {
+        this.port.postMessage({
+          type: 'diagDub',
+          dubChannelEnabled: [...this._dubChannelEnabled],
+          activeCount: this._dubChannelEnabled.filter(Boolean).length,
+          paulaChannels: 4,
+        });
+        break;
+      }
+
       case 'enableOsc':
         this._oscEnabled = true;
         this._oscLastSendTime = 0;
@@ -664,6 +693,11 @@ class UADEProcessor extends AudioWorkletProcessor {
         this._wasm._malloc(frameBytes),
       ];
       this._isolationSlots = [null, null, null, null];
+      // Per-channel dub-send flags — Paula has 4 channels so the API caps at 4
+      // even though the worklet exposes 32 outputs for consistency with
+      // LibOpenMPT (DUB_OUTPUT_BASE=5, MAX_DUB_CHANNELS=32). Indices ≥4 are
+      // no-ops on UADE. See src/engine/tone/ChannelRoutedEffects.ts.
+      this._dubChannelEnabled = [false, false, false, false];
 
       // Initialize UADE engine
       const ret = this._wasm._uade_wasm_init(sampleRate || 44100);
@@ -2142,9 +2176,12 @@ class UADEProcessor extends AudioWorkletProcessor {
         if (outR !== outL) outR[i] = heapF32[baseR + i];
       }
 
-      // --- Per-channel audio capture (isolation + oscilloscope) ---
+      // --- Per-channel audio capture (isolation + dub + oscilloscope) ---
       const hasIsolation = this._isolationSlots && this._isolationSlots.some(s => s !== null);
-      const needsPerChannel = hasIsolation || this._oscEnabled;
+      const hasDub = this._dubChannelEnabled && this._dubChannelEnabled.some(Boolean);
+      const needsPerChannel = hasIsolation || hasDub || this._oscEnabled;
+      // DUB_OUTPUT_BASE matches ChannelRoutedEffects.ts (= 1 + MAX_ISOLATION_SLOTS)
+      const DUB_OUTPUT_BASE = 5;
       if (needsPerChannel && this._wasm._uade_wasm_read_channel_samples && this._chPtrs) {
         // Read per-channel audio captured during the render pass
         const chFrames = this._wasm._uade_wasm_read_channel_samples(
@@ -2152,6 +2189,25 @@ class UADEProcessor extends AudioWorkletProcessor {
         );
         if (chFrames > 0) {
           const chBases = this._chPtrs.map(p => p >> 2);
+
+          // Route to dub-send outputs — one output per Paula channel. Mono-
+          // mixed into both stereo sides (the tap is downstream and the
+          // channel's dub send is a mono path through the DubBus anyway).
+          if (hasDub) {
+            for (let ch = 0; ch < 4; ch++) {
+              if (!this._dubChannelEnabled[ch]) continue;
+              const slotOut = outputs[DUB_OUTPUT_BASE + ch];
+              if (!slotOut || slotOut.length === 0) continue;
+              const sL = slotOut[0];
+              const sR = slotOut[1] || slotOut[0];
+              const chBase = chBases[ch];
+              for (let i = 0; i < chFrames; i++) {
+                const sample = heapF32[chBase + i];
+                sL[i] = sample;
+                if (sR !== sL) sR[i] = sample;
+              }
+            }
+          }
 
           // Route to isolation slot outputs
           if (hasIsolation) {

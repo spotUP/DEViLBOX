@@ -336,7 +336,10 @@ export class ChannelRoutedEffectsManager {
     const worklet = engine.getWorkletNode();
     if (!worklet) return;
 
-    worklet.port.postMessage({ cmd: 'dubChannelEnable', val: { channel: channelIndex } });
+    // Dual-convention envelope: LibOpenMPT worklet switches on `cmd`, UADE /
+    // Hively / Furnace worklets switch on `type`. Send both so a single
+    // postMessage reaches any engine without branching per-engine here.
+    worklet.port.postMessage({ cmd: 'dubChannelEnable', type: 'dubChannelEnable', val: { channel: channelIndex }, channel: channelIndex });
     try {
       worklet.connect(gain, DUB_OUTPUT_BASE + channelIndex);
     } catch (e) {
@@ -360,7 +363,7 @@ export class ChannelRoutedEffectsManager {
     const engine = await getActiveIsolationEngine();
     const worklet = engine?.getWorkletNode();
     if (worklet) {
-      worklet.port.postMessage({ cmd: 'dubChannelDisable', val: { channel: channelIndex } });
+      worklet.port.postMessage({ cmd: 'dubChannelDisable', type: 'dubChannelDisable', val: { channel: channelIndex }, channel: channelIndex });
       try { worklet.disconnect(gain, DUB_OUTPUT_BASE + channelIndex); } catch { /* ok */ }
     }
     this.channelDubActive[channelIndex] = false;
@@ -629,6 +632,36 @@ const engineResolversByMode: Record<string, () => Promise<IsolationCapableEngine
     const { PreTrackerEngine } = await import('../pretracker/PreTrackerEngine');
     if (PreTrackerEngine.hasInstance()) {
       return PreTrackerEngine.getInstance() as IsolationCapableEngine;
+    }
+    return null;
+  },
+  // Hardcoded resolvers for UADE/Hively/Furnace so the resolver map stays
+  // consistent with the module instance returning it. The dynamic
+  // `registerIsolationEngineResolver` path below still works (and
+  // overwrites these if an engine registers itself) but hardcoding avoids
+  // Vite HMR divergence where a re-imported engine module registers into
+  // a different copy of this map than the store-side resolver reads from.
+  tfmx: async () => {
+    const { UADEEngine } = await import('../uade/UADEEngine');
+    if (UADEEngine.hasInstance()) {
+      const engine = UADEEngine.getInstance();
+      if (engine.isAvailable()) return engine as unknown as IsolationCapableEngine;
+    }
+    return null;
+  },
+  hively: async () => {
+    const { HivelyEngine } = await import('../hively/HivelyEngine');
+    if (HivelyEngine.hasInstance()) {
+      const engine = HivelyEngine.getInstance();
+      if (engine.isAvailable()) return engine as unknown as IsolationCapableEngine;
+    }
+    return null;
+  },
+  furnace: async () => {
+    const { FurnaceDispatchEngine } = await import('../furnace-dispatch/FurnaceDispatchEngine');
+    if (FurnaceDispatchEngine.hasInstance()) {
+      const engine = FurnaceDispatchEngine.getInstance();
+      if (engine.isAvailable()) return engine as unknown as IsolationCapableEngine;
     }
     return null;
   },
