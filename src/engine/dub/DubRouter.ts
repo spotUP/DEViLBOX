@@ -30,6 +30,35 @@ import { transportTapeStop } from './moves/transportTapeStop';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { getTrackerReplayer } from '@/engine/TrackerReplayer';
+import * as Tone from 'tone';
+
+/**
+ * Resolve the current pattern-row position. Prefers the active replayer's
+ * audio-synced state (works for libopenmpt / UADE / Hively / Furnace where
+ * the transport store isn't driven), falls back to useTransportStore for
+ * Tone.js-only sessions.
+ */
+function currentRow(): number {
+  try {
+    const replayer = getTrackerReplayer();
+    if (replayer) {
+      const state = replayer.getStateAtTime(Tone.now(), true /* peek */);
+      if (state && typeof state.row === 'number') {
+        const ts = useTransportStore.getState();
+        const duration = state.duration;
+        if (duration > 0) {
+          const progress = Math.min(Math.max((Tone.now() - state.time) / duration, 0), 1);
+          return state.row + progress;
+        }
+        return state.row;
+        // `ts` kept live for a future "if replayer stale, fall back" branch.
+        void ts;
+      }
+    }
+  } catch { /* replayer not ready */ }
+  return useTransportStore.getState().currentRow ?? 0;
+}
 
 const MOVES: Record<string, DubMove> = {
   echoThrow,
@@ -52,9 +81,13 @@ const MOVES: Record<string, DubMove> = {
 /**
  * What every subscriber sees when a move fires. `row` is the tracker's
  * row-level position at fire time, quantized by the caller if they wanted
- * grid placement. DubRecorder uses this as the stored `beat` on DubEvent.
+ * grid placement. DubRecorder uses this as the stored `row` on DubEvent.
+ * `invocationId` uniquely identifies the fire; a matching DubReleaseEvent
+ * with the same id is published when the returned disposer is called
+ * (only for hold-kind moves that actually return a disposer).
  */
 export interface DubFireEvent {
+  invocationId: string;
   moveId: string;
   channelId?: number;
   params: Record<string, number>;
@@ -62,8 +95,27 @@ export interface DubFireEvent {
   source: 'live' | 'lane';
 }
 
-type Subscriber = (event: DubFireEvent) => void;
-const subscribers = new Set<Subscriber>();
+/**
+ * Published when a held move releases (disposer called). Recorder uses
+ * this to fill in durationRows on the previously-captured DubEvent so
+ * the lane editor can render held moves as proper rectangles.
+ */
+export interface DubReleaseEvent {
+  invocationId: string;
+  row: number;  // release row position (for durationRows = releaseRow - fireRow)
+  source: 'live' | 'lane';
+}
+
+type FireSubscriber = (event: DubFireEvent) => void;
+type ReleaseSubscriber = (event: DubReleaseEvent) => void;
+const subscribers = new Set<FireSubscriber>();
+const releaseSubscribers = new Set<ReleaseSubscriber>();
+
+let _invCounter = 0;
+function nextInvocationId(): string {
+  _invCounter = (_invCounter + 1) | 0;
+  return `${Date.now().toString(36)}-${_invCounter.toString(36)}`;
+}
 
 let _bus: DubBus | null = null;
 
@@ -73,10 +125,18 @@ export function setDubBusForRouter(bus: DubBus | null): void {
 }
 
 /** Subscribe to fire events. Returns an unsubscribe fn. */
-export function subscribeDubRouter(fn: Subscriber): () => void {
+export function subscribeDubRouter(fn: FireSubscriber): () => void {
   subscribers.add(fn);
   return () => {
     subscribers.delete(fn);
+  };
+}
+
+/** Subscribe to release events (disposer invocations for held moves). */
+export function subscribeDubRelease(fn: ReleaseSubscriber): () => void {
+  releaseSubscribers.add(fn);
+  return () => {
+    releaseSubscribers.delete(fn);
   };
 }
 
@@ -103,14 +163,14 @@ export function fire(
   }
 
   const merged = { ...move.defaults, ...params };
-  const transport = useTransportStore.getState();
-  const bpm = transport.bpm || 120;
-  const row = transport.currentRow ?? 0;
+  const bpm = useTransportStore.getState().bpm || 120;
+  const row = currentRow();
 
   const ctx: DubMoveContext = { bus: _bus, channelId, params: merged, bpm, source };
   const disposer = move.execute(ctx);
 
-  const event: DubFireEvent = { moveId, channelId, params: merged, row, source };
+  const invocationId = nextInvocationId();
+  const event: DubFireEvent = { invocationId, moveId, channelId, params: merged, row, source };
   for (const fn of subscribers) {
     try {
       fn(event);
@@ -119,5 +179,28 @@ export function fire(
     }
   }
 
-  return disposer;
+  if (!disposer) return null;
+
+  // Wrap the move's own disposer so calling it publishes a release event
+  // with the matching invocationId. Subscribers can pair fire → release by
+  // id to fill in durationRows on held-move events. Idempotent — wrapping
+  // only fires the release once even if dispose() is called multiple times.
+  let released = false;
+  const wrapped = {
+    dispose() {
+      if (released) return;
+      released = true;
+      try { disposer.dispose(); } catch (e) { console.warn('[DubRouter] disposer threw:', e); }
+      const releaseRow = currentRow();
+      const relEvent: DubReleaseEvent = { invocationId, row: releaseRow, source };
+      for (const fn of releaseSubscribers) {
+        try {
+          fn(relEvent);
+        } catch (err) {
+          console.warn('[DubRouter] release subscriber failed:', err);
+        }
+      }
+    },
+  };
+  return wrapped;
 }
