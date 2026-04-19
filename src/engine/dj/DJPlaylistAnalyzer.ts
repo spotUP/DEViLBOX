@@ -247,6 +247,15 @@ export async function analyzePlaylist(
       }
       const track = current.track;
       const isHVSC = track.fileName.startsWith('hvsc:');
+      // Extensions the server's UADE renderer cannot handle — these must go
+      // through the local DJ pipeline (libopenmpt et al.) instead. UADE is
+      // Amiga-formats only (TFMX, MDAT, classic 4-channel MOD, etc.), so
+      // FastTracker 2 XM, Impulse Tracker IT, Scream Tracker S3M, and modern
+      // MOD variants all 422 on the server.
+      const ext = track.fileName.toLowerCase().split('.').pop() || '';
+      const needsLocalPipeline = isHVSC || [
+        'xm', 'it', 's3m', 'mod', 'mptm', 'umx', 'dbm', 'mo3',
+      ].includes(ext);
       // `let` (not `const`) so the 404 auto-fix can rewrite them when it
       // redirects the download to a different Modland path. Downstream code
       // (server analyze query, TFMX companion dir, UADE companion probe)
@@ -371,7 +380,7 @@ export async function analyzePlaylist(
         // analysis baked in and already returns bpm/musicalKey/energy/duration.
         let result: { bpm: number; musicalKey: string; energy: number; duration: number; rmsDb?: number; peakDb?: number };
 
-        if (isHVSC) {
+        if (needsLocalPipeline) {
           const pipelineResult = await getDJPipeline().loadOrEnqueue(buffer, filename, undefined, 'low');
           if (!pipelineResult.analysis) {
             throw new Error('Local pipeline returned no analysis');
