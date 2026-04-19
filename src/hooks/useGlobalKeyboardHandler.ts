@@ -139,6 +139,7 @@ import {
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@stores/useCursorStore';
+import { useDrumPadStore } from '@stores/useDrumPadStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -1939,6 +1940,30 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       if (e.key === 'Escape' && _activeView !== 'tracker') {
         import('@/engine/dj/DJActions').then(({ djPanic }) => djPanic()).catch(() => { /* ok */ });
         return;
+      }
+
+      // Dub Studio — W fires Echo Throw on the currently selected tracker
+      // channel. Tracker-view-only, no modifiers. Handled BEFORE scheme
+      // lookup so the protracker scheme's `W` note binding doesn't steal it
+      // when the Dub Bus is enabled. When the bus is OFF the key falls
+      // through to the normal note-entry scheme — W stays usable for typing
+      // notes when not dubbing.
+      if (
+        e.code === 'KeyW' &&
+        _activeView === 'tracker' &&
+        !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey &&
+        !e.repeat
+      ) {
+        const dubEnabled = useDrumPadStore.getState().dubBus.enabled;
+        if (dubEnabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          import('@/engine/dub/DubRouter').then(({ fire }) => {
+            const selectedCh = useCursorStore.getState().cursor.channelIndex;
+            fire('echoThrow', selectedCh);
+          }).catch(() => { /* ok */ });
+          return;
+        }
       }
 
       // Normalize the event
