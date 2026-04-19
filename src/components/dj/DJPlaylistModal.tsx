@@ -1878,8 +1878,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
           console.warn('[DJPlaylistModal] Auto-gain apply failed:', err);
         }
         // Remember this track for scroll-restore on next modal open / search clear.
+        // Also mark as played so the user can visually tell what they've played
+        // across view switches during a live set.
         if (activePlaylistId) {
           useDJPlaylistStore.getState().setLastPlayedTrack(activePlaylistId, track.id);
+          useDJPlaylistStore.getState().markTrackPlayed(activePlaylistId, index);
         }
       } finally {
         setLoadingTrackIndex(null);
