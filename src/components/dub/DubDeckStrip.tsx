@@ -278,6 +278,22 @@ export const DubDeckStrip: React.FC = () => {
         >
           ● REC {armed ? 'armed' : 'off'}
         </button>
+        {/* Character voicing — 4 engineer presets + custom. Loads a
+            curated snapshot of EQ + spring + echo + saturator values. */}
+        <span className="text-text-muted ml-2">VOICE</span>
+        <select
+          className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary text-[10px] font-mono focus:ring-1 focus:ring-accent-primary"
+          value={dubBusSettings.characterPreset}
+          onChange={(e) => setDubBus({ characterPreset: e.target.value as typeof dubBusSettings.characterPreset })}
+          title="Engineer character preset — loads EQ curve + spring + echo + tape saturator values tuned to that engineer's signature. See research at thoughts/shared/research/2026-04-20_dub-sound-coloring.md"
+          disabled={!busEnabled}
+        >
+          <option value="custom">Custom</option>
+          <option value="tubby">King Tubby</option>
+          <option value="scientist">Scientist</option>
+          <option value="perry">Lee Perry</option>
+          <option value="madProfessor">Mad Professor</option>
+        </select>
         <span className="flex-1" />
         <span className="text-text-muted">
           {pattern?.dubLane?.events.length ?? 0} events on this pattern
@@ -297,6 +313,48 @@ export const DubDeckStrip: React.FC = () => {
         >
           KILL
         </button>
+      </div>
+
+      {/* Tone row — bass shelf + mid scoop + stereo width */}
+      <div className="flex items-center gap-2 text-[9px] text-text-muted">
+        <span className="w-14 shrink-0">TONE ▸</span>
+        <div className="flex items-center gap-1">
+          <span>BASS</span>
+          <input
+            type="range" min={-12} max={12} step={0.5}
+            value={dubBusSettings.bassShelfGainDb}
+            onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
+            className="w-16 accent-accent-primary"
+            disabled={!busEnabled}
+            title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · ${dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}${dubBusSettings.bassShelfGainDb.toFixed(1)} dB · classic Tubby bass lift`}
+          />
+          <span className="w-10 text-text-secondary">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)}dB</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span>MID</span>
+          <input
+            type="range" min={-12} max={6} step={0.5}
+            value={dubBusSettings.midScoopGainDb}
+            onChange={(e) => setDubBus({ midScoopGainDb: Number(e.target.value), characterPreset: 'custom' })}
+            className="w-16 accent-accent-secondary"
+            disabled={!busEnabled}
+            title={`Mid peaking at ${dubBusSettings.midScoopFreqHz}Hz · ${dubBusSettings.midScoopGainDb > 0 ? '+' : ''}${dubBusSettings.midScoopGainDb.toFixed(1)} dB · the Scientist mid-scoop`}
+          />
+          <span className="w-10 text-text-secondary">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)}dB</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span>WIDTH</span>
+          <input
+            type="range" min={0} max={2} step={0.05}
+            value={dubBusSettings.stereoWidth}
+            onChange={(e) => setDubBus({ stereoWidth: Number(e.target.value), characterPreset: 'custom' })}
+            className="w-16 accent-accent-highlight"
+            disabled={!busEnabled}
+            title={`Stereo width ${dubBusSettings.stereoWidth.toFixed(2)}× · 0 = mono (Perry), 1 = neutral, 2 = wide (Mad Professor)`}
+          />
+          <span className="w-10 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
+        </div>
+        <span className="flex-1" />
       </div>
 
       {/* Globals row */}

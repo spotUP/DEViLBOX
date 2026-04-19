@@ -14,8 +14,16 @@
 
 import * as Tone from 'tone';
 import type { DubBusSettings } from '../../types/dub';
-import { DEFAULT_DUB_BUS } from '../../types/dub';
-import { SpringReverbEffect } from '../effects/SpringReverbEffect';
+import { DEFAULT_DUB_BUS, DUB_CHARACTER_PRESETS } from '../../types/dub';
+import {
+  AelapseEffect,
+  PARAM_SPRINGS_DRYWET,
+  PARAM_SPRINGS_LENGTH,
+  PARAM_SPRINGS_DAMP,
+  PARAM_SPRINGS_CHAOS,
+  PARAM_SPRINGS_SCATTER,
+  PARAM_SPRINGS_TONE,
+} from '../effects/AelapseEffect';
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
@@ -99,8 +107,43 @@ export class DubBus {
   //     and-dub drops, giving the dub "texture" a tape feel.
   private input: GainNode;
   private hpf: BiquadFilterNode;
+  // ─── Sound coloring stage (research 2026-04-20_dub-sound-coloring.md) ──
+  // King Tubby bass shelf — resonant low-shelf at ~90 Hz for the dub
+  // "weight." Sits after the HPF so it doesn't amplify sub-rumble.
+  private bassShelf: BiquadFilterNode;
+  // Scientist mid-scoop — peaking cut around 700 Hz. Sits on the return
+  // side (post-comp) so it shapes the already-echoed/sprung signal.
+  private midScoop: BiquadFilterNode;
+  // Stereo M/S width — splits L/R into mid (L+R) and side (L-R), applies
+  // width to the side channel, recombines. width=0 → mono, 1 → neutral,
+  // 2 → doubled side (Mad Professor ping-pong style).
+  private stereoSplit: ChannelSplitterNode;
+  private stereoMid: GainNode;
+  private stereoSide: GainNode;
+  private stereoInvertR: GainNode;
+  private stereoMerge: ChannelMergerNode;
   private tapeSat: WaveShaperNode;    // asymmetric tanh — MCI board bite
-  private spring: SpringReverbEffect;
+  /** Aelapse-ported spring-reverb DSP (C++ → WASM). Replaces the old
+   *  Tone.js-based SpringReverbEffect — proper tank simulation with chaos,
+   *  damping, and per-spring scatter. Delay side disabled since the bus
+   *  already runs SpaceEcho as its dedicated tape-head chain. */
+  private spring: AelapseEffect;
+  /** Cached mirror of the current springs dry/wet so dubPanic + mini-drain
+   *  can zero it and restore without re-reading the engine. Mirrors what
+   *  SpringReverbEffect's `.wet` used to hold inline. */
+  private _springWetCache: number = 0.55;
+
+  /** Set the Aelapse springs dry/wet AND cache it. Use everywhere old code
+   *  did `this.spring.wet = v`. */
+  private _setSpringWet(v: number): void {
+    this._springWetCache = v;
+    try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, v); } catch { /* ok */ }
+  }
+
+  /** Read the current springs dry/wet — diagnostic for gig-sims/tests.
+   *  AelapseEffect doesn't expose a param reader, so we mirror it in
+   *  `_springWetCache`. */
+  getSpringWet(): number { return this._springWetCache; }
   private echo: SpaceEchoEffect;
   private sidechain: DynamicsCompressorNode;  // fast (pumping)
   private glue: DynamicsCompressorNode;       // slow (dubplate glue)
@@ -183,6 +226,24 @@ export class DubBus {
     this.hpf.frequency.value = this.settings.hpfCutoff;
     this.hpf.Q.value = 0.707;
 
+    // Tubby bass shelf — resonant low-shelf at 90 Hz (research default).
+    // Positioned AFTER the HPF so the shelf doesn't re-amplify rumble the
+    // HPF just removed.
+    this.bassShelf = this.context.createBiquadFilter();
+    this.bassShelf.type = 'lowshelf';
+    this.bassShelf.frequency.value = this.settings.bassShelfFreqHz;
+    this.bassShelf.Q.value = this.settings.bassShelfQ;
+    this.bassShelf.gain.value = this.settings.bassShelfGainDb;
+
+    // Scientist mid-scoop — peaking cut around 700 Hz. Inserted on the
+    // return side between Glue compressor and the final LPF so it shapes
+    // the post-compression (already spatialized) signal.
+    this.midScoop = this.context.createBiquadFilter();
+    this.midScoop.type = 'peaking';
+    this.midScoop.frequency.value = this.settings.midScoopFreqHz;
+    this.midScoop.Q.value = this.settings.midScoopQ;
+    this.midScoop.gain.value = this.settings.midScoopGainDb;
+
     // Tape saturation — asymmetric tanh curve that models the positive/negative
     // asymmetry of transformer-coupled magnetic tape. Softens positive peaks
     // more than negative, which is what gives RE-201 / Studer saturation its
@@ -193,12 +254,28 @@ export class DubBus {
     this.tapeSat.curve = makeTapeSatCurve(0.35);
     this.tapeSat.oversample = '2x';
 
-    // Spring reverb — tightened diffusion from 0.7 → 0.4 for a more
-    // pronounced single-slap character (less "cathedral", more "metal tank").
-    // That's what gives King Tubby's recordings their snappy springiness.
-    this.spring = new SpringReverbEffect({
-      decay: 0.6, damping: 0.45, tension: 0.55, mix: 0.55, drip: 0.7, diffusion: 0.4,
-      wet: this.settings.springWet,
+    // Spring reverb — Aelapse (C++ → WASM port of the smiarx/aelapse spring
+    // tank sim). Parameters tuned for King Tubby "metal tank" character:
+    // short length + heavy damping + scatter + a touch of chaos gives the
+    // snappy single-slap that defines the dub spring sound. Delay side
+    // disabled because DubBus already runs SpaceEcho as its dedicated
+    // tape-head chain.
+    this._springWetCache = this.settings.springWet;
+    this.spring = new AelapseEffect({
+      delayActive:    false,
+      springsActive:  true,
+      springsDryWet:  this.settings.springWet,
+      springsWidth:   1.0,   // full stereo splay
+      springsLength:  0.35,  // short tank — slap, not cathedral
+      springsDecay:   0.45,  // moderate decay
+      springsDamp:    0.55,  // heavy damping tames HF ring
+      springsShape:   0.30,  // softer transient shape
+      springsTone:    0.55,  // slight high-mid emphasis
+      springsScatter: 0.60,  // strong per-spring scatter = metallic character
+      springsChaos:   0.15,  // a touch of chaos for organic motion
+      wet:            1.0,   // dry/wet happens via springsDryWet; Aelapse
+                             // top-level wet stays at 1 so the chain passes
+                             // through fully processed audio.
     });
 
     this.echo = new SpaceEchoEffect({
@@ -244,6 +321,33 @@ export class DubBus {
     this.lpf.frequency.value = 20000;
     this.lpf.Q.value = 0.707;
 
+    // Stereo width M/S matrix — see `_updateStereoWidth` for the coefficient
+    // math. Four gain nodes implement M+S decode: L contributes coeffA to
+    // left-out + coeffB to right-out; R contributes coeffB to left-out +
+    // coeffA to right-out. coeffA = 0.5 + 0.5*width, coeffB = 0.5 - 0.5*width.
+    //   width=0 → mono  (both outs = M)
+    //   width=1 → pass  (L→L, R→R)
+    //   width=2 → wide  (doubled side)
+    this.stereoSplit = this.context.createChannelSplitter(2);
+    this.stereoMerge = this.context.createChannelMerger(2);
+    this.stereoMid = this.context.createGain();          // L → left_out contribution
+    this.stereoSide = this.context.createGain();         // R → right_out contribution
+    this.stereoInvertR = this.context.createGain();      // L → right_out contribution
+    const stereoInvertL = this.context.createGain();     // R → left_out contribution (private, only for topology below)
+    // L path:
+    this.stereoSplit.connect(this.stereoMid, 0);   // L gain
+    this.stereoMid.connect(this.stereoMerge, 0, 0);
+    this.stereoSplit.connect(this.stereoInvertR, 0);  // L → right out
+    this.stereoInvertR.connect(this.stereoMerge, 0, 1);
+    // R path:
+    this.stereoSplit.connect(stereoInvertL, 1);   // R → left out
+    stereoInvertL.connect(this.stereoMerge, 0, 0);
+    this.stereoSplit.connect(this.stereoSide, 1);   // R gain
+    this.stereoSide.connect(this.stereoMerge, 0, 1);
+    // Cache the "R to left" node for the width update — stash it on the
+    // side node via a non-enumerable back-reference.
+    (this.stereoSide as unknown as { _invertL?: GainNode })._invertL = stereoInvertL;
+
     this.return_ = this.context.createGain();
     this.return_.gain.value = this.enabled ? this.settings.returnGain : 0;
 
@@ -274,14 +378,15 @@ export class DubBus {
     // every enable toggle below.
     this.noiseGain.gain.value = 0;
 
-    // Wire the vintage Tubby/Scientist chain:
-    //   input → HPF → TapeSat → Echo → Spring
-    //                           │
-    //                      feedback ← echoOut
+    // Wire the vintage Tubby/Scientist chain (with coloring stages inserted):
+    //   input → HPF → BassShelf → TapeSat → Echo → Spring
+    //                                        │
+    //                                 feedback ← echoOut
     //
-    //   Spring.output → Sidechain → Glue → LPF → return → master
+    //   Spring.output → Sidechain → Glue → MidScoop → LPF → StereoMS → return → master
     this.input.connect(this.hpf);
-    this.hpf.connect(this.tapeSat);
+    this.hpf.connect(this.bassShelf);
+    this.bassShelf.connect(this.tapeSat);
     Tone.connect(this.tapeSat, this.echo as unknown as Tone.InputNode);
     this.echo.connect(this.spring);
     // Feedback regen: tap echo output (before spring) back into input.
@@ -290,13 +395,18 @@ export class DubBus {
     const echoOut = (this.echo as unknown as { output: Tone.ToneAudioNode }).output;
     Tone.connect(echoOut, this.feedback as unknown as Tone.InputNode);
     this.feedback.connect(this.input);
-    // Post-spring output chain
+    // Post-spring output chain with coloring inserts (mid scoop + M/S width).
     const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
     Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
     this.sidechain.connect(this.glue);
-    this.glue.connect(this.lpf);
-    this.lpf.connect(this.return_);
+    this.glue.connect(this.midScoop);
+    this.midScoop.connect(this.lpf);
+    this.lpf.connect(this.stereoSplit);
+    this.stereoMerge.connect(this.return_);
     this.return_.connect(this.master);
+    // Apply initial stereo width (other coloring params are set via node.gain/
+    // frequency defaults above).
+    this._applyStereoWidth(this.settings.stereoWidth);
     // Noise source into input — runs always; masked by the return gain going
     // to zero when the bus is disabled.
     this.noise.connect(this.noiseGain);
@@ -438,7 +548,7 @@ export class DubBus {
     this._miniDrainPending = false;
     try {
       this.echo.setIntensity(this.settings.echoIntensity);
-      this.spring.wet = this.settings.springWet;
+      this._setSpringWet(this.settings.springWet);
       console.log(`[DubBus] mini-drain ✗ aborted — new consumer attached; echoIntensity=${this.settings.echoIntensity.toFixed(2)} springWet=${this.settings.springWet.toFixed(2)}`);
     } catch { /* ok */ }
   }
@@ -462,7 +572,7 @@ export class DubBus {
     const drainMs = Math.max(250, settings.echoRateMs * 3 + 200);
     try {
       this.echo.setIntensityInstant(0);
-      this.spring.wet = 0;
+      this._setSpringWet(0);
       console.log(`[DubBus] mini-drain ▶ last releaser fired, zeroed echo+spring (drain ${drainMs} ms)`);
     } catch { /* ok */ }
     const t = setTimeout(() => {
@@ -478,7 +588,7 @@ export class DubBus {
       if (this.actionReleasers.size > 0) return;
       try {
         this.echo.setIntensity(settings.echoIntensity);
-        this.spring.wet = settings.springWet;
+        this._setSpringWet(settings.springWet);
         console.log(`[DubBus] mini-drain ◀ restored echoIntensity=${settings.echoIntensity.toFixed(2)} springWet=${settings.springWet.toFixed(2)}`);
       } catch { /* ok */ }
     }, drainMs);
@@ -741,7 +851,7 @@ export class DubBus {
       // delay line keep recirculating during the ramp, which is the
       // "echo lingers forever" tail users hit during live panic.
       this.echo.setIntensityInstant(0);
-      this.spring.wet = 0;
+      this._setSpringWet(0);
     } catch (err) { console.warn('[DubPanic] echo/spring zero failed:', err); }
     const drainTimer = setTimeout(() => {
       this.throwTimers.delete(drainTimer);
@@ -751,7 +861,7 @@ export class DubBus {
       // knob tweaks the user made during the drain window are honored.
       try {
         this.echo.setIntensity(this.settings.echoIntensity);
-        this.spring.wet = this.settings.springWet;
+        this._setSpringWet(this.settings.springWet);
       } catch { /* ok */ }
     }, 2000);
     this.throwTimers.add(drainTimer);
@@ -868,7 +978,7 @@ export class DubBus {
           this._draining = false;
           try {
             this.echo.setIntensity(merged.echoIntensity);
-            this.spring.wet = merged.springWet;
+            this._setSpringWet(merged.springWet);
           } catch { /* ok */ }
         }
       }
@@ -883,7 +993,7 @@ export class DubBus {
     // 2 s window. Without this guard, mirror-effect writes during drain
     // would restore intensity mid-flight and leave residual echo on re-enable.
     if (!this._draining) {
-      this.spring.wet = merged.springWet;
+      this._setSpringWet(merged.springWet);
       this.echo.setIntensity(merged.echoIntensity);
       this.echo.wet = merged.echoWet;
     }
@@ -892,6 +1002,84 @@ export class DubBus {
     // 0 → -6 dB threshold (barely compresses), 1 → -36 dB (heavy pumping).
     const threshold = -6 - merged.sidechainAmount * 30;
     this.sidechain.threshold.setTargetAtTime(threshold, now, 0.05);
+
+    // ── Coloring params (research doc §3) ───────────────────────────────
+    // All smoothed via setTargetAtTime so mid-gig knob twitches don't click.
+    this.bassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
+    this.bassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
+    this.bassShelf.gain.setTargetAtTime(merged.bassShelfGainDb, now, 0.02);
+    this.midScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
+    this.midScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
+    this.midScoop.gain.setTargetAtTime(merged.midScoopGainDb, now, 0.02);
+    this._applyStereoWidth(merged.stereoWidth);
+
+    // Character-preset selection: apply the preset's overrides + spring
+    // params on first sight, then flip back to 'custom' so subsequent user
+    // edits don't re-trigger. Guarded against the preset fields being the
+    // reason for the write (the mirror effect would ping-pong).
+    if (typeof settings.characterPreset === 'string' && settings.characterPreset !== 'custom') {
+      this._applyCharacterPreset(settings.characterPreset);
+    }
+  }
+
+  /**
+   * Apply a curated engineer-voicing preset — loads coloring params + echo
+   * + spring values in one shot. See DUB_CHARACTER_PRESETS in types/dub.ts
+   * for the voicing tables. The preset's `.overrides` merge into the bus's
+   * `settings` (via re-entrant setSettings minus the preset field); the
+   * spring params + tape saturator drive apply directly on the DSP nodes.
+   *
+   * Non-reentrant: we strip the `characterPreset` key off the overrides
+   * before re-calling setSettings to avoid infinite recursion.
+   */
+  private _applyCharacterPreset(name: Exclude<DubBusSettings['characterPreset'], 'custom'>): void {
+    const preset = DUB_CHARACTER_PRESETS[name];
+    if (!preset) return;
+    // Apply spring params directly
+    const now = this.context.currentTime;
+    void now;
+    try {
+      if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
+      if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
+      if (preset.springsChaos   !== undefined) this.spring.setParamById(PARAM_SPRINGS_CHAOS,   preset.springsChaos);
+      if (preset.springsScatter !== undefined) this.spring.setParamById(PARAM_SPRINGS_SCATTER, preset.springsScatter);
+      if (preset.springsTone    !== undefined) this.spring.setParamById(PARAM_SPRINGS_TONE,    preset.springsTone);
+    } catch { /* ok */ }
+    // Apply tape saturator drive (rebuild curve if changed)
+    if (preset.tapeSatDrive !== undefined) {
+      try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
+    }
+    // Merge the preset's setting overrides — but strip out characterPreset
+    // itself so this call doesn't recurse. Force-write the merged settings
+    // as 'custom' so subsequent user edits stay on 'custom' until they
+    // deliberately pick another preset.
+    const overrides = { ...preset.overrides };
+    // Fire a non-recursive settings pass: bypass the presetField-branch via
+    // a direct merge of the `settings` cache, then re-call setSettings with
+    // the values (minus the presetField).
+    this.setSettings({ ...overrides, characterPreset: 'custom' });
+  }
+
+  /**
+   * Update the M/S matrix gain coefficients per `width`:
+   *   coeffA = 0.5 + 0.5*width (straight through from own side)
+   *   coeffB = 0.5 - 0.5*width (cross-bleed to the other side)
+   * width=0 → both sides see (L+R)/2 = mono
+   * width=1 → identity (L→L, R→R)
+   * width=2 → doubled side content (wide Mad Professor)
+   */
+  private _applyStereoWidth(width: number): void {
+    const w = Math.max(0, Math.min(2, width));
+    const a = 0.5 + 0.5 * w;
+    const b = 0.5 - 0.5 * w;
+    const now = this.context.currentTime;
+    const invertL = (this.stereoSide as unknown as { _invertL?: GainNode })._invertL;
+    try {
+      this.stereoMid.gain.setTargetAtTime(a, now, 0.02);       // L→left
+      this.stereoSide.gain.setTargetAtTime(a, now, 0.02);      // R→right
+      this.stereoInvertR.gain.setTargetAtTime(b, now, 0.02);   // L→right
+      if (invertL) invertL.gain.setTargetAtTime(b, now, 0.02); // R→left
+    } catch { /* ok */ }
   }
 
   getSettings(): DubBusSettings {
@@ -957,6 +1145,59 @@ export class DubBus {
   }
 
   /**
+   * Solo a single channel's dub tap for the window of a move. Snapshot every
+   * registered channelTap's gain, zero all except `channelId`, return a
+   * releaser that restores the snapshot. Caller schedules the release when
+   * the effect completes (triggers) or drives it on pointer release (holds).
+   *
+   * Effect: while soloed, only `channelId`'s audio feeds the bus chain
+   * (echo, spring, etc.). So a Spring Slam or Filter Drop fired "on
+   * channel 3" only splashes / sweeps channel 3's content.
+   *
+   * No-op + empty releaser when bus is disabled.
+   */
+  soloChannelTap(channelId: number, attackSec = 0.005): () => void {
+    if (!this.enabled) return () => {};
+    // Snapshot current gains so release can restore exact values (including
+    // any mid-flight rampTo on other taps).
+    const snapshot = new Map<number, number>();
+    for (const [id, tap] of this.channelTaps) {
+      snapshot.set(id, tap.gain.value);
+    }
+    const now = this.context.currentTime;
+    for (const [id, tap] of this.channelTaps) {
+      if (id === channelId) continue;
+      try {
+        tap.gain.cancelScheduledValues(now);
+        tap.gain.setValueAtTime(tap.gain.value, now);
+        tap.gain.linearRampToValueAtTime(0, now + attackSec);
+      } catch { /* ok */ }
+    }
+    // Also bump the target channel to full so the solo "opens" its tap
+    // even if the user had its send low.
+    const tgt = this.channelTaps.get(channelId);
+    if (tgt) {
+      try {
+        tgt.gain.cancelScheduledValues(now);
+        tgt.gain.setValueAtTime(tgt.gain.value, now);
+        tgt.gain.linearRampToValueAtTime(1, now + attackSec);
+      } catch { /* ok */ }
+    }
+    return () => {
+      const release = this.context.currentTime;
+      for (const [id, gain] of snapshot) {
+        const tap = this.channelTaps.get(id);
+        if (!tap) continue;
+        try {
+          tap.gain.cancelScheduledValues(release);
+          tap.gain.setValueAtTime(tap.gain.value, release);
+          tap.gain.linearRampToValueAtTime(gain, release + 0.08);
+        } catch { /* ok */ }
+      }
+    };
+  }
+
+  /**
    * Spring Slam — temporarily crank spring wet to `amount` (default 1.0),
    * then restore the user's baseline after `ms`. Designed for rhythmic
    * "splash" hits where a drum/clap gets a sudden tail of metal-tank
@@ -966,10 +1207,10 @@ export class DubBus {
   slamSpring(amount = 1.0, ms = 400): void {
     if (!this.enabled) return;
     const target = Math.min(1.0, Math.max(0, amount));
-    try { this.spring.wet = target; } catch { /* ok */ }
+    this._setSpringWet(target);
     const t = setTimeout(() => {
       this.throwTimers.delete(t);
-      try { this.spring.wet = this.settings.springWet; } catch { /* ok */ }
+      this._setSpringWet(this.settings.springWet);
     }, ms);
     this.throwTimers.add(t);
   }
