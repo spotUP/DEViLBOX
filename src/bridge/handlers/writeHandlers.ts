@@ -380,6 +380,40 @@ export function setChannelSolo(params: Record<string, unknown>): Record<string, 
   return { ok: true };
 }
 
+// ─── Dub Bus (tracker-view) ────────────────────────────────────────────────
+// Dub-bus tools for live-debugging the Tracker Dub Studio from MCP.
+// The DubBus lives inside DrumPadEngine (extracted in Phase 0) and is shared
+// between drumpad pads, DJ decks, and tracker channels.
+
+export function setChannelDubSend(params: Record<string, unknown>): Record<string, unknown> {
+  useMixerStore.getState().setChannelDubSend(params.channel as number, params.amount as number);
+  return { ok: true };
+}
+
+export async function setDubBusEnabled(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
+  useDrumPadStore.getState().setDubBus({ enabled: params.enabled as boolean });
+  return { ok: true };
+}
+
+export async function setDubBusSettings(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { useDrumPadStore } = await import('../../stores/useDrumPadStore');
+  // Strip unknown keys so the store doesn't receive garbage if the caller guesses
+  const settings = params.settings as Record<string, unknown>;
+  useDrumPadStore.getState().setDubBus(settings);
+  return { ok: true };
+}
+
+export async function fireDubMove(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { fire } = await import('../../engine/dub/DubRouter');
+  const moveId = params.moveId as string;
+  const channelId = params.channelId as number | undefined;
+  const source = (params.source as 'live' | 'lane' | undefined) ?? 'live';
+  const moveParams = (params.params as Record<string, number> | undefined) ?? {};
+  fire(moveId, channelId, moveParams, source);
+  return { ok: true };
+}
+
 export function muteAllChannels(): Record<string, unknown> {
   const mixer = useMixerStore.getState();
   for (let i = 0; i < mixer.channels.length; i++) {
