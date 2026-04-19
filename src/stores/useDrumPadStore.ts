@@ -476,8 +476,23 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   // Dub Bus actions — patch + persist. Engine listens via usePadEngineDubBus
   // hook and pushes changes to the live DrumPadEngine.
   setDubBus: (patch: Partial<DubBusSettings>) => {
+    const prior = get().dubBus.enabled;
     set((state) => ({ dubBus: { ...state.dubBus, ...patch } }));
     get().saveToStorage();
+    // Auto-apply sound system when bus flips OFF → ON and the current bank
+    // has no pad-level dubSend configured yet. Skips if any pad already has
+    // a dubSend — we never clobber a user's custom send config. This turns
+    // the bus button into a true one-click "dub on/off" control: toggle it
+    // on, fire pads, hear echo. No "wait, I also have to click Apply" step.
+    if (patch.enabled === true && !prior) {
+      const { programs, currentProgramId, currentBank } = get();
+      const program = programs.get(currentProgramId);
+      if (program) {
+        const bankPads = getBankPads(program.pads, currentBank);
+        const noneConfigured = bankPads.every(p => (p.dubSend ?? 0) === 0);
+        if (noneConfigured) get().applySoundSystemToBank();
+      }
+    }
   },
 
   setPadDubSend: (padId: number, value: number) => {
