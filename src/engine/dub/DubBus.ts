@@ -140,6 +140,9 @@ export class DubBus {
   // hold window expires. Held here so dispose() can clear them — otherwise
   // a timer that fires post-dispose tries to write to torn-down AudioParams.
   private throwTimers: Set<ReturnType<typeof setTimeout>> = new Set();
+  // setInterval handles for continuous modulation moves (tapeWobble).
+  // Kept separate because clearInterval / clearTimeout aren't cross-compatible.
+  private wobbleHandles: Set<ReturnType<typeof setInterval>> = new Set();
   // When true, setSettings suppresses writes to echoIntensity and
   // springWet on the live nodes. Set by `dubPanic` while draining the echo
   // / spring buffers; cleared by the restore timer after the drain window.
@@ -965,6 +968,71 @@ export class DubBus {
     this.throwTimers.add(t);
   }
 
+  /**
+   * Sweep the echo delay time to `targetMs` over `downMs`, hold at target,
+   * then return to the user's baseline over `upMs`. When the tape head
+   * accelerates/decelerates on a real RE-201, echoes in flight get
+   * pitch-shifted — this move emulates that by ramping the delay time
+   * faster than one echo period, producing a whoosh as the tail's
+   * pitch rises or falls.
+   */
+  throwEchoTime(targetMs: number, downMs = 120, holdMs = 200, upMs = 300): void {
+    if (!this.enabled) return;
+    const baseline = this.settings.echoRateMs;
+    const target = Math.max(20, Math.min(1500, targetMs));
+    // Step the rate through a short linear ramp via sequential setRate calls.
+    // SpaceEchoEffect.setRate internally smooths to avoid clicks.
+    const steps = 6;
+    const stepMs = downMs / steps;
+    for (let i = 1; i <= steps; i++) {
+      const v = baseline + (target - baseline) * (i / steps);
+      const t = setTimeout(() => {
+        this.throwTimers.delete(t);
+        try { this.echo.setRate(v); } catch { /* ok */ }
+      }, stepMs * i);
+      this.throwTimers.add(t);
+    }
+    const returnAt = downMs + holdMs;
+    const upSteps = 6;
+    const upStepMs = upMs / upSteps;
+    for (let i = 1; i <= upSteps; i++) {
+      const v = target + (baseline - target) * (i / upSteps);
+      const t = setTimeout(() => {
+        this.throwTimers.delete(t);
+        try { this.echo.setRate(v); } catch { /* ok */ }
+      }, returnAt + upStepMs * i);
+      this.throwTimers.add(t);
+    }
+  }
+
+  /**
+   * Continuous echo-rate LFO — call to start wobbling the delay line
+   * at `depthMs` around the user's baseline at `rateHz`. Returns a
+   * releaser that stops the LFO and restores the baseline smoothly.
+   * Real tape heads wow on every platter rotation; this emulates that
+   * seasick flutter without the RE-201's own wow param (which bakes
+   * a fixed-rate wobble into the tape head read point, not the delay
+   * time itself).
+   */
+  startTapeWobble(depthMs = 30, rateHz = 2.5): () => void {
+    if (!this.enabled) return () => {};
+    const baseline = this.settings.echoRateMs;
+    const period = 1000 / Math.max(0.05, rateHz);
+    const stepMs = Math.max(16, period / 16);  // 16 steps per cycle, ≥16ms
+    let phase = 0;
+    const handle = setInterval(() => {
+      phase += stepMs / period;
+      const rate = baseline + Math.sin(phase * Math.PI * 2) * depthMs;
+      try { this.echo.setRate(Math.max(20, rate)); } catch { /* ok */ }
+    }, stepMs);
+    this.wobbleHandles.add(handle);
+    return () => {
+      clearInterval(handle);
+      this.wobbleHandles.delete(handle);
+      try { this.echo.setRate(baseline); } catch { /* ok */ }
+    };
+  }
+
   /** Dispose and release all bus resources. */
   dispose(): void {
     this._disposed = true;
@@ -980,6 +1048,8 @@ export class DubBus {
     // Cancel any in-flight dub action releasers + pending throw timers before
     // tearing nodes down — otherwise late-firing timers try to cancelScheduledValues
     // on disposed AudioParams and spam the console with errors.
+    for (const h of this.wobbleHandles) clearInterval(h);
+    this.wobbleHandles.clear();
     for (const t of this.throwTimers) clearTimeout(t);
     this.throwTimers.clear();
     clearAllPendingThrows();

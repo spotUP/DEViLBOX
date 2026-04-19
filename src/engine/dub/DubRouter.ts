@@ -17,6 +17,10 @@ import { dubStab } from './moves/dubStab';
 import { filterDrop } from './moves/filterDrop';
 import { dubSiren } from './moves/dubSiren';
 import { springSlam } from './moves/springSlam';
+import { channelMute } from './moves/channelMute';
+import { channelThrow } from './moves/channelThrow';
+import { delayTimeThrow } from './moves/delayTimeThrow';
+import { tapeWobble } from './moves/tapeWobble';
 import type { DubMove, DubMoveContext } from './moves/_types';
 import type { DubBus } from './DubBus';
 import { useTransportStore } from '@/stores/useTransportStore';
@@ -27,8 +31,12 @@ const MOVES: Record<string, DubMove> = {
   filterDrop,
   dubSiren,
   springSlam,
-  // Future moves register here: channelMute, channelThrow, backwardReverb,
-  // toast, tapeStop, tapeWobble, snareCrack, delayTimeThrow, masterDrop.
+  channelMute,
+  channelThrow,
+  delayTimeThrow,
+  tapeWobble,
+  // Future moves register here: backwardReverb, toast, tapeStop,
+  // snareCrack, masterDrop.
 };
 
 /**
