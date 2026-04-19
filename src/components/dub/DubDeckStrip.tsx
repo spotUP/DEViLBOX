@@ -24,7 +24,7 @@ import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
 import { getChannelRoutedEffectsManager } from '@/engine/tone/ChannelRoutedEffects';
 import { getToneEngine } from '@/engine/ToneEngine';
-import { Knob } from '@components/controls/Knob';
+import { Fader } from '@components/controls/Fader';
 import { DubLaneTimeline } from './DubLaneTimeline';
 
 // ─── Per-channel ops ────────────────────────────────────────────────────────
@@ -364,16 +364,15 @@ export const DubDeckStrip: React.FC = () => {
                   </button>
                 );
               })}
-              <Knob
+              <Fader
                 value={dubSend}
-                min={0}
-                max={1}
                 size="sm"
+                color="accent-primary"
                 onChange={(v) => setChannelDubSend(i, v)}
-                title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%`}
+                title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%. Drag vertically; double-click for full send. Each real dub desk had faders on every channel — riding these is how Tubby mixed.`}
                 disabled={!busEnabled}
-                hideValue
-                formatValue={(v) => `${Math.round(v * 100)}%`}
+                doubleClickValue={1}
+                paramKey={`dub.channelSend.ch${i}`}
               />
             </div>
           );
