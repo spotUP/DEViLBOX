@@ -17,7 +17,8 @@ import type { InstrumentConfig } from '@/types';
 import type { StartrekkerAMConfig } from '@/types/instrument/exotic';
 import { createSamplerInstrument } from './AmigaUtils';
 
-const NT_MAGIC = 'ST1.2 ModuleINFO';
+const NT_MAGIC_V12 = 'ST1.2 ModuleINFO';
+const NT_MAGIC_V13 = 'ST1.3 ModuleINFO';
 const AM_MAGIC = 0x414D;  // "AM"
 
 function r16(buf: Uint8Array, off: number): number {
@@ -69,12 +70,15 @@ function periodToNote(period: number): number {
   return best + 1;  // 1-based note
 }
 
-/** Verify NT file has the correct 16-byte header */
+/** Verify NT file has the correct 16-byte header.
+ *  StarTrekker AM ships in multiple revisions — v1.2 and v1.3 differ only in
+ *  the version byte and the modland archive contains both. Both use the same
+ *  24-byte prefix layout + 120-byte instrument records, so we accept either. */
 export function isStartrekkerNT(data: ArrayBuffer | Uint8Array): boolean {
   const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
   if (buf.length < 24) return false;
   const hdr = String.fromCharCode(...buf.slice(0, 16));
-  return hdr === NT_MAGIC;
+  return hdr === NT_MAGIC_V12 || hdr === NT_MAGIC_V13;
 }
 
 /**
