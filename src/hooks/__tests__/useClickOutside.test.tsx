@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
-import { useRef, type RefObject } from 'react';
+import type { RefObject } from 'react';
 import { useClickOutside } from '../useClickOutside';
 
 function firePointerDown(target: EventTarget): void {
