@@ -81,11 +81,11 @@ export class DJMixerEngine {
     // Attack 1ms catches crossfader transient spikes (10ms ramps)
     // Release 50ms balances fast recovery for battle cuts vs pumping avoidance
     this.limiter = new Tone.Compressor({
-      threshold: -1,
+      threshold: -0.3,
       ratio: 20,
       attack: 0.001,
       release: 0.05,
-      knee: 4,
+      knee: 0,
     });
 
     this.masterMeter = new Tone.Meter({ smoothing: 0.8 });
@@ -103,7 +103,7 @@ export class DJMixerEngine {
       this.masterGain.connect(this.chainGain);
       this.chainGain.connect(this.duckGain);
       this.duckGain.connect(this.limiter);
-      
+
       // Connect limiter to Destination INPUT (not .toDestination())
       // This allows DJ FX to tap from Destination OUTPUT
       this.limiter.connect(Tone.getDestination().input as any);
@@ -183,7 +183,7 @@ export class DJMixerEngine {
   // ==========================================================================
 
   setMasterVolume(value: number): void {
-    this.masterGain.gain.rampTo(Math.max(0, Math.min(1.5, value)), 0.02);
+    this.masterGain.gain.rampTo(Math.max(0, Math.min(2.0, value)), 0.02);
   }
 
   getMasterVolume(): number {
