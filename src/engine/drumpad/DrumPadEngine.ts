@@ -171,6 +171,12 @@ export class DrumPadEngine {
     const instOutput = getToneEngine().getInstrumentChainOutput(instrumentId);
     if (!instOutput) return; // chain not built yet — caller retries next trigger
 
+    // A mini-drain may be in flight from the previous pad's release — if so,
+    // abort it so the user's echoIntensity + springWet come back RIGHT NOW.
+    // Otherwise this new pad would play for up to ~1 s with zero echo while
+    // the drain window ran to completion, which makes fast playing feel dead.
+    this.dubBus.abortMiniDrain();
+
     const existing = this.synthPadDubSends.get(padId);
     if (existing && existing.source === instOutput) {
       // Same instrument — just update the send gain in place.
