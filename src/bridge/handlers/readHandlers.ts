@@ -609,6 +609,50 @@ export function getAudioState(): Record<string, unknown> {
   };
 }
 
+// ─── Dub Bus ───────────────────────────────────────────────────────────────────
+// Diagnostic for the shared DubBus — bus enabled state, settings, which tracker
+// channels have registered taps (i.e. have received audio from the multi-output
+// worklet). Returns null fields when the bus hasn't been created yet.
+
+export function getDubBusState(): Record<string, unknown> {
+  // Avoid dynamic imports — the file is hot on the critical read path. The
+  // stores are already imported at the top of the file.
+  // DrumPadEngine owns the DubBus; it may not exist yet if the user never
+  // mounted tracker/drumpad/DJ view.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const routingMod = require('../../hooks/drumpad/useMIDIPadRouting') as {
+    getDrumPadEngine: () => import('../../engine/drumpad/DrumPadEngine').DrumPadEngine | null;
+  };
+  const dpEngine = routingMod.getDrumPadEngine();
+  const bus = dpEngine?.getDubBus() ?? null;
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const drumPadMod = require('../../stores/useDrumPadStore') as {
+    useDrumPadStore: { getState: () => { dubBus: Record<string, unknown> } };
+  };
+  const storeSettings = drumPadMod.useDrumPadStore.getState().dubBus;
+
+  // Dub-send values from the mixer store (what the user has dialed).
+  const mixer = useMixerStore.getState();
+  const channelDubSends = mixer.channels.map((c, i) => ({ index: i, dubSend: c.dubSend }));
+
+  // Private field access via cast — MCP diagnostic only. Production code
+  // never reads these directly; they're here so the gig-sim can confirm the
+  // bus actually received the tap registrations from ChannelRoutedEffects.
+  let registeredChannelTaps: number[] = [];
+  if (bus) {
+    const busAny = bus as unknown as { channelTaps: Map<number, GainNode> };
+    registeredChannelTaps = Array.from(busAny.channelTaps.keys()).sort((a, b) => a - b);
+  }
+
+  return {
+    hasBus: !!bus,
+    storeSettings,
+    channelDubSends,
+    registeredChannelTaps,
+  };
+}
+
 // ─── Synth Errors ──────────────────────────────────────────────────────────────
 
 export function getSynthErrors(): Record<string, unknown> {

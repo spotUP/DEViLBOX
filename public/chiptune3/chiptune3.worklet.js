@@ -385,6 +385,24 @@ class MPT extends AudioWorkletProcessor {
 			case 'dubChannelDisableAll':
 				this.teardownAllDubSlots_()
 				break
+			case 'diagDub':
+				// Diagnostic: report dub slot state. Mirrors diagIsolation's shape.
+				this.port.postMessage({
+					cmd: 'diagDub',
+					channels: this.channels,
+					hasModuleBuffer: !!this.moduleBuffer,
+					mainMuteFunc: this.muteFunc,
+					userMuteMask: this.userMuteMask,
+					activeDubSlots: this.dubSlots.map((s, ch) => s ? {
+						ch,
+						hasModulePtr: !!s.modulePtr,
+						hasExtPtr: !!s.extPtr,
+						muteFunc: s.muteFunc,
+						channelMask: s.channelMask,
+					} : null).filter(Boolean),
+					dubSlotCount: this.dubSlots.filter(Boolean).length,
+				})
+				break
 			case 'diagIsolation':
 				// Diagnostic: report current isolation state
 				this.port.postMessage({

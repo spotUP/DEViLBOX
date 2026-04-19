@@ -30,6 +30,9 @@ export const DubDeckStrip: React.FC = () => {
 
   const busEnabled = useDrumPadStore(s => s.dubBus.enabled);
   const setDubBus = useDrumPadStore(s => s.setDubBus);
+  // The full dubBus settings object — used by the store→bus mirror effect
+  // below to keep the live DubBus in sync with user-edited store state.
+  const dubBusSettings = useDrumPadStore(s => s.dubBus);
 
   const channels = useMixerStore(s => s.channels);
   const setChannelDubSend = useMixerStore(s => s.setChannelDubSend);
@@ -99,6 +102,18 @@ export const DubDeckStrip: React.FC = () => {
     }
     return () => setDubBusForRouter(null);
   }, []);
+
+  // Mirror `useDrumPadStore.dubBus` → live DubBus settings. Mirrors PadGrid's
+  // pattern for the drumpad view (PadGrid.tsx:88-92): without this, tracker-only
+  // sessions never push the enabled flag / echoIntensity / etc to the bus, so
+  // openChannelTap bails early (isEnabled === false) and no audio flows.
+  useEffect(() => {
+    try {
+      ensureDrumPadEngine().setDubBusSettings(dubBusSettings);
+    } catch (e) {
+      console.warn('[DubDeckStrip] setDubBusSettings failed:', e);
+    }
+  }, [dubBusSettings]);
 
   // Start the recorder for the lifetime of this component.
   useEffect(() => {

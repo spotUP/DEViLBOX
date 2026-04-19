@@ -594,6 +594,53 @@ export function createMcpServer(): McpServer {
     (p) => call('solo_channel', p),
   );
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // DUB BUS — live dub performance (tracker + drumpad + DJ share the same bus)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'set_channel_dub_send',
+    'Set dub-send level for a tracker channel (0-1). First non-zero value lazily activates the WASM worklet dub output for that channel.',
+    {
+      channel: z.number().int().min(0).describe('Channel index'),
+      amount: z.number().min(0).max(1).describe('Dub send level (0=off, 1=full)'),
+    },
+    (p) => call('set_channel_dub_send', p),
+  );
+
+  server.tool(
+    'set_dub_bus_enabled',
+    'Turn the shared DubBus on/off. When disabled, dub-send audio does not reach master even if channel sends are non-zero.',
+    { enabled: z.boolean().describe('Bus enabled') },
+    (p) => call('set_dub_bus_enabled', p),
+  );
+
+  server.tool(
+    'set_dub_bus_settings',
+    'Adjust dub bus parameters (echoIntensity, echoRateMs, echoWet, springWet, returnGain, hpfCutoff, sidechainAmount).',
+    { settings: z.record(z.any()).describe('Partial DubBusSettings object') },
+    (p) => call('set_dub_bus_settings', p),
+  );
+
+  server.tool(
+    'fire_dub_move',
+    'Fire a dub move by id (currently: echoThrow). Equivalent to pressing the keyboard shortcut or dub pad.',
+    {
+      moveId: z.string().describe('Move id (e.g. "echoThrow")'),
+      channelId: z.number().int().optional().describe('Tracker channel index when the move is channel-scoped'),
+      params: z.record(z.number()).optional().describe('Override move defaults (e.g. throwBeats)'),
+      source: z.enum(['live', 'lane']).optional().describe('Source for telemetry (default "live")'),
+    },
+    (p) => call('fire_dub_move', p),
+  );
+
+  server.tool(
+    'get_dub_bus_state',
+    'Return DubBus diagnostics: hasBus, store settings, per-channel dubSend values, which channels have registered taps in the bus.',
+    {},
+    () => call('get_dub_bus_state'),
+  );
+
   server.tool(
     'mute_all_channels',
     'Mute all channels',
