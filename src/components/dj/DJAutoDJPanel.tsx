@@ -12,6 +12,9 @@ import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { enableAutoDJ, disableAutoDJ, skipAutoDJ, pauseAutoDJ, resumeAutoDJ, playAutoDJFromIndex } from '@/engine/dj/DJActions';
 import { analyzePlaylist, playlistNeedsAnalysis, trackHasRemoteSource, type AnalysisProgress, type ModlandFixCandidate } from '@/engine/dj/DJPlaylistAnalyzer';
+import { Modal } from '@/components/ui/Modal';
+import { ModalHeader } from '@/components/ui/ModalHeader';
+import { Button } from '@/components/ui/Button';
 
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
@@ -55,21 +58,80 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const currentTrack = activePlaylist?.tracks[currentIdx];
 
   const [paused, setPaused] = useState(false);
+  const [showAnalyzeWarning, setShowAnalyzeWarning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeProgress, setAnalyzeProgress] = useState<AnalysisProgress | null>(null);
+
+  const actuallyEnable = useCallback(async () => {
+    const error = await enableAutoDJ(0);
+    if (error) {
+      useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
+    } else {
+      setPaused(false);
+      onClose?.();
+    }
+  }, [onClose]);
+
+  // Split the "needs analysis" count into two categories so the warning can
+  // explain exactly what's missing and why:
+  //   - missingBpm: never analyzed (no bpm/key either). Fallback +9 dB trim.
+  //   - missingLoudness: analyzed by the old server path (bpm present) but
+  //     has no rmsDb — this happens to any track scanned before the
+  //     local-pipeline switch. Still plays at the fallback trim.
+  const missingBpmCount = activePlaylist
+    ? activePlaylist.tracks.filter((t) => trackHasRemoteSource(t) && t.bpm === 0).length
+    : 0;
+  const missingLoudnessCount = activePlaylist
+    ? activePlaylist.tracks.filter((t) => trackHasRemoteSource(t) && t.bpm > 0 && (t.rmsDb === undefined || t.rmsDb === null)).length
+    : 0;
+  const unanalyzedCount = missingBpmCount + missingLoudnessCount;
 
   const handleToggle = useCallback(async () => {
     if (enabled) {
       disableAutoDJ();
       setPaused(false);
-    } else {
-      const error = await enableAutoDJ(0);
-      if (error) {
-        useUIStore.getState().setStatusMessage(`Auto DJ: ${error}`, false, 4000);
-      } else {
-        setPaused(false);
-        onClose?.();
-      }
+      return;
     }
-  }, [enabled, onClose]);
+    if (activePlaylist && (playlistNeedsAnalysis(activePlaylist) || unanalyzedCount > 0)) {
+      setShowAnalyzeWarning(true);
+      return;
+    }
+    await actuallyEnable();
+  }, [enabled, activePlaylist, unanalyzedCount, actuallyEnable]);
+
+  const handleAnalyzeAndPlay = useCallback(async () => {
+    if (!activePlaylistId) return;
+    setAnalyzing(true);
+    try {
+      // Targeted re-analyze: the set of tracks missing bpm OR missing loudness.
+      // Using trackIds (instead of force=true) scopes the run to only the rows
+      // that actually need work, so already-complete tracks aren't re-scanned.
+      const pl = useDJPlaylistStore.getState().playlists.find(p => p.id === activePlaylistId);
+      const targetIds = pl
+        ? pl.tracks
+            .filter((t) => trackHasRemoteSource(t) && (t.bpm === 0 || t.rmsDb === undefined || t.rmsDb === null))
+            .map((t) => t.id)
+        : [];
+      await analyzePlaylist(
+        activePlaylistId,
+        (p) => setAnalyzeProgress(p),
+        undefined,
+        targetIds.length > 0 ? { trackIds: targetIds, force: true } : undefined,
+      );
+    } catch (err) {
+      useUIStore.getState().setStatusMessage(`Analyze failed: ${err}`, false, 4000);
+    } finally {
+      setAnalyzing(false);
+      setAnalyzeProgress(null);
+      setShowAnalyzeWarning(false);
+    }
+    await actuallyEnable();
+  }, [activePlaylistId, actuallyEnable]);
+
+  const handlePlayAnyway = useCallback(async () => {
+    setShowAnalyzeWarning(false);
+    await actuallyEnable();
+  }, [actuallyEnable]);
 
   const handlePauseResume = useCallback(() => {
     if (paused) {
@@ -381,6 +443,61 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           </button>
         </div>
       )}
+
+      <Modal isOpen={showAnalyzeWarning} onClose={() => !analyzing && setShowAnalyzeWarning(false)} size="sm">
+        <ModalHeader title="Unanalyzed tracks" onClose={() => !analyzing && setShowAnalyzeWarning(false)} />
+        <div className="p-4 text-xs font-mono space-y-3">
+          <p className="text-text-primary">
+            <span className="text-accent-warning font-bold">{unanalyzedCount}</span> of{' '}
+            <span className="text-text-primary font-bold">{trackCount}</span> tracks in{' '}
+            <span className="text-accent-primary">{activePlaylist?.name ?? 'this playlist'}</span>{' '}
+            need (re-)analysis.
+          </p>
+          {missingBpmCount > 0 && (
+            <p className="text-text-muted">
+              <span className="text-text-primary font-bold">{missingBpmCount}</span> track{missingBpmCount === 1 ? '' : 's'} never analyzed — missing BPM, key, and loudness data.
+            </p>
+          )}
+          {missingLoudnessCount > 0 && (
+            <p className="text-text-muted">
+              <span className="text-text-primary font-bold">{missingLoudnessCount}</span> track{missingLoudnessCount === 1 ? ' has' : 's have'} BPM/key but no loudness data
+              (scanned before the local-pipeline switch) — will play at a fixed +9 dB fallback trim
+              instead of per-track loudness matching.
+            </p>
+          )}
+          <p className="text-text-muted">
+            Re-analyzing fills in the missing values so every track hits the same volume target.
+          </p>
+          {analyzing && analyzeProgress && (
+            <div className="pt-2 border-t border-dark-borderLight">
+              <div className="flex justify-between text-text-muted mb-1">
+                <span>Analyzing track {analyzeProgress.current} of {analyzeProgress.total}</span>
+                <span>{Math.round((analyzeProgress.current / analyzeProgress.total) * 100)}%</span>
+              </div>
+              <div className="h-1 bg-dark-bgTertiary rounded overflow-hidden">
+                <div
+                  className="h-full bg-accent-primary transition-all"
+                  style={{ width: `${(analyzeProgress.current / analyzeProgress.total) * 100}%` }}
+                />
+              </div>
+              {analyzeProgress.trackName && (
+                <div className="text-[10px] text-text-muted mt-1 truncate">{analyzeProgress.trackName}</div>
+              )}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowAnalyzeWarning(false)} disabled={analyzing}>
+              Cancel
+            </Button>
+            <Button variant="default" size="sm" onClick={handlePlayAnyway} disabled={analyzing}>
+              Play anyway
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleAnalyzeAndPlay} disabled={analyzing}>
+              {analyzing ? 'Analyzing…' : 'Analyze & play'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
