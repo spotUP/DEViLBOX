@@ -256,7 +256,6 @@ interface SettingsStore {
   vuMeterStyle: 'segments' | 'fill'; // VU meter style: segments=LED bars, fill=solid background
   vuMeterSwing: boolean; // Enable sine wave swing animation on VU meters
   vuMeterMirror: boolean; // Mirror VU meters downward (from top of pattern editor)
-  customBannerImage: string | null; // Base64 data URL for custom banner image
   wobbleWindows: boolean; // Compiz-style wobbly windows in GL UI
   maxHeadroomMode: boolean; // Max Headroom glitchy AI head behavior in VJ view
 
@@ -298,7 +297,6 @@ interface SettingsStore {
   setVuMeterStyle: (style: 'segments' | 'fill') => void;
   setVuMeterSwing: (enabled: boolean) => void;
   setVuMeterMirror: (enabled: boolean) => void;
-  setCustomBannerImage: (dataUrl: string | null) => void;
   setWobbleWindows: (enabled: boolean) => void;
   setMaxHeadroomMode: (enabled: boolean) => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
@@ -487,7 +485,6 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterStyle: 'segments' as const,  // Default: LED segment style
       vuMeterSwing: true,  // Default: sine wave swing enabled
       vuMeterMirror: false,  // Default: VU meters extend upward
-      customBannerImage: null,  // No custom banner by default
       wobbleWindows: false,  // Wobbly windows disabled by default
       maxHeadroomMode: false,
       crtEnabled: false,
@@ -639,11 +636,6 @@ export const useSettingsStore = create<SettingsStore>()(
           state.vuMeterMirror = vuMeterMirror;
         }),
 
-      setCustomBannerImage: (customBannerImage) =>
-        set((state) => {
-          state.customBannerImage = customBannerImage;
-        }),
-
       setWobbleWindows: (wobbleWindows) =>
         set((state) => {
           state.wobbleWindows = wobbleWindows;
@@ -739,7 +731,6 @@ export const useSettingsStore = create<SettingsStore>()(
         vuMeterStyle: state.vuMeterStyle,
         vuMeterSwing: state.vuMeterSwing,
         vuMeterMirror: state.vuMeterMirror,
-        customBannerImage: state.customBannerImage,
         wobbleWindows: state.wobbleWindows,
         maxHeadroomMode: state.maxHeadroomMode,
         crtEnabled: state.crtEnabled,

@@ -171,8 +171,6 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const resetCustomTheme = useThemeStore((s) => s.resetCustomTheme);
 
   // ── Store: useSettingsStore ──────────────────────────────────────────────
-  const customBannerImage = useSettingsStore((s) => s.customBannerImage);
-  const setCustomBannerImage = useSettingsStore((s) => s.setCustomBannerImage);
   const welcomeJingleEnabled = useSettingsStore((s) => s.welcomeJingleEnabled);
   const setWelcomeJingleEnabled = useSettingsStore((s) => s.setWelcomeJingleEnabled);
   const amigaLimits = useSettingsStore((s) => s.amigaLimits);
@@ -391,7 +389,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     currentThemeId, setTheme, customThemeColors, copyThemeToCustom,
     setCustomColor, resetCustomTheme,
     // Settings store
-    customBannerImage, setCustomBannerImage, welcomeJingleEnabled, setWelcomeJingleEnabled,
+    welcomeJingleEnabled, setWelcomeJingleEnabled,
     amigaLimits, setAmigaLimits, linearInterpolation, setLinearInterpolation,
     useBLEP, setUseBLEP, stereoSeparation, stereoSeparationMode, modplugSeparation,
     midiPolyphonic, setMidiPolyphonic,
