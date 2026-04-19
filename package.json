@@ -31,6 +31,7 @@
     "test:compliance": "vitest run src/engine/effects/__tests__/ComplianceRunner.test.ts",
     "test:playback": "npx tsx tools/playback-smoke-test.ts --check-baseline",
     "test:playback:update": "npx tsx tools/playback-smoke-test.ts --write-baseline",
+    "test:ui-smoke": "vitest run --config tools/ui-smoke/vitest.config.ts",
     "test:ui": "vitest --ui",
     "lint": "eslint .",
     "preview": "vite preview",
