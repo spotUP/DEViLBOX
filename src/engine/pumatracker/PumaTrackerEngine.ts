@@ -5,8 +5,13 @@
  * Follows the PreTrackerEngine singleton pattern.
  */
 
-import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
+import {
+  WASMSingletonBase,
+  createWASMAssetsCache,
+  type WASMAssetsCache,
+  type WASMLoaderConfig,
+} from '@engine/wasm/WASMSingletonBase';
 
 /** Decoded cell data from a PumaTracker pattern */
 export interface PumaCellData {
@@ -15,32 +20,16 @@ export interface PumaCellData {
   param: number;        // effect parameter
 }
 
-export class PumaTrackerEngine {
+export class PumaTrackerEngine extends WASMSingletonBase {
   private static instance: PumaTrackerEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+  private static cache: WASMAssetsCache = createWASMAssetsCache();
 
-  private audioContext: AudioContext;
-  private workletNode: AudioWorkletNode | null = null;
-  readonly output: GainNode;
-
-  private _initPromise: Promise<void>;
-  private _resolveInit: (() => void) | null = null;
-  private _disposed = false;
   private _pendingRequests: Map<number, { resolve: (data: unknown) => void }> = new Map();
   private _nextRequestId = 1;
 
   private constructor() {
-    this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
-    this._initPromise = new Promise<void>((resolve) => {
-      this._resolveInit = resolve;
-    });
-
-    this.initialize();
+    super();
+    this.initialize(PumaTrackerEngine.cache);
   }
 
   static getInstance(): PumaTrackerEngine {
@@ -54,59 +43,18 @@ export class PumaTrackerEngine {
     return !!PumaTrackerEngine.instance && !PumaTrackerEngine.instance._disposed;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      await PumaTrackerEngine.ensureInitialized(this.audioContext);
-      this.createNode();
-    } catch (err) {
-      console.error('[PumaTrackerEngine] Initialization failed:', err);
-    }
+  protected getLoaderConfig(): WASMLoaderConfig {
+    // NOTE: worklet uses CamelCase "PumaTracker.worklet.js" but wasm/js are
+    // lowercase "Pumatracker.wasm/Pumatracker.js" — preserve that exactly.
+    return {
+      dir: 'pumatracker',
+      workletFile: 'PumaTracker.worklet.js',
+      wasmFile: 'Pumatracker.wasm',
+      jsFile: 'Pumatracker.js',
+    };
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
-
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}pumatracker/PumaTracker.worklet.js`);
-      } catch {
-        // Module might already be registered
-      }
-
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}pumatracker/Pumatracker.wasm`),
-          fetch(`${baseUrl}pumatracker/Pumatracker.js`),
-        ]);
-
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
-            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
-          this.jsCode = code;
-        }
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
+  protected createNode(): void {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'pumatracker-processor', {
@@ -159,15 +107,11 @@ export class PumaTrackerEngine {
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: PumaTrackerEngine.wasmBinary,
-      jsCode: PumaTrackerEngine.jsCode,
+      wasmBinary: PumaTrackerEngine.cache.wasmBinary,
+      jsCode: PumaTrackerEngine.cache.jsCode,
     });
 
     this.workletNode.connect(this.output);
-  }
-
-  async ready(): Promise<void> {
-    return this._initPromise;
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
@@ -263,11 +207,8 @@ export class PumaTrackerEngine {
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  dispose(): void {
-    this._disposed = true;
-    this.workletNode?.port.postMessage({ type: 'dispose' });
-    this.workletNode?.disconnect();
-    this.workletNode = null;
+  override dispose(): void {
+    super.dispose();
     if (PumaTrackerEngine.instance === this) {
       PumaTrackerEngine.instance = null;
     }
