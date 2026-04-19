@@ -222,7 +222,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       import('../engine/ToneEngine').then(({ getToneEngine }) => {
         const engine = getToneEngine();
         engine.ensureInstrumentReady(inst);
-      });
+      }).catch(() => { /* audio context unavailable (SSR / happy-dom) — safe to skip */ });
       // Apply per-instrument default octave (e.g. bass synths start at octave 2)
       if (inst.defaultOctave !== undefined) {
         import('./useEditorStore').then(({ useEditorStore }) => {
