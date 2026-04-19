@@ -26,7 +26,7 @@ import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { fire as fireDub } from '@/engine/dub/DubRouter';
 import { ensureDrumPadEngine } from '@hooks/drumpad/useMIDIPadRouting';
-import { Knob } from '@components/controls/Knob';
+import { Fader } from '@components/controls/Fader';
 import { DubLaneTimeline } from './DubLaneTimeline';
 
 interface MoveDef {
@@ -336,17 +336,16 @@ export const DubFullScreenMode: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-text-muted">
                   <span className="shrink-0">SEND</span>
-                  <Knob
+                  <Fader
                     value={dubSend}
-                    min={0}
-                    max={1}
-                    size="sm"
+                    size="md"
+                    color="accent-primary"
                     onChange={(v) => setChannelDubSend(i, v)}
                     disabled={!busEnabled}
-                    hideValue
+                    doubleClickValue={1}
+                    paramKey={`dub.channelSend.ch${i}`}
                     formatValue={(v) => `${Math.round(v * 100)}%`}
                   />
-                  <span className="text-text-primary">{Math.round(dubSend * 100)}%</span>
                 </div>
               </div>
             );
