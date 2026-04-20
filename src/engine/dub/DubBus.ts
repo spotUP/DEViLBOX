@@ -27,6 +27,8 @@ import {
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
 import { ToneArmEffect } from '../effects/ToneArmEffect';
+import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
+import { DattorroPlateEffect } from '../effects/DattorroPlateEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
@@ -172,6 +174,12 @@ export class DubBus {
    *  damping, and per-spring scatter. Delay side disabled since the bus
    *  already runs SpaceEcho as its dedicated tape-head chain. */
   private spring: AelapseEffect;
+  // Optional plate-stage insert — see `setPlateStage` + the DubBusSettings
+  // `plateStage` field. null when plateStage='off'. Instantiated lazily.
+  private plateStage: MadProfessorPlateEffect | DattorroPlateEffect | null = null;
+  // Send gain that feeds the plate input. On/off gate via mix level.
+  // When plateStage is null, this node is disconnected.
+  private plateSend: GainNode | null = null;
   /** Cached mirror of the current springs dry/wet so dubPanic + mini-drain
    *  can zero it and restore without re-reading the engine. Mirrors what
    *  SpringReverbEffect's `.wet` used to hold inline. */
@@ -182,6 +190,69 @@ export class DubBus {
   private _setSpringWet(v: number): void {
     this._springWetCache = v;
     try { this.spring.setParamById(PARAM_SPRINGS_DRYWET, v); } catch { /* ok */ }
+  }
+
+  /**
+   * Swap the optional plate-stage insert. `stage` = 'off' tears down the
+   * current plate (if any); 'madprofessor' or 'dattorro' builds a new
+   * plate and wires it in parallel from stereoMerge back to the return.
+   * Wet level comes from `settings.plateStageMix` (0-1).
+   *
+   * The plate is ADDITIVE: bus.spring + bus.echo still run their normal
+   * chain. The plate adds a colored tail on top. Bypass it by setting
+   * plateStageMix=0 OR plateStage='off'. The 'off' path also disposes
+   * the WASM worklet so a disabled plate costs nothing.
+   */
+  setPlateStage(stage: DubBusSettings['plateStage']): void {
+    if (stage === this.settings.plateStage && this.plateStage !== null) return;
+    this._teardownPlateStage();
+    this.settings = { ...this.settings, plateStage: stage };
+    if (stage !== 'off') {
+      this._installPlateStage(stage, this.settings.plateStageMix);
+    }
+  }
+
+  /** Set the plate-stage wet amount (0..1). No-op when plateStage='off'. */
+  setPlateStageMix(mix: number): void {
+    const clamped = Math.max(0, Math.min(1, mix));
+    this.settings = { ...this.settings, plateStageMix: clamped };
+    if (this.plateSend) this.plateSend.gain.value = clamped;
+  }
+
+  /** Build + wire the plate stage. stereoMerge → plateSend → plate → return_. */
+  private _installPlateStage(stage: 'madprofessor' | 'dattorro', mix: number): void {
+    try {
+      const plate: MadProfessorPlateEffect | DattorroPlateEffect =
+        stage === 'madprofessor'
+          ? new MadProfessorPlateEffect({ wet: 1 })
+          : new DattorroPlateEffect({ wet: 1 });
+      const send = this.context.createGain();
+      send.gain.value = Math.max(0, Math.min(1, mix));
+      Tone.connect(this.stereoMerge, send);
+      const plateInput = (plate as unknown as { input: { input: AudioNode } }).input.input;
+      send.connect(plateInput);
+      Tone.connect(plate, this.return_);
+      this.plateStage = plate;
+      this.plateSend = send;
+      console.log(`[DubBus] plateStage installed: ${stage} mix=${mix.toFixed(2)}`);
+    } catch (err) {
+      console.warn(`[DubBus] plateStage install failed (${stage}):`, err);
+      this.plateStage = null;
+      this.plateSend = null;
+    }
+  }
+
+  /** Tear down the plate-stage insert if present. Idempotent. */
+  private _teardownPlateStage(): void {
+    if (this.plateSend) {
+      try { this.plateSend.disconnect(); } catch { /* ok */ }
+      this.plateSend = null;
+    }
+    if (this.plateStage) {
+      try { this.plateStage.disconnect(); } catch { /* ok */ }
+      try { this.plateStage.dispose(); } catch { /* ok */ }
+      this.plateStage = null;
+    }
   }
 
   /** Read the current springs dry/wet — diagnostic for gig-sims/tests.
@@ -339,6 +410,8 @@ export class DubBus {
   // curve) were applied. Lets setSettings skip redundant rebuilds when the
   // mirror effect fires setSettings with unchanged preset name.
   private _lastTapeMode: DubBusSettings['tapeSatMode'] | null = null;
+  // Same gating pattern for plateStage — swap only on real transition.
+  private _lastPlateStage: DubBusSettings['plateStage'] | null = null;
   private _lastAppliedPreset: DubBusSettings['characterPreset'] = 'custom';
   // Once-per-engine warning latches so we don't flood the console during a
   // live set if the bus is disabled or the mixer isn't attached. Reset when
@@ -805,6 +878,15 @@ export class DubBus {
     this.lpf.connect(this.stereoSplit);
     this.stereoMerge.connect(this.return_);
     this.return_.connect(this.master);
+
+    // Optional plate-stage insert — branches from stereoMerge into the
+    // selected plate (MadProfessor or Dattorro), blends back into return
+    // at `plateStageMix`. Bypassed when `plateStage === 'off'`. Created
+    // lazily so a bus running plateStage='off' pays zero WASM overhead.
+    if (this.settings.plateStage !== 'off') {
+      this._installPlateStage(this.settings.plateStage, this.settings.plateStageMix);
+    }
+
     // Apply initial stereo width (other coloring params are set via node.gain/
     // frequency defaults above).
     this._applyStereoWidth(this.settings.stereoWidth);
@@ -1536,6 +1618,21 @@ export class DubBus {
     const wantStack = merged.tapeSatMode === 'stack';
     this.tapeSatBypass.gain.setTargetAtTime(wantStack ? 0 : 1, now, 0.03);
     this.tapeStackMix.gain.setTargetAtTime(wantStack ? 1 : 0, now, 0.03);
+
+    // Plate-stage changes — swap the insert if the type changed, OR
+    // update the wet send if only the mix moved. Type change is
+    // relatively expensive (WASM teardown + worklet init for the new
+    // plate) so we gate on a real transition.
+    if (settings.plateStage !== undefined && settings.plateStage !== this._lastPlateStage) {
+      this._lastPlateStage = settings.plateStage;
+      this.setPlateStage(settings.plateStage);
+    }
+    if (settings.plateStageMix !== undefined && this.plateSend) {
+      this.plateSend.gain.setTargetAtTime(
+        Math.max(0, Math.min(1, settings.plateStageMix)),
+        now, 0.03,
+      );
+    }
     // Apply the 15ips curve when that mode is selected. Rebuild triggered
     // only on mode transition to avoid hot-path curve allocation.
     if (merged.tapeSatMode !== this._lastTapeMode) {
@@ -3136,5 +3233,6 @@ export class DubBus {
     try { this.return_.disconnect(); } catch { /* ok */ }
     try { this.spring.dispose(); } catch { /* ok */ }
     try { this.echo.dispose(); } catch { /* ok */ }
+    this._teardownPlateStage();
   }
 }

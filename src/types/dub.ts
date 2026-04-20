@@ -155,6 +155,23 @@ export interface DubBusSettings {
   //               tape speed (half of 30 ips). Research-quoted as the dub
   //               engineer's trick for "heavier/dirtier bottom."
   tapeSatMode: 'single' | 'stack' | 'tape15ips';
+
+  // ─── Optional plate-stage insert (2026-04-21) ──────────────────────────
+  // When non-'off', a plate reverb is inserted as a POST-processing stage
+  // at the very end of the bus chain (after the M/S width matrix, before
+  // the return gain). The spring + echo still run their normal path —
+  // the plate only adds an additional colored tail on top. Useful for
+  // layering a long Mad Professor cathedral OR a metallic Dattorro plate
+  // over the shorter Aelapse spring + tape echo character.
+  //
+  // 'off'          = no plate stage (current behavior, bus unchanged)
+  // 'madprofessor' = MVerb + pre-HPF + post-LPF (long dark PCM-70 voicing)
+  // 'dattorro'     = Jon Dattorro 1997 plate (metallic, "infinite" tail)
+  plateStage: 'off' | 'madprofessor' | 'dattorro';
+  // Wet amount for the plate stage (0-1). 0 = bypassed (even when
+  // plateStage !== 'off'); 1 = fully wet. Default 0.35 — audible colored
+  // tail without overwhelming the bus.
+  plateStageMix: number;
 }
 
 export const DEFAULT_DUB_BUS: DubBusSettings = {
@@ -223,6 +240,8 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   sweepDepthMs:     4,
   sweepFeedback:    0.72,
   tapeSatMode:      'single',
+  plateStage:       'off',
+  plateStageMix:    0.35,
 };
 
 /** The 11 stepped positions of the Altec 9069B filter, per audiothing.net/
