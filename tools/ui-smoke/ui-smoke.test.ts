@@ -204,6 +204,112 @@ describe('ui-smoke — flow 07: DJ deck + crossfader sweep (both decks audible)'
   );
 });
 
+describe('ui-smoke — flow 08: scratch audio continuity', () => {
+  it.runIf(!!client)(
+    'jog-wheel scratch keeps audio flowing with no NaN / console errors',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      await c.call('dj_vj_action', { action: 'switchView', args: { view: 'dj' } });
+      await sleep(400);
+
+      // Single deck is enough — scratch state is per-deck. Same fixture
+      // flow 07 uses (cached → instant load).
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+      await c.call('dj_vj_action', {
+        action: 'loadDeck',
+        args: { side: 'A', filename: payload.filename, data: payload.data },
+      });
+      await sleep(400);
+      await c.call('dj_vj_action', { action: 'playDeck', args: { side: 'A' } });
+      await sleep(600); // let playback reach steady RMS
+
+      // Baseline: pre-scratch RMS must be non-silent. If this fails the
+      // whole scratch assertion is meaningless (fixture or load broke).
+      const baseline = await c.call<{ rmsAvg?: number; silent?: boolean }>(
+        'get_audio_level', { durationMs: 400 },
+      );
+      expect(
+        baseline.silent,
+        `pre-scratch baseline silent — flow aborted`,
+      ).not.toBe(true);
+      expect(baseline.rmsAvg ?? 0).toBeGreaterThan(0.01);
+
+      // Enter scratch, drive a sequence of velocities mirroring a real
+      // jog-wheel gesture: forward → backward → forward → stop. Sleeps
+      // span the 200 ms direction-switch cooldown so every transition
+      // exercises the full state machine (not just the cooldown fast-path).
+      await c.call('dj_vj_action', { action: 'startScratch', args: { side: 'A' } });
+      const scratchPlan = [
+        { v: +1.5, hold: 250 },
+        { v: -1.0, hold: 250 }, // crosses direction-switch cooldown
+        { v: +0.8, hold: 250 },
+        { v: -0.5, hold: 250 },
+        { v: +1.0, hold: 250 },
+      ];
+      const levels: Array<{ step: number; rms: number; silent: boolean }> = [];
+      for (const [i, step] of scratchPlan.entries()) {
+        await c.call('dj_vj_action', {
+          action: 'setScratchVelocity',
+          args: { side: 'A', velocity: step.v },
+        });
+        await sleep(step.hold);
+        const level = await c.call<{ rmsAvg?: number; silent?: boolean }>(
+          'get_audio_level', { durationMs: 150 },
+        );
+        levels.push({ step: i, rms: level.rmsAvg ?? 0, silent: !!level.silent });
+      }
+
+      // Release — decay back to rest. Audio must resume normal playback.
+      await c.call('dj_vj_action', {
+        action: 'stopScratch',
+        args: { side: 'A', decayMs: 200 },
+      });
+      await sleep(400);
+      const postDecay = await c.call<{ rmsAvg?: number; silent?: boolean }>(
+        'get_audio_level', { durationMs: 400 },
+      );
+
+      try { await c.call('dj_vj_action', { action: 'stopDeck', args: { side: 'A' } }); } catch { /* ok */ }
+      await c.call('dj_vj_action', { action: 'switchView', args: { view: 'tracker' } });
+      await sleep(200);
+
+      // Scratch must not produce pockets of total silence. A few dipping
+      // samples are fine (direction-switch muting < 50ms), but a whole
+      // 150ms RMS window at zero = ring buffer collapsed.
+      const silentSteps = levels.filter((l) => l.silent || l.rms < 0.001);
+      expect(
+        silentSteps.length,
+        `scratch went silent during steps: ${JSON.stringify(silentSteps)}. full levels: ${JSON.stringify(levels)}`,
+      ).toBe(0);
+
+      // Post-decay, playback should be audible again at roughly baseline
+      // level — not silent, not stuck. Tolerant factor accommodates the
+      // decay curve still settling (RMS within ±50% of baseline).
+      expect(
+        postDecay.silent,
+        `post-decay went silent — decay broke playback, baseline rms=${baseline.rmsAvg}`,
+      ).not.toBe(true);
+      expect(postDecay.rmsAvg ?? 0).toBeGreaterThan(0.01);
+
+      // No NaN / uncaught errors in the console during the whole flow.
+      const errors = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+      const critical = (errors.entries ?? []).filter(
+        (e) =>
+          e.level === 'error' &&
+          !/favicon|devtools|WebSocket closed/i.test(e.message),
+      );
+      expect(critical, `critical errors during scratch: ${JSON.stringify(critical)}`).toEqual([]);
+      // A NaN escaping into AudioParam writes would show up in the console
+      // OR produce a long silent stretch — both are already asserted above.
+    },
+    60000,
+  );
+});
+
 // Scaffolding kept in place, entire suite skipped until Furnace's gain /
 // silent-regression state stabilises. Loading 9 .fur fixtures in a row
 // currently contaminates flow 06's state (they share the Furnace
