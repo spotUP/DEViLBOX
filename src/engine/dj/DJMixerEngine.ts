@@ -25,6 +25,7 @@ import { InstrumentFactory } from '@/engine/InstrumentFactory';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { DJCueEngine } from './DJCueEngine';
 import type { DeckId } from './DeckEngine';
+import { effectiveBassLock } from './bassLockDefaults';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
@@ -402,16 +403,16 @@ export class DJMixerEngine {
     }
 
     // Build new chain: newChainGain → [FX nodes] → duckGain
-    // When delay/reverb effects are present, adds bass-lock crossover:
+    // When any enabled effect has bass-lock ON, we insert the crossover:
     //   chainGain → LP(150Hz) → duckGain  (dry bass, always clean)
     //   chainGain → HP(150Hz) → [FX] → duckGain  (FX'd mids/highs only)
-    const BASS_LOCK_TYPES = new Set([
-      'Delay', 'FeedbackDelay', 'PingPongDelay',
-      'Reverb', 'JCReverb', 'Freeverb', 'MVerb', 'SpringReverb',
-      'RETapeEcho', 'SpaceEcho',
-    ]);
+    //
+    // The flag is per-FX (`EffectConfig.bassLock`). Undefined falls back
+    // to a per-type default — see `bassLockDefaults.ts`. Users can flip
+    // individual effects on/off via `update_master_effect` with
+    // `{ bassLock: boolean }`.
     const needsBassLock = nodes.length > 0 &&
-      enabled.some((fx) => BASS_LOCK_TYPES.has(fx.type));
+      enabled.some((fx) => effectiveBassLock(fx.type, fx.bassLock));
 
     const newChainGain = new Tone.Gain(0); // starts silent
     const extraDisposables: AudioNode[] = []; // raw Web Audio nodes for cleanup
