@@ -2289,6 +2289,50 @@ export async function exportMp3(params: Record<string, unknown>): Promise<Record
   return exportWav({ ...params, format: 'mp3' });
 }
 
+/**
+ * Export every channel as its own WAV or MP3 via live-solo capture. Real-time
+ * wall-clock is N × song duration — a 16-channel 3-minute song takes ~48
+ * minutes. Callers should not poll this like a fast request; it returns when
+ * every channel is done. Returns base64-encoded blobs per stem.
+ */
+export async function exportStems(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const rawFormat = (params.format as string | undefined)?.toLowerCase();
+    const format: 'wav' | 'mp3' = rawFormat === 'mp3' ? 'mp3' : 'wav';
+    const kbps = typeof params.kbps === 'number' ? params.kbps : 192;
+
+    const { exportLiveCaptureStems } = await import('../../lib/export/audioExport');
+    const stems = await exportLiveCaptureStems({ format, kbps });
+
+    const out: Array<Record<string, unknown>> = [];
+    for (const s of stems) {
+      const buf = await s.blob.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let b64 = '';
+      for (let i = 0; i < bytes.length; i += 8190) {
+        b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 8190)));
+      }
+      out.push({
+        channelIndex: s.channelIndex,
+        channelName: s.channelName,
+        format: s.format,
+        mimeType: s.format === 'mp3' ? 'audio/mpeg' : 'audio/wav',
+        sizeBytes: buf.byteLength,
+        [s.format === 'mp3' ? 'mp3Base64' : 'wavBase64']: b64,
+      });
+    }
+    return {
+      ok: true,
+      method: 'live-solo-capture',
+      format,
+      count: out.length,
+      stems: out,
+    };
+  } catch (e) {
+    return { error: `exportStems failed: ${(e as Error).message}` };
+  }
+}
+
 /** Export pattern as formatted text */
 export async function exportPatternText(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
