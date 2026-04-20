@@ -122,6 +122,13 @@ interface TestVerification {
   rmsAvg: number;
   peakMax?: number;       // 2026-04-20: distortion/clipping gate
   peakStatus?: 'ok' | 'warn' | 'clip';  // ok <1.5, warn 1.5-4, clip >=4
+  // 2026-04-20: track raw audibility separately from audioPass. audioPass
+  // is lenient (it passes when allowSilent=true even on a silent format);
+  // wasSilent tells the truth so the summary can flag silent formats
+  // regardless of their allowSilent waiver. Helps triage formats that
+  // quietly went silent on a regression and spot allowSilent waivers
+  // that might be ready to be removed.
+  wasSilent?: boolean;
   // Tier 2: Instruments
   instrumentCount: number;
   instrumentPass: boolean;
@@ -777,6 +784,7 @@ async function runTest(client: MCPBridgeClient, test: TestCase): Promise<TestRes
     const audibleByOurThreshold = (level.rmsAvg ?? 0) >= SILENCE_THRESHOLD_RMS
       || (level.rmsMax ?? 0) >= SILENCE_THRESHOLD_RMS * 4;
     verification.audioPass = audibleByOurThreshold || !!test.allowSilent;
+    verification.wasSilent = !audibleByOurThreshold;
 
     // ── Distortion / clipping gate (2026-04-20) ────────────────────────────
     // User reports: random Furnace songs peak past unity and distort audibly.
@@ -1268,6 +1276,25 @@ async function main(): Promise<void> {
   const peakWarn = withV.filter(r => r.verification!.peakStatus === 'warn');
   const peakClip = withV.filter(r => r.verification!.peakStatus === 'clip');
 
+  // Silent-format summary (2026-04-20). Split into two bins:
+  //   - "silent (unexpected)" — test had no allowSilent waiver AND
+  //     produced no audio. Already fails the test; surfaced here for
+  //     an at-a-glance catalog of which formats went dark this run.
+  //   - "silent (allowSilent waiver)" — test passes despite silence
+  //     because allowSilent=true. Listed so waivers can be audited:
+  //     if one of these gains audibility on a future run, the waiver
+  //     can be dropped.
+  const silentUnexpected = withV.filter(r => {
+    const v = r.verification!;
+    const t = allTests.find(t => t.name === r.name);
+    return v.wasSilent && !t?.allowSilent;
+  });
+  const silentWaived = withV.filter(r => {
+    const v = r.verification!;
+    const t = allTests.find(t => t.name === r.name);
+    return v.wasSilent && !!t?.allowSilent;
+  });
+
   const instTested = withV.filter(r => r.verification!.instrumentCount > 0 || !r.verification!.instrumentPass);
   const instPass = withV.filter(r => r.verification!.instrumentPass).length;
   const instNoInst = withV.filter(r => r.verification!.instrumentCount === 0 && r.verification!.instrumentPass).length;
@@ -1318,6 +1345,17 @@ async function main(): Promise<void> {
     for (const r of peakWarn) {
       const p = r.verification!.peakMax!.toFixed(2);
       console.log(`                  warn  ${p}  ${r.name}`);
+    }
+  }
+  if (silentUnexpected.length > 0 || silentWaived.length > 0) {
+    console.log(`  Silent:       ${silentUnexpected.length} unexpected, ${silentWaived.length} with allowSilent waiver`);
+    for (const r of silentUnexpected) {
+      const rms = (r.rmsAvg ?? 0).toFixed(6);
+      console.log(`                  SILENT  rms=${rms}  ${r.name}`);
+    }
+    for (const r of silentWaived) {
+      const rms = (r.rmsAvg ?? 0).toFixed(6);
+      console.log(`                  waived  rms=${rms}  ${r.name}`);
     }
   }
   if (exportTested.length > 0) {
@@ -1442,6 +1480,8 @@ async function main(): Promise<void> {
           status: r.status,
           rmsAvg: r.rmsAvg ?? 0,
           instrumentCount: r.verification?.instrumentCount ?? 0,
+          peakMax: r.verification?.peakMax ?? 0,
+          wasSilent: r.verification?.wasSilent ?? false,
         })),
       };
       fs.writeFileSync(baselinePath, JSON.stringify(snapshot, null, 2) + '\n');
@@ -1483,6 +1523,26 @@ async function main(): Promise<void> {
             detail: `rms ${prev.rmsAvg.toFixed(4)} → ${(r.rmsAvg ?? 0).toFixed(4)} (< 50% baseline)`,
           });
         }
+        // 2026-04-20: peak regression — a format that used to peak
+        // cleanly (< 1.5) now peaks above the warn threshold, or a
+        // previously-elevated peak crossed into clipping territory.
+        // Baseline peak of 0 (from older baselines without peakMax)
+        // is ignored — don't false-positive on missing baseline data.
+        const prevPeak = prev.peakMax ?? 0;
+        const currPeak = r.verification?.peakMax ?? 0;
+        if (prevPeak > 0 && currPeak >= 4 && prevPeak < 4) {
+          regressions.push({
+            name: r.name,
+            kind: 'PEAK_REGRESSION',
+            detail: `peakMax ${prevPeak.toFixed(2)} → ${currPeak.toFixed(2)} (crossed into clipping)`,
+          });
+        } else if (prevPeak > 0 && prevPeak < 1.5 && currPeak >= 1.5) {
+          regressions.push({
+            name: r.name,
+            kind: 'PEAK_REGRESSION',
+            detail: `peakMax ${prevPeak.toFixed(2)} → ${currPeak.toFixed(2)} (crossed warn threshold)`,
+          });
+        }
       }
       if (regressions.length === 0) {
         console.log(`  OK — no regressions against baseline of ${baseline.updatedAt}`);
@@ -1505,6 +1565,13 @@ interface BaselineEntry {
   status: 'pass' | 'fail' | 'skip';
   rmsAvg: number;
   instrumentCount: number;
+  // 2026-04-20: track the peak so a format that started clean can't
+  // silently drift into distortion without the baseline diff catching it.
+  peakMax?: number;
+  // 2026-04-20: track silence so allowSilent waivers stay honest — if
+  // a waived format gains audibility we spot it, and if a previously
+  // audible format goes silent the STATUS_REGRESSION check covers it.
+  wasSilent?: boolean;
 }
 interface BaselineSnapshot {
   updatedAt: string;
