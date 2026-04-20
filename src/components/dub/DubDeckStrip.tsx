@@ -41,29 +41,38 @@ const CHANNEL_OPS: Array<{ label: string; title: string; moveId: string; color: 
 ];
 
 // ─── Global moves ──────────────────────────────────────────────────────────
-const GLOBAL_MOVES: Array<{ label: string; title: string; moveId: string; color: string; kind: 'trigger' | 'hold' }> = [
-  { label: 'SLAM',   title: 'Spring Slam — instant splash of spring reverb',       moveId: 'springSlam',        color: 'accent-success',       kind: 'trigger' },
-  { label: 'FILT',   title: 'Filter Drop — LPF sweeps down while held',            moveId: 'filterDrop',        color: 'accent-secondary',     kind: 'hold' },
-  { label: 'SIREN',  title: 'Dub Siren — echo self-oscillation while held',        moveId: 'dubSiren',          color: 'accent-warning',       kind: 'hold' },
-  { label: 'WOBBLE', title: 'Tape Wobble — LFO on echo rate while held',           moveId: 'tapeWobble',        color: 'accent-warning/70',    kind: 'hold' },
-  { label: 'CRACK',  title: 'Snare Crack — noise burst through bus',               moveId: 'snareCrack',        color: 'text-primary',         kind: 'trigger' },
-  { label: 'DELAY',  title: 'Delay-Time Throw — echo rate sweep (pitch whoosh)',   moveId: 'delayTimeThrow',    color: 'accent-highlight/70',  kind: 'trigger' },
-  { label: 'BACK',   title: 'Backward Reverb — last 0.8 s reversed through bus',   moveId: 'backwardReverb',    color: 'accent-highlight',     kind: 'trigger' },
-  { label: 'DROP',   title: 'Master Drop — mute dry while held; bus tail survives', moveId: 'masterDrop',       color: 'accent-error/70',      kind: 'hold' },
-  { label: 'STOP',   title: 'Tape Stop — bus LPF + echo-rate collapse',            moveId: 'tapeStop',          color: 'accent-secondary/70',  kind: 'trigger' },
-  { label: 'STOP!',  title: 'Transport Tape Stop — real tempo+pitch slowdown (LibOpenMPT only)', moveId: 'transportTapeStop', color: 'accent-error', kind: 'trigger' },
-  { label: 'TOAST',  title: 'Toast — route DJ mic into bus while held (DJ mic must be started)', moveId: 'toast', color: 'accent-success/70', kind: 'hold' },
-  { label: 'SCREAM', title: 'Tubby Scream — reverb self-feedback through sweeping bandpass; rising metallic cry (hold)', moveId: 'tubbyScream', color: 'accent-error', kind: 'hold' },
-  { label: 'WIDE',   title: 'Stereo Doubler — 20ms cross-fed delay for mono→stereo widening (hold)', moveId: 'stereoDoubler', color: 'accent-highlight', kind: 'hold' },
-  { label: 'RVRSE',  title: 'Reverse Echo — last 0.4s snapshot reversed through tape echo (pre-downbeat flourish)', moveId: 'reverseEcho', color: 'accent-highlight/70', kind: 'trigger' },
-  { label: 'PING',   title: 'Sonar Ping — clean 1 kHz sine fed through the echo (Tubby transition accent)', moveId: 'sonarPing', color: 'accent-primary/70', kind: 'trigger' },
-  { label: 'RADIO',  title: 'Radio Riser — band-limited pink noise sweep 200 Hz → 5 kHz (section rise)', moveId: 'radioRiser', color: 'accent-warning/70', kind: 'trigger' },
-  { label: 'SUB',    title: 'Sub Swell — 55 Hz sine pulse direct to return (Laswell-style weight)', moveId: 'subSwell', color: 'accent-primary', kind: 'trigger' },
-  { label: 'BASS',   title: 'Osc Bass — self-oscillating LPF as bass drone (hold, earth-shaker)', moveId: 'oscBass', color: 'accent-primary', kind: 'hold' },
-  { label: 'CRUSH',  title: 'Crush Bass — 3-bit quantize-distorted sawtooth through LPF → return (hold, jungle weight)', moveId: 'crushBass', color: 'accent-error/70', kind: 'hold' },
-  { label: 'SUBH',   title: 'Sub Harmonic — envelope-follower sub pulse that tracks every transient in the mix (hold)', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold' },
-  { label: '380',    title: 'Tubby 380 — snap echo rate to 380 ms (the classic Tubby chord-delay timing)', moveId: 'delayPreset380', color: 'accent-secondary/70', kind: 'trigger' },
-  { label: 'DOT',    title: 'Dotted — snap echo rate to dotted-8th (1.5 beat, BPM-synced) — "very typical" dub timing', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'trigger' },
+// `category`: 'gen' self-generates audio (PING, RADIO, BASS, CRUSH, SUB, CRACK,
+// SIREN, SLAM, SCREAM, DROP, STOP!, TOAST, SUB) — works without any channel
+// sending into the bus. 'proc' processes the bus signal (WIDE, RVRSE, FILT,
+// WOBBLE, BACK, STOP, 380, DOT, SUBH) — needs a channel dubSend > 0 to hear
+// anything. Group shown separately in the strip with a tiny divider so the
+// user knows why a processor is silent when the bus has no input.
+interface GlobalMove { label: string; title: string; moveId: string; color: string; kind: 'trigger' | 'hold'; category: 'gen' | 'proc'; }
+const GLOBAL_MOVES: Array<GlobalMove> = [
+  // ── Generators (no channel send needed) ──
+  { label: 'SLAM',   title: 'Spring Slam — instant splash of spring reverb [generator]', moveId: 'springSlam', color: 'accent-success', kind: 'trigger', category: 'gen' },
+  { label: 'SIREN',  title: 'Dub Siren — Rasta-box pitch-swept synth through bus [generator]', moveId: 'dubSiren', color: 'accent-warning', kind: 'hold', category: 'gen' },
+  { label: 'CRACK',  title: 'Snare Crack — bandpass noise burst [generator]', moveId: 'snareCrack', color: 'text-primary', kind: 'trigger', category: 'gen' },
+  { label: 'DROP',   title: 'Master Drop — mute dry while held; bus tail survives [generator]', moveId: 'masterDrop', color: 'accent-error/70', kind: 'hold', category: 'gen' },
+  { label: 'STOP!',  title: 'Transport Tape Stop — real tempo+pitch slowdown (LibOpenMPT only) [generator]', moveId: 'transportTapeStop', color: 'accent-error', kind: 'trigger', category: 'gen' },
+  { label: 'TOAST',  title: 'Toast — route DJ mic into bus while held (needs DJ mic started)', moveId: 'toast', color: 'accent-success/70', kind: 'hold', category: 'gen' },
+  { label: 'SCREAM', title: 'Tubby Scream — reverb self-feedback, rising metallic cry [generator]', moveId: 'tubbyScream', color: 'accent-error', kind: 'hold', category: 'gen' },
+  { label: 'PING',   title: 'Sonar Ping — 1 kHz sine fed through the echo [generator]', moveId: 'sonarPing', color: 'accent-primary/70', kind: 'trigger', category: 'gen' },
+  { label: 'RADIO',  title: 'Radio Riser — pink noise sweep 200 Hz → 5 kHz [generator]', moveId: 'radioRiser', color: 'accent-warning/70', kind: 'trigger', category: 'gen' },
+  { label: 'SUB',    title: 'Sub Swell — 55 Hz sine pulse direct to return [generator]', moveId: 'subSwell', color: 'accent-primary', kind: 'trigger', category: 'gen' },
+  { label: 'BASS',   title: 'Osc Bass — self-oscillating LPF as bass drone (hold) [generator]', moveId: 'oscBass', color: 'accent-primary', kind: 'hold', category: 'gen' },
+  { label: 'CRUSH',  title: 'Crush Bass — 3-bit quantize saw drone (hold) [generator]', moveId: 'crushBass', color: 'accent-error/70', kind: 'hold', category: 'gen' },
+  // ── Processors (need CH send > 0 to be audible) ──
+  { label: 'FILT',   title: 'Filter Drop — LPF sweeps down while held [PROCESSOR — needs CH send]', moveId: 'filterDrop', color: 'accent-secondary', kind: 'hold', category: 'proc' },
+  { label: 'WOBBLE', title: 'Tape Wobble — LFO on echo rate while held [PROCESSOR — needs CH send]', moveId: 'tapeWobble', color: 'accent-warning/70', kind: 'hold', category: 'proc' },
+  { label: 'DELAY',  title: 'Delay-Time Throw — echo rate sweep (pitch whoosh) [PROCESSOR — needs CH send]', moveId: 'delayTimeThrow', color: 'accent-highlight/70', kind: 'trigger', category: 'proc' },
+  { label: 'BACK',   title: 'Backward Reverb — last 0.8 s reversed through bus [PROCESSOR — needs CH send]', moveId: 'backwardReverb', color: 'accent-highlight', kind: 'trigger', category: 'proc' },
+  { label: 'STOP',   title: 'Tape Stop — bus LPF + echo-rate collapse [PROCESSOR — needs CH send]', moveId: 'tapeStop', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: 'WIDE',   title: 'Stereo Doubler — 20ms cross-fed widening (hold) [PROCESSOR — needs CH send]', moveId: 'stereoDoubler', color: 'accent-highlight', kind: 'hold', category: 'proc' },
+  { label: 'RVRSE',  title: 'Reverse Echo — last 0.4s reversed through tape echo [PROCESSOR — needs CH send]', moveId: 'reverseEcho', color: 'accent-highlight/70', kind: 'trigger', category: 'proc' },
+  { label: 'SUBH',   title: 'Sub Harmonic — env-follower sub pulse on every transient (hold) [PROCESSOR — needs CH send]', moveId: 'subHarmonic', color: 'accent-primary/70', kind: 'hold', category: 'proc' },
+  { label: '380',    title: 'Tubby 380 — snap echo rate to 380 ms [PROCESSOR — needs CH send]', moveId: 'delayPreset380', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
+  { label: 'DOT',    title: 'Dotted — snap echo rate to dotted-8th (BPM-synced) [PROCESSOR — needs CH send]', moveId: 'delayPresetDotted', color: 'accent-secondary/70', kind: 'trigger', category: 'proc' },
 ];
 
 // Map color tokens to button class fragments. Keeps Tailwind's JIT happy —
@@ -297,6 +306,10 @@ export const DubDeckStrip: React.FC = () => {
   }, [pattern]);
 
   const visibleChannelCount = pattern?.channels.length ?? 4;
+  // Whether ANY visible channel has a non-zero dub-send — processors
+  // (bus-audio modifiers) can only make sound when at least one channel
+  // is feeding the bus. Used to dim the processor row + show a hint.
+  const anySend = channels.slice(0, visibleChannelCount).some(c => (c?.dubSend ?? 0) > 0);
   // Previously auto-seeded every channel's dubSend to 0.4 on bus-enable
   // for instant gratification. Removed — it turned "enable bus" into
   // "everything gets bathed in echo+spring" which drowned master insert
@@ -372,10 +385,11 @@ export const DubDeckStrip: React.FC = () => {
   // pointerleave releases it. Proper press-and-hold (not click-to-toggle),
   // matching physical instrument gesture.
   const holdStart = useCallback((moveId: string, channelId?: number) => {
-    if (!busEnabled) return;
+    if (!busEnabled) { console.warn(`[DubDeck] holdStart ${moveId} ignored — bus disabled`); return; }
     const key = `${moveId}:${channelId ?? 'g'}`;
-    if (activeHolds.current.has(key)) return;  // already active
+    if (activeHolds.current.has(key)) { console.warn(`[DubDeck] holdStart ${moveId} ignored — already active in map`); return; }
     const disp = fireDub(moveId, channelId);
+    console.log(`[DubDeck] holdStart ${moveId} fired → disposer=${!!disp}`);
     if (disp) {
       activeHolds.current.set(key, () => disp.dispose());
       setHeldMoves(prev => new Set(prev).add(key));
@@ -523,77 +537,118 @@ export const DubDeckStrip: React.FC = () => {
 
       {!stripCollapsed && (
       <>
-      {/* Tone row — bass shelf + mid scoop + stereo width */}
-      <div className="flex items-center gap-2 text-[9px] text-text-muted">
-        <span className="w-14 shrink-0">TONE ▸</span>
-        <div className="flex items-center gap-1">
-          <span>BASS</span>
-          <input
-            type="range" min={-18} max={18} step={0.5}
-            value={dubBusSettings.bassShelfGainDb}
-            onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
-            className="w-16 accent-accent-primary"
-            disabled={!busEnabled}
-            title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · ${dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}${dubBusSettings.bassShelfGainDb.toFixed(1)} dB · classic Tubby bass lift`}
-          />
-          <span className="w-10 text-text-secondary">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)}dB</span>
+      {/* Master section — TONE EQ + global generators + global processors.
+          Kept as full-width bands above the channel strips so the layout
+          below reads like a real mixing desk: master up top, channels as
+          vertical columns underneath. */}
+      <div className="flex flex-col gap-1 pb-1 border-b border-dark-border">
+        {/* Tone row — bass shelf + mid scoop + stereo width */}
+        <div className="flex items-center gap-2 text-[9px] text-text-muted">
+          <span className="w-14 shrink-0">TONE ▸</span>
+          <div className="flex items-center gap-1">
+            <span>BASS</span>
+            <input
+              type="range" min={-18} max={18} step={0.5}
+              value={dubBusSettings.bassShelfGainDb}
+              onChange={(e) => setDubBus({ bassShelfGainDb: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-16 accent-accent-primary"
+              disabled={!busEnabled}
+              title={`Bass shelf at ${dubBusSettings.bassShelfFreqHz}Hz · ${dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}${dubBusSettings.bassShelfGainDb.toFixed(1)} dB · classic Tubby bass lift`}
+            />
+            <span className="w-10 text-text-secondary">{dubBusSettings.bassShelfGainDb > 0 ? '+' : ''}{dubBusSettings.bassShelfGainDb.toFixed(1)}dB</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span>MID</span>
+            <input
+              type="range" min={-12} max={6} step={0.5}
+              value={dubBusSettings.midScoopGainDb}
+              onChange={(e) => setDubBus({ midScoopGainDb: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-16 accent-accent-secondary"
+              disabled={!busEnabled}
+              title={`Mid peaking at ${dubBusSettings.midScoopFreqHz}Hz · ${dubBusSettings.midScoopGainDb > 0 ? '+' : ''}${dubBusSettings.midScoopGainDb.toFixed(1)} dB · the Scientist mid-scoop`}
+            />
+            <span className="w-10 text-text-secondary">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)}dB</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span>WIDTH</span>
+            <input
+              type="range" min={0} max={2} step={0.05}
+              value={dubBusSettings.stereoWidth}
+              onChange={(e) => setDubBus({ stereoWidth: Number(e.target.value), characterPreset: 'custom' })}
+              className="w-16 accent-accent-highlight"
+              disabled={!busEnabled}
+              title={`Stereo width ${dubBusSettings.stereoWidth.toFixed(2)}× · 0 = mono (Perry), 1 = neutral, 2 = wide (Mad Professor)`}
+            />
+            <span className="w-10 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
+          </div>
+          <span className="flex-1" />
         </div>
-        <div className="flex items-center gap-1">
-          <span>MID</span>
-          <input
-            type="range" min={-12} max={6} step={0.5}
-            value={dubBusSettings.midScoopGainDb}
-            onChange={(e) => setDubBus({ midScoopGainDb: Number(e.target.value), characterPreset: 'custom' })}
-            className="w-16 accent-accent-secondary"
-            disabled={!busEnabled}
-            title={`Mid peaking at ${dubBusSettings.midScoopFreqHz}Hz · ${dubBusSettings.midScoopGainDb > 0 ? '+' : ''}${dubBusSettings.midScoopGainDb.toFixed(1)} dB · the Scientist mid-scoop`}
-          />
-          <span className="w-10 text-text-secondary">{dubBusSettings.midScoopGainDb > 0 ? '+' : ''}{dubBusSettings.midScoopGainDb.toFixed(1)}dB</span>
+
+        {/* Generators — self-generating moves (no channel send needed) */}
+        <div className="flex items-center gap-1 text-[9px]">
+          <span className="text-text-muted w-14 shrink-0" title="Instruments (self-generating — no channel send needed)">INSTR ▸</span>
+          <div className="flex gap-1 flex-wrap">
+            {GLOBAL_MOVES.filter(m => m.category === 'gen').map((m) => {
+              const key = `${m.moveId}:g`;
+              const active = heldMoves.has(key);
+              const isHold = m.kind === 'hold';
+              return (
+                <button
+                  key={m.moveId}
+                  className={colorClasses(m.color, active)}
+                  onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
+                  onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
+                  onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onPointerLeave={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
+                  title={m.title + (isHold ? ' (press-and-hold)' : '')}
+                  disabled={!busEnabled}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <span>WIDTH</span>
-          <input
-            type="range" min={0} max={2} step={0.05}
-            value={dubBusSettings.stereoWidth}
-            onChange={(e) => setDubBus({ stereoWidth: Number(e.target.value), characterPreset: 'custom' })}
-            className="w-16 accent-accent-highlight"
-            disabled={!busEnabled}
-            title={`Stereo width ${dubBusSettings.stereoWidth.toFixed(2)}× · 0 = mono (Perry), 1 = neutral, 2 = wide (Mad Professor)`}
-          />
-          <span className="w-10 text-text-secondary">{dubBusSettings.stereoWidth.toFixed(2)}×</span>
+
+        {/* Processors — modify bus content, need channel send > 0 to be
+            audible. Dimmed when no channel is sending. */}
+        <div className="flex items-center gap-1 text-[9px]">
+          <span className="text-text-muted w-14 shrink-0" title="Processors (need channel send > 0 to hear)">PROC ▸</span>
+          <div className="flex gap-1 flex-wrap">
+            {GLOBAL_MOVES.filter(m => m.category === 'proc').map((m) => {
+              const key = `${m.moveId}:g`;
+              const active = heldMoves.has(key);
+              const isHold = m.kind === 'hold';
+              const disabled = !busEnabled || !anySend;
+              return (
+                <button
+                  key={m.moveId}
+                  className={colorClasses(m.color, active) + (disabled && busEnabled ? ' opacity-40' : '')}
+                  onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
+                  onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
+                  onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onPointerLeave={isHold ? () => holdEnd(m.moveId) : undefined}
+                  onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
+                  title={m.title + (isHold ? ' (press-and-hold)' : '') + (!anySend ? ' — RAISE A CHANNEL SEND TO HEAR' : '')}
+                  disabled={!busEnabled}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+          {!anySend && busEnabled && (
+            <span className="text-text-muted text-[9px] italic">raise a CH send to hear processors</span>
+          )}
         </div>
-        <span className="flex-1" />
       </div>
 
-      {/* Globals row */}
-      <div className="flex items-center gap-1 text-[9px]">
-        <span className="text-text-muted w-14 shrink-0">GLOBAL ▸</span>
-        <div className="flex gap-1 flex-wrap">
-          {GLOBAL_MOVES.map((m) => {
-            const key = `${m.moveId}:g`;
-            const active = heldMoves.has(key);
-            const isHold = m.kind === 'hold';
-            return (
-              <button
-                key={m.moveId}
-                className={colorClasses(m.color, active)}
-                onClick={isHold ? undefined : () => fireTrigger(m.moveId)}
-                onPointerDown={isHold ? () => holdStart(m.moveId) : undefined}
-                onPointerUp={isHold ? () => holdEnd(m.moveId) : undefined}
-                onPointerLeave={isHold ? () => holdEnd(m.moveId) : undefined}
-                onPointerCancel={isHold ? () => holdEnd(m.moveId) : undefined}
-                title={m.title + (isHold ? ' (press-and-hold)' : '')}
-                disabled={!busEnabled}
-              >
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Per-channel rows — hold toggle + 4 ops + dub-send knob */}
-      <div className="flex flex-col gap-0.5 text-[9px]">
+      {/* Channel strips — classic mixer-desk layout. Each channel is a
+          vertical column: label → op buttons stacked → HOLD → vertical
+          fader → send % readout. Horizontal scroll if the pattern has
+          more channels than fit. */}
+      <div className="flex items-end gap-1.5 overflow-x-auto pt-1">
         {Array.from({ length: visibleChannelCount }, (_, i) => {
           const ch = channels[i];
           const dubSend = ch?.dubSend ?? 0;
@@ -601,11 +656,46 @@ export const DubDeckStrip: React.FC = () => {
           const isHeld = heldChannels.has(i);
           const isFlashed = i === flashedChannel;
           return (
-            <div key={i} className="flex items-center gap-1">
-              <span className="text-text-muted w-14 shrink-0">CH {i + 1}</span>
+            <div
+              key={i}
+              className={
+                'flex flex-col items-center gap-1 px-1.5 py-1 rounded border min-w-[52px] shrink-0 transition-colors ' +
+                (isHeld
+                  ? 'bg-accent-primary/10 border-accent-primary'
+                  : hasDubSend
+                    ? 'bg-dark-bg border-dark-borderLight'
+                    : 'bg-dark-bgTertiary border-dark-border')
+              }
+            >
+              <span
+                className="text-[9px] font-bold text-text-secondary leading-none truncate max-w-[48px]"
+                title={`Ch ${i + 1}${ch ? ' · ' + ch.name : ''}`}
+              >
+                CH {i + 1}
+              </span>
+              {CHANNEL_OPS.map((op) => {
+                const key = `${op.moveId}:${i}`;
+                const active = heldMoves.has(key);
+                const isHold = op.kind === 'hold';
+                return (
+                  <button
+                    key={op.moveId}
+                    className={colorClasses(op.color, active) + ' w-full text-center'}
+                    onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
+                    onPointerDown={isHold ? () => holdStart(op.moveId, i) : undefined}
+                    onPointerUp={isHold ? () => holdEnd(op.moveId, i) : undefined}
+                    onPointerLeave={isHold ? () => holdEnd(op.moveId, i) : undefined}
+                    onPointerCancel={isHold ? () => holdEnd(op.moveId, i) : undefined}
+                    title={`Ch ${i + 1} · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
+                    disabled={!busEnabled}
+                  >
+                    {op.label}
+                  </button>
+                );
+              })}
               <button
                 className={
-                  'px-1.5 py-0.5 rounded border min-w-[28px] text-[9px] font-bold transition-all duration-150 ' +
+                  'px-1.5 py-0.5 rounded border w-full text-[9px] font-bold transition-all duration-150 ' +
                   (isHeld
                     ? 'bg-accent-primary border-accent-primary text-text-inverse shadow-[0_0_8px_var(--color-accent-primary)]'
                     : isFlashed
@@ -620,29 +710,9 @@ export const DubDeckStrip: React.FC = () => {
               >
                 HOLD
               </button>
-              {CHANNEL_OPS.map((op) => {
-                const key = `${op.moveId}:${i}`;
-                const active = heldMoves.has(key);
-                const isHold = op.kind === 'hold';
-                return (
-                  <button
-                    key={op.moveId}
-                    className={colorClasses(op.color, active)}
-                    onClick={isHold ? undefined : () => fireTrigger(op.moveId, i)}
-                    onPointerDown={isHold ? () => holdStart(op.moveId, i) : undefined}
-                    onPointerUp={isHold ? () => holdEnd(op.moveId, i) : undefined}
-                    onPointerLeave={isHold ? () => holdEnd(op.moveId, i) : undefined}
-                    onPointerCancel={isHold ? () => holdEnd(op.moveId, i) : undefined}
-                    title={`Ch ${i + 1} · ${op.title}${isHold ? ' (press-and-hold)' : ''}`}
-                    disabled={!busEnabled}
-                  >
-                    {op.label}
-                  </button>
-                );
-              })}
               <Fader
                 value={dubSend}
-                size="sm"
+                size="md"
                 color="accent-primary"
                 onChange={(v) => setChannelDubSend(i, v)}
                 title={`Ch ${i + 1} dub send — ${Math.round(dubSend * 100)}%. Drag vertically; double-click for full send. Each real dub desk had faders on every channel — riding these is how Tubby mixed.`}
@@ -650,6 +720,9 @@ export const DubDeckStrip: React.FC = () => {
                 doubleClickValue={1}
                 paramKey={`dub.channelSend.ch${i}`}
               />
+              <span className="text-[9px] font-mono text-text-secondary leading-none">
+                {Math.round(dubSend * 100)}%
+              </span>
             </div>
           );
         })}
