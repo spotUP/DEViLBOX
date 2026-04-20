@@ -343,7 +343,60 @@ export type MappableParameter =
   | 'masterFx.slot2.wet'
   | 'masterFx.slot2.param0'
   | 'masterFx.masterVolume'
-  | 'masterFx.limiterCeiling';
+  | 'masterFx.limiterCeiling'
+  // Dub Studio moves + bus params (routed via routeDubParameter in
+  // parameterRouter.ts). All 27 moves enumerated here so DEFAULT_CC_MAPPINGS
+  // can pre-wire out-of-the-box CC → move routing — users override via MIDI
+  // Learn. Per-channel variants (`dub.echoThrow.ch3` etc.) stay dynamic;
+  // only global moves get default CCs.
+  | DubMoveParameter;
+
+/**
+ * Full dub-move parameter namespace. One entry per move registered in
+ * DubRouter.MOVES (lives in src/engine/dub/DubRouter.ts) + one entry per
+ * continuous bus param in DUB_BUS_PARAMS (parameterRouter.ts). Keep in
+ * sync — the `dubMovesDefaultCCMappings.test.ts` contract guards it.
+ */
+export type DubMoveParameter =
+  // Global moves (27 total — Phase 1 + PR #42 moves)
+  | 'dub.echoThrow'
+  | 'dub.dubStab'
+  | 'dub.channelThrow'
+  | 'dub.channelMute'
+  | 'dub.springSlam'
+  | 'dub.filterDrop'
+  | 'dub.dubSiren'
+  | 'dub.tapeWobble'
+  | 'dub.snareCrack'
+  | 'dub.delayTimeThrow'
+  | 'dub.backwardReverb'
+  | 'dub.masterDrop'
+  | 'dub.tapeStop'
+  | 'dub.transportTapeStop'
+  | 'dub.toast'
+  | 'dub.tubbyScream'
+  | 'dub.stereoDoubler'
+  | 'dub.reverseEcho'
+  | 'dub.sonarPing'
+  | 'dub.radioRiser'
+  | 'dub.subSwell'
+  | 'dub.oscBass'
+  | 'dub.crushBass'
+  | 'dub.subHarmonic'
+  | 'dub.echoBuildUp'
+  | 'dub.delayPreset380'
+  | 'dub.delayPresetDotted'
+  // Continuous bus settings
+  | 'dub.echoIntensity'
+  | 'dub.echoWet'
+  | 'dub.echoRateMs'
+  | 'dub.springWet'
+  | 'dub.returnGain'
+  | 'dub.hpfCutoff'
+  | 'dub.sidechainAmount'
+  // Bus enable + REC arm toggles
+  | 'dub.enabled'
+  | 'dub.armed';
 
 export interface CCMapping {
   ccNumber: number;
