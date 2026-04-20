@@ -129,6 +129,7 @@ interface UIStore {
   closeModal: () => void;
   togglePatterns: () => void;
   toggleEditorFullscreen: () => void;
+  setEditorFullscreen: (v: boolean) => void;
   toggleAutomationLanes: () => void;
   toggleMacroLanes: () => void;
   toggleMacroSlots: () => void;
@@ -370,6 +371,11 @@ export const useUIStore = create<UIStore>()(
       toggleEditorFullscreen: () =>
         set((state) => {
           state.editorFullscreen = !state.editorFullscreen;
+        }),
+
+      setEditorFullscreen: (v: boolean) =>
+        set((state) => {
+          state.editorFullscreen = v;
         }),
 
       toggleAutomationLanes: () =>

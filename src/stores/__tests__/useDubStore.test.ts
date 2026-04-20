@@ -5,10 +5,10 @@ import { resetStore } from './_harness';
 describe('useDubStore', () => {
   beforeEach(() => resetStore(useDubStore));
 
-  it('starts disarmed and not full-screen', () => {
+  it('starts disarmed with the strip collapsed', () => {
     const s = useDubStore.getState();
     expect(s.armed).toBe(false);
-    expect(s.fullScreen).toBe(false);
+    expect(s.stripCollapsed).toBe(true);
     expect(s.lastCapturedAt).toBeNull();
   });
 
@@ -19,11 +19,11 @@ describe('useDubStore', () => {
     expect(useDubStore.getState().armed).toBe(false);
   });
 
-  it('setFullScreen toggles full-screen mode', () => {
-    useDubStore.getState().setFullScreen(true);
-    expect(useDubStore.getState().fullScreen).toBe(true);
-    useDubStore.getState().setFullScreen(false);
-    expect(useDubStore.getState().fullScreen).toBe(false);
+  it('setStripCollapsed / toggleStripCollapsed control the strip body', () => {
+    useDubStore.getState().setStripCollapsed(false);
+    expect(useDubStore.getState().stripCollapsed).toBe(false);
+    useDubStore.getState().toggleStripCollapsed();
+    expect(useDubStore.getState().stripCollapsed).toBe(true);
   });
 
   it('markCaptured stamps lastCapturedAt with a monotonically increasing number', () => {

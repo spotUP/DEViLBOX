@@ -65,7 +65,6 @@ import { Sc68Visualizer } from './Sc68Visualizer';
 import { TrackScopesStrip } from './TrackScopesStrip';
 import { PatternBottomBar } from './PatternBottomBar';
 import { DubDeckStrip } from '@components/dub/DubDeckStrip';
-import { DubFullScreenMode } from '@components/dub/DubFullScreenMode';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
 
 interface TrackerViewProps {
@@ -774,19 +773,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <PatternBottomBar />
           )}
 
-          {/* Dub Deck Strip — tracker-mode-only performance surface for the
-              shared dub bus. Registers the DubBus with the router, starts
-              the recorder, keeps the lane player synced to the current pattern. */}
-          {!editorFullscreen && viewMode === 'tracker' && (
-            <DubDeckStrip />
-          )}
-
-          {/* Full-Screen Dub Mode — mounts unconditionally so backtick from
-              anywhere in tracker view enters it. Internally short-circuits
-              when useDubStore.fullScreen is false. Spec §"Layout — two
-              shells, one engine" in 2026-04-19-tracker-dub-studio-design.md. */}
+          {/* Dub Deck Strip — tracker-mode performance surface for the
+              shared dub bus. Rendered in both normal and editor-fullscreen
+              modes so the bus toggle + auto-fullscreen logic keeps working;
+              the strip collapses itself to a thin header by default
+              (useDubStore.stripCollapsed). */}
           {viewMode === 'tracker' && (
-            <DubFullScreenMode />
+            <DubDeckStrip />
           )}
 
         </div>
