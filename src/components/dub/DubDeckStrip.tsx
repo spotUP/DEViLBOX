@@ -307,6 +307,36 @@ export const DubDeckStrip: React.FC = () => {
     return () => clearTimeout(h);
   }, [dubBusSettings, transportBpm]);
 
+  // G13: sidechain source router. When sidechainSource flips between
+  // 'bus' and 'channel' (or the channel index changes), re-wire the
+  // isolation tap from ChannelRoutedEffects into the dub bus's sidechain
+  // detector. 'bus' mode removes any active tap (bus self-detects).
+  useEffect(() => {
+    const source = dubBusSettings.sidechainSource;
+    const channelIndex = dubBusSettings.sidechainChannelIndex;
+    if (source !== 'channel') return;
+    let scInputNode: AudioNode | null = null;
+    let activeChannel: number | null = null;
+    (async () => {
+      try {
+        const bus = ensureDrumPadEngine().getDubBus();
+        scInputNode = bus.getSidechainInput();
+        const mgr = getChannelRoutedEffectsManager();
+        const ok = await mgr.addSidechainTap(channelIndex, scInputNode);
+        if (ok) activeChannel = channelIndex;
+      } catch (e) {
+        console.warn('[DubDeckStrip] sidechain tap failed:', e);
+      }
+    })();
+    return () => {
+      if (activeChannel !== null && scInputNode) {
+        try {
+          getChannelRoutedEffectsManager().removeSidechainTap(activeChannel, scInputNode);
+        } catch { /* ok */ }
+      }
+    };
+  }, [dubBusSettings.sidechainSource, dubBusSettings.sidechainChannelIndex]);
+
   useEffect(() => {
     return startDubRecorder();
   }, []);

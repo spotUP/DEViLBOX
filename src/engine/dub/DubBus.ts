@@ -188,6 +188,23 @@ export class DubBus {
    *  AelapseEffect doesn't expose a param reader, so we mirror it in
    *  `_springWetCache`. */
   getSpringWet(): number { return this._springWetCache; }
+
+  /**
+   * Expose the sidechain compressor's input node so the per-channel
+   * isolation router can feed a specific channel's audio into the
+   * detector when `sidechainSource === 'channel'`. The returned node IS
+   * the DynamicsCompressorNode — downstream callers treat it as a plain
+   * AudioNode input. G13.
+   *
+   * NB: the current architecture uses a single-input compressor, so
+   * connecting a channel tap here adds that channel's audio to the bus
+   * output as well as driving detection. For most performance contexts
+   * that's acceptable (the channel's own dubSend is usually already
+   * non-zero); a pure detection-only sidechain would need a dedicated
+   * analyser path in a future revision.
+   */
+  getSidechainInput(): AudioNode { return this.sidechain; }
+
   private echo: SpaceEchoEffect;
   private sidechain: DynamicsCompressorNode;  // fast (pumping)
   private glue: DynamicsCompressorNode;       // slow (dubplate glue)
@@ -2292,7 +2309,7 @@ export class DubBus {
    * drone. Implemented via an AnalyserNode polling on rAF — not sample-
    * accurate but punchy enough for a dub move.
    */
-  startSubHarmonic(freq = 55, threshold = 0.06, level = 0.7): () => void {
+  startSubHarmonic(freq = 55, threshold = 0.06, level = 0.5): () => void {
     if (!this.enabled) return () => {};
     const ctx = this.context;
     const analyser = ctx.createAnalyser();
@@ -2314,7 +2331,11 @@ export class DubBus {
       env.gain.value = 0;
       osc.connect(env);
       env.connect(this.return_);
-      const peak = Math.max(0, Math.min(1.0, level));
+      // Sine sums in phase with the song at low frequencies — level 0.85 over
+      // a song at baseline 0.86 pushed peak to 1.066 in the 2026-04-20 sweep.
+      // Clamp at 0.55 leaves enough headroom that even in-phase summation
+      // with a loud song stays below full scale.
+      const peak = Math.max(0, Math.min(0.55, level));
       env.gain.setValueAtTime(0, now);
       env.gain.linearRampToValueAtTime(peak, now + 0.01);
       env.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
@@ -2352,7 +2373,7 @@ export class DubBus {
    * odd-harmonic edge), LPF removes aliased hiss. 3-bit = 8 quantize
    * levels; 2-bit = 4; 1-bit = hard square. Lower bits = more aggressive.
    */
-  startCrushBass(freq = 55, bits = 3, level = 0.75): () => void {
+  startCrushBass(freq = 55, bits = 3, level = 0.55): () => void {
     if (!this.enabled) return () => {};
     const ctx = this.context;
     const now = ctx.currentTime;
@@ -2379,7 +2400,11 @@ export class DubBus {
     shaper.connect(lpf);
     lpf.connect(env);
     env.connect(this.return_);
-    const peak = Math.max(0, Math.min(1.0, level));
+    // Bit-crushed saw adds hard odd harmonics on top of the song's own low
+    // end — measured peak 1.004 in the 2026-04-20 sweep at level 0.75 over
+    // baseline 0.75. Clamp at 0.55 keeps it under unity while still sounding
+    // aggressive against the mix.
+    const peak = Math.max(0, Math.min(0.55, level));
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.05);
     osc.start(now);
@@ -2424,8 +2449,10 @@ export class DubBus {
     filt.connect(env);
     env.connect(this.return_);
     // Headroom clamp — Q=18 lowpass gain at resonance can push the output
-    // past unity if `peak` gets anywhere near 1.0. Keep it under 0.6.
-    const peak = Math.max(0, Math.min(0.6, level));
+    // past unity. Original 0.6 measured peak 1.048, 0.35 measured 1.003
+    // (Skope "world class dub" — baseline ~0.58, oscBass Δ 0.42). 0.30
+    // leaves a ~6 dB safety margin so peaks stay <0.95 on typical songs.
+    const peak = Math.max(0, Math.min(0.30, level));
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.08);
     osc.start(now);
