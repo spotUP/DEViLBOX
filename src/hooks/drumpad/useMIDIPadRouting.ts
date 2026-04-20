@@ -27,6 +27,7 @@ import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
 import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
+import { getNativeAudioNode } from '../../utils/audio-context';
 import { applyVelocityCurve, PAD_INSTRUMENT_BASE, MPK_SLOT_COUNT, mpkSlotId } from '../../types/drumpad';
 import type { ScratchActionId } from '../../types/drumpad';
 import { DJ_FX_ACTION_MAP } from '../../engine/drumpad/DjFxActions';
@@ -262,7 +263,13 @@ export function getNoteRepeatEngine(): NoteRepeatEngine | null {
 function getOrCreateEngine(): DrumPadEngine {
   if (!_engine) {
     const ctx = getAudioContext();
-    _engine = new DrumPadEngine(ctx);
+    // Route the drumpad master (which hosts the DubBus) into ToneEngine's
+    // master chain at `masterEffectsInput`. This puts drum pads + every dub
+    // move (siren, echo, spring reverb, filter drops, throws, sub swells…)
+    // through the export tap at `blepInput` — otherwise exports silently
+    // drop the entire dub layer. A DJ mixer attach later replaces this
+    // connection via `rerouteOutput`; detach restores it.
+    _engine = new DrumPadEngine(ctx, resolveDefaultOutputDestination(ctx));
     _noteRepeat = new NoteRepeatEngine(_engine);
     useDrumPadStore.getState().loadFromIndexedDB(ctx);
     // If a DJ engine is already up, attach its mixer so dub-action pads can
@@ -275,6 +282,22 @@ function getOrCreateEngine(): DrumPadEngine {
     } catch { /* DJ engine not available */ }
   }
   return _engine;
+}
+
+/**
+ * Resolve the drumpad's default output destination. Prefer ToneEngine's
+ * `masterEffectsInput` (so drum pads + dub bus flow through master FX and
+ * land in the export tap). Fall back to `ctx.destination` if the Tone
+ * engine isn't ready yet or the native node can't be resolved — the user
+ * still gets sound, they just miss master FX + export.
+ */
+export function resolveDefaultOutputDestination(ctx: AudioContext): AudioNode {
+  try {
+    const tone = getToneEngine();
+    const native = getNativeAudioNode(tone.masterEffectsInput);
+    if (native) return native;
+  } catch { /* fall through */ }
+  return ctx.destination;
 }
 
 function disposeEngineIfUnused(): void {
