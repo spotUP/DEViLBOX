@@ -119,6 +119,13 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
     initialSpeed: modData?.initialSpeed ?? 6,
     initialBPM: modData?.initialBPM ?? 125,
     linearPeriods,
+    // Stamp the raw buffer so downstream wiring can route audio through
+    // LibopenmptEngine. Without this, `.mod`/`.xm`/`.it`/`.s3m` imports
+    // left the format store's `libopenmptFileData` as null — LibopenmptEngine
+    // never got instantiated → `getActiveIsolationEngine()` returned null →
+    // every per-channel dub send was a silent no-op. Every other path in
+    // AmigaFormatParsers stamps this field; the common-format path did not.
+    libopenmptFileData: buffer.slice(0),
   };
 }
 
