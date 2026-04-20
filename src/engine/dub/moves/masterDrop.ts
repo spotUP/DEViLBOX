@@ -77,6 +77,7 @@ export const masterDrop: DubMove = {
       const collected = await collectDryGains();
       if (disposed) return;  // already released while collecting — just no-op
       const now = ctx.currentTime;
+      console.log(`[masterDrop] fired — dry gains collected: ${collected.length} (${collected.length === 0 ? 'NO ENGINES FOUND — drop will be INAUDIBLE' : 'ramping to 0'})`);
       for (const entry of collected) {
         pairs.push(entry);
         try {
