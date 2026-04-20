@@ -16,6 +16,7 @@ import { DubFilterEffect } from '../effects/DubFilterEffect';
 import { MoogFilterEffect, MoogFilterModel, MoogFilterMode } from '../effects/MoogFilterEffect';
 import { MVerbEffect } from '../effects/MVerbEffect';
 import { MadProfessorPlateEffect } from '../effects/MadProfessorPlateEffect';
+import { DattorroPlateEffect } from '../effects/DattorroPlateEffect';
 import { LeslieEffect } from '../effects/LeslieEffect';
 import { SpringReverbEffect } from '../effects/SpringReverbEffect';
 import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
@@ -45,6 +46,7 @@ export function getDefaultEffectWet(type: string): number {
     case 'JCReverb':
     case 'MVerb':
     case 'MadProfessorPlate':
+    case 'DattorroPlate':
     case 'SpringReverb':
     case 'ShimmerReverb':
       return 50;
@@ -138,6 +140,8 @@ switch (type) {
     return { damping: 0.5, density: 0.5, bandwidth: 0.5, decay: 0.7, predelay: 0.0, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.5 };
   case 'MadProfessorPlate':
     return { decay: 0.85, damping: 0.75, density: 0.80, predelay: 0.18, size: 0.70, hpfHz: 200, lpfHz: 5000 };
+  case 'DattorroPlate':
+    return { predelay: 0.15, preFilter: 0.70, inputDiffusion: 0.75, decayDiffusion: 0.50, decay: 0.85, damping: 0.35 };
   case 'Leslie':
     return { speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 };
   case 'SpringReverb':
@@ -653,6 +657,18 @@ export async function createEffect(
         size: Number(p.size),
         hpfHz: Number(p.hpfHz),
         lpfHz: Number(p.lpfHz),
+        wet: wetValue,
+      });
+      break;
+
+    case 'DattorroPlate':
+      node = new DattorroPlateEffect({
+        predelay: Number(p.predelay),
+        preFilter: Number(p.preFilter),
+        inputDiffusion: Number(p.inputDiffusion),
+        decayDiffusion: Number(p.decayDiffusion),
+        decay: Number(p.decay),
+        damping: Number(p.damping),
         wet: wetValue,
       });
       break;
