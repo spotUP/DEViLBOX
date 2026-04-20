@@ -35,6 +35,7 @@ export type AudioEffectType =
   // WASM effects (native C++ DSP via AudioWorklet)
   | 'MoogFilter'       // 6 analog-modeled Moog ladder filters (WASM)
   | 'MVerb'            // MVerb plate reverb (WASM, GPL v3)
+  | 'MadProfessorPlate' // MVerb tuned to Mad Professor PCM-70 dub voicing (WASM)
   | 'Leslie'           // Leslie rotary speaker (WASM)
   | 'SpringReverb'     // Spring reverb with drip (WASM)
   | 'VinylNoise'       // Vinyl crackle & hiss synthesizer
