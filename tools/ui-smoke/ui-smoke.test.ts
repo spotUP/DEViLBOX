@@ -96,6 +96,59 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
+describe('ui-smoke — flow 06: Furnace playback stays within gain limits', () => {
+  // Upstream Furnace demo used by tools/furnace-audit/lockstep.test.ts.
+  // Small, deterministic, inside the committed submodule.
+  const FURNACE_FIXTURE = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../third-party/furnace-master/demos/ay8910/vibe_zone.fur',
+  );
+
+  // Existential skip: the submodule may not be initialised on a fresh clone.
+  const furnaceAvailable = (() => {
+    try { readFileSync(FURNACE_FIXTURE); return true; } catch { return false; }
+  })();
+
+  it.runIf(!!client && furnaceAvailable)(
+    'Furnace AY-3-8910 fixture peaks below the clipping threshold',
+    async () => {
+      const c = client!;
+      try { await c.call('stop'); } catch { /* ok */ }
+      await sleep(200);
+      await c.call('clear_console_errors');
+
+      const bytes = readFileSync(FURNACE_FIXTURE);
+      await c.call('load_file', {
+        filename: 'vibe_zone.fur',
+        data: bytes.toString('base64'),
+      });
+      await sleep(500);
+      await c.call('play');
+      await sleep(1500);
+
+      // Thresholds:
+      //   peakMax <  4.0  — hard ceiling. Normal audio peaks at or below 1.0;
+      //                    up to ~2.0 is a reasonable pre-limiter overshoot.
+      //                    >4.0 is unambiguously clipping / gain-staging bug.
+      //   rmsAvg  <  1.5  — sustained RMS above unity is also broken; a
+      //                    Furnace chiptune in normal bounds stays <0.5.
+      const level = await c.call<{
+        rmsAvg?: number; rmsMax?: number; peakMax?: number; silent?: boolean;
+      }>('get_audio_level', { durationMs: 1500 });
+
+      const rmsAvg = level.rmsAvg ?? 0;
+      const peakMax = level.peakMax ?? 0;
+      const diag = `level=${JSON.stringify(level)}`;
+      expect(level.silent, diag).not.toBe(true);
+      expect(peakMax, `peak gate: ${diag}`).toBeLessThan(4);
+      expect(rmsAvg, `rms gate: ${diag}`).toBeLessThan(1.5);
+
+      try { await c.call('stop'); } catch { /* ok */ }
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 05: dub bus enable → fire move → disable', () => {
   it.runIf(!!client)(
     'dub bus can be toggled and a dub move fires without unhandled rejections',
