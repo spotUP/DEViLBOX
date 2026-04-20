@@ -798,6 +798,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         const result = await loadFile(file, { companionFiles });
         if (result.success === 'pending-import') {
           setPendingFile(result.file);
+          // Surface companion files from the Online panel download into the
+          // import dialog — otherwise the dialog's internal File[]→Map
+          // conversion (ImportModuleDialog.tsx:387-395) produces an empty
+          // map and WASM replayers that need a companion (TFMX smpl.*,
+          // Jason Page smp.*, Startrekker .nt, …) fail with -3.
+          if (companionFiles && companionFiles.size > 0) {
+            const asFiles: File[] = [];
+            for (const [name, buf] of companionFiles) {
+              asFiles.push(new File([buf], name));
+            }
+            setPendingCompanions(asFiles);
+          }
           setShowImportDialog(true);
         } else if (result.success === true) {
           notify.success(result.message);
