@@ -61,6 +61,18 @@ export interface DubBusSettings {
   // the return briefly ducks so transients cut through the tail (the
   // "pumping dub" effect). 0 = no duck, 1 = full duck.
   sidechainAmount: number;
+  // Sidechain source — what audio drives the ducking.
+  //   'bus'     = the bus input itself (self-compression; current default)
+  //   'channel' = a specific tracker channel (e.g. only the kick triggers
+  //               ducking, even when it's low in the bus)
+  // Channel mode works via ChannelRoutedEffects' isolation tap: a per-
+  // channel worklet output is summed into the bus compressor alongside
+  // the normal bus signal, so loud channel transients pull the threshold
+  // down harder than the bus alone would.
+  sidechainSource: 'bus' | 'channel';
+  // When sidechainSource = 'channel', which tracker channel index (0-based)
+  // drives the ducking. Ignored for 'bus' mode. Defaults to 0 (first ch).
+  sidechainChannelIndex: number;
   // How much of a deck's audio is injected into the bus when a dub-action
   // pad fires (throw / hold / mute). 0-1; typical 0.85-1.0.
   deckTapAmount: number;
@@ -171,6 +183,8 @@ export const DEFAULT_DUB_BUS: DubBusSettings = {
   echoWet: 0.7,          // was 0.5 — the echo is the CONTENT of the bus, push it forward
   echoRateMs: 300,
   sidechainAmount: 0.15,
+  sidechainSource: 'bus',
+  sidechainChannelIndex: 0,
   deckTapAmount: 0.75,   // gig-fix: was 1.0 — tap is ALREADY hitting a
                          // bus with echo+spring+feedback; full deck into
                          // it stacks on top of the dry mix and overloads
