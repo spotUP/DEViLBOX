@@ -17,6 +17,11 @@ import { randomUUID } from 'crypto';
 import { writeFileSync } from 'fs';
 
 const WS_URL = 'ws://localhost:4003/mcp';
+const MODLAND_API = 'http://localhost:3011/api/modland';
+// Optional: `MODLAND_QUERY="world class dub"` loads the first matching result
+// from Modland before running the sweep. Otherwise the sweep uses whatever
+// song is already loaded + playing in the browser.
+const MODLAND_QUERY = process.env.MODLAND_QUERY;
 
 // Ordered so the bridge-disrupting `transportTapeStop` fires LAST — otherwise
 // the browser briefly drops off the WS relay while the tracker stops, and
@@ -113,6 +118,34 @@ async function main() {
   console.log(`[sweep] connecting to ${WS_URL}…`);
   await connect();
   console.log('[sweep] connected.');
+
+  // Optional pre-load from Modland so the sweep runs deterministically
+  // against a known song. Set MODLAND_QUERY env var to the title.
+  if (MODLAND_QUERY) {
+    console.log(`[sweep] MODLAND_QUERY="${MODLAND_QUERY}" — searching Modland…`);
+    const searchResp = await fetch(`${MODLAND_API}/search?q=${encodeURIComponent(MODLAND_QUERY)}&limit=10`);
+    if (!searchResp.ok) throw new Error(`Modland search failed: HTTP ${searchResp.status}`);
+    const searchJson = await searchResp.json() as { results: Array<{ filename: string; format: string; full_path: string }> };
+    if (!searchJson.results?.length) throw new Error(`Modland search returned no results for "${MODLAND_QUERY}"`);
+    const hit = searchJson.results[0];
+    console.log(`[sweep] loading: ${hit.filename} (${hit.format}) — ${hit.full_path}`);
+
+    // Download via the server proxy so caching + rate-limiting is shared.
+    const dlResp = await fetch(`${MODLAND_API}/download?path=${encodeURIComponent(hit.full_path)}`);
+    if (!dlResp.ok) throw new Error(`Modland download failed: HTTP ${dlResp.status}`);
+    const bytes = Buffer.from(await dlResp.arrayBuffer());
+    const base64 = bytes.toString('base64');
+
+    // Send to the browser via the WS bridge's load_file method. Same
+    // code path that the MCP `load_file` / `load_modland` tools use.
+    const loaded = await call('load_file', {
+      filename: hit.filename,
+      data: base64,
+    });
+    console.log(`[sweep] loaded: ${JSON.stringify(loaded).slice(0, 160)}`);
+    // Give the replayer a moment to spin up + start producing audio.
+    await sleep(1500);
+  }
 
   // Ensure playback is running — otherwise the audio-level measurements pick
   // up only the dry dub output (many moves are *processors* and produce
