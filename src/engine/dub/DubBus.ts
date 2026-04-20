@@ -1434,6 +1434,13 @@ export class DubBus {
             this._setSpringWet(merged.springWet);
           } catch { /* ok */ }
         }
+        // Pre-warm the reverse-capture ring so the FIRST reverseEcho /
+        // backwardReverb fire has audio to reverse. The worklet captures
+        // audio continuously, but the ring is empty for ~1 s after the
+        // worklet boots. Without this kick, the first fire hits the
+        // `if (!frames)` abort path and produces silence (sweep Δpk
+        // 0.006 vs 0.103 on subsequent fires — 2026-04-20 run).
+        void this._ensureReverseCapture().catch(() => { /* worklet optional */ });
       } else {
         // Disabling: truly silence the bus. return_.gain alone isn't enough
         // because echo feedback + spring keep looping on stale content, and
@@ -2184,11 +2191,49 @@ export class DubBus {
     const node = await this._ensureReverseCapture();
     if (!node) { console.warn('[DubBus] reverseEcho ignored — capture node missing'); return; }
     console.log(`[DubBus] reverseEcho ▶ captureDur=${durationSec}s amount=${amount}`);
-    await new Promise<void>((resolve) => {
+    // First-fire robustness: if the capture worklet was created only moments
+    // ago (bus just enabled), its ring buffer may still be empty. 2026-04-20
+    // sweep caught this as Δpk=+0.006 on the first fire vs +0.103 on later
+    // fires. Retry up to 2× with 180ms between attempts — at normal sample
+    // rates ~8k frames accumulate per 180ms block, enough for any sensible
+    // durationSec <= ~800ms.
+    await this._snapshotReverseRing(node, durationSec, /* playbackAmount */ amount, /* maxAttempts */ 3);
+  }
+
+  /**
+   * Internal — snapshot the reverse-capture ring and schedule the reversed
+   * buffer for playback. Retries on empty ring (worklet just booted, audio
+   * hasn't accumulated yet). Shared by reverseEcho (into echo chain only)
+   * and could be extended to backwardReverb if it hits the same race.
+   */
+  private async _snapshotReverseRing(
+    node: AudioWorkletNode,
+    durationSec: number,
+    amount: number,
+    maxAttempts: number,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const didPlay = await this._snapshotReverseRingOnce(node, durationSec, amount);
+      if (didPlay) return;
+      // Empty ring on this attempt — wait briefly for the capture worklet to
+      // accumulate more frames, then try again.
+      if (attempt < maxAttempts - 1) {
+        await new Promise((r) => setTimeout(r, 180));
+      }
+    }
+    console.warn('[DubBus] reverseEcho abort — ring still empty after retries; bus input likely silent');
+  }
+
+  private async _snapshotReverseRingOnce(
+    node: AudioWorkletNode,
+    durationSec: number,
+    amount: number,
+  ): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => {
         console.warn('[DubBus] reverseEcho timeout — worklet did not reply within 1s');
         node.port.removeEventListener('message', handler);
-        resolve();
+        resolve(false);
       }, 1000);
       const handler = (ev: MessageEvent) => {
         const msg = ev.data;
@@ -2201,8 +2246,8 @@ export class DubBus {
           const frames = Number(msg.frames) || srcLeft.length;
           console.log(`[DubBus] reverseEcho snapshot received — frames=${frames}`);
           if (!frames) {
-            console.warn('[DubBus] reverseEcho abort — empty ring buffer (no audio reached bus.input yet)');
-            resolve();
+            // Signal empty — caller decides whether to retry.
+            resolve(false);
             return;
           }
           const left = new Float32Array(new ArrayBuffer(frames * 4));
@@ -2232,10 +2277,12 @@ export class DubBus {
           src.start(now);
           src.stop(now + dur + 0.01);
           src.onended = () => { try { envG.disconnect(); } catch { /* ok */ } };
+          resolve(true);
+          return;
         } catch (err) {
           console.warn('[DubBus] reverseEcho playback failed:', err);
         }
-        resolve();
+        resolve(false);
       };
       node.port.addEventListener('message', handler);
       node.port.start?.();
