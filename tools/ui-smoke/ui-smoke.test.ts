@@ -96,6 +96,42 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
+describe('ui-smoke — flow 04: reload the same MOD twice (state cleanup)', () => {
+  it.runIf(!!client)(
+    'loads, plays, stops, reloads, plays again — no crash, no leak, still audible',
+    async () => {
+      const c = client!;
+      const payload = loadFixtureBase64(FIXTURE_MOD);
+
+      for (const pass of ['first', 'second'] as const) {
+        try { await c.call('stop'); } catch { /* ok */ }
+        await sleep(200);
+        await c.call('clear_console_errors');
+        await c.call('load_file', { filename: payload.filename, data: payload.data });
+        await sleep(400);
+
+        const info = await c.call<{ numChannels?: number }>('get_song_info');
+        expect(info.numChannels, `pass=${pass} channels=${info.numChannels}`).toBe(4);
+
+        await c.call('play');
+        await sleep(800);
+        const level = await c.call<{ rms?: number; rmsMax?: number }>('get_audio_level', { durationMs: 800 });
+        const rms = level.rms ?? level.rmsMax ?? 0;
+        expect(rms, `pass=${pass} rms=${rms}`).toBeGreaterThan(0.0005);
+
+        const errors = await c.call<{ entries?: Array<{ level: string; message: string }> }>('get_console_errors');
+        const critical = (errors.entries ?? []).filter(
+          (e) => e.level === 'error' && !/favicon|devtools|WebSocket closed/i.test(e.message),
+        );
+        expect(critical, `pass=${pass} critical: ${JSON.stringify(critical)}`).toEqual([]);
+      }
+
+      try { await c.call('stop'); } catch { /* ok */ }
+    },
+    FLOW_TIMEOUT_MS,
+  );
+});
+
 describe('ui-smoke — flow 03: MOD decode exposes patterns + instruments', () => {
   it.runIf(!!client)(
     'loaded MOD has at least one instrument and a non-empty pattern',
