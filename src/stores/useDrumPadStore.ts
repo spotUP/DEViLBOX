@@ -122,6 +122,21 @@ const DEFAULT_PREFERENCES: DrumPadState['preferences'] = {
   showAdvanced: false,
 };
 
+/**
+ * Keys of DubBusSettings that are part of the engineer-character voicing
+ * (i.e. they appear in at least one preset's `overrides`). When the user
+ * edits one of these via `setDubBus` WITHOUT explicitly passing
+ * `characterPreset`, and the current preset isn't already 'custom', the
+ * preset name auto-flips to 'custom'. Fixes G16 ("why does the VOICE
+ * dropdown still say Tubby after I nudged one knob").
+ *
+ * Computed from the presets so it self-maintains: adding a new field to a
+ * preset's overrides automatically adds it to this set.
+ */
+const CHARACTER_FIELDS: ReadonlySet<string> = new Set(
+  Object.values(DUB_CHARACTER_PRESETS).flatMap(p => Object.keys(p.overrides)),
+);
+
 // Bump this when factory presets or stored schema changes — discards stale data
 const DRUMPAD_SCHEMA_VERSION = 28;
 const DRUMPAD_SCHEMA_KEY = 'devilbox_drumpad_schema';
@@ -501,6 +516,18 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
         // UI pass `characterPreset: 'custom'` when the user manually tweaks
         // a field, flipping us to Custom.
         effective = { ...preset.overrides, ...patch };
+      }
+    } else if (patch.characterPreset === undefined && get().dubBus.characterPreset !== 'custom') {
+      // G16: auto-flip to 'custom' when a character field is edited without
+      // an explicit characterPreset in the patch. Without this, the VOICE
+      // dropdown keeps showing "Tubby" after the user nudges a preset-owned
+      // knob via a UI path that forgets to pass `characterPreset: 'custom'`
+      // — the state is incoherent (preset name doesn't match settings).
+      // Non-character fields (`enabled`, `armed`, `returnGain*-excluded*`)
+      // don't trigger the flip — they're independent of voicing.
+      const touchesCharacter = Object.keys(patch).some(k => CHARACTER_FIELDS.has(k));
+      if (touchesCharacter) {
+        effective = { ...patch, characterPreset: 'custom' };
       }
     }
     set((state) => ({ dubBus: { ...state.dubBus, ...effective } }));
