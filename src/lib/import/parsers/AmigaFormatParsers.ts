@@ -584,14 +584,12 @@ export async function tryRouteFormat(
   // ── SID files (.sid) — Ambiguous: could be SidMon 1.0 (Amiga) or C64 PSID/RSID
   // Try magic detection: C64 SID has "PSID"/"RSID" at offset 0, SidMon has signature string
   if (matchesExt(filename, ['sid'])) {
-    // First check if it's C64 SID (PSID/RSID magic at offset 0)
+    // First check if it's C64 SID (PSID/RSID magic at offset 0).
+    // `.sid` is shared between C64 (PSID/RSID magic at offset 0) and
+    // SidMon 1 (Amiga). Magic-byte detection disambiguates — C64 SIDs
+    // must NEVER fall through to the SidMon fallback below.
     const { isSIDFormat, parseSIDFile } = await import('@lib/import/formats/SIDParser');
-    const isC64 = isSIDFormat(buffer);
-    const head = new Uint8Array(buffer).slice(0, 4);
-    const magic = String.fromCharCode(head[0] || 0, head[1] || 0, head[2] || 0, head[3] || 0);
-    console.log(`[AmigaFormatParsers/.sid] ${originalFileName} magic="${magic}" isC64SID=${isC64}`);
-    if (isC64) {
-      // It's a C64 SID - use dedicated C64SIDEngine (never fall back to UADE)
+    if (isSIDFormat(buffer)) {
       return parseSIDFile(buffer, originalFileName);
     }
     
