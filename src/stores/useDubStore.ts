@@ -68,7 +68,36 @@ interface DubStore {
    *  wow/flutter, HF roll-off, sub rumble, L/R drift. Master-insert. */
   vinylLevel: number;
   setVinylLevel: (v: number) => void;
+
+  /** Auto Dub — autonomous dub-move performer. Strictly opt-in, off by
+   *  default. When on, the AutoDub singleton polls transport + fires moves
+   *  through DubRouter in a persona-flavored rule table. Captures to
+   *  dubLane automatically if `armed` is also true. */
+  autoDubEnabled: boolean;
+  setAutoDubEnabled: (v: boolean) => void;
+  /** 0..1 — scales per-tick roll probability, per-bar move budget, and
+   *  per-move wet params together. One knob. */
+  autoDubIntensity: number;
+  setAutoDubIntensity: (v: number) => void;
+  /** Persona id — picks weight bias + intensity default + character preset.
+   *  'custom' = no bias (flat weights). */
+  autoDubPersona: AutoDubPersonaId;
+  setAutoDubPersona: (v: AutoDubPersonaId) => void;
+  /** Move ids the user never wants fired. UI is a chip row. */
+  autoDubMoveBlacklist: string[];
+  setAutoDubMoveBlacklist: (v: string[]) => void;
 }
+
+/** Persona identifiers. Full definitions live in AutoDubPersonas.ts so the
+ *  store stays dependency-free (otherwise we'd have a circular import with
+ *  anything that reads useDubStore during module init). */
+export type AutoDubPersonaId =
+  | 'custom'
+  | 'tubby'
+  | 'scientist'
+  | 'perry'
+  | 'madProfessor'
+  | 'jammy';
 
 export const useDubStore = create<DubStore>((set) => ({
   armed: false,
@@ -95,6 +124,15 @@ export const useDubStore = create<DubStore>((set) => ({
 
   vinylLevel: 0,
   setVinylLevel: (v) => set({ vinylLevel: Math.max(0, Math.min(10, v)) }),
+
+  autoDubEnabled: false,
+  setAutoDubEnabled: (v) => set({ autoDubEnabled: v }),
+  autoDubIntensity: 0.5,
+  setAutoDubIntensity: (v) => set({ autoDubIntensity: Math.max(0, Math.min(1, v)) }),
+  autoDubPersona: 'custom',
+  setAutoDubPersona: (v) => set({ autoDubPersona: v }),
+  autoDubMoveBlacklist: [],
+  setAutoDubMoveBlacklist: (v) => set({ autoDubMoveBlacklist: v }),
 }));
 
 /**

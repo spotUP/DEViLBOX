@@ -24,6 +24,8 @@ import { DJPlaylistModal } from './DJPlaylistModal';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
 import { DJAutoDJPanel } from './DJAutoDJPanel';
+import { AutoDubPanel } from '@components/dub/AutoDubPanel';
+import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { DJAutoMixNowButton } from './DJAutoMixNowButton';
 import { DJVocoderControl } from './DJVocoderControl';
 import { DJRemoteControlButton } from './DJRemoteControlButton';
@@ -69,6 +71,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const autoDJBtnRef = useRef<HTMLButtonElement>(null);
   const [autoDJDropdownPos, setAutoDJDropdownPos] = useState({ top: 0, left: 0 });
   const autoDJEnabled = useDJStore((s) => s.autoDJEnabled);
+  const dubBusEnabledDJ = useDrumPadStore((s) => s.dubBus.enabled);
   const activePlaylistName = useDJPlaylistStore((s) => {
     const p = s.playlists.find((pl) => pl.id === s.activePlaylistId);
     return p?.name ?? null;
@@ -431,6 +434,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
               Auto DJ{autoDJEnabled ? ' ON' : ''}
             </button>
             {autoDJEnabled && <DJAutoMixNowButton />}
+            <AutoDubPanel busEnabled={dubBusEnabledDJ} />
             <DJVocoderControl />
             <DJRemoteControlButton />
             <button
