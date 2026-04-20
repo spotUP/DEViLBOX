@@ -19,7 +19,17 @@ import { getTrackerReplayer } from '@/engine/TrackerReplayer';
 import type { DubEvent } from '@/types/dub';
 
 // Move-id → Tailwind bg-color class. New moves add entries here.
+// Grouped by family so related moves land on similar hues:
+//   primary / primary/70 → echo family
+//   highlight / highlight/70 → dub stabs, one-shot delay accents
+//   secondary / secondary/70 → filters, tape stop (sweep-style)
+//   warning / warning/70 → siren, wobble (modulation)
+//   success / success/70 → spring, toast (resonant tails)
+//   error / error/70 → mute, drop, transport stop (destructive)
+//   text-primary → snare / ping / click family
+//   accent-primary/40 → sub / bass family (deep low end)
 const MOVE_COLOR: Record<string, string> = {
+  // ── Phase 1 moves ──
   echoThrow: 'bg-accent-primary',
   dubStab: 'bg-accent-highlight',
   filterDrop: 'bg-accent-secondary',
@@ -35,12 +45,28 @@ const MOVE_COLOR: Record<string, string> = {
   backwardReverb: 'bg-accent-highlight',
   toast: 'bg-accent-success/70',
   transportTapeStop: 'bg-accent-error',
+  // ── PR #42 moves — grouped by family ──
+  reverseEcho:       'bg-accent-primary/50',    // echo family, darker
+  echoBuildUp:       'bg-accent-primary/40',    // echo family, deep build
+  delayPreset380:    'bg-accent-highlight/50',  // delay accent
+  delayPresetDotted: 'bg-accent-highlight/40',  // delay accent, darker
+  tubbyScream:       'bg-accent-warning/50',    // modulated scream → warning fam
+  stereoDoubler:     'bg-accent-primary/30',    // wide echo tint
+  sonarPing:         'bg-text-primary/70',      // ping family
+  radioRiser:        'bg-accent-warning/40',    // sweep-riser → warning fam
+  subSwell:          'bg-accent-secondary/50',  // low sweep
+  oscBass:           'bg-accent-secondary/40',  // bass family, deeper
+  crushBass:         'bg-accent-error/50',      // destructive bass crush
+  subHarmonic:       'bg-accent-secondary/30',  // sub family, deepest
 };
 
 // Hold-kind moves have a meaningful durationRows. Keep in sync with the
 // kind table in parameterRouter.ts (any edit there needs a matching entry here).
 const HOLD_KINDS = new Set([
+  // Phase 1 holds
   'channelMute', 'filterDrop', 'dubSiren', 'tapeWobble', 'masterDrop', 'toast',
+  // PR #42 holds (moves that return a disposer)
+  'tubbyScream', 'stereoDoubler', 'oscBass', 'crushBass', 'subHarmonic',
 ]);
 
 const POINT_WIDTH_PX = 6;   // rendered width for trigger events
