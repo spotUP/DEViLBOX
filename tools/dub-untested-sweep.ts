@@ -23,15 +23,26 @@ const MODLAND_API = 'http://localhost:3011/api/modland';
 // song is already loaded + playing in the browser.
 const MODLAND_QUERY = process.env.MODLAND_QUERY;
 
-// Ordered so the bridge-disrupting `transportTapeStop` fires LAST — otherwise
-// the browser briefly drops off the WS relay while the tracker stops, and
-// the remaining moves race against a re-connecting bridge. Also keeps
-// `tapeStop` near the end for the same reason (softer variant).
-const MOVES: Array<{ short: string; id: string }> = [
+// `holdMs` overrides the default 1.5 s hold window for ramp-up moves whose
+// peak arrives late (tapeWobble, radioRiser, subSwell): measuring at 1.5 s
+// clips their envelope and falsely flags them FLAT. `channelScan` forces a
+// per-channel-ID fire pass for moves whose audibility is entirely a function
+// of WHICH tracker channel is targeted (channelMute, channelThrow) — firing
+// always on channel 0 misses them whenever channel 0 happens to be quiet
+// during the 1.5-s measurement window. Ordered so bridge-disrupting moves
+// (`transportTapeStop`, `tapeStop`) fire LAST.
+interface MoveEntry {
+  short: string;
+  id: string;
+  holdMs?: number;       // override default 1500 ms
+  channelScan?: boolean; // fire on channels 0..3, keep the biggest delta
+}
+
+const MOVES: MoveEntry[] = [
+  // Trigger / short moves
   { short: 'SLAM',   id: 'springSlam' },
   { short: 'FILT',   id: 'filterDrop' },
   { short: 'SIREN',  id: 'dubSiren' },
-  { short: 'WOBBLE', id: 'tapeWobble' },
   { short: 'CRACK',  id: 'snareCrack' },
   { short: 'DELAY',  id: 'delayTimeThrow' },
   { short: 'BACK',   id: 'backwardReverb' },
@@ -41,13 +52,23 @@ const MOVES: Array<{ short: string; id: string }> = [
   { short: 'WIDE',   id: 'stereoDoubler' },
   { short: 'RVRSE',  id: 'reverseEcho' },
   { short: 'PING',   id: 'sonarPing' },
-  { short: 'RADIO',  id: 'radioRiser' },
-  { short: 'SUB',    id: 'subSwell' },
   { short: 'BASS',   id: 'oscBass' },
   { short: 'CRUSH',  id: 'crushBass' },
-  { short: 'SUBH',   id: 'subHarmonic' },
+  { short: 'SUBH',   id: 'subHarmonic', holdMs: 3000 },
   { short: '380',    id: 'delayPreset380' },
   { short: 'DOT',    id: 'delayPresetDotted' },
+  // Ramp-up moves — need longer hold for envelope to land
+  { short: 'WOBBLE', id: 'tapeWobble', holdMs: 3000 },
+  { short: 'RADIO',  id: 'radioRiser', holdMs: 3000 },
+  { short: 'SUB',    id: 'subSwell',   holdMs: 3000 },
+  // New coverage: moves that were missing from the pre-G3 sweep list
+  { short: 'THROW',  id: 'echoThrow' },
+  { short: 'STAB',   id: 'dubStab' },
+  { short: 'BUILD',  id: 'echoBuildUp', holdMs: 3000 },
+  // Channel-targeted moves — need a loud channel
+  { short: 'MUTE',   id: 'channelMute',   channelScan: true },
+  { short: 'CTHROW', id: 'channelThrow',  channelScan: true },
+  // Disruptive moves last (WS can briefly drop)
   { short: 'STOP',   id: 'tapeStop' },
   { short: 'STOP!',  id: 'transportTapeStop' },
 ];
@@ -174,7 +195,68 @@ async function main() {
 
   const rows: Row[] = [];
 
-  for (const { short, id } of MOVES) {
+  // Single fire-and-measure pass against one channel. Returns measurement +
+  // any error captured. Used by both the normal path and the channelScan
+  // path; factoring it out lets channelScan retry on ch 0..3 and keep the
+  // biggest delta (cf. `channelMute` / `channelThrow`).
+  async function fireAndMeasure(
+    moveId: string,
+    channelId: number,
+    holdMs: number,
+  ): Promise<{
+    baselineRms: number; baselinePeak: number;
+    peakRms: number; peakPeak: number; peakSilent: boolean;
+    tailRms: number; tailSilent: boolean;
+    held: boolean; fireError?: string; releaseError?: string;
+  }> {
+    let baselineRms = NaN, baselinePeak = NaN;
+    let peakRms = NaN, peakPeak = NaN, peakSilent = true;
+    let tailRms = NaN, tailSilent = true;
+    let held = false;
+    let fireError: string | undefined;
+    let releaseError: string | undefined;
+
+    try {
+      const pre = await call('get_audio_level', { durationMs: 300 });
+      baselineRms = pre?.rmsAvg ?? NaN;
+      baselinePeak = pre?.peakMax ?? NaN;
+    } catch { /* ignore */ }
+
+    let heldHandle: string | null = null;
+    try {
+      const fireResult = await call('fire_dub_move', { moveId, channelId });
+      heldHandle = fireResult?.heldHandle ?? null;
+      held = !!heldHandle;
+    } catch (err) {
+      fireError = (err as Error).message;
+    }
+
+    await sleep(holdMs);
+    try {
+      const peak = await call('get_audio_level', { durationMs: 1000 });
+      peakRms = peak?.rmsAvg ?? NaN;
+      peakPeak = peak?.peakMax ?? NaN;
+      peakSilent = !!peak?.isSilent;
+    } catch { /* ignore */ }
+
+    if (heldHandle) {
+      try { await call('release_dub_move', { heldHandle }); }
+      catch (err) { releaseError = (err as Error).message; }
+    }
+
+    await sleep(1000);
+    try {
+      const tail = await call('get_audio_level', { durationMs: 500 });
+      tailRms = tail?.rmsAvg ?? NaN;
+      tailSilent = !!tail?.isSilent;
+    } catch { /* ignore */ }
+
+    return { baselineRms, baselinePeak, peakRms, peakPeak, peakSilent, tailRms, tailSilent, held, fireError, releaseError };
+  }
+
+  for (const entry of MOVES) {
+    const { short, id } = entry;
+    const holdMs = entry.holdMs ?? 1500;
     const row: Row = {
       short, id,
       held: false,
@@ -186,52 +268,32 @@ async function main() {
 
     try { await call('clear_console_errors'); } catch { /* ignore */ }
 
-    // Per-move baseline — song loudness JUST before the move fires. We
-    // compare against this (not the global sweep-start baseline) because
-    // the song loudness drifts over a 2-minute sweep as the pattern progresses.
-    try {
-      const pre = await call('get_audio_level', { durationMs: 300 });
-      row.baselineRms = pre?.rmsAvg ?? NaN;
-      row.baselinePeak = pre?.peakMax ?? NaN;
-    } catch { /* ignore */ }
-
-    // Fire.
-    let heldHandle: string | null = null;
-    try {
-      const fireResult = await call('fire_dub_move', { moveId: id, channelId: 0 });
-      heldHandle = fireResult?.heldHandle ?? null;
-      row.held = !!heldHandle;
-    } catch (err) {
-      row.fireError = (err as Error).message;
+    // channelScan: fire on each of channels 0..3 and keep the pass with the
+    // largest |Δpeak|. Needed for channelMute / channelThrow because their
+    // audibility depends entirely on the target channel being loud right
+    // now; always firing ch=0 would flag them FLAT whenever ch=0 is quiet.
+    const channelsToTry = entry.channelScan ? [0, 1, 2, 3] : [0];
+    let best: Awaited<ReturnType<typeof fireAndMeasure>> | null = null;
+    let bestDelta = -Infinity;
+    for (const ch of channelsToTry) {
+      const m = await fireAndMeasure(id, ch, holdMs);
+      const d = Math.abs((m.peakPeak || 0) - (m.baselinePeak || 0));
+      if (d > bestDelta) { bestDelta = d; best = m; }
+      // Short-circuit once we have a clear detect — saves ~8 s per scan move.
+      if (entry.channelScan && d > 0.05) break;
     }
+    const m = best!;
+    row.baselineRms  = m.baselineRms;
+    row.baselinePeak = m.baselinePeak;
+    row.peakRms      = m.peakRms;
+    row.peakPeak     = m.peakPeak;
+    row.peakSilent   = m.peakSilent;
+    row.tailRms      = m.tailRms;
+    row.tailSilent   = m.tailSilent;
+    row.held         = m.held;
+    row.fireError    = m.fireError;
+    row.releaseError = m.releaseError;
 
-    // Peak during.
-    await sleep(1500);
-    try {
-      const peak = await call('get_audio_level', { durationMs: 1000 });
-      row.peakRms = peak?.rmsAvg ?? NaN;
-      row.peakPeak = peak?.peakMax ?? NaN;
-      row.peakSilent = !!peak?.isSilent;
-    } catch { /* ignore */ }
-
-    // Release.
-    if (heldHandle) {
-      try {
-        await call('release_dub_move', { heldHandle });
-      } catch (err) {
-        row.releaseError = (err as Error).message;
-      }
-    }
-
-    // Tail.
-    await sleep(1000);
-    try {
-      const tail = await call('get_audio_level', { durationMs: 500 });
-      row.tailRms = tail?.rmsAvg ?? NaN;
-      row.tailSilent = !!tail?.isSilent;
-    } catch { /* ignore */ }
-
-    // Errors.
     try {
       const errs = await call('get_console_errors');
       const entries: Array<{ level: string; message: string }> = errs?.entries ?? [];
