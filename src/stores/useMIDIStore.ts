@@ -179,13 +179,77 @@ function mapGridValue(midiValue: number, min: number, max: number, curve?: 'line
   return min + applyGridCurve(midiValue, curve) * (max - min);
 }
 
-// Default TD-3 CC mappings (matches Behringer TD-3/TD-3-MO MIDI implementation)
+// Default CC mappings. Shipped out-of-the-box so a fresh install has sensible
+// CC → parameter routing before the user runs MIDI Learn.
+//
+// Layout choices:
+//   CC 10, 16, 71, 74, 75 — TD-3/TD-3-MO factory defaults (must stay for
+//                          backwards compat with Behringer TD-3 owners).
+//   CC 20-46              — dub-move triggers/holds (27 moves). Avoids
+//                          MIDI-reserved CCs (1 mod, 2 breath, 7 vol,
+//                          11 expr, 64 sustain, 120-127 channel mode).
+//                          Contiguous block so controllers with adjacent
+//                          pads (MPK Mini bank-A/B, Launchkey) can land
+//                          one move per pad.
+//   CC 47-53              — dub bus continuous params (7 bus settings).
+//   CC 54-55              — dub bus enable + REC arm (toggles at 0.5).
+//
+// Contract test `src/midi/performance/__tests__/dubMovesDefaultCCMappings.test.ts`
+// verifies: (1) every DUB_MOVE_KINDS entry has a default, (2) no CC collisions,
+// (3) no overlap with the TD-3 block.
 const DEFAULT_CC_MAPPINGS: CCMapping[] = [
+  // TD-3 factory (unchanged)
   { ccNumber: 74, parameter: 'cutoff', min: 200, max: 20000, curve: 'logarithmic' },
   { ccNumber: 71, parameter: 'resonance', min: 0, max: 100, curve: 'linear' },
-  { ccNumber: 10, parameter: 'envMod', min: 0, max: 100, curve: 'linear' }, // TD-3 sends Env Mod on CC 10
+  { ccNumber: 10, parameter: 'envMod', min: 0, max: 100, curve: 'linear' },
   { ccNumber: 75, parameter: 'decay', min: 30, max: 3000, curve: 'logarithmic' },
   { ccNumber: 16, parameter: 'accent', min: 0, max: 100, curve: 'linear' },
+
+  // Dub moves — 27 global triggers + holds. min/max/curve unused by the
+  // dub router (it normalises 0-1 and fires on upward 0.5 crossing), but
+  // the CCMapping shape still requires them.
+  { ccNumber: 20, parameter: 'dub.echoThrow',         min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 21, parameter: 'dub.dubStab',           min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 22, parameter: 'dub.channelThrow',      min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 23, parameter: 'dub.channelMute',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 24, parameter: 'dub.springSlam',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 25, parameter: 'dub.filterDrop',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 26, parameter: 'dub.dubSiren',          min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 27, parameter: 'dub.tapeWobble',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 28, parameter: 'dub.snareCrack',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 29, parameter: 'dub.delayTimeThrow',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 30, parameter: 'dub.backwardReverb',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 31, parameter: 'dub.masterDrop',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 32, parameter: 'dub.tapeStop',          min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 33, parameter: 'dub.transportTapeStop', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 34, parameter: 'dub.toast',             min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 35, parameter: 'dub.tubbyScream',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 36, parameter: 'dub.stereoDoubler',     min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 37, parameter: 'dub.reverseEcho',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 38, parameter: 'dub.sonarPing',         min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 39, parameter: 'dub.radioRiser',        min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 40, parameter: 'dub.subSwell',          min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 41, parameter: 'dub.oscBass',           min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 42, parameter: 'dub.crushBass',         min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 43, parameter: 'dub.subHarmonic',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 44, parameter: 'dub.echoBuildUp',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 45, parameter: 'dub.delayPreset380',    min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 46, parameter: 'dub.delayPresetDotted', min: 0, max: 1, curve: 'linear' },
+
+  // Dub bus continuous params — min/max are documentary; the actual
+  // normalisation is handled by DUB_BUS_PARAMS transforms in
+  // parameterRouter.ts (e.g. echoRateMs derives 40..1000 ms from 0-1).
+  { ccNumber: 47, parameter: 'dub.echoIntensity',   min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 48, parameter: 'dub.echoWet',         min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 49, parameter: 'dub.echoRateMs',      min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 50, parameter: 'dub.springWet',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 51, parameter: 'dub.returnGain',      min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 52, parameter: 'dub.hpfCutoff',       min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 53, parameter: 'dub.sidechainAmount', min: 0, max: 1, curve: 'linear' },
+
+  // Bus toggles (enable on upward 0.5 crossing, same semantics as moves)
+  { ccNumber: 54, parameter: 'dub.enabled', min: 0, max: 1, curve: 'linear' },
+  { ccNumber: 55, parameter: 'dub.armed',   min: 0, max: 1, curve: 'linear' },
 ];
 
 // CC handlers stored outside Zustand state (Map doesn't work well with immer)
