@@ -18,7 +18,7 @@ import type { DubMove } from './_types';
 export const tubbyScream: DubMove = {
   id: 'tubbyScream',
   kind: 'hold',
-  defaults: { centerHz: 900, sweepHz: 2600, sweepSec: 3.0, feedbackAmount: 0.75 },
+  defaults: { centerHz: 900, sweepHz: 2600, sweepSec: 3.0, feedbackAmount: 2.2 },
 
   execute({ bus, params }) {
     const centerHz = params.centerHz ?? this.defaults.centerHz;
