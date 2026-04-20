@@ -516,6 +516,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       case 'seqStop': {
         if (this.wasm && this.sequencerActive) this.wasm.seqStop();
         this.sequencerActive = false;
+        // Tell the main thread to wipe the per-channel scope store so the
+        // visualizer draws clean channels immediately. Pairs with the
+        // sequencerActive gate on the periodic send path.
+        this.port.postMessage({ type: 'oscilloscopeClear' });
         break;
       }
       case 'enableCmdLog': {
@@ -1282,9 +1286,14 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
 
     // Non-audio-critical: oscilloscope + position reporting (isolated from render)
     try {
-      // Periodically send oscilloscope data (~30fps)
+      // Periodically send oscilloscope data (~30fps) — but ONLY while the
+      // sequencer is active. Without the gate, the worklet's process() loop
+      // keeps scraping the chip's internal buffers forever (AudioWorklets
+      // can't really stop), forwarding phantom boundary transients to the
+      // visualizer after stop. That's what was showing up as the "audio
+      // pollution" spikes on the stopped scopes.
       this.oscSendCounter++;
-      if (this.oscSendCounter >= this.oscSendInterval) {
+      if (this.sequencerActive && this.oscSendCounter >= this.oscSendInterval) {
         this.oscSendCounter = 0;
         this.readOscilloscopeData();
       }
