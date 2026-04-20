@@ -2400,8 +2400,14 @@ export class DubBus {
    * Osc Bass — self-oscillating LPF as a bass source. A sawtooth through
    * a high-Q lowpass at the target frequency, creating a resonant drone
    * bass. Hold move; release fades over 200 ms.
+   *
+   * Peak is clamped to 0.6 because the Q=18 lowpass resonates +10-15 dB
+   * at the cutoff — with an unclamped `level=0.9` default the old path
+   * pushed the bus past unity (measured 1.001 in the 2026-04-20 untested-FX
+   * sweep). 0.6 leaves ~4 dB headroom for the resonance peak so the bus
+   * never goes above full scale even at the loudest point of the saw.
    */
-  startOscBass(freq = 55, level = 0.9): () => void {
+  startOscBass(freq = 55, level = 0.45): () => void {
     if (!this.enabled) return () => {};
     const ctx = this.context;
     const now = ctx.currentTime;
@@ -2417,7 +2423,9 @@ export class DubBus {
     osc.connect(filt);
     filt.connect(env);
     env.connect(this.return_);
-    const peak = Math.max(0, Math.min(1.0, level));
+    // Headroom clamp — Q=18 lowpass gain at resonance can push the output
+    // past unity if `peak` gets anywhere near 1.0. Keep it under 0.6.
+    const peak = Math.max(0, Math.min(0.6, level));
     env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(peak, now + 0.08);
     osc.start(now);
