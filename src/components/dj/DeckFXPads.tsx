@@ -173,6 +173,10 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   const killMid = useDJStore((s) => s.decks[deckId].eqMidKill);
   const killHigh = useDJStore((s) => s.decks[deckId].eqHighKill);
   const hasBeatGrid = useDJStore((s) => !!s.decks[deckId].beatGrid);
+  // Subscribe for the DUB pad channel-target badge. Readers: the tab header
+  // ("DUB ·Nch") and each dub pad (small chip in the corner when targeting
+  // is armed).
+  const fxTargetCount = useDJStore((s) => s.decks[deckId].fxTargetChannels.size);
 
   const killState: Record<string, boolean> = {
     'kill-low': killLow,
@@ -283,7 +287,38 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   const activateDubPad = useCallback((padId: string, mode: 'momentary' | 'instant') => {
     const moveId = DUB_PAD_MAP[padId];
     if (!moveId) return;
-    const disposer = fireDubMove(moveId, undefined, {}, 'live');
+
+    // Per-channel targeting: when the deck is in fx-target mode and has
+    // channels selected, fire the move once per target channel so the
+    // event's `channelId` reaches the DubBus's channel-tap router.
+    //
+    // When the target set is empty (today's default), fire once with
+    // `undefined` — whole-deck semantics, unchanged behaviour.
+    //
+    // NOTE: Per-channel audibility from DJ decks also requires per-deck
+    // channel-tap wiring on the bus (see the `dj-per-deck-channel-taps`
+    // follow-up plan). Today the events fire with the correct channelId
+    // but DubBus.openChannelTap only reaches the global tracker engine,
+    // not per-deck replayers — so audibly this falls back to whole-deck
+    // until the bus gains deck-aware per-channel routing.
+    const fxTargets = useDJStore.getState().decks[deckId].fxTargetChannels;
+    let disposer: { dispose(): void } | null = null;
+    if (fxTargets.size > 0) {
+      const disposers: Array<{ dispose(): void } | null> = [];
+      for (const ch of fxTargets) {
+        disposers.push(fireDubMove(moveId, ch, {}, 'live'));
+      }
+      disposer = {
+        dispose: () => {
+          for (const d of disposers) {
+            if (d) try { d.dispose(); } catch { /* ok */ }
+          }
+        },
+      };
+    } else {
+      disposer = fireDubMove(moveId, undefined, {}, 'live');
+    }
+
     setActivePads((prev) => new Set(prev).add(padId));
     if (mode === 'instant') {
       // Trigger-kind move — dispose immediately since there's no hold semantics,
@@ -296,7 +331,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       // Hold — keep the disposer so pointerup can dispose cleanly.
       cancelRefs.current.set(padId, () => { try { disposer.dispose(); } catch { /* ok */ } });
     }
-  }, []);
+  }, [deckId]);
 
   const handlePadDown = useCallback((pad: PadDef) => {
     // Dub pads are in DUB_PAD_MAP regardless of mode (instant or momentary).
@@ -380,9 +415,13 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
-          title="Dub bus sends — throws, holds, drops, wobble, echo, siren"
+          title={
+            fxTargetCount > 0
+              ? `Dub bus sends — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
+              : 'Dub bus sends — throws, holds, drops, wobble, echo, siren'
+          }
         >
-          DUB
+          DUB{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
         </button>
         <button
           onClick={() => setPage('dub2')}
@@ -391,9 +430,13 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'
           }`}
-          title="Dub bus sends page 2 — stabs, reverse/tape, bass drones"
+          title={
+            fxTargetCount > 0
+              ? `Dub bus sends page 2 — targeting ${fxTargetCount} channel${fxTargetCount > 1 ? 's' : ''}`
+              : 'Dub bus sends page 2 — stabs, reverse/tape, bass drones'
+          }
         >
-          DUB 2
+          DUB 2{fxTargetCount > 0 ? ` ·${fxTargetCount}ch` : ''}
         </button>
         {page === 'jump' && hasBeatGrid && (
           <span className="text-[7px] text-green-400 ml-auto">● GRID</span>
@@ -446,6 +489,24 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               )}
               <span className="relative text-[9px] font-bold">{pad.label}</span>
               {pad.sublabel && <span className="relative text-[7px] opacity-60">{pad.sublabel}</span>}
+              {/*
+                Channel-target chip: shown only on DUB pads when fx targeting
+                is armed. Communicates that pressing this pad will fire the
+                move once per selected channel rather than whole-deck.
+              */}
+              {(page === 'dub' || page === 'dub2') && fxTargetCount > 0 && (
+                <span
+                  className="absolute top-0.5 right-0.5 rounded-sm px-1 font-mono font-bold pointer-events-none"
+                  style={{
+                    fontSize: 7,
+                    background: 'var(--color-accent-highlight, #f59e0b)',
+                    color: 'var(--color-text-inverse, #000)',
+                    lineHeight: '10px',
+                  }}
+                >
+                  {fxTargetCount}CH
+                </span>
+              )}
             </button>
           );
         })}
