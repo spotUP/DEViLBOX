@@ -19,6 +19,8 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useMixerStore } from '@/stores/useMixerStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useUIStore } from '@/stores/useUIStore';
+import { useTransportStore } from '@/stores/useTransportStore';
+import { bpmSyncedEchoRate, getActiveBpm } from '@/engine/dub/DubActions';
 import { setDubBusForRouter, subscribeDubRouter, fire as fireDub } from '@/engine/dub/DubRouter';
 import { startDubRecorder } from '@/engine/dub/DubRecorder';
 import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
@@ -282,13 +284,28 @@ export const DubDeckStrip: React.FC = () => {
     }
   }, [vinylLevel]);
 
+  // Tracker transport BPM — when the song BPM changes (F-command, tempo
+  // tool), any active echoSyncDivision should re-derive echoRateMs so the
+  // delay stays locked to the grid. Before G12 the rate was frozen at
+  // division-selection time.
+  const transportBpm = useTransportStore((s) => s.bpm);
+
   useEffect(() => {
-    try {
-      ensureDrumPadEngine().setDubBusSettings(dubBusSettings);
-    } catch (e) {
-      console.warn('[DubDeckStrip] setDubBusSettings failed:', e);
-    }
-  }, [dubBusSettings]);
+    // Debounce 100 ms — pitch-fader scrubbing in DJ view and rapid tempo
+    // commands in tracker view can fire a dozen BPM updates in a few
+    // hundred ms. Without debounce the engine churns setDubBusSettings
+    // calls that ramp the delay line audibly.
+    const h = setTimeout(() => {
+      try {
+        const bpm = getActiveBpm();
+        const synced = bpmSyncedEchoRate(bpm, dubBusSettings.echoSyncDivision, dubBusSettings.echoRateMs);
+        ensureDrumPadEngine().setDubBusSettings({ ...dubBusSettings, echoRateMs: synced });
+      } catch (e) {
+        console.warn('[DubDeckStrip] setDubBusSettings failed:', e);
+      }
+    }, 100);
+    return () => clearTimeout(h);
+  }, [dubBusSettings, transportBpm]);
 
   useEffect(() => {
     return startDubRecorder();
