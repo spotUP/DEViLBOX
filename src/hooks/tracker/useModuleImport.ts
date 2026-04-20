@@ -38,7 +38,15 @@ export function useModuleImport() {
 
   // ── Module import — delegates to the unified importTrackerModule ──────
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
-    await importTrackerModule(info, options);
+    try {
+      await importTrackerModule(info, options);
+    } catch (err) {
+      const { showAlert } = await import('@stores/useConfirmStore');
+      const msg = err instanceof Error ? err.message : String(err);
+      const name = info.file?.name ?? info.metadata?.title ?? 'module';
+      console.error('[useModuleImport] import failed:', err);
+      void showAlert({ title: 'Load Failed', message: `${name}: ${msg}` });
+    }
   }, []);
 
   return { handleModuleImport, handleTD3Import, handleSunVoxImport };

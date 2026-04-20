@@ -25,6 +25,8 @@ import {
   PARAM_SPRINGS_TONE,
 } from '../effects/AelapseEffect';
 import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
+import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
+import { ToneArmEffect } from '../effects/ToneArmEffect';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
@@ -197,6 +199,67 @@ export class DubBus {
   private enabled = DEFAULT_DUB_BUS.enabled;
   private settings: DubBusSettings = { ...DEFAULT_DUB_BUS };
 
+  // ─── Master-insert TONE EQ ─────────────────────────────────────────────
+  // The TONE sliders in the Dub Deck (BASS shelf, MID scoop, WIDTH) shape
+  // the ENTIRE master output when the bus is enabled — not just the wet
+  // return. This is how real dub engineers work: the whole mix takes on
+  // the dub voicing. Without this path, a +12 dB BASS boost on the bus
+  // would only lift the wet portion (~35 % of the audible signal) and
+  // feel subtle. Here we insert between `masterEffectsInput` and `blepInput`
+  // so the dry + wet sum gets shaped.
+  private masterBassShelf!: BiquadFilterNode;
+  private masterMidScoop!: BiquadFilterNode;
+  private masterLpf!: BiquadFilterNode;
+  // Safety soft-clip between bass shelf and the rest of the master insert
+  // chain. Prevents extreme low-shelf boosts (±18 dB at 200 Hz) from
+  // producing overflow peaks that would break downstream worklets
+  // (ToneArm / VinylNoise). Transparent at normal levels; tanh-saturates
+  // gracefully above ±1.0.
+  private masterSafetyClip!: WaveShaperNode;
+  // Chorus-on-master (dub finisher) — crossfaded in via masterChorusWet.
+  private masterChorusDelayL!: DelayNode;
+  private masterChorusDelayR!: DelayNode;
+  private masterChorusLfoL!: OscillatorNode;
+  private masterChorusLfoR!: OscillatorNode;
+  private masterChorusLfoGainL!: GainNode;
+  private masterChorusLfoGainR!: GainNode;
+  private masterChorusWet!: GainNode;
+  private masterChorusDry!: GainNode;
+  // Club Simulator — Tone.Convolver with a generated small-room IR.
+  private masterConvolver: ConvolverNode | null = null;
+  private masterConvolverWet!: GainNode;
+  private masterConvolverDry!: GainNode;
+  // JA Press vinyl — DSP comes from dedicated effect classes (below).
+  // vinylSum is the tail gain that feeds masterInsertTail.
+  private vinylSum!: GainNode;
+  private vinylLevel = 0;  // 0..1 (0..10 scaled)
+  // Direct output tap — clicks/scratches bypass the master insert chain
+  // (EQ, LPF, width matrix, chorus, convolver) so they sound like pure
+  // vinyl transients on the finished output, not FX-colored noise bursts.
+  // Connected to masterChannel native input in wireMasterInsert.
+  private vinylDirect!: GainNode;
+  // Real vinyl DSP — combined ToneArm (physics: wow/flutter/coil/RIAA/
+  // stylus) + VinylNoiseEffect (surface degradation: dust/dropout/age/
+  // ghostEcho/warp/eccentricity/pinch/innerGroove). Chained in series
+  // inside the master-insert path: convolverSum → toneArm → vinylNoise
+  // → vinylSum. Both load their worklets lazily; synchronous pass-
+  // through until ready.
+  private toneArmEffect: ToneArmEffect | null = null;
+  private vinylEffect: VinylNoiseEffect | null = null;
+  // Stereo width on master — M/S matrix identical in topology to the
+  // bus-level one but operating on the final mix.
+  private masterSplit!: ChannelSplitterNode;
+  private masterMid!: GainNode;
+  private masterSide!: GainNode;
+  private masterInvertR!: GainNode;
+  private masterMerge!: ChannelMergerNode;
+  // Wiring tracking so enable/disable can splice in + out cleanly.
+  private masterInsertHead!: AudioNode;   // where the incoming source should connect
+  private masterInsertTail!: AudioNode;   // what connects onward to the master destination
+  private masterInsertSource: AudioNode | null = null;
+  private masterInsertDest: AudioNode | null = null;
+  private masterInsertActive = false;
+
   // DJ deck taps — each is a GainNode with gain=0 at rest. When attached to a
   // DJ mixer, the mixer's deck input connects INTO these, which feed the bus.
   // Dub-action pads raise these gains to spill deck audio into the bus.
@@ -244,6 +307,11 @@ export class DubBus {
   // the pre-panic tail at default intensity=0.62 after 1 s).
   private _draining = false;
   private _miniDrainPending = false;
+  // Last character preset whose DSP-side bits (spring params + tape-sat
+  // curve) were applied. Lets setSettings skip redundant rebuilds when the
+  // mirror effect fires setSettings with unchanged preset name.
+  private _lastTapeMode: DubBusSettings['tapeSatMode'] | null = null;
+  private _lastAppliedPreset: DubBusSettings['characterPreset'] = 'custom';
   // Once-per-engine warning latches so we don't flood the console during a
   // live set if the bus is disabled or the mixer isn't attached. Reset when
   // the condition clears (attach succeeds / bus gets enabled).
@@ -299,6 +367,153 @@ export class DubBus {
     this.midScoop.frequency.value = this.settings.midScoopFreqHz;
     this.midScoop.Q.value = this.settings.midScoopQ;
     this.midScoop.gain.value = this.settings.midScoopGainDb;
+
+    // ─── Master-insert TONE EQ (dry + wet together) ──────────────────────
+    // Identical filter types to bus-level, but operates on the full master
+    // signal. Starts flat (gain 0) and only becomes audible once the bus
+    // is enabled AND the user's TONE settings are non-neutral.
+    this.masterBassShelf = this.context.createBiquadFilter();
+    this.masterBassShelf.type = 'lowshelf';
+    this.masterBassShelf.frequency.value = this.settings.bassShelfFreqHz;
+    this.masterBassShelf.Q.value = this.settings.bassShelfQ;
+    this.masterBassShelf.gain.value = 0;  // flat until wired in by enable
+    this.masterMidScoop = this.context.createBiquadFilter();
+    this.masterMidScoop.type = 'peaking';
+    this.masterMidScoop.frequency.value = this.settings.midScoopFreqHz;
+    this.masterMidScoop.Q.value = this.settings.midScoopQ;
+    this.masterMidScoop.gain.value = 0;
+    // Master LPF — bypassed (18 kHz) by default. Tape-stop moves sweep
+    // this down to ~400 Hz to mask the resampler aliasing that LibOpenMPT
+    // produces at extreme slowdown factors.
+    this.masterLpf = this.context.createBiquadFilter();
+    this.masterLpf.type = 'lowpass';
+    this.masterLpf.frequency.value = 18000;
+    this.masterLpf.Q.value = 0.707;
+    // Safety clipper — tanh curve that's effectively linear up to ±0.9
+    // and softly saturates beyond. Prevents extreme bass-shelf boosts
+    // (up to +18 dB) from producing overflow peaks that break downstream
+    // worklets.
+    this.masterSafetyClip = this.context.createWaveShaper();
+    {
+      const n = 2048;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * 2 - 1;  // -1..1
+        // Gentle tanh: linear below ~0.8, smooth soft-clip above
+        curve[i] = Math.tanh(x * 1.2) / Math.tanh(1.2);
+      }
+      this.masterSafetyClip.curve = curve;
+    }
+    this.masterSafetyClip.oversample = '2x';
+    // Master Chorus — two detuned delays (L/R) with slow LFOs, crossfaded
+    // via masterChorusWet. Dry at 1.0 always; wet ramps in/out on toggle.
+    // Classic dub "chorus on the whole finished track" polish.
+    this.masterChorusDelayL = this.context.createDelay(0.05);
+    this.masterChorusDelayR = this.context.createDelay(0.05);
+    this.masterChorusDelayL.delayTime.value = 0.012;
+    this.masterChorusDelayR.delayTime.value = 0.018;
+    this.masterChorusLfoL = this.context.createOscillator();
+    this.masterChorusLfoR = this.context.createOscillator();
+    this.masterChorusLfoL.type = 'sine';
+    this.masterChorusLfoR.type = 'sine';
+    this.masterChorusLfoL.frequency.value = 0.8;
+    this.masterChorusLfoR.frequency.value = 1.1;
+    this.masterChorusLfoGainL = this.context.createGain();
+    this.masterChorusLfoGainR = this.context.createGain();
+    this.masterChorusLfoGainL.gain.value = 0.004;  // 4ms depth
+    this.masterChorusLfoGainR.gain.value = 0.004;
+    this.masterChorusLfoL.connect(this.masterChorusLfoGainL);
+    this.masterChorusLfoGainL.connect(this.masterChorusDelayL.delayTime);
+    this.masterChorusLfoR.connect(this.masterChorusLfoGainR);
+    this.masterChorusLfoGainR.connect(this.masterChorusDelayR.delayTime);
+    this.masterChorusLfoL.start();
+    this.masterChorusLfoR.start();
+    this.masterChorusDry = this.context.createGain();
+    this.masterChorusDry.gain.value = 1;
+    this.masterChorusWet = this.context.createGain();
+    this.masterChorusWet.gain.value = 0;  // off by default
+    // Club Simulator convolver — IR generated on-demand when user toggles on.
+    this.masterConvolverDry = this.context.createGain();
+    this.masterConvolverDry.gain.value = 1;
+    this.masterConvolverWet = this.context.createGain();
+    this.masterConvolverWet.gain.value = 0;
+    // JA Press vinyl — VinylNoiseEffect + (future: ToneArmEffect) own the
+    // DSP. `vinylSum` is the tail that feeds masterInsertTail; the vinyl
+    // effects are created later (see below) and wired into the chain.
+    this.vinylSum = this.context.createGain();
+    this.vinylSum.gain.value = 1;
+    // M/S width matrix — 4-gain topology mirroring the proven bus-level
+    // `_applyStereoWidth` coefficients:
+    //   L_out = L×coeffA + R×coeffB
+    //   R_out = L×coeffB + R×coeffA
+    //   coeffA = 0.5 + 0.5×width, coeffB = 0.5 − 0.5×width
+    // (width=0 → mono, 1 → passthrough, 2 → wide biased).
+    this.masterSplit = this.context.createChannelSplitter(2);
+    this.masterMerge = this.context.createChannelMerger(2);
+    this.masterMid  = this.context.createGain();   // L→L path (coeffA)
+    this.masterSide = this.context.createGain();   // R→R path (coeffA)
+    this.masterInvertR = this.context.createGain();// L→R path (coeffB)
+    const masterSideInvertL = this.context.createGain(); // R→L path (coeffB)
+    // Initial width=1 → coeffA=1, coeffB=0
+    this.masterMid.gain.value = 1;
+    this.masterSide.gain.value = 1;
+    this.masterInvertR.gain.value = 0;
+    masterSideInvertL.gain.value = 0;
+    // EQ pre-chain: in → bassShelf → safety-clip → midScoop → LPF → split
+    this.masterBassShelf.connect(this.masterSafetyClip);
+    this.masterSafetyClip.connect(this.masterMidScoop);
+    this.masterMidScoop.connect(this.masterLpf);
+    this.masterLpf.connect(this.masterSplit);
+    // L contributions
+    this.masterSplit.connect(this.masterMid, 0);
+    this.masterMid.connect(this.masterMerge, 0, 0);
+    this.masterSplit.connect(this.masterInvertR, 0);
+    this.masterInvertR.connect(this.masterMerge, 0, 1);
+    // R contributions
+    this.masterSplit.connect(masterSideInvertL, 1);
+    masterSideInvertL.connect(this.masterMerge, 0, 0);
+    this.masterSplit.connect(this.masterSide, 1);
+    this.masterSide.connect(this.masterMerge, 0, 1);
+    // Stash the R→L cross-gain so the width update can reach it later.
+    (this.masterSide as unknown as { _invertL?: GainNode })._invertL = masterSideInvertL;
+    // Chorus post-merge: merger → delayL + delayR → chorusWet; direct → chorusDry.
+    // Both dry + wet feed the convolver dry/wet, and both of those feed tail.
+    const chorusSum = this.context.createGain();
+    this.masterMerge.connect(this.masterChorusDry);
+    this.masterMerge.connect(this.masterChorusDelayL);
+    this.masterMerge.connect(this.masterChorusDelayR);
+    this.masterChorusDelayL.connect(this.masterChorusWet);
+    this.masterChorusDelayR.connect(this.masterChorusWet);
+    this.masterChorusDry.connect(chorusSum);
+    this.masterChorusWet.connect(chorusSum);
+    // chorusSum → convolver dry/wet sum
+    chorusSum.connect(this.masterConvolverDry);
+    // Wet path added on-demand when clubSim enabled (convolver created lazily).
+    const convolverSum = this.context.createGain();
+    this.masterConvolverDry.connect(convolverSum);
+    this.masterConvolverWet.connect(convolverSum);
+    // Vinyl chain — ToneArm (physics) → VinylNoise (surface defects) → vinylSum.
+    // Params all start at 0; setVinylLevel scales them together 0-10.
+    this.toneArmEffect = new ToneArmEffect({
+      wow: 0, coil: 0, flutter: 0, riaa: 0, stylus: 0, hiss: 0, pops: 0, rpm: 33.333, wet: 1,
+    });
+    this.vinylEffect = new VinylNoiseEffect({
+      hiss: 0, dust: 0, age: 0, speed: 0,
+      riaa: 0, stylusResonance: 0, wornStylus: 0, pinch: 0,
+      innerGroove: 0, ghostEcho: 0, dropout: 0, warp: 0, eccentricity: 0,
+      wet: 1,
+    });
+    Tone.connect(convolverSum, this.toneArmEffect.input as unknown as Tone.InputNode);
+    Tone.connect(this.toneArmEffect.output as unknown as Tone.ToneAudioNode, this.vinylEffect.input as unknown as Tone.InputNode);
+    Tone.connect(this.vinylEffect.output as unknown as Tone.ToneAudioNode, this.vinylSum as unknown as Tone.InputNode);
+    // Direct-output tap for vinyl clicks/scratches — bypasses every
+    // master-side FX so the transients land on the output as raw vinyl
+    // defects, not "FX-chain processed noise bursts". Wired to the master
+    // destination node when wireMasterInsert runs.
+    this.vinylDirect = this.context.createGain();
+    this.vinylDirect.gain.value = 1;
+    this.masterInsertHead = this.masterBassShelf;
+    this.masterInsertTail = this.vinylSum;
 
     // Liquid sweep — parallel comb-filter branch. See class-level docstring.
     // The LFO runs continuously (can't stop + restart an OscillatorNode),
@@ -846,6 +1061,58 @@ export class DubBus {
    * `amount` is capped internally at 0.95 — above that, the tape saturation
    * isn't strong enough to contain the loop and output clips to infinity.
    */
+  /**
+   * Dub Siren — fires the existing DubSirenSynth into the bus input so echo +
+   * spring process the pitch-swept tone. Lazy-instantiated on first call and
+   * kept alive for the life of the bus. Returns a dispose function that
+   * calls triggerRelease on the synth.
+   */
+  private _sirenSynth: import('./DubSirenSynth').DubSirenSynth | null = null;
+  private _sirenSynthConnected = false;
+  async _ensureSirenSynth(): Promise<import('./DubSirenSynth').DubSirenSynth | null> {
+    if (this._sirenSynth) return this._sirenSynth;
+    try {
+      const { DubSirenSynth } = await import('./DubSirenSynth');
+      const synth = new DubSirenSynth({
+        oscillator: { type: 'square', frequency: 440 },
+        lfo: { enabled: true, type: 'triangle', rate: 1.2, depth: 250 },
+        delay: { enabled: false, time: 0.3, feedback: 0, wet: 0 },
+        filter: { enabled: true, type: 'lowpass', frequency: 3000, rolloff: -12 },
+        reverb: { enabled: false, decay: 1, wet: 0 },
+      });
+      await synth.ready;
+      this._sirenSynth = synth;
+      return synth;
+    } catch (err) {
+      console.warn('[DubBus] DubSirenSynth init failed:', err);
+      return null;
+    }
+  }
+
+  startSiren(): () => void {
+    if (!this.enabled) return () => {};
+    let released = false;
+    let release: (() => void) | null = null;
+    void this._ensureSirenSynth().then((synth) => {
+      if (!synth || released) return;
+      if (!this._sirenSynthConnected) {
+        try {
+          synth.output.connect(this.input);
+          this._sirenSynthConnected = true;
+        } catch (err) {
+          console.warn('[DubBus] siren synth connect failed:', err);
+        }
+      }
+      try { synth.triggerAttack(undefined, undefined, 1.0); } catch { /* ok */ }
+      release = () => { try { synth.triggerRelease(); } catch { /* ok */ } };
+      if (released) release();
+    });
+    return () => {
+      released = true;
+      if (release) release();
+    };
+  }
+
   setSirenFeedback(amount: number, rampSec = 0.08): () => void {
     if (!this.enabled) {
       console.warn('[DubBus] setSirenFeedback ignored — bus disabled');
@@ -1132,6 +1399,21 @@ export class DubBus {
             this._setSpringWet(merged.springWet);
           } catch { /* ok */ }
         }
+      } else {
+        // Disabling: truly silence the bus. return_.gain alone isn't enough
+        // because echo feedback + spring keep looping on stale content, and
+        // any future re-enable (or a drain bug) would leak that stale tail.
+        // Close input → no new signal enters. Zero echo intensity + spring
+        // wet → feedback loops decay naturally. Return gain handled below.
+        try {
+          const t = this.context.currentTime;
+          const ig = this.input.gain;
+          ig.cancelScheduledValues(t);
+          ig.setValueAtTime(ig.value, t);
+          ig.linearRampToValueAtTime(0, t + 0.04);
+        } catch { /* ok */ }
+        try { this.echo.setIntensity(0); } catch { /* ok */ }
+        try { this._setSpringWet(0); } catch { /* ok */ }
       }
     }
     const now = this.context.currentTime;
@@ -1149,7 +1431,10 @@ export class DubBus {
     // The drain restore timer applies the user's settings at the end of the
     // 2 s window. Without this guard, mirror-effect writes during drain
     // would restore intensity mid-flight and leave residual echo on re-enable.
-    if (!this._draining) {
+    // Also suppress when bus is disabled — the enable-flag handler already
+    // zeroed these; re-writing merged.* here would revive the feedback loop
+    // on a disabled bus, defeating the whole point of the disable path.
+    if (!this._draining && this.enabled) {
       this._setSpringWet(merged.springWet);
       this.echo.setIntensity(merged.echoIntensity);
       this.echo.wet = merged.echoWet;
@@ -1169,6 +1454,26 @@ export class DubBus {
     this.midScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
     this.midScoop.gain.setTargetAtTime(merged.midScoopGainDb, now, 0.02);
     this._applyStereoWidth(merged.stereoWidth);
+    // Master-insert TONE EQ — drives the whole mix (dry + wet) when wired.
+    // Gain writes are gated so a disabled bus stays transparent on master.
+    const masterActive = this.enabled && this.masterInsertActive;
+    this.masterBassShelf.frequency.setTargetAtTime(merged.bassShelfFreqHz, now, 0.02);
+    this.masterBassShelf.Q.setTargetAtTime(merged.bassShelfQ, now, 0.02);
+    this.masterBassShelf.gain.setTargetAtTime(masterActive ? merged.bassShelfGainDb : 0, now, 0.02);
+    this.masterMidScoop.frequency.setTargetAtTime(merged.midScoopFreqHz, now, 0.02);
+    this.masterMidScoop.Q.setTargetAtTime(merged.midScoopQ, now, 0.02);
+    this.masterMidScoop.gain.setTargetAtTime(masterActive ? merged.midScoopGainDb : 0, now, 0.02);
+    // Master width: 4-gain coeff matrix matching the bus-level pattern.
+    // Neutral (width=1 → coeffA=1, coeffB=0) when bus disabled or inactive
+    // so the master stays untouched.
+    const mw = masterActive ? Math.max(0, Math.min(2, merged.stereoWidth)) : 1;
+    const mA = 0.5 + 0.5 * mw;
+    const mB = 0.5 - 0.5 * mw;
+    const masterInvertL = (this.masterSide as unknown as { _invertL?: GainNode })._invertL;
+    this.masterMid.gain.setTargetAtTime(mA, now, 0.02);
+    this.masterSide.gain.setTargetAtTime(mA, now, 0.02);
+    this.masterInvertR.gain.setTargetAtTime(mB, now, 0.02);
+    if (masterInvertL) masterInvertL.gain.setTargetAtTime(mB, now, 0.02);
     // Liquid sweep params — clamp + smooth. sweepAmount=0 fully silences
     // the branch; LFO keeps running (can't stop OscillatorNode).
     const sweepAmt = Math.max(0, Math.min(1, merged.sweepAmount));
@@ -1182,36 +1487,61 @@ export class DubBus {
     // Tape sat mode crossfade — both gates ramp over 60ms so switching
     // mid-gig doesn't click. Same time constant intentional: gains sum
     // near 1 during the overlap which is fine (quiet crossfade dip is
-    // inaudible on dub tails).
+    // inaudible on dub tails). 'tape15ips' shares the single-path gate
+    // but rebuilds the WaveShaper curve with a heavier drive + treble
+    // roll-off (see _applyCharacterPreset + the mode-transition block
+    // below).
     const wantStack = merged.tapeSatMode === 'stack';
     this.tapeSatBypass.gain.setTargetAtTime(wantStack ? 0 : 1, now, 0.03);
     this.tapeStackMix.gain.setTargetAtTime(wantStack ? 1 : 0, now, 0.03);
+    // Apply the 15ips curve when that mode is selected. Rebuild triggered
+    // only on mode transition to avoid hot-path curve allocation.
+    if (merged.tapeSatMode !== this._lastTapeMode) {
+      this._lastTapeMode = merged.tapeSatMode;
+      if (merged.tapeSatMode === 'tape15ips') {
+        try { this.tapeSat.curve = makeTapeSatCurve(0.7); } catch { /* ok */ }
+      } else if (merged.tapeSatMode === 'single') {
+        // Restore preset's tape curve or default 0.35.
+        const p = this._lastAppliedPreset;
+        const drive = p && p !== 'custom' ? (DUB_CHARACTER_PRESETS[p]?.tapeSatDrive ?? 0.35) : 0.35;
+        try { this.tapeSat.curve = makeTapeSatCurve(drive); } catch { /* ok */ }
+      }
+    }
 
-    // Character-preset selection: apply the preset's overrides + spring
-    // params on first sight, then flip back to 'custom' so subsequent user
-    // edits don't re-trigger. Guarded against the preset fields being the
-    // reason for the write (the mirror effect would ping-pong).
-    if (typeof settings.characterPreset === 'string' && settings.characterPreset !== 'custom') {
-      this._applyCharacterPreset(settings.characterPreset);
+    // Character-preset selection: apply the DSP-side bits (spring, tape
+    // saturator curve) when the preset NAME transitions. The settings-side
+    // overrides have already been rewritten upstream by the store's
+    // setDubBus action — we don't need to re-apply them here. Gate on a
+    // real transition so a mirror-effect render with unchanged preset
+    // doesn't rebuild the WaveShaper curve on every tick.
+    const incomingPreset = settings.characterPreset;
+    if (
+      typeof incomingPreset === 'string' &&
+      incomingPreset !== 'custom' &&
+      incomingPreset !== this._lastAppliedPreset
+    ) {
+      this._applyCharacterPreset(incomingPreset);
+      this._lastAppliedPreset = incomingPreset;
+    } else if (incomingPreset === 'custom') {
+      this._lastAppliedPreset = 'custom';
     }
   }
 
   /**
-   * Apply a curated engineer-voicing preset — loads coloring params + echo
-   * + spring values in one shot. See DUB_CHARACTER_PRESETS in types/dub.ts
-   * for the voicing tables. The preset's `.overrides` merge into the bus's
-   * `settings` (via re-entrant setSettings minus the preset field); the
-   * spring params + tape saturator drive apply directly on the DSP nodes.
+   * Apply the DSP-only bits of a character preset — spring params + tape
+   * saturator curve. The settings-side fields (hpfCutoff, bassShelfGainDb,
+   * etc.) are applied upstream by the store's setDubBus action, which
+   * rewrites those values into the store BEFORE the mirror effect fires
+   * setSettings on us. So by the time we land here, this.settings already
+   * matches the preset; we only need to touch the things the store can't:
+   * the spring worklet params and the tape-sat WaveShaper curve.
    *
-   * Non-reentrant: we strip the `characterPreset` key off the overrides
-   * before re-calling setSettings to avoid infinite recursion.
+   * Called once per preset-transition from setSettings — idempotent, so
+   * repeat writes are cheap (setParamById is a no-op at the same value).
    */
   private _applyCharacterPreset(name: Exclude<DubBusSettings['characterPreset'], 'custom'>): void {
     const preset = DUB_CHARACTER_PRESETS[name];
     if (!preset) return;
-    // Apply spring params directly
-    const now = this.context.currentTime;
-    void now;
     try {
       if (preset.springsLength  !== undefined) this.spring.setParamById(PARAM_SPRINGS_LENGTH,  preset.springsLength);
       if (preset.springsDamp    !== undefined) this.spring.setParamById(PARAM_SPRINGS_DAMP,    preset.springsDamp);
@@ -1219,19 +1549,72 @@ export class DubBus {
       if (preset.springsScatter !== undefined) this.spring.setParamById(PARAM_SPRINGS_SCATTER, preset.springsScatter);
       if (preset.springsTone    !== undefined) this.spring.setParamById(PARAM_SPRINGS_TONE,    preset.springsTone);
     } catch { /* ok */ }
-    // Apply tape saturator drive (rebuild curve if changed)
     if (preset.tapeSatDrive !== undefined) {
       try { this.tapeSat.curve = makeTapeSatCurve(preset.tapeSatDrive); } catch { /* ok */ }
     }
-    // Merge the preset's setting overrides — but strip out characterPreset
-    // itself so this call doesn't recurse. Force-write the merged settings
-    // as 'custom' so subsequent user edits stay on 'custom' until they
-    // deliberately pick another preset.
-    const overrides = { ...preset.overrides };
-    // Fire a non-recursive settings pass: bypass the presetField-branch via
-    // a direct merge of the `settings` cache, then re-call setSettings with
-    // the values (minus the presetField).
-    this.setSettings({ ...overrides, characterPreset: 'custom' });
+  }
+
+  /**
+   * Splice the master-side TONE EQ chain between `source` and `dest`. Called
+   * by DubDeckStrip when the bus enables — it hands over the native
+   * `masterEffectsInput` and `blepInput` nodes from ToneEngine so we can
+   * intercept the whole master signal, not just the wet return. Caller is
+   * responsible for calling `unwireMasterInsert()` on disable.
+   *
+   * Idempotent: re-calling while active is a no-op. Safe to call with the
+   * same nodes after a hot-reload — we undo the previous wiring first.
+   */
+  wireMasterInsert(source: AudioNode, dest: AudioNode): void {
+    if (this.masterInsertActive &&
+        this.masterInsertSource === source &&
+        this.masterInsertDest === dest) {
+      return;
+    }
+    if (this.masterInsertActive) this.unwireMasterInsert();
+    try { source.disconnect(dest); } catch { /* ok */ }
+    try {
+      source.connect(this.masterInsertHead);
+      this.masterInsertTail.connect(dest);
+      // Direct tap for vinyl clicks/scratches — lands right next to the
+      // main signal at the destination, so they're NOT filtered by any
+      // master-side FX.
+      this.vinylDirect.connect(dest);
+      this.masterInsertSource = source;
+      this.masterInsertDest = dest;
+      this.masterInsertActive = true;
+      // Re-run setSettings so the master-side gain writes pick up masterActive=true.
+      this.setSettings({});
+    } catch (err) {
+      console.warn('[DubBus] wireMasterInsert failed, restoring passthrough:', err);
+      try { source.connect(dest); } catch { /* ok */ }
+      this.masterInsertActive = false;
+    }
+  }
+
+  /** Reverse the master insert. Safe to call when inactive. */
+  unwireMasterInsert(): void {
+    if (!this.masterInsertActive || !this.masterInsertSource || !this.masterInsertDest) {
+      this.masterInsertActive = false;
+      return;
+    }
+    try { this.masterInsertSource.disconnect(this.masterInsertHead); } catch { /* ok */ }
+    try { this.masterInsertTail.disconnect(this.masterInsertDest); } catch { /* ok */ }
+    try { this.vinylDirect.disconnect(this.masterInsertDest); } catch { /* ok */ }
+    try { this.masterInsertSource.connect(this.masterInsertDest); } catch { /* ok */ }
+    this.masterInsertSource = null;
+    this.masterInsertDest = null;
+    this.masterInsertActive = false;
+    // Reset master-side gains to neutral so even a dangling reference is silent.
+    const now = this.context.currentTime;
+    try { this.masterBassShelf.gain.setTargetAtTime(0, now, 0.02); } catch { /* ok */ }
+    try { this.masterMidScoop.gain.setTargetAtTime(0, now, 0.02); } catch { /* ok */ }
+    try {
+      this.masterMid.gain.setTargetAtTime(1, now, 0.02);
+      this.masterSide.gain.setTargetAtTime(1, now, 0.02);
+      this.masterInvertR.gain.setTargetAtTime(0, now, 0.02);
+      const iL = (this.masterSide as unknown as { _invertL?: GainNode })._invertL;
+      if (iL) iL.gain.setTargetAtTime(0, now, 0.02);
+    } catch { /* ok */ }
   }
 
   /**
@@ -1272,32 +1655,59 @@ export class DubBus {
     this.channelTaps.delete(channelId);
   }
 
+  // Activation callback — set by DubDeckStrip on mount. Lets openChannelTap
+  // lazy-activate a channel's dub send when the user fires a move on a
+  // channel whose fader is at 0 (no tap registered yet). Without this, the
+  // whole move library (Echo Throw, Dub Stab, Channel Throw, Spring Slam,
+  // etc.) was silent on cold channels because the tap only exists after
+  // setChannelDubSend's async worklet activation.
+  private channelActivate: ((channelId: number, amount: number) => void) | null = null;
+
+  setChannelActivationCallback(cb: ((channelId: number, amount: number) => void) | null): void {
+    this.channelActivate = cb;
+  }
+
   /**
    * Echo Throw entry point — momentarily bump the channel's tap gain to
    * `amount` (regardless of the user's baseline dubSend), then close back
    * to the baseline when the returned releaser fires. Mirrors openDeckTap.
    *
-   * Returns a releaser that ramps the tap back to its baseline; echoThrow
-   * schedules this after throwBeats. No-ops cleanly when the bus is disabled
-   * or no tap is registered for this channel (dubSend = 0 / engine not ready).
+   * Returns a releaser that ramps the tap back to its baseline.
+   *
+   * Warm path: tap already registered (fader > 0) — ramp existing gain.
+   * Cold path: tap not yet registered — drive the mixer store's dubSend
+   * via activation callback so the worklet spins up its dub slot, then on
+   * release drive it back to the prior value.
    */
   openChannelTap(channelId: number, amount: number, attackSec = 0.005): () => void {
     if (!this.enabled) return () => {};
-    const tap = this.channelTaps.get(channelId);
-    if (!tap) return () => {};
-
-    const baseline = tap.gain.value;
     const clamped = Math.min(1, Math.max(0, amount));
-    const now = this.context.currentTime;
-    tap.gain.cancelScheduledValues(now);
-    tap.gain.setValueAtTime(tap.gain.value, now);
-    tap.gain.linearRampToValueAtTime(clamped, now + attackSec);
+    const tap = this.channelTaps.get(channelId);
 
+    if (tap) {
+      const baseline = tap.gain.value;
+      const now = this.context.currentTime;
+      tap.gain.cancelScheduledValues(now);
+      tap.gain.setValueAtTime(tap.gain.value, now);
+      tap.gain.linearRampToValueAtTime(clamped, now + attackSec);
+      return () => {
+        const release = this.context.currentTime;
+        tap.gain.cancelScheduledValues(release);
+        tap.gain.setValueAtTime(tap.gain.value, release);
+        tap.gain.linearRampToValueAtTime(baseline, release + 0.08);
+      };
+    }
+
+    // Cold channel — no tap yet. Activate via callback; the mixer store's
+    // setChannelDubSend triggers ChannelRoutedEffects._activateDubChannel
+    // which spins up the worklet dub slot + registers the tap with us.
+    // Tap will exist shortly after but we don't wait — the gain ramp from
+    // setChannelDubSend (0.02 s) is short enough that the move's envelope
+    // lands audibly inside the throw window.
+    if (!this.channelActivate) return () => {};
+    this.channelActivate(channelId, clamped);
     return () => {
-      const release = this.context.currentTime;
-      tap.gain.cancelScheduledValues(release);
-      tap.gain.setValueAtTime(tap.gain.value, release);
-      tap.gain.linearRampToValueAtTime(baseline, release + 0.08);
+      try { this.channelActivate?.(channelId, 0); } catch { /* ok */ }
     };
   }
 
@@ -1378,9 +1788,99 @@ export class DubBus {
    * reverb and then snaps back. Mirrors modulateFeedback's pattern so
    * disposal works the same way. No-op when bus is disabled.
    */
-  slamSpring(amount = 1.0, ms = 400): void {
+  slamSpring(amount = 1.0, ms = 800): void {
     if (!this.enabled) return;
     const target = Math.min(1.0, Math.max(0, amount));
+    // Kick the tank: TWO stacked layers model the physical reality of
+    // hitting a spring reverb unit.
+    //   1. SUB-THUMP — a 55 Hz sine with 200 ms exp decay, the tank body
+    //      "whumping". Routed through the bus input AND into the return
+    //      directly so it hits the output LOUD even when the mix is quiet.
+    //   2. METAL SHANG — bandpass-filtered noise at 800 Hz, routed into
+    //      the spring's input so every spring in the tank oscillates.
+    // Without (1) the user only hears a metallic click; without (2) only
+    // a low whump. Stacked they read as THUNDER.
+    try {
+      const ctx = this.context;
+      const now = ctx.currentTime;
+      const sr = ctx.sampleRate;
+
+      // ── Layer 1: sub-thump ─────────────────────────────────────────────
+      const thumpDur = 0.30;
+      const thumpBuf = ctx.createBuffer(2, Math.round(sr * thumpDur), sr);
+      for (let c = 0; c < 2; c++) {
+        const ch = thumpBuf.getChannelData(c);
+        for (let i = 0; i < ch.length; i++) {
+          const t = i / sr;
+          const env = Math.min(1, t / 0.003) * Math.exp(-t / 0.08);
+          // 55 Hz sine, slight detune per channel for stereo body
+          const freq = 55 + (c === 0 ? -1 : 1);
+          ch[i] = Math.sin(2 * Math.PI * freq * t) * env;
+        }
+      }
+      const thumpSrc = ctx.createBufferSource();
+      thumpSrc.buffer = thumpBuf;
+      const thumpToInput = ctx.createGain();
+      thumpToInput.gain.value = target * 1.5;
+      thumpSrc.connect(thumpToInput);
+      thumpToInput.connect(this.input);
+      // Direct to return so the whump is always audible, not choked by bus sidechain
+      const thumpToReturn = ctx.createGain();
+      thumpToReturn.gain.value = target * 2.0;
+      thumpSrc.connect(thumpToReturn);
+      thumpToReturn.connect(this.return_);
+      thumpSrc.start(now);
+      thumpSrc.stop(now + thumpDur + 0.05);
+      thumpSrc.onended = () => {
+        try { thumpSrc.disconnect(); thumpToInput.disconnect(); thumpToReturn.disconnect(); } catch { /* ok */ }
+      };
+
+      // ── Layer 2: metal shang ───────────────────────────────────────────
+      const shangDur = 0.15;
+      const shangBuf = ctx.createBuffer(2, Math.round(sr * shangDur), sr);
+      for (let c = 0; c < 2; c++) {
+        const ch = shangBuf.getChannelData(c);
+        for (let i = 0; i < ch.length; i++) {
+          const attackSamples = sr * 0.003;
+          const attack = Math.min(1, i / attackSamples);
+          const decay = Math.exp(-Math.max(0, i - attackSamples) / (ch.length * 0.22));
+          ch[i] = (Math.random() * 2 - 1) * attack * decay;
+        }
+      }
+      const shangSrc = ctx.createBufferSource();
+      shangSrc.buffer = shangBuf;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 2500;
+      bp.Q.value = 0.8;
+      shangSrc.connect(bp);
+      // Add a bright top-end splash — 6 kHz peaking filter in parallel
+      // with the main bandpass so the shang has real crystalline sparkle.
+      const bright = ctx.createBiquadFilter();
+      bright.type = 'peaking';
+      bright.frequency.value = 5500;
+      bright.Q.value = 2.0;
+      bright.gain.value = 9;  // +9 dB presence at 5.5 kHz
+      shangSrc.connect(bright);
+      const shangToSpring = ctx.createGain();
+      shangToSpring.gain.value = target * 3.0;  // hit the tank HARD
+      bp.connect(shangToSpring);
+      bright.connect(shangToSpring);
+      Tone.connect(shangToSpring, this.spring.input as unknown as Tone.InputNode);
+      const shangToReturn = ctx.createGain();
+      shangToReturn.gain.value = target * 1.5;
+      bp.connect(shangToReturn);
+      bright.connect(shangToReturn);
+      shangToReturn.connect(this.return_);
+      shangSrc.start(now);
+      shangSrc.stop(now + shangDur + 0.05);
+      shangSrc.onended = () => {
+        try { shangSrc.disconnect(); bp.disconnect(); bright.disconnect(); shangToSpring.disconnect(); shangToReturn.disconnect(); } catch { /* ok */ }
+      };
+    } catch (err) {
+      console.warn('[DubBus] slamSpring impulse failed:', err);
+    }
+    // Crank wet for a long tail window so the tank ring reads clearly.
     this._setSpringWet(target);
     const t = setTimeout(() => {
       this.throwTimers.delete(t);
@@ -1526,16 +2026,40 @@ export class DubBus {
           shaper.gain.value = 0;
           src.connect(shaper);
           shaper.connect(this.input);
+          // Route a parallel copy to return_ so the reverse reads LOUD even
+          // when bus sidechain/glue damps the wet return.
+          const reverseToReturn = this.context.createGain();
+          reverseToReturn.gain.value = 0;
+          src.connect(reverseToReturn);
+          reverseToReturn.connect(this.return_);
           const now = this.context.currentTime;
           const durationPlayed = frames / this.context.sampleRate;
+          // Rising swell envelope — reversed audio gets louder as it
+          // approaches the "original attack" moment, classic "suck into
+          // the downbeat" character. Peaks at 1.5 (hot) and ramps down over
+          // final 10ms to avoid click.
           shaper.gain.setValueAtTime(0, now);
-          shaper.gain.linearRampToValueAtTime(1, now + 0.005);
-          shaper.gain.setValueAtTime(1, now + Math.max(0.01, durationPlayed - 0.005));
+          shaper.gain.linearRampToValueAtTime(1.2, now + durationPlayed * 0.85);
+          shaper.gain.setValueAtTime(1.2, now + Math.max(0.01, durationPlayed - 0.01));
           shaper.gain.linearRampToValueAtTime(0, now + durationPlayed);
+          // Parallel direct-to-return at lower gain for body
+          reverseToReturn.gain.setValueAtTime(0, now);
+          reverseToReturn.gain.linearRampToValueAtTime(0.6, now + durationPlayed * 0.85);
+          reverseToReturn.gain.setValueAtTime(0.6, now + Math.max(0.01, durationPlayed - 0.01));
+          reverseToReturn.gain.linearRampToValueAtTime(0, now + durationPlayed);
+          // Spring wet swell — crank to 1.0 peaking at the end of the
+          // reverse so the spring tank rings out as the reverse lands.
+          const priorWet = this._springWetCache;
+          this._setSpringWet(1.0);
+          const wetRestoreTimer = setTimeout(() => {
+            this.throwTimers.delete(wetRestoreTimer);
+            this._setSpringWet(priorWet);
+          }, (durationPlayed + 0.3) * 1000);
+          this.throwTimers.add(wetRestoreTimer);
           src.start(now);
           src.stop(now + durationPlayed + 0.01);
           src.onended = () => {
-            try { shaper.disconnect(); } catch { /* ok */ }
+            try { shaper.disconnect(); reverseToReturn.disconnect(); } catch { /* ok */ }
           };
         } catch (err) {
           console.warn('[DubBus] backwardReverb playback failed:', err);
@@ -1560,6 +2084,663 @@ export class DubBus {
    * After holdSec, every param snaps back to the user's baseline. Fire-and-
    * forget; owns its own timeline, no disposer. No-op when bus disabled.
    */
+  /**
+   * Reverse Echo — grab last `durationSec` from the reverse-capture ring,
+   * reverse it, play forward at `amount` gain directly into the echo
+   * input path. Distinct from backwardReverb which goes through the FULL
+   * bus wet chain. This version stays tight and "dry-reverse-echoed",
+   * landing as a pre-downbeat flourish rather than a long swell.
+   */
+  async reverseEcho(durationSec = 0.4, amount = 1.0): Promise<void> {
+    if (!this.enabled) return;
+    const node = await this._ensureReverseCapture();
+    if (!node) return;
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        node.port.removeEventListener('message', handler);
+        resolve();
+      }, 1000);
+      const handler = (ev: MessageEvent) => {
+        const msg = ev.data;
+        if (!msg || msg.cmd !== 'snapshot') return;
+        clearTimeout(timeout);
+        node.port.removeEventListener('message', handler);
+        try {
+          const srcLeft = msg.left as Float32Array;
+          const srcRight = msg.right as Float32Array;
+          const frames = Number(msg.frames) || srcLeft.length;
+          if (!frames) { resolve(); return; }
+          const left = new Float32Array(new ArrayBuffer(frames * 4));
+          const right = new Float32Array(new ArrayBuffer(frames * 4));
+          left.set(srcLeft);
+          right.set(srcRight);
+          const buf = this.context.createBuffer(2, frames, this.context.sampleRate);
+          buf.copyToChannel(left, 0);
+          buf.copyToChannel(right, 1);
+          const src = this.context.createBufferSource();
+          src.buffer = buf;
+          const envG = this.context.createGain();
+          envG.gain.value = 0;
+          src.connect(envG);
+          // Route directly into echo input rather than bus input so the
+          // signal gets the 3-head tape-echo treatment without the HPF +
+          // bassShelf + tapeSat pre-chain coloring the reverse further.
+          const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
+          Tone.connect(envG, echoIn);
+          const now = this.context.currentTime;
+          const dur = frames / this.context.sampleRate;
+          const peak = Math.max(0, Math.min(1.5, amount));
+          envG.gain.setValueAtTime(0, now);
+          envG.gain.linearRampToValueAtTime(peak, now + 0.003);
+          envG.gain.setValueAtTime(peak, now + Math.max(0.005, dur - 0.005));
+          envG.gain.linearRampToValueAtTime(0, now + dur);
+          src.start(now);
+          src.stop(now + dur + 0.01);
+          src.onended = () => { try { envG.disconnect(); } catch { /* ok */ } };
+        } catch (err) {
+          console.warn('[DubBus] reverseEcho playback failed:', err);
+        }
+        resolve();
+      };
+      node.port.addEventListener('message', handler);
+      node.port.start?.();
+      node.port.postMessage({ cmd: 'snapshot', durationSec });
+    });
+  }
+
+  /**
+   * Set the echo delay rate directly. Used by delayPreset* moves to snap
+   * to canonical Tubby / Perry timings without touching the user-facing
+   * settings.echoRateMs (so the preset is "drive-by" — next setSettings
+   * pass from the UI will push the user's rate back).
+   */
+  setEchoRate(ms: number): void {
+    if (!this.enabled) return;
+    try { this.echo.setRate(Math.max(10, Math.min(1500, ms))); } catch { /* ok */ }
+  }
+
+  /**
+   * Sonar Ping — single sine pulse fed into the echo input so it repeats
+   * across 3 tape heads. Clean tone, short envelope, ride the default
+   * echo rate. Classic Tubby / Perry transition accent.
+   */
+  firePing(freq = 1000, durationMs = 140, level = 0.8): void {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.context;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = Math.max(100, Math.min(8000, freq));
+      const env = ctx.createGain();
+      env.gain.value = 0;
+      osc.connect(env);
+      const peak = Math.max(0, Math.min(1.0, level));
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(peak, now + 0.005);
+      env.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.01), now + durationMs / 1000);
+      // Route into echo input so the repeats stack; small parallel to return_
+      // so the first ping lands audibly even if return gain is low.
+      const toEcho = ctx.createGain();
+      toEcho.gain.value = 1.0;
+      env.connect(toEcho);
+      const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
+      Tone.connect(toEcho, echoIn);
+      const toReturn = ctx.createGain();
+      toReturn.gain.value = 0.6;
+      env.connect(toReturn);
+      toReturn.connect(this.return_);
+      osc.start(now);
+      osc.stop(now + durationMs / 1000 + 0.02);
+      osc.onended = () => {
+        try { env.disconnect(); toEcho.disconnect(); toReturn.disconnect(); } catch { /* ok */ }
+      };
+    } catch (err) {
+      console.warn('[DubBus] firePing failed:', err);
+    }
+  }
+
+  /**
+   * Radio Riser — band-limited pink-noise swept from `startHz` → `endHz`
+   * over `sweepSec`, routed into the bus. Rising build-up that can stand
+   * in for a Dub Siren or precede a drop.
+   */
+  fireRadioRiser(startHz = 200, endHz = 5000, sweepSec = 1.2, level = 0.7): void {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.context;
+      const sr = ctx.sampleRate;
+      const dur = Math.max(0.2, sweepSec);
+      const frames = Math.ceil(sr * (dur + 0.1));
+      const buf = ctx.createBuffer(1, frames, sr);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      // Bandpass sweep from startHz → endHz with moderate Q for the
+      // "radio between stations" character
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = Math.max(80, startHz);
+      bp.Q.value = 3;
+      const now = ctx.currentTime;
+      bp.frequency.setValueAtTime(Math.max(80, startHz), now);
+      bp.frequency.exponentialRampToValueAtTime(Math.max(80, endHz), now + dur);
+      // Rising envelope
+      const env = ctx.createGain();
+      env.gain.value = 0;
+      const peak = Math.max(0, Math.min(1.0, level));
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(peak, now + dur);
+      env.gain.linearRampToValueAtTime(0, now + dur + 0.05);
+      src.connect(bp);
+      bp.connect(env);
+      const toInput = ctx.createGain();
+      toInput.gain.value = 0.9;
+      env.connect(toInput);
+      toInput.connect(this.input);
+      const toReturn = ctx.createGain();
+      toReturn.gain.value = 0.5;
+      env.connect(toReturn);
+      toReturn.connect(this.return_);
+      src.start(now);
+      src.stop(now + dur + 0.1);
+      src.onended = () => {
+        try { bp.disconnect(); env.disconnect(); toInput.disconnect(); toReturn.disconnect(); } catch { /* ok */ }
+      };
+    } catch (err) {
+      console.warn('[DubBus] fireRadioRiser failed:', err);
+    }
+  }
+
+  /**
+   * Sub Swell — clean low-frequency sine pulse routed direct to return
+   * to add weight without going through the echo/spring chain. Short
+   * envelope so it reads as a "UUUUM" pulse rather than a drone.
+   */
+  fireSubSwell(freq = 55, durationMs = 400, level = 0.8): void {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.context;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = Math.max(30, Math.min(200, freq));
+      const env = ctx.createGain();
+      env.gain.value = 0;
+      osc.connect(env);
+      const peak = Math.max(0, Math.min(1.0, level));
+      const dur = durationMs / 1000;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(peak, now + 0.02);
+      env.gain.setValueAtTime(peak, now + Math.max(0.03, dur * 0.7));
+      env.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.001), now + dur);
+      env.connect(this.return_);
+      osc.start(now);
+      osc.stop(now + dur + 0.02);
+      osc.onended = () => { try { env.disconnect(); } catch { /* ok */ } };
+    } catch (err) {
+      console.warn('[DubBus] fireSubSwell failed:', err);
+    }
+  }
+
+  /**
+   * Sub Harmonic — envelope-follower that triggers a short sub-sine pulse
+   * whenever the bus input crosses `threshold`. The sub rides every
+   * transient in the music, thickening kicks/snares without a continuous
+   * drone. Implemented via an AnalyserNode polling on rAF — not sample-
+   * accurate but punchy enough for a dub move.
+   */
+  startSubHarmonic(freq = 55, threshold = 0.06, level = 0.7): () => void {
+    if (!this.enabled) return () => {};
+    const ctx = this.context;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.1;
+    try {
+      Tone.connect(this.input, analyser as unknown as Tone.InputNode);
+    } catch { /* ok */ }
+    const data = new Float32Array(analyser.fftSize);
+    let rafHandle = 0;
+    let lastFireAt = 0;
+    let running = true;
+    const fireSub = () => {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = Math.max(30, Math.min(200, freq));
+      const env = ctx.createGain();
+      env.gain.value = 0;
+      osc.connect(env);
+      env.connect(this.return_);
+      const peak = Math.max(0, Math.min(1.0, level));
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(peak, now + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+      osc.start(now);
+      osc.stop(now + 0.22);
+      osc.onended = () => { try { env.disconnect(); } catch { /* ok */ } };
+    };
+    const poll = () => {
+      if (!running) return;
+      analyser.getFloatTimeDomainData(data);
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) {
+        const a = Math.abs(data[i]);
+        if (a > peak) peak = a;
+      }
+      const nowMs = performance.now();
+      // Fire if above threshold AND we haven't fired in 100 ms (debounce)
+      if (peak > threshold && nowMs - lastFireAt > 100) {
+        lastFireAt = nowMs;
+        fireSub();
+      }
+      rafHandle = requestAnimationFrame(poll);
+    };
+    rafHandle = requestAnimationFrame(poll);
+    return () => {
+      running = false;
+      cancelAnimationFrame(rafHandle);
+      try { analyser.disconnect(); } catch { /* ok */ }
+    };
+  }
+
+  /**
+   * Crush Bass — sawtooth → WaveShaper quantized to N bits → LPF → return.
+   * The bit-depth reduction creates stepped quantization distortion (hard
+   * odd-harmonic edge), LPF removes aliased hiss. 3-bit = 8 quantize
+   * levels; 2-bit = 4; 1-bit = hard square. Lower bits = more aggressive.
+   */
+  startCrushBass(freq = 55, bits = 3, level = 0.75): () => void {
+    if (!this.enabled) return () => {};
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = Math.max(20, Math.min(400, freq));
+    // WaveShaper quantize curve — map -1..1 to the nearest N-bit level
+    const levels = Math.pow(2, Math.max(1, Math.min(8, bits)));
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / (curve.length - 1)) * 2 - 1;  // -1..1
+      curve[i] = Math.round((x + 1) * 0.5 * (levels - 1)) / (levels - 1) * 2 - 1;
+    }
+    shaper.curve = curve;
+    shaper.oversample = '2x';
+    const lpf = ctx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 1800;  // kills aliased hiss above bass content
+    lpf.Q.value = 0.707;
+    const env = ctx.createGain();
+    env.gain.value = 0;
+    osc.connect(shaper);
+    shaper.connect(lpf);
+    lpf.connect(env);
+    env.connect(this.return_);
+    const peak = Math.max(0, Math.min(1.0, level));
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(peak, now + 0.05);
+    osc.start(now);
+    return () => {
+      const release = ctx.currentTime;
+      try {
+        env.gain.cancelScheduledValues(release);
+        env.gain.setValueAtTime(env.gain.value, release);
+        env.gain.linearRampToValueAtTime(0, release + 0.2);
+      } catch { /* ok */ }
+      setTimeout(() => {
+        try { osc.stop(); osc.disconnect(); shaper.disconnect(); lpf.disconnect(); env.disconnect(); } catch { /* ok */ }
+      }, 300);
+    };
+  }
+
+  /**
+   * Osc Bass — self-oscillating LPF as a bass source. A sawtooth through
+   * a high-Q lowpass at the target frequency, creating a resonant drone
+   * bass. Hold move; release fades over 200 ms.
+   */
+  startOscBass(freq = 55, level = 0.9): () => void {
+    if (!this.enabled) return () => {};
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = Math.max(30, Math.min(200, freq));
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = Math.max(30, Math.min(200, freq));
+    filt.Q.value = 18;  // self-oscillation territory
+    const env = ctx.createGain();
+    env.gain.value = 0;
+    osc.connect(filt);
+    filt.connect(env);
+    env.connect(this.return_);
+    const peak = Math.max(0, Math.min(1.0, level));
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(peak, now + 0.08);
+    osc.start(now);
+    return () => {
+      const release = ctx.currentTime;
+      try {
+        env.gain.cancelScheduledValues(release);
+        env.gain.setValueAtTime(env.gain.value, release);
+        env.gain.linearRampToValueAtTime(0, release + 0.2);
+      } catch { /* ok */ }
+      setTimeout(() => {
+        try { osc.stop(); osc.disconnect(); filt.disconnect(); env.disconnect(); } catch { /* ok */ }
+      }, 300);
+    };
+  }
+
+  /**
+   * Cross-fed Stereo Doubler — inject a ~20ms delayed copy of the bus input
+   * panned opposite with cross-feedback between the channels. Mono content
+   * reads as wide stereo via Haas + comb-filter character. Classic dub
+   * widening trick quoted by Dan D.N.A. in the Dub Scrolls.
+   */
+  startStereoDoubler(delayMs = 20, feedback = 0.3, wet = 0.6): () => void {
+    if (!this.enabled) return () => {};
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    const splitter = ctx.createChannelSplitter(2);
+    const merger = ctx.createChannelMerger(2);
+    const delayL = ctx.createDelay(0.1);
+    const delayR = ctx.createDelay(0.1);
+    delayL.delayTime.value = delayMs / 1000;
+    delayR.delayTime.value = delayMs / 1000;
+    const fbL = ctx.createGain(); fbL.gain.value = Math.max(0, Math.min(0.7, feedback));
+    const fbR = ctx.createGain(); fbR.gain.value = Math.max(0, Math.min(0.7, feedback));
+    const wetGain = ctx.createGain();
+    wetGain.gain.value = 0;
+    // Topology:
+    //   input → splitter →
+    //     L → delayL → merger(R)   + fb to delayR
+    //     R → delayR → merger(L)   + fb to delayL
+    //   merger → wetGain → return_ (parallel, so dry stays intact)
+    try {
+      Tone.connect(this.input, splitter as unknown as Tone.InputNode);
+    } catch { /* ok */ }
+    splitter.connect(delayL, 0);
+    splitter.connect(delayR, 1);
+    delayL.connect(merger, 0, 1);
+    delayR.connect(merger, 0, 0);
+    delayL.connect(fbL); fbL.connect(delayR);
+    delayR.connect(fbR); fbR.connect(delayL);
+    merger.connect(wetGain);
+    wetGain.connect(this.return_);
+    wetGain.gain.setValueAtTime(0, now);
+    wetGain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, wet)), now + 0.1);
+    return () => {
+      const release = ctx.currentTime;
+      try {
+        wetGain.gain.cancelScheduledValues(release);
+        wetGain.gain.setValueAtTime(wetGain.gain.value, release);
+        wetGain.gain.linearRampToValueAtTime(0, release + 0.2);
+      } catch { /* ok */ }
+      setTimeout(() => {
+        try { splitter.disconnect(); delayL.disconnect(); delayR.disconnect(); fbL.disconnect(); fbR.disconnect(); merger.disconnect(); wetGain.disconnect(); } catch { /* ok */ }
+      }, 300);
+    };
+  }
+
+  /**
+   * Tubby Scream — route the spring return back into the spring input
+   * through a sweepable bandpass, so the reverb drives itself into
+   * self-oscillation at the band center. Sweeping the center from low to
+   * high produces the signature "crying metal" scream that rises in pitch
+   * while ramping up in amplitude. Release kills the feedback loop.
+   */
+  startTubbyScream(
+    centerHz = 900,
+    topHz = 2600,
+    sweepSec = 3,
+    feedbackAmount = 1.3,
+  ): () => void {
+    if (!this.enabled) return () => {};
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    // Tap spring output → bandpass → gain → back into spring input.
+    // Self-oscillation requires LOOP GAIN > 1.0 at resonance; with spring
+    // dry/wet ~0.55 and unity bandpass, the tap MUST exceed 1.0 to build.
+    // Cap at 1.8 — above that the loop saturates too hard and sounds
+    // like harsh noise instead of the metallic cry.
+    const tap = ctx.createGain();
+    tap.gain.value = 0;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = Math.max(100, centerHz);
+    bp.Q.value = 3.5;  // broader resonance = easier self-oscillation across frequencies
+    const fbAmt = Math.max(0, Math.min(1.8, feedbackAmount));
+    tap.gain.setValueAtTime(0, now);
+    tap.gain.linearRampToValueAtTime(fbAmt, now + 0.2);
+    // Sweep center frequency over sweepSec — rising whine
+    bp.frequency.cancelScheduledValues(now);
+    bp.frequency.setValueAtTime(Math.max(100, centerHz), now);
+    bp.frequency.exponentialRampToValueAtTime(Math.max(100, topHz), now + sweepSec);
+    try {
+      // Get spring output via Tone ref; connect to bandpass then back to spring input
+      const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+      Tone.connect(springOut, bp as unknown as Tone.InputNode);
+      bp.connect(tap);
+      Tone.connect(tap, this.spring.input as unknown as Tone.InputNode);
+      console.log('[DubBus] tubbyScream ▶ wired spring→bp→tap→spring, fb=' + fbAmt.toFixed(2) + ' Q=' + bp.Q.value.toFixed(1));
+    } catch (err) {
+      console.warn('[DubBus] tubbyScream wire failed:', err);
+      return () => {};
+    }
+    // Seed the feedback loop with a brief noise burst — without any signal
+    // in the spring the loop has nothing to amplify even with gain > 1.0
+    // (digital silence stays zero). 20ms filtered-noise kick gets the
+    // self-oscillation going.
+    try {
+      const seedBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.02), ctx.sampleRate);
+      const seedData = seedBuf.getChannelData(0);
+      for (let i = 0; i < seedData.length; i++) seedData[i] = (Math.random() * 2 - 1) * 0.5;
+      const seedSrc = ctx.createBufferSource();
+      seedSrc.buffer = seedBuf;
+      const seedGain = ctx.createGain();
+      seedGain.gain.value = 0.4;
+      seedSrc.connect(seedGain);
+      Tone.connect(seedGain, this.spring.input as unknown as Tone.InputNode);
+      seedSrc.start(now);
+      seedSrc.stop(now + 0.04);
+      seedSrc.onended = () => { try { seedGain.disconnect(); } catch { /* ok */ } };
+    } catch { /* ok */ }
+    return () => {
+      const release = ctx.currentTime;
+      try {
+        tap.gain.cancelScheduledValues(release);
+        tap.gain.setValueAtTime(tap.gain.value, release);
+        tap.gain.linearRampToValueAtTime(0, release + 0.2);
+      } catch { /* ok */ }
+      // Disconnect after ramp completes
+      setTimeout(() => {
+        try { bp.disconnect(); tap.disconnect(); } catch { /* ok */ }
+      }, 300);
+    };
+  }
+
+  /**
+   * Reverb→Delay order swap. When `reverseOrder` is true, the chain runs
+   * spring → echo instead of the default echo → spring. Research: "reverb
+   * then delay = whole room repeated" — delay AFTER reverb captures the
+   * reverberant space and echoes THAT, producing a distinct geometry from
+   * the conventional delay-into-reverb which just adds reverb to echoed
+   * taps. Live-switchable: disconnect the two series links, swap them,
+   * reconnect. No crossfade; the 40 ms gap during swap is acceptable
+   * (dub moves tolerate transients).
+   */
+  private _reverseChainOrder = false;
+  setReverseChainOrder(on: boolean): void {
+    if (on === this._reverseChainOrder) return;
+    const springIn = this.spring.input as unknown as Tone.InputNode;
+    const echoIn = (this.echo as unknown as { input: Tone.InputNode }).input;
+    const echoOut = (this.echo as unknown as { output: Tone.ToneAudioNode }).output;
+    const springOut = (this.spring as unknown as { output: Tone.ToneAudioNode }).output;
+    try {
+      if (on) {
+        // Normal → Reverse: was tapeSat→echo→spring→sidechain.
+        // Want tapeSat→spring→echo→sidechain.
+        Tone.disconnect(this.tapeSatBypass, echoIn);
+        Tone.disconnect(this.tapeStackMix, echoIn);
+        Tone.disconnect(echoOut, springIn);
+        Tone.disconnect(springOut, this.sidechain as unknown as Tone.InputNode);
+        Tone.connect(this.tapeSatBypass, springIn);
+        Tone.connect(this.tapeStackMix, springIn);
+        Tone.connect(springOut, echoIn);
+        Tone.connect(echoOut, this.sidechain as unknown as Tone.InputNode);
+      } else {
+        // Reverse → Normal: the mirror operation.
+        Tone.disconnect(this.tapeSatBypass, springIn);
+        Tone.disconnect(this.tapeStackMix, springIn);
+        Tone.disconnect(springOut, echoIn);
+        Tone.disconnect(echoOut, this.sidechain as unknown as Tone.InputNode);
+        Tone.connect(this.tapeSatBypass, echoIn);
+        Tone.connect(this.tapeStackMix, echoIn);
+        Tone.connect(echoOut, springIn);
+        Tone.connect(springOut, this.sidechain as unknown as Tone.InputNode);
+      }
+      this._reverseChainOrder = on;
+    } catch (err) {
+      console.warn('[DubBus] setReverseChainOrder swap failed:', err);
+    }
+  }
+
+  /**
+   * JA Press vinyl degradation level. `level10` is 0-10; 0 = clean, 10 =
+   * gutter-scraped Jamaican 7". Drives every stage of the vinyl chain:
+   *   - Wow LFO depth (pitch drift from warped groove)
+   *   - Rumble boost (sub-bass tonearm vibration)
+   *   - HF roll-off (worn stylus + compressed 7" mastering)
+   *   - Surface noise (constant pink hiss)
+   *   - Random click/pop generator (stochastic impulses)
+   *   - L/R balance drift (off-center groove)
+   *
+   * All params scale non-linearly (cubed) so levels 1-3 are SUBTLE wear
+   * and 7-10 is SEVERE shit pressing. Live-updatable; 20 ms smoothing.
+   */
+  setVinylLevel(level10: number): void {
+    const l = Math.max(0, Math.min(10, level10));
+    this.vinylLevel = l / 10;
+    const lin = this.vinylLevel;
+    const sq = lin * lin;
+    const cubed = lin * lin * lin;
+    // ToneArm physics — turntable motion + cartridge physics.
+    const ta = this.toneArmEffect;
+    if (ta) {
+      try {
+        ta.setWow(0.7 * sq);       // slow pitch wobble (one per rotation)
+        ta.setCoil(0.35 * lin);    // cartridge Faraday induction distortion
+        ta.setFlutter(0.55 * sq);  // fast AM wobble
+        ta.setRiaa(0.3 * lin);     // RIAA curve blend
+        ta.setStylus(0.6 * sq);    // HF rolloff from worn needle
+        ta.setHiss(0.25 * lin);    // baseline surface hiss
+        ta.setPops(0.9 * cubed);   // CLICK/POP density — main "dirty record" character
+        ta.wet = l === 0 ? 0 : 1;
+      } catch { /* ok */ }
+    }
+    // VinylNoise — additional surface defects layered on top.
+    const vn = this.vinylEffect;
+    if (vn) {
+      try {
+        vn.setDust(0.95 * sq);           // big clicks + crackles
+        vn.setAge(0.8 * cubed);          // cumulative groove damage
+        vn.setWornStylus(0.4 * sq);      // HF smear (avoid doubling w/ToneArm stylus)
+        vn.setPinch(0.3 * lin);          // even-harmonic distortion
+        vn.setInnerGroove(0.5 * sq);     // asymmetric waveshaping
+        vn.setGhostEcho(0.4 * cubed);    // BPF pre-echo (groove pre-print)
+        vn.setDropout(0.6 * cubed);      // random amplitude dips
+        vn.setWarp(0.4 * sq);            // multi-LFO pitch wobble
+        vn.setEccentricity(0.5 * sq);    // rotation-rate drift
+        vn.setStylusResonance(0.25 * lin);
+        vn.setHiss(0);                    // ToneArm handles hiss, avoid doubling
+        vn.setRiaa(0);                    // ditto
+        vn.wet = l === 0 ? 0 : 1;
+        vn.setPlaying(l > 0);
+      } catch { /* ok */ }
+    }
+  }
+
+  /** Enable/disable the chorus-on-master finisher. Ramps over 200 ms. */
+  setMasterChorus(on: boolean): void {
+    if (!this.masterChorusWet) return;
+    const now = this.context.currentTime;
+    try {
+      this.masterChorusWet.gain.cancelScheduledValues(now);
+      this.masterChorusWet.gain.setValueAtTime(this.masterChorusWet.gain.value, now);
+      this.masterChorusWet.gain.linearRampToValueAtTime(on ? 0.45 : 0, now + 0.2);
+    } catch { /* ok */ }
+  }
+
+  /** Enable/disable the Club Simulator convolver. Lazy-allocates the IR
+   *  on first enable — a procedurally-generated small-club impulse with
+   *  ~350 ms decay and some high-frequency roll-off to mimic a PA-in-room
+   *  response. */
+  setClubSim(on: boolean): void {
+    if (!this.masterConvolverWet) return;
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    if (on && !this.masterConvolver) {
+      try {
+        this.masterConvolver = ctx.createConvolver();
+        // Generate a 350ms IR with exponential decay + stereo decorrelation.
+        const len = Math.round(ctx.sampleRate * 0.35);
+        const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (let c = 0; c < 2; c++) {
+          const ch = buf.getChannelData(c);
+          for (let i = 0; i < len; i++) {
+            const tau = len * 0.22;
+            const env = Math.exp(-i / tau);
+            // Low-pass noise — duplicate last sample weighted for rolling avg
+            const noise = (Math.random() * 2 - 1) * env;
+            ch[i] = i > 0 ? ch[i - 1] * 0.6 + noise * 0.4 : noise;
+          }
+        }
+        this.masterConvolver.buffer = buf;
+        this.masterConvolver.normalize = true;
+        this.masterConvolverDry.connect(this.masterConvolver);
+        this.masterConvolver.connect(this.masterConvolverWet);
+      } catch (err) {
+        console.warn('[DubBus] club-sim convolver init failed:', err);
+        return;
+      }
+    }
+    try {
+      this.masterConvolverWet.gain.cancelScheduledValues(now);
+      this.masterConvolverWet.gain.setValueAtTime(this.masterConvolverWet.gain.value, now);
+      this.masterConvolverWet.gain.linearRampToValueAtTime(on ? 0.55 : 0, now + 0.3);
+    } catch { /* ok */ }
+  }
+
+  /**
+   * Sweep the master-insert LPF down to `targetHz` over `downSec`, hold for
+   * `holdSec`, then open back to 18 kHz (bypass). Used by transportTapeStop
+   * to mask LibOpenMPT's resampler aliasing at extreme slowdown — high
+   * frequencies that would read as "bit-crush" get rolled off the master
+   * output during the wind-down.
+   */
+  sweepMasterLpf(targetHz = 400, downSec = 0.8, holdSec = 0.2): void {
+    if (!this.masterLpf) return;
+    const now = this.context.currentTime;
+    const f = this.masterLpf.frequency;
+    try {
+      f.cancelScheduledValues(now);
+      f.setValueAtTime(f.value, now);
+      f.exponentialRampToValueAtTime(Math.max(80, targetHz), now + downSec);
+    } catch { /* ok */ }
+    const restore = setTimeout(() => {
+      this.throwTimers.delete(restore);
+      try {
+        const t = this.context.currentTime;
+        f.cancelScheduledValues(t);
+        f.setValueAtTime(f.value, t);
+        f.exponentialRampToValueAtTime(18000, t + 0.35);
+      } catch { /* ok */ }
+    }, (downSec + holdSec) * 1000);
+    this.throwTimers.add(restore);
+  }
+
   tapeStop(downSec = 0.6, holdSec = 0.15): void {
     if (!this.enabled) return;
     const now = this.context.currentTime;
@@ -1619,32 +2800,55 @@ export class DubBus {
    * @param durationMs  Total duration of the noise burst (default 40ms)
    * @param level       Peak gain 0..1 (default 0.6)
    */
-  fireNoiseBurst(durationMs = 40, level = 0.6): void {
+  fireNoiseBurst(durationMs = 80, level = 1.0): void {
     if (!this.enabled) return;
     try {
-      // Generate ~200ms of white noise so the buffer outlives any reasonable
-      // burst duration. Re-used per call — cheap vs. the echo/spring work.
-      const sr = this.context.sampleRate;
-      const frames = Math.ceil((durationMs + 20) * sr / 1000);
-      const buf = this.context.createBuffer(1, frames, sr);
+      const ctx = this.context;
+      const sr = ctx.sampleRate;
+      const frames = Math.ceil((durationMs + 30) * sr / 1000);
+      const buf = ctx.createBuffer(1, frames, sr);
       const data = buf.getChannelData(0);
       for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
-      const src = this.context.createBufferSource();
+      const src = ctx.createBufferSource();
       src.buffer = buf;
-      const gain = this.context.createGain();
-      gain.gain.value = 0;
-      src.connect(gain);
-      gain.connect(this.input);
-      const now = this.context.currentTime;
-      const peak = Math.min(1, Math.max(0, level));
-      // Attack 1ms → decay to 0 over remaining duration. Exponential-ish via
-      // setTargetAtTime gives a snappier crack than a linear ramp.
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(peak, now + 0.001);
-      gain.gain.setTargetAtTime(0, now + 0.001, durationMs / 3000);
+      // Bandpass filter @ 3.5 kHz with low Q so it covers 2-6 kHz — that's
+      // where snare snap + stick-attack energy lives. Makes the burst read
+      // as a real snare crack rather than broadband hiss.
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 3500;
+      bp.Q.value = 0.7;
+      // Highpass on top to kill any low-end rumble leaking through
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1500;
+      hp.Q.value = 0.5;
+      src.connect(bp);
+      bp.connect(hp);
+      // Envelope — 1ms attack, fast exp decay
+      const env = ctx.createGain();
+      env.gain.value = 0;
+      hp.connect(env);
+      const peak = Math.min(1.5, Math.max(0, level));
+      const now = ctx.currentTime;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(peak, now + 0.001);
+      env.gain.setTargetAtTime(0, now + 0.001, durationMs / 3000);
+      // Path 1: bus input — echo/spring tail the crack
+      const toInput = ctx.createGain();
+      toInput.gain.value = 0.8;
+      env.connect(toInput);
+      toInput.connect(this.input);
+      // Path 2: direct to return — guaranteed loud snap even if bus is damped
+      const toReturn = ctx.createGain();
+      toReturn.gain.value = 1.0;
+      env.connect(toReturn);
+      toReturn.connect(this.return_);
       src.start(now);
-      src.stop(now + durationMs / 1000 + 0.02);
-      src.onended = () => { try { gain.disconnect(); } catch { /* ok */ } };
+      src.stop(now + durationMs / 1000 + 0.03);
+      src.onended = () => {
+        try { bp.disconnect(); hp.disconnect(); env.disconnect(); toInput.disconnect(); toReturn.disconnect(); } catch { /* ok */ }
+      };
     } catch { /* best-effort */ }
   }
 

@@ -15,7 +15,7 @@ import type { DubMove } from './_types';
 export const snareCrack: DubMove = {
   id: 'snareCrack',
   kind: 'trigger',
-  defaults: { durationMs: 40, level: 0.6 },
+  defaults: { durationMs: 80, level: 1.0 },
 
   execute({ bus, params }) {
     const durationMs = params.durationMs ?? this.defaults.durationMs;

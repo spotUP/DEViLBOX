@@ -83,6 +83,24 @@ window.addEventListener('error', (event) => {
   // In production, send to error reporting service
 });
 
+// Dev-mode capture array — ui-smoke and manual probes can read
+// window.__capturedRejections to pull every stack we've seen. Populated only
+// when import.meta.env.DEV so production never accumulates the array.
+declare global {
+  interface Window {
+    __capturedRejections?: Array<{
+      time: number;
+      reasonType: string;
+      reasonStr: string;
+      reasonName: string | null;
+      stack: string;
+    }>;
+  }
+}
+if (import.meta.env.DEV) {
+  window.__capturedRejections = [];
+}
+
 window.addEventListener('unhandledrejection', (event) => {
   // Suppress InvalidStateError - this happens when audioWorklet.addModule() is called
   // on a suspended AudioContext. It's not critical as worklets will load when context resumes.
@@ -92,8 +110,40 @@ window.addEventListener('unhandledrejection', (event) => {
     return;
   }
 
-  console.error('[Global] Unhandled promise rejection:', event.reason);
-  // In production, send to error reporting service
+  // Build a structured snapshot that's useful even when event.reason is an
+  // empty string / undefined / non-Error — exactly the silent-failure class
+  // the regression suite is supposed to surface. Uses the distinctive
+  // `[unhandledrejection]` prefix so tools/ui-smoke/get_console_errors can
+  // grep for it without a new MCP tool.
+  const reason = event.reason;
+  const reasonType = typeof reason;
+  const reasonStr = (() => {
+    try { return String(reason); } catch { return '<unstringifiable>'; }
+  })();
+  const reasonName = reason && typeof reason === 'object' && 'name' in reason
+    ? String((reason as { name?: unknown }).name ?? '')
+    : null;
+  // If the reason is an Error, use its stack. Otherwise synthesize one from
+  // the handler call site so there's always *something* traceable.
+  const stack = reason instanceof Error
+    ? reason.stack ?? '(Error without stack)'
+    : (new Error('synthetic stack at unhandledrejection listener').stack ?? '(no stack)');
+
+  if (import.meta.env.DEV && window.__capturedRejections) {
+    window.__capturedRejections.push({
+      time: Date.now(),
+      reasonType,
+      reasonStr,
+      reasonName,
+      stack,
+    });
+  }
+
+  console.error(
+    `[unhandledrejection] type=${reasonType}` +
+    ` name=${reasonName ?? '-'}` +
+    ` reason=${reasonStr || '(empty)'}\n${stack}`
+  );
 });
 
 createRoot(document.getElementById('root')!).render(
