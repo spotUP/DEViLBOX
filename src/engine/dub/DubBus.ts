@@ -2495,7 +2495,7 @@ export class DubBus {
     centerHz = 900,
     topHz = 2600,
     sweepSec = 3,
-    feedbackAmount = 1.3,
+    feedbackAmount = 2.2,
   ): () => void {
     if (!this.enabled) return () => {};
     const ctx = this.context;
@@ -2511,9 +2511,17 @@ export class DubBus {
     bp.type = 'bandpass';
     bp.frequency.value = Math.max(100, centerHz);
     bp.Q.value = 3.5;  // broader resonance = easier self-oscillation across frequencies
-    const fbAmt = Math.max(0, Math.min(1.8, feedbackAmount));
+    // Cap at 2.5 — at spring dry/wet 0.55, the tap's output passes through
+    // the spring at ~0.45× (dry only, since fb doesn't excite wet), so the
+    // tap must exceed ~2.2 to build up self-oscillation from the noise seed.
+    const fbAmt = Math.max(0, Math.min(2.5, feedbackAmount));
     tap.gain.setValueAtTime(0, now);
     tap.gain.linearRampToValueAtTime(fbAmt, now + 0.2);
+    // Crank spring wet to 1.0 for the duration of SCREAM so the loop runs
+    // through 100% wet spring (where the resonant ringing lives). Prior
+    // value restored on dispose.
+    const priorWet = this._springWetCache;
+    this._setSpringWet(1.0);
     // Sweep center frequency over sweepSec — rising whine
     bp.frequency.cancelScheduledValues(now);
     bp.frequency.setValueAtTime(Math.max(100, centerHz), now);
@@ -2534,13 +2542,18 @@ export class DubBus {
     // (digital silence stays zero). 20ms filtered-noise kick gets the
     // self-oscillation going.
     try {
-      const seedBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.02), ctx.sampleRate);
+      const seedBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.008), ctx.sampleRate);
       const seedData = seedBuf.getChannelData(0);
-      for (let i = 0; i < seedData.length; i++) seedData[i] = (Math.random() * 2 - 1) * 0.5;
+      // Decaying noise burst — quieter over time so the initial "tick"
+      // is softer; loop will amplify it once running.
+      for (let i = 0; i < seedData.length; i++) {
+        const env = Math.exp(-i / (seedData.length * 0.4));
+        seedData[i] = (Math.random() * 2 - 1) * env * 0.2;
+      }
       const seedSrc = ctx.createBufferSource();
       seedSrc.buffer = seedBuf;
       const seedGain = ctx.createGain();
-      seedGain.gain.value = 0.4;
+      seedGain.gain.value = 0.15;
       seedSrc.connect(seedGain);
       Tone.connect(seedGain, this.spring.input as unknown as Tone.InputNode);
       seedSrc.start(now);
@@ -2554,6 +2567,8 @@ export class DubBus {
         tap.gain.setValueAtTime(tap.gain.value, release);
         tap.gain.linearRampToValueAtTime(0, release + 0.2);
       } catch { /* ok */ }
+      // Restore spring wet to the user's prior setting.
+      try { this._setSpringWet(priorWet); } catch { /* ok */ }
       // Disconnect after ramp completes
       setTimeout(() => {
         try { bp.disconnect(); tap.disconnect(); } catch { /* ok */ }
