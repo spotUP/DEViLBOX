@@ -522,6 +522,58 @@ export const DJ_PAD_PRESETS: DJPreset[] = [
       throwQuantize: 'off',
     }),
   },
+
+  // ═══ New plate-specific dub kits (2026-04-20) ═══
+  // Tuned to the new MadProfessorPlate / DattorroPlate character. They
+  // use the same buildFullDubKit layout — the difference is entirely in
+  // the bus personality (HPF position, spring vs echo balance, sync
+  // division). Pair these with the matching plate in Master FX for the
+  // full voicing; the pads work standalone too.
+
+  {
+    id: 'mad-professor-desk',
+    name: 'Mad Professor Mix Desk',
+    description: 'Long dark PCM-70 dub plate — heavy echo into a wide cathedral tail. Pair with "Mad Professor Cathedral" or "Mad Professor Studio" in Master FX.',
+    create: () => buildFullDubKit('D-15', 'Mad Professor Desk'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 0.6,
+      hpfCutoff: 200,            // matches MadProfessorPlate pre-HPF
+      springWet: 0.30,           // let the plate carry the tail
+      echoIntensity: 0.72,       // long smoky repeats
+      echoWet: 0.78,
+      echoRateMs: 400,
+      echoSyncDivision: '1/8D',  // the dotted-eighth roots skank
+      sidechainAmount: 0.45,
+      deckTapAmount: 0.7,
+      throwBeats: 1.0,           // long throw into the plate
+      sirenFeedback: 0.85,
+      filterDropHz: 180,
+      throwQuantize: 'offbeat',
+    }),
+  },
+  {
+    id: 'dattorro-chamber',
+    name: 'Dattorro Plate Lab',
+    description: 'Metallic, resonant plate with bright short echo — Scientist-70s tank. Pair with "Dattorro Steel" or "Dattorro Infinite" in Master FX.',
+    create: () => buildFullDubKit('D-16', 'Dattorro Plate Lab'),
+    onApply: (store) => store.setDubBus({
+      enabled: true,
+      returnGain: 0.58,
+      hpfCutoff: 220,
+      springWet: 0.55,           // metallic resonance character
+      echoIntensity: 0.55,
+      echoWet: 0.60,
+      echoRateMs: 240,           // brighter, tighter
+      echoSyncDivision: '1/8',
+      sidechainAmount: 0.55,
+      deckTapAmount: 0.85,
+      throwBeats: 0.5,
+      sirenFeedback: 0.80,
+      filterDropHz: 220,
+      throwQuantize: '1/8',
+    }),
+  },
 ];
 
 /**
