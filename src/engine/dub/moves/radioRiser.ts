@@ -18,6 +18,7 @@ export const radioRiser: DubMove = {
     const startHz = params.startHz ?? this.defaults.startHz;
     const endHz = params.endHz ?? this.defaults.endHz;
     const level = params.level ?? this.defaults.level;
+    console.log(`[radioRiser] fired ${startHz}→${endHz}Hz over ${sweepSec}s lvl=${level}`);
     bus.fireRadioRiser(startHz, endHz, sweepSec, level);
     return null;
   },
