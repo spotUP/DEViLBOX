@@ -175,13 +175,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     );
 
   const handleFileSelect = useCallback(async (file: File, overrideCompanions?: File[]) => {
-    console.log(`[ImportModuleDialog.handleFileSelect] "${file.name}" size=${file.size}`);
     if (!isSupportedModule(file.name)) {
-      console.warn(`[ImportModuleDialog.handleFileSelect] REJECTED "${file.name}" — isSupportedModule returned false`);
       setError(`Unsupported file format. Supported: ${getSupportedExtensions().slice(0, 5).join(', ')}...`);
       return;
     }
-    console.log(`[ImportModuleDialog.handleFileSelect] accepted "${file.name}"`);
 
     // Determine which companions apply: explicit overrides take precedence over prop companions
     const companions = overrideCompanions ?? companionFilesRef.current;
