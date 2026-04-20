@@ -25,6 +25,7 @@ export const tapeStop: DubMove = {
   execute({ bus, params }) {
     const downSec = params.downSec ?? this.defaults.downSec;
     const holdSec = params.holdSec ?? this.defaults.holdSec;
+    console.log(`[tapeStop] fired downSec=${downSec} holdSec=${holdSec} (bus-only — dry mix unaffected)`);
     bus.tapeStop(downSec, holdSec);
     return null;
   },
