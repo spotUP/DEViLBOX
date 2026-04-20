@@ -96,9 +96,9 @@ describe('ui-smoke — flow 01: load + play a real MOD', () => {
   );
 });
 
-describe('ui-smoke — flow 07: DJ deck audio (end-to-end via pre-render pipeline)', () => {
+describe('ui-smoke — flow 07: DJ deck + crossfader sweep (both decks audible)', () => {
   it.runIf(!!client)(
-    'switch → DJ, load deck A (triggers pre-render), play, measure sustained audio',
+    'loads both decks, sweeps crossfader 0 → 1, both sides stay audible',
     async () => {
       const c = client!;
       try { await c.call('stop'); } catch { /* ok */ }
@@ -108,28 +108,45 @@ describe('ui-smoke — flow 07: DJ deck audio (end-to-end via pre-render pipelin
       await c.call('dj_vj_action', { action: 'switchView', args: { view: 'dj' } });
       await sleep(400);
 
+      // Same fixture on both decks — isolates crossfader math from per-track
+      // quirks. Each load triggers the pre-render pipeline (first one ~2 s,
+      // second hits the audio cache so ~instant).
       const payload = loadFixtureBase64(FIXTURE_MOD);
-      // Pre-render pipeline takes a few seconds for the first render —
-      // larger than other flows' load budget. Includes WAV render +
-      // analysis.
-      await c.call('dj_vj_action', {
-        action: 'loadDeck',
-        args: { side: 'A', filename: payload.filename, data: payload.data },
-      });
-      await sleep(400);
+      for (const side of ['A', 'B'] as const) {
+        await c.call('dj_vj_action', {
+          action: 'loadDeck',
+          args: { side, filename: payload.filename, data: payload.data },
+        });
+        await sleep(300);
+      }
 
-      await c.call('dj_vj_action', { action: 'setCrossfader', args: { value: 0 } });
       await c.call('dj_vj_action', { action: 'playDeck', args: { side: 'A' } });
-      await sleep(700);
+      await c.call('dj_vj_action', { action: 'playDeck', args: { side: 'B' } });
+      await sleep(500);
 
-      const level = await c.call<{ rmsAvg?: number; peakMax?: number; silent?: boolean }>(
-        'get_audio_level', { durationMs: 800 },
-      );
-      const diag = `level=${JSON.stringify(level)}`;
-      expect(level.silent, `DJ deck silent — pre-render / play-back path broken. ${diag}`).not.toBe(true);
-      expect((level.rmsAvg ?? 0), `DJ RMS at 0, expected >0.01. ${diag}`).toBeGreaterThan(0.01);
+      // Sweep: position 0 (full A), 0.5 (both), 1 (full B). All three must
+      // produce sustained audio — catches the "crossfader stalls at 0" /
+      // "pink-noise floor" regressions from the DJ fix log.
+      const peaks: Record<string, number> = {};
+      for (const xf of [0, 0.5, 1] as const) {
+        await c.call('dj_vj_action', { action: 'setCrossfader', args: { value: xf } });
+        await sleep(250);
+        const level = await c.call<{ rmsAvg?: number; peakMax?: number; silent?: boolean }>(
+          'get_audio_level', { durationMs: 500 },
+        );
+        peaks[`xf=${xf}`] = level.peakMax ?? 0;
+        expect(
+          level.silent,
+          `xf=${xf} went silent — pre-render or crossfader math broke. peaks: ${JSON.stringify(peaks)}`,
+        ).not.toBe(true);
+        expect(
+          (level.rmsAvg ?? 0),
+          `xf=${xf} RMS dropped below 0.01 — audible output missing. peaks: ${JSON.stringify(peaks)}`,
+        ).toBeGreaterThan(0.01);
+      }
 
       try { await c.call('dj_vj_action', { action: 'stopDeck', args: { side: 'A' } }); } catch { /* ok */ }
+      try { await c.call('dj_vj_action', { action: 'stopDeck', args: { side: 'B' } }); } catch { /* ok */ }
       await c.call('dj_vj_action', { action: 'switchView', args: { view: 'tracker' } });
       await sleep(200);
 
@@ -139,9 +156,10 @@ describe('ui-smoke — flow 07: DJ deck audio (end-to-end via pre-render pipelin
           e.level === 'error' &&
           !/favicon|devtools|WebSocket closed/i.test(e.message),
       );
-      expect(critical, `critical errors in DJ flow: ${JSON.stringify(critical)}`).toEqual([]);
+      expect(critical, `critical errors in DJ sweep: ${JSON.stringify(critical)}`).toEqual([]);
     },
-    // Larger timeout — pre-render adds seconds to load time.
+    // Pre-render takes ~2 s for the first load; cached re-render instant.
+    // Full sweep with sleeps budget ~6 s + render.
     120000,
   );
 });
