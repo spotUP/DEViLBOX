@@ -1111,7 +1111,12 @@ function App() {
                 }
               } catch (error) {
                 console.error('Failed to load tracker module:', error);
-                void showAlert({ title: 'Load Failed', message: 'Failed to load file' });
+                // Surface the actual reason (UADE dispatch error, missing
+                // companion, parser throw, etc.) instead of a flat
+                // "Failed to load file" — otherwise the user has no way
+                // to tell a companion 404 apart from a parse crash.
+                const reason = error instanceof Error ? error.message : String(error);
+                void showAlert({ title: 'Load Failed', message: `${filename}: ${reason}` });
               }
             }}
           />

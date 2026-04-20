@@ -12,6 +12,7 @@ import {
   getModlandFormats,
   downloadModlandFile,
   downloadTFMXCompanion,
+  downloadUADECompanions,
   getModlandStatus,
   type ModlandFile,
   type ModlandFormat,
@@ -800,20 +801,42 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     setError(null);
     try {
       let buffer: ArrayBuffer;
+      let companions: Map<string, ArrayBuffer> | undefined;
+
       if (item.source === 'hvsc') {
-        buffer = await downloadHVSCFile(item.key);
+        // HVSC SID files are single-file — no companions.
+        try {
+          buffer = await downloadHVSCFile(item.key);
+        } catch (fetchErr) {
+          throw new Error(`HVSC download failed: ${(fetchErr as Error).message}`);
+        }
       } else {
-        const [modBuffer, companion] = await Promise.all([
-          downloadModlandFile(item.key),
-          downloadTFMXCompanion(item.key),
+        // Modland: fetch main file, then look for every companion flavour
+        // UADE supports (TFMX smpl., Jason Page smp., MFP smp., Richard
+        // Joseph .ins, Startrekker AM .nt, Sonix .ss/.instr). Main file
+        // first so `downloadUADECompanions` can magic-byte-gate the
+        // Startrekker .nt probe without a blind 404 per MOD.
+        try {
+          buffer = await downloadModlandFile(item.key);
+        } catch (fetchErr) {
+          throw new Error(`Modland download failed: ${(fetchErr as Error).message}`);
+        }
+
+        // Parallel: broad UADE companion sweep + TFMX mdat/smpl pair.
+        // `downloadUADECompanions` doesn't handle mdat./smpl. (different
+        // basename transform), so we keep the dedicated TFMX call.
+        const [uadeCompanions, tfmx] = await Promise.all([
+          downloadUADECompanions(item.key, buffer).catch(() => []),
+          downloadTFMXCompanion(item.key).catch(() => null),
         ]);
-        buffer = modBuffer;
-        if (companion) {
-          const { UADEEngine } = await import('@engine/uade/UADEEngine');
-          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        const all = [...uadeCompanions];
+        if (tfmx) all.push(tfmx);
+        if (all.length > 0) {
+          companions = new Map(all.map((c) => [c.filename, c.buffer]));
         }
       }
-      await onLoadTrackerModule(buffer, item.filename);
+
+      await onLoadTrackerModule(buffer, item.filename, companions);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to download');
