@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
-import { exportPatternAsWav, exportSongAsWav, getUADEInstrument, exportUADEAsWav } from './audioExport';
+import { exportLiveCaptureToWav, exportUADEAsWav, getUADEInstrument } from './audioExport';
 
 type AudioExportScope = 'pattern' | 'song';
 
@@ -31,67 +31,96 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();
   const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>(initialScope || 'pattern');
+  // Option: unmute every channel during export so the WAV contains the
+  // whole mix even if the user is currently soloing one channel.
+  const [unmuteAll, setUnmuteAll] = useState<boolean>(true);
+  // Option: Shift-style "raw module render" — skip the live graph and
+  // render the underlying module file through the UADE offline renderer.
+  // Ignored if the song has no module data (pure DEViLBOX composition).
+  const [rawRender, setRawRender] = useState<boolean>(false);
+  // Refs so the handler closure (stored in parent-supplied `handlerRef`)
+  // always reads the freshest values without re-registering.
+  const unmuteAllRef = useRef(unmuteAll);
+  const rawRenderRef = useRef(rawRender);
+  useEffect(() => { unmuteAllRef.current = unmuteAll; }, [unmuteAll]);
+  useEffect(() => { rawRenderRef.current = rawRender; }, [rawRender]);
 
   useEffect(() => {
     if (initialScope) setAudioExportScope(initialScope);
   }, [initialScope]);
 
-  // Register export handler (assigned during render — always has fresh closure)
+  // Register export handler (assigned during render — always has fresh closure).
+  //
+  // All paths now go through `exportLiveCaptureToWav` — a real-time capture
+  // of the engine's master output post-FX. This is the only path that
+  // includes every synth (TB303/DB303/Furnace/UADE/Hively/libopenmpt/…),
+  // every per-instrument + per-channel + master effect, the user's mute/
+  // solo state, stereo separation, and every in-song tracker effect.
+  //
+  // For a raw-module render (ignore all user processing), hold Shift at
+  // export time — we'll route UADE-backed songs through the offline UADE
+  // renderer which bypasses the live graph.
   handlerRef.current = async () => {
     setIsRendering(true);
     setRenderProgress(0);
     try {
-      // Check if this is a UADE-backed module — render through UADE for accurate output
+      const baseName = metadata.name || 'song';
       const uadeInst = getUADEInstrument(instruments);
-      if (uadeInst?.uade?.fileData) {
-        // Module was loaded via UADE parser — use its stored fileData
+
+      // Shift-export → raw module render bypassing the live graph. Useful
+      // when the user wants the file "as shipped" without their mix.
+      const rawMode = rawRenderRef.current;
+
+      if (rawMode && uadeInst?.uade?.fileData) {
         await exportUADEAsWav(
           uadeInst.uade.fileData,
           uadeInst.uade.filename,
-          `${metadata.name || 'song'}.wav`,
+          `${baseName}.wav`,
           uadeInst.uade.currentSubsong ?? 0,
-          (progress) => setRenderProgress(progress)
+          (progress) => setRenderProgress(progress),
         );
-      } else if (originalModuleData?.base64) {
-        // Module was loaded via native parser but we have original bytes —
-        // render through UADE for accurate effects/mixing
+        return;
+      }
+      if (rawMode && originalModuleData?.base64) {
         const binaryStr = atob(originalModuleData.base64);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-        const fileData = bytes.buffer;
-        const sourceFilename = originalModuleData.sourceFile || `module.${originalModuleData.format.toLowerCase()}`;
+        const sourceFilename = originalModuleData.sourceFile ||
+          `module.${originalModuleData.format.toLowerCase()}`;
         await exportUADEAsWav(
-          fileData,
+          bytes.buffer,
           sourceFilename,
-          `${metadata.name || 'song'}.wav`,
+          `${baseName}.wav`,
           0,
-          (progress) => setRenderProgress(progress)
+          (progress) => setRenderProgress(progress),
         );
-      } else if (audioExportScope === 'song') {
-        // Export all patterns in sequence
-        const sequence = patterns.map((_, index) => index);
-        await exportSongAsWav(
-          patterns,
-          sequence,
-          instruments,
-          bpm,
-          `${metadata.name || 'song'}.wav`,
-          (progress) => setRenderProgress(progress)
-        );
-      } else {
-        // Export single pattern
+        return;
+      }
+
+      // Default path — live capture. Handles every song type uniformly.
+      if (audioExportScope === 'pattern') {
         const pattern = patterns[selectedPatternIndex];
         if (!pattern) {
           notify.warning('Please select a valid pattern');
           return false;
         }
-        await exportPatternAsWav(
-          pattern,
-          instruments,
-          bpm,
-          `${pattern.name || 'pattern'}.wav`,
-          (progress) => setRenderProgress(progress)
-        );
+        // Pattern-scope duration: rows × secondsPerRow + 2 s tail.
+        const secondsPerRow = (60 / bpm) * 0.25;
+        const durationSec = pattern.length * secondsPerRow + 2;
+        await exportLiveCaptureToWav({
+          durationSec,
+          unmuteAll: unmuteAllRef.current,
+          filename: `${pattern.name || 'pattern'}.wav`,
+          onProgress: (p) => setRenderProgress(p),
+        });
+      } else {
+        // Full song — let the helper estimate duration from transport +
+        // patterns.
+        await exportLiveCaptureToWav({
+          unmuteAll: unmuteAllRef.current,
+          filename: `${baseName}.wav`,
+          onProgress: (p) => setRenderProgress(p),
+        });
       }
     } finally {
       setIsRendering(false);
@@ -156,8 +185,33 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
           </div>
         )}
 
+        {/* Options */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-xs font-mono text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={unmuteAll}
+              onChange={(e) => setUnmuteAll(e.target.checked)}
+              disabled={isRendering}
+            />
+            <span>Unmute all channels for the render (ignores current mute/solo)</span>
+          </label>
+          <label className="flex items-center gap-2 text-xs font-mono text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rawRender}
+              onChange={(e) => setRawRender(e.target.checked)}
+              disabled={isRendering}
+            />
+            <span>Raw module render (skip user effects + mix, UADE-backed only)</span>
+          </label>
+        </div>
+
         <div className="text-sm font-mono text-text-secondary space-y-1">
           <div>Format: <span className="text-accent-primary">WAV (16-bit, 44.1kHz)</span></div>
+          <div>Method: <span className="text-accent-primary">
+            {rawRender ? 'Raw UADE offline' : 'Live capture (real-time)'}
+          </span></div>
           <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
           {audioExportScope === 'song' ? (
             <>
