@@ -127,6 +127,15 @@ import {
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132
 } from '@engine/keyboard/commands/djScratch';
 import {
+  dubEchoThrow, dubStab, dubChannelThrow, dubSpringSlam, dubSnareCrack,
+  dubDelayTimeThrow, dubBackwardReverb, dubTapeStop, dubTransportTapeStop,
+  dubReverseEcho, dubSonarPing, dubRadioRiser, dubSubSwell, dubEchoBuildUp,
+  dubDelayPreset380, dubDelayPresetDotted,
+  dubChannelMute, dubFilterDrop, dubSiren, dubTapeWobble, dubMasterDrop,
+  dubToast, dubTubbyScream, dubStereoDoubler, dubOscBass, dubCrushBass,
+  dubSubHarmonic, dubPanicReleaseAll,
+} from '@engine/keyboard/commands/dubMoves';
+import {
   trackerFaderCutOn, trackerFaderCutOff,
   trackerCrabOn, trackerCrabOff,
   trackerTransformerOn, trackerTransformerOff,
@@ -723,6 +732,38 @@ function initializeRegistry() {
     { name: 'dj_fader_lfo_18',   contexts: ['global'], handler: djFaderLFO18,   description: 'DJ Fader LFO: 1/8 note' },
     { name: 'dj_fader_lfo_116',  contexts: ['global'], handler: djFaderLFO116,  description: 'DJ Fader LFO: 1/16 note' },
     { name: 'dj_fader_lfo_132',  contexts: ['global'], handler: djFaderLFO132,  description: 'DJ Fader LFO: 1/32 note' },
+
+    // === DUB MOVES (trigger — fire once on press) ===
+    { name: 'dub_echo_throw',         contexts: ['global'], handler: dubEchoThrow,         description: 'Dub: Echo Throw' },
+    { name: 'dub_stab',               contexts: ['global'], handler: dubStab,              description: 'Dub: Stab' },
+    { name: 'dub_channel_throw',      contexts: ['global'], handler: dubChannelThrow,      description: 'Dub: Channel Throw' },
+    { name: 'dub_spring_slam',        contexts: ['global'], handler: dubSpringSlam,        description: 'Dub: Spring Slam' },
+    { name: 'dub_snare_crack',        contexts: ['global'], handler: dubSnareCrack,        description: 'Dub: Snare Crack' },
+    { name: 'dub_delay_time_throw',   contexts: ['global'], handler: dubDelayTimeThrow,    description: 'Dub: Delay Time Throw' },
+    { name: 'dub_backward_reverb',    contexts: ['global'], handler: dubBackwardReverb,    description: 'Dub: Backward Reverb' },
+    { name: 'dub_tape_stop',          contexts: ['global'], handler: dubTapeStop,          description: 'Dub: Tape Stop' },
+    { name: 'dub_transport_tape_stop', contexts: ['global'], handler: dubTransportTapeStop, description: 'Dub: Transport Tape Stop' },
+    { name: 'dub_reverse_echo',       contexts: ['global'], handler: dubReverseEcho,       description: 'Dub: Reverse Echo' },
+    { name: 'dub_sonar_ping',         contexts: ['global'], handler: dubSonarPing,         description: 'Dub: Sonar Ping' },
+    { name: 'dub_radio_riser',        contexts: ['global'], handler: dubRadioRiser,        description: 'Dub: Radio Riser' },
+    { name: 'dub_sub_swell',          contexts: ['global'], handler: dubSubSwell,          description: 'Dub: Sub Swell' },
+    { name: 'dub_echo_build_up',      contexts: ['global'], handler: dubEchoBuildUp,       description: 'Dub: Echo Build-Up' },
+    { name: 'dub_delay_preset_380',   contexts: ['global'], handler: dubDelayPreset380,    description: 'Dub: Delay Preset 380ms' },
+    { name: 'dub_delay_preset_dotted', contexts: ['global'], handler: dubDelayPresetDotted, description: 'Dub: Delay Preset Dotted' },
+
+    // === DUB MOVES (hold — fire on press, release on keyup) ===
+    { name: 'dub_channel_mute',   contexts: ['global'], handler: dubChannelMute,   releaseHandler: () => dubChannelMute(false),   description: 'Dub: Channel Mute (hold)' },
+    { name: 'dub_filter_drop',    contexts: ['global'], handler: dubFilterDrop,    releaseHandler: () => dubFilterDrop(false),    description: 'Dub: Filter Drop (hold)' },
+    { name: 'dub_siren',          contexts: ['global'], handler: dubSiren,         releaseHandler: () => dubSiren(false),         description: 'Dub: Siren (hold)' },
+    { name: 'dub_tape_wobble',    contexts: ['global'], handler: dubTapeWobble,    releaseHandler: () => dubTapeWobble(false),    description: 'Dub: Tape Wobble (hold)' },
+    { name: 'dub_master_drop',    contexts: ['global'], handler: dubMasterDrop,    releaseHandler: () => dubMasterDrop(false),    description: 'Dub: Master Drop (hold)' },
+    { name: 'dub_toast',          contexts: ['global'], handler: dubToast,         releaseHandler: () => dubToast(false),         description: 'Dub: Toast (hold)' },
+    { name: 'dub_tubby_scream',   contexts: ['global'], handler: dubTubbyScream,   releaseHandler: () => dubTubbyScream(false),   description: 'Dub: Tubby Scream (hold)' },
+    { name: 'dub_stereo_doubler', contexts: ['global'], handler: dubStereoDoubler, releaseHandler: () => dubStereoDoubler(false), description: 'Dub: Stereo Doubler (hold)' },
+    { name: 'dub_osc_bass',       contexts: ['global'], handler: dubOscBass,       releaseHandler: () => dubOscBass(false),       description: 'Dub: Osc Bass (hold)' },
+    { name: 'dub_crush_bass',     contexts: ['global'], handler: dubCrushBass,     releaseHandler: () => dubCrushBass(false),     description: 'Dub: Crush Bass (hold)' },
+    { name: 'dub_sub_harmonic',   contexts: ['global'], handler: dubSubHarmonic,   releaseHandler: () => dubSubHarmonic(false),   description: 'Dub: Sub Harmonic (hold)' },
+    { name: 'dub_panic',          contexts: ['global'], handler: dubPanicReleaseAll, description: 'Dub: Panic release all held' },
 
     // === TRACKER SCRATCH (works during tracker playback, no DJ mode needed) ===
     // Held-key commands (keydown triggers handler, keyup triggers releaseHandler)
