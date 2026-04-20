@@ -984,3 +984,87 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
     </div>
   );
 };
+
+// ============================================================================
+// MAD PROFESSOR PLATE EDITOR — MVerb + pre-HPF / post-LPF tuned for dub
+// ============================================================================
+
+export const MadProfessorPlateEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const decay    = getParam(effect, 'decay', 0.85);
+  const damping  = getParam(effect, 'damping', 0.75);
+  const density  = getParam(effect, 'density', 0.80);
+  const predelay = getParam(effect, 'predelay', 0.18);
+  const size     = getParam(effect, 'size', 0.70);
+  const hpfHz    = getParam(effect, 'hpfHz', 200);
+  const lpfHz    = getParam(effect, 'lpfHz', 5000);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  return (
+    <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#e0a800" />
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader size="lg" color="#e0a800" title="Plate" />
+        <div className="flex justify-around items-end flex-wrap gap-y-4">
+          <Knob value={decay}    min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)}    label="Decay"   color="#e0a800" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={size}     min={0} max={1} onChange={(v) => onUpdateParameter('size', v)}     label="Size"    color="#e0a800" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={damping}  min={0} max={1} onChange={(v) => onUpdateParameter('damping', v)}  label="Damp"    color="#f0c040" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={density}  min={0} max={1} onChange={(v) => onUpdateParameter('density', v)}  label="Density" color="#f0c040" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={predelay} min={0} max={1} onChange={(v) => onUpdateParameter('predelay', v)} label="Pre-Dly" color="#f0c040" formatValue={(v) => `${Math.round(v * 250)}ms`} />
+        </div>
+      </section>
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader size="lg" color="#b08000" title="Voicing (PCM-70)" />
+        <div className="flex justify-around items-end flex-wrap gap-y-4">
+          <Knob value={hpfHz} min={40}  max={800}   onChange={(v) => onUpdateParameter('hpfHz', v)} label="HPF In"  color="#b08000" formatValue={(v) => `${Math.round(v)}Hz`} />
+          <Knob value={lpfHz} min={1500} max={16000} onChange={(v) => onUpdateParameter('lpfHz', v)} label="LPF Out" color="#b08000" formatValue={(v) => `${Math.round(v / 100) / 10}kHz`} />
+          <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet} label="Wet" color="#ffd700" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// ============================================================================
+// DATTORRO PLATE EDITOR — Jon Dattorro 1997 plate (el-visio/dattorro-verb)
+// ============================================================================
+
+export const DattorroPlateEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const predelay       = getParam(effect, 'predelay', 0.15);
+  const preFilter      = getParam(effect, 'preFilter', 0.70);
+  const inputDiffusion = getParam(effect, 'inputDiffusion', 0.75);
+  const decayDiffusion = getParam(effect, 'decayDiffusion', 0.50);
+  const decay          = getParam(effect, 'decay', 0.85);
+  const damping        = getParam(effect, 'damping', 0.35);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  return (
+    <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#10b981" />
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader size="lg" color="#10b981" title="Tank" />
+        <div className="flex justify-around items-end flex-wrap gap-y-4">
+          <Knob value={decay}    min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)}    label="Decay"   color="#10b981" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={damping}  min={0} max={1} onChange={(v) => onUpdateParameter('damping', v)}  label="Damp"    color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={predelay} min={0} max={1} onChange={(v) => onUpdateParameter('predelay', v)} label="Pre-Dly" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}ms`} />
+        </div>
+      </section>
+      <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader size="lg" color="#059669" title="Diffusion" />
+        <div className="flex justify-around items-end flex-wrap gap-y-4">
+          <Knob value={inputDiffusion} min={0} max={1} onChange={(v) => onUpdateParameter('inputDiffusion', v)} label="Input Diff"  color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={decayDiffusion} min={0} max={1} onChange={(v) => onUpdateParameter('decayDiffusion', v)} label="Tank Diff"   color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={preFilter}      min={0} max={1} onChange={(v) => onUpdateParameter('preFilter', v)}      label="Pre-Filter"  color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet} label="Wet" color="#6ee7b7" formatValue={(v) => `${Math.round(v)}%`} />
+        </div>
+      </section>
+    </div>
+  );
+};

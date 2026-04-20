@@ -94,6 +94,15 @@ export interface EffectConfig {
   // When set, the effect is applied via a dedicated send bus to only
   // the selected channels instead of the full master chain.
   selectedChannels?: number[];
+
+  // DJ master-chain bass-lock: when true, the effect is inserted on a
+  // high-pass split at ~150 Hz and the low end bypasses the effect
+  // entirely (keeps the bassline clean while phaser/reverb/delay
+  // processes the mids/highs only). When false, effect processes full
+  // spectrum. When undefined, falls back to a per-type default (see
+  // `getDefaultBassLock` in bassLockDefaults.ts — true for reverbs /
+  // delays / phasers, false for distortion/compression/EQ).
+  bassLock?: boolean;
 }
 
 /** Per-effect parameter preset (factory or user-saved) */
