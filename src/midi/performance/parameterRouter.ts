@@ -72,6 +72,7 @@ type ParameterRoute = ConfigRoute | VSTBridgeRoute | EffectRoute | ChannelFilter
  * plain `dub.<moveId>` form.
  */
 const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
+  // ── Phase 1 moves (original set) ──
   echoThrow:         'trigger',
   dubStab:           'trigger',
   channelThrow:      'trigger',
@@ -87,6 +88,19 @@ const DUB_MOVE_KINDS: Record<string, 'trigger' | 'hold'> = {
   tapeStop:          'trigger',
   transportTapeStop: 'trigger',
   toast:             'hold',
+  // ── PR #42 moves — kind matches move file (hold = startXxx returns a disposer) ──
+  tubbyScream:       'hold',   // bus.startTubbyScream(...)
+  stereoDoubler:     'hold',   // bus.startStereoDoubler(...)
+  reverseEcho:       'trigger', // bus.reverseEcho(durationSec, amount)
+  sonarPing:         'trigger', // bus.firePing(...)
+  radioRiser:        'trigger', // bus.fireRadioRiser(...)
+  subSwell:          'trigger', // bus.fireSubSwell(...)
+  oscBass:           'hold',   // bus.startOscBass(...)
+  crushBass:         'hold',   // bus.startCrushBass(...)
+  subHarmonic:       'hold',   // bus.startSubHarmonic(...)
+  echoBuildUp:       'trigger', // mixer dubSend envelope (no dispose)
+  delayPreset380:    'trigger', // bus.setEchoRate(...) one-shot
+  delayPresetDotted: 'trigger', // bus.setEchoRate(...) one-shot
 };
 
 /**
